@@ -124,7 +124,7 @@ td .n{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-left
   <main class="main">
     <div class="tabs"><div class="tab on">Overview</div><div class="tab">About</div></div>
     <h2 class="viewhead">End-to-end accuracy — BLIS vs InferenceX</h2>
-    <p class="dek">Every number is a full <b>blis replay</b> through the whole stack, scored against the pinned weekly InferenceX dump. Two tables, like AISimulate's Overview: a <b>summary</b> drill-down (model → workload → GPU → topology), and a <b>points</b> table for the selected row (measured vs predicted per concurrency). No pass/fail colouring — report, don't assert.</p>
+    <p class="dek">Every number is a full <b>blis replay</b> through the whole stack, scored against the pinned weekly InferenceX dump. Two tables: a <b>summary</b> drill-down (model → workload → GPU → topology), and a <b>points</b> table for the selected row (measured vs predicted per concurrency). No pass/fail colouring — report, don't assert.</p>
 
     <div class="chips">
       <span class="toggle"><span class="sw"><span class="dot"></span></span>multi-node</span>
@@ -214,7 +214,7 @@ td .n{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-left
       </table>
     </div>
 
-    <!-- ============ TABLE 2: POINTS (leaf), AISimulate-style measured vs predicted ============ -->
+    <!-- ============ TABLE 2: POINTS (leaf), measured vs predicted ============ -->
     <div class="tbl-title" style="margin-top:26px">Points — MiniMax-M3 › 1k/1k › H200 › tp8·ep8·pp1 vllm <span class="ver">v0.31.0</span> <span class="facet">measured vs predicted per concurrency, absolute units · error %</span></div>
     <div class="tscroll">
       <table class="readout pts">
@@ -278,7 +278,7 @@ td .n{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-left
       <span><b>mape</b> absolute · <b>shape</b> curvature · <b>Tail p99</b> MAPE only (no shape)</span>
     </div>
 
-    <p class="foot">Numbers are illustrative placeholders for layout only. Two tables mirror AISimulate's Overview: a <b>summary</b> drill-down (model → workload → GPU → topology) carrying per-row coverage, and a <b>points</b> table for the selected row showing measured vs predicted per concurrency. Mean TTFT/TPOT/E2E report MAPE <i>and</i> shape; <b>Tail p99 reports MAPE only</b> (stated in the column header). Throughput MAPE is per-GPU-normalised. vLLM version is a per-row badge + filter, not a group. No quality filtering — every measured point is scored; multi-node is a toggle (off by default). <b>Selecting a topology row in the summary populates the points table below it</b> (and deep-links via the URL).</p>
+    <p class="foot">Numbers are illustrative placeholders for layout only. Two tables: a <b>summary</b> drill-down (model → workload → GPU → topology) carrying per-row coverage, and a <b>points</b> table for the selected row showing measured vs predicted per concurrency. Mean TTFT/TPOT/E2E report MAPE <i>and</i> shape; <b>Tail p99 reports MAPE only</b> (stated in the column header). Throughput MAPE is per-GPU-normalised. vLLM version is a per-row badge + filter, not a group. No quality filtering — every measured point is scored; multi-node is a toggle (off by default). <b>Selecting a topology row in the summary populates the points table below it</b> (and deep-links via the URL).</p>
   </main>
 </div>
 </body>
