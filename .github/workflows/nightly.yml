@@ -15,6 +15,15 @@ on:
         description: "Skip the 34GB dump restore; use a staged corpus (ci-verify proof)"
         type: boolean
         default: false
+  # ci-verify branches run the full pipeline in budget mode on push, so the machinery is proven
+  # green without the 34GB dump (schedule/workflow_dispatch only register on the default branch).
+  # paths-ignore stops the publish commit (which writes data/ + state/) from re-triggering a run.
+  push:
+    branches:
+      - "ci-verify/**"
+    paths-ignore:
+      - "data/**"
+      - "state/**"
 
 permissions:
   contents: write # commit the snapshot to the Pages-served branch
@@ -31,8 +40,17 @@ jobs:
       changed: ${{ steps.diff.outputs.changed }}
       blis_tag: ${{ steps.resolve.outputs.blis_tag }}
       ix_tag: ${{ steps.resolve.outputs.ix_tag }}
+      budget: ${{ steps.mode.outputs.budget }}
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve run mode (budget on ci-verify push or explicit input)
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.budget_mode }}" = "true" ]; then
+            echo "budget=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "budget=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Resolve both inputs live (never hardcoded)
         id: resolve
         env:
@@ -48,7 +66,7 @@ jobs:
   # ---------------------------------------------------------------- 2. evaluate (heavy)
   evaluate:
     needs: detect-diff
-    if: ${{ needs.detect-diff.outputs.changed == 'true' || inputs.force || inputs.budget_mode }}
+    if: ${{ needs.detect-diff.outputs.changed == 'true' || inputs.force || needs.detect-diff.outputs.budget == 'true' }}
     # Hosted runner for diff/build/publish. The dump restore (~34GB) does NOT fit a hosted
     # runner's disk (RFC D3) — in a real nightly run the evaluate job must target a larger
     # self-hosted runner (set `runs-on: [self-hosted, blis-eval]`). The budget_mode path below
@@ -70,7 +88,7 @@ jobs:
         run: pip install --quiet jsonschema
 
       - name: Pre-flight — dump restore budget (RFC D3)
-        if: ${{ !inputs.budget_mode }}
+        if: ${{ needs.detect-diff.outputs.budget != 'true' }}
         run: |
           echo "::group::disk budget"
           df -h / | tee /tmp/df.txt
@@ -88,7 +106,7 @@ jobs:
           fi
 
       - name: Stage a corpus for budget mode (ci-verify proof, no 34GB dump)
-        if: ${{ inputs.budget_mode }}
+        if: ${{ needs.detect-diff.outputs.budget == 'true' }}
         env:
           BLIS_TAG: ${{ needs.detect-diff.outputs.blis_tag }}
         run: bash orchestrator/stage_budget_corpus.sh
@@ -98,7 +116,7 @@ jobs:
           BLIS_TAG: ${{ needs.detect-diff.outputs.blis_tag }}
           IX_TAG: ${{ needs.detect-diff.outputs.ix_tag }}
           GH_TOKEN: ${{ github.token }}
-          SKIP_INGEST: ${{ inputs.budget_mode && '1' || '0' }}
+          SKIP_INGEST: ${{ needs.detect-diff.outputs.budget == 'true' && '1' || '0' }}
           DASH_DIR: ${{ github.workspace }}
           WORK: ${{ github.workspace }}/.work
           SNAPSHOT_DATE: ${{ needs.detect-diff.outputs.ix_tag }}
@@ -179,5 +197,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/latest/summary.json "data/snapshots/${snap_id}/summary.json" state/last-run.json
-          git commit -m "nightly: ${snap_id}" || { echo "nothing to commit"; exit 0; }
+          git commit -m "nightly: ${snap_id} [skip ci]" || { echo "nothing to commit"; exit 0; }
           git push

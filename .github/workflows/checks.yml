@@ -44,15 +44,17 @@ jobs:
       - name: No AISimulate / AIConfigurator / AIC in shipped code, config or data (RFC C1)
         run: |
           # The RFC + mockup legitimately reference the inspiration as prior art; the DASHBOARD's
-          # shipped surface must be clean. Scan authored code/config/data, not the spec docs.
-          if grep -rniE 'aisimulate|aiconfigurator|\baic\b' \
+          # shipped surface must be clean. Scan authored code/config/data, not the spec docs and
+          # not this guard's own pattern (the workflows carry the term only to forbid it).
+          hits=$(grep -rniE 'aisimulate|aiconfigurator|\baic\b' \
                --include='*.ts' --include='*.tsx' --include='*.py' --include='*.sh' \
-               --include='*.mjs' --include='*.json' --include='*.yml' --include='*.yaml' \
-               --include='*.css' --include='*.html' \
-               orchestrator web/src web/*.mjs web/package.json web/vite.config.ts \
-               schemas state .github data 2>/dev/null \
-             | grep -v node_modules | grep -v package-lock; then
+               --include='*.mjs' --include='*.json' --include='*.css' --include='*.html' \
+               orchestrator web/src web/browser_smoke.mjs web/package.json web/vite.config.ts \
+               schemas state data 2>/dev/null \
+             | grep -v node_modules | grep -v package-lock || true)
+          if [ -n "$hits" ]; then
             echo "::error::forbidden term found in shipped surface (RFC C1)"
+            echo "$hits"
             exit 1
           fi
           echo "grep-clean: no forbidden terms in the shipped surface"
