@@ -71,6 +71,7 @@ tr:hover td{background:#fbfdfa}
 .grouphdr td{background:var(--alt-bg);color:var(--alt-ink);font-weight:600;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;padding:6px 11px;border-bottom:1px solid var(--alt-line)}
 .coverage{margin-top:14px;font-size:12px;color:var(--muted);display:flex;gap:20px;flex-wrap:wrap}
 .coverage b{color:var(--ink);font-family:var(--font-mono);font-weight:600}
+.coverage .nscov{font-family:var(--font-sans);font-size:11px;color:var(--muted)}
 .foot{margin-top:22px;font-size:11.5px;color:var(--muted);max-width:860px;line-height:1.55}
 .legend{margin-top:10px;font-size:11px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
 .legend span .ver{margin-left:0}
@@ -189,8 +190,7 @@ tr:hover td{background:#fbfdfa}
 
     <div class="coverage">
       <span>scored <b>410</b></span>
-      <span>unsupported <b>44</b></span>
-      <span>no-scenario <b>12</b></span>
+      <span>not scored <b>56</b> <span class="nscov">(no BLIS scenario — model/hardware not in catalog, or engine BLIS can't model)</span></span>
       <span>multi-node <b>31</b> (hidden)</span>
       <span>failed <b>0</b></span>
       <span>noise floor (per-row) <b>~2.3%</b></span>
