@@ -57,6 +57,21 @@ The real numbers come from CI (`orchestrator/evaluate.sh`), which needs a restor
 dump; both inputs are resolved live. `budget_mode` runs the full pipeline on a hosted runner
 against a small staged corpus (no 34 GB dump) to prove the machinery end to end.
 
+## Deployment (GitHub Pages, one branch — RFC §4.2)
+
+The built site is self-contained: `web/` copies `data/latest/summary.json` into the bundle, so
+`vite build` emits a `dist/` carrying the SPA **and** its data. For production, enable GitHub
+Pages once (Settings → Pages) — no server, no container, no RITS/OpenShift. The nightly `publish`
+job commits the fresh snapshot to that same branch; a failed/partial run publishes nothing and
+the prior snapshot stands.
+
+The runner-budget reality (RFC D3): the InferenceX dump is ~34 GB compressed and does **not** fit
+a hosted runner's disk, so a real nightly run targets a **self-hosted `evaluate`** runner
+(`runs-on: [self-hosted, blis-eval]`, ≥120 GB disk) while `detect-diff` and `publish` stay hosted;
+the pre-flight step STOPs loudly and keeps the prior snapshot if the budget isn't met. The
+`ci-verify.yml` workflow proves the whole pipeline on a hosted runner in **budget mode** (a small
+real staged corpus, no dump).
+
 ## Metrics & scope (v0.1.0)
 
 - **In:** mean **TTFT** and **TPOT**, each **MAPE** (absolute level error) and **shape**
