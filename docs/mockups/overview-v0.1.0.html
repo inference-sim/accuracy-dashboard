@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+:root{
+  --paper:#f7f9f6; --panel:#fff; --ink:#171c1a; --muted:#5b6660;
+  --line:#e3e7df; --line-strong:#c3ccbf; --accent:#1f6e5c; --accent-ink:#0f4438;
+  --accent-soft:#d9e9e1; --warn-ink:#7a4a12; --warn-bg:#f3e3c9; --warn-line:#d8b984;
+  --alt-ink:#34366e; --alt-bg:#dcdcf0; --alt-line:#7679c4;
+  --font-sans:'IBM Plex Sans',-apple-system,'Segoe UI',system-ui,sans-serif;
+  --font-mono:'IBM Plex Mono','SFMono-Regular',ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.layout{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+/* ---- sidebar rail (leaderboard pattern) ---- */
+.rail{border-right:1px solid var(--line);padding:28px 22px;background:var(--panel)}
+.rail h1{font-size:19px;font-weight:700;letter-spacing:-0.01em;margin:0 0 2px}
+.rail .sub{color:var(--muted);font-size:12.5px;margin:0 0 24px;line-height:1.45}
+.rail .seclabel{font-size:10.5px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin:22px 0 8px}
+.rail .kv{font-size:12.5px;margin:6px 0;display:flex;justify-content:space-between;gap:8px}
+.rail .kv .k{color:var(--muted)}
+.rail .kv .v{font-family:var(--font-mono);color:var(--ink);font-weight:500}
+.rail .pill{display:inline-block;font-family:var(--font-mono);font-size:11px;padding:2px 7px;border-radius:3px;background:var(--accent-soft);color:var(--accent-ink);border:1px solid var(--accent)}
+.rail a{color:var(--accent);text-decoration:none;font-size:12.5px}
+.dl{margin-top:18px;display:inline-block;font-size:12px;font-family:var(--font-mono);border:1px solid var(--line-strong);padding:5px 10px;border-radius:4px;color:var(--accent-ink);text-decoration:none}
+/* ---- main ---- */
+.main{padding:34px 40px 60px;max-width:1180px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:22px}
+.tab{padding:8px 14px;font-size:13.5px;color:var(--muted);border-bottom:2px solid transparent;cursor:default}
+.tab.on{color:var(--accent-ink);border-bottom-color:var(--accent);font-weight:600}
+h2.viewhead{margin:0 0 6px;font-size:22px;font-weight:600;letter-spacing:-0.01em}
+.dek{color:var(--muted);font-size:14px;margin:0 0 22px;max-width:760px}
+.dek b{color:var(--ink)}
+/* ---- scope chips ---- */
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;align-items:center}
+.chip{font-size:11.5px;font-family:var(--font-mono);padding:3px 9px;border-radius:12px;border:1px solid var(--line-strong);color:var(--muted);background:var(--panel)}
+.chip.off{text-decoration:line-through;opacity:.65}
+.chip.grp{border-color:var(--alt-line);color:var(--alt-ink);background:var(--alt-bg)}
+/* ---- table ---- */
+.tscroll{border:1px solid var(--line-strong);border-radius:6px;overflow:hidden;background:var(--panel)}
+table.readout{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--panel)}
+table.readout th,table.readout td{padding:8px 11px;text-align:left;vertical-align:middle;border-bottom:1px solid var(--line);white-space:nowrap}
+thead tr.grp th{padding:9px 11px 4px;font-size:10.5px;font-weight:600;color:var(--muted);letter-spacing:0.03em;text-transform:uppercase;border-bottom:none;background:#eef1ec}
+thead tr.grp th.sep{border-left:1px solid var(--line-strong)}
+thead tr.col th{padding:4px 11px 8px;font-weight:600;font-size:11.5px;background:var(--panel);border-bottom:2px solid var(--line-strong);color:var(--ink)}
+thead tr.col th.sep{border-left:1px solid var(--line-strong)}
+thead tr.col th .arrow{color:var(--accent);font-size:10px}
+td.sep{border-left:1px solid var(--line)}
+.mono{font-family:var(--font-mono)}
+td .num{font-family:var(--font-mono);font-weight:500}
+td .n{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);margin-left:3px}
+.dep .m{font-weight:600}
+.dep .cfg{color:var(--muted);font-size:11px;font-family:var(--font-mono)}
+tr:hover td{background:#fbfdfa}
+.tier-mr{background:#fcfdfb}
+.tier-all{color:var(--muted)}
+.noise{font-size:10px;color:var(--muted);font-family:var(--font-mono)}
+.ver{display:inline-block;font-size:10px;font-family:var(--font-mono);padding:1px 5px;border-radius:3px;background:var(--accent-soft);color:var(--accent-ink);border:1px solid var(--accent);margin-left:4px}
+.ver.off{background:var(--warn-bg);color:var(--warn-ink);border-color:var(--warn-line)}
+.dotted{border-bottom:1px dotted var(--muted)}
+.grouphdr td{background:var(--alt-bg);color:var(--alt-ink);font-weight:600;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;padding:6px 11px;border-bottom:1px solid var(--alt-line)}
+.coverage{margin-top:14px;font-size:12px;color:var(--muted);display:flex;gap:20px;flex-wrap:wrap}
+.coverage b{color:var(--ink);font-family:var(--font-mono);font-weight:600}
+.foot{margin-top:22px;font-size:11.5px;color:var(--muted);max-width:860px;line-height:1.55}
+.legend{margin-top:10px;font-size:11px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+.legend span .ver{margin-left:0}
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- SIDEBAR / PROVENANCE RAIL (leaderboard) -->
+  <aside class="rail">
+    <h1>BLIS Accuracy</h1>
+    <p class="sub">How accurately BLIS predicts real inference latency, scored nightly against SemiAnalysis InferenceX.</p>
+
+    <div class="seclabel">BLIS release (CI-resolved)</div>
+    <span class="pill">v0.10.0</span>
+    <div class="kv" style="margin-top:10px"><span class="k">image</span><span class="v">sha256:4c1a…</span></div>
+    <div class="kv"><span class="k">catalog</span><span class="v">0.2.1</span></div>
+    <div class="kv"><span class="k">kernel</span><span class="v">v0.1.0</span></div>
+
+    <div class="seclabel">Ground truth</div>
+    <div class="kv"><span class="k">source</span><span class="v">InferenceX</span></div>
+    <div class="kv"><span class="k">dump</span><span class="v">2026-09-28</span></div>
+    <div class="kv"><span class="k">through</span><span class="v">2026-09-27</span></div>
+    <div class="kv"><span class="k">sha256</span><span class="v">9125257c…</span></div>
+
+    <div class="seclabel">Run</div>
+    <div class="kv"><span class="k">snapshot</span><span class="v">10-15</span></div>
+    <div class="kv"><span class="k">last ok</span><span class="v">06:17 UTC</span></div>
+    <a class="dl" href="#">⤓ summary.json</a>
+    <div style="margin-top:18px"><a href="#">↗ inference-sim/accuracy-dashboard</a></div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="tabs">
+      <div class="tab on">Overview</div>
+      <div class="tab">About</div>
+    </div>
+
+    <h2 class="viewhead">End-to-end accuracy — BLIS vs InferenceX</h2>
+    <p class="dek">Every number is a full <b>blis replay</b> through the whole stack (router → scheduler → batch → kernel), scored against the pinned weekly InferenceX dump. Two tiers shown side by side: <b>measured-or-resolved</b> (apples-to-apples) and <b>all</b> (approximate). No pass/fail colouring — report, don't assert.</p>
+
+    <div class="chips">
+      <span class="chip off">multi-node</span>
+      <span class="chip off">bad-silicon</span>
+      <span class="chip off">outliers</span>
+      <span class="chip grp">headline: on-target vLLM v0.31.0</span>
+      <span class="chip grp">+ off-version / retired below</span>
+    </div>
+
+    <div class="tscroll">
+      <table class="readout">
+        <thead>
+          <tr class="grp">
+            <th rowspan="2" style="vertical-align:bottom">Deployment</th>
+            <th rowspan="2" style="vertical-align:bottom">pts</th>
+            <th class="sep" colspan="3">TTFT &nbsp;mape · shape</th>
+            <th class="sep" colspan="3">TPOT &nbsp;mape · shape</th>
+            <th class="sep" colspan="2">E2E</th>
+            <th class="sep" colspan="2">Tail p99</th>
+            <th class="sep">Tput</th>
+          </tr>
+          <tr class="col">
+            <th class="sep">M·R <span class="arrow">▲</span></th><th>all</th><th>shape</th>
+            <th class="sep">M·R</th><th>all</th><th>shape</th>
+            <th class="sep">M·R</th><th>all</th>
+            <th class="sep">ttft</th><th>tpot</th>
+            <th class="sep">tok/s</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- HEADLINE GROUP -->
+          <tr><td class="dep"><span class="m">MiniMax-M3</span> · H200 · tp8<span class="ver">v0.31.0</span><div class="cfg">MXFP8 · 1k/1k</div></td>
+            <td class="mono">24</td>
+            <td class="sep"><span class="num">18.9%</span><span class="n">20</span></td><td class="tier-all"><span class="num">22.1%</span><span class="n">24</span></td><td><span class="num">9.4%</span></td>
+            <td class="sep"><span class="num">14.2%</span><span class="n">20</span></td><td class="tier-all"><span class="num">16.0%</span><span class="n">24</span></td><td><span class="num">1.8%</span></td>
+            <td class="sep"><span class="num">12.7%</span></td><td class="tier-all"><span class="num">14.1%</span></td>
+            <td class="sep"><span class="num">31.0%</span><span class="n">12</span></td><td><span class="num">6.1%</span></td>
+            <td class="sep"><span class="num">8.3%</span></td></tr>
+
+          <tr><td class="dep"><span class="m">DeepSeek-V4-Pro</span> · H200 · tp8<span class="ver">v0.31.0</span><div class="cfg">FP8 · 8k/1k</div></td>
+            <td class="mono">21</td>
+            <td class="sep"><span class="num">22.4%</span><span class="n">18</span></td><td class="tier-all"><span class="num">24.0%</span><span class="n">21</span></td><td><span class="num">11.8%</span></td>
+            <td class="sep"><span class="num">15.1%</span><span class="n">18</span></td><td class="tier-all"><span class="num">17.3%</span><span class="n">21</span></td><td><span class="num">2.1%</span></td>
+            <td class="sep"><span class="num">13.9%</span></td><td class="tier-all"><span class="num">15.4%</span></td>
+            <td class="sep"><span class="num">44.1%</span><span class="n">9</span></td><td><span class="num">7.4%</span></td>
+            <td class="sep"><span class="num">9.6%</span></td></tr>
+
+          <tr><td class="dep"><span class="m">gpt-oss-120b</span> · H100 · tp4<span class="ver">v0.31.0</span><div class="cfg">FP8 · 1k/1k</div></td>
+            <td class="mono">18</td>
+            <td class="sep"><span class="num">16.1%</span><span class="n">16</span></td><td class="tier-all"><span class="num">17.9%</span><span class="n">18</span></td><td><span class="num">7.7%</span></td>
+            <td class="sep"><span class="num">12.8%</span><span class="n">16</span></td><td class="tier-all"><span class="num">13.6%</span><span class="n">18</span></td><td><span class="num">1.4%</span></td>
+            <td class="sep"><span class="num">11.0%</span></td><td class="tier-all"><span class="num">12.2%</span></td>
+            <td class="sep"><span class="num">28.4%</span><span class="n">10</span></td><td><span class="num">5.5%</span></td>
+            <td class="sep"><span class="num">7.1%</span></td></tr>
+
+          <tr><td class="dep"><span class="m">GLM-5</span> · B200 · tp8<span class="ver">v0.31.0</span><div class="cfg">FP4 · 1k/8k</div></td>
+            <td class="mono">15</td>
+            <td class="sep"><span class="num">20.2%</span><span class="n">14</span></td><td class="tier-all"><span class="num">21.5%</span><span class="n">15</span></td><td><span class="num">10.1%</span></td>
+            <td class="sep"><span class="num">13.5%</span><span class="n">14</span></td><td class="tier-all"><span class="num">14.8%</span><span class="n">15</span></td><td><span class="num">1.9%</span></td>
+            <td class="sep"><span class="num">12.1%</span></td><td class="tier-all"><span class="num">13.3%</span></td>
+            <td class="sep"><span class="num">33.7%</span><span class="n">8</span></td><td><span class="num">6.6%</span></td>
+            <td class="sep"><span class="num">8.9%</span></td></tr>
+
+          <!-- OFF-VERSION / RETIRED GROUP -->
+          <tr class="grouphdr"><td colspan="13">Off-version / retired models — excluded from headline (older vLLM than BLIS's target; shown for context)</td></tr>
+
+          <tr class="tier-all"><td class="dep"><span class="m">Llama-3.1-70B-Instruct</span> · H200 · tp2<span class="ver off">v0.29.0</span><div class="cfg">FP8 · 1k/1k · <span class="dotted">retired 2025-10-29</span></div></td>
+            <td class="mono">12</td>
+            <td class="sep"><span class="num">—</span></td><td><span class="num">41.3%</span><span class="n">12</span></td><td><span class="num">18.2%</span></td>
+            <td class="sep"><span class="num">—</span></td><td><span class="num">26.7%</span><span class="n">12</span></td><td><span class="num">3.4%</span></td>
+            <td class="sep"><span class="num">—</span></td><td><span class="num">22.9%</span></td>
+            <td class="sep"><span class="num">—</span></td><td><span class="num">—</span></td>
+            <td class="sep"><span class="num">13.2%</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="coverage">
+      <span>scored <b>410</b></span>
+      <span>unsupported <b>44</b></span>
+      <span>no-scenario <b>12</b></span>
+      <span>removed · outliers <b>7</b> · bad-silicon <b>3</b></span>
+      <span>failed <b>0</b></span>
+      <span>noise floor (per-row) <b>~2.3%</b></span>
+    </div>
+
+    <div class="legend">
+      <span><span class="ver">v0.31.0</span> on BLIS's target vLLM — counts toward headline</span>
+      <span><span class="ver off">v0.29.0</span> off-version — context only</span>
+      <span><b>M·R</b> measured-or-resolved tier · <b>all</b> approximate · <span class="n" style="margin:0">ⁿ</span> point count per metric</span>
+    </div>
+
+    <p class="foot">Numbers are illustrative placeholders for layout only. Scope: single-node, single_turn sweeps with ≥3 concurrencies; multi-node, bad-silicon and outliers are removed before scoring by a measured-data-only rule (never BLIS's error). “same-points Δ vs previous snapshot” appears on hover per cell (the honest “did this release move accuracy?” number, point-set change held out). A failed or partial nightly run publishes nothing and leaves the previous snapshot in place.</p>
+  </main>
+</div>
+</body>
+</html>
