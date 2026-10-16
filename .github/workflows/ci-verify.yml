@@ -1,0 +1,153 @@
+name: ci-verify
+
+# Proves the nightly pipeline END TO END on a hosted runner WITHOUT the 34GB dump (RFC D1/D3),
+# via budget mode: build blis+signedprobe+metricscore from source at the live-resolved tag,
+# stage a small REAL corpus, run signedprobe per point, shape → schema-validate → headless +
+# browser render → publish. Same jobs as nightly.yml, minus the `schedule` trigger (GitHub only
+# registers scheduled workflows from the default branch). Runs on push to ci-verify/** and on
+# demand. Delete this workflow when the pipeline merges to the default branch; nightly.yml then
+# carries the schedule.
+on:
+  push:
+    branches:
+      - "ci-verify/**"
+    paths-ignore:
+      - "data/**"
+      - "state/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-verify-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  detect-diff:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+      blis_tag: ${{ steps.resolve.outputs.blis_tag }}
+      ix_tag: ${{ steps.resolve.outputs.ix_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve both inputs live (never hardcoded) — RFC A2
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash orchestrator/resolve_inputs.sh
+      - name: Diff against state/last-run.json — RFC §4.6
+        id: diff
+        env:
+          BLIS_TAG: ${{ steps.resolve.outputs.blis_tag }}
+          IX_TAG: ${{ steps.resolve.outputs.ix_tag }}
+        run: bash orchestrator/detect_diff.sh
+
+  evaluate:
+    needs: detect-diff
+    # Always run in ci-verify so the proof produces a snapshot; the real nightly gates on `changed`.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install --quiet jsonschema
+
+      - name: Stage a small REAL corpus (budget mode — no 34GB dump, RFC D3)
+        env:
+          BLIS_TAG: ${{ needs.detect-diff.outputs.blis_tag }}
+          WORK: ${{ github.workspace }}/.work
+          DASH_DIR: ${{ github.workspace }}
+        run: bash orchestrator/stage_budget_corpus.sh
+
+      - name: Evaluate — build from source → signedprobe → summary.json (RFC M1/M2)
+        env:
+          BLIS_TAG: ${{ needs.detect-diff.outputs.blis_tag }}
+          IX_TAG: ${{ needs.detect-diff.outputs.ix_tag }}
+          GH_TOKEN: ${{ github.token }}
+          SKIP_INGEST: "1"
+          DASH_DIR: ${{ github.workspace }}
+          WORK: ${{ github.workspace }}/.work
+        run: |
+          export SNAPSHOT_DATE="$(date -u +%Y-%m-%d)"
+          bash orchestrator/evaluate.sh
+
+      - name: Stage the fresh snapshot for the site + tests
+        run: |
+          mkdir -p web/public/data/latest data/latest
+          cp .work/summary.json web/public/data/latest/summary.json
+          cp .work/summary.json data/latest/summary.json
+
+      - name: Headless render test (zero console errors, real data — RFC B1)
+        working-directory: web
+        run: |
+          npm ci
+          npm run test
+          npm run build
+
+      - name: Browser smoke-test (real Chromium, zero console errors — RFC B1)
+        working-directory: web
+        run: |
+          npm install --no-save playwright@1.56.0
+          npx playwright install --with-deps chromium
+          node browser_smoke.mjs
+
+      - name: Upload snapshot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: summary-json
+          path: .work/summary.json
+
+  publish:
+    needs: [detect-diff, evaluate]
+    if: ${{ needs.evaluate.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: summary-json
+          path: incoming
+      - name: Diff — unchanged snapshot ⇒ no-op (RFC D3)
+        id: changecheck
+        run: |
+          new="incoming/summary.json"
+          cur="data/latest/summary.json"
+          if [ -f "$cur" ] && python3 -c "
+          import json,sys
+          a=json.load(open('$new')); b=json.load(open('$cur'))
+          sys.exit(0 if a.get('snapshot_id')==b.get('snapshot_id') and a['totals']==b['totals'] else 1)
+          "; then
+            echo "noop=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::snapshot identical to the published one — publishing nothing (no-op)"
+          else
+            echo "noop=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Commit the snapshot to the branch (RFC §4.2)
+        if: ${{ steps.changecheck.outputs.noop == 'false' }}
+        env:
+          BLIS_TAG: ${{ needs.detect-diff.outputs.blis_tag }}
+          IX_TAG: ${{ needs.detect-diff.outputs.ix_tag }}
+        run: |
+          snap_id=$(python3 -c "import json;print(json.load(open('incoming/summary.json'))['snapshot_id'])")
+          mkdir -p data/latest "data/snapshots/${snap_id}"
+          cp incoming/summary.json data/latest/summary.json
+          cp incoming/summary.json "data/snapshots/${snap_id}/summary.json"
+          python3 -c "import json; json.dump({'blis_tag':'${BLIS_TAG}','ix_tag':'${IX_TAG}','snapshot_id':'${snap_id}'}, open('state/last-run.json','w'), indent=2)"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/latest/summary.json "data/snapshots/${snap_id}/summary.json" state/last-run.json
+          git commit -m "ci-verify: ${snap_id} [skip ci]" || { echo "nothing to commit"; exit 0; }
+          git push
+      - name: Summary
+        run: |
+          echo "### ci-verify result" >> "$GITHUB_STEP_SUMMARY"
+          echo "- no-op: ${{ steps.changecheck.outputs.noop }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- blis: ${{ needs.detect-diff.outputs.blis_tag }} / ix: ${{ needs.detect-diff.outputs.ix_tag }}" >> "$GITHUB_STEP_SUMMARY"
