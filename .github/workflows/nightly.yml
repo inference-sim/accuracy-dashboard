@@ -1,0 +1,183 @@
+name: nightly-accuracy
+
+# Nightly re-evaluation of BLIS accuracy vs the pinned weekly InferenceX dump (RFC §4.6).
+# Also runnable on demand. BOTH inputs are resolved live at run time — nothing is hardcoded.
+on:
+  schedule:
+    - cron: "17 6 * * *" # nightly, off the :00 mark (RFC §4.6)
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Re-evaluate even if inputs are unchanged"
+        type: boolean
+        default: false
+      budget_mode:
+        description: "Skip the 34GB dump restore; use a staged corpus (ci-verify proof)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write # commit the snapshot to the Pages-served branch
+
+concurrency:
+  group: nightly-accuracy
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------- 1. detect-diff (hosted-safe)
+  detect-diff:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+      blis_tag: ${{ steps.resolve.outputs.blis_tag }}
+      ix_tag: ${{ steps.resolve.outputs.ix_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve both inputs live (never hardcoded)
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash orchestrator/resolve_inputs.sh
+      - name: Diff against state/last-run.json
+        id: diff
+        env:
+          BLIS_TAG: ${{ steps.resolve.outputs.blis_tag }}
+          IX_TAG: ${{ steps.resolve.outputs.ix_tag }}
+        run: bash orchestrator/detect_diff.sh
+
+  # ---------------------------------------------------------------- 2. evaluate (heavy)
+  evaluate:
+    needs: detect-diff
+    if: ${{ needs.detect-diff.outputs.changed == 'true' || inputs.force || inputs.budget_mode }}
+    # Hosted runner for diff/build/publish. The dump restore (~34GB) does NOT fit a hosted
+    # runner's disk (RFC D3) — in a real nightly run the evaluate job must target a larger
+    # self-hosted runner (set `runs-on: [self-hosted, blis-eval]`). The budget_mode path below
+    # stages a small corpus so the full pipeline (build→signedprobe→summary→validate→publish)
+    # is proven green on hosted CI without the dump.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Python deps
+        run: pip install --quiet jsonschema
+
+      - name: Pre-flight — dump restore budget (RFC D3)
+        if: ${{ !inputs.budget_mode }}
+        run: |
+          echo "::group::disk budget"
+          df -h / | tee /tmp/df.txt
+          free_gb=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
+          echo "free disk: ${free_gb} GB"
+          echo "::endgroup::"
+          # The compressed dump alone is ~34GB; the restored DB is larger. A hosted runner has
+          # ~14GB free. STOP loudly rather than scoring a partial dump.
+          if [ "${free_gb:-0}" -lt 80 ]; then
+            echo "::error::Runner has ${free_gb}GB free; the InferenceX dump restore needs ~80GB+."
+            echo "FIX (RFC §4.6): run this evaluate job on a self-hosted runner with >=120GB disk"
+            echo "(runs-on: [self-hosted, blis-eval]); keep detect-diff and publish on hosted."
+            echo "Publishing nothing; the prior snapshot stands (RFC D3)."
+            exit 75   # EX_TEMPFAIL — the publish job treats a skipped evaluate as a no-op
+          fi
+
+      - name: Stage a corpus for budget mode (ci-verify proof, no 34GB dump)
+        if: ${{ inputs.budget_mode }}
+        env:
+          BLIS_TAG: ${{ needs.detect-diff.outputs.blis_tag }}
+        run: bash orchestrator/stage_budget_corpus.sh
+
+      - name: Evaluate — build from source → signedprobe → summary.json
+        env:
+          BLIS_TAG: ${{ needs.detect-diff.outputs.blis_tag }}
+          IX_TAG: ${{ needs.detect-diff.outputs.ix_tag }}
+          GH_TOKEN: ${{ github.token }}
+          SKIP_INGEST: ${{ inputs.budget_mode && '1' || '0' }}
+          DASH_DIR: ${{ github.workspace }}
+          WORK: ${{ github.workspace }}/.work
+          SNAPSHOT_DATE: ${{ needs.detect-diff.outputs.ix_tag }}
+        run: |
+          # In budget mode the staged corpus already lives in $WORK; evaluate.sh consumes it.
+          export SNAPSHOT_DATE="$(date -u +%Y-%m-%d)"
+          bash orchestrator/evaluate.sh
+
+      - name: Stage the fresh snapshot for the site + tests
+        run: |
+          mkdir -p web/public/data/latest data/latest
+          cp .work/summary.json web/public/data/latest/summary.json
+          cp .work/summary.json data/latest/summary.json
+
+      - name: Headless render smoke-test (zero console errors, real data — RFC B1)
+        working-directory: web
+        run: |
+          npm ci
+          npm run test        # renderToStaticMarkup: zero console errors + no NaN/blank on the real snapshot
+          npm run build       # tsc + vite build; dist/ bundles the data for Pages
+
+      - name: Browser smoke-test (real Chromium, zero console errors — RFC B1)
+        working-directory: web
+        run: |
+          npm install --no-save playwright@1.56.0
+          npx playwright install --with-deps chromium
+          node browser_smoke.mjs
+
+      - name: Upload snapshot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: summary-json
+          path: .work/summary.json
+
+  # ---------------------------------------------------------------- 3. publish (hosted-safe)
+  publish:
+    needs: [detect-diff, evaluate]
+    if: ${{ needs.evaluate.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: summary-json
+          path: incoming
+
+      - name: Diff — unchanged input ⇒ no-op (RFC D3)
+        id: changecheck
+        run: |
+          new="incoming/summary.json"
+          cur="data/latest/summary.json"
+          if [ -f "$cur" ] && python3 -c "
+          import json,sys
+          a=json.load(open('$new')); b=json.load(open('$cur'))
+          sys.exit(0 if a.get('snapshot_id')==b.get('snapshot_id') and a['totals']==b['totals'] else 1)
+          "; then
+            echo "noop=true" >> "$GITHUB_OUTPUT"
+            echo "snapshot identical to the published one — publishing nothing"
+          else
+            echo "noop=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit the snapshot to the Pages-served branch
+        if: ${{ steps.changecheck.outputs.noop == 'false' }}
+        env:
+          BLIS_TAG: ${{ needs.detect-diff.outputs.blis_tag }}
+          IX_TAG: ${{ needs.detect-diff.outputs.ix_tag }}
+        run: |
+          snap_id=$(python3 -c "import json;print(json.load(open('incoming/summary.json'))['snapshot_id'])")
+          mkdir -p data/latest "data/snapshots/${snap_id}"
+          cp incoming/summary.json data/latest/summary.json
+          cp incoming/summary.json "data/snapshots/${snap_id}/summary.json"
+          # Advance state only on a successful publish (RFC §4.6).
+          python3 -c "import json; json.dump({'blis_tag':'${BLIS_TAG}','ix_tag':'${IX_TAG}','snapshot_id':'${snap_id}'}, open('state/last-run.json','w'), indent=2)"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/latest/summary.json "data/snapshots/${snap_id}/summary.json" state/last-run.json
+          git commit -m "nightly: ${snap_id}" || { echo "nothing to commit"; exit 0; }
+          git push

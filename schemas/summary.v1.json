@@ -1,0 +1,263 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://inference-sim.github.io/accuracy-dashboard/schemas/summary.v1.json",
+  "title": "BLIS Accuracy Dashboard summary.json (v1)",
+  "description": "The nightly snapshot the static Overview page renders. Defined and versioned locally in this repo (RFC-0001 §4.4). schema_version gates a format break before the site renders garbage. Shaped from cmd/signedprobe's per-point CSV + the direct corpus facets; this repo computes MAPE/shape/aggregates and holds no other scoring logic.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "snapshot_id", "generated_at", "provenance",
+    "coverage", "target_vllm", "metrics", "totals", "matrix", "scope"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "snapshot_id": {
+      "type": "string",
+      "description": "e.g. 2026-10-15_blis-v0.10.0_ix-2026-09-28",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}_blis-.+_ix-.+$"
+    },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "previous_snapshot_id": { "type": ["string", "null"] },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blis", "ground_truth", "evaluator_commit", "scorer"],
+      "properties": {
+        "blis": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["release", "commit_sha", "catalog", "registry", "extractor_version"],
+          "properties": {
+            "release": { "type": "string", "description": "CI-resolved latest stable tag; never main/pre-release" },
+            "commit_sha": { "type": "string" },
+            "catalog": { "type": "string", "description": "derived from the release's installation.md" },
+            "registry": { "type": "string", "description": "derived from the release's installation.md" },
+            "extractor_version": { "type": "string", "description": "blis-latency-kernel@<go.mod-pinned tag>" }
+          }
+        },
+        "ground_truth": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "release_tag", "measurement_sha256"],
+          "properties": {
+            "source": { "type": "string" },
+            "source_url": { "type": "string" },
+            "release_tag": { "type": "string", "pattern": "^db-dump/" },
+            "measurement_date_through": { "type": ["string", "null"] },
+            "measurement_sha256": { "type": "string" }
+          }
+        },
+        "evaluator_commit": { "type": "string" },
+        "scorer": { "const": "signedprobe" }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scored", "not_scored", "multinode_hidden", "failed", "not_scored_reasons"],
+      "properties": {
+        "scored": { "type": "integer", "minimum": 0 },
+        "not_scored": { "type": "integer", "minimum": 0 },
+        "multinode_hidden": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "measured_excluded": {
+          "type": "integer", "minimum": 0,
+          "description": "measured-data artefacts surfaced in known_artefacts; counted, NOT dropped from scoring"
+        },
+        "not_scored_reasons": {
+          "type": "object",
+          "description": "breakdown of not_scored; keys are reason slugs (e.g. no_acceptance_rate, model_not_in_catalog, hardware_not_in_catalog, engine_not_modeled)",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "known_artefacts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "noted for the reader; NOT filtered out of scoring (RFC: no quality exclusions in v0.1.0)"
+    },
+    "target_vllm": { "type": "string", "description": "BLIS's priced vLLM; the version filter defaults to on-target" },
+    "metrics": {
+      "type": "array",
+      "items": { "enum": ["ttft", "tpot"] },
+      "description": "v0.1.0 set only; E2E/tail/throughput are NOT keys anywhere in this schema"
+    },
+    "metricscore_comparison": {
+      "type": ["object", "null"],
+      "description": "LOGGED, never gated (RFC A6/§4.4). The expected gap = three edge-sets' point counts.",
+      "additionalProperties": true
+    },
+    "totals": { "$ref": "#/definitions/metricBlockPair" },
+    "matrix": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/modelNode" }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vllm_version_filter"],
+      "properties": {
+        "multinode": { "type": "string" },
+        "measured_exclusions": { "type": "array", "items": { "type": "string" } },
+        "vllm_version_filter": { "const": "on-target" }
+      }
+    }
+  },
+  "definitions": {
+    "mapeShape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ttft": { "type": ["number", "null"] },
+        "tpot": { "type": ["number", "null"] },
+        "n": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "samePointsDelta": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "tpot_mape": { "type": ["number", "null"] },
+        "ttft_mape": { "type": ["number", "null"] },
+        "n_intersect": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "metricBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mape", "shape"],
+      "properties": {
+        "mape": { "$ref": "#/definitions/mapeShape" },
+        "shape": { "$ref": "#/definitions/mapeShape" },
+        "noise_floor_pct": { "type": ["number", "null"] },
+        "same_points_delta": { "$ref": "#/definitions/samePointsDelta" }
+      }
+    },
+    "metricBlockPair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["measured_or_resolved", "all"],
+      "properties": {
+        "measured_or_resolved": { "$ref": "#/definitions/metricBlock" },
+        "all": { "$ref": "#/definitions/metricBlock" }
+      }
+    },
+    "coverageCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scored", "total"],
+      "properties": {
+        "scored": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "modelNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "model", "coverage", "metrics", "rows"],
+      "properties": {
+        "level": { "const": "model" },
+        "model": { "type": "string", "description": "id from server log, NOT display name (D7)" },
+        "display_name": { "type": "string" },
+        "source": { "type": "string" },
+        "vllm_version": { "type": ["string", "null"] },
+        "on_target_version": { "type": ["boolean", "null"] },
+        "coverage": { "$ref": "#/definitions/coverageCount" },
+        "metrics": { "$ref": "#/definitions/metricBlockPair" },
+        "rows": { "type": "array", "items": { "$ref": "#/definitions/workloadNode" } }
+      }
+    },
+    "workloadNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "label", "coverage", "metrics", "rows"],
+      "properties": {
+        "level": { "const": "workload" },
+        "label": { "type": "string" },
+        "isl": { "type": ["integer", "null"] },
+        "osl": { "type": ["integer", "null"] },
+        "coverage": { "$ref": "#/definitions/coverageCount" },
+        "metrics": { "$ref": "#/definitions/metricBlockPair" },
+        "rows": { "type": "array", "items": { "$ref": "#/definitions/gpuNode" } }
+      }
+    },
+    "gpuNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "label", "coverage", "metrics", "rows"],
+      "properties": {
+        "level": { "const": "gpu" },
+        "label": { "type": "string" },
+        "precision": { "type": ["string", "null"] },
+        "coverage": { "$ref": "#/definitions/coverageCount" },
+        "metrics": { "$ref": "#/definitions/metricBlockPair" },
+        "rows": { "type": "array", "items": { "$ref": "#/definitions/topologyNode" } }
+      }
+    },
+    "topologyNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "coverage", "metrics", "rows"],
+      "properties": {
+        "level": { "const": "topology" },
+        "framework": { "type": "string" },
+        "engine_version": { "type": ["string", "null"] },
+        "on_target_version": { "type": ["boolean", "null"] },
+        "is_multinode": { "type": "boolean" },
+        "parallelism": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" }
+        },
+        "serving": { "type": ["string", "null"] },
+        "spec_method": { "type": ["string", "null"] },
+        "label": { "type": "string" },
+        "coverage": { "$ref": "#/definitions/coverageCount" },
+        "metrics": { "$ref": "#/definitions/metricBlockPair" },
+        "rows": { "type": "array", "items": { "$ref": "#/definitions/pointNode" } }
+      }
+    },
+    "pointNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "concurrency", "tier"],
+      "properties": {
+        "level": { "const": "point" },
+        "concurrency": { "type": "integer", "minimum": 1 },
+        "tier": { "enum": ["measured_or_resolved", "all"] },
+        "measured": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ttft_ms": { "type": ["number", "null"] },
+            "tpot_ms": { "type": ["number", "null"] }
+          }
+        },
+        "predicted": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ttft_ms": { "type": ["number", "null"] },
+            "tpot_ms": { "type": ["number", "null"] }
+          }
+        },
+        "error_pct": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ttft": { "type": ["number", "null"] },
+            "tpot": { "type": ["number", "null"] }
+          }
+        },
+        "shape": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "ttft": { "type": ["number", "null"] },
+            "tpot": { "type": ["number", "null"] }
+          }
+        },
+        "shape_reason": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

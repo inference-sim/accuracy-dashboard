@@ -1,0 +1,18 @@
+# build + scratch
+web/node_modules/
+web/dist/
+web/public/data/
+.work/
+*.log
+
+# OS
+.DS_Store
+
+# local upstream build artifacts (never committed; CI builds from source)
+blis
+signedprobe
+metricscore
+
+# python cache
+__pycache__/
+*.pyc
