@@ -39,6 +39,13 @@ h2.viewhead{margin:0 0 6px;font-size:22px;font-weight:600;letter-spacing:-0.01em
 .chip{font-size:11.5px;font-family:var(--font-mono);padding:3px 9px;border-radius:12px;border:1px solid var(--line-strong);color:var(--muted);background:var(--panel)}
 .chip.off{text-decoration:line-through;opacity:.65}
 .chip.grp{border-color:var(--alt-line);color:var(--alt-ink);background:var(--alt-bg)}
+/* multi-node on/off toggle */
+.toggle{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-family:var(--font-mono);color:var(--muted);cursor:default}
+.toggle .sw{width:26px;height:15px;border-radius:8px;background:var(--line-strong);position:relative;display:inline-block}
+.toggle .sw .dot{position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:#fff}
+.toggle.on{color:var(--accent-ink)}
+.toggle.on .sw{background:var(--accent)}
+.toggle.on .sw .dot{left:13px}
 /* ---- table ---- */
 .tscroll{border:1px solid var(--line-strong);border-radius:6px;overflow:hidden;background:var(--panel)}
 table.readout{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--panel)}
@@ -81,6 +88,7 @@ tr:hover td{background:#fbfdfa}
     <div class="kv" style="margin-top:10px"><span class="k">image</span><span class="v">sha256:4c1a…</span></div>
     <div class="kv"><span class="k">catalog</span><span class="v">0.2.1</span></div>
     <div class="kv"><span class="k">kernel</span><span class="v">v0.1.0</span></div>
+    <div class="kv"><span class="k">registry</span><span class="v">v0.1.1</span></div>
 
     <div class="seclabel">Ground truth</div>
     <div class="kv"><span class="k">source</span><span class="v">InferenceX</span></div>
@@ -106,9 +114,7 @@ tr:hover td{background:#fbfdfa}
     <p class="dek">Every number is a full <b>blis replay</b> through the whole stack (router → scheduler → batch → kernel), scored against the pinned weekly InferenceX dump. Two tiers shown side by side: <b>measured-or-resolved</b> (apples-to-apples) and <b>all</b> (approximate). No pass/fail colouring — report, don't assert.</p>
 
     <div class="chips">
-      <span class="chip off">multi-node</span>
-      <span class="chip off">bad-silicon</span>
-      <span class="chip off">outliers</span>
+      <span class="toggle"><span class="sw"><span class="dot"></span></span>include multi-node</span>
       <span class="chip grp">headline: on-target vLLM v0.31.0</span>
       <span class="chip grp">+ off-version / retired below</span>
     </div>
@@ -185,7 +191,7 @@ tr:hover td{background:#fbfdfa}
       <span>scored <b>410</b></span>
       <span>unsupported <b>44</b></span>
       <span>no-scenario <b>12</b></span>
-      <span>removed · outliers <b>7</b> · bad-silicon <b>3</b></span>
+      <span>multi-node <b>31</b> (hidden)</span>
       <span>failed <b>0</b></span>
       <span>noise floor (per-row) <b>~2.3%</b></span>
     </div>
@@ -196,7 +202,7 @@ tr:hover td{background:#fbfdfa}
       <span><b>M·R</b> measured-or-resolved tier · <b>all</b> approximate · <span class="n" style="margin:0">ⁿ</span> point count per metric</span>
     </div>
 
-    <p class="foot">Numbers are illustrative placeholders for layout only. Scope: single-node, single_turn sweeps with ≥3 concurrencies; multi-node, bad-silicon and outliers are removed before scoring by a measured-data-only rule (never BLIS's error). “same-points Δ vs previous snapshot” appears on hover per cell (the honest “did this release move accuracy?” number, point-set change held out). A failed or partial nightly run publishes nothing and leaves the previous snapshot in place.</p>
+    <p class="foot">Numbers are illustrative placeholders for layout only. Scope: single_turn sweeps with ≥3 concurrencies. <b>No quality filtering</b> — we do not drop “outliers” or “bad-silicon” points; every measured point is scored and shown (report, don't assert). Multi-node is the one scope control: it's a <b>toggle</b> (off by default, since a multi-node run exercises cross-node collectives), and when on, BLIS replays those deployments with the correct multi-node scenario (node count, fabric, and pp/tp/ep placement written into the scenario the harness feeds <span class="mono">blis replay</span>). “same-points Δ vs previous snapshot” appears on hover per cell. A failed or partial nightly run publishes nothing and leaves the previous snapshot in place.</p>
   </main>
 </div>
 </body>
