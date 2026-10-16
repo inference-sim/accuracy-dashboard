@@ -141,7 +141,6 @@ td .n{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-left
           <tr class="grp">
             <th rowspan="2" style="vertical-align:bottom">Model / workload / GPU / topology</th>
             <th rowspan="2" style="vertical-align:bottom">vLLM</th>
-            <th rowspan="2" style="vertical-align:bottom">coverage</th>
             <th class="sep" colspan="2">TTFT (mean)</th>
             <th class="sep" colspan="2">TPOT (mean)</th>
             <th class="sep" colspan="2">E2E (mean)</th>
@@ -159,59 +158,60 @@ td .n{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-left
         <tbody>
           <tr class="r0 selrow"><td class="name"><span class="caret">▾</span>MiniMax-M3<span class="facet">4 gpu · 2 wl · 24 topo</span></td>
             <td><span class="ver">v0.31.0</span></td>
-            <td><span class="cov"><span class="bar"><i style="width:83%"></i></span>83% <span class="n">102/123</span></span></td>
-            <td class="sep"><span class="num">18.9%</span></td><td><span class="num">9.4%</span></td>
+                        <td class="sep"><span class="num">18.9%</span></td><td><span class="num">9.4%</span></td>
             <td class="sep"><span class="num">14.2%</span></td><td><span class="num">1.8%</span></td>
             <td class="sep"><span class="num">12.7%</span></td><td><span class="num">4.1%</span></td>
             <td class="sep"><span class="num">31.0%</span></td><td><span class="num">6.1%</span></td><td><span class="num">17.5%</span></td>
             <td class="sep"><span class="num">8.3%</span></td></tr>
           <tr class="r1 selrow"><td class="name"><span class="caret">▾</span>1k / 1k<span class="facet">isl 1024 · osl 1024</span></td>
-            <td></td><td><span class="cov"><span class="bar"><i style="width:86%"></i></span>86% <span class="n">55/64</span></span></td>
-            <td class="sep"><span class="num">17.1%</span></td><td><span class="num">8.8%</span></td>
+            <td></td>            <td class="sep"><span class="num">17.1%</span></td><td><span class="num">8.8%</span></td>
             <td class="sep"><span class="num">13.0%</span></td><td><span class="num">1.6%</span></td>
             <td class="sep"><span class="num">11.4%</span></td><td><span class="num">3.7%</span></td>
             <td class="sep"><span class="num">28.9%</span></td><td><span class="num">5.4%</span></td><td><span class="num">15.9%</span></td>
             <td class="sep"><span class="num">7.6%</span></td></tr>
           <tr class="r2 selrow"><td class="name"><span class="caret">▾</span>H200<span class="facet">fp8 · MXFP8</span></td>
-            <td></td><td><span class="cov"><span class="bar"><i style="width:90%"></i></span>90% <span class="n">28/31</span></span></td>
-            <td class="sep"><span class="num">16.2%</span></td><td><span class="num">8.1%</span></td>
+            <td></td>            <td class="sep"><span class="num">16.2%</span></td><td><span class="num">8.1%</span></td>
             <td class="sep"><span class="num">12.4%</span></td><td><span class="num">1.5%</span></td>
             <td class="sep"><span class="num">10.8%</span></td><td><span class="num">3.5%</span></td>
             <td class="sep"><span class="num">27.1%</span></td><td><span class="num">5.1%</span></td><td><span class="num">14.8%</span></td>
             <td class="sep"><span class="num">7.2%</span></td></tr>
           <tr class="r3 sel"><td class="name"><span class="caret">▸</span>tp8 · ep8 · pp1 · vllm<span class="facet">aggregated · single-node · ← selected</span></td>
-            <td></td><td><span class="cov"><span class="bar"><i style="width:100%"></i></span>100% <span class="n">8/8</span></span></td>
-            <td class="sep"><span class="num">15.4%</span></td><td><span class="num">7.9%</span></td>
+            <td></td>            <td class="sep"><span class="num">15.4%</span></td><td><span class="num">7.9%</span></td>
             <td class="sep"><span class="num">12.0%</span></td><td><span class="num">1.4%</span></td>
             <td class="sep"><span class="num">10.3%</span></td><td><span class="num">3.3%</span></td>
             <td class="sep"><span class="num">26.4%</span></td><td><span class="num">4.9%</span></td><td><span class="num">14.1%</span></td>
             <td class="sep"><span class="num">7.0%</span></td></tr>
           <tr class="r0"><td class="name"><span class="caret">▸</span>DeepSeek-V4-Pro<span class="facet">4 gpu · 2 wl · 18 topo</span></td>
             <td><span class="ver">v0.31.0</span></td>
-            <td><span class="cov"><span class="bar"><i style="width:79%"></i></span>79% <span class="n">88/111</span></span></td>
-            <td class="sep"><span class="num">22.4%</span></td><td><span class="num">11.8%</span></td>
+                        <td class="sep"><span class="num">22.4%</span></td><td><span class="num">11.8%</span></td>
             <td class="sep"><span class="num">15.1%</span></td><td><span class="num">2.1%</span></td>
             <td class="sep"><span class="num">13.9%</span></td><td><span class="num">4.6%</span></td>
             <td class="sep"><span class="num">44.1%</span></td><td><span class="num">7.4%</span></td><td><span class="num">21.3%</span></td>
             <td class="sep"><span class="num">9.6%</span></td></tr>
           <tr class="r0"><td class="name"><span class="caret">▸</span>gpt-oss-120b<span class="facet">3 gpu · 2 wl · 14 topo</span></td>
             <td><span class="ver">v0.31.0</span></td>
-            <td><span class="cov"><span class="bar"><i style="width:88%"></i></span>88% <span class="n">71/81</span></span></td>
-            <td class="sep"><span class="num">16.1%</span></td><td><span class="num">7.7%</span></td>
+                        <td class="sep"><span class="num">16.1%</span></td><td><span class="num">7.7%</span></td>
             <td class="sep"><span class="num">12.8%</span></td><td><span class="num">1.4%</span></td>
             <td class="sep"><span class="num">11.0%</span></td><td><span class="num">3.1%</span></td>
             <td class="sep"><span class="num">28.4%</span></td><td><span class="num">5.5%</span></td><td><span class="num">15.1%</span></td>
             <td class="sep"><span class="num">7.1%</span></td></tr>
           <tr class="r0"><td class="name"><span class="caret">▸</span>Llama-3.1-70B-Instruct<span class="facet">1 gpu · 1 wl · 2 topo · retired 2025-10-29</span></td>
             <td><span class="ver off">v0.29.0</span></td>
-            <td><span class="cov"><span class="bar"><i style="width:67%"></i></span>67% <span class="n">12/18</span></span></td>
-            <td class="sep"><span class="num all">41.3%</span></td><td><span class="num all">18.2%</span></td>
+                        <td class="sep"><span class="num all">41.3%</span></td><td><span class="num all">18.2%</span></td>
             <td class="sep"><span class="num all">26.7%</span></td><td><span class="num all">3.4%</span></td>
             <td class="sep"><span class="num all">22.9%</span></td><td><span class="num all">6.1%</span></td>
             <td class="sep"><span class="num all">—</span></td><td><span class="num all">—</span></td><td><span class="num all">—</span></td>
             <td class="sep"><span class="num all">13.2%</span></td></tr>
         </tbody>
       </table>
+    </div>
+
+    <div class="coverage" style="margin:14px 0 4px">
+      <span>models <b>21</b></span>
+      <span>points scored <b>410</b></span>
+      <span>not scored <b>56</b> <span class="nscov">(no BLIS scenario — model/hardware not in catalog, or engine BLIS can't model)</span></span>
+      <span>multi-node <b>31</b> (hidden)</span>
+      <span>failed <b>0</b></span>
     </div>
 
     <!-- ============ TABLE 2: POINTS (leaf), measured vs predicted ============ -->
@@ -264,13 +264,6 @@ td .n{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-left
       </table>
     </div>
 
-    <div class="coverage">
-      <span>models <b>21</b></span>
-      <span>points scored <b>410</b></span>
-      <span>not scored <b>56</b> <span class="nscov">(no BLIS scenario — model/hardware not in catalog, or engine BLIS can't model)</span></span>
-      <span>multi-node <b>31</b> (hidden)</span>
-      <span>failed <b>0</b></span>
-    </div>
 
     <div class="legend">
       <span><span class="ver" style="margin:0">v0.31.0</span> on BLIS's target vLLM</span>
@@ -278,7 +271,7 @@ td .n{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-left
       <span><b>mape</b> absolute · <b>shape</b> curvature · <b>Tail p99</b> MAPE only (no shape)</span>
     </div>
 
-    <p class="foot">Numbers are illustrative placeholders for layout only. Two tables: a <b>summary</b> drill-down (model → workload → GPU → topology) carrying per-row coverage, and a <b>points</b> table for the selected row showing measured vs predicted per concurrency. Mean TTFT/TPOT/E2E report MAPE <i>and</i> shape; <b>Tail p99 reports MAPE only</b> (stated in the column header). Throughput MAPE is per-GPU-normalised. vLLM version is a per-row badge + filter, not a group. No quality filtering — every measured point is scored; multi-node is a toggle (off by default). <b>Selecting a topology row in the summary populates the points table below it</b> (and deep-links via the URL).</p>
+    <p class="foot">Numbers are illustrative placeholders for layout only. Two tables: a <b>summary</b> drill-down (model → workload → GPU → topology), then run-wide counts, and a <b>points</b> table for the selected row showing measured vs predicted per concurrency. Mean TTFT/TPOT/E2E report MAPE <i>and</i> shape; <b>Tail p99 reports MAPE only</b> (stated in the column header). Throughput MAPE is per-GPU-normalised. vLLM version is a per-row badge + filter, not a group. No quality filtering — every measured point is scored; multi-node is a toggle (off by default). <b>Selecting a topology row in the summary populates the points table below it</b> (and deep-links via the URL).</p>
   </main>
 </div>
 </body>
