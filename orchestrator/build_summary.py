@@ -22,8 +22,10 @@ from __future__ import annotations
 
 import argparse
 import csv
+import glob
 import json
 import math
+import os
 import sys
 from collections import OrderedDict
 from typing import Any
@@ -137,6 +139,29 @@ def _read_engine_versions(path: str) -> dict[tuple[str, str], str]:
                 break
         if ev:
             out[(sw["scenario"], sw["label"])] = ev
+    return out
+
+
+def _read_scenario_versions(scenarios_dir: str) -> dict[str, str]:
+    """Per-scenario engine_version from the generated scenario YAMLs, keyed by the scenario
+    filename. In the direct path the engine-settings `resolved.engine_version` is empty (the
+    dump's benchmark rows carry no resolved-engine line), so the authoritative measured version
+    is the scenario's own `engine_version:` field, which the scenario generator writes from the
+    dump's topology record. Parsed with a plain line scan (no YAML dep)."""
+    out: dict[str, str] = {}
+    for p in glob.glob(os.path.join(scenarios_dir, "*.yaml")):
+        name = os.path.basename(p)
+        try:
+            with open(p) as fh:
+                for line in fh:
+                    s = line.strip()
+                    if s.startswith("engine_version:"):
+                        v = s.split(":", 1)[1].strip().strip('"').strip("'")
+                        if v:
+                            out[name] = v
+                        break
+        except OSError:
+            continue
     return out
 
 
@@ -456,6 +481,7 @@ def main(argv=None):
     ap.add_argument("--provenance", required=True, help="provenance JSON (CI-resolved inputs)")
     ap.add_argument("--previous", help="previous summary.json for same-points delta", default=None)
     ap.add_argument("--engine-settings", help="engine-settings JSON for per-sweep resolved engine_version", default=None)
+    ap.add_argument("--scenarios", help="scenario dir; engine_version read from each YAML (direct-path fallback)", default=None)
     ap.add_argument("--metricscore-log", help="metricscore stdout (logged, non-blocking)", default=None)
     args = ap.parse_args(argv)
 
@@ -473,8 +499,12 @@ def main(argv=None):
     vllm_by_sweep = {}
     noise_by_sweep = {}
     engine_versions = _read_engine_versions(args.engine_settings) if args.engine_settings else {}
+    scenario_versions = _read_scenario_versions(args.scenarios) if args.scenarios else {}
     for (scenario, label) in facets:
-        vllm_by_sweep[(scenario, label)] = engine_versions.get((scenario, label), target_vllm)
+        # Prefer the engine-settings resolved version; else the scenario YAML's engine_version
+        # (the direct path's authoritative source); else the target. Never NaN.
+        ev = engine_versions.get((scenario, label)) or scenario_versions.get(scenario) or target_vllm
+        vllm_by_sweep[(scenario, label)] = ev
         noise_by_sweep[(scenario, label)] = None
 
     sweeps = enrich_points(rows, noise_by_sweep)

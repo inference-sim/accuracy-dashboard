@@ -183,7 +183,7 @@ PY
 log "shaping CSV into summary.json"
 OUT="$WORK/summary.json"
 python3 "$DASH_DIR/orchestrator/build_summary.py" \
-  --csv "$CSV" --corpus "$CORPUS" --engine-settings "$SETTINGS" \
+  --csv "$CSV" --corpus "$CORPUS" --engine-settings "$SETTINGS" --scenarios "$SCENARIOS" \
   --provenance "$PROV" --out "$OUT" --metricscore-log "$METRIC_LOG" \
   ${PREVIOUS_SUMMARY:+--previous "$PREVIOUS_SUMMARY"}
 
