@@ -64,6 +64,16 @@ thead tr.col th{padding:4px 10px 8px;font-weight:600;font-size:11px;background:v
 thead tr.col th.sep{border-left:1px solid var(--line-strong)}
 thead tr.col th .arrow{color:var(--accent);font-size:10px}
 td.sep{border-left:1px solid var(--line)}
+/* gated (not-yet-emitted) columns: visibly inert */
+th.gated{color:#aab2a6 !important;background:repeating-linear-gradient(45deg,#f4f6f2,#f4f6f2 4px,#eef1ec 4px,#eef1ec 8px) !important}
+td.gated{background:repeating-linear-gradient(45deg,#fafbf9,#fafbf9 4px,#f4f6f2 4px,#f4f6f2 8px)}
+td.gated .g{color:#c3ccbf}
+.gate{display:inline-block;font-size:8.5px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#8a938a;border:1px solid var(--line-strong);border-radius:3px;padding:0 4px;margin-left:4px;vertical-align:middle}
+.gate-legend{font-size:11px;color:var(--muted);margin:7px 0 0}
+.disabled-note{color:#aab2a6;font-size:10px}
+tr.totals td{background:var(--accent-soft) !important;font-weight:600;border-top:2px solid var(--accent);border-bottom:2px solid var(--line-strong)}
+tr.totals .num{font-weight:700}
+.delta{font-family:var(--font-mono);font-size:10.5px;color:var(--accent);font-weight:600;margin-left:3px}
 .mono{font-family:var(--font-mono)}
 td .num{font-family:var(--font-mono);font-weight:500}
 td .n{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-left:3px}
@@ -127,14 +137,14 @@ td .n{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-left
     <p class="dek">Every number is a full <b>blis replay</b> through the whole stack, scored against the pinned weekly InferenceX dump. Two tables: a <b>summary</b> drill-down (model → workload → GPU → topology), and a <b>points</b> table for the selected row (measured vs predicted per concurrency). No pass/fail colouring — report, don't assert.</p>
 
     <div class="chips">
-      <span class="toggle"><span class="sw"><span class="dot"></span></span>multi-node</span>
+      <span class="toggle"><span class="sw"><span class="dot"></span></span>multi-node <span class="disabled-note">(disabled — needs kernel change)</span></span>
       <span class="flt">tier <span class="tierseg"><span class="on">measured·resolved</span><span>all</span></span></span>
-      <span class="flt">vLLM version <span class="box">all <span class="car">▾</span></span></span>
+      <span class="flt">vLLM version <span class="box">on-target v0.31.0 <span class="car">▾</span></span></span>
       <span class="flt">hardware <span class="box">all <span class="car">▾</span></span></span>
     </div>
 
     <!-- ============ TABLE 1: SUMMARY DRILL-DOWN ============ -->
-    <div class="tbl-title">Summary — mean MAPE &amp; shape, tail p99 MAPE, throughput MAPE</div>
+    <div class="tbl-title">Summary — mean TTFT/TPOT: MAPE &amp; shape <span class="facet">· E2E / tail p99 / throughput gated until a scored release emits them</span></div>
     <div class="tscroll">
       <table class="readout">
         <thead>
@@ -143,73 +153,75 @@ td .n{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-left
             <th rowspan="2" style="vertical-align:bottom">vLLM</th>
             <th class="sep" colspan="2">TTFT (mean)</th>
             <th class="sep" colspan="2">TPOT (mean)</th>
-            <th class="sep" colspan="2">E2E (mean)</th>
-            <th class="sep" colspan="3">Tail p99 — MAPE</th>
-            <th class="sep">Tput</th>
+            <th class="sep gated" colspan="2">E2E (mean) <span class="gate">needs BLIS ≥ v?</span></th>
+            <th class="sep gated" colspan="3">Tail p99 — MAPE <span class="gate">gated</span></th>
+            <th class="sep gated">Tput <span class="gate">gated</span></th>
           </tr>
           <tr class="col">
             <th class="sep">mape <span class="arrow">▲</span></th><th>shape</th>
             <th class="sep">mape</th><th>shape</th>
-            <th class="sep">mape</th><th>shape</th>
-            <th class="sep">ttft</th><th>tpot</th><th>e2e</th>
-            <th class="sep">mape</th>
+            <th class="sep gated">mape</th><th class="gated">shape</th>
+            <th class="sep gated">ttft</th><th class="gated">tpot</th><th class="gated">e2e</th>
+            <th class="sep gated">mape</th>
           </tr>
         </thead>
         <tbody>
+          <tr class="r0 totals"><td class="name"><b>ALL MODELS</b><span class="facet">headline · on-target v0.31.0 · 388 pts</span></td>
+            <td><span class="ver">v0.31.0</span></td>
+            <td class="sep"><span class="num">20.1%</span></td><td><span class="num">10.2%</span></td>
+            <td class="sep"><span class="num">15.3%</span> <span class="delta">▼0.4</span></td><td><span class="num">2.0%</span></td>
+            <td class="sep gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td>
+            <td class="sep gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td>
+            <td class="sep gated"><span class="g">·</span></td></tr>
           <tr class="r0 selrow"><td class="name"><span class="caret">▾</span>MiniMax-M3<span class="facet">4 gpu · 2 wl · 24 topo</span></td>
             <td><span class="ver">v0.31.0</span></td>
-                        <td class="sep"><span class="num">18.9%</span></td><td><span class="num">9.4%</span></td>
+            <td class="sep"><span class="num">18.9%</span></td><td><span class="num">9.4%</span></td>
             <td class="sep"><span class="num">14.2%</span></td><td><span class="num">1.8%</span></td>
-            <td class="sep"><span class="num">12.7%</span></td><td><span class="num">4.1%</span></td>
-            <td class="sep"><span class="num">31.0%</span></td><td><span class="num">6.1%</span></td><td><span class="num">17.5%</span></td>
-            <td class="sep"><span class="num">8.3%</span></td></tr>
+            <td class="sep gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td>
+            <td class="sep gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td>
+            <td class="sep gated"><span class="g">·</span></td></tr>
           <tr class="r1 selrow"><td class="name"><span class="caret">▾</span>1k / 1k<span class="facet">isl 1024 · osl 1024</span></td>
             <td></td>            <td class="sep"><span class="num">17.1%</span></td><td><span class="num">8.8%</span></td>
             <td class="sep"><span class="num">13.0%</span></td><td><span class="num">1.6%</span></td>
-            <td class="sep"><span class="num">11.4%</span></td><td><span class="num">3.7%</span></td>
-            <td class="sep"><span class="num">28.9%</span></td><td><span class="num">5.4%</span></td><td><span class="num">15.9%</span></td>
-            <td class="sep"><span class="num">7.6%</span></td></tr>
+            <td class="sep gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td>
+            <td class="sep gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td>
+            <td class="sep gated"><span class="g">·</span></td></tr>
           <tr class="r2 selrow"><td class="name"><span class="caret">▾</span>H200<span class="facet">fp8 · MXFP8</span></td>
             <td></td>            <td class="sep"><span class="num">16.2%</span></td><td><span class="num">8.1%</span></td>
             <td class="sep"><span class="num">12.4%</span></td><td><span class="num">1.5%</span></td>
-            <td class="sep"><span class="num">10.8%</span></td><td><span class="num">3.5%</span></td>
-            <td class="sep"><span class="num">27.1%</span></td><td><span class="num">5.1%</span></td><td><span class="num">14.8%</span></td>
-            <td class="sep"><span class="num">7.2%</span></td></tr>
+            <td class="sep gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td>
+            <td class="sep gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td>
+            <td class="sep gated"><span class="g">·</span></td></tr>
           <tr class="r3 sel"><td class="name"><span class="caret">▸</span>tp8 · ep8 · pp1 · vllm<span class="facet">aggregated · single-node · ← selected</span></td>
             <td></td>            <td class="sep"><span class="num">15.4%</span></td><td><span class="num">7.9%</span></td>
             <td class="sep"><span class="num">12.0%</span></td><td><span class="num">1.4%</span></td>
-            <td class="sep"><span class="num">10.3%</span></td><td><span class="num">3.3%</span></td>
-            <td class="sep"><span class="num">26.4%</span></td><td><span class="num">4.9%</span></td><td><span class="num">14.1%</span></td>
-            <td class="sep"><span class="num">7.0%</span></td></tr>
+            <td class="sep gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td>
+            <td class="sep gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td>
+            <td class="sep gated"><span class="g">·</span></td></tr>
           <tr class="r0"><td class="name"><span class="caret">▸</span>DeepSeek-V4-Pro<span class="facet">4 gpu · 2 wl · 18 topo</span></td>
             <td><span class="ver">v0.31.0</span></td>
-                        <td class="sep"><span class="num">22.4%</span></td><td><span class="num">11.8%</span></td>
+            <td class="sep"><span class="num">22.4%</span></td><td><span class="num">11.8%</span></td>
             <td class="sep"><span class="num">15.1%</span></td><td><span class="num">2.1%</span></td>
-            <td class="sep"><span class="num">13.9%</span></td><td><span class="num">4.6%</span></td>
-            <td class="sep"><span class="num">44.1%</span></td><td><span class="num">7.4%</span></td><td><span class="num">21.3%</span></td>
-            <td class="sep"><span class="num">9.6%</span></td></tr>
+            <td class="sep gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td>
+            <td class="sep gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td>
+            <td class="sep gated"><span class="g">·</span></td></tr>
           <tr class="r0"><td class="name"><span class="caret">▸</span>gpt-oss-120b<span class="facet">3 gpu · 2 wl · 14 topo</span></td>
             <td><span class="ver">v0.31.0</span></td>
-                        <td class="sep"><span class="num">16.1%</span></td><td><span class="num">7.7%</span></td>
+            <td class="sep"><span class="num">16.1%</span></td><td><span class="num">7.7%</span></td>
             <td class="sep"><span class="num">12.8%</span></td><td><span class="num">1.4%</span></td>
-            <td class="sep"><span class="num">11.0%</span></td><td><span class="num">3.1%</span></td>
-            <td class="sep"><span class="num">28.4%</span></td><td><span class="num">5.5%</span></td><td><span class="num">15.1%</span></td>
-            <td class="sep"><span class="num">7.1%</span></td></tr>
-          <tr class="r0"><td class="name"><span class="caret">▸</span>Llama-3.1-70B-Instruct<span class="facet">1 gpu · 1 wl · 2 topo · retired 2025-10-29</span></td>
-            <td><span class="ver off">v0.29.0</span></td>
-                        <td class="sep"><span class="num all">41.3%</span></td><td><span class="num all">18.2%</span></td>
-            <td class="sep"><span class="num all">26.7%</span></td><td><span class="num all">3.4%</span></td>
-            <td class="sep"><span class="num all">22.9%</span></td><td><span class="num all">6.1%</span></td>
-            <td class="sep"><span class="num all">—</span></td><td><span class="num all">—</span></td><td><span class="num all">—</span></td>
-            <td class="sep"><span class="num all">13.2%</span></td></tr>
+            <td class="sep gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td>
+            <td class="sep gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td><td class="gated"><span class="g">·</span></td>
+            <td class="sep gated"><span class="g">·</span></td></tr>
         </tbody>
       </table>
     </div>
+    <div class="gate-legend"><span class="gate">gated</span> E2E, tail p99 and throughput are defined but not emitted by the scored release (v0.10.0); they switch on when a release emits them. See §4.3a.</div>
 
     <div class="coverage" style="margin:14px 0 4px">
       <span>models <b>21</b></span>
-      <span>points scored <b>410</b></span>
-      <span>not scored <b>56</b> <span class="nscov">(no BLIS scenario — model/hardware not in catalog, or engine BLIS can't model)</span></span>
+      <span>points scored <b>388</b></span>
+      <span>not scored <b>56</b> <span class="nscov">(no scenario, or mtp without an acceptance rate)</span></span>
+      <span>excluded (measured) <b>7</b> <span class="nscov">(ttft-spike 4, non-monotone-tpot 3)</span></span>
       <span>multi-node <b>31</b> (hidden)</span>
       <span>failed <b>0</b></span>
     </div>
@@ -223,43 +235,31 @@ td .n{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-left
             <th rowspan="2" style="vertical-align:bottom">conc</th>
             <th class="sep" colspan="3">TTFT (ms)</th>
             <th class="sep" colspan="3">TPOT (ms)</th>
-            <th class="sep" colspan="3">E2E (ms)</th>
-            <th class="sep" colspan="3">p99 TTFT (ms)</th>
-            <th class="sep" colspan="3">Tput (tok/s/gpu)</th>
+            <th class="sep gated" colspan="3">E2E / p99 / Tput <span class="gate">gated</span></th>
           </tr>
           <tr class="col">
             <th class="sep">meas</th><th>pred</th><th>err</th>
             <th class="sep">meas</th><th>pred</th><th>err</th>
-            <th class="sep">meas</th><th>pred</th><th>err</th>
-            <th class="sep">meas</th><th>pred</th><th>err</th>
-            <th class="sep">meas</th><th>pred</th><th>err</th>
+            <th class="sep gated" colspan="3">not emitted by scored release</th>
           </tr>
         </thead>
         <tbody>
           <tr><td class="mono">1</td>
             <td class="sep mono">160</td><td class="mono">149</td><td class="e"><span class="num">−6.9%</span></td>
             <td class="sep mono">7.18</td><td class="mono">7.26</td><td class="e"><span class="num">+1.1%</span></td>
-            <td class="sep mono">6772</td><td class="mono">6690</td><td class="e"><span class="num">−1.2%</span></td>
-            <td class="sep mono">221</td><td class="mono">243</td><td class="e"><span class="num">+10.0%</span></td>
-            <td class="sep mono">17.0</td><td class="mono">16.6</td><td class="e"><span class="num">−2.4%</span></td></tr>
+            <td class="sep gated" colspan="3"><span class="g">·</span></td></tr>
           <tr><td class="mono">4</td>
             <td class="sep mono">204</td><td class="mono">189</td><td class="e"><span class="num">−7.4%</span></td>
             <td class="sep mono">8.82</td><td class="mono">9.01</td><td class="e"><span class="num">+2.2%</span></td>
-            <td class="sep mono">8288</td><td class="mono">8140</td><td class="e"><span class="num">−1.8%</span></td>
-            <td class="sep mono">289</td><td class="mono">331</td><td class="e"><span class="num">+14.5%</span></td>
-            <td class="sep mono">53.7</td><td class="mono">52.4</td><td class="e"><span class="num">−2.4%</span></td></tr>
+            <td class="sep gated" colspan="3"><span class="g">·</span></td></tr>
           <tr><td class="mono">16</td>
             <td class="sep mono">368</td><td class="mono">331</td><td class="e"><span class="num">−10.1%</span></td>
             <td class="sep mono">13.1</td><td class="mono">13.4</td><td class="e"><span class="num">+2.4%</span></td>
-            <td class="sep mono">12348</td><td class="mono">12520</td><td class="e"><span class="num">+1.4%</span></td>
-            <td class="sep mono">612</td><td class="mono">735</td><td class="e"><span class="num">+20.1%</span></td>
-            <td class="sep mono">145</td><td class="mono">141</td><td class="e"><span class="num">−2.9%</span></td></tr>
+            <td class="sep gated" colspan="3"><span class="g">·</span></td></tr>
           <tr><td class="mono">64</td>
             <td class="sep mono">821</td><td class="mono">980</td><td class="e"><span class="num">+19.3%</span></td>
             <td class="sep mono">13.2</td><td class="mono">15.1</td><td class="e"><span class="num">+14.8%</span></td>
-            <td class="sep mono">7100</td><td class="mono">8030</td><td class="e"><span class="num">+13.1%</span></td>
-            <td class="sep mono">980</td><td class="mono">1284</td><td class="e"><span class="num">+31.0%</span></td>
-            <td class="sep mono">118</td><td class="mono">128</td><td class="e"><span class="num">+8.3%</span></td></tr>
+            <td class="sep gated" colspan="3"><span class="g">·</span></td></tr>
         </tbody>
       </table>
     </div>
@@ -268,10 +268,10 @@ td .n{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-left
     <div class="legend">
       <span><span class="ver" style="margin:0">v0.31.0</span> on BLIS's target vLLM</span>
       <span><span class="ver off" style="margin:0">v0.29.0</span> off BLIS's target</span>
-      <span><b>mape</b> absolute · <b>shape</b> curvature · <b>Tail p99</b> MAPE only (no shape)</span>
+      <span><b>mape</b> absolute · <b>shape</b> curvature · <span class="gate">gated</span> defined but not emitted by the scored release</span>
     </div>
 
-    <p class="foot">Numbers are illustrative placeholders for layout only. Two tables: a <b>summary</b> drill-down (model → workload → GPU → topology), then run-wide counts, and a <b>points</b> table for the selected row showing measured vs predicted per concurrency. Mean TTFT/TPOT/E2E report MAPE <i>and</i> shape; <b>Tail p99 reports MAPE only</b> (stated in the column header). Throughput MAPE is per-GPU-normalised. vLLM version is a per-row badge + filter, not a group. No quality filtering — every measured point is scored; multi-node is a toggle (off by default). <b>Selecting a topology row in the summary populates the points table below it</b> (and deep-links via the URL).</p>
+    <p class="foot">Numbers are illustrative placeholders for layout only. Two tables: a <b>summary</b> drill-down (model → workload → GPU → topology) with a <b>totals/headline row</b> (visible same-points Δ vs the previous snapshot), then run-wide counts, and a <b>points</b> table for the selected row (measured vs predicted per concurrency). <b>v0.1.0 scores mean TTFT and TPOT only</b> (MAPE + shape) — all the pinned release emits; <b>E2E, tail p99 and throughput are gated</b> ("needs BLIS ≥ vX") until a scored release emits them. Exclusions are measured-data-only (ttft-spike, non-monotone-tpot), counted; `mtp` points need a server-log acceptance rate or go to not-scored. Default view is <b>on-target v0.31.0</b>. vLLM version is a per-row badge + filter, not a group. <b>Selecting a topology row populates the points table below it</b> (deep-linked via the URL).</p>
   </main>
 </div>
 </body>
