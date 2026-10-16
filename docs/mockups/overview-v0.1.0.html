@@ -114,7 +114,7 @@ tr:hover td{background:#fbfdfa}
     <p class="dek">Every number is a full <b>blis replay</b> through the whole stack (router → scheduler → batch → kernel), scored against the pinned weekly InferenceX dump. Two tiers shown side by side: <b>measured-or-resolved</b> (apples-to-apples) and <b>all</b> (approximate). No pass/fail colouring — report, don't assert.</p>
 
     <div class="chips">
-      <span class="toggle"><span class="sw"><span class="dot"></span></span>include multi-node</span>
+      <span class="toggle"><span class="sw"><span class="dot"></span></span>multi-node</span>
       <span class="chip grp">headline: on-target vLLM v0.31.0</span>
       <span class="chip grp">+ off-version / retired below</span>
     </div>
@@ -125,17 +125,17 @@ tr:hover td{background:#fbfdfa}
           <tr class="grp">
             <th rowspan="2" style="vertical-align:bottom">Deployment</th>
             <th rowspan="2" style="vertical-align:bottom">pts</th>
-            <th class="sep" colspan="3">TTFT &nbsp;mape · shape</th>
-            <th class="sep" colspan="3">TPOT &nbsp;mape · shape</th>
+            <th class="sep" colspan="3">TTFT</th>
+            <th class="sep" colspan="3">TPOT</th>
             <th class="sep" colspan="2">E2E</th>
-            <th class="sep" colspan="2">Tail p99</th>
+            <th class="sep" colspan="3">Tail p99</th>
             <th class="sep">Tput</th>
           </tr>
           <tr class="col">
             <th class="sep">M·R <span class="arrow">▲</span></th><th>all</th><th>shape</th>
             <th class="sep">M·R</th><th>all</th><th>shape</th>
             <th class="sep">M·R</th><th>all</th>
-            <th class="sep">ttft</th><th>tpot</th>
+            <th class="sep">ttft</th><th>tpot</th><th>e2e</th>
             <th class="sep">tok/s</th>
           </tr>
         </thead>
@@ -146,7 +146,7 @@ tr:hover td{background:#fbfdfa}
             <td class="sep"><span class="num">18.9%</span><span class="n">20</span></td><td class="tier-all"><span class="num">22.1%</span><span class="n">24</span></td><td><span class="num">9.4%</span></td>
             <td class="sep"><span class="num">14.2%</span><span class="n">20</span></td><td class="tier-all"><span class="num">16.0%</span><span class="n">24</span></td><td><span class="num">1.8%</span></td>
             <td class="sep"><span class="num">12.7%</span></td><td class="tier-all"><span class="num">14.1%</span></td>
-            <td class="sep"><span class="num">31.0%</span><span class="n">12</span></td><td><span class="num">6.1%</span></td>
+            <td class="sep"><span class="num">31.0%</span><span class="n">12</span></td><td><span class="num">6.1%</span></td><td><span class="num">17.5%</span></td>
             <td class="sep"><span class="num">8.3%</span></td></tr>
 
           <tr><td class="dep"><span class="m">DeepSeek-V4-Pro</span> · H200 · tp8<span class="ver">v0.31.0</span><div class="cfg">FP8 · 8k/1k</div></td>
@@ -154,7 +154,7 @@ tr:hover td{background:#fbfdfa}
             <td class="sep"><span class="num">22.4%</span><span class="n">18</span></td><td class="tier-all"><span class="num">24.0%</span><span class="n">21</span></td><td><span class="num">11.8%</span></td>
             <td class="sep"><span class="num">15.1%</span><span class="n">18</span></td><td class="tier-all"><span class="num">17.3%</span><span class="n">21</span></td><td><span class="num">2.1%</span></td>
             <td class="sep"><span class="num">13.9%</span></td><td class="tier-all"><span class="num">15.4%</span></td>
-            <td class="sep"><span class="num">44.1%</span><span class="n">9</span></td><td><span class="num">7.4%</span></td>
+            <td class="sep"><span class="num">44.1%</span><span class="n">9</span></td><td><span class="num">7.4%</span></td><td><span class="num">21.3%</span></td>
             <td class="sep"><span class="num">9.6%</span></td></tr>
 
           <tr><td class="dep"><span class="m">gpt-oss-120b</span> · H100 · tp4<span class="ver">v0.31.0</span><div class="cfg">FP8 · 1k/1k</div></td>
@@ -162,7 +162,7 @@ tr:hover td{background:#fbfdfa}
             <td class="sep"><span class="num">16.1%</span><span class="n">16</span></td><td class="tier-all"><span class="num">17.9%</span><span class="n">18</span></td><td><span class="num">7.7%</span></td>
             <td class="sep"><span class="num">12.8%</span><span class="n">16</span></td><td class="tier-all"><span class="num">13.6%</span><span class="n">18</span></td><td><span class="num">1.4%</span></td>
             <td class="sep"><span class="num">11.0%</span></td><td class="tier-all"><span class="num">12.2%</span></td>
-            <td class="sep"><span class="num">28.4%</span><span class="n">10</span></td><td><span class="num">5.5%</span></td>
+            <td class="sep"><span class="num">28.4%</span><span class="n">10</span></td><td><span class="num">5.5%</span></td><td><span class="num">15.1%</span></td>
             <td class="sep"><span class="num">7.1%</span></td></tr>
 
           <tr><td class="dep"><span class="m">GLM-5</span> · B200 · tp8<span class="ver">v0.31.0</span><div class="cfg">FP4 · 1k/8k</div></td>
@@ -170,18 +170,18 @@ tr:hover td{background:#fbfdfa}
             <td class="sep"><span class="num">20.2%</span><span class="n">14</span></td><td class="tier-all"><span class="num">21.5%</span><span class="n">15</span></td><td><span class="num">10.1%</span></td>
             <td class="sep"><span class="num">13.5%</span><span class="n">14</span></td><td class="tier-all"><span class="num">14.8%</span><span class="n">15</span></td><td><span class="num">1.9%</span></td>
             <td class="sep"><span class="num">12.1%</span></td><td class="tier-all"><span class="num">13.3%</span></td>
-            <td class="sep"><span class="num">33.7%</span><span class="n">8</span></td><td><span class="num">6.6%</span></td>
+            <td class="sep"><span class="num">33.7%</span><span class="n">8</span></td><td><span class="num">6.6%</span></td><td><span class="num">18.8%</span></td>
             <td class="sep"><span class="num">8.9%</span></td></tr>
 
           <!-- OFF-VERSION / RETIRED GROUP -->
-          <tr class="grouphdr"><td colspan="13">Off-version / retired models — excluded from headline (older vLLM than BLIS's target; shown for context)</td></tr>
+          <tr class="grouphdr"><td colspan="14">Off-version / retired models — excluded from headline (older vLLM than BLIS's target; shown for context)</td></tr>
 
           <tr class="tier-all"><td class="dep"><span class="m">Llama-3.1-70B-Instruct</span> · H200 · tp2<span class="ver off">v0.29.0</span><div class="cfg">FP8 · 1k/1k · <span class="dotted">retired 2025-10-29</span></div></td>
             <td class="mono">12</td>
             <td class="sep"><span class="num">—</span></td><td><span class="num">41.3%</span><span class="n">12</span></td><td><span class="num">18.2%</span></td>
             <td class="sep"><span class="num">—</span></td><td><span class="num">26.7%</span><span class="n">12</span></td><td><span class="num">3.4%</span></td>
             <td class="sep"><span class="num">—</span></td><td><span class="num">22.9%</span></td>
-            <td class="sep"><span class="num">—</span></td><td><span class="num">—</span></td>
+            <td class="sep"><span class="num">—</span></td><td><span class="num">—</span></td><td><span class="num">—</span></td>
             <td class="sep"><span class="num">13.2%</span></td></tr>
         </tbody>
       </table>
