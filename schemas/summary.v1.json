@@ -221,6 +221,7 @@
       "properties": {
         "level": { "const": "point" },
         "concurrency": { "type": "integer", "minimum": 1 },
+        "point_key": { "type": "string", "description": "stable scenario|label|concurrency identity for the same-points delta" },
         "tier": { "enum": ["measured_or_resolved", "all"] },
         "measured": {
           "type": "object",

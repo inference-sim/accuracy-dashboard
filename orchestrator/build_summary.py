@@ -283,6 +283,9 @@ def point_node(p: dict[str, Any]) -> dict[str, Any]:
         "level": "point",
         "concurrency": p["concurrency"],
         "tier": p["tier"],
+        # Stable identity across snapshots, so the same-points delta can intersect two runs by
+        # the exact (scenario, label, concurrency) a point came from (RFC §4.4 / Q6).
+        "point_key": f'{p["scenario"]}\x1f{p["label"]}\x1f{p["concurrency"]}',
         "measured": {"ttft_ms": ms(p["meas_ttft_us"]), "tpot_ms": ms(p["meas_tpot_us"])},
         "predicted": {"ttft_ms": ms(p["pred_ttft_us"]), "tpot_ms": ms(p["pred_tpot_us"])},
         "error_pct": {"ttft": _r(p["mape_ttft"]), "tpot": _r(p["mape_tpot"])},
@@ -431,14 +434,15 @@ def _close(a, b, tol=1e-9):
 
 def same_points_delta(flat, previous_summary):
     """Change vs the previous snapshot over the INTERSECTION of points both snapshots scored
-    (RFC §4.4 / Q6). Returns None on the first snapshot."""
+    (RFC §4.4 / Q6). Returns None on the first snapshot. Both sides key by the stable point_key
+    (scenario|label|concurrency), so the intersection is the points genuinely scored by both."""
     if not previous_summary:
         return None
     prev_pts = _collect_prev_points(previous_summary)
     if not prev_pts:
         return None
     def key(p):
-        return (p["scenario"], p["label"], p["concurrency"])
+        return f'{p["scenario"]}\x1f{p["label"]}\x1f{p["concurrency"]}'
     cur = {key(p): p for p in flat}
     inter = [k for k in cur if k in prev_pts]
     if not inter:
@@ -457,29 +461,20 @@ def same_points_delta(flat, previous_summary):
 
 
 def _collect_prev_points(prev):
+    """Map the previous snapshot's point_key -> its per-point errors, so the delta intersects on
+    the exact points. Falls back to None-safe if an older snapshot lacks point_key."""
     out = {}
     def walk(node):
         if node.get("level") == "point":
+            k = node.get("point_key")
+            if k:
+                ep = node.get("error_pct", {}) or {}
+                out[k] = {"error_ttft": ep.get("ttft"), "error_tpot": ep.get("tpot")}
             return
-        for child in node.get("rows", []):
-            if child.get("level") == "point":
-                pass
+        for child in node.get("rows", []) or []:
             walk(child)
-    # The previous summary stores per-point error_pct on point nodes; collect them keyed by the
-    # topology scenario/label is not stored on the point, so we key by (model, workload, gpu,
-    # topo-label, concurrency) which is stable across snapshots.
-    def walk2(node, trail):
-        lvl = node.get("level")
-        if lvl == "point":
-            k = (*trail, node["concurrency"])
-            ep = node.get("error_pct", {})
-            out[k] = {"error_ttft": ep.get("ttft"), "error_tpot": ep.get("tpot")}
-            return
-        key_part = node.get("model") or node.get("label") or ""
-        for child in node.get("rows", []):
-            walk2(child, (*trail, key_part) if lvl else trail)
     for m in prev.get("matrix", []):
-        walk2(m, ())
+        walk(m)
     return out
 
 
