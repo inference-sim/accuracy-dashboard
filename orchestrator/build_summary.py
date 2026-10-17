@@ -283,9 +283,6 @@ def point_node(p: dict[str, Any]) -> dict[str, Any]:
         "level": "point",
         "concurrency": p["concurrency"],
         "tier": p["tier"],
-        # Stable identity across snapshots, so the same-points delta can intersect two runs by
-        # the exact (scenario, label, concurrency) a point came from (RFC §4.4 / Q6).
-        "point_key": f'{p["scenario"]}\x1f{p["label"]}\x1f{p["concurrency"]}',
         "measured": {"ttft_ms": ms(p["meas_ttft_us"]), "tpot_ms": ms(p["meas_tpot_us"])},
         "predicted": {"ttft_ms": ms(p["pred_ttft_us"]), "tpot_ms": ms(p["pred_tpot_us"])},
         "error_pct": {"ttft": _r(p["mape_ttft"]), "tpot": _r(p["mape_tpot"])},
@@ -430,54 +427,6 @@ def _close(a, b, tol=1e-9):
     return math.isclose(a, b, rel_tol=1e-9, abs_tol=tol)
 
 
-# ------------------------------------------------------------------------------- same-points delta
-
-def same_points_delta(flat, previous_summary):
-    """Change vs the previous snapshot over the INTERSECTION of points both snapshots scored
-    (RFC §4.4 / Q6). Returns None on the first snapshot. Both sides key by the stable point_key
-    (scenario|label|concurrency), so the intersection is the points genuinely scored by both."""
-    if not previous_summary:
-        return None
-    prev_pts = _collect_prev_points(previous_summary)
-    if not prev_pts:
-        return None
-    def key(p):
-        return f'{p["scenario"]}\x1f{p["label"]}\x1f{p["concurrency"]}'
-    cur = {key(p): p for p in flat}
-    inter = [k for k in cur if k in prev_pts]
-    if not inter:
-        return None
-    def delta(field_cur, field_prev):
-        cur_vals = [abs(cur[k][field_cur]) for k in inter if cur[k][field_cur] is not None and prev_pts[k].get(field_prev) is not None]
-        prev_vals = [abs(prev_pts[k][field_prev]) for k in inter if cur[k][field_cur] is not None and prev_pts[k].get(field_prev) is not None]
-        if not cur_vals:
-            return None
-        return round(sum(cur_vals) / len(cur_vals) - sum(prev_vals) / len(prev_vals), 4)
-    return {
-        "tpot_mape": delta("mape_tpot", "error_tpot"),
-        "ttft_mape": delta("mape_ttft", "error_ttft"),
-        "n_intersect": len(inter),
-    }
-
-
-def _collect_prev_points(prev):
-    """Map the previous snapshot's point_key -> its per-point errors, so the delta intersects on
-    the exact points. Falls back to None-safe if an older snapshot lacks point_key."""
-    out = {}
-    def walk(node):
-        if node.get("level") == "point":
-            k = node.get("point_key")
-            if k:
-                ep = node.get("error_pct", {}) or {}
-                out[k] = {"error_ttft": ep.get("ttft"), "error_tpot": ep.get("tpot")}
-            return
-        for child in node.get("rows", []) or []:
-            walk(child)
-    for m in prev.get("matrix", []):
-        walk(m)
-    return out
-
-
 # ------------------------------------------------------------------------------------- main
 
 def main(argv=None):
@@ -486,7 +435,6 @@ def main(argv=None):
     ap.add_argument("--corpus", required=True, help="direct corpus JSON (facets)")
     ap.add_argument("--out", required=True, help="output summary.json")
     ap.add_argument("--provenance", required=True, help="provenance JSON (CI-resolved inputs)")
-    ap.add_argument("--previous", help="previous summary.json for same-points delta", default=None)
     ap.add_argument("--engine-settings", help="engine-settings JSON for per-sweep resolved engine_version", default=None)
     ap.add_argument("--scenarios", help="scenario dir; engine_version read from each YAML (direct-path fallback)", default=None)
     ap.add_argument("--metricscore-log", help="metricscore stdout (logged, non-blocking)", default=None)
@@ -517,18 +465,6 @@ def main(argv=None):
     totals = metric_block_pair(flat)
     assert_self_consistent(flat, totals)
 
-    previous_summary = None
-    if args.previous:
-        try:
-            with open(args.previous) as fh:
-                previous_summary = json.load(fh)
-        except FileNotFoundError:
-            previous_summary = None
-
-    delta = same_points_delta(flat, previous_summary)
-    totals["measured_or_resolved"]["same_points_delta"] = delta
-    totals["all"]["same_points_delta"] = delta
-
     metricscore_comparison = None
     if args.metricscore_log:
         try:
@@ -541,7 +477,6 @@ def main(argv=None):
         "schema_version": 1,
         "snapshot_id": prov["snapshot_id"],
         "generated_at": prov["generated_at"],
-        "previous_snapshot_id": (previous_summary or {}).get("snapshot_id"),
         "provenance": prov["provenance"],
         "coverage": prov["coverage"],
         "known_artefacts": prov.get("known_artefacts", []),

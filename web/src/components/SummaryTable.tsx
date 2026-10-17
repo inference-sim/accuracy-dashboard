@@ -5,14 +5,13 @@
  * populates the points table (handled by the parent). Numbers are recomputed client-side from
  * the visible points, so a filter never shows a stale aggregate (RFC B3).
  */
-import { formatDelta, formatPct } from '../format'
+import { formatPct } from '../format'
 import type { RenderRow } from '../tree'
 import type { SortKey, SortSpec } from '../sort'
-import type { MetricBlockPair, SamePointsDelta, TierKey } from '../types'
+import type { MetricBlockPair, TierKey } from '../types'
 
 interface Props {
   totals: MetricBlockPair
-  totalsDelta: SamePointsDelta | null
   totalsPointCount: number
   rows: RenderRow[]
   tier: TierKey
@@ -60,10 +59,9 @@ function HeaderButton({
 }
 
 export function SummaryTable(props: Props) {
-  const { totals, totalsDelta, totalsPointCount, rows, tier, sort, onSort, selectedId } = props
+  const { totals, totalsPointCount, rows, tier, sort, onSort, selectedId } = props
   const tb = (b: MetricBlockPair) => b[tier]
   const t = tb(totals)
-  const delta = totalsDelta ? formatDelta(totalsDelta.tpot_mape) : null
 
   return (
     <div className="tscroll">
@@ -109,18 +107,12 @@ export function SummaryTable(props: Props) {
             <td />
             <td className="sep">
               <Num v={t.mape.ttft} />
-              {totalsDelta && formatDelta(totalsDelta.ttft_mape) && (
-                <span className={`delta ${formatDelta(totalsDelta.ttft_mape)!.dir}`}>
-                  {formatDelta(totalsDelta.ttft_mape)!.text}
-                </span>
-              )}
             </td>
             <td>
               <Num v={t.shape.ttft} />
             </td>
             <td className="sep">
               <Num v={t.mape.tpot} />
-              {delta && <span className={`delta ${delta.dir}`}>{delta.text}</span>}
             </td>
             <td>
               <Num v={t.shape.tpot} />

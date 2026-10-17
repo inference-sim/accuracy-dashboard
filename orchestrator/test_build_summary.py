@@ -112,40 +112,6 @@ def test_unscorable_rows_are_held_out_of_scoring():
         os.unlink(path)
 
 
-def test_same_points_delta_intersects_by_point_key():
-    # Regression: current points keyed one way and previous points keyed another → the
-    # intersection was always empty and the delta always null, even on a real second run.
-    # Both sides must key by the stable point_key.
-    prev_summary = {
-        "matrix": [
-            {"level": "model", "rows": [
-                {"level": "workload", "rows": [
-                    {"level": "gpu", "rows": [
-                        {"level": "topology", "rows": [
-                            {"level": "point", "concurrency": 1,
-                             "point_key": "s.yaml\x1f1k1k\x1f1",
-                             "error_pct": {"ttft": 40.0, "tpot": 20.0}},
-                        ]},
-                    ]},
-                ]},
-            ]},
-        ],
-    }
-    # current flat point at the SAME (scenario,label,concurrency), improved error
-    flat = [{"scenario": "s.yaml", "label": "1k1k", "concurrency": 1,
-             "mape_ttft": 30.0, "mape_tpot": 15.0}]
-    d = bs.same_points_delta(flat, prev_summary)
-    assert d is not None, "delta must not be null when a prior point intersects"
-    assert d["n_intersect"] == 1
-    assert math.isclose(d["ttft_mape"], 30.0 - 40.0)  # -10 (improved)
-    assert math.isclose(d["tpot_mape"], 15.0 - 20.0)  # -5 (improved)
-
-
-def test_same_points_delta_null_on_first_snapshot():
-    flat = [{"scenario": "s.yaml", "label": "1k1k", "concurrency": 1, "mape_ttft": 30.0, "mape_tpot": 15.0}]
-    assert bs.same_points_delta(flat, None) is None
-
-
 def test_self_consistency_catches_tampering():
     flat = [
         {"tier": "all", "mape_ttft": 10.0, "mape_tpot": 5.0, "shape_ttft": 2.0, "shape_tpot": 1.0},

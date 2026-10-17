@@ -17,7 +17,6 @@
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}_blis-.+_ix-.+$"
     },
     "generated_at": { "type": "string", "format": "date-time" },
-    "previous_snapshot_id": { "type": ["string", "null"] },
     "provenance": {
       "type": "object",
       "additionalProperties": false,
@@ -111,15 +110,6 @@
         "n": { "type": "integer", "minimum": 0 }
       }
     },
-    "samePointsDelta": {
-      "type": ["object", "null"],
-      "additionalProperties": false,
-      "properties": {
-        "tpot_mape": { "type": ["number", "null"] },
-        "ttft_mape": { "type": ["number", "null"] },
-        "n_intersect": { "type": "integer", "minimum": 0 }
-      }
-    },
     "metricBlock": {
       "type": "object",
       "additionalProperties": false,
@@ -127,8 +117,7 @@
       "properties": {
         "mape": { "$ref": "#/definitions/mapeShape" },
         "shape": { "$ref": "#/definitions/mapeShape" },
-        "noise_floor_pct": { "type": ["number", "null"] },
-        "same_points_delta": { "$ref": "#/definitions/samePointsDelta" }
+        "noise_floor_pct": { "type": ["number", "null"] }
       }
     },
     "metricBlockPair": {
@@ -221,7 +210,6 @@
       "properties": {
         "level": { "const": "point" },
         "concurrency": { "type": "integer", "minimum": 1 },
-        "point_key": { "type": "string", "description": "stable scenario|label|concurrency identity for the same-points delta" },
         "tier": { "enum": ["measured_or_resolved", "all"] },
         "measured": {
           "type": "object",

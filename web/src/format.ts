@@ -40,11 +40,3 @@ export function formatCount(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return EM_DASH
   return value.toLocaleString('en-US', { maximumFractionDigits: 0 })
 }
-
-/** The same-points delta badge, e.g. "▼0.4" (improved) / "▲1.1" (regressed). */
-export function formatDelta(value: number | null | undefined, digits = 1): { text: string; dir: 'down' | 'up' | 'flat' } | null {
-  if (value == null || !Number.isFinite(value)) return null
-  const dir = value < 0 ? 'down' : value > 0 ? 'up' : 'flat'
-  const arrow = dir === 'down' ? '▼' : dir === 'up' ? '▲' : ''
-  return { text: `${arrow}${Math.abs(value).toFixed(digits)}`, dir }
-}

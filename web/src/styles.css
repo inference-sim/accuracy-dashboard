@@ -72,7 +72,6 @@ td.gated .g{color:#c3ccbf}
 .disabled-note{color:#aab2a6;font-size:10px}
 tr.totals td{background:var(--accent-soft) !important;font-weight:600;border-top:2px solid var(--accent);border-bottom:2px solid var(--line-strong)}
 tr.totals .num{font-weight:700}
-.delta{font-family:var(--font-mono);font-size:10.5px;color:var(--accent);font-weight:600;margin-left:3px}
 .mono{font-family:var(--font-mono)}
 td .num{font-family:var(--font-mono);font-weight:500}
 td .n{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-left:3px}

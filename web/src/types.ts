@@ -13,17 +13,10 @@ export interface MapeShape {
   n: number
 }
 
-export interface SamePointsDelta {
-  tpot_mape: number | null
-  ttft_mape: number | null
-  n_intersect: number
-}
-
 export interface MetricBlock {
   mape: MapeShape
   shape: MapeShape
   noise_floor_pct?: number | null
-  same_points_delta?: SamePointsDelta | null
 }
 
 export interface MetricBlockPair {
@@ -125,7 +118,6 @@ export interface Summary {
   schema_version: 1
   snapshot_id: string
   generated_at: string
-  previous_snapshot_id: string | null
   provenance: Provenance
   coverage: Coverage
   known_artefacts?: string[]

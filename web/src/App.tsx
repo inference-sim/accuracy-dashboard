@@ -121,10 +121,8 @@ function Overview({
     visible.length > 0
   const effectiveTier = tierFellBack ? 'all' : route.tier
 
-  // The totals block is recomputed from the visible points too, so the headline matches the
-  // filtered view. same_points_delta is a snapshot-level number from the orchestrator.
+  // The totals block is recomputed from the visible points so the headline matches the filtered view.
   const totals = useMemo(() => aggregatePair(visible), [visible])
-  const storedDelta = summary.totals.measured_or_resolved.same_points_delta ?? null
 
   const rows = useMemo(() => buildRows(visible, expanded), [visible, expanded])
 
@@ -226,7 +224,6 @@ function Overview({
       <div className="tbl-title">Summary — mean TTFT/TPOT: MAPE &amp; shape</div>
       <SummaryTable
         totals={totals}
-        totalsDelta={storedDelta}
         totalsPointCount={visible.length}
         rows={orderedRows}
         tier={effectiveTier}

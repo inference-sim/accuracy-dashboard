@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { EM_DASH, formatCount, formatDelta, formatMs, formatPct, formatSignedPct } from './format'
+import { EM_DASH, formatCount, formatMs, formatPct, formatSignedPct } from './format'
 
 describe('format helpers never show NaN/blank (RFC B1)', () => {
   it('formatPct renders em dash for null/non-finite', () => {
@@ -26,11 +26,5 @@ describe('format helpers never show NaN/blank (RFC B1)', () => {
   it('formatCount groups thousands and em-dashes null', () => {
     expect(formatCount(1584)).toBe('1,584')
     expect(formatCount(null)).toBe(EM_DASH)
-  })
-
-  it('formatDelta picks a down arrow for improvement', () => {
-    expect(formatDelta(-0.4)).toEqual({ text: '▼0.4', dir: 'down' })
-    expect(formatDelta(1.1)).toEqual({ text: '▲1.1', dir: 'up' })
-    expect(formatDelta(null)).toBeNull()
   })
 })
