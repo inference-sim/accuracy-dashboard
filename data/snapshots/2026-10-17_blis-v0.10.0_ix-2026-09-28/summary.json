@@ -17,7 +17,7 @@
       "measurement_date_through": null,
       "measurement_sha256": "391a8eb04272f582a619d56b3e7d54f37bbc518b1588271ac79c48b9167a5218"
     },
-    "evaluator_commit": "e0ad395564c9987e76158fce35508f3f7d4cf082",
+    "evaluator_commit": "e8cbf710e9655bd390be0cac2d526d2ae5059cca",
     "scorer": "signedprobe"
   },
   "coverage": {
