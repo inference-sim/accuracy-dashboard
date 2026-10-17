@@ -2,7 +2,6 @@
   "schema_version": 1,
   "snapshot_id": "2026-10-17_blis-v0.10.0_ix-2026-09-28",
   "generated_at": "2026-10-17T00:00:00Z",
-  "previous_snapshot_id": null,
   "provenance": {
     "blis": {
       "release": "v0.10.0",
@@ -18,7 +17,7 @@
       "measurement_date_through": null,
       "measurement_sha256": "391a8eb04272f582a619d56b3e7d54f37bbc518b1588271ac79c48b9167a5218"
     },
-    "evaluator_commit": "3efa38fbdbe42cb257449c813b227a11a7fc5f99",
+    "evaluator_commit": "71752887a2335e13bad85e2fe545324b34362afe",
     "scorer": "signedprobe"
   },
   "coverage": {
@@ -33,7 +32,6 @@
     "gpt-oss-120b/h200 TTFT spikes (4)",
     "non-monotone-TPOT sweeps"
   ],
-  "target_vllm": "0.31.0",
   "metrics": [
     "ttft",
     "tpot"
@@ -54,8 +52,7 @@
         "tpot": null,
         "n": 0
       },
-      "noise_floor_pct": 1.6,
-      "same_points_delta": null
+      "noise_floor_pct": 1.6
     },
     "all": {
       "mape": {
@@ -68,8 +65,7 @@
         "tpot": 21.23725158196423,
         "n": 18
       },
-      "noise_floor_pct": 1.6,
-      "same_points_delta": null
+      "noise_floor_pct": 1.6
     }
   },
   "matrix": [
@@ -78,7 +74,7 @@
       "model": "deepseek-v4-pro",
       "source": "inferencex",
       "vllm_version": "0.29.0",
-      "on_target_version": false,
+      "on_target_version": null,
       "coverage": {
         "scored": 8,
         "total": 8
@@ -191,7 +187,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -364,7 +360,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -505,7 +501,7 @@
       "model": "gpt-oss-120b",
       "source": "inferencex",
       "vllm_version": "0.29.0",
-      "on_target_version": false,
+      "on_target_version": null,
       "coverage": {
         "scored": 8,
         "total": 8
@@ -618,7 +614,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -791,7 +787,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -932,7 +928,7 @@
       "model": "kimi-k2.5",
       "source": "inferencex",
       "vllm_version": "0.29.0",
-      "on_target_version": false,
+      "on_target_version": null,
       "coverage": {
         "scored": 4,
         "total": 4
@@ -1045,7 +1041,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -1186,7 +1182,7 @@
       "model": "minimax-m2.5",
       "source": "inferencex",
       "vllm_version": "0.29.0",
-      "on_target_version": false,
+      "on_target_version": null,
       "coverage": {
         "scored": 4,
         "total": 4
@@ -1299,7 +1295,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -1437,11 +1433,11 @@
     }
   ],
   "scope": {
-    "multinode": "toggle (hidden by default; disabled in v0.1.0 -- needs kernel change)",
+    "multinode": "toggle (hidden by default; disabled in v0.1.0)",
     "measured_exclusions": [
       "ttft_spike",
       "non_monotone_tpot_sweep"
     ],
-    "vllm_version_filter": "on-target"
+    "vllm_version_filter": "all"
   }
 }
