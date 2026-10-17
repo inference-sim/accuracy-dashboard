@@ -3,7 +3,7 @@
  * per concurrency), the leaf view from the mockup. Absolute units in ms (signedprobe emits µs;
  * the orchestrator converts). A missing value renders an em dash, never NaN/blank (RFC B1).
  */
-import { formatMs, formatSignedPct } from '../format'
+import { formatMs, formatSignedPct, formatVersion } from '../format'
 import type { FlatPoint } from '../aggregate'
 
 interface Props {
@@ -28,7 +28,7 @@ export function PointsTable({ points, title, vllm }: Props) {
     <>
       <div className="tbl-title" style={{ marginTop: 26 }}>
         {title}
-        {vllm && <span className="ver neutral">v{vllm.replace(/^v/, '')}</span>}{' '}
+        {vllm && <span className="ver neutral">{formatVersion(vllm)}</span>}{' '}
         <span className="facet">measured vs predicted per concurrency, absolute units · error %</span>
       </div>
       <div className="tscroll">

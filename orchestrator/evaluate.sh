@@ -63,6 +63,7 @@ git clone -q --depth 1 --branch "$kernel" https://github.com/inference-sim/blis-
 CORPUS="$WORK/inferencex_direct_corpus.json"
 ABS="$WORK/inferencex_direct_absolutes.json"
 SETTINGS="$WORK/inferencex_direct_settings.json"
+DIRECT="$WORK/inferencex_direct.json"   # carries each run's real container image → true vLLM version
 SCENARIOS="$WORK/scenarios"
 mkdir -p "$SCENARIOS"
 
@@ -191,6 +192,7 @@ log "shaping CSV into summary.json"
 OUT="$WORK/summary.json"
 python3 "$DASH_DIR/orchestrator/build_summary.py" \
   --csv "$CSV" --corpus "$CORPUS" --engine-settings "$SETTINGS" --scenarios "$SCENARIOS" \
+  ${DIRECT:+$([ -f "$DIRECT" ] && echo --direct "$DIRECT")} \
   --provenance "$PROV" --out "$OUT" --metricscore-log "$METRIC_LOG"
 
 log "validating summary.json against the local schema"

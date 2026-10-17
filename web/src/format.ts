@@ -41,3 +41,13 @@ export function formatCount(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return EM_DASH
   return value.toLocaleString('en-US', { maximumFractionDigits: 0 })
 }
+
+/**
+ * A vLLM version label. Numeric semver gets a "v" prefix (0.21.0 → "v0.21.0"); non-semver
+ * build tags (nightly, custom images like "deepseekv4-cu130") are shown verbatim — no "v".
+ */
+export function formatVersion(v: string | null | undefined): string {
+  if (!v) return EM_DASH
+  const bare = v.replace(/^v/, '')
+  return /^\d+\.\d+/.test(bare) ? `v${bare}` : v
+}

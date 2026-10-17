@@ -10,7 +10,7 @@ import { applyFilters } from './filter'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { PointsTable } from './components/PointsTable'
 import { SummaryTable } from './components/SummaryTable'
-import { formatCount } from './format'
+import { formatCount, formatVersion } from './format'
 import { parseRoute, routeToHash, type RouteState } from './route'
 import { buildRows } from './tree'
 import { nextSort, sortModelKeys, type SortKey, type SortSpec } from './sort'
@@ -214,7 +214,7 @@ function Overview({
             <option value="all">all versions</option>
             {versions.map((v) => (
               <option key={v} value={`v:${v}`}>
-                v{v.replace(/^v/, '')}
+                {formatVersion(v)}
               </option>
             ))}
           </select>

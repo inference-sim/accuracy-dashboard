@@ -5,7 +5,7 @@
  * populates the points table (handled by the parent). Numbers are recomputed client-side from
  * the visible points, so a filter never shows a stale aggregate (RFC B3).
  */
-import { formatPct } from '../format'
+import { formatPct, formatVersion } from '../format'
 import type { RenderRow } from '../tree'
 import type { SortKey, SortSpec } from '../sort'
 import type { MetricBlockPair, TierKey } from '../types'
@@ -27,10 +27,13 @@ function Num({ v }: { v: number | null }) {
   return <span className="num">{formatPct(v)}</span>
 }
 
-// A neutral per-row vLLM version badge (no pass/fail colouring — version is a facet, not a verdict).
-function VerBadge({ vllm }: { vllm: string | null }) {
-  if (!vllm) return null
-  return <span className="ver neutral">v{vllm.replace(/^v/, '')}</span>
+// The vLLM version facet for a row (no pass/fail colouring — a facet, not a verdict). A single
+// version shows its badge; a row that pools several shows "N versions" rather than claiming one
+// (so a model row spanning 8 builds never masquerades as one specific version).
+function VerCell({ versions }: { versions: string[] }) {
+  if (versions.length === 0) return null
+  if (versions.length === 1) return <span className="ver neutral">{formatVersion(versions[0]!)}</span>
+  return <span className="facet" title={versions.map(formatVersion).join(', ')}>{versions.length} versions</span>
 }
 
 function HeaderButton({
@@ -142,7 +145,7 @@ export function SummaryTable(props: Props) {
                   {isSelected && <span className="facet">← selected</span>}
                 </td>
                 <td>
-                  <VerBadge vllm={row.vllm} />
+                  <VerCell versions={row.versions} />
                 </td>
                 <td className="sep">
                   <Num v={b.mape.ttft} />

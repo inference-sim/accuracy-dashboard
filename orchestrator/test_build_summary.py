@@ -112,6 +112,21 @@ def test_unscorable_rows_are_held_out_of_scoring():
         os.unlink(path)
 
 
+def test_vllm_version_parser_handles_real_and_future_tags():
+    # The real per-run vLLM version comes from the container image tag. Must handle the shapes
+    # the dump actually carries AND degrade sensibly on unseen future formats (never crash).
+    f = bs._parse_vllm_version
+    assert f("vllm/vllm-openai:v0.21.0") == "0.21.0"
+    assert f("vllm/vllm-openai:v0.31.0") == "0.31.0"       # a future on-target-ish version
+    assert f("img:v0.20.1@sha256:deadbeef") == "0.20.1"    # digest stripped
+    assert f("ghcr.io/x/vllm:0.33.2") == "0.33.2"          # no leading v
+    assert f("img:v1.0.0-rc1") == "1.0.0"                  # future major
+    assert f("img:nightly-abc123") == "nightly"
+    assert f("img:deepseekv4-cu130") == "deepseekv4-cu130"  # custom build → raw tag, not invented
+    assert f("") is None
+    assert f(None) is None
+
+
 def test_self_consistency_catches_tampering():
     flat = [
         {"tier": "all", "mape_ttft": 10.0, "mape_tpot": 5.0, "shape_ttft": 2.0, "shape_tpot": 1.0},

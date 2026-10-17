@@ -26,6 +26,7 @@ import glob
 import json
 import math
 import os
+import re
 import sys
 from collections import OrderedDict
 from typing import Any
@@ -174,6 +175,44 @@ def _read_scenario_versions(scenarios_dir: str) -> dict[str, str]:
                         break
         except OSError:
             continue
+    return out
+
+
+def _parse_vllm_version(image: str | None) -> str | None:
+    """Extract the real vLLM version from an InferenceX run's container image tag. The scenario
+    YAML's engine_version is a generator-fixed constant (not the run's actual build), so the
+    truthful per-run version is the image tag the deployment was measured on. Examples:
+    'vllm/vllm-openai:v0.21.0' -> '0.21.0'; '...:v0.20.1@sha256:..' -> '0.20.1';
+    '...:nightly-abc' -> 'nightly'; '...:deepseekv4-cu130' -> 'deepseekv4-cu130' (custom build)."""
+    if not image:
+        return None
+    tag = image.split(":", 1)[1] if ":" in image else image
+    tag = tag.split("@", 1)[0]  # drop @sha256 digest
+    m = re.match(r"v?(\d+\.\d+\.\d+)", tag) or re.match(r"v?(\d+\.\d+)", tag)
+    if m:
+        return m.group(1)
+    if tag.startswith("nightly"):
+        return "nightly"
+    return tag or None
+
+
+def _read_direct_versions(path: str) -> dict[tuple[str, str], str]:
+    """Per-(scenario,label) REAL vLLM version, parsed from each sweep's measured container image
+    in the direct-extractor JSON. This is the single truthful source for which vLLM build each
+    row was measured on. Only the clean image field is read; no third-party keys are copied."""
+    out: dict[tuple[str, str], str] = {}
+    try:
+        with open(path) as fh:
+            doc = json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return out
+    for sw in doc.get("sweeps", []):
+        img = sw.get("image")
+        if isinstance(img, list):
+            img = img[0] if img else None
+        v = _parse_vllm_version(img)
+        if v:
+            out[(sw["scenario"], sw["label"])] = v
     return out
 
 
@@ -436,7 +475,8 @@ def main(argv=None):
     ap.add_argument("--out", required=True, help="output summary.json")
     ap.add_argument("--provenance", required=True, help="provenance JSON (CI-resolved inputs)")
     ap.add_argument("--engine-settings", help="engine-settings JSON for per-sweep resolved engine_version", default=None)
-    ap.add_argument("--scenarios", help="scenario dir; engine_version read from each YAML (direct-path fallback)", default=None)
+    ap.add_argument("--scenarios", help="scenario dir; engine_version read from each YAML (fallback)", default=None)
+    ap.add_argument("--direct", help="inferencex_direct.json; the REAL per-sweep vLLM version from each run's image", default=None)
     ap.add_argument("--metricscore-log", help="metricscore stdout (logged, non-blocking)", default=None)
     args = ap.parse_args(argv)
 
@@ -446,15 +486,22 @@ def main(argv=None):
     rows, unscorable = read_signedprobe_csv(args.csv)
     facets = read_corpus_facets(args.corpus)
 
-    # Per-sweep measured vLLM engine_version comes from the engine-settings file (the run's
-    # resolved args), else the scenario YAML's engine_version (the direct path's source). A sweep
-    # with neither carries null, which the UI shows as a marker — never NaN, never an assumed value.
+    # Per-sweep vLLM version, truthful-source-first:
+    #   1. the REAL image tag from the direct-extractor JSON (the actual build the run used);
+    #   2. the engine-settings resolved.engine_version (empty on the direct path);
+    #   3. the scenario YAML's engine_version (a generator-fixed constant — last resort).
+    # A sweep with none carries null, shown as a marker — never NaN, never an assumed value.
+    # (1) is load-bearing for a fair comparison: without it every row mislabels as the scenario
+    # default, pooling runs across vLLM versions under one wrong badge.
     vllm_by_sweep = {}
     noise_by_sweep = {}
+    direct_versions = _read_direct_versions(args.direct) if args.direct else {}
     engine_versions = _read_engine_versions(args.engine_settings) if args.engine_settings else {}
     scenario_versions = _read_scenario_versions(args.scenarios) if args.scenarios else {}
     for (scenario, label) in facets:
-        ev = engine_versions.get((scenario, label)) or scenario_versions.get(scenario)
+        ev = (direct_versions.get((scenario, label))
+              or engine_versions.get((scenario, label))
+              or scenario_versions.get(scenario))
         vllm_by_sweep[(scenario, label)] = ev
         noise_by_sweep[(scenario, label)] = None
 

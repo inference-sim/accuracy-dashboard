@@ -15,9 +15,11 @@ export interface RenderRow {
   facet: string
   /** the metrics recomputed from this node's visible points */
   metrics: MetricBlockPair
-  /** vLLM badge value for model/topology rows (null = no badge on this row) */
-  vllm: string | null
-  onTarget: boolean | null
+  /** the distinct vLLM versions among this row's visible points. The badge shows the single
+   *  version when there's exactly one; when a row pools several (model/workload/GPU rows almost
+   *  always do), it shows "N versions" rather than an arbitrary pick (never claims one version
+   *  for data that spans many). */
+  versions: string[]
   /** count of visible points under this node */
   pointCount: number
   /** depth 0..3 → r0..r3 */
@@ -39,13 +41,16 @@ function group<T>(items: T[], keyfn: (t: T) => string): Map<string, T[]> {
   return m
 }
 
+/** The distinct, sorted vLLM versions among a set of points — the honest version facet for a row. */
+function distinctVersions(pts: FlatPoint[]): string[] {
+  return [...new Set(pts.map((p) => p.engineVersion).filter((v): v is string => !!v))].sort()
+}
+
 /** Build the ordered, flattened render rows honoring which node ids are expanded. */
 export function buildRows(points: FlatPoint[], expanded: Set<string>): RenderRow[] {
   const rows: RenderRow[] = []
   const byModel = group(points, (p) => p.model)
   for (const [model, mpts] of [...byModel.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-    const vllm = mpts.find((p) => p.modelVllm)?.modelVllm ?? null
-    const onTarget = mpts.find((p) => p.modelOnTarget != null)?.modelOnTarget ?? null
     const nWl = new Set(mpts.map((p) => p.workloadLabel)).size
     const nGpu = new Set(mpts.map((p) => p.gpu)).size
     const nTopo = new Set(mpts.map((p) => p.sweepKey)).size
@@ -53,7 +58,7 @@ export function buildRows(points: FlatPoint[], expanded: Set<string>): RenderRow
     rows.push({
       level: 'model', label: model,
       facet: `${nGpu} gpu · ${nWl} wl · ${nTopo} topo`,
-      metrics: aggregatePair(mpts), vllm, onTarget,
+      metrics: aggregatePair(mpts), versions: distinctVersions(mpts),
       pointCount: mpts.length, depth: 0, id: modelId,
     })
     if (!expanded.has(modelId)) continue
@@ -65,7 +70,7 @@ export function buildRows(points: FlatPoint[], expanded: Set<string>): RenderRow
       rows.push({
         level: 'workload', label: shortWorkload(wl),
         facet: w0.isl != null && w0.osl != null ? `isl ${w0.isl} · osl ${w0.osl}` : wl,
-        metrics: aggregatePair(wpts), vllm: null, onTarget: null,
+        metrics: aggregatePair(wpts), versions: distinctVersions(wpts),
         pointCount: wpts.length, depth: 1, id: wlId,
       })
       if (!expanded.has(wlId)) continue
@@ -77,7 +82,7 @@ export function buildRows(points: FlatPoint[], expanded: Set<string>): RenderRow
         rows.push({
           level: 'gpu', label: gpu,
           facet: g0.precision ? g0.precision : '',
-          metrics: aggregatePair(gpts), vllm: null, onTarget: null,
+          metrics: aggregatePair(gpts), versions: distinctVersions(gpts),
           pointCount: gpts.length, depth: 2, id: gpuId,
         })
         if (!expanded.has(gpuId)) continue
@@ -92,7 +97,7 @@ export function buildRows(points: FlatPoint[], expanded: Set<string>): RenderRow
           rows.push({
             level: 'topology', label: topo,
             facet: facetBits,
-            metrics: aggregatePair(tpts), vllm: t0.engineVersion, onTarget: t0.onTargetVersion,
+            metrics: aggregatePair(tpts), versions: distinctVersions(tpts),
             pointCount: tpts.length, depth: 3, id: topoId,
             sweepKey: t0.sweepKey,
           })
