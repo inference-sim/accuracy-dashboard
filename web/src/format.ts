@@ -29,8 +29,10 @@ export function formatSignedPct(value: number | null | undefined, digits = 1): s
 /** Renders an absolute latency in ms. Reused convention from the leaderboard. */
 export function formatMs(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return EM_DASH
-  if (value >= 1000) return `${(value / 1000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}s`
-  // Keep 3 significant-ish digits for the small decode numbers (7.18) but whole ms for large.
+  // Always milliseconds (the points-table columns are labelled "(ms)"), so a measured value and
+  // BLIS's prediction in the same row are directly comparable — never "2.25s" beside "643".
+  // Precision scales with magnitude: small decode numbers keep decimals (7.18), large TTFTs show
+  // whole ms with thousands grouping (2,245).
   const digits = value >= 100 ? 0 : value >= 10 ? 1 : 2
   return value.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })
 }

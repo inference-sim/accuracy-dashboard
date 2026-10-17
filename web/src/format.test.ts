@@ -16,10 +16,11 @@ describe('format helpers never show NaN/blank (RFC B1)', () => {
     expect(formatSignedPct(null)).toBe(EM_DASH)
   })
 
-  it('formatMs scales ms→s and keeps small decode numbers readable', () => {
+  it('formatMs always stays in ms (no seconds switch) so meas/pred are comparable', () => {
     expect(formatMs(7.18)).toBe('7.18')
     expect(formatMs(821)).toBe('821')
-    expect(formatMs(1500)).toBe('1.50s')
+    expect(formatMs(1500)).toBe('1,500') // ms with thousands grouping, never "1.50s"
+    expect(formatMs(2245)).toBe('2,245')
     expect(formatMs(null)).toBe(EM_DASH)
   })
 
