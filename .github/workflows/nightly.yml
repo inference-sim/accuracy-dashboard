@@ -127,9 +127,13 @@ jobs:
 
       - name: Stage the fresh snapshot for the site + tests
         run: |
-          mkdir -p web/public/data/latest data/latest
+          snap_id=$(python3 -c "import json;print(json.load(open('.work/summary.json'))['snapshot_id'])")
+          mkdir -p web/public/data/latest "web/public/data/snapshots/${snap_id}" data/latest
           cp .work/summary.json web/public/data/latest/summary.json
+          cp .work/summary.json "web/public/data/snapshots/${snap_id}/summary.json"
           cp .work/summary.json data/latest/summary.json
+          # The dev-server smoke needs a real index.json (production always has one).
+          python3 orchestrator/update_index.py --data-dir web/public/data --retention-days 30 --today "$(date -u +%F)"
 
       - name: Headless render smoke-test (zero console errors, real data — RFC B1)
         working-directory: web

@@ -47,11 +47,25 @@ if (server) await new Promise((r) => server.listen(PORT, r))
 const browser = await chromium.launch()
 const page = await browser.newPage()
 const problems = []
+// data/index.json is OPTIONAL by design: loadIndex() tolerates its absence (a site published
+// before the run-picker existed) and degrades to latest-only. A 404 on it is expected, not a
+// defect. The browser's generic "Failed to load resource: 404" console message does NOT carry
+// the URL, so we can't filter by text — instead we track which URLs actually 4xx'd via the
+// `response` event, and treat a bare 404 console error as noise IFF the only 4xx responses were
+// the optional index. Any other 4xx (or any non-404 console error) is fatal.
+const bad4xx = [] // non-index URLs that returned >=400
+const consoleErrors = [] // collected, judged at the end (avoids a console/response ordering race)
+const isOptionalIndex = (u) => /index\.json(\?|$)/.test(u)
+page.on('response', (r) => {
+  if (r.status() >= 400 && !isOptionalIndex(r.url())) bad4xx.push(`${r.status()} ${r.url()}`)
+})
 page.on('console', (m) => {
-  if (m.type() === 'error') problems.push(`console.error: ${m.text()}`)
+  if (m.type() === 'error') consoleErrors.push(m.text())
 })
 page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`))
-page.on('requestfailed', (r) => problems.push(`requestfailed: ${r.url()} ${r.failure()?.errorText}`))
+page.on('requestfailed', (r) => {
+  if (!isOptionalIndex(r.url())) problems.push(`requestfailed: ${r.url()} ${r.failure()?.errorText}`)
+})
 
 let ok = true
 try {
@@ -78,6 +92,14 @@ try {
 } catch (e) {
   problems.push(`navigation: ${e.message}`)
   ok = false
+}
+
+// Judge console errors now that all responses have settled. A bare "Failed to load resource: 404"
+// with NO non-index 4xx is the optional data/index.json — expected, ignore. Everything else fatal.
+for (const t of consoleErrors) {
+  const isBare404 = /Failed to load resource/.test(t) && /404|Not Found/.test(t)
+  if (isBare404 && bad4xx.length === 0) continue
+  problems.push(`console.error: ${t}`)
 }
 
 await browser.close()
