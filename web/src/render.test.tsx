@@ -143,9 +143,22 @@ describe('App renders the real CI-shaped snapshot', () => {
     expect(html).toContain('<select') // the picker dropdown is present
   })
 
-  it('omits the run-picker when there is only one run (or no index)', () => {
+  it('omits the run-picker entirely when there is no index', () => {
     const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={null} />)
     expect(html).not.toContain('Nightly run')
+  })
+
+  it('shows the run-picker (disabled, no "re-run" note) for a single-run index', () => {
+    const index = {
+      schema_version: 1 as const,
+      latest: 'a',
+      retention_days: 30,
+      runs: [{ snapshot_id: 'a', generated_at: null, blis_release: 'v0.10.0', ix_release: 'db-dump/2026-09-28', path: 'snapshots/a/summary.json' }],
+    }
+    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={index} />)
+    expect(html).toContain('Nightly run') // picker shown as provenance
+    expect(html).toContain('disabled') // but not interactive with only one run
+    expect(html).not.toContain('does not re-run') // note only when there are older runs
   })
 })
 

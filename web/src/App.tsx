@@ -313,11 +313,12 @@ function Layout({
         <p className="sub">
           How accurately BLIS predicts real inference latency, scored nightly against SemiAnalysis InferenceX.
         </p>
-        {runs.length > 1 && (
+        {runs.length >= 1 && (
           <>
             <div className="seclabel">Nightly run</div>
             <select
               className="box runsel"
+              disabled={runs.length === 1}
               value={picker.run ?? runs[0]!.snapshot_id}
               onChange={(e) => {
                 const id = e.target.value
@@ -331,7 +332,9 @@ function Layout({
                 </option>
               ))}
             </select>
-            <div className="runsel-note">Viewing an older run shows its full results — it does not re-run.</div>
+            {runs.length > 1 && (
+              <div className="runsel-note">Viewing an older run shows its full results — it does not re-run.</div>
+            )}
           </>
         )}
         {p && (
