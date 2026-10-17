@@ -561,7 +561,7 @@ def main(argv=None):
         "totals": totals,
         "matrix": matrix,
         "scope": {
-            "multinode": "toggle (hidden by default; disabled in v0.1.0, planned for a future release)",
+            "multinode": "toggle (hidden by default; disabled in v0.1.0)",
             "measured_exclusions": ["ttft_spike", "non_monotone_tpot_sweep"],
             "vllm_version_filter": "on-target",
         },

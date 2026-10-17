@@ -177,11 +177,11 @@ function Overview({
       </p>
 
       <div className="chips">
-        <span className={`toggle disabled`} title="Multi-node scoring is planned for a future release">
+        <span className={`toggle disabled`} title="Disabled in v0.1.0">
           <span className="sw">
             <span className="dot" />
           </span>
-          multi-node <span className="disabled-note">(disabled)</span>
+          multi-node <span className="disabled-note">(disabled in v0.1.0)</span>
         </span>
         <span className="flt">
           tier{' '}
