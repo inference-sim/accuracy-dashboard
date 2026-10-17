@@ -46,6 +46,12 @@ TIER_MAP = {
     "STRICT": "measured_or_resolved",
     "ALL (approximate)": "all",
 }
+# UNSCORABLE is a real tier signedprobe emits for points BLIS cannot score end-to-end — chiefly
+# speculative (mtp) sweeps, where `blis replay` refuses a drafting scenario with no acceptance
+# rate. Per RFC §4.4 these are NOT scored into the metrics; they are counted in coverage as
+# not_scored (reason no_acceptance_rate for mtp). So an UNSCORABLE row is dropped from scoring,
+# never folded into "all".
+TIER_UNSCORABLE = "UNSCORABLE"
 # "all" is the superset: every measured_or_resolved point also counts in "all".
 SCHEMA_TIERS = ["measured_or_resolved", "all"]
 
@@ -59,7 +65,9 @@ class ColumnContractError(RuntimeError):
 
 # ----------------------------------------------------------------------------- CSV ingest
 
-def read_signedprobe_csv(path: str) -> list[dict[str, Any]]:
+def read_signedprobe_csv(path: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Return (scored_rows, unscorable_rows). Scored rows carry a schema tier; unscorable rows
+    (chiefly mtp) are held out of scoring and counted as not_scored (RFC §4.4)."""
     with open(path, newline="") as fh:
         reader = csv.reader(fh)
         try:
@@ -75,7 +83,8 @@ def read_signedprobe_csv(path: str) -> list[dict[str, Any]]:
                 f"  expected: {EXPECTED_HEADER}\n"
                 f"  got:      {header}"
             )
-        rows = []
+        rows: list[dict[str, Any]] = []
+        unscorable: list[dict[str, Any]] = []
         for raw in reader:
             if not raw:
                 continue
@@ -84,19 +93,22 @@ def read_signedprobe_csv(path: str) -> list[dict[str, Any]]:
             for k in ("meas_tpot_us", "pred_tpot_us", "meas_ttft_us", "pred_ttft_us"):
                 r[k] = float(r[k])
             tier = r["tier_unbracketed"]
+            if tier == TIER_UNSCORABLE:
+                unscorable.append(r)
+                continue
             if tier not in TIER_MAP:
                 raise ColumnContractError(
                     f"signedprobe emitted an unknown tier {tier!r} -- update TIER_MAP."
                 )
             r["tier"] = TIER_MAP[tier]
             rows.append(r)
-    if not rows:
+    if not rows and not unscorable:
         # A probe that emitted only its header is a failure, not a result (mirrors signedprobe
         # itself, which exits 1 in that case).
         raise ColumnContractError(
             f"signedprobe CSV {path} has a header but no data rows -- nothing was scored."
         )
-    return rows
+    return rows, unscorable
 
 
 def read_corpus_facets(path: str) -> dict[tuple[str, str], dict[str, Any]]:
@@ -488,7 +500,7 @@ def main(argv=None):
     with open(args.provenance) as fh:
         prov = json.load(fh)
 
-    rows = read_signedprobe_csv(args.csv)
+    rows, unscorable = read_signedprobe_csv(args.csv)
     facets = read_corpus_facets(args.corpus)
 
     target_vllm = prov.get("target_vllm", "0.31.0")

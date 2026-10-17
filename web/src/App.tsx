@@ -102,7 +102,19 @@ function Overview({
   setExpanded: (s: Set<string>) => void
 }) {
   const allPoints = useMemo(() => flattenPoints(summary), [summary])
-  const visible = useMemo(() => applyFilters(allPoints, route), [allPoints, route])
+  const filtered = useMemo(() => applyFilters(allPoints, route), [allPoints, route])
+  const visible = filtered.points
+
+  // Effective tier: the default is measured_or_resolved, but if a snapshot has zero
+  // measured-or-resolved points (the direct dump path leaves settings resolved, so every point
+  // lands in "all") we fall back to the "all" tier rather than show an empty headline — the
+  // same graceful principle as the on-target fallback. The user's explicit tier click is always
+  // honoured; this only rescues the DEFAULT.
+  const tierFellBack =
+    route.tier === 'measured_or_resolved' &&
+    visible.filter((p) => p.tier === 'measured_or_resolved').length === 0 &&
+    visible.length > 0
+  const effectiveTier = tierFellBack ? 'all' : route.tier
 
   // The totals block is recomputed from the visible points too, so the headline matches the
   // filtered view. same_points_delta is a snapshot-level number from the orchestrator.
@@ -114,7 +126,7 @@ function Overview({
   // Sort reorders only the model-level rows; children follow their parent.
   const orderedRows = useMemo(() => {
     const modelRows = rows.filter((r) => r.level === 'model')
-    const order = sortModelKeys(modelRows, sort, route.tier)
+    const order = sortModelKeys(modelRows, sort, effectiveTier)
     const rank = new Map(order.map((label, i) => [label, i]))
     // Stable: group rows by their owning model, then emit models in sorted order.
     const byModel = new Map<string, typeof rows>()
@@ -128,7 +140,7 @@ function Overview({
     return [...byModel.entries()]
       .sort((a, b) => (rank.get(a[0]) ?? 0) - (rank.get(b[0]) ?? 0))
       .flatMap(([, rs]) => rs)
-  }, [rows, sort, route.tier])
+  }, [rows, sort, effectiveTier])
 
   const onToggle = (id: string) => {
     const next = new Set(expanded)
@@ -141,9 +153,9 @@ function Overview({
   const selectedPoints: FlatPoint[] = useMemo(() => {
     if (!route.sel) return []
     const tierScoped =
-      route.tier === 'all' ? visible : visible.filter((p) => p.tier === 'measured_or_resolved')
+      effectiveTier === 'all' ? visible : visible.filter((p) => p.tier === 'measured_or_resolved')
     return tierScoped.filter((p) => p.sweepKey === route.sel)
-  }, [visible, route.sel, route.tier])
+  }, [visible, route.sel, effectiveTier])
 
   const selFirst = selectedPoints[0]
   const pointsTitle = selFirst
@@ -188,6 +200,7 @@ function Overview({
               all
             </span>
           </span>
+          {tierFellBack && <span className="disabled-note">(no measured·resolved points — showing all)</span>}
         </span>
         <span className="flt">
           vLLM version{' '}
@@ -200,13 +213,21 @@ function Overview({
         </span>
       </div>
 
+      {filtered.onTargetFellBack && (
+        <div className="fallback-note" role="status">
+          No points in this snapshot ran on BLIS's target vLLM v{summary.target_vllm} — showing{' '}
+          <b>all versions</b> instead (every scored point is off-target). Accuracy here mixes vLLM
+          versions; it is not the on-target headline.
+        </div>
+      )}
+
       <div className="tbl-title">Summary — mean TTFT/TPOT: MAPE &amp; shape</div>
       <SummaryTable
         totals={totals}
         totalsDelta={storedDelta}
         totalsPointCount={visible.length}
         rows={orderedRows}
-        tier={route.tier}
+        tier={effectiveTier}
         targetVllm={summary.target_vllm}
         sort={sort}
         onSort={(k: SortKey) => setSort(nextSort(sort, k))}

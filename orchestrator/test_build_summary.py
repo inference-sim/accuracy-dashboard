@@ -94,6 +94,24 @@ def test_header_contract_rejects_empty_csv():
         os.unlink(path)
 
 
+def test_unscorable_rows_are_held_out_of_scoring():
+    # signedprobe emits mtp points with tier UNSCORABLE; they must be returned separately and
+    # never scored into the metrics (RFC §4.4 — not_scored:no_acceptance_rate).
+    header = ",".join(bs.EXPECTED_HEADER)
+    with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False) as fh:
+        fh.write(header + "\n")
+        fh.write("ok.yaml,m,b200,1k1k,1,7000,8000,160000,150000,ALL (approximate)\n")
+        fh.write("mtp.yaml,m,b200,1k1k,1,7000,8000,160000,150000,UNSCORABLE\n")
+        path = fh.name
+    try:
+        rows, unscorable = bs.read_signedprobe_csv(path)
+        assert len(rows) == 1 and rows[0]["scenario"] == "ok.yaml"
+        assert len(unscorable) == 1 and unscorable[0]["scenario"] == "mtp.yaml"
+        assert rows[0]["tier"] == "all"
+    finally:
+        os.unlink(path)
+
+
 def test_self_consistency_catches_tampering():
     flat = [
         {"tier": "all", "mape_ttft": 10.0, "mape_tpot": 5.0, "shape_ttft": 2.0, "shape_tpot": 1.0},

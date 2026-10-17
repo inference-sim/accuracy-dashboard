@@ -136,12 +136,19 @@ python3 - "$PROV" "$BLIS_TAG" "$SIM_SHA" "$catalog" "$registry" "$kernel" "$IX_T
 import json, sys, csv
 (out, blis_tag, sim_sha, catalog, registry, kernel, ix_tag, ix_date, meas_sha, today, csv_path, corpus_path) = sys.argv[1:13]
 # Coverage: compare the corpus against signedprobe's CSV rows (RFC §4.4) — the pipeline never
-# parses signedprobe's stderr. A corpus point with no emitted CSV row is not_scored.
-emitted = set()
+# parses signedprobe's stderr. A corpus point with no SCORED CSV row is not_scored. An emitted
+# row whose tier is UNSCORABLE (chiefly mtp — blis refuses a drafting scenario with no
+# acceptance rate) is counted as not_scored:no_acceptance_rate, never as scored.
+scored_keys = set()
+unscorable_keys = set()
 with open(csv_path, newline="") as fh:
     r = csv.DictReader(fh)
     for row in r:
-        emitted.add((row["scenario"], row["label"], row["concurrency"]))
+        key = (row["scenario"], row["label"], row["concurrency"])
+        if row["tier_unbracketed"] == "UNSCORABLE":
+            unscorable_keys.add(key)
+        else:
+            scored_keys.add(key)
 corpus = json.load(open(corpus_path))
 total_points = 0
 not_scored = 0
@@ -151,12 +158,14 @@ for sw in corpus.get("sweeps", []):
     for p in sw.get("points", []):
         total_points += 1
         key = (sw["scenario"], sw["label"], str(p["concurrency"]))
-        if key not in emitted:
-            not_scored += 1
-            if spec and spec != "none":
-                reasons["no_acceptance_rate"] = reasons.get("no_acceptance_rate", 0) + 1
-            else:
-                reasons["skipped_or_run_error"] = reasons.get("skipped_or_run_error", 0) + 1
+        if key in scored_keys:
+            continue
+        not_scored += 1
+        if (spec and spec != "none") or key in unscorable_keys:
+            reasons["no_acceptance_rate"] = reasons.get("no_acceptance_rate", 0) + 1
+        else:
+            reasons["skipped_or_run_error"] = reasons.get("skipped_or_run_error", 0) + 1
+emitted = scored_keys
 snapshot_id = f"{today}_blis-{blis_tag}_ix-{ix_date}"
 doc = {
   "snapshot_id": snapshot_id,

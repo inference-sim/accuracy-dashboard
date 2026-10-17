@@ -41,15 +41,23 @@ describe('App renders the real CI-shaped snapshot', () => {
   })
 
   it('renders every model when the populated tier is viewed (via deep-link)', () => {
-    // This fixture's real blis-replay points land in the "all" tier (fabricated absolutes
-    // can't match prompt-lengths evidence, so the scorer marks them approximate — a fixture
-    // artefact, not a UI bug; CI's real dump tiers them measured-or-resolved). Drive the UI to
-    // the "all" tier the way a user's deep-link would, then every model must render.
+    // The real dump's vLLM runs are all off-target (v0.29.0 vs target v0.31.0), so the
+    // on-target default falls back to all versions (RFC §6 open-question 2) — every model must
+    // still render. Drive to the "all" tier the way a user's deep-link would.
     const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} initialHash="#/?tier=all" />)
     expect(html).toContain('deepseek-v4-pro')
     expect(html).toContain('gpt-oss-120b')
     expect(html).toContain('kimi-k2.5')
     expect(html).toContain('minimax-m2.5')
+  })
+
+  it('falls back to all versions (with a banner) when no points are on-target', () => {
+    // Default view = on-target; the real snapshot has zero on-target points, so the UI must not
+    // show an empty headline — it falls back and says so (RFC §6 open-question 2).
+    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} />)
+    expect(html).toContain('showing')
+    expect(html).toContain('all versions')
+    expect(html).toContain('deepseek-v4-pro') // data visible, not an empty table
   })
 
   it('a deep-linked selected topology populates the points table with measured vs predicted', () => {
@@ -93,12 +101,17 @@ describe('App renders the real CI-shaped snapshot', () => {
 })
 
 describe('client-side aggregation keeps filters honest (RFC B3)', () => {
-  it('on-target filter changes the point count vs all-versions', () => {
+  it('on-target filter never yields more points than all-versions', () => {
     const summary = loadFixture()
     const all = flattenPoints(summary)
     const onTarget = applyFilters(all, { sel: null, tier: 'all', vllm: 'on-target', multinode: false })
     const allVersions = applyFilters(all, { sel: null, tier: 'all', vllm: 'all', multinode: false })
-    expect(allVersions.length).toBeGreaterThanOrEqual(onTarget.length)
+    // With a real snapshot that has zero on-target points, on-target falls back to all — so the
+    // counts are equal and the fallback flag is set. In general on-target <= all-versions.
+    expect(onTarget.points.length).toBeLessThanOrEqual(allVersions.points.length)
+    if (onTarget.points.length === allVersions.points.length) {
+      expect(onTarget.onTargetFellBack).toBe(true)
+    }
   })
 
   it('totals recompute from visible points (not the stored node metrics)', () => {

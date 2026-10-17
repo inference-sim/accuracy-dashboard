@@ -139,3 +139,8 @@ td .na { color: var(--line-strong); font-family: var(--font-mono); }
 /* empty points-table hint */
 .pts-empty { padding: 18px; color: var(--muted); font-size: 12.5px; }
 .notscored-detail { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* on-target → all-versions fallback banner (RFC §6 open-question 2) */
+.fallback-note { border: 1px solid var(--warn-line); background: var(--warn-bg);
+  color: var(--warn-ink); padding: 9px 12px; border-radius: 6px; margin: 0 0 14px;
+  font-size: 12.5px; line-height: 1.45; }
