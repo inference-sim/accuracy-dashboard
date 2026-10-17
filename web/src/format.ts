@@ -27,13 +27,12 @@ export function formatSignedPct(value: number | null | undefined, digits = 1): s
 }
 
 /** Renders an absolute latency in ms. Reused convention from the leaderboard. */
-export function formatMs(value: number | null | undefined): string {
+export function formatMs(value: number | null | undefined, digits: number): string {
   if (value == null || !Number.isFinite(value)) return EM_DASH
-  // Always milliseconds (the points-table columns are labelled "(ms)"), so a measured value and
-  // BLIS's prediction in the same row are directly comparable — never "2.25s" beside "643".
-  // Precision scales with magnitude: small decode numbers keep decimals (7.18), large TTFTs show
-  // whole ms with thousands grouping (2,245).
-  const digits = value >= 100 ? 0 : value >= 10 ? 1 : 2
+  // Always milliseconds (the points-table columns are labelled "(ms)"), at a FIXED precision the
+  // caller sets per column — so every cell down a column has the same decimals and a measured
+  // value lines up with BLIS's prediction. (TTFT spans ~26–700,000 ms → 0 decimals; TPOT spans
+  // ~2.5–465 ms → 2 decimals.) Thousands grouping for large values (2,245).
   return value.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })
 }
 

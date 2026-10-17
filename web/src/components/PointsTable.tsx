@@ -12,8 +12,12 @@ interface Props {
   vllm: string | null
 }
 
-function Cell({ v, kind }: { v: number | null; kind: 'ms' | 'err' }) {
-  const text = kind === 'ms' ? formatMs(v) : formatSignedPct(v)
+// TTFT and TPOT have very different scales, so each column fixes its own ms precision (every
+// cell down a column matches): TTFT 0 decimals (~26–700,000 ms), TPOT 2 decimals (~2.5–465 ms).
+const MS_DIGITS = { ttft: 0, tpot: 2 } as const
+
+function Cell({ v, kind, metric }: { v: number | null; kind: 'ms' | 'err'; metric: 'ttft' | 'tpot' }) {
+  const text = kind === 'ms' ? formatMs(v, MS_DIGITS[metric]) : formatSignedPct(v)
   if (kind === 'err') return <span className="num">{text}</span>
   return <>{text}</>
 }
@@ -60,22 +64,22 @@ export function PointsTable({ points, title, vllm }: Props) {
                 <tr key={`${p.concurrency}-${i}`}>
                   <td className="mono">{p.concurrency}</td>
                   <td className="sep mono">
-                    <Cell v={p.measTtftMs} kind="ms" />
+                    <Cell v={p.measTtftMs} kind="ms" metric="ttft" />
                   </td>
                   <td className="mono">
-                    <Cell v={p.predTtftMs} kind="ms" />
+                    <Cell v={p.predTtftMs} kind="ms" metric="ttft" />
                   </td>
                   <td className="e">
-                    <Cell v={p.errTtft} kind="err" />
+                    <Cell v={p.errTtft} kind="err" metric="ttft" />
                   </td>
                   <td className="sep mono">
-                    <Cell v={p.measTpotMs} kind="ms" />
+                    <Cell v={p.measTpotMs} kind="ms" metric="tpot" />
                   </td>
                   <td className="mono">
-                    <Cell v={p.predTpotMs} kind="ms" />
+                    <Cell v={p.predTpotMs} kind="ms" metric="tpot" />
                   </td>
                   <td className="e">
-                    <Cell v={p.errTpot} kind="err" />
+                    <Cell v={p.errTpot} kind="err" metric="tpot" />
                   </td>
                 </tr>
               ))}
