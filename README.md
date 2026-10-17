@@ -65,12 +65,36 @@ Pages once (Settings → Pages) — no server, no container, no RITS/OpenShift. 
 job commits the fresh snapshot to that same branch; a failed/partial run publishes nothing and
 the prior snapshot stands.
 
-The runner-budget reality (RFC D3): the InferenceX dump is ~34 GB compressed and does **not** fit
-a hosted runner's disk, so a real nightly run targets a **self-hosted `evaluate`** runner
-(`runs-on: [self-hosted, blis-eval]`, ≥120 GB disk) while `detect-diff` and `publish` stay hosted;
-the pre-flight step STOPs loudly and keeps the prior snapshot if the budget isn't met. The
-`ci-verify.yml` workflow proves the whole pipeline on a hosted runner in **budget mode** (a small
-real staged corpus, no dump).
+The runner-budget reality (RFC D3), measured on the real dump: `db-dump/2026-09-28` is **~31 GB
+compressed** and **~323 GB decompressed** (Postgres custom format v1.16 — needs `pg_restore` from
+PostgreSQL 17+). It does **not** fit a GitHub-hosted runner's ~14 GB disk, so a production nightly
+run targets a **self-hosted `evaluate`** runner (`runs-on: [self-hosted, blis-eval]`) while
+`detect-diff` and `publish` stay hosted; the pre-flight step STOPs loudly and keeps the prior
+snapshot if the budget isn't met. The `ci-verify.yml` workflow proves the whole pipeline on a
+hosted runner in **budget mode** (a small real staged corpus, no dump).
+
+### First real run (RFC D4) — against `db-dump/2026-09-28`, sha-verified
+
+The full pipeline was run end-to-end against the actual dump (restored locally; the evaluate step
+is machine-portable to a self-hosted runner). From that run:
+
+- **Corpus:** 590 sweeps / **3,345 points**, vLLM-only, 5 models (deepseek-v4-pro, gpt-oss-120b,
+  kimi-k2.5, minimax-m2.5, minimax-m3), 4 GPUs (b200/b300/h100/h200). Extraction skipped AMD parts
+  (no catalog coefficients) and <3-concurrency sweeps — counted, not hidden.
+- **signedprobe:** **3,315 points emitted** from real `blis replay` (~73 min); **2,497 scored**,
+  **848 not_scored** = 821 `no_acceptance_rate` (mtp/speculative, tier UNSCORABLE) + 27 run-errors
+  (concurrencies absent from the seed-0 workload fixture, e.g. 4096).
+- **Headline (all tier):** TTFT MAPE **31.1%** / shape 28.1%; TPOT MAPE **19.7%** / shape 12.7%
+  over 2,497 points — the RFC-predicted shape holds (TTFT, the queue-dominated metric, ~1.6× TPOT;
+  cf. the AISimulate reference 22.4% TPOT / 45.3% TTFT).
+- **On-target count (settles §6.3 / open-question 2):** **zero** — every scored point ran vLLM
+  `0.29.0`, not the target `0.31.0`. So the on-target default would be empty; the UI falls back to
+  all versions with a banner (and the measured·resolved tier is likewise empty on the direct path,
+  so it falls back to the all tier). This is the freshness-fallback the RFC flagged as needed.
+- **metricscore gap, by §4.4's three edge-sets:** (a) 23 partially-failing sweeps → signedprobe
+  keeps 79 points metricscore drops whole-sweep; (b) measured-TPOT-without-TTFT: **0** (this dump
+  always carries both); (c) prefix-caching points: **0** (this dump disables prefix caching
+  entirely — a concrete answer to the RFC's open question). The comparison is logged, never gated.
 
 ## Metrics & scope (v0.1.0)
 
