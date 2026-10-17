@@ -124,7 +124,6 @@ export function SummaryTable(props: Props) {
             <td className="sep">
               <Num v={t.mape.tpot} />
               {delta && <span className={`delta ${delta.dir}`}>{delta.text}</span>}
-              {!totalsDelta && <span className="delta" style={{ color: 'var(--muted)' }}>— (first snapshot)</span>}
             </td>
             <td>
               <Num v={t.shape.tpot} />
