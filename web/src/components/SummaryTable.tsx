@@ -5,7 +5,7 @@
  * populates the points table (handled by the parent). Numbers are recomputed client-side from
  * the visible points, so a filter never shows a stale aggregate (RFC B3).
  */
-import { formatPct, formatVersion } from '../format'
+import { formatPct } from '../format'
 import type { RenderRow } from '../tree'
 import type { SortKey, SortSpec } from '../sort'
 import type { MetricBlockPair, TierKey } from '../types'
@@ -25,15 +25,6 @@ interface Props {
 
 function Num({ v }: { v: number | null }) {
   return <span className="num">{formatPct(v)}</span>
-}
-
-// The vLLM version facet for a row (no pass/fail colouring — a facet, not a verdict). A single
-// version shows its badge; a row that pools several shows "N versions" rather than claiming one
-// (so a model row spanning 8 builds never masquerades as one specific version).
-function VerCell({ versions }: { versions: string[] }) {
-  if (versions.length === 0) return null
-  if (versions.length === 1) return <span className="ver neutral">{formatVersion(versions[0]!)}</span>
-  return <span className="facet" title={versions.map(formatVersion).join(', ')}>{versions.length} versions</span>
 }
 
 function HeaderButton({
@@ -74,9 +65,6 @@ export function SummaryTable(props: Props) {
             <th rowSpan={2} style={{ verticalAlign: 'bottom' }}>
               Model / workload / GPU / topology
             </th>
-            <th rowSpan={2} style={{ verticalAlign: 'bottom' }}>
-              vLLM
-            </th>
             <th className="sep" colSpan={2}>
               TTFT (mean)
             </th>
@@ -106,8 +94,6 @@ export function SummaryTable(props: Props) {
               <b>ALL MODELS</b>
               <span className="facet">headline · {totalsPointCount} pts</span>
             </td>
-            {/* No vLLM badge on the totals row — it aggregates across versions (per-model rows carry the badge). */}
-            <td />
             <td className="sep">
               <Num v={t.mape.ttft} />
             </td>
@@ -143,9 +129,6 @@ export function SummaryTable(props: Props) {
                   {row.level === 'model' ? <b className="name">{row.label}</b> : row.label}
                   {row.facet && <span className="facet">{row.facet}</span>}
                   {isSelected && <span className="facet">← selected</span>}
-                </td>
-                <td>
-                  <VerCell versions={row.versions} />
                 </td>
                 <td className="sep">
                   <Num v={b.mape.ttft} />

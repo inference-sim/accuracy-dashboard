@@ -261,7 +261,7 @@ function Overview({
         </span>
       </div>
 
-      <PointsTable points={selectedPoints} title={pointsTitle} vllm={selFirst?.engineVersion ?? null} />
+      <PointsTable points={selectedPoints} title={pointsTitle} />
 
       <div className="legend">
         <span>

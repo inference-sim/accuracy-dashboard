@@ -9,7 +9,6 @@ import type { FlatPoint } from '../aggregate'
 interface Props {
   points: FlatPoint[]
   title: string
-  vllm: string | null
 }
 
 // TTFT and TPOT have very different scales, so each column fixes its own ms precision (every
@@ -22,14 +21,18 @@ function Cell({ v, kind, metric }: { v: number | null; kind: 'ms' | 'err'; metri
   return <>{text}</>
 }
 
-export function PointsTable({ points, title, vllm }: Props) {
-  const sorted = [...points].sort((a, b) => a.concurrency - b.concurrency)
+export function PointsTable({ points, title }: Props) {
+  // Sort by concurrency, then group repeats by their vLLM version so the per-version rows read
+  // in order. The version is where the repeated measured values come from (same deployment,
+  // different vLLM build), so it earns its own column here.
+  const sorted = [...points].sort(
+    (a, b) => a.concurrency - b.concurrency || (a.engineVersion ?? '').localeCompare(b.engineVersion ?? ''),
+  )
   return (
     <>
       <div className="tbl-title" style={{ marginTop: 26 }}>
-        {title}
-        {vllm && <span className="ver neutral">{formatVersion(vllm)}</span>}{' '}
-        <span className="facet">measured vs predicted per concurrency, absolute units · error %</span>
+        {title}{' '}
+        <span className="facet">measured vs predicted per concurrency · vLLM build · absolute units · error %</span>
       </div>
       <div className="tscroll">
         {sorted.length === 0 ? (
@@ -40,6 +43,9 @@ export function PointsTable({ points, title, vllm }: Props) {
               <tr className="grp">
                 <th rowSpan={2} style={{ verticalAlign: 'bottom' }}>
                   conc
+                </th>
+                <th rowSpan={2} style={{ verticalAlign: 'bottom' }}>
+                  vLLM
                 </th>
                 <th className="sep" colSpan={3}>
                   TTFT (ms)
@@ -59,10 +65,13 @@ export function PointsTable({ points, title, vllm }: Props) {
             </thead>
             <tbody>
               {sorted.map((p, i) => (
-                // InferenceX carries repeat benchmark runs at the SAME concurrency, so
-                // concurrency alone is not a unique key — index disambiguates the repeats.
+                // InferenceX carries repeat benchmark runs at the SAME concurrency (different
+                // vLLM builds), so concurrency alone is not a unique key — index disambiguates.
                 <tr key={`${p.concurrency}-${i}`}>
                   <td className="mono">{p.concurrency}</td>
+                  <td className="mono">
+                    {p.engineVersion ? <span className="ver neutral">{formatVersion(p.engineVersion)}</span> : <span className="marker">—</span>}
+                  </td>
                   <td className="sep mono">
                     <Cell v={p.measTtftMs} kind="ms" metric="ttft" />
                   </td>
