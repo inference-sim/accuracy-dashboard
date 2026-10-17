@@ -48,10 +48,10 @@ export function PointsTable({ points, title }: Props) {
                   vLLM
                 </th>
                 <th className="sep" colSpan={3}>
-                  TTFT (ms)
+                  mean TTFT (ms)
                 </th>
                 <th className="sep" colSpan={3}>
-                  TPOT (ms)
+                  mean TPOT (ms)
                 </th>
               </tr>
               <tr className="col">
@@ -96,6 +96,16 @@ export function PointsTable({ points, title }: Props) {
           </table>
         )}
       </div>
+      {sorted.length > 0 && (
+        <p className="pts-note">
+          Each value is a per-run <b>arithmetic mean over the benchmark's requests</b> (vLLM
+          <span className="mono"> calculate_metrics</span>): mean TTFT over all main-phase requests;
+          mean TPOT = mean of (latency − TTFT) ⁄ (output_len − 1) over requests with &gt;1 output token.
+          Not a median or tail — p99 is out of scope for v0.1.0. Measured means come from the
+          InferenceX dump; predicted means from BLIS replaying the same requests, same definition.
+          Repeated rows at one concurrency are the same deployment measured on different vLLM builds.
+        </p>
+      )}
     </>
   )
 }

@@ -66,10 +66,10 @@ export function SummaryTable(props: Props) {
               Model / workload / GPU / topology
             </th>
             <th className="sep" colSpan={2}>
-              TTFT (mean)
+              mean TTFT
             </th>
             <th className="sep" colSpan={2}>
-              TPOT (mean)
+              mean TPOT
             </th>
           </tr>
           <tr className="col">

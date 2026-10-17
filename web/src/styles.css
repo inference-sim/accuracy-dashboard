@@ -137,6 +137,8 @@ td .na { color: var(--line-strong); font-family: var(--font-mono); }
 
 /* empty points-table hint */
 .pts-empty { padding: 18px; color: var(--muted); font-size: 12.5px; }
+.pts-note { margin: 8px 0 0; font-size: 11px; color: var(--muted); max-width: 920px; line-height: 1.5; }
+.pts-note b { color: var(--ink); font-weight: 600; }
 .notscored-detail { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
 /* neutral per-row vLLM version badge — a facet, not a verdict (no pass/fail colouring) */
