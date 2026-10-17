@@ -11,12 +11,12 @@ interface Props {
   title: string
 }
 
-// TTFT and TPOT have very different scales, so each column fixes its own ms precision (every
-// cell down a column matches): TTFT 0 decimals (~26–700,000 ms), TPOT 2 decimals (~2.5–465 ms).
-const MS_DIGITS = { ttft: 0, tpot: 2 } as const
+// Both TTFT and TPOT render at a fixed 2 decimals — the measured/predicted values carry sub-ms
+// precision, and a uniform precision keeps every cell (and both columns) directly comparable.
+const MS_DIGITS = 2
 
-function Cell({ v, kind, metric }: { v: number | null; kind: 'ms' | 'err'; metric: 'ttft' | 'tpot' }) {
-  const text = kind === 'ms' ? formatMs(v, MS_DIGITS[metric]) : formatSignedPct(v)
+function Cell({ v, kind }: { v: number | null; kind: 'ms' | 'err' }) {
+  const text = kind === 'ms' ? formatMs(v, MS_DIGITS) : formatSignedPct(v)
   if (kind === 'err') return <span className="num">{text}</span>
   return <>{text}</>
 }
@@ -73,22 +73,22 @@ export function PointsTable({ points, title }: Props) {
                     {p.engineVersion ? <span className="ver neutral">{formatVersion(p.engineVersion)}</span> : <span className="marker">—</span>}
                   </td>
                   <td className="sep mono">
-                    <Cell v={p.measTtftMs} kind="ms" metric="ttft" />
+                    <Cell v={p.measTtftMs} kind="ms" />
                   </td>
                   <td className="mono">
-                    <Cell v={p.predTtftMs} kind="ms" metric="ttft" />
+                    <Cell v={p.predTtftMs} kind="ms" />
                   </td>
                   <td className="e">
-                    <Cell v={p.errTtft} kind="err" metric="ttft" />
+                    <Cell v={p.errTtft} kind="err" />
                   </td>
                   <td className="sep mono">
-                    <Cell v={p.measTpotMs} kind="ms" metric="tpot" />
+                    <Cell v={p.measTpotMs} kind="ms" />
                   </td>
                   <td className="mono">
-                    <Cell v={p.predTpotMs} kind="ms" metric="tpot" />
+                    <Cell v={p.predTpotMs} kind="ms" />
                   </td>
                   <td className="e">
-                    <Cell v={p.errTpot} kind="err" metric="tpot" />
+                    <Cell v={p.errTpot} kind="err" />
                   </td>
                 </tr>
               ))}

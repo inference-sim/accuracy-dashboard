@@ -4,8 +4,10 @@
  * (RFC B3: deep-link, row-select → points table, default view). Reader and writer live in one
  * module so they cannot drift.
  *
- *   #/?sel=<sweepKey>&tier=<measured_or_resolved|all>&vllm=<all|v:X.Y.Z>&mn=<0|1>
+ *   #/?run=<snapshot_id>&sel=<sweepKey>&tier=<measured_or_resolved|all>&vllm=<all|v:X.Y.Z>&mn=<0|1>
  *
+ * `run` selects which published nightly snapshot to view (absent = the latest). Choosing a run
+ * only loads older results — it never triggers a new evaluation.
  * `sel` is the selected topology's sweepKey (model|workload|gpu|topoLabel). Absent = default
  * view (nothing selected). tier defaults to measured_or_resolved; vllm defaults to all;
  * mn (multi-node) defaults to 0 (hidden).
@@ -19,6 +21,8 @@ import type { TierKey } from './types'
 export type VllmFilter = 'all' | { version: string }
 
 export interface RouteState {
+  /** snapshot_id of the run being viewed, or null for the latest. */
+  run: string | null
   sel: string | null
   tier: TierKey
   vllm: VllmFilter
@@ -26,6 +30,7 @@ export interface RouteState {
 }
 
 export const DEFAULT_ROUTE: RouteState = {
+  run: null,
   sel: null,
   tier: 'measured_or_resolved',
   vllm: 'all',
@@ -50,7 +55,9 @@ export function parseRoute(hash: string): RouteState {
   const p = query(hash)
   const tier = p.get('tier')
   const sel = p.get('sel')
+  const run = p.get('run')
   return {
+    run: run && run !== '' ? run : null,
     sel: sel && sel !== '' ? sel : null,
     tier: tier === 'all' ? 'all' : 'measured_or_resolved',
     vllm: parseVllm(p.get('vllm')),
@@ -60,6 +67,7 @@ export function parseRoute(hash: string): RouteState {
 
 export function routeToHash(state: RouteState): string {
   const p = new URLSearchParams()
+  if (state.run) p.set('run', state.run)
   if (state.sel) p.set('sel', state.sel)
   if (state.tier !== DEFAULT_ROUTE.tier) p.set('tier', state.tier)
   if (state.vllm !== DEFAULT_ROUTE.vllm) p.set('vllm', vllmToParam(state.vllm))

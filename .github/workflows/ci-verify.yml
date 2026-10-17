@@ -149,9 +149,11 @@ jobs:
           cp incoming/summary.json data/latest/summary.json
           cp incoming/summary.json "data/snapshots/${snap_id}/summary.json"
           python3 -c "import json; json.dump({'blis_tag':'${BLIS_TAG}','ix_tag':'${IX_TAG}','snapshot_id':'${snap_id}'}, open('state/last-run.json','w'), indent=2)"
+          # Rebuild the run index for the picker + prune snapshots older than 30 days.
+          python3 orchestrator/update_index.py --data-dir data --retention-days 30 --today "$(date -u +%F)"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/latest/summary.json "data/snapshots/${snap_id}/summary.json" state/last-run.json
+          git add -A data state/last-run.json
           git commit -m "ci-verify: ${snap_id} [skip ci]" || { echo "nothing to commit"; exit 0; }
           git push
       - name: Summary

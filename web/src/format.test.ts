@@ -16,15 +16,14 @@ describe('format helpers never show NaN/blank (RFC B1)', () => {
     expect(formatSignedPct(null)).toBe(EM_DASH)
   })
 
-  it('formatMs renders ms at a fixed per-column precision (no s/ms switch)', () => {
-    // TPOT column: 2 decimals; every cell matches
+  it('formatMs renders ms at a fixed precision (no s/ms switch), thousands-grouped', () => {
+    // The points table uses 2 decimals for both TTFT and TPOT.
     expect(formatMs(7.18, 2)).toBe('7.18')
-    expect(formatMs(465.4, 2)).toBe('465.40')
-    // TTFT column: 0 decimals, thousands grouping, never "1.50s"
-    expect(formatMs(821, 0)).toBe('821')
-    expect(formatMs(2245, 0)).toBe('2,245')
-    expect(formatMs(708765, 0)).toBe('708,765')
-    expect(formatMs(null, 0)).toBe(EM_DASH)
+    expect(formatMs(101.5255, 2)).toBe('101.53') // sub-ms precision kept, not rounded to int
+    expect(formatMs(821, 2)).toBe('821.00')
+    expect(formatMs(2245, 2)).toBe('2,245.00') // thousands grouping, never "2.25s"
+    expect(formatMs(708765.4, 2)).toBe('708,765.40')
+    expect(formatMs(null, 2)).toBe(EM_DASH)
   })
 
   it('formatCount groups thousands and em-dashes null', () => {

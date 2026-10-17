@@ -11,20 +11,30 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { PointsTable } from './components/PointsTable'
 import { SummaryTable } from './components/SummaryTable'
 import { formatCount, formatVersion } from './format'
+import type { RunIndex } from './load'
 import { parseRoute, routeToHash, type RouteState } from './route'
 import { buildRows } from './tree'
 import { nextSort, sortModelKeys, type SortKey, type SortSpec } from './sort'
 import type { Summary } from './types'
+
+interface Picker {
+  index: RunIndex | null
+  run: string | null
+  onPick: (run: string | null) => void
+}
 
 const hasWindow = typeof window !== 'undefined'
 
 export function App({
   summary,
   loadError,
+  index = null,
   initialHash,
 }: {
   summary: Summary | null
   loadError: string | null
+  /** The retained-runs manifest for the run-picker; null = no index published (latest only). */
+  index?: RunIndex | null
   /** Test/SSR seam: the starting hash when there is no window. In the browser the live hash wins. */
   initialHash?: string
 }) {
@@ -47,11 +57,13 @@ export function App({
     setRoute(merged)
   }
 
+  const picker = { index, run: route.run, onPick: (run: string | null) => update({ run, sel: null }) }
+
   if (loadError) {
     return (
-      <Layout summary={null}>
+      <Layout summary={null} picker={picker}>
         <div className="viewerror" role="alert">
-          <h3>Could not load the latest snapshot.</h3>
+          <h3>Could not load this snapshot.</h3>
           <pre>
             <code>{loadError}</code>
           </pre>
@@ -61,14 +73,14 @@ export function App({
   }
   if (!summary) {
     return (
-      <Layout summary={null}>
-        <div className="loading">Loading the latest snapshot…</div>
+      <Layout summary={null} picker={picker}>
+        <div className="loading">Loading the snapshot…</div>
       </Layout>
     )
   }
 
   return (
-    <Layout summary={summary}>
+    <Layout summary={summary} picker={picker}>
       <ErrorBoundary resetKey={route.sel}>
         <Overview
           summary={summary}
@@ -283,8 +295,17 @@ function findIdForSweep(rows: ReturnType<typeof buildRows>, sweepKey: string): s
   return match?.id ?? null
 }
 
-function Layout({ summary, children }: { summary: Summary | null; children: React.ReactNode }) {
+function Layout({
+  summary,
+  picker,
+  children,
+}: {
+  summary: Summary | null
+  picker: Picker
+  children: React.ReactNode
+}) {
   const p = summary?.provenance
+  const runs = picker.index?.runs ?? []
   return (
     <div className="layout">
       <aside className="rail">
@@ -292,6 +313,27 @@ function Layout({ summary, children }: { summary: Summary | null; children: Reac
         <p className="sub">
           How accurately BLIS predicts real inference latency, scored nightly against SemiAnalysis InferenceX.
         </p>
+        {runs.length > 1 && (
+          <>
+            <div className="seclabel">Nightly run</div>
+            <select
+              className="box runsel"
+              value={picker.run ?? runs[0]!.snapshot_id}
+              onChange={(e) => {
+                const id = e.target.value
+                picker.onPick(id === runs[0]!.snapshot_id ? null : id) // newest → null (track "latest")
+              }}
+            >
+              {runs.map((r, i) => (
+                <option key={r.snapshot_id} value={r.snapshot_id}>
+                  {r.snapshot_id.slice(0, 10)} · {r.blis_release ?? '?'}
+                  {i === 0 ? ' · latest' : ''}
+                </option>
+              ))}
+            </select>
+            <div className="runsel-note">Viewing an older run shows its full results — it does not re-run.</div>
+          </>
+        )}
         {p && (
           <>
             <div className="seclabel">BLIS release (CI-resolved)</div>

@@ -36,16 +36,21 @@ describe('App renders the real CI-shaped snapshot', () => {
 
   it('renders a selected topology with REPEAT-concurrency points with zero console errors', () => {
     // Regression: InferenceX has repeat benchmark runs at the same concurrency, so the points
-    // table must key rows uniquely (concurrency alone collides → React key warning). This
-    // selects a real topology that has 42 points across only 7 distinct concurrencies.
+    // table must key rows uniquely (concurrency alone collides → React key warning). Find a real
+    // topology that actually has repeats (several in the dump do).
     const summary = loadFixture()
-    const m = summary.matrix[0]!
-    const w = m.rows[0]!
-    const g = w.rows[0]!
-    const t = g.rows[0]!
-    const sweepKey = `${m.model}|${w.label}|${g.label}|${t.label}`
-    const concs = t.rows.map((p) => p.concurrency)
-    expect(concs.length).toBeGreaterThan(new Set(concs).size) // the fixture really has repeats
+    let sweepKey = ''
+    outer: for (const m of summary.matrix)
+      for (const w of m.rows)
+        for (const g of w.rows)
+          for (const t of g.rows) {
+            const concs = t.rows.map((p) => p.concurrency)
+            if (concs.length > new Set(concs).size) {
+              sweepKey = `${m.model}|${w.label}|${g.label}|${t.label}`
+              break outer
+            }
+          }
+    expect(sweepKey).not.toBe('') // the fixture really has a repeat-concurrency topology
     const errors: string[] = []
     const spy = vi.spyOn(console, 'error').mockImplementation((...a) => {
       errors.push(a.map(String).join(' '))
@@ -118,8 +123,29 @@ describe('App renders the real CI-shaped snapshot', () => {
 
   it('renders a clear error (not a blank page) when loading fails', () => {
     const html = renderToStaticMarkup(<App summary={null} loadError={'fetching data/latest/summary.json returned HTTP 404'} />)
-    expect(html).toContain('Could not load the latest snapshot')
+    expect(html).toContain('Could not load this snapshot')
     expect(html).toContain('HTTP 404')
+  })
+
+  it('renders the nightly run-picker when an index with >1 run is supplied', () => {
+    const index = {
+      schema_version: 1 as const,
+      latest: 'b',
+      retention_days: 30,
+      runs: [
+        { snapshot_id: 'b', generated_at: null, blis_release: 'v0.10.0', ix_release: 'db-dump/2026-09-28', path: 'snapshots/b/summary.json' },
+        { snapshot_id: 'a', generated_at: null, blis_release: 'v0.10.0', ix_release: 'db-dump/2026-09-21', path: 'snapshots/a/summary.json' },
+      ],
+    }
+    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={index} />)
+    expect(html).toContain('Nightly run')
+    expect(html).toContain('does not re-run')
+    expect(html).toContain('<select') // the picker dropdown is present
+  })
+
+  it('omits the run-picker when there is only one run (or no index)', () => {
+    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={null} />)
+    expect(html).not.toContain('Nightly run')
   })
 })
 
@@ -128,8 +154,8 @@ describe('client-side aggregation keeps filters honest (RFC B3)', () => {
     const summary = loadFixture()
     const all = flattenPoints(summary)
     const version = all.find((p) => p.engineVersion)!.engineVersion!
-    const allVersions = applyFilters(all, { sel: null, tier: 'all', vllm: 'all', multinode: false })
-    const pinned = applyFilters(all, { sel: null, tier: 'all', vllm: { version }, multinode: false })
+    const allVersions = applyFilters(all, { run: null, sel: null, tier: 'all', vllm: 'all', multinode: false })
+    const pinned = applyFilters(all, { run: null, sel: null, tier: 'all', vllm: { version }, multinode: false })
     expect(pinned.length).toBeLessThanOrEqual(allVersions.length)
     expect(pinned.every((p) => p.engineVersion === version)).toBe(true)
   })
