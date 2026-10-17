@@ -207,12 +207,15 @@ def _read_direct_versions(path: str) -> dict[tuple[str, str], str]:
     except (OSError, json.JSONDecodeError):
         return out
     for sw in doc.get("sweeps", []):
+        scenario, label = sw.get("scenario"), sw.get("label")
+        if not scenario or not label:
+            continue  # a sweep with no identity can't be joined; skip rather than crash
         img = sw.get("image")
         if isinstance(img, list):
             img = img[0] if img else None
         v = _parse_vllm_version(img)
         if v:
-            out[(sw["scenario"], sw["label"])] = v
+            out[(scenario, label)] = v
     return out
 
 

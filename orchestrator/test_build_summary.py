@@ -2,6 +2,7 @@
 
 Run: python3 -m pytest orchestrator/test_build_summary.py  (or: python3 orchestrator/test_build_summary.py)
 """
+import json
 import math
 import os
 import sys
@@ -123,8 +124,30 @@ def test_vllm_version_parser_handles_real_and_future_tags():
     assert f("img:v1.0.0-rc1") == "1.0.0"                  # future major
     assert f("img:nightly-abc123") == "nightly"
     assert f("img:deepseekv4-cu130") == "deepseekv4-cu130"  # custom build → raw tag, not invented
+    assert f("img:v0.31.0-cu130") == "0.31.0"               # platform suffix dropped
+    assert f("registry.io/team/vllm:v0.40.2") == "0.40.2"   # other registry, far-future
     assert f("") is None
     assert f(None) is None
+
+
+def test_read_direct_versions_degrades_without_crashing():
+    # A future dump/extractor shape must never crash the build — missing image, null, list,
+    # a sweep with no scenario/label, no sweeps key: all skip gracefully.
+    def w(doc):
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
+            json.dump(doc, fh)
+            path = fh.name
+        try:
+            return bs._read_direct_versions(path)
+        finally:
+            os.unlink(path)
+    assert w({"sweeps": [{"scenario": "s.yaml", "label": "1k1k", "image": "vllm:v0.31.0"}]}) == {("s.yaml", "1k1k"): "0.31.0"}
+    assert w({"sweeps": [{"scenario": "s.yaml", "label": "1k1k"}]}) == {}          # image missing
+    assert w({"sweeps": [{"scenario": "s.yaml", "label": "1k1k", "image": None}]}) == {}  # null
+    assert w({"sweeps": [{"scenario": "s.yaml", "label": "1k1k", "image": ["vllm:v0.31.0"]}]}) == {("s.yaml", "1k1k"): "0.31.0"}  # list
+    assert w({"sweeps": [{"image": "vllm:v0.31.0"}]}) == {}                        # no scenario/label → skip, no crash
+    assert w({"foo": 1}) == {}                                                     # no sweeps key
+    assert bs._read_direct_versions("/no/such/file.json") == {}                   # missing file
 
 
 def test_self_consistency_catches_tampering():
