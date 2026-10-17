@@ -368,10 +368,7 @@ function Layout({ summary, children }: { summary: Summary | null; children: Reac
         </div>
       </aside>
       <main className="main">
-        <div className="tabs">
-          <div className="tab on">Overview</div>
-          <div className="tab">About</div>
-        </div>
+        {/* Overview is the only page in v0.1.0 (RFC §4.5), so no tab bar. */}
         {children}
       </main>
     </div>
