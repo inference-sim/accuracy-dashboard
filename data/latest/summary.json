@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "snapshot_id": "2026-10-16_blis-v0.10.0_ix-2026-09-28",
-  "generated_at": "2026-10-16T00:00:00Z",
+  "snapshot_id": "2026-10-17_blis-v0.10.0_ix-2026-09-28",
+  "generated_at": "2026-10-17T00:00:00Z",
   "previous_snapshot_id": null,
   "provenance": {
     "blis": {
@@ -18,7 +18,7 @@
       "measurement_date_through": null,
       "measurement_sha256": "391a8eb04272f582a619d56b3e7d54f37bbc518b1588271ac79c48b9167a5218"
     },
-    "evaluator_commit": "3971d2875d66dcfc12fb1e99b7f2a24693867c72",
+    "evaluator_commit": "3efa38fbdbe42cb257449c813b227a11a7fc5f99",
     "scorer": "signedprobe"
   },
   "coverage": {

@@ -1,0 +1,1447 @@
+{
+  "schema_version": 1,
+  "snapshot_id": "2026-10-17_blis-v0.10.0_ix-2026-09-28",
+  "generated_at": "2026-10-17T00:00:00Z",
+  "previous_snapshot_id": null,
+  "provenance": {
+    "blis": {
+      "release": "v0.10.0",
+      "commit_sha": "0d092d4ef64f605046de1181adf8e2b6ee564725",
+      "catalog": "0.2.1",
+      "registry": "v0.1.1",
+      "extractor_version": "blis-latency-kernel@v0.1.0"
+    },
+    "ground_truth": {
+      "source": "SemiAnalysis InferenceX",
+      "source_url": "https://github.com/SemiAnalysisAI/InferenceX-app/releases/tag/db-dump/2026-09-28",
+      "release_tag": "db-dump/2026-09-28",
+      "measurement_date_through": null,
+      "measurement_sha256": "391a8eb04272f582a619d56b3e7d54f37bbc518b1588271ac79c48b9167a5218"
+    },
+    "evaluator_commit": "3efa38fbdbe42cb257449c813b227a11a7fc5f99",
+    "scorer": "signedprobe"
+  },
+  "coverage": {
+    "scored": 24,
+    "not_scored": 0,
+    "multinode_hidden": 0,
+    "failed": 0,
+    "measured_excluded": 0,
+    "not_scored_reasons": {}
+  },
+  "known_artefacts": [
+    "gpt-oss-120b/h200 TTFT spikes (4)",
+    "non-monotone-TPOT sweeps"
+  ],
+  "target_vllm": "0.31.0",
+  "metrics": [
+    "ttft",
+    "tpot"
+  ],
+  "metricscore_comparison": {
+    "raw": "no points scored\n",
+    "gated": false
+  },
+  "totals": {
+    "measured_or_resolved": {
+      "mape": {
+        "ttft": null,
+        "tpot": null,
+        "n": 0
+      },
+      "shape": {
+        "ttft": null,
+        "tpot": null,
+        "n": 0
+      },
+      "noise_floor_pct": 1.6,
+      "same_points_delta": null
+    },
+    "all": {
+      "mape": {
+        "ttft": 67.76207114432658,
+        "tpot": 43.35016933499049,
+        "n": 24
+      },
+      "shape": {
+        "ttft": 36.893238288187405,
+        "tpot": 21.23725158196423,
+        "n": 18
+      },
+      "noise_floor_pct": 1.6,
+      "same_points_delta": null
+    }
+  },
+  "matrix": [
+    {
+      "level": "model",
+      "model": "deepseek-v4-pro",
+      "source": "inferencex",
+      "vllm_version": "0.29.0",
+      "on_target_version": false,
+      "coverage": {
+        "scored": 8,
+        "total": 8
+      },
+      "metrics": {
+        "measured_or_resolved": {
+          "mape": {
+            "ttft": null,
+            "tpot": null,
+            "n": 0
+          },
+          "shape": {
+            "ttft": null,
+            "tpot": null,
+            "n": 0
+          },
+          "noise_floor_pct": 1.6
+        },
+        "all": {
+          "mape": {
+            "ttft": 51.52078066914498,
+            "tpot": 44.771516655214896,
+            "n": 8
+          },
+          "shape": {
+            "ttft": 31.943830299038144,
+            "tpot": 25.013413581583563,
+            "n": 6
+          },
+          "noise_floor_pct": 1.6
+        }
+      },
+      "rows": [
+        {
+          "level": "workload",
+          "label": "1024:1024",
+          "isl": 1024,
+          "osl": 1024,
+          "coverage": {
+            "scored": 8,
+            "total": 8
+          },
+          "metrics": {
+            "measured_or_resolved": {
+              "mape": {
+                "ttft": null,
+                "tpot": null,
+                "n": 0
+              },
+              "shape": {
+                "ttft": null,
+                "tpot": null,
+                "n": 0
+              },
+              "noise_floor_pct": 1.6
+            },
+            "all": {
+              "mape": {
+                "ttft": 51.52078066914498,
+                "tpot": 44.771516655214896,
+                "n": 8
+              },
+              "shape": {
+                "ttft": 31.943830299038144,
+                "tpot": 25.013413581583563,
+                "n": 6
+              },
+              "noise_floor_pct": 1.6
+            }
+          },
+          "rows": [
+            {
+              "level": "gpu",
+              "label": "b200",
+              "precision": "nvfp4",
+              "coverage": {
+                "scored": 4,
+                "total": 4
+              },
+              "metrics": {
+                "measured_or_resolved": {
+                  "mape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "shape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                },
+                "all": {
+                  "mape": {
+                    "ttft": 62.891125594049285,
+                    "tpot": 19.93965930797155,
+                    "n": 4
+                  },
+                  "shape": {
+                    "ttft": 36.756825124184985,
+                    "tpot": 22.273048238792096,
+                    "n": 3
+                  },
+                  "noise_floor_pct": 1.6
+                }
+              },
+              "rows": [
+                {
+                  "level": "topology",
+                  "framework": "vllm",
+                  "engine_version": "0.29.0",
+                  "on_target_version": false,
+                  "is_multinode": false,
+                  "parallelism": {
+                    "dp": 1,
+                    "ep": 1,
+                    "pp": 1,
+                    "tp": 8
+                  },
+                  "serving": "aggregated",
+                  "spec_method": "none",
+                  "label": "dp1 \u00b7 ep1 \u00b7 pp1 \u00b7 tp8",
+                  "coverage": {
+                    "scored": 4,
+                    "total": 4
+                  },
+                  "metrics": {
+                    "measured_or_resolved": {
+                      "mape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    },
+                    "all": {
+                      "mape": {
+                        "ttft": 62.891125594049285,
+                        "tpot": 19.93965930797155,
+                        "n": 4
+                      },
+                      "shape": {
+                        "ttft": 36.756825124184985,
+                        "tpot": 22.273048238792096,
+                        "n": 3
+                      },
+                      "noise_floor_pct": 1.6
+                    }
+                  },
+                  "rows": [
+                    {
+                      "level": "point",
+                      "concurrency": 1,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 160.0,
+                        "tpot_ms": 7.18
+                      },
+                      "predicted": {
+                        "ttft_ms": 81.9719,
+                        "tpot_ms": 8.1333
+                      },
+                      "error_pct": {
+                        "ttft": -48.7676,
+                        "tpot": 13.2771
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 4,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 204.0,
+                        "tpot_ms": 8.82
+                      },
+                      "predicted": {
+                        "ttft_ms": 91.6538,
+                        "tpot_ms": 8.9994
+                      },
+                      "error_pct": {
+                        "ttft": -55.0717,
+                        "tpot": 2.0339
+                      },
+                      "shape": {
+                        "ttft": -12.3049,
+                        "tpot": -9.9254
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 16,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 368.0,
+                        "tpot_ms": 13.1
+                      },
+                      "predicted": {
+                        "ttft_ms": 112.0388,
+                        "tpot_ms": 12.143
+                      },
+                      "error_pct": {
+                        "ttft": -69.5547,
+                        "tpot": -7.3057
+                      },
+                      "shape": {
+                        "ttft": -40.5741,
+                        "tpot": -18.1703
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 64,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 821.0,
+                        "tpot_ms": 13.2
+                      },
+                      "predicted": {
+                        "ttft_ms": 179.2194,
+                        "tpot_ms": 20.7427
+                      },
+                      "error_pct": {
+                        "ttft": -78.1706,
+                        "tpot": 57.1419
+                      },
+                      "shape": {
+                        "ttft": -57.3914,
+                        "tpot": 38.7235
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": "gpu",
+              "label": "h200",
+              "precision": "fp8",
+              "coverage": {
+                "scored": 4,
+                "total": 4
+              },
+              "metrics": {
+                "measured_or_resolved": {
+                  "mape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "shape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                },
+                "all": {
+                  "mape": {
+                    "ttft": 40.15043574424068,
+                    "tpot": 69.60337400245824,
+                    "n": 4
+                  },
+                  "shape": {
+                    "ttft": 27.1308354738913,
+                    "tpot": 27.75377892437503,
+                    "n": 3
+                  },
+                  "noise_floor_pct": 1.6
+                }
+              },
+              "rows": [
+                {
+                  "level": "topology",
+                  "framework": "vllm",
+                  "engine_version": "0.29.0",
+                  "on_target_version": false,
+                  "is_multinode": false,
+                  "parallelism": {
+                    "dp": 1,
+                    "ep": 1,
+                    "pp": 1,
+                    "tp": 8
+                  },
+                  "serving": "aggregated",
+                  "spec_method": "none",
+                  "label": "dp1 \u00b7 ep1 \u00b7 pp1 \u00b7 tp8",
+                  "coverage": {
+                    "scored": 4,
+                    "total": 4
+                  },
+                  "metrics": {
+                    "measured_or_resolved": {
+                      "mape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    },
+                    "all": {
+                      "mape": {
+                        "ttft": 40.15043574424068,
+                        "tpot": 69.60337400245824,
+                        "n": 4
+                      },
+                      "shape": {
+                        "ttft": 27.1308354738913,
+                        "tpot": 27.75377892437503,
+                        "n": 3
+                      },
+                      "noise_floor_pct": 1.6
+                    }
+                  },
+                  "rows": [
+                    {
+                      "level": "point",
+                      "concurrency": 1,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 168.0,
+                        "tpot_ms": 7.539
+                      },
+                      "predicted": {
+                        "ttft_ms": 126.2334,
+                        "tpot_ms": 11.4818
+                      },
+                      "error_pct": {
+                        "ttft": -24.8611,
+                        "tpot": 52.2981
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 4,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 214.2,
+                        "tpot_ms": 9.261
+                      },
+                      "predicted": {
+                        "ttft_ms": 150.626,
+                        "tpot_ms": 13.0108
+                      },
+                      "error_pct": {
+                        "ttft": -29.6798,
+                        "tpot": 40.4901
+                      },
+                      "shape": {
+                        "ttft": -6.413,
+                        "tpot": -7.7532
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 16,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 386.4,
+                        "tpot_ms": 13.755
+                      },
+                      "predicted": {
+                        "ttft_ms": 202.1209,
+                        "tpot_ms": 18.6124
+                      },
+                      "error_pct": {
+                        "ttft": -47.6913,
+                        "tpot": 35.314
+                      },
+                      "shape": {
+                        "ttft": -30.384,
+                        "tpot": -11.1519
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 64,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 862.05,
+                        "tpot_ms": 13.86
+                      },
+                      "predicted": {
+                        "ttft_ms": 358.8746,
+                        "tpot_ms": 34.6932
+                      },
+                      "error_pct": {
+                        "ttft": -58.3696,
+                        "tpot": 150.3114
+                      },
+                      "shape": {
+                        "ttft": -44.5955,
+                        "tpot": 64.3562
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "level": "model",
+      "model": "gpt-oss-120b",
+      "source": "inferencex",
+      "vllm_version": "0.29.0",
+      "on_target_version": false,
+      "coverage": {
+        "scored": 8,
+        "total": 8
+      },
+      "metrics": {
+        "measured_or_resolved": {
+          "mape": {
+            "ttft": null,
+            "tpot": null,
+            "n": 0
+          },
+          "shape": {
+            "ttft": null,
+            "tpot": null,
+            "n": 0
+          },
+          "noise_floor_pct": 1.6
+        },
+        "all": {
+          "mape": {
+            "ttft": 78.33293555190728,
+            "tpot": 57.56850234233758,
+            "n": 8
+          },
+          "shape": {
+            "ttft": 41.444291926657755,
+            "tpot": 18.450670917009244,
+            "n": 6
+          },
+          "noise_floor_pct": 1.6
+        }
+      },
+      "rows": [
+        {
+          "level": "workload",
+          "label": "1024:1024",
+          "isl": 1024,
+          "osl": 1024,
+          "coverage": {
+            "scored": 8,
+            "total": 8
+          },
+          "metrics": {
+            "measured_or_resolved": {
+              "mape": {
+                "ttft": null,
+                "tpot": null,
+                "n": 0
+              },
+              "shape": {
+                "ttft": null,
+                "tpot": null,
+                "n": 0
+              },
+              "noise_floor_pct": 1.6
+            },
+            "all": {
+              "mape": {
+                "ttft": 78.33293555190728,
+                "tpot": 57.56850234233758,
+                "n": 8
+              },
+              "shape": {
+                "ttft": 41.444291926657755,
+                "tpot": 18.450670917009244,
+                "n": 6
+              },
+              "noise_floor_pct": 1.6
+            }
+          },
+          "rows": [
+            {
+              "level": "gpu",
+              "label": "h200",
+              "precision": "nvfp4",
+              "coverage": {
+                "scored": 4,
+                "total": 4
+              },
+              "metrics": {
+                "measured_or_resolved": {
+                  "mape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "shape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                },
+                "all": {
+                  "mape": {
+                    "ttft": 79.05258539114891,
+                    "tpot": 62.977653971075796,
+                    "n": 4
+                  },
+                  "shape": {
+                    "ttft": 42.178352441901296,
+                    "tpot": 15.129893123104027,
+                    "n": 3
+                  },
+                  "noise_floor_pct": 1.6
+                }
+              },
+              "rows": [
+                {
+                  "level": "topology",
+                  "framework": "vllm",
+                  "engine_version": "0.29.0",
+                  "on_target_version": false,
+                  "is_multinode": false,
+                  "parallelism": {
+                    "dp": 1,
+                    "ep": 1,
+                    "pp": 1,
+                    "tp": 8
+                  },
+                  "serving": "aggregated",
+                  "spec_method": "none",
+                  "label": "dp1 \u00b7 ep1 \u00b7 pp1 \u00b7 tp8",
+                  "coverage": {
+                    "scored": 4,
+                    "total": 4
+                  },
+                  "metrics": {
+                    "measured_or_resolved": {
+                      "mape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    },
+                    "all": {
+                      "mape": {
+                        "ttft": 79.05258539114891,
+                        "tpot": 62.977653971075796,
+                        "n": 4
+                      },
+                      "shape": {
+                        "ttft": 42.178352441901296,
+                        "tpot": 15.129893123104027,
+                        "n": 3
+                      },
+                      "noise_floor_pct": 1.6
+                    }
+                  },
+                  "rows": [
+                    {
+                      "level": "point",
+                      "concurrency": 1,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 176.0,
+                        "tpot_ms": 7.898
+                      },
+                      "predicted": {
+                        "ttft_ms": 53.9264,
+                        "tpot_ms": 3.209
+                      },
+                      "error_pct": {
+                        "ttft": -69.36,
+                        "tpot": -59.3698
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 4,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 224.4,
+                        "tpot_ms": 9.702
+                      },
+                      "predicted": {
+                        "ttft_ms": 58.7648,
+                        "tpot_ms": 3.4398
+                      },
+                      "error_pct": {
+                        "ttft": -73.8125,
+                        "tpot": -64.545
+                      },
+                      "shape": {
+                        "ttft": -14.5316,
+                        "tpot": -12.7371
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 16,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 404.8,
+                        "tpot_ms": 14.41
+                      },
+                      "predicted": {
+                        "ttft_ms": 67.4076,
+                        "tpot_ms": 4.232
+                      },
+                      "error_pct": {
+                        "ttft": -83.3479,
+                        "tpot": -70.6313
+                      },
+                      "shape": {
+                        "ttft": -45.6525,
+                        "tpot": -27.717
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 64,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 903.1,
+                        "tpot_ms": 14.52
+                      },
+                      "predicted": {
+                        "ttft_ms": 93.1103,
+                        "tpot_ms": 6.1907
+                      },
+                      "error_pct": {
+                        "ttft": -89.6899,
+                        "tpot": -57.3645
+                      },
+                      "shape": {
+                        "ttft": -66.3509,
+                        "tpot": 4.9356
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": "gpu",
+              "label": "h100",
+              "precision": "nvfp4",
+              "coverage": {
+                "scored": 4,
+                "total": 4
+              },
+              "metrics": {
+                "measured_or_resolved": {
+                  "mape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "shape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                },
+                "all": {
+                  "mape": {
+                    "ttft": 77.61328571266566,
+                    "tpot": 52.159350713599366,
+                    "n": 4
+                  },
+                  "shape": {
+                    "ttft": 40.710231411414206,
+                    "tpot": 21.771448710914466,
+                    "n": 3
+                  },
+                  "noise_floor_pct": 1.6
+                }
+              },
+              "rows": [
+                {
+                  "level": "topology",
+                  "framework": "vllm",
+                  "engine_version": "0.29.0",
+                  "on_target_version": false,
+                  "is_multinode": false,
+                  "parallelism": {
+                    "dp": 1,
+                    "ep": 1,
+                    "pp": 1,
+                    "tp": 4
+                  },
+                  "serving": "aggregated",
+                  "spec_method": "none",
+                  "label": "dp1 \u00b7 ep1 \u00b7 pp1 \u00b7 tp4",
+                  "coverage": {
+                    "scored": 4,
+                    "total": 4
+                  },
+                  "metrics": {
+                    "measured_or_resolved": {
+                      "mape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    },
+                    "all": {
+                      "mape": {
+                        "ttft": 77.61328571266566,
+                        "tpot": 52.159350713599366,
+                        "n": 4
+                      },
+                      "shape": {
+                        "ttft": 40.710231411414206,
+                        "tpot": 21.771448710914466,
+                        "n": 3
+                      },
+                      "noise_floor_pct": 1.6
+                    }
+                  },
+                  "rows": [
+                    {
+                      "level": "point",
+                      "concurrency": 1,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 184.0,
+                        "tpot_ms": 8.257
+                      },
+                      "predicted": {
+                        "ttft_ms": 59.2963,
+                        "tpot_ms": 3.6172
+                      },
+                      "error_pct": {
+                        "ttft": -67.7737,
+                        "tpot": -56.1922
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 4,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 234.6,
+                        "tpot_ms": 10.143
+                      },
+                      "predicted": {
+                        "ttft_ms": 65.0687,
+                        "tpot_ms": 4.1794
+                      },
+                      "error_pct": {
+                        "ttft": -72.264,
+                        "tpot": -58.7951
+                      },
+                      "shape": {
+                        "ttft": -13.9335,
+                        "tpot": -5.9416
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 16,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 423.2,
+                        "tpot_ms": 15.065
+                      },
+                      "predicted": {
+                        "ttft_ms": 76.6695,
+                        "tpot_ms": 6.0516
+                      },
+                      "error_pct": {
+                        "ttft": -81.8834,
+                        "tpot": -59.83
+                      },
+                      "shape": {
+                        "ttft": -43.783,
+                        "tpot": -8.304
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 64,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 944.15,
+                        "tpot_ms": 15.18
+                      },
+                      "predicted": {
+                        "ttft_ms": 108.2749,
+                        "tpot_ms": 10.0461
+                      },
+                      "error_pct": {
+                        "ttft": -88.532,
+                        "tpot": -33.8201
+                      },
+                      "shape": {
+                        "ttft": -64.4142,
+                        "tpot": 51.0687
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "level": "model",
+      "model": "kimi-k2.5",
+      "source": "inferencex",
+      "vllm_version": "0.29.0",
+      "on_target_version": false,
+      "coverage": {
+        "scored": 4,
+        "total": 4
+      },
+      "metrics": {
+        "measured_or_resolved": {
+          "mape": {
+            "ttft": null,
+            "tpot": null,
+            "n": 0
+          },
+          "shape": {
+            "ttft": null,
+            "tpot": null,
+            "n": 0
+          },
+          "noise_floor_pct": 1.6
+        },
+        "all": {
+          "mape": {
+            "ttft": 71.760895827222,
+            "tpot": 22.656720982197392,
+            "n": 4
+          },
+          "shape": {
+            "ttft": 36.4788269871141,
+            "tpot": 21.05325472664256,
+            "n": 3
+          },
+          "noise_floor_pct": 1.6
+        }
+      },
+      "rows": [
+        {
+          "level": "workload",
+          "label": "1024:1024",
+          "isl": 1024,
+          "osl": 1024,
+          "coverage": {
+            "scored": 4,
+            "total": 4
+          },
+          "metrics": {
+            "measured_or_resolved": {
+              "mape": {
+                "ttft": null,
+                "tpot": null,
+                "n": 0
+              },
+              "shape": {
+                "ttft": null,
+                "tpot": null,
+                "n": 0
+              },
+              "noise_floor_pct": 1.6
+            },
+            "all": {
+              "mape": {
+                "ttft": 71.760895827222,
+                "tpot": 22.656720982197392,
+                "n": 4
+              },
+              "shape": {
+                "ttft": 36.4788269871141,
+                "tpot": 21.05325472664256,
+                "n": 3
+              },
+              "noise_floor_pct": 1.6
+            }
+          },
+          "rows": [
+            {
+              "level": "gpu",
+              "label": "b200",
+              "precision": "nvfp4",
+              "coverage": {
+                "scored": 4,
+                "total": 4
+              },
+              "metrics": {
+                "measured_or_resolved": {
+                  "mape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "shape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                },
+                "all": {
+                  "mape": {
+                    "ttft": 71.760895827222,
+                    "tpot": 22.656720982197392,
+                    "n": 4
+                  },
+                  "shape": {
+                    "ttft": 36.4788269871141,
+                    "tpot": 21.05325472664256,
+                    "n": 3
+                  },
+                  "noise_floor_pct": 1.6
+                }
+              },
+              "rows": [
+                {
+                  "level": "topology",
+                  "framework": "vllm",
+                  "engine_version": "0.29.0",
+                  "on_target_version": false,
+                  "is_multinode": false,
+                  "parallelism": {
+                    "dp": 1,
+                    "ep": 1,
+                    "pp": 1,
+                    "tp": 8
+                  },
+                  "serving": "aggregated",
+                  "spec_method": "none",
+                  "label": "dp1 \u00b7 ep1 \u00b7 pp1 \u00b7 tp8",
+                  "coverage": {
+                    "scored": 4,
+                    "total": 4
+                  },
+                  "metrics": {
+                    "measured_or_resolved": {
+                      "mape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    },
+                    "all": {
+                      "mape": {
+                        "ttft": 71.760895827222,
+                        "tpot": 22.656720982197392,
+                        "n": 4
+                      },
+                      "shape": {
+                        "ttft": 36.4788269871141,
+                        "tpot": 21.05325472664256,
+                        "n": 3
+                      },
+                      "noise_floor_pct": 1.6
+                    }
+                  },
+                  "rows": [
+                    {
+                      "level": "point",
+                      "concurrency": 1,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 192.0,
+                        "tpot_ms": 8.616
+                      },
+                      "predicted": {
+                        "ttft_ms": 74.6399,
+                        "tpot_ms": 6.8866
+                      },
+                      "error_pct": {
+                        "ttft": -61.1251,
+                        "tpot": -20.0724
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 4,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 244.8,
+                        "tpot_ms": 10.584
+                      },
+                      "predicted": {
+                        "ttft_ms": 83.9878,
+                        "tpot_ms": 7.6508
+                      },
+                      "error_pct": {
+                        "ttft": -65.6913,
+                        "tpot": -27.7133
+                      },
+                      "shape": {
+                        "ttft": -11.7459,
+                        "tpot": -9.5597
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 16,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 441.6,
+                        "tpot_ms": 15.72
+                      },
+                      "predicted": {
+                        "ttft_ms": 105.2926,
+                        "tpot_ms": 10.353
+                      },
+                      "error_pct": {
+                        "ttft": -76.1566,
+                        "tpot": -34.1413
+                      },
+                      "shape": {
+                        "ttft": -38.6664,
+                        "tpot": -17.602
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 64,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 985.2,
+                        "tpot_ms": 15.84
+                      },
+                      "predicted": {
+                        "ttft_ms": 156.9357,
+                        "tpot_ms": 17.2181
+                      },
+                      "error_pct": {
+                        "ttft": -84.0707,
+                        "tpot": 8.7
+                      },
+                      "shape": {
+                        "ttft": -59.0242,
+                        "tpot": 35.998
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "level": "model",
+      "model": "minimax-m2.5",
+      "source": "inferencex",
+      "vllm_version": "0.29.0",
+      "on_target_version": false,
+      "coverage": {
+        "scored": 4,
+        "total": 4
+      },
+      "metrics": {
+        "measured_or_resolved": {
+          "mape": {
+            "ttft": null,
+            "tpot": null,
+            "n": 0
+          },
+          "shape": {
+            "ttft": null,
+            "tpot": null,
+            "n": 0
+          },
+          "noise_floor_pct": 1.6
+        },
+        "all": {
+          "mape": {
+            "ttft": 75.10409859663298,
+            "tpot": 32.764257032640586,
+            "n": 4
+          },
+          "shape": {
+            "ttft": 38.104358290618514,
+            "tpot": 19.442085767957206,
+            "n": 3
+          },
+          "noise_floor_pct": 1.6
+        }
+      },
+      "rows": [
+        {
+          "level": "workload",
+          "label": "1024:1024",
+          "isl": 1024,
+          "osl": 1024,
+          "coverage": {
+            "scored": 4,
+            "total": 4
+          },
+          "metrics": {
+            "measured_or_resolved": {
+              "mape": {
+                "ttft": null,
+                "tpot": null,
+                "n": 0
+              },
+              "shape": {
+                "ttft": null,
+                "tpot": null,
+                "n": 0
+              },
+              "noise_floor_pct": 1.6
+            },
+            "all": {
+              "mape": {
+                "ttft": 75.10409859663298,
+                "tpot": 32.764257032640586,
+                "n": 4
+              },
+              "shape": {
+                "ttft": 38.104358290618514,
+                "tpot": 19.442085767957206,
+                "n": 3
+              },
+              "noise_floor_pct": 1.6
+            }
+          },
+          "rows": [
+            {
+              "level": "gpu",
+              "label": "h200",
+              "precision": "fp8",
+              "coverage": {
+                "scored": 4,
+                "total": 4
+              },
+              "metrics": {
+                "measured_or_resolved": {
+                  "mape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "shape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                },
+                "all": {
+                  "mape": {
+                    "ttft": 75.10409859663298,
+                    "tpot": 32.764257032640586,
+                    "n": 4
+                  },
+                  "shape": {
+                    "ttft": 38.104358290618514,
+                    "tpot": 19.442085767957206,
+                    "n": 3
+                  },
+                  "noise_floor_pct": 1.6
+                }
+              },
+              "rows": [
+                {
+                  "level": "topology",
+                  "framework": "vllm",
+                  "engine_version": "0.29.0",
+                  "on_target_version": false,
+                  "is_multinode": false,
+                  "parallelism": {
+                    "dp": 1,
+                    "ep": 1,
+                    "pp": 1,
+                    "tp": 8
+                  },
+                  "serving": "aggregated",
+                  "spec_method": "none",
+                  "label": "dp1 \u00b7 ep1 \u00b7 pp1 \u00b7 tp8",
+                  "coverage": {
+                    "scored": 4,
+                    "total": 4
+                  },
+                  "metrics": {
+                    "measured_or_resolved": {
+                      "mape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    },
+                    "all": {
+                      "mape": {
+                        "ttft": 75.10409859663298,
+                        "tpot": 32.764257032640586,
+                        "n": 4
+                      },
+                      "shape": {
+                        "ttft": 38.104358290618514,
+                        "tpot": 19.442085767957206,
+                        "n": 3
+                      },
+                      "noise_floor_pct": 1.6
+                    }
+                  },
+                  "rows": [
+                    {
+                      "level": "point",
+                      "concurrency": 1,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 200.0,
+                        "tpot_ms": 8.975
+                      },
+                      "predicted": {
+                        "ttft_ms": 69.7152,
+                        "tpot_ms": 5.8104
+                      },
+                      "error_pct": {
+                        "ttft": -65.1424,
+                        "tpot": -35.2603
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 4,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 255.0,
+                        "tpot_ms": 11.025
+                      },
+                      "predicted": {
+                        "ttft_ms": 77.8022,
+                        "tpot_ms": 6.5826
+                      },
+                      "error_pct": {
+                        "ttft": -69.4893,
+                        "tpot": -40.2943
+                      },
+                      "shape": {
+                        "ttft": -12.4705,
+                        "tpot": -7.7758
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 16,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 460.0,
+                        "tpot_ms": 16.375
+                      },
+                      "predicted": {
+                        "ttft_ms": 93.0125,
+                        "tpot_ms": 9.1513
+                      },
+                      "error_pct": {
+                        "ttft": -79.7799,
+                        "tpot": -44.1143
+                      },
+                      "shape": {
+                        "ttft": -41.9923,
+                        "tpot": -13.6764
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 64,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 1026.25,
+                        "tpot_ms": 16.5
+                      },
+                      "predicted": {
+                        "ttft_ms": 143.626,
+                        "tpot_ms": 14.621
+                      },
+                      "error_pct": {
+                        "ttft": -86.0048,
+                        "tpot": -11.3881
+                      },
+                      "shape": {
+                        "ttft": -59.8503,
+                        "tpot": 36.874
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scope": {
+    "multinode": "toggle (hidden by default; disabled in v0.1.0 -- needs kernel change)",
+    "measured_exclusions": [
+      "ttft_spike",
+      "non_monotone_tpot_sweep"
+    ],
+    "vllm_version_filter": "on-target"
+  }
+}
