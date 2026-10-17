@@ -173,8 +173,7 @@ function Overview({
       <p className="dek">
         Every number is a full <b>blis replay</b> through the whole stack, scored against the pinned weekly
         InferenceX dump. Two tables: a <b>summary</b> drill-down (model → workload → GPU → topology), and a{' '}
-        <b>points</b> table for the selected row (measured vs predicted per concurrency). No pass/fail colouring —
-        report, don't assert.
+        <b>points</b> table for the selected row (measured vs predicted per concurrency).
       </p>
 
       <div className="chips">
