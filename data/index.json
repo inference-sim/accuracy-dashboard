@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-17T08:18:43Z",
+  "generated_at": "2026-10-17T08:18:56Z",
   "retention_days": 30,
   "latest": "2026-10-17_blis-v0.10.0_ix-2026-09-28",
   "runs": [
