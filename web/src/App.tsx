@@ -277,15 +277,6 @@ function Overview({
           <b>mape</b> absolute · <b>shape</b> curvature · <b>n</b> points per metric
         </span>
       </div>
-
-      {summary.known_artefacts && summary.known_artefacts.length > 0 && (
-        <p className="foot">
-          <b>Known measurement artefacts</b> (noted, not dropped — RFC keeps scoring logic out of this repo):{' '}
-          {summary.known_artefacts.join('; ')}. v0.1.0 scores mean TTFT and TPOT only (MAPE + shape); E2E, tail p99
-          and throughput are planned for a future release. vLLM version is a per-row badge + filter, not a group.
-          Selecting a topology row populates the points table (deep-linked via the URL).
-        </p>
-      )}
     </>
   )
 }
