@@ -41,7 +41,10 @@
     "ttft",
     "tpot"
   ],
-  "metricscore_comparison": null,
+  "metricscore_comparison": {
+    "raw": "metricscore: no points scored (whole-sweep-drop on missing high-concurrency fixture points).\nsignedprobe scored 2497; metricscore 0. Logged, never gated (RFC A6).\n",
+    "gated": false
+  },
   "totals": {
     "measured_or_resolved": {
       "mape": {

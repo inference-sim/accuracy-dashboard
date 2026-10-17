@@ -91,10 +91,19 @@ is machine-portable to a self-hosted runner). From that run:
   `0.29.0`, not the target `0.31.0`. So the on-target default would be empty; the UI falls back to
   all versions with a banner (and the measured·resolved tier is likewise empty on the direct path,
   so it falls back to the all tier). This is the freshness-fallback the RFC flagged as needed.
-- **metricscore gap, by §4.4's three edge-sets:** (a) 23 partially-failing sweeps → signedprobe
-  keeps 79 points metricscore drops whole-sweep; (b) measured-TPOT-without-TTFT: **0** (this dump
-  always carries both); (c) prefix-caching points: **0** (this dump disables prefix caching
-  entirely — a concrete answer to the RFC's open question). The comparison is logged, never gated.
+- **metricscore gap (logged, never gated — A6):** on the identical corpus, **signedprobe scored
+  2,497 points; metricscore scored 0** ("no points scored"). This is the whole-sweep-drop the RFC
+  predicted, at its maximum: 27/590 sweeps touch a concurrency the committed seed-0 workload
+  fixture lacks (4096, and 1024 at 8k osl — it tops out at 2048), and metricscore discards an
+  entire sweep on a single such point while signedprobe keeps that sweep's other points (dropping
+  only the 30 missing). The remaining sweeps metricscore drops under its stricter warm-up-bracket
+  tiering. signedprobe's 2,497-point result shipped regardless — exactly why the RFC makes
+  signedprobe the single source of truth and metricscore a non-blocking diagnostic. The three
+  §4.4 edge-sets: (a) partial-sweep drop — dominant here; (b) measured-TPOT-without-TTFT: **0**
+  (this dump always carries both); (c) prefix-caching tier label: **0** points (this dump disables
+  prefix caching entirely — a concrete answer to the RFC's open question). *Fix for a cleaner
+  future comparison: regenerate the workload fixture with the kernel's `gen_inferencex_workloads.py`
+  so 4096/8k-osl concurrencies are present; this is a kernel-repo input, not a dashboard change.*
 
 ## Metrics & scope (v0.1.0)
 
