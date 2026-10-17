@@ -34,6 +34,29 @@ describe('App renders the real CI-shaped snapshot', () => {
     expect(html).not.toContain('>null<')
   })
 
+  it('renders a selected topology with REPEAT-concurrency points with zero console errors', () => {
+    // Regression: InferenceX has repeat benchmark runs at the same concurrency, so the points
+    // table must key rows uniquely (concurrency alone collides → React key warning). This
+    // selects a real topology that has 42 points across only 7 distinct concurrencies.
+    const summary = loadFixture()
+    const m = summary.matrix[0]!
+    const w = m.rows[0]!
+    const g = w.rows[0]!
+    const t = g.rows[0]!
+    const sweepKey = `${m.model}|${w.label}|${g.label}|${t.label}`
+    const concs = t.rows.map((p) => p.concurrency)
+    expect(concs.length).toBeGreaterThan(new Set(concs).size) // the fixture really has repeats
+    const errors: string[] = []
+    const spy = vi.spyOn(console, 'error').mockImplementation((...a) => {
+      errors.push(a.map(String).join(' '))
+    })
+    renderToStaticMarkup(
+      <App summary={summary} loadError={null} initialHash={`#/?sel=${encodeURIComponent(sweepKey)}&tier=all`} />,
+    )
+    spy.mockRestore()
+    expect(errors.join('\n')).toBe('') // no "two children with the same key" warning
+  })
+
   it('shows the headline totals row and the title', () => {
     const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} />)
     expect(html).toContain('ALL MODELS')

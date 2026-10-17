@@ -95,7 +95,15 @@ jobs:
         run: |
           npm install --no-save playwright@1.56.0
           npx playwright install --with-deps chromium
+          # 1) production build — catches runtime throws / failed fetches / NaN
           node browser_smoke.mjs
+          # 2) DEV server — unminified React surfaces warnings (duplicate keys, etc.) the
+          #    production build strips. Start dev (predev stages the fixture), smoke, stop.
+          npm run dev > /tmp/dev.log 2>&1 &
+          DEV_PID=$!
+          for i in $(seq 1 30); do grep -q "Local:" /tmp/dev.log && break; sleep 1; done
+          SMOKE_URL=http://localhost:5173 node browser_smoke.mjs
+          kill $DEV_PID 2>/dev/null || true
 
       - name: Upload snapshot artifact
         uses: actions/upload-artifact@v4

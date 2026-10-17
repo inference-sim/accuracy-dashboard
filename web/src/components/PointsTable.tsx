@@ -55,8 +55,10 @@ export function PointsTable({ points, title, vllm, onTarget }: Props) {
               </tr>
             </thead>
             <tbody>
-              {sorted.map((p) => (
-                <tr key={p.concurrency}>
+              {sorted.map((p, i) => (
+                // InferenceX carries repeat benchmark runs at the SAME concurrency, so
+                // concurrency alone is not a unique key — index disambiguates the repeats.
+                <tr key={`${p.concurrency}-${i}`}>
                   <td className="mono">{p.concurrency}</td>
                   <td className="sep mono">
                     <Cell v={p.measTtftMs} kind="ms" />
