@@ -105,6 +105,13 @@ function Overview({
   const filtered = useMemo(() => applyFilters(allPoints, route), [allPoints, route])
   const visible = filtered.points
 
+  // Distinct vLLM versions present in the snapshot, for the version dropdown (§4.5: version is
+  // a filter). Sorted; the dropdown offers on-target + all + each of these.
+  const versions = useMemo(
+    () => [...new Set(allPoints.map((p) => p.engineVersion).filter((v): v is string => !!v))].sort(),
+    [allPoints],
+  )
+
   // Effective tier: the default is measured_or_resolved, but if a snapshot has zero
   // measured-or-resolved points (the direct dump path leaves settings resolved, so every point
   // lands in "all") we fall back to the "all" tier rather than show an empty headline — the
@@ -200,12 +207,22 @@ function Overview({
         </span>
         <span className="flt">
           vLLM version{' '}
-          <span
-            className="box clk"
-            onClick={() => update({ vllm: route.vllm === 'on-target' ? 'all' : 'on-target' })}
+          <select
+            className="box vllmsel"
+            value={typeof route.vllm === 'object' ? `v:${route.vllm.version}` : route.vllm}
+            onChange={(e) => {
+              const v = e.target.value
+              update({ vllm: v === 'all' ? 'all' : v === 'on-target' ? 'on-target' : { version: v.replace(/^v:/, '') } })
+            }}
           >
-            {route.vllm === 'on-target' ? `on-target v${summary.target_vllm}` : 'all versions'} <span className="car">▾</span>
-          </span>
+            <option value="on-target">on-target v{summary.target_vllm}</option>
+            <option value="all">all versions</option>
+            {versions.map((v) => (
+              <option key={v} value={`v:${v}`}>
+                v{v.replace(/^v/, '')}
+              </option>
+            ))}
+          </select>
         </span>
       </div>
 

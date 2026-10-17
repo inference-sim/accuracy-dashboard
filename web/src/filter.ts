@@ -28,5 +28,10 @@ export function applyFilters(points: FlatPoint[], route: RouteState): FilterResu
     }
     return { points: onTarget, onTargetFellBack: false }
   }
+  if (typeof route.vllm === 'object') {
+    // A specific pinned version — isolate it.
+    const want = route.vllm.version
+    return { points: base.filter((p) => p.engineVersion === want), onTargetFellBack: false }
+  }
   return { points: base, onTargetFellBack: false }
 }
