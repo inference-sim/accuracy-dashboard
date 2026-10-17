@@ -177,14 +177,11 @@ function Overview({
       </p>
 
       <div className="chips">
-        <span
-          className={`toggle disabled`}
-          title="Enabling multi-node needs a blis-latency-kernel change (RFC §4.5)"
-        >
+        <span className={`toggle disabled`} title="Multi-node scoring is planned for a future release">
           <span className="sw">
             <span className="dot" />
           </span>
-          multi-node <span className="disabled-note">(disabled — needs kernel change)</span>
+          multi-node <span className="disabled-note">(disabled)</span>
         </span>
         <span className="flt">
           tier{' '}
