@@ -297,7 +297,7 @@ def _r(v: float | None) -> float | None:
     return round(v, 4) if v is not None else None
 
 
-def build_matrix(sweeps, facets, target_vllm, vllm_by_sweep, totals_in_scope):
+def build_matrix(sweeps, facets, vllm_by_sweep, totals_in_scope):
     """model -> workload -> gpu -> topology -> point, each node carrying a metricBlockPair
     recomputed from the leaf points under it (not stored-and-frozen; RFC §4.4 point 1)."""
     # Attach facets + enrich row objects with their grouping keys.
@@ -323,7 +323,7 @@ def build_matrix(sweeps, facets, target_vllm, vllm_by_sweep, totals_in_scope):
             "model": model,
             "source": "inferencex",
             "vllm_version": model_vllm,
-            "on_target_version": (model_vllm == target_vllm) if model_vllm else None,
+            "on_target_version": None,  # vLLM version is a facet, not a verdict (no target concept)
             "coverage": {"scored": len(mpts), "total": len(mpts)},
             "metrics": metric_block_pair(mpts),
             "rows": [],
@@ -365,7 +365,7 @@ def build_matrix(sweeps, facets, target_vllm, vllm_by_sweep, totals_in_scope):
                         "level": "topology",
                         "framework": framework,
                         "engine_version": tvllm,
-                        "on_target_version": (tvllm == target_vllm) if tvllm else None,
+                        "on_target_version": None,  # facet, not a verdict
                         "is_multinode": False,  # multinode filtered at extraction in v0.1.0
                         "parallelism": par,
                         "serving": serving,
@@ -503,26 +503,21 @@ def main(argv=None):
     rows, unscorable = read_signedprobe_csv(args.csv)
     facets = read_corpus_facets(args.corpus)
 
-    target_vllm = prov.get("target_vllm", "0.31.0")
-
-    # Per-sweep resolved vLLM engine_version comes from the engine-settings file (the measured
-    # run's resolved args — the same source the mockup's per-topology badge reads), falling back
-    # to the target when a sweep carries none. Never NaN; a null shows as a marker.
+    # Per-sweep measured vLLM engine_version comes from the engine-settings file (the run's
+    # resolved args), else the scenario YAML's engine_version (the direct path's source). A sweep
+    # with neither carries null, which the UI shows as a marker — never NaN, never an assumed value.
     vllm_by_sweep = {}
     noise_by_sweep = {}
     engine_versions = _read_engine_versions(args.engine_settings) if args.engine_settings else {}
     scenario_versions = _read_scenario_versions(args.scenarios) if args.scenarios else {}
     for (scenario, label) in facets:
-        # Prefer the engine-settings resolved version; else the scenario YAML's engine_version
-        # (the direct path's authoritative source); else the target. Never NaN.
-        ev = engine_versions.get((scenario, label)) or scenario_versions.get(scenario) or target_vllm
+        ev = engine_versions.get((scenario, label)) or scenario_versions.get(scenario)
         vllm_by_sweep[(scenario, label)] = ev
         noise_by_sweep[(scenario, label)] = None
 
     sweeps = enrich_points(rows, noise_by_sweep)
 
-    target_vllm = prov.get("target_vllm", "0.31.0")
-    matrix, flat = build_matrix(sweeps, facets, target_vllm, vllm_by_sweep, None)
+    matrix, flat = build_matrix(sweeps, facets, vllm_by_sweep, None)
 
     totals = metric_block_pair(flat)
     assert_self_consistent(flat, totals)
@@ -555,7 +550,6 @@ def main(argv=None):
         "provenance": prov["provenance"],
         "coverage": prov["coverage"],
         "known_artefacts": prov.get("known_artefacts", []),
-        "target_vllm": target_vllm,
         "metrics": ["ttft", "tpot"],
         "metricscore_comparison": metricscore_comparison,
         "totals": totals,
@@ -563,7 +557,7 @@ def main(argv=None):
         "scope": {
             "multinode": "toggle (hidden by default; disabled in v0.1.0)",
             "measured_exclusions": ["ttft_spike", "non_monotone_tpot_sweep"],
-            "vllm_version_filter": "on-target",
+            "vllm_version_filter": "all",
         },
     }
 

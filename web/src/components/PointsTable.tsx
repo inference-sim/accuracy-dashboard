@@ -10,7 +10,6 @@ interface Props {
   points: FlatPoint[]
   title: string
   vllm: string | null
-  onTarget: boolean | null
 }
 
 function Cell({ v, kind }: { v: number | null; kind: 'ms' | 'err' }) {
@@ -19,13 +18,13 @@ function Cell({ v, kind }: { v: number | null; kind: 'ms' | 'err' }) {
   return <>{text}</>
 }
 
-export function PointsTable({ points, title, vllm, onTarget }: Props) {
+export function PointsTable({ points, title, vllm }: Props) {
   const sorted = [...points].sort((a, b) => a.concurrency - b.concurrency)
   return (
     <>
       <div className="tbl-title" style={{ marginTop: 26 }}>
         {title}
-        {vllm && <span className={`ver${onTarget === false ? ' off' : ''}`}>v{vllm.replace(/^v/, '')}</span>}{' '}
+        {vllm && <span className="ver neutral">v{vllm.replace(/^v/, '')}</span>}{' '}
         <span className="facet">measured vs predicted per concurrency, absolute units · error %</span>
       </div>
       <div className="tscroll">

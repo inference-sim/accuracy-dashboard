@@ -16,7 +16,6 @@ interface Props {
   totalsPointCount: number
   rows: RenderRow[]
   tier: TierKey
-  targetVllm: string
   sort: SortSpec | null
   onSort: (key: SortKey) => void
   selectedId: string | null
@@ -29,9 +28,10 @@ function Num({ v }: { v: number | null }) {
   return <span className="num">{formatPct(v)}</span>
 }
 
-function VerBadge({ vllm, onTarget }: { vllm: string | null; onTarget: boolean | null }) {
+// A neutral per-row vLLM version badge (no pass/fail colouring — version is a facet, not a verdict).
+function VerBadge({ vllm }: { vllm: string | null }) {
   if (!vllm) return null
-  return <span className={`ver${onTarget === false ? ' off' : ''}`}>v{vllm.replace(/^v/, '')}</span>
+  return <span className="ver neutral">v{vllm.replace(/^v/, '')}</span>
 }
 
 function HeaderButton({
@@ -150,7 +150,7 @@ export function SummaryTable(props: Props) {
                   {isSelected && <span className="facet">← selected</span>}
                 </td>
                 <td>
-                  <VerBadge vllm={row.vllm} onTarget={row.onTarget} />
+                  <VerBadge vllm={row.vllm} />
                 </td>
                 <td className="sep">
                   <Num v={b.mape.ttft} />

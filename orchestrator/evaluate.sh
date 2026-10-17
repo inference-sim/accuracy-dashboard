@@ -170,7 +170,6 @@ snapshot_id = f"{today}_blis-{blis_tag}_ix-{ix_date}"
 doc = {
   "snapshot_id": snapshot_id,
   "generated_at": today + "T00:00:00Z",
-  "target_vllm": "0.31.0",
   "provenance": {
     "blis": {"release": blis_tag, "commit_sha": sim_sha, "catalog": catalog,
              "registry": registry, "extractor_version": f"blis-latency-kernel@{kernel}"},

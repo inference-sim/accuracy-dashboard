@@ -36,7 +36,6 @@
     "gpt-oss-120b/h200 TTFT spikes",
     "non-monotone-TPOT sweeps"
   ],
-  "target_vllm": "0.31.0",
   "metrics": [
     "ttft",
     "tpot"
@@ -81,7 +80,7 @@
       "model": "deepseek-v4-pro",
       "source": "inferencex",
       "vllm_version": "0.29.0",
-      "on_target_version": false,
+      "on_target_version": null,
       "coverage": {
         "scored": 404,
         "total": 404
@@ -194,7 +193,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -1126,7 +1125,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 2,
@@ -1635,7 +1634,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -2651,7 +2650,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -3121,7 +3120,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 2,
@@ -3507,7 +3506,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 2,
@@ -3615,7 +3614,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -4232,7 +4231,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 2,
@@ -4970,7 +4969,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -5986,7 +5985,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -6225,7 +6224,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 2,
@@ -6902,7 +6901,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -7813,7 +7812,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -8262,7 +8261,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 2,
@@ -8414,7 +8413,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -9010,7 +9009,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 2,
@@ -9718,7 +9717,7 @@
       "model": "gpt-oss-120b",
       "source": "inferencex",
       "vllm_version": "0.29.0",
-      "on_target_version": false,
+      "on_target_version": null,
       "coverage": {
         "scored": 483,
         "total": 483
@@ -9831,7 +9830,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -10364,7 +10363,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -10855,7 +10854,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -11364,7 +11363,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -11834,7 +11833,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -12304,7 +12303,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -12813,7 +12812,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -13388,7 +13387,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -13963,7 +13962,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -14617,7 +14616,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -14793,7 +14792,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -14969,7 +14968,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -15163,7 +15162,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -15423,7 +15422,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -15683,7 +15682,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -15982,7 +15981,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -16242,7 +16241,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -16502,7 +16501,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -16841,7 +16840,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -17332,7 +17331,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -17823,7 +17822,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -18290,7 +18289,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -18760,7 +18759,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -19230,7 +19229,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -19571,7 +19570,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -20146,7 +20145,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -20721,7 +20720,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -21296,7 +21295,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -21773,7 +21772,7 @@
       "model": "kimi-k2.5",
       "source": "inferencex",
       "vllm_version": "0.29.0",
-      "on_target_version": false,
+      "on_target_version": null,
       "coverage": {
         "scored": 378,
         "total": 378
@@ -21886,7 +21885,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -22335,7 +22334,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -23015,7 +23014,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -23314,7 +23313,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -24057,7 +24056,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -24524,7 +24523,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -25178,7 +25177,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -25795,7 +25794,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -26832,7 +26831,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -27302,7 +27301,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -27601,7 +27600,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -28659,7 +28658,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -29192,7 +29191,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -29452,7 +29451,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 2,
@@ -29604,7 +29603,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -30258,7 +30257,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -30518,7 +30517,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -30817,7 +30816,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -31084,7 +31083,7 @@
       "model": "minimax-m2.5",
       "source": "inferencex",
       "vllm_version": "0.29.0",
-      "on_target_version": false,
+      "on_target_version": null,
       "coverage": {
         "scored": 580,
         "total": 580
@@ -31197,7 +31196,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -31310,7 +31309,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -31906,7 +31905,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -32943,7 +32942,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -33161,7 +33160,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -33379,7 +33378,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 2,
@@ -33657,7 +33656,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -34043,7 +34042,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -34555,7 +34554,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -34668,7 +34667,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 2,
@@ -35009,7 +35008,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -35584,7 +35583,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -35925,7 +35924,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -36458,7 +36457,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -37217,7 +37216,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -37687,7 +37686,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -38724,7 +38723,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -39803,7 +39802,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -40018,7 +40017,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -40656,7 +40655,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -41105,7 +41104,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -41491,7 +41490,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -41643,7 +41642,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -42218,7 +42217,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -42559,7 +42558,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -43092,7 +43091,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -43851,7 +43850,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -44111,7 +44110,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -44410,7 +44409,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -44814,7 +44813,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -44969,7 +44968,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -45404,7 +45403,7 @@
       "model": "minimax-m3",
       "source": "inferencex",
       "vllm_version": "0.29.0",
-      "on_target_version": false,
+      "on_target_version": null,
       "coverage": {
         "scored": 652,
         "total": 652
@@ -45517,7 +45516,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -45693,7 +45692,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -46268,7 +46267,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -46843,7 +46842,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -47145,7 +47144,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -47825,7 +47824,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 2,
@@ -48064,7 +48063,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 2,
@@ -48342,7 +48341,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -48539,7 +48538,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -49177,7 +49176,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -49668,7 +49667,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -49970,7 +49969,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -50356,7 +50355,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -51036,7 +51035,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 2,
@@ -51124,7 +51123,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 2,
@@ -51363,7 +51362,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 2,
@@ -51641,7 +51640,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -51859,7 +51858,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -52137,7 +52136,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -52334,7 +52333,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -52552,7 +52551,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -52791,7 +52790,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -53051,7 +53050,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 2,
@@ -53243,7 +53242,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -53797,7 +53796,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -54750,7 +54749,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -55577,7 +55576,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -55879,7 +55878,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -56685,7 +56684,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 2,
@@ -56888,7 +56887,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -57379,7 +57378,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -58101,7 +58100,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -58739,7 +58738,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -59041,7 +59040,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -59931,7 +59930,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 2,
@@ -60209,7 +60208,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -60406,7 +60405,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -60684,7 +60683,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -60860,7 +60859,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -61078,7 +61077,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -61317,7 +61316,7 @@
                   "level": "topology",
                   "framework": "vllm",
                   "engine_version": "0.29.0",
-                  "on_target_version": false,
+                  "on_target_version": null,
                   "is_multinode": false,
                   "parallelism": {
                     "dp": 1,
@@ -61565,6 +61564,6 @@
       "ttft_spike",
       "non_monotone_tpot_sweep"
     ],
-    "vllm_version_filter": "on-target"
+    "vllm_version_filter": "all"
   }
 }

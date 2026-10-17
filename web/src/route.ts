@@ -4,19 +4,19 @@
  * (RFC B3: deep-link, row-select → points table, default view). Reader and writer live in one
  * module so they cannot drift.
  *
- *   #/?sel=<sweepKey>&tier=<measured_or_resolved|all>&vllm=<on-target|all|v:X.Y.Z>&mn=<0|1>
+ *   #/?sel=<sweepKey>&tier=<measured_or_resolved|all>&vllm=<all|v:X.Y.Z>&mn=<0|1>
  *
  * `sel` is the selected topology's sweepKey (model|workload|gpu|topoLabel). Absent = default
- * view (nothing selected). tier defaults to measured_or_resolved; vllm defaults to on-target
- * (the default state IS the headline, §6.3); mn (multi-node) defaults to 0 (hidden).
+ * view (nothing selected). tier defaults to measured_or_resolved; vllm defaults to all;
+ * mn (multi-node) defaults to 0 (hidden).
  *
- * vllm is a filter (§4.5): "on-target" (BLIS's target version), "all" (every version), or a
- * specific pinned version carried as "v:<version>" so a single off-target version can be isolated.
+ * vllm is a filter (§4.5): "all" (every version) or a specific pinned version carried as
+ * "v:<version>" so a single version can be isolated. The version is a per-row facet, not a group.
  */
 import type { TierKey } from './types'
 
-/** 'on-target' | 'all' | { version: '0.29.0' } — the last isolates one specific vLLM version. */
-export type VllmFilter = 'on-target' | 'all' | { version: string }
+/** 'all' | { version: '0.29.0' } — the latter isolates one specific vLLM version. */
+export type VllmFilter = 'all' | { version: string }
 
 export interface RouteState {
   sel: string | null
@@ -28,7 +28,7 @@ export interface RouteState {
 export const DEFAULT_ROUTE: RouteState = {
   sel: null,
   tier: 'measured_or_resolved',
-  vllm: 'on-target',
+  vllm: 'all',
   multinode: false,
 }
 
@@ -38,15 +38,12 @@ function query(hash: string): URLSearchParams {
 }
 
 function parseVllm(raw: string | null): VllmFilter {
-  if (raw === 'all') return 'all'
   if (raw && raw.startsWith('v:') && raw.length > 2) return { version: raw.slice(2) }
-  return 'on-target'
+  return 'all'
 }
 
 function vllmToParam(v: VllmFilter): string {
-  if (v === 'all') return 'all'
-  if (typeof v === 'object') return `v:${v.version}`
-  return 'on-target'
+  return typeof v === 'object' ? `v:${v.version}` : 'all'
 }
 
 export function parseRoute(hash: string): RouteState {

@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": [
     "schema_version", "snapshot_id", "generated_at", "provenance",
-    "coverage", "target_vllm", "metrics", "totals", "matrix", "scope"
+    "coverage", "metrics", "totals", "matrix", "scope"
   ],
   "properties": {
     "schema_version": { "const": 1 },
@@ -76,7 +76,6 @@
       "items": { "type": "string" },
       "description": "noted for the reader; NOT filtered out of scoring (RFC: no quality exclusions in v0.1.0)"
     },
-    "target_vllm": { "type": "string", "description": "BLIS's priced vLLM; the version filter defaults to on-target" },
     "metrics": {
       "type": "array",
       "items": { "enum": ["ttft", "tpot"] },
@@ -95,11 +94,10 @@
     "scope": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["vllm_version_filter"],
       "properties": {
         "multinode": { "type": "string" },
         "measured_exclusions": { "type": "array", "items": { "type": "string" } },
-        "vllm_version_filter": { "const": "on-target" }
+        "vllm_version_filter": { "type": "string" }
       }
     }
   },

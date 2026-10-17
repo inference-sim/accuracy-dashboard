@@ -21,7 +21,7 @@ export function validateSummary(raw: unknown): Summary {
       `summary.json schema_version is ${JSON.stringify(doc.schema_version)}, this build renders version 1`,
     )
   }
-  for (const key of ['snapshot_id', 'provenance', 'coverage', 'totals', 'matrix', 'target_vllm']) {
+  for (const key of ['snapshot_id', 'provenance', 'coverage', 'totals', 'matrix']) {
     if (!(key in doc)) throw new SummaryLoadError(`summary.json is missing required field "${key}"`)
   }
   if (!Array.isArray(doc.matrix)) {

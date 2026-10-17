@@ -102,11 +102,10 @@ function Overview({
   setExpanded: (s: Set<string>) => void
 }) {
   const allPoints = useMemo(() => flattenPoints(summary), [summary])
-  const filtered = useMemo(() => applyFilters(allPoints, route), [allPoints, route])
-  const visible = filtered.points
+  const visible = useMemo(() => applyFilters(allPoints, route), [allPoints, route])
 
-  // Distinct vLLM versions present in the snapshot, for the version dropdown (§4.5: version is
-  // a filter). Sorted; the dropdown offers on-target + all + each of these.
+  // Distinct vLLM versions present in the snapshot, for the version dropdown (§4.5: version is a
+  // per-row filter). Sorted; the dropdown offers "all versions" + each of these.
   const versions = useMemo(
     () => [...new Set(allPoints.map((p) => p.engineVersion).filter((v): v is string => !!v))].sort(),
     [allPoints],
@@ -114,9 +113,8 @@ function Overview({
 
   // Effective tier: the default is measured_or_resolved, but if a snapshot has zero
   // measured-or-resolved points (the direct dump path leaves settings resolved, so every point
-  // lands in "all") we fall back to the "all" tier rather than show an empty headline — the
-  // same graceful principle as the on-target fallback. The user's explicit tier click is always
-  // honoured; this only rescues the DEFAULT.
+  // lands in "all") we fall back to the "all" tier rather than show an empty headline. The
+  // user's explicit tier click is always honoured; this only rescues the DEFAULT.
   const tierFellBack =
     route.tier === 'measured_or_resolved' &&
     visible.filter((p) => p.tier === 'measured_or_resolved').length === 0 &&
@@ -209,13 +207,12 @@ function Overview({
           vLLM version{' '}
           <select
             className="box vllmsel"
-            value={typeof route.vllm === 'object' ? `v:${route.vllm.version}` : route.vllm}
+            value={typeof route.vllm === 'object' ? `v:${route.vllm.version}` : 'all'}
             onChange={(e) => {
               const v = e.target.value
-              update({ vllm: v === 'all' ? 'all' : v === 'on-target' ? 'on-target' : { version: v.replace(/^v:/, '') } })
+              update({ vllm: v === 'all' ? 'all' : { version: v.replace(/^v:/, '') } })
             }}
           >
-            <option value="on-target">on-target v{summary.target_vllm}</option>
             <option value="all">all versions</option>
             {versions.map((v) => (
               <option key={v} value={`v:${v}`}>
@@ -226,14 +223,6 @@ function Overview({
         </span>
       </div>
 
-      {filtered.onTargetFellBack && (
-        <div className="fallback-note" role="status">
-          No points in this snapshot ran on BLIS's target vLLM v{summary.target_vllm} — showing{' '}
-          <b>all versions</b> instead (every scored point is off-target). Accuracy here mixes vLLM
-          versions; it is not the on-target headline.
-        </div>
-      )}
-
       <div className="tbl-title">Summary — mean TTFT/TPOT: MAPE &amp; shape</div>
       <SummaryTable
         totals={totals}
@@ -241,7 +230,6 @@ function Overview({
         totalsPointCount={visible.length}
         rows={orderedRows}
         tier={effectiveTier}
-        targetVllm={summary.target_vllm}
         sort={sort}
         onSort={(k: SortKey) => setSort(nextSort(sort, k))}
         selectedId={route.sel ? findIdForSweep(orderedRows, route.sel) : null}
@@ -276,20 +264,14 @@ function Overview({
         </span>
       </div>
 
-      <PointsTable points={selectedPoints} title={pointsTitle} vllm={selFirst?.engineVersion ?? null} onTarget={selFirst?.onTargetVersion ?? null} />
+      <PointsTable points={selectedPoints} title={pointsTitle} vllm={selFirst?.engineVersion ?? null} />
 
       <div className="legend">
         <span>
           <span className="ver" style={{ margin: 0 }}>
-            v{summary.target_vllm}
+            vX.Y.Z
           </span>{' '}
-          on BLIS's target vLLM
-        </span>
-        <span>
-          <span className="ver off" style={{ margin: 0 }}>
-            off
-          </span>{' '}
-          off BLIS's target
+          the row's measured vLLM version
         </span>
         <span>
           <b>mape</b> absolute · <b>shape</b> curvature · <b>n</b> points per metric
@@ -300,9 +282,8 @@ function Overview({
         <p className="foot">
           <b>Known measurement artefacts</b> (noted, not dropped — RFC keeps scoring logic out of this repo):{' '}
           {summary.known_artefacts.join('; ')}. v0.1.0 scores mean TTFT and TPOT only (MAPE + shape); E2E, tail p99
-          and throughput are planned for a future release. Default view is on-target v{summary.target_vllm}; vLLM
-          version is a per-row badge + filter, not a group. Selecting a topology row populates the points table
-          (deep-linked via the URL).
+          and throughput are planned for a future release. vLLM version is a per-row badge + filter, not a group.
+          Selecting a topology row populates the points table (deep-linked via the URL).
         </p>
       )}
     </>

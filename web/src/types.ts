@@ -129,7 +129,6 @@ export interface Summary {
   provenance: Provenance
   coverage: Coverage
   known_artefacts?: string[]
-  target_vllm: string
   metrics: Metric[]
   metricscore_comparison?: unknown
   totals: MetricBlockPair
@@ -137,7 +136,7 @@ export interface Summary {
   scope: {
     multinode?: string
     measured_exclusions?: string[]
-    vllm_version_filter: 'on-target'
+    vllm_version_filter?: string
   }
 }
 

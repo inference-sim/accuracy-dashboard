@@ -124,17 +124,14 @@ describe('App renders the real CI-shaped snapshot', () => {
 })
 
 describe('client-side aggregation keeps filters honest (RFC B3)', () => {
-  it('on-target filter never yields more points than all-versions', () => {
+  it('a specific-version filter isolates that version; "all" shows every version', () => {
     const summary = loadFixture()
     const all = flattenPoints(summary)
-    const onTarget = applyFilters(all, { sel: null, tier: 'all', vllm: 'on-target', multinode: false })
+    const version = all.find((p) => p.engineVersion)!.engineVersion!
     const allVersions = applyFilters(all, { sel: null, tier: 'all', vllm: 'all', multinode: false })
-    // With a real snapshot that has zero on-target points, on-target falls back to all — so the
-    // counts are equal and the fallback flag is set. In general on-target <= all-versions.
-    expect(onTarget.points.length).toBeLessThanOrEqual(allVersions.points.length)
-    if (onTarget.points.length === allVersions.points.length) {
-      expect(onTarget.onTargetFellBack).toBe(true)
-    }
+    const pinned = applyFilters(all, { sel: null, tier: 'all', vllm: { version }, multinode: false })
+    expect(pinned.length).toBeLessThanOrEqual(allVersions.length)
+    expect(pinned.every((p) => p.engineVersion === version)).toBe(true)
   })
 
   it('totals recompute from visible points (not the stored node metrics)', () => {
