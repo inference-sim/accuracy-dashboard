@@ -60,7 +60,7 @@ function HeaderButton({
 }
 
 export function SummaryTable(props: Props) {
-  const { totals, totalsDelta, totalsPointCount, rows, tier, targetVllm, sort, onSort, selectedId } = props
+  const { totals, totalsDelta, totalsPointCount, rows, tier, sort, onSort, selectedId } = props
   const tb = (b: MetricBlockPair) => b[tier]
   const t = tb(totals)
   const delta = totalsDelta ? formatDelta(totalsDelta.tpot_mape) : null
@@ -103,13 +103,10 @@ export function SummaryTable(props: Props) {
           <tr className="r0 totals">
             <td className="name">
               <b>ALL MODELS</b>
-              <span className="facet">
-                headline · {props.tier === 'all' ? 'all versions' : `on-target v${targetVllm}`} · {totalsPointCount} pts
-              </span>
+              <span className="facet">headline · {totalsPointCount} pts</span>
             </td>
-            <td>
-              <VerBadge vllm={targetVllm} onTarget={true} />
-            </td>
+            {/* No vLLM badge on the totals row — it aggregates across versions (per-model rows carry the badge). */}
+            <td />
             <td className="sep">
               <Num v={t.mape.ttft} />
               {totalsDelta && formatDelta(totalsDelta.ttft_mape) && (
