@@ -11,19 +11,6 @@ on:
         description: "Re-evaluate even if inputs are unchanged"
         type: boolean
         default: false
-      budget_mode:
-        description: "Skip the 34GB dump restore; use a staged corpus (ci-verify proof)"
-        type: boolean
-        default: false
-  # ci-verify branches run the full pipeline in budget mode on push, so the machinery is proven
-  # green without the 34GB dump (schedule/workflow_dispatch only register on the default branch).
-  # paths-ignore stops the publish commit (which writes data/ + state/) from re-triggering a run.
-  push:
-    branches:
-      - "ci-verify/**"
-    paths-ignore:
-      - "data/**"
-      - "state/**"
 
 permissions:
   contents: write # commit the snapshot to the Pages-served branch
@@ -40,17 +27,8 @@ jobs:
       changed: ${{ steps.diff.outputs.changed }}
       blis_tag: ${{ steps.resolve.outputs.blis_tag }}
       ix_tag: ${{ steps.resolve.outputs.ix_tag }}
-      budget: ${{ steps.mode.outputs.budget }}
     steps:
       - uses: actions/checkout@v4
-      - name: Resolve run mode (budget on ci-verify push or explicit input)
-        id: mode
-        run: |
-          if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.budget_mode }}" = "true" ]; then
-            echo "budget=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "budget=false" >> "$GITHUB_OUTPUT"
-          fi
       - name: Resolve both inputs live (never hardcoded)
         id: resolve
         env:
@@ -63,65 +41,55 @@ jobs:
           IX_TAG: ${{ steps.resolve.outputs.ix_tag }}
         run: bash orchestrator/detect_diff.sh
 
-  # ---------------------------------------------------------------- 2. evaluate (heavy)
+  # ---------------------------------------------------------------- 2. evaluate (full real dump)
   evaluate:
     needs: detect-diff
-    if: ${{ needs.detect-diff.outputs.changed == 'true' || inputs.force || needs.detect-diff.outputs.budget == 'true' }}
-    # Hosted runner for diff/build/publish. The dump restore (~34GB) does NOT fit a hosted
-    # runner's disk (RFC D3) — in a real nightly run the evaluate job must target a larger
-    # self-hosted runner (set `runs-on: [self-hosted, blis-eval]`). The budget_mode path below
-    # stages a small corpus so the full pipeline (build→signedprobe→summary→validate→publish)
-    # is proven green on hosted CI without the dump.
+    if: ${{ needs.detect-diff.outputs.changed == 'true' || inputs.force }}
+    # Runs the full real dump on a GitHub-hosted runner: the ingest streams the ~31 GB compressed
+    # dump straight through zstd into pg_restore of only the 3 tables the extractor reads, so
+    # neither the compressed nor the ~323 GB decompressed archive lands on disk — only ~6 GB of
+    # restored tables sit in the Postgres service container. No self-hosted runner needed.
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 10s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: inferencex
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24"
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-
-      - name: Install Python deps
-        run: pip install --quiet jsonschema
-
-      - name: Pre-flight — dump restore budget (RFC D3)
-        if: ${{ needs.detect-diff.outputs.budget != 'true' }}
+      - name: Install deps (jsonschema, psql 17, zstd)
         run: |
-          echo "::group::disk budget"
-          df -h / | tee /tmp/df.txt
-          free_gb=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
-          echo "free disk: ${free_gb} GB"
-          echo "::endgroup::"
-          # The compressed dump alone is ~34GB; the restored DB is larger. A hosted runner has
-          # ~14GB free. STOP loudly rather than scoring a partial dump.
-          if [ "${free_gb:-0}" -lt 80 ]; then
-            echo "::error::Runner has ${free_gb}GB free; the InferenceX dump restore needs ~80GB+."
-            echo "FIX (RFC §4.6): run this evaluate job on a self-hosted runner with >=120GB disk"
-            echo "(runs-on: [self-hosted, blis-eval]); keep detect-diff and publish on hosted."
-            echo "Publishing nothing; the prior snapshot stands (RFC D3)."
-            exit 75   # EX_TEMPFAIL — the publish job treats a skipped evaluate as a no-op
-          fi
+          pip install --quiet jsonschema
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17 zstd
 
-      - name: Stage a corpus for budget mode (ci-verify proof, no 34GB dump)
-        if: ${{ needs.detect-diff.outputs.budget == 'true' }}
-        env:
-          BLIS_TAG: ${{ needs.detect-diff.outputs.blis_tag }}
-        run: bash orchestrator/stage_budget_corpus.sh
-
-      - name: Evaluate — build from source → signedprobe → summary.json
+      - name: Evaluate — stream dump → build from source → signedprobe → summary.json
         env:
           BLIS_TAG: ${{ needs.detect-diff.outputs.blis_tag }}
           IX_TAG: ${{ needs.detect-diff.outputs.ix_tag }}
           GH_TOKEN: ${{ github.token }}
-          SKIP_INGEST: ${{ needs.detect-diff.outputs.budget == 'true' && '1' || '0' }}
           DASH_DIR: ${{ github.workspace }}
           WORK: ${{ github.workspace }}/.work
-          SNAPSHOT_DATE: ${{ needs.detect-diff.outputs.ix_tag }}
         run: |
-          # In budget mode the staged corpus already lives in $WORK; evaluate.sh consumes it.
           export SNAPSHOT_DATE="$(date -u +%Y-%m-%d)"
           bash orchestrator/evaluate.sh
 

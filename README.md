@@ -53,9 +53,9 @@ npm run test                        # headless render tests (zero console errors
 python3 orchestrator/test_build_summary.py   # orchestrator arithmetic + self-consistency oracle
 ```
 
-The real numbers come from CI (`orchestrator/evaluate.sh`), which needs a restored InferenceX
-dump; both inputs are resolved live. `budget_mode` runs the full pipeline on a hosted runner
-against a small staged corpus (no 34 GB dump) to prove the machinery end to end.
+The real numbers come from CI (`orchestrator/evaluate.sh`); both inputs are resolved live. The
+dump is ingested by `orchestrator/stream_restore.sh` — it streams the resolved weekly dump into a
+Postgres service container, restoring only the 3 tables the extractor reads.
 
 ## Deployment (GitHub Pages, one branch — RFC §4.2)
 
@@ -65,18 +65,21 @@ Pages once (Settings → Pages) — no server, no container, no RITS/OpenShift. 
 job commits the fresh snapshot to that same branch; a failed/partial run publishes nothing and
 the prior snapshot stands.
 
-The runner-budget reality (RFC D3), measured on the real dump: `db-dump/2026-09-28` is **~31 GB
-compressed** and **~323 GB decompressed** (Postgres custom format v1.16 — needs `pg_restore` from
-PostgreSQL 17+). It does **not** fit a GitHub-hosted runner's ~14 GB disk, so a production nightly
-run targets a **self-hosted `evaluate`** runner (`runs-on: [self-hosted, blis-eval]`) while
-`detect-diff` and `publish` stay hosted; the pre-flight step STOPs loudly and keeps the prior
-snapshot if the budget isn't met. The `ci-verify.yml` workflow proves the whole pipeline on a
-hosted runner in **budget mode** (a small real staged corpus, no dump).
+### Runner budget — fits a GitHub-hosted runner (RFC D3)
+
+`db-dump/2026-09-28` is **~31 GB compressed / ~323 GB decompressed** (Postgres custom format v1.16,
+needs `pg_restore` from PostgreSQL 17+) — far more than a hosted runner's ~14 GB disk if restored
+whole. But the direct extractor reads only **3 tables** (`benchmark_results`, `configs`,
+`server_logs`), so `stream_restore.sh` streams the release parts straight through `zstd -d` into
+`pg_restore -t <those tables>`: **neither the 31 GB compressed nor the 323 GB decompressed archive
+ever lands on disk**, and only **~6 GB of restored tables** sit in the Postgres service container.
+The scored output is byte-identical to a full restore — the other tables contribute nothing to the
+extractor (verified: 590 sweeps / 3,345 points either way). So the **real full dump runs on a
+standard GitHub-hosted runner** — no self-hosted runner, no on-disk dump.
 
 ### First real run (RFC D4) — against `db-dump/2026-09-28`, sha-verified
 
-The full pipeline was run end-to-end against the actual dump (restored locally; the evaluate step
-is machine-portable to a self-hosted runner). From that run:
+The full pipeline was run end-to-end against the actual dump. From that run:
 
 - **Corpus:** 590 sweeps / **3,345 points**, vLLM-only, 5 models (deepseek-v4-pro, gpt-oss-120b,
   kimi-k2.5, minimax-m2.5, minimax-m3), 4 GPUs (b200/b300/h100/h200). Extraction skipped AMD parts

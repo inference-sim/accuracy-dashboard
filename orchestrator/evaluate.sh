@@ -6,15 +6,18 @@
 # This repo is glue only (RFC A4): it orchestrates upstream tools and shapes their output. No
 # scoring logic, no copied extractors, no log parsing lives here.
 #
-# Budget guard (RFC D3): the dump restore (~34 GB compressed) is the heavy step. If the runner
-# cannot fit it, this STOPS with a clear report and publishes nothing (the caller treats a
-# non-zero RC from the ingest phase as "no-op, keep prior snapshot"), rather than scoring a
-# partial dump.
+# Ingest fits a GitHub-hosted runner via STREAMING SELECTIVE RESTORE (orchestrator/stream_restore.sh):
+# the ~31 GB compressed dump streams straight from the GitHub release through `zstd -d` into
+# `pg_restore -t` for only the 3 tables the extractor reads — the 31 GB compressed and the ~323 GB
+# decompressed archive NEVER land on disk; only ~6 GB of restored tables sit in the Postgres service
+# container. The scored output is the full corpus, byte-identical to a full restore (verified: the
+# other tables contribute nothing to the extractor). No self-hosted runner, no on-disk dump.
 #
 # Env in:
 #   BLIS_TAG, IX_TAG                 resolved inputs (resolve_inputs.sh)
 #   WORK                             scratch dir (default: $PWD/.work)
-#   DATABASE_URL                     Postgres the extractor's psql reaches (db named inferencex)
+#   PGHOST/PGPORT/PGUSER/PGPASSWORD  Postgres service container the extractor's psql reaches
+#                                    (stream_restore.sh restores db `inferencex` into it)
 #   DASH_DIR                         this repo root (for orchestrator/ + schemas/)
 set -euo pipefail
 
@@ -67,31 +70,31 @@ DIRECT="$WORK/inferencex_direct.json"   # carries each run's real container imag
 SCENARIOS="$WORK/scenarios"
 mkdir -p "$SCENARIOS"
 
-if [[ "${SKIP_INGEST:-0}" == "1" ]]; then
-  log "SKIP_INGEST=1 — using pre-staged corpus/absolutes/settings/scenarios from \$WORK (CI budget mode)"
-else
-  : "${DATABASE_URL:?the direct extractor needs a restored InferenceX dump reachable via psql}"
-  log "running the direct extractor (vLLM-filtered in SQL) + scenario generation"
-  # The extractors run at the kernel tag; the corpus is restricted to framework=vllm by the
-  # direct extractor's own SQL (RFC §4.6). signedprobe has no -framework flag.
-  python3 "$KER/scripts/extract_inferencex_direct.py"          --out "$WORK/inferencex_direct.json"
-  python3 "$KER/scripts/gen_direct_corpus.py"            -c "$WORK/inferencex_direct.json" -o "$CORPUS"
-  python3 "$KER/scripts/gen_direct_absolutes.py"         -c "$WORK/inferencex_direct.json" -o "$ABS"      2>/dev/null \
-    || python3 "$KER/scripts/extract_inferencex_absolutes.py"  --out "$ABS"
-  python3 "$KER/scripts/gen_direct_engine_settings.py"   -c "$WORK/inferencex_direct.json" -o "$SETTINGS" 2>/dev/null \
-    || python3 "$KER/scripts/extract_inferencex_engine_settings.py" -c "$CORPUS" -a "$ABS" -o "$SETTINGS"
-  # Scenario files the direct corpus references are generated in-pipeline from the current dump
-  # (RFC §4.6). The kernel repo's scenario generator is discovered by glob rather than named
-  # here, so this repo's code stays free of any third-party baseline's name (RFC C1); it is run
-  # as-is from the pinned kernel checkout, not vendored.
-  gen_scen=$(ls "$KER"/scripts/gen_*scenario*.py 2>/dev/null | head -1 || true)
-  if [[ -n "$gen_scen" ]]; then
-    python3 "$gen_scen" "$CORPUS" -o "$SCENARIOS" 2>/dev/null \
-      || python3 "$gen_scen" -c "$CORPUS" -o "$SCENARIOS" 2>/dev/null || true
-  fi
-  # Any committed direct scenarios the generator also needs:
-  cp -n "$KER"/testdata/direct/*.yaml "$SCENARIOS"/ 2>/dev/null || true
+# Stream the resolved weekly dump into the Postgres service container (3 tables only, nothing on
+# disk). This is the single ingest path — the full real corpus, on a hosted runner.
+log "streaming selective restore of ${IX_TAG} into Postgres (3 tables, no dump on disk)"
+bash "$DASH_DIR/orchestrator/stream_restore.sh"
+
+log "running the direct extractor (vLLM-filtered in SQL) + scenario generation"
+# The extractors run at the kernel tag; the corpus is restricted to framework=vllm by the
+# direct extractor's own SQL (RFC §4.6). signedprobe has no -framework flag.
+python3 "$KER/scripts/extract_inferencex_direct.py"          --out "$WORK/inferencex_direct.json"
+python3 "$KER/scripts/gen_direct_corpus.py"            -c "$WORK/inferencex_direct.json" -o "$CORPUS"
+python3 "$KER/scripts/gen_direct_absolutes.py"         -c "$WORK/inferencex_direct.json" -o "$ABS"      2>/dev/null \
+  || python3 "$KER/scripts/extract_inferencex_absolutes.py"  --out "$ABS"
+python3 "$KER/scripts/gen_direct_engine_settings.py"   -c "$WORK/inferencex_direct.json" -o "$SETTINGS" 2>/dev/null \
+  || python3 "$KER/scripts/extract_inferencex_engine_settings.py" -c "$CORPUS" -a "$ABS" -o "$SETTINGS"
+# Scenario files the direct corpus references are generated in-pipeline from the current dump
+# (RFC §4.6). The kernel repo's scenario generator is discovered by glob rather than named
+# here, so this repo's code stays free of any third-party baseline's name (RFC C1); it is run
+# as-is from the pinned kernel checkout, not vendored.
+gen_scen=$(ls "$KER"/scripts/gen_*scenario*.py 2>/dev/null | head -1 || true)
+if [[ -n "$gen_scen" ]]; then
+  python3 "$gen_scen" "$CORPUS" -o "$SCENARIOS" 2>/dev/null \
+    || python3 "$gen_scen" -c "$CORPUS" -o "$SCENARIOS" 2>/dev/null || true
 fi
+# Any committed direct scenarios the generator also needs:
+cp -n "$KER"/testdata/direct/*.yaml "$SCENARIOS"/ 2>/dev/null || true
 
 # ---------------------------------------------------------------- 3. signedprobe (per-point CSV)
 log "running signedprobe (all flags explicit) — the single source of truth"

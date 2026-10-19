@@ -1,12 +1,12 @@
 name: ci-verify
 
-# Proves the nightly pipeline END TO END on a hosted runner WITHOUT the 34GB dump (RFC D1/D3),
-# via budget mode: build blis+signedprobe+metricscore from source at the live-resolved tag,
-# stage a small REAL corpus, run signedprobe per point, shape → schema-validate → headless +
-# browser render → publish. Same jobs as nightly.yml, minus the `schedule` trigger (GitHub only
-# registers scheduled workflows from the default branch). Runs on push to ci-verify/** and on
-# demand. Delete this workflow when the pipeline merges to the default branch; nightly.yml then
-# carries the schedule.
+# Runs the REAL nightly pipeline END TO END on a GitHub-hosted runner (RFC D1): resolve inputs
+# live → stream the full InferenceX dump into a Postgres service container (3 tables, nothing on
+# disk) → build blis+signedprobe+metricscore from source → signedprobe over the full corpus →
+# shape → schema-validate → headless + browser render → publish. Same jobs as nightly.yml, minus
+# the `schedule` trigger (GitHub only registers scheduled workflows from the default branch). Runs
+# on push to ci-verify/** and on demand. Delete this workflow when the pipeline merges to the
+# default branch; nightly.yml then carries the schedule.
 on:
   push:
     branches:
@@ -46,8 +46,29 @@ jobs:
 
   evaluate:
     needs: detect-diff
-    # Always run in ci-verify so the proof produces a snapshot; the real nightly gates on `changed`.
+    # Always run in ci-verify so a snapshot is produced; the real nightly gates on `changed`.
     runs-on: ubuntu-latest
+    # Postgres service container the streaming restore loads the 3 tables into. The restored
+    # footprint is ~6 GB — well within a hosted runner — because only benchmark_results/configs/
+    # server_logs are restored, not the full 323 GB dump.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 10s
+          --health-timeout 5s --health-retries 10
+    env:
+      # libpq picks these up; the extractor + stream_restore.sh connect via bare psql.
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: inferencex
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -57,20 +78,17 @@ jobs:
         with:
           python-version: "3.13"
       - run: pip install --quiet jsonschema
+      - name: Install client tools (psql 17, zstd)
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17 zstd
 
-      - name: Stage a small REAL corpus (budget mode — no 34GB dump, RFC D3)
-        env:
-          BLIS_TAG: ${{ needs.detect-diff.outputs.blis_tag }}
-          WORK: ${{ github.workspace }}/.work
-          DASH_DIR: ${{ github.workspace }}
-        run: bash orchestrator/stage_budget_corpus.sh
-
-      - name: Evaluate — build from source → signedprobe → summary.json (RFC M1/M2)
+      - name: Evaluate — stream dump → build from source → signedprobe → summary.json (RFC M1/M2)
         env:
           BLIS_TAG: ${{ needs.detect-diff.outputs.blis_tag }}
           IX_TAG: ${{ needs.detect-diff.outputs.ix_tag }}
           GH_TOKEN: ${{ github.token }}
-          SKIP_INGEST: "1"
           DASH_DIR: ${{ github.workspace }}
           WORK: ${{ github.workspace }}/.work
         run: |
