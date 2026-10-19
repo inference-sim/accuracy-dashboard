@@ -11,6 +11,18 @@ on:
         description: "Re-evaluate even if inputs are unchanged"
         type: boolean
         default: false
+  # TEMPORARY (remove before merge): the real pipeline isn't on the default branch yet, so
+  # workflow_dispatch 404s. A push trigger on the ci-verify branch lets us exercise the real nightly
+  # (filtered set, full publish path) now. REVERT to schedule + workflow_dispatch once this lands on
+  # the default branch — the schedule only registers from there anyway.
+  push:
+    branches:
+      - "ci-verify/**"
+    paths-ignore:
+      - "data/**"
+      - "state/**"
+      - "web/**"
+      - "README.md"
 
 # Least privilege (PR #3 review point 4): read-only by default so `evaluate` — which builds and
 # runs CLONED UPSTREAM code — cannot push. Only the `publish` job is granted `contents: write`.
@@ -46,7 +58,9 @@ jobs:
   # ---------------------------------------------------------------- 2. evaluate (full real dump)
   evaluate:
     needs: detect-diff
-    if: ${{ needs.detect-diff.outputs.changed == 'true' || inputs.force }}
+    # The push trigger (temporary) always evaluates, so a branch push exercises the real run even
+    # when inputs are unchanged vs state/last-run.json.
+    if: ${{ needs.detect-diff.outputs.changed == 'true' || inputs.force || github.event_name == 'push' }}
     # Runs the full real dump on a GitHub-hosted runner: the ingest streams the ~31 GB compressed
     # dump straight through zstd into pg_restore of only the 3 tables the extractor reads, so
     # neither the compressed nor the ~323 GB decompressed archive lands on disk — only ~6 GB of
