@@ -1,23 +1,18 @@
 name: ci-verify
 
-# Runs the REAL nightly pipeline END TO END on a GitHub-hosted runner (RFC D1): resolve inputs
-# live → stream the full InferenceX dump into a Postgres service container (3 tables, nothing on
-# disk) → build blis+signedprobe+metricscore from source → signedprobe over the full corpus →
-# shape → schema-validate → headless + browser render → publish. Same jobs as nightly.yml, minus
-# the `schedule` trigger (GitHub only registers scheduled workflows from the default branch). Runs
-# on push to ci-verify/** and on demand. Delete this workflow when the pipeline merges to the
-# default branch; nightly.yml then carries the schedule.
+# MANUAL, VERIFY-ONLY end-to-end proof of the real pipeline (RFC D1): resolve inputs live → stream
+# the InferenceX dump into a Postgres service container (3 tables, nothing on disk) → build
+# blis+signedprobe+metricscore from source → filter to the latest-N vLLM versions → signedprobe →
+# shape → schema-validate → headless + browser render. It does NOT publish: no data commit, no site
+# change (only nightly.yml publishes). An author/reviewer triggers it on demand for a PR branch:
+#   gh workflow run ci-verify.yml --ref <branch>
+# Nothing per-PR/per-commit runs this automatically — only the fast `checks` workflow runs on PRs.
+# The scheduled, publishing equivalent lives in nightly.yml (default branch only).
 on:
-  push:
-    branches:
-      - "ci-verify/**"
-    paths-ignore:
-      - "data/**"
-      - "state/**"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read  # verify-only — never commits data or touches the site
 
 concurrency:
   group: ci-verify-${{ github.ref }}
@@ -134,59 +129,29 @@ jobs:
           name: summary-json
           path: .work/summary.json
 
-  publish:
+  # Verify-only summary. Reports the result + the scored counts from the uploaded summary.json but
+  # NEVER commits data or touches the site — publishing is nightly.yml's job alone (user decision:
+  # a manual pre-merge run proves green, it does not publish).
+  verify-summary:
     needs: [detect-diff, evaluate]
     if: ${{ needs.evaluate.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref }}
       - uses: actions/download-artifact@v4
         with:
           name: summary-json
           path: incoming
-      - name: Diff — unchanged snapshot ⇒ no-op (RFC D3)
-        id: changecheck
+      - name: Report scored counts (no publish)
         run: |
-          new="incoming/summary.json"
-          cur="data/latest/summary.json"
-          if [ -f "$cur" ] && python3 -c "
-          import json,sys
-          a=json.load(open('$new')); b=json.load(open('$cur'))
-          sys.exit(0 if a.get('snapshot_id')==b.get('snapshot_id') and a['totals']==b['totals'] else 1)
-          "; then
-            echo "noop=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::snapshot identical to the published one — publishing nothing (no-op)"
-          else
-            echo "noop=false" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Publish snapshot + maintain the run index (RFC §4.2)
-        env:
-          BLIS_TAG: ${{ needs.detect-diff.outputs.blis_tag }}
-          IX_TAG: ${{ needs.detect-diff.outputs.ix_tag }}
-          NOOP: ${{ steps.changecheck.outputs.noop }}
-        run: |
-          snap_id=$(python3 -c "import json;print(json.load(open('incoming/summary.json'))['snapshot_id'])")
-          # Only overwrite the published numbers when the snapshot actually changed (no-op keeps the
-          # prior data/latest, per RFC D3). But ALWAYS write this run's snapshot dir and rebuild the
-          # index + prune >30d — so the picker's index.json stays correct even on an unchanged day
-          # and aged-out runs are dropped regardless.
-          if [ "$NOOP" != "true" ]; then
-            mkdir -p data/latest
-            cp incoming/summary.json data/latest/summary.json
-            python3 -c "import json; json.dump({'blis_tag':'${BLIS_TAG}','ix_tag':'${IX_TAG}','snapshot_id':'${snap_id}'}, open('state/last-run.json','w'), indent=2)"
-          fi
-          mkdir -p "data/snapshots/${snap_id}"
-          cp incoming/summary.json "data/snapshots/${snap_id}/summary.json"
-          python3 orchestrator/update_index.py --data-dir data --retention-days 30 --today "$(date -u +%F)"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A data state/last-run.json
-          git commit -m "ci-verify: ${snap_id} [skip ci]" || { echo "nothing to commit (no-op, index unchanged)"; exit 0; }
-          git push
-      - name: Summary
-        run: |
-          echo "### ci-verify result" >> "$GITHUB_STEP_SUMMARY"
-          echo "- no-op: ${{ steps.changecheck.outputs.noop }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- blis: ${{ needs.detect-diff.outputs.blis_tag }} / ix: ${{ needs.detect-diff.outputs.ix_tag }}" >> "$GITHUB_STEP_SUMMARY"
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          d = json.load(open("incoming/summary.json"))
+          cov = d.get("coverage", {})
+          f = (d.get("provenance") or {}).get("vllm_filter") or {}
+          print("### ci-verify result (verify-only — nothing published)")
+          print(f"- snapshot: `{d.get('snapshot_id')}`")
+          print(f"- blis: `${{ needs.detect-diff.outputs.blis_tag }}` / ix: `${{ needs.detect-diff.outputs.ix_tag }}`")
+          print(f"- scored: **{cov.get('scored')}**  not_scored: {cov.get('not_scored')}")
+          if f:
+              print(f"- vLLM filter: latest-{f.get('n')} {f.get('window_kept')}")
+          PY

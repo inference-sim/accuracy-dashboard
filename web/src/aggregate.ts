@@ -17,7 +17,6 @@ import type { Metric, MetricBlock, MetricBlockPair, Summary, TierKey } from './t
 export interface FlatPoint {
   model: string
   modelVllm: string | null
-  modelOnTarget: boolean | null
   workloadLabel: string
   isl: number | null
   osl: number | null
@@ -25,7 +24,6 @@ export interface FlatPoint {
   precision: string | null
   framework: string
   engineVersion: string | null
-  onTargetVersion: boolean | null
   isMultinode: boolean
   topoLabel: string
   parallelism: Record<string, number>
@@ -57,7 +55,6 @@ export function flattenPoints(summary: Summary): FlatPoint[] {
             out.push({
               model: m.model,
               modelVllm: m.vllm_version,
-              modelOnTarget: m.on_target_version,
               workloadLabel: w.label,
               isl: w.isl,
               osl: w.osl,
@@ -65,7 +62,6 @@ export function flattenPoints(summary: Summary): FlatPoint[] {
               precision: g.precision,
               framework: t.framework,
               engineVersion: t.engine_version,
-              onTargetVersion: t.on_target_version,
               isMultinode: t.is_multinode,
               topoLabel: t.label,
               parallelism: t.parallelism,

@@ -78,7 +78,19 @@ bash "$DASH_DIR/orchestrator/stream_restore.sh"
 log "running the direct extractor (vLLM-filtered in SQL) + scenario generation"
 # The extractors run at the kernel tag; the corpus is restricted to framework=vllm by the
 # direct extractor's own SQL (RFC §4.6). signedprobe has no -framework flag.
-python3 "$KER/scripts/extract_inferencex_direct.py"          --out "$WORK/inferencex_direct.json"
+python3 "$KER/scripts/extract_inferencex_direct.py"          --out "$WORK/inferencex_direct.raw.json"
+
+# Filter the direct corpus to the vLLM versions worth scoring BEFORE the gen_direct_* scripts read
+# it (RFC discussion #2, point 2 — replaces the on-target-v0.31.0 rule). Two reductions, both at the
+# superset file: (1) keep only the latest ${VLLM_LATEST_N:-5} NUMBERED versions present in this dump;
+# (2) since BLIS's prediction is independent of the vLLM version, keep only the NEWEST surviving
+# version per BLIS-input identity — so each prediction is scored ONCE, against the latest build. This
+# is glue (selection only); signedprobe + build_summary are unchanged and just see a smaller corpus.
+# The output takes the canonical name every downstream step + $DIRECT already read.
+log "filtering direct corpus to latest ${VLLM_LATEST_N:-5} numbered vLLM versions (+ dedup to latest)"
+python3 "$DASH_DIR/orchestrator/filter_latest_vllm.py" \
+  --in "$WORK/inferencex_direct.raw.json" --out "$WORK/inferencex_direct.json" -n "${VLLM_LATEST_N:-5}"
+
 python3 "$KER/scripts/gen_direct_corpus.py"            -c "$WORK/inferencex_direct.json" -o "$CORPUS"
 python3 "$KER/scripts/gen_direct_absolutes.py"         -c "$WORK/inferencex_direct.json" -o "$ABS"      2>/dev/null \
   || python3 "$KER/scripts/extract_inferencex_absolutes.py"  --out "$ABS"
@@ -135,9 +147,9 @@ TODAY="${SNAPSHOT_DATE:-$IX_DATE}"
 MEAS_SHA=$(gh release download "$IX_TAG" --repo SemiAnalysisAI/InferenceX-app -p SHA256SUMS -O - 2>/dev/null \
              | head -1 | awk '{print $1}' || echo "unknown")
 PROV="$WORK/provenance.json"
-python3 - "$PROV" "$BLIS_TAG" "$SIM_SHA" "$catalog" "$registry" "$kernel" "$IX_TAG" "$IX_DATE" "$MEAS_SHA" "$TODAY" "$CSV" "$CORPUS" <<'PY'
+python3 - "$PROV" "$BLIS_TAG" "$SIM_SHA" "$catalog" "$registry" "$kernel" "$IX_TAG" "$IX_DATE" "$MEAS_SHA" "$TODAY" "$CSV" "$CORPUS" "$DIRECT" <<'PY'
 import json, sys, csv
-(out, blis_tag, sim_sha, catalog, registry, kernel, ix_tag, ix_date, meas_sha, today, csv_path, corpus_path) = sys.argv[1:13]
+(out, blis_tag, sim_sha, catalog, registry, kernel, ix_tag, ix_date, meas_sha, today, csv_path, corpus_path, direct_path) = sys.argv[1:14]
 # Coverage: compare the corpus against signedprobe's CSV rows (RFC §4.4) — the pipeline never
 # parses signedprobe's stderr. A corpus point with no SCORED CSV row is not_scored. An emitted
 # row whose tier is UNSCORABLE (chiefly mtp — blis refuses a drafting scenario with no
@@ -169,6 +181,14 @@ for sw in corpus.get("sweeps", []):
         else:
             reasons["skipped_or_run_error"] = reasons.get("skipped_or_run_error", 0) + 1
 emitted = scored_keys
+# The vLLM-version filter applied before scoring (RFC discussion #2 point 2) is recorded in the
+# filtered direct.json; surface it in provenance so the published snapshot is self-describing about
+# WHICH vLLM versions it scored (fail-loud / auditable).
+vllm_filter = None
+try:
+    vllm_filter = json.load(open(direct_path)).get("vllm_filter")
+except (OSError, json.JSONDecodeError):
+    pass
 snapshot_id = f"{today}_blis-{blis_tag}_ix-{ix_date}"
 doc = {
   "snapshot_id": snapshot_id,
@@ -181,7 +201,8 @@ doc = {
                      "release_tag": ix_tag, "measurement_date_through": None,
                      "measurement_sha256": meas_sha},
     "evaluator_commit": __import__("os").environ.get("GITHUB_SHA", "local"),
-    "scorer": "signedprobe"
+    "scorer": "signedprobe",
+    "vllm_filter": vllm_filter
   },
   "coverage": {"scored": len(emitted), "not_scored": not_scored, "multinode_hidden": 0,
                "failed": 0, "measured_excluded": 0, "not_scored_reasons": reasons},

@@ -47,7 +47,12 @@
           }
         },
         "evaluator_commit": { "type": "string" },
-        "scorer": { "const": "signedprobe" }
+        "scorer": { "const": "signedprobe" },
+        "vllm_filter": {
+          "type": ["object", "null"],
+          "description": "the latest-N vLLM-version filter applied before scoring (RFC discussion #2 point 2); null if unfiltered",
+          "additionalProperties": true
+        }
       }
     },
     "coverage": {
@@ -148,7 +153,6 @@
         "display_name": { "type": "string" },
         "source": { "type": "string" },
         "vllm_version": { "type": ["string", "null"] },
-        "on_target_version": { "type": ["boolean", "null"] },
         "coverage": { "$ref": "#/definitions/coverageCount" },
         "metrics": { "$ref": "#/definitions/metricBlockPair" },
         "rows": { "type": "array", "items": { "$ref": "#/definitions/workloadNode" } }
@@ -189,7 +193,6 @@
         "level": { "const": "topology" },
         "framework": { "type": "string" },
         "engine_version": { "type": ["string", "null"] },
-        "on_target_version": { "type": ["boolean", "null"] },
         "is_multinode": { "type": "boolean" },
         "parallelism": {
           "type": "object",

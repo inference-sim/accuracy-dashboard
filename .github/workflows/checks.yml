@@ -1,12 +1,23 @@
 name: checks
 
-# Fast, hosted-only guards that run on every push/PR: the orchestrator's arithmetic + fail-loud
-# contract, the web unit/render tests, and the C1 grep (no third-party baseline name in shipped
-# code). These never need the dump or a release build.
+# Fast, hosted-only guards: the orchestrator's arithmetic + fail-loud contract, the web unit/render
+# tests, and the C1 grep (no third-party baseline name in shipped code). These never need the dump
+# or a release build — this is the ONLY suite that runs per-PR (the ~90-min real pipeline is
+# nightly / manual ci-verify, never on arbitrary PRs).
+#
+# Triggers scoped so a PR commit runs this exactly ONCE: `pull_request` covers PR branches (incl.
+# forks); `push` is limited to the default branch so direct pushes to main are still checked
+# without double-firing alongside the PR event.
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
+
+# A newer commit supersedes an in-flight run on the same ref — no stacking of fast checks.
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   orchestrator:

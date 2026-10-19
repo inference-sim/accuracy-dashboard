@@ -69,9 +69,8 @@ describe('App renders the real CI-shaped snapshot', () => {
   })
 
   it('renders every model when the populated tier is viewed (via deep-link)', () => {
-    // The real dump's vLLM runs are all off-target (v0.29.0 vs target v0.31.0), so the
-    // on-target default falls back to all versions (RFC §6 open-question 2) — every model must
-    // still render. Drive to the "all" tier the way a user's deep-link would.
+    // The direct path leaves settings resolved, so every point lands in the "all" tier (zero in
+    // measured·resolved). Every model must still render. Drive to the "all" tier via deep-link.
     const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} initialHash="#/?tier=all" />)
     expect(html).toContain('deepseek-v4-pro')
     expect(html).toContain('gpt-oss-120b')
@@ -79,12 +78,11 @@ describe('App renders the real CI-shaped snapshot', () => {
     expect(html).toContain('minimax-m2.5')
   })
 
-  it('falls back to all versions (with a banner) when no points are on-target', () => {
-    // Default view = on-target; the real snapshot has zero on-target points, so the UI must not
-    // show an empty headline — it falls back and says so (RFC §6 open-question 2).
+  it('falls back to the all tier (with a banner) when measured·resolved is empty', () => {
+    // Default tier = measured·resolved; the real snapshot has zero such points (direct path), so
+    // the UI must not show an empty headline — it falls back to the all tier and says so.
     const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} />)
-    expect(html).toContain('showing')
-    expect(html).toContain('all versions')
+    expect(html).toContain('no measured·resolved points — showing all')
     expect(html).toContain('deepseek-v4-pro') // data visible, not an empty table
   })
 

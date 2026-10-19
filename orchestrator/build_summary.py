@@ -365,7 +365,6 @@ def build_matrix(sweeps, facets, vllm_by_sweep, totals_in_scope):
             "model": model,
             "source": "inferencex",
             "vllm_version": model_vllm,
-            "on_target_version": None,  # vLLM version is a facet, not a verdict (no target concept)
             "coverage": {"scored": len(mpts), "total": len(mpts)},
             "metrics": metric_block_pair(mpts),
             "rows": [],
@@ -407,7 +406,6 @@ def build_matrix(sweeps, facets, vllm_by_sweep, totals_in_scope):
                         "level": "topology",
                         "framework": framework,
                         "engine_version": tvllm,
-                        "on_target_version": None,  # facet, not a verdict
                         "is_multinode": False,  # multinode filtered at extraction in v0.1.0
                         "parallelism": par,
                         "serving": serving,

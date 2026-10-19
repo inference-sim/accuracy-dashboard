@@ -44,7 +44,6 @@ export interface TopologyNode {
   level: 'topology'
   framework: string
   engine_version: string | null
-  on_target_version: boolean | null
   is_multinode: boolean
   parallelism: Record<string, number>
   serving: string | null
@@ -80,7 +79,6 @@ export interface ModelNode {
   display_name?: string
   source?: string
   vllm_version: string | null
-  on_target_version: boolean | null
   coverage: CoverageCount
   metrics: MetricBlockPair
   rows: WorkloadNode[]
