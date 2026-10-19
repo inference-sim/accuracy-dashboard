@@ -189,3 +189,29 @@ td .na { color: var(--line-strong); font-family: var(--font-mono); }
 .dd:has(.dd-trigger.runsel) { display: block; }
 .dd .dd-trigger.runsel { width: 100%; padding: 3px 8px; }
 .runsel-note { font-size: 10.5px; color: var(--muted); margin: 5px 0 2px; line-height: 1.4; }
+
+/* ---- A-vs-B compare view (RFC discussion #2 point 3) ---- */
+.cmp-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 16px;
+  font-size: 12.5px; color: var(--muted); }
+.cmp-head .cmp-run { font-family: var(--font-mono); color: var(--ink); }
+.cmp-head .cmp-run b { font-weight: 600; }
+.cmp-tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px;
+  border: 1px solid var(--line-strong); margin-right: 4px; }
+.cmp-tag.cmp-a { background: var(--panel); color: var(--muted); }
+.cmp-tag.cmp-b { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent); }
+.cmp-head .cmp-arrow { color: var(--muted); font-size: 14px; }
+.cmp-head .cmp-note { flex-basis: 100%; font-size: 11.5px; line-height: 1.5; }
+.cmp-head .cmp-cov { color: var(--muted); }
+/* delta cells: lower error is better → negative Δ green (improved), positive red (regressed) */
+table.cmp td .num { font-variant-numeric: tabular-nums; font-weight: 600; }
+table.cmp td .num.d-better { color: var(--under-ink); }
+table.cmp td .num.d-worse { color: var(--over-ink); }
+table.cmp td .num.d-zero { color: var(--muted); font-weight: 400; }
+/* rail provenance in compare mode: run A and run B side by side, each labelled, so the panel never
+   misrepresents which run the BLIS release / commit / dump belong to */
+.prov-ab { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+.prov-ab .prov-col { min-width: 0; }
+.prov-ab .prov-col .seclabel { display: flex; align-items: center; gap: 5px; }
+.prov-ab .prov-col .pill { font-size: 10px; padding: 1px 5px; word-break: break-all; }
+.prov-ab .prov-col .kv { font-size: 11px; gap: 4px; }
+.prov-ab .prov-col .kv .v { font-size: 10.5px; }

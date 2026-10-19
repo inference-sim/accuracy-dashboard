@@ -117,4 +117,47 @@ export function aggregatePair(points: FlatPoint[]): MetricBlockPair {
   return { measured_or_resolved: aggregate(points, 'measured_or_resolved'), all: aggregate(points, 'all') }
 }
 
+/**
+ * Per-point identity that is stable ACROSS snapshots, for the A-vs-B compare view (RFC discussion
+ * #2 point 3). `sweepKey` (model|workload|gpu|topoLabel) identifies the topology; concurrency +
+ * engineVersion pin the individual point within it (concurrency alone collides across vLLM builds —
+ * see PointsTable). Two runs' points are "the same point" iff this key matches.
+ */
+export function pointKey(p: FlatPoint): string {
+  return `${p.sweepKey}|${p.concurrency}|${p.engineVersion ?? ''}`
+}
+
+/**
+ * The points scored by BOTH runs (strict intersection), returned as aligned pairs. A point is
+ * "scored" iff it has at least one non-null error metric. Points present in only one run are
+ * dropped — the compare Δ is defined only over the shared set (RFC discussion #2 point 3). Returns
+ * also the only-in-A / only-in-B counts so coverage drift can be surfaced.
+ */
+export interface PointPair {
+  key: string
+  a: FlatPoint
+  b: FlatPoint
+}
+export function intersectByKey(
+  aPoints: FlatPoint[],
+  bPoints: FlatPoint[],
+): { pairs: PointPair[]; onlyA: number; onlyB: number } {
+  const scored = (p: FlatPoint) => p.errTtft != null || p.errTpot != null
+  const bByKey = new Map<string, FlatPoint>()
+  for (const p of bPoints) if (scored(p)) bByKey.set(pointKey(p), p)
+  const aByKey = new Map<string, FlatPoint>()
+  for (const p of aPoints) if (scored(p)) aByKey.set(pointKey(p), p)
+  const pairs: PointPair[] = []
+  for (const [key, a] of aByKey) {
+    const b = bByKey.get(key)
+    if (b) pairs.push({ key, a, b })
+  }
+  const sharedKeys = new Set(pairs.map((x) => x.key))
+  let onlyA = 0
+  for (const k of aByKey.keys()) if (!sharedKeys.has(k)) onlyA++
+  let onlyB = 0
+  for (const k of bByKey.keys()) if (!sharedKeys.has(k)) onlyB++
+  return { pairs, onlyA, onlyB }
+}
+
 export const METRICS: Metric[] = ['ttft', 'tpot']

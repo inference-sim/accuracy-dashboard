@@ -11,6 +11,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { PointsTable } from './components/PointsTable'
 import { SummaryTable } from './components/SummaryTable'
 import { Dropdown } from './components/Dropdown'
+import { Compare } from './components/Compare'
 import { formatCount, formatVersion } from './format'
 import type { RunIndex } from './load'
 import { parseRoute, routeToHash, type RouteState } from './route'
@@ -22,17 +23,23 @@ interface Picker {
   index: RunIndex | null
   run: string | null
   onPick: (run: string | null) => void
+  /** second slot (A-vs-B compare); null = single-run mode. */
+  runB: string | null
+  onPickB: (runB: string | null) => void
 }
 
 const hasWindow = typeof window !== 'undefined'
 
 export function App({
   summary,
+  summaryB = null,
   loadError,
   index = null,
   initialHash,
 }: {
   summary: Summary | null
+  /** The second run's snapshot for the A-vs-B compare view; null = single-run mode. */
+  summaryB?: Summary | null
   loadError: string | null
   /** The retained-runs manifest for the run-picker; null = no index published (latest only). */
   index?: RunIndex | null
@@ -58,7 +65,25 @@ export function App({
     setRoute(merged)
   }
 
-  const picker = { index, run: route.run, onPick: (run: string | null) => update({ run, sel: null }) }
+  const picker: Picker = {
+    index,
+    run: route.run,
+    onPick: (run: string | null) => update({ run, sel: null }),
+    runB: route.runB,
+    // Entering compare: pin A to an EXPLICIT snapshot_id (route.run may be null = "track latest",
+    // which can't be diffed reliably). Leaving compare (runB=null): restore the latest-null form so
+    // single-run keeps tracking latest. Resolve "latest" → index.runs[0].
+    onPickB: (runB: string | null) => {
+      if (runB) {
+        const aId = route.run ?? index?.runs?.[0]?.snapshot_id ?? null
+        update({ run: aId, runB, sel: null })
+      } else {
+        // back to single-run: if A is the newest snapshot, collapse to null to resume tracking latest
+        const latest = index?.runs?.[0]?.snapshot_id ?? null
+        update({ run: route.run === latest ? null : route.run, runB: null, sel: null })
+      }
+    },
+  }
 
   if (loadError) {
     return (
@@ -76,6 +101,20 @@ export function App({
     return (
       <Layout summary={null} picker={picker}>
         <div className="loading">Loading the snapshot…</div>
+      </Layout>
+    )
+  }
+
+  // A-vs-B compare mode: entered only when a second run is chosen AND its snapshot has loaded, and
+  // the two runs are DIFFERENT (a run compared with itself is meaningless — guard a hand-crafted
+  // run=X&runB=X URL by falling through to the single-run Overview). The dropdowns already prevent
+  // picking the same run on both sides. The single-run path below is otherwise unchanged.
+  if (route.runB && summaryB && summaryB.snapshot_id !== summary.snapshot_id) {
+    return (
+      <Layout summary={summary} summaryB={summaryB} picker={picker}>
+        <ErrorBoundary resetKey={route.runB}>
+          <Compare a={summary} b={summaryB} tier={route.tier} />
+        </ErrorBoundary>
       </Layout>
     )
   }
@@ -177,6 +216,9 @@ function Overview({
   const pointsTitle = selFirst
     ? `Points — ${selFirst.model} › ${selFirst.workloadLabel} › ${selFirst.gpu} › ${selFirst.topoLabel}`
     : 'Points'
+  // A ?sel= that resolves to zero points (deep-linked a row not in THIS snapshot, or hidden by the
+  // current tier/version filter) must not read like "nothing selected" (PR #3 review UI-c).
+  const selMissing = route.sel != null && selectedPoints.length === 0
 
   const cov = summary.coverage
   const notScoredDetail = Object.entries(cov.not_scored_reasons || {})
@@ -269,7 +311,7 @@ function Overview({
         </span>
       </div>
 
-      <PointsTable points={selectedPoints} title={pointsTitle} />
+      <PointsTable points={selectedPoints} title={pointsTitle} selMissing={selMissing} />
 
       <div className="legend">
         <span>
@@ -279,7 +321,7 @@ function Overview({
           the row's measured vLLM version
         </span>
         <span>
-          <b>mape</b> absolute · <b>shape</b> curvature · <b>n</b> points per metric
+          <b>mape</b> absolute · <b>shape</b> curvature
         </span>
       </div>
     </>
@@ -289,6 +331,69 @@ function Overview({
 function findIdForSweep(rows: ReturnType<typeof buildRows>, sweepKey: string): string | null {
   const match = rows.find((r) => r.level === 'topology' && r.sweepKey === sweepKey)
   return match?.id ?? null
+}
+
+/** One run's provenance (BLIS release/commit/catalog/kernel/registry + ground-truth dump + run id).
+ *  Reused for the single-run rail and both columns of the A-vs-B compare rail. */
+function RunProvenance({ summary }: { summary: Summary }) {
+  const p = summary.provenance
+  if (!p) return null
+  // Null-safe reads (PR #3 review UI-b): validateSummary now rejects a malformed provenance up
+  // front, but the rail still optional-chains every field so a partial summary that slips through
+  // renders the page shell with em dashes — never a blank page (the rail sits outside ErrorBoundary).
+  const b = p.blis ?? ({} as Partial<NonNullable<typeof p.blis>>)
+  const gt = p.ground_truth ?? ({} as Partial<NonNullable<typeof p.ground_truth>>)
+  const dash = (s: string | null | undefined, fn: (v: string) => string = (v) => v) => (s ? fn(s) : '—')
+  return (
+    <>
+      <div className="seclabel">BLIS release (CI-resolved)</div>
+      <span className="pill">{b.release ?? '—'}</span>
+      <div className="kv" style={{ marginTop: 10 }}>
+        <span className="k">commit</span>
+        <span className="v">{dash(b.commit_sha, (v) => `${v.slice(0, 7)}…`)}</span>
+      </div>
+      <div className="kv">
+        <span className="k">catalog</span>
+        <span className="v">{b.catalog ?? '—'}</span>
+      </div>
+      <div className="kv">
+        <span className="k">kernel</span>
+        <span className="v">{dash(b.extractor_version, (v) => v.replace(/^.*@/, ''))}</span>
+      </div>
+      <div className="kv">
+        <span className="k">registry</span>
+        <span className="v">{b.registry ?? '—'}</span>
+      </div>
+      <div className="seclabel">Ground truth</div>
+      <div className="kv">
+        <span className="k">source</span>
+        <span className="v">InferenceX</span>
+      </div>
+      <div className="kv">
+        <span className="k">dump</span>
+        <span className="v">{dash(gt.release_tag, (v) => v.replace('db-dump/', ''))}</span>
+      </div>
+      {gt.measurement_date_through && (
+        <div className="kv">
+          <span className="k">through</span>
+          <span className="v">{gt.measurement_date_through}</span>
+        </div>
+      )}
+      <div className="kv">
+        <span className="k">sha256</span>
+        <span className="v">{dash(gt.measurement_sha256, (v) => `${v.slice(0, 8)}…`)}</span>
+      </div>
+      <div className="seclabel">Run</div>
+      <div className="kv">
+        <span className="k">snapshot</span>
+        <span className="v">{dash(summary.snapshot_id, (v) => v.slice(0, 10))}</span>
+      </div>
+      <div className="kv">
+        <span className="k">generated</span>
+        <span className="v">{dash(summary.generated_at, (v) => `${v.slice(11, 16)} UTC`)}</span>
+      </div>
+    </>
+  )
 }
 
 /** The GitHub mark (Octicon path), for the repo link in the rail. aria-hidden: the link text names it. */
@@ -307,15 +412,18 @@ const RAIL_COLLAPSED_KEY = 'blis-rail-collapsed'
 
 function Layout({
   summary,
+  summaryB = null,
   picker,
   children,
 }: {
   summary: Summary | null
+  /** present only in A-vs-B compare mode — the rail then shows both runs' provenance side by side. */
+  summaryB?: Summary | null
   picker: Picker
   children: React.ReactNode
 }) {
-  const p = summary?.provenance
   const runs = picker.index?.runs ?? []
+  const comparing = summaryB != null
 
   // The rail is collapsible so the tables can use the full width; the choice is remembered.
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -365,76 +473,85 @@ function Layout({
         </p>
         {runs.length >= 1 && (
           <>
-            <div className="seclabel">Nightly run</div>
+            {/* First slot. In single-run mode it's just "Nightly run"; in compare mode it is run A
+                (the baseline). The current A id — picker.run falls back to the latest snapshot. */}
+            <div className="seclabel">
+              {comparing && <span className="cmp-tag cmp-a">A</span>} {comparing ? 'Baseline run' : 'Nightly run'}
+            </div>
             <Dropdown
               className="runsel"
-              ariaLabel="Select a nightly run"
+              ariaLabel="Select the nightly run (A)"
               disabled={runs.length === 1}
               value={picker.run ?? runs[0]!.snapshot_id}
-              options={runs.map((r, i) => ({
-                value: r.snapshot_id,
-                label: `${r.snapshot_id.slice(0, 10)} · ${r.blis_release ?? '?'}${i === 0 ? ' · latest' : ''}`,
-              }))}
-              onChange={(id) => picker.onPick(id === runs[0]!.snapshot_id ? null : id) /* newest → null (track "latest") */}
+              // A can never be the run already chosen as B — a run must not be compared with itself.
+              options={runs
+                .filter((r) => r.snapshot_id !== picker.runB)
+                .map((r, i) => ({
+                  value: r.snapshot_id,
+                  label: `${r.snapshot_id.slice(0, 10)} · ${r.blis_release ?? '?'}${i === 0 ? ' · latest' : ''}`,
+                }))}
+              // Single-run: picking the latest → null ("track latest", resolves via data/latest).
+              // Compare mode: ALWAYS pin the explicit snapshot_id — a null-latest A can't be diffed
+              // reliably (data/latest may not be the labelled run), which showed the wrong A.
+              onChange={(id) =>
+                picker.onPick(!comparing && id === runs[0]!.snapshot_id ? null : id)
+              }
             />
-            {runs.length > 1 && (
+            {runs.length > 1 && !comparing && (
               <div className="runsel-note">Viewing an older run shows its full results — it does not re-run.</div>
             )}
-          </>
-        )}
-        {p && (
-          <>
-            <div className="seclabel">BLIS release (CI-resolved)</div>
-            <span className="pill">{p.blis.release}</span>
-            <div className="kv" style={{ marginTop: 10 }}>
-              <span className="k">commit</span>
-              <span className="v">{p.blis.commit_sha.slice(0, 7)}…</span>
-            </div>
-            <div className="kv">
-              <span className="k">catalog</span>
-              <span className="v">{p.blis.catalog}</span>
-            </div>
-            <div className="kv">
-              <span className="k">kernel</span>
-              <span className="v">{p.blis.extractor_version.replace(/^.*@/, '')}</span>
-            </div>
-            <div className="kv">
-              <span className="k">registry</span>
-              <span className="v">{p.blis.registry}</span>
-            </div>
-            <div className="seclabel">Ground truth</div>
-            <div className="kv">
-              <span className="k">source</span>
-              <span className="v">InferenceX</span>
-            </div>
-            <div className="kv">
-              <span className="k">dump</span>
-              <span className="v">{p.ground_truth.release_tag.replace('db-dump/', '')}</span>
-            </div>
-            {p.ground_truth.measurement_date_through && (
-              <div className="kv">
-                <span className="k">through</span>
-                <span className="v">{p.ground_truth.measurement_date_through}</span>
-              </div>
+            {/* Second slot = run B (compared). Only meaningful with ≥2 retained runs. "none" leaves
+                single-run mode (the Overview). */}
+            {runs.length >= 2 && (
+              <>
+                <div className="seclabel">
+                  <span className="cmp-tag cmp-b">B</span> Compare against
+                </div>
+                <Dropdown
+                  className="runsel"
+                  ariaLabel="Compare against a second run (B)"
+                  value={picker.runB ?? '__none__'}
+                  options={[
+                    { value: '__none__', label: 'none (single run)' },
+                    ...runs
+                      .filter((r) => r.snapshot_id !== (picker.run ?? runs[0]!.snapshot_id))
+                      .map((r) => ({
+                        value: r.snapshot_id,
+                        label: `${r.snapshot_id.slice(0, 10)} · ${r.blis_release ?? '?'}`,
+                      })),
+                  ]}
+                  onChange={(id) => picker.onPickB(id === '__none__' ? null : id)}
+                />
+                {picker.runB && (
+                  <div className="runsel-note">Showing Δ (B − A) over the points both runs scored.</div>
+                )}
+              </>
             )}
-            <div className="kv">
-              <span className="k">sha256</span>
-              <span className="v">{p.ground_truth.measurement_sha256.slice(0, 8)}…</span>
-            </div>
-            <div className="seclabel">Run</div>
-            <div className="kv">
-              <span className="k">snapshot</span>
-              <span className="v">{summary!.snapshot_id.slice(0, 10)}</span>
-            </div>
-            <div className="kv">
-              <span className="k">generated</span>
-              <span className="v">{summary!.generated_at.slice(11, 16)} UTC</span>
-            </div>
-            <a className="dl" href="data/latest/summary.json" download>
-              ⤓ summary.json
-            </a>
           </>
         )}
+        {/* Single-run: one provenance block (with the summary.json download). Compare mode: both
+            runs side by side (A = baseline, B = compared) so the rail never misrepresents which run
+            the BLIS release / commit / dump belong to. */}
+        {summary &&
+          (comparing ? (
+            <div className="prov-ab">
+              <div className="prov-col">
+                <div className="seclabel"><span className="cmp-tag cmp-a">A</span> run</div>
+                <RunProvenance summary={summary} />
+              </div>
+              <div className="prov-col">
+                <div className="seclabel"><span className="cmp-tag cmp-b">B</span> run</div>
+                <RunProvenance summary={summaryB!} />
+              </div>
+            </div>
+          ) : (
+            <>
+              <RunProvenance summary={summary} />
+              <a className="dl" href="data/latest/summary.json" download>
+                ⤓ summary.json
+              </a>
+            </>
+          ))}
         <div style={{ marginTop: 18 }}>
           <a className="ghlink" href="https://github.com/inference-sim/accuracy-dashboard">
             <GithubMark />

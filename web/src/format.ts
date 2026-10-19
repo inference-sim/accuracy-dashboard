@@ -26,6 +26,21 @@ export function formatSignedPct(value: number | null | undefined, digits = 1): s
   return `${sign}${mag}%`
 }
 
+/**
+ * A signed delta in percentage points for the A-vs-B compare view: +2.7 / −1.4 (true minus sign,
+ * no "%" since it's a difference of two percentages — "pp"). null/non-finite → em dash. A delta of
+ * exactly 0 renders "0.0" with no sign.
+ */
+export function formatSignedDelta(value: number | null | undefined, digits = 1): string {
+  if (value == null || !Number.isFinite(value)) return EM_DASH
+  const sign = value > 0 ? '+' : value < 0 ? '−' : ''
+  const mag = Math.abs(value).toLocaleString('en-US', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })
+  return `${sign}${mag}`
+}
+
 /** Renders an absolute latency in ms. Reused convention from the leaderboard. */
 export function formatMs(value: number | null | undefined, digits: number): string {
   if (value == null || !Number.isFinite(value)) return EM_DASH
