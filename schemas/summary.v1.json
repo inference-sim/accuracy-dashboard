@@ -193,6 +193,7 @@
         "level": { "const": "topology" },
         "framework": { "type": "string" },
         "engine_version": { "type": ["string", "null"] },
+        "precision": { "type": ["string", "null"] },
         "is_multinode": { "type": "boolean" },
         "parallelism": {
           "type": "object",

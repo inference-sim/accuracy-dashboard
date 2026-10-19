@@ -79,6 +79,17 @@ def test_different_stated_config_not_deduped():
     assert len(kept) == 2
 
 
+def test_model_path_only_difference_is_deduped():
+    # stated_config.model is a load path/alias — same model from a different location. BLIS predicts
+    # identically, so sweeps differing ONLY in it must collapse to one (not look-alike duplicate rows).
+    sweeps = [
+        _sweep("vllm/vllm-openai:v0.25.0", stated={"model": "nvidia/Foo-NVFP4", "block_size": 256}),
+        _sweep("vllm/vllm-openai:v0.25.0", stated={"model": "/scratch/models/Foo-NVFP4", "block_size": 256}),
+    ]
+    kept, _ = flv.filter_sweeps(sweeps, n=5)
+    assert len(kept) == 1  # collapsed — model path is not a BLIS input
+
+
 def test_points_preserved_on_kept_sweeps():
     sweeps = [_sweep("vllm/vllm-openai:v0.25.1", pts=5)]
     kept, _ = flv.filter_sweeps(sweeps, n=5)

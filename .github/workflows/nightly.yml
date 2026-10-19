@@ -50,6 +50,10 @@ jobs:
     # neither the compressed nor the ~323 GB decompressed archive lands on disk — only ~6 GB of
     # restored tables sit in the Postgres service container. No self-hosted runner needed.
     runs-on: ubuntu-latest
+    # The ~25-min restore + the signedprobe blis-replay tail (a few high-concurrency replays
+    # dominate wall-time) can run long on a 2-core hosted runner; raise above GitHub's 360-min
+    # default so the real run is never cut mid-score.
+    timeout-minutes: 480
     services:
       postgres:
         image: postgres:17

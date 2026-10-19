@@ -43,6 +43,7 @@ jobs:
     needs: detect-diff
     # Always run in ci-verify so a snapshot is produced; the real nightly gates on `changed`.
     runs-on: ubuntu-latest
+    timeout-minutes: 480  # long restore + signedprobe tail; above GitHub's 360-min default
     # Postgres service container the streaming restore loads the 3 tables into. The restored
     # footprint is ~6 GB — well within a hosted runner — because only benchmark_results/configs/
     # server_logs are restored, not the full 323 GB dump.

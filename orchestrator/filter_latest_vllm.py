@@ -52,6 +52,13 @@ def _identity(sw: dict) -> str:
     """Canonical BLIS-input identity for a sweep — everything that drives the prediction EXCEPT the
     vLLM version/image. Two sweeps with the same identity get the same BLIS number, so only the
     newest-vLLM one is kept."""
+    # stated_config.model is a LOAD PATH / alias (e.g. 'nvidia/MiniMax-M2.5-NVFP4' vs
+    # '/scratch/models/MiniMax-M2.5-NVFP4') — the same model fetched from a different location. It
+    # never changes BLIS's latency physics (verified: such pairs produce byte-identical predictions),
+    # so it must NOT make two sweeps count as distinct deployments. Drop it from the identity; the
+    # real model identity is the top-level sw["model"]. All other stated_config fields (block_size,
+    # prefix_caching, expert_parallel, speculative_*, gpu_memory_utilization) are kept.
+    stated = {k: v for k, v in (sw.get("stated_config") or {}).items() if k != "model"}
     return json.dumps(
         {
             "model": sw.get("model"),
@@ -62,7 +69,7 @@ def _identity(sw: dict) -> str:
             "framework": sw.get("framework"),
             "workload": sw.get("workload"),
             "parallelism": sw.get("parallelism"),
-            "stated_config": sw.get("stated_config"),
+            "stated_config": stated,
         },
         sort_keys=True,
     )

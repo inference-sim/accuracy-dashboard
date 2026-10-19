@@ -391,21 +391,34 @@ def build_matrix(sweeps, facets, vllm_by_sweep, totals_in_scope):
                 }
                 for topokey, tpts in group(
                     gpts,
+                    # A "topology" row must be ONE real deployment. Besides parallelism/serving/
+                    # spec/vLLM, distinct deployments can differ by precision (fp4 vs fp8) or other
+                    # stated-config the extractor split into separate scenario files (-cfgN). Those
+                    # drive DIFFERENT blis predictions, so they must be DIFFERENT rows — include
+                    # precision and the scenario filename (the extractor's unique deployment key) in
+                    # the grouping, else their points pile up at the same concurrency as look-alike
+                    # duplicates.
                     lambda p: (
                         p["_facets"].get("framework") or "vllm",
                         tuple(sorted((p["_facets"].get("parallelism") or {}).items())),
                         p["_facets"].get("serving"),
                         p["_facets"].get("spec_method"),
                         p["_vllm"],
+                        p["_facets"].get("precision"),
+                        p["scenario"],
                     ),
                 ).items():
-                    framework, par_items, serving, spec_method, tvllm = topokey
+                    framework, par_items, serving, spec_method, tvllm, precision, scenario = topokey
                     par = {k: v for k, v in par_items if v is not None}
-                    label = " · ".join(f"{k}{v}" for k, v in sorted(par.items())) or "default"
+                    base = " · ".join(f"{k}{v}" for k, v in sorted(par.items())) or "default"
+                    # Disambiguate same-parallelism deployments that differ by precision (shown) so
+                    # the two rows are visibly distinct, not look-alike duplicates.
+                    label = f"{base} · {precision}" if precision else base
                     topo_node = {
                         "level": "topology",
                         "framework": framework,
                         "engine_version": tvllm,
+                        "precision": precision,
                         "is_multinode": False,  # multinode filtered at extraction in v0.1.0
                         "parallelism": par,
                         "serving": serving,

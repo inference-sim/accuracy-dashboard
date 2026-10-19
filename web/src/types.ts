@@ -44,6 +44,7 @@ export interface TopologyNode {
   level: 'topology'
   framework: string
   engine_version: string | null
+  precision: string | null
   is_multinode: boolean
   parallelism: Record<string, number>
   serving: string | null
