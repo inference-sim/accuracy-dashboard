@@ -34,21 +34,25 @@ if [[ "${#PARTS[@]}" -eq 0 ]]; then
   exit 2
 fi
 log "streaming ${#PARTS[@]} parts of ${IX_TAG} → zstd -d → pg_restore (3 tables)"
+log "disk before restore:"; df -h / 2>/dev/null | tail -1 >&2 || true
 
 # Stream: each part to stdout in order → reassembled by cat ordering → zstd long-window decompress
 # → pg_restore filtering to the 3 tables. pg_restore reads the custom-format archive from a
 # non-seekable pipe (verified) and restores only -t tables. --no-owner/--no-privileges: the dump
-# is owned by neondb_owner, absent here.
+# is owned by neondb_owner, absent here. pg_restore's stderr goes to a FILE (not a process-sub,
+# which loses output when the pipe tears down) so a real failure reason survives.
+PGERR="${WORK:-/tmp}/pg_restore.err"
 set -o pipefail
 {
   for p in "${PARTS[@]}"; do
-    gh release download "$IX_TAG" --repo "$IX_REPO" -p "$p" -O -
+    # A failed part download must abort the WHOLE stream, not feed pg_restore a truncated archive.
+    gh release download "$IX_TAG" --repo "$IX_REPO" -p "$p" -O - || { log "part $p failed to download"; exit 1; }
   done
 } | zstd -d --long=27 \
-  | pg_restore --no-owner --no-privileges \
+  | pg_restore --no-owner --no-privileges --no-tablespaces \
       -t benchmark_results -t configs -t server_logs \
-      -d "$PGDATABASE" 2> >(tail -5 >&2) \
-  || { rc=$?; log "stream restore failed (rc=$rc) — publishing nothing"; exit "$rc"; }
+      -d "$PGDATABASE" 2>"$PGERR" \
+  || { rc=$?; log "stream restore failed (rc=$rc) — pg_restore said:"; tail -15 "$PGERR" >&2; log "disk after:"; df -h / 2>/dev/null | tail -1 >&2; exit "$rc"; }
 
 # Prove the restore is the full corpus, not a truncated stream: the extractor needs non-empty
 # benchmark_results joined to configs + server_logs. Fail loud on an empty/partial restore rather
