@@ -23,8 +23,17 @@ IX_REPO="${IX_REPO:-SemiAnalysisAI/InferenceX-app}"
 export PGDATABASE="${PGDATABASE:-inferencex}"
 log() { echo "[stream-restore] $*" >&2; }
 
-# The extractor connects to a db literally named `inferencex` via bare psql, so create it.
-createdb "$PGDATABASE" 2>/dev/null || log "db ${PGDATABASE} already exists"
+# The extractor connects to a db literally named `inferencex` via bare psql, so create it. Only the
+# "already exists" case is benign — an auth/connection/server error must NOT be swallowed (PR #3
+# review P-createdb). Capture createdb's stderr and re-raise anything that isn't "already exists".
+if ! cdb_err=$(createdb "$PGDATABASE" 2>&1); then
+  if printf '%s' "$cdb_err" | grep -qi "already exists"; then
+    log "db ${PGDATABASE} already exists — reusing"
+  else
+    log "FATAL: createdb ${PGDATABASE} failed: ${cdb_err}"
+    exit 4
+  fi
+fi
 
 # Enumerate the dump's part assets in order (part00..partNN) + confirm it ships a dump at all.
 mapfile -t PARTS < <(gh release view "$IX_TAG" --repo "$IX_REPO" \

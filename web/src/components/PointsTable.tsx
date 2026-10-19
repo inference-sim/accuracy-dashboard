@@ -9,6 +9,9 @@ import type { FlatPoint } from '../aggregate'
 interface Props {
   points: FlatPoint[]
   title: string
+  /** true when a row IS selected (?sel=) but resolves to zero points in this snapshot/filter —
+   *  shown distinctly from the "nothing selected yet" prompt (PR #3 review UI-c). */
+  selMissing?: boolean
 }
 
 // Both TTFT and TPOT render at a fixed 2 decimals — the measured/predicted values carry sub-ms
@@ -26,13 +29,16 @@ function Cell({ v, kind }: { v: number | null; kind: 'ms' | 'err' }) {
   return <>{text}</>
 }
 
-export function PointsTable({ points, title }: Props) {
+export function PointsTable({ points, title, selMissing = false }: Props) {
   // Sort by concurrency, then group repeats by their vLLM version so the per-version rows read
   // in order. The version is where the repeated measured values come from (same deployment,
   // different vLLM build), so it earns its own column here.
   const sorted = [...points].sort(
     (a, b) => a.concurrency - b.concurrency || (a.engineVersion ?? '').localeCompare(b.engineVersion ?? ''),
   )
+  // Surface why shape is absent for this sweep, if the scorer recorded a reason — previously
+  // shapeReason was carried on every point but never shown (PR #3 review UI-c).
+  const shapeReason = sorted.find((p) => p.shapeReason)?.shapeReason ?? null
   return (
     <>
       <div className="tbl-title" style={{ marginTop: 26 }}>
@@ -41,7 +47,14 @@ export function PointsTable({ points, title }: Props) {
       </div>
       <div className="tscroll">
         {sorted.length === 0 ? (
-          <div className="pts-empty">Select a topology row in the summary table above to see its per-concurrency points.</div>
+          selMissing ? (
+            <div className="pts-empty">
+              That topology isn’t in this snapshot (it may have aged out, differ by run, or be hidden
+              by the current tier / vLLM-version filter). Pick a row below, or clear the filters.
+            </div>
+          ) : (
+            <div className="pts-empty">Select a topology row in the summary table above to see its per-concurrency points.</div>
+          )
         ) : (
           <table className="readout pts">
             <thead>
@@ -102,6 +115,11 @@ export function PointsTable({ points, title }: Props) {
           </table>
         )}
       </div>
+      {shapeReason && (
+        <p className="pts-note notscored-detail">
+          <b>shape not scored:</b> {shapeReason}
+        </p>
+      )}
       {sorted.length > 0 && (
         <p className="pts-note">
           Each value is a per-run <b>arithmetic mean over the benchmark's requests</b> (vLLM

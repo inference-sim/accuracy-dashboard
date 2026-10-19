@@ -1,7 +1,7 @@
 /**
  * Table 1 — the summary drill-down (model → workload → GPU → topology), as the approved
- * mockup lays it out. A totals/headline row sits above the models with the
- * visible same-points Δ. Columns are mean TTFT/TPOT: MAPE & shape. Selecting a topology row
+ * mockup lays it out. A totals/headline row sits above the models. Columns are mean TTFT/TPOT:
+ * MAPE & shape, one value per cell (no delta — the A-vs-B Δ is a separate Compare view). Selecting a topology row
  * populates the points table (handled by the parent). Numbers are recomputed client-side from
  * the visible points, so a filter never shows a stale aggregate (RFC B3).
  */

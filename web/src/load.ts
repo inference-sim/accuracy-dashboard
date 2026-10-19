@@ -5,7 +5,8 @@
  * ErrorBoundary renders verbatim rather than letting the page show NaN/blank (RFC B1/C3).
  *
  * data/index.json lists every retained nightly run (newest first) so the run-picker can let a
- * user view an older run's full results — no delta, no re-run, just that snapshot's data.
+ * user view an older run's full results (no re-run, just that snapshot's data), or pick a second
+ * run for the explicit A-vs-B Compare view (RFC discussion #2 point 3).
  */
 import type { Summary } from './types'
 
@@ -49,6 +50,25 @@ export function validateSummary(raw: unknown): Summary {
   if (!Array.isArray(doc.matrix)) {
     throw new SummaryLoadError('summary.json "matrix" is not an array')
   }
+  // Validate NESTED shape, not just top-level keys (PR #3 review UI-b). The rail dereferences
+  // provenance.blis.* and provenance.ground_truth.*; a summary with `provenance` present but those
+  // sub-objects missing used to pass here and then throw during render → a blank page outside the
+  // ErrorBoundary. Fail loud HERE instead, so the load-error view renders the message verbatim.
+  const obj = (v: unknown, path: string): Record<string, unknown> => {
+    if (v == null || typeof v !== 'object' || Array.isArray(v)) {
+      throw new SummaryLoadError(`summary.json "${path}" is missing or not an object`)
+    }
+    return v as Record<string, unknown>
+  }
+  const need = (o: Record<string, unknown>, keys: string[], path: string) => {
+    for (const k of keys) if (!(k in o)) throw new SummaryLoadError(`summary.json "${path}.${k}" is missing`)
+  }
+  const prov = obj(doc.provenance, 'provenance')
+  need(obj(prov.blis, 'provenance.blis'), ['release', 'commit_sha', 'catalog', 'registry', 'extractor_version'], 'provenance.blis')
+  need(obj(prov.ground_truth, 'provenance.ground_truth'), ['source', 'release_tag', 'measurement_sha256'], 'provenance.ground_truth')
+  const totals = obj(doc.totals, 'totals')
+  for (const tier of ['measured_or_resolved', 'all']) obj(totals[tier], `totals.${tier}`)
+  need(obj(doc.coverage, 'coverage'), ['scored', 'not_scored'], 'coverage')
   return doc as unknown as Summary
 }
 

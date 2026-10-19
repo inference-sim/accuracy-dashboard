@@ -12,8 +12,10 @@ on:
         type: boolean
         default: false
 
+# Least privilege (PR #3 review point 4): read-only by default so `evaluate` — which builds and
+# runs CLONED UPSTREAM code — cannot push. Only the `publish` job is granted `contents: write`.
 permissions:
-  contents: write # commit the snapshot to the Pages-served branch
+  contents: read
 
 concurrency:
   group: nightly-accuracy
@@ -139,6 +141,8 @@ jobs:
     needs: [detect-diff, evaluate]
     if: ${{ needs.evaluate.result == 'success' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # ONLY this job may commit the snapshot to the Pages-served branch
     steps:
       - uses: actions/checkout@v4
         with:

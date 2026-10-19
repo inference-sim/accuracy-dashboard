@@ -41,8 +41,18 @@ git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inf
 SIM_SHA=$(git -C "$SIM" rev-parse HEAD)
 
 log "deriving catalog/registry/kernel from ${BLIS_TAG}"
-eval "$(bash "$DASH_DIR/orchestrator/resolve_versions.sh" "$SIM" 2>/dev/null | sort -u | sed 's/^/export /;s/=/=/')"
-: "${catalog:?}" ; : "${registry:?}" ; : "${kernel:?}"
+# Capture resolve_versions' output and its exit status explicitly. The old form piped it through
+# `eval "$(… 2>/dev/null | …)"` which swallowed the resolver's FATAL message AND its exit code, so
+# a failed resolve surfaced only as a confusing "catalog: parameter null" later (PR #3 review
+# P-resolve). Now its stderr reaches the log and a non-zero resolve fails the run loud.
+RESOLVED=$(bash "$DASH_DIR/orchestrator/resolve_versions.sh" "$SIM") || {
+  log "FATAL: resolve_versions.sh failed for ${BLIS_TAG} — cannot derive catalog/registry/kernel"
+  exit 6
+}
+eval "$(printf '%s\n' "$RESOLVED" | sort -u | sed 's/^/export /')"
+: "${catalog:?resolve_versions did not emit catalog}"
+: "${registry:?resolve_versions did not emit registry}"
+: "${kernel:?resolve_versions did not emit kernel}"
 log "catalog=$catalog registry=$registry kernel=$kernel"
 
 log "building blis, signedprobe, metricscore from source"
@@ -91,22 +101,32 @@ log "filtering direct corpus to latest ${VLLM_LATEST_N:-5} numbered vLLM version
 python3 "$DASH_DIR/orchestrator/filter_latest_vllm.py" \
   --in "$WORK/inferencex_direct.raw.json" --out "$WORK/inferencex_direct.json" -n "${VLLM_LATEST_N:-5}"
 
-python3 "$KER/scripts/gen_direct_corpus.py"            -c "$WORK/inferencex_direct.json" -o "$CORPUS"
-python3 "$KER/scripts/gen_direct_absolutes.py"         -c "$WORK/inferencex_direct.json" -o "$ABS"      2>/dev/null \
-  || python3 "$KER/scripts/extract_inferencex_absolutes.py"  --out "$ABS"
-python3 "$KER/scripts/gen_direct_engine_settings.py"   -c "$WORK/inferencex_direct.json" -o "$SETTINGS" 2>/dev/null \
-  || python3 "$KER/scripts/extract_inferencex_engine_settings.py" -c "$CORPUS" -a "$ABS" -o "$SETTINGS"
+# Each generator reads the filtered direct.json and MUST succeed. No `2>/dev/null || <fallback>`
+# chains (PR #3 review point 1): a fallback to a different extractor either silently changes where
+# the data comes from, or (for absolutes) can't even run — and both hide the real error. Under
+# `set -e` a generation failure now fails the whole run, loud, as RFC §4.6 requires.
+python3 "$KER/scripts/gen_direct_corpus.py"          -c "$WORK/inferencex_direct.json" -o "$CORPUS"
+python3 "$KER/scripts/gen_direct_absolutes.py"       -c "$WORK/inferencex_direct.json" -o "$ABS"
+python3 "$KER/scripts/gen_direct_engine_settings.py" -c "$WORK/inferencex_direct.json" -o "$SETTINGS"
+
 # Scenario files the direct corpus references are generated in-pipeline from the current dump
-# (RFC §4.6). The kernel repo's scenario generator is discovered by glob rather than named
-# here, so this repo's code stays free of any third-party baseline's name (RFC C1); it is run
-# as-is from the pinned kernel checkout, not vendored.
+# (RFC §4.6). The generator is discovered by glob (so this repo names no third-party baseline, RFC
+# C1) and MUST exist and succeed — NO `|| true`, and crucially NO `cp -n` of the kernel's frozen
+# testdata scenarios: that fallback would silently score a new dump against 591 stale committed
+# scenarios (PR #3 review point 1). It is run as-is from the pinned kernel checkout, not vendored.
 gen_scen=$(ls "$KER"/scripts/gen_*scenario*.py 2>/dev/null | head -1 || true)
-if [[ -n "$gen_scen" ]]; then
-  python3 "$gen_scen" "$CORPUS" -o "$SCENARIOS" 2>/dev/null \
-    || python3 "$gen_scen" -c "$CORPUS" -o "$SCENARIOS" 2>/dev/null || true
+if [[ -z "$gen_scen" ]]; then
+  log "FATAL: no gen_*scenario*.py in the pinned kernel checkout ($KER/scripts) — cannot generate scenarios"
+  exit 5
 fi
-# Any committed direct scenarios the generator also needs:
-cp -n "$KER"/testdata/direct/*.yaml "$SCENARIOS"/ 2>/dev/null || true
+# The generator takes the corpus positionally; it has no -c form at the pinned tag.
+python3 "$gen_scen" "$CORPUS" -o "$SCENARIOS"
+nscen=$(ls "$SCENARIOS"/*.yaml 2>/dev/null | wc -l | tr -d ' ')
+log "generated ${nscen} scenario file(s) from the current dump"
+if [[ "$nscen" -eq 0 ]]; then
+  log "FATAL: scenario generation produced no files — refusing to score against an empty/stale set"
+  exit 5
+fi
 
 # ---------------------------------------------------------------- 3. signedprobe (per-point CSV)
 log "running signedprobe (all flags explicit) — the single source of truth"
@@ -181,6 +201,19 @@ for sw in corpus.get("sweeps", []):
         else:
             reasons["skipped_or_run_error"] = reasons.get("skipped_or_run_error", 0) + 1
 emitted = scored_keys
+# Coverage accounting MUST balance: every corpus point is either scored or not_scored, and the
+# not_scored reasons must sum to not_scored (PR #3 review P-coverage). Assert the identity and fail
+# loud rather than silently publishing a summary whose counts don't add up. Note `emitted` /
+# scored_keys are SETS keyed by (scenario,label,concurrency); a repeat-concurrency row collapses
+# here — that's an accepted v0.1.0 limitation, noted, not hidden.
+scored = len(emitted)
+if scored + not_scored != total_points:
+    print(f"FATAL: coverage does not balance: scored({scored}) + not_scored({not_scored}) "
+          f"!= total_points({total_points})", file=sys.stderr)
+    sys.exit(7)
+if sum(reasons.values()) != not_scored:
+    print(f"FATAL: not_scored_reasons sum ({sum(reasons.values())}) != not_scored ({not_scored})", file=sys.stderr)
+    sys.exit(7)
 # The vLLM-version filter applied before scoring (RFC discussion #2 point 2) is recorded in the
 # filtered direct.json; surface it in provenance so the published snapshot is self-describing about
 # WHICH vLLM versions it scored (fail-loud / auditable).
@@ -206,7 +239,10 @@ doc = {
   },
   "coverage": {"scored": len(emitted), "not_scored": not_scored, "multinode_hidden": 0,
                "failed": 0, "measured_excluded": 0, "not_scored_reasons": reasons},
-  "known_artefacts": ["gpt-oss-120b/h200 TTFT spikes (4)", "non-monotone-TPOT sweeps"]
+  # No hard-coded artefact claims (PR #3 review point 2): the old "gpt-oss-120b/h200 TTFT spikes (4)"
+  # was a fixed string for a rule that runs nowhere, and the count was wrong (5, not 4). v0.1.0
+  # applies no exclusions and computes no artefact list, so the honest value is empty.
+  "known_artefacts": []
 }
 json.dump(doc, open(out, "w"), indent=2)
 print(f"provenance: snapshot_id={snapshot_id} scored={len(emitted)} not_scored={not_scored}", file=sys.stderr)

@@ -547,7 +547,10 @@ def main(argv=None):
         "matrix": matrix,
         "scope": {
             "multinode": "toggle (hidden by default; disabled in v0.1.0)",
-            "measured_exclusions": ["ttft_spike", "non_monotone_tpot_sweep"],
+            # v0.1.0 applies NO quality exclusions — every point signedprobe emits is scored (RFC
+            # §4.3/§4.4). The previous ["ttft_spike","non_monotone_tpot_sweep"] claimed rules that
+            # run nowhere (PR #3 review point 2); the honest value is the empty list.
+            "measured_exclusions": [],
             "vllm_version_filter": "all",
         },
     }

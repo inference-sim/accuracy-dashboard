@@ -140,8 +140,8 @@ describe('App renders the real CI-shaped snapshot', () => {
     // the picker is the styled dropdown (native <select> replaced per jgchn review); it shows the
     // latest run's label and is interactive (not disabled) when >1 run exists
     expect(html).toContain('dd-trigger box runsel')
-    expect(html).toContain('aria-label="Select a nightly run"')
-    expect(html).not.toContain('aria-label="Select a nightly run" disabled')
+    expect(html).toContain('aria-label="Select the nightly run (A)"')
+    expect(html).not.toContain('aria-label="Select the nightly run (A)" disabled')
   })
 
   it('omits the run-picker entirely when there is no index', () => {
@@ -168,10 +168,28 @@ describe('client-side aggregation keeps filters honest (RFC B3)', () => {
     const summary = loadFixture()
     const all = flattenPoints(summary)
     const version = all.find((p) => p.engineVersion)!.engineVersion!
-    const allVersions = applyFilters(all, { run: null, sel: null, tier: 'all', vllm: 'all', multinode: false })
-    const pinned = applyFilters(all, { run: null, sel: null, tier: 'all', vllm: { version }, multinode: false })
+    const allVersions = applyFilters(all, { run: null, runB: null, sel: null, tier: 'all', vllm: 'all', multinode: false })
+    const pinned = applyFilters(all, { run: null, runB: null, sel: null, tier: 'all', vllm: { version }, multinode: false })
     expect(pinned.length).toBeLessThanOrEqual(allVersions.length)
     expect(pinned.every((p) => p.engineVersion === version)).toBe(true)
+  })
+
+  it('a version filter changes the RENDERED headline number (not just subset size) — T-b', () => {
+    const summary = loadFixture()
+    const all = flattenPoints(summary)
+    // pick a version that is NOT the only one, so filtering genuinely changes the mean
+    const versions = [...new Set(all.map((p) => p.engineVersion).filter(Boolean))]
+    const version = versions.find((v) => all.filter((p) => p.engineVersion === v).length < all.length)!
+    // hand-compute the expected all-tier TTFT MAPE over just that version's points
+    const pinnedPts = all.filter((p) => p.engineVersion === version)
+    const errs = pinnedPts.map((p) => p.errTtft).filter((e): e is number => e != null)
+    const expected = errs.reduce((a, e) => a + Math.abs(e), 0) / errs.length
+    // render App with that version pinned + the all tier, and read the headline TTFT mape cell
+    const hash = `#/?tier=all&vllm=${encodeURIComponent('v:' + version)}`
+    const html = renderToStaticMarkup(<App summary={summary} loadError={null} initialHash={hash} />)
+    // the totals row renders mape as e.g. "32.9%"; assert the hand-computed mean appears
+    const want = `${expected.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+    expect(html).toContain(want)
   })
 
   it('totals recompute from visible points (not the stored node metrics)', () => {

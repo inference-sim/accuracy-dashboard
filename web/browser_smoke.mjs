@@ -72,16 +72,22 @@ try {
   await page.goto(`${BASE}/#/`, { waitUntil: 'networkidle', timeout: 30000 })
   // The data load is async; wait for a real number cell to appear.
   await page.waitForSelector('table.readout', { timeout: 15000 })
-  // Drill model → workload → GPU → topology so the POINTS table renders — the repeat-concurrency
-  // rows that triggered the duplicate-key warning live there. In dev mode React emits it here.
+  // Drill model → workload → GPU → topology so the POINTS table renders. FAIL LOUD if a level is
+  // missing (PR #3 review T-c): the old `if (el)` silently skipped, so a broken table that renders
+  // no rows would pass the smoke. Each level must exist for the real snapshot.
   for (const sel of ['tr.r0.selrow', 'tr.r1.selrow', 'tr.r2.selrow', 'tr.r3']) {
     const el = await page.$(sel)
-    if (el) {
-      await el.click()
-      await page.waitForTimeout(300)
+    if (!el) {
+      problems.push(`drill-down: expected a row matching "${sel}" but found none (table is empty or broken)`)
+      break
     }
+    await el.click()
+    await page.waitForTimeout(300)
   }
   await page.waitForTimeout(300)
+  // After drilling to a topology, the points table must actually render rows (not the empty prompt).
+  const ptRows = await page.$$('table.pts tbody tr')
+  if (ptRows.length === 0) problems.push('drill-down: points table rendered zero rows after selecting a topology')
 
   // Exercise the styled dropdown (replaces native <select>): open it, assert the popup listbox
   // appears, pick the last option, confirm it closes. This is the interactive path SSR can't cover.

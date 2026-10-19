@@ -54,18 +54,18 @@
         "vllm-minimax-m3-perf-x86_64-13.0.1-8b00f41"
       ],
       "sweeps_after_window": 159,
-      "sweeps_after_dedup": 107
+      "sweeps_after_dedup": 87
     }
   },
   "coverage": {
-    "scored": 450,
-    "not_scored": 129,
+    "scored": 382,
+    "not_scored": 99,
     "multinode_hidden": 0,
     "failed": 0,
     "measured_excluded": 0,
     "not_scored_reasons": {
       "skipped_or_run_error": 4,
-      "no_acceptance_rate": 125
+      "no_acceptance_rate": 95
     }
   },
   "known_artefacts": [],
@@ -93,14 +93,14 @@
     },
     "all": {
       "mape": {
-        "ttft": 32.8789994240951,
-        "tpot": 17.31916006204893,
-        "n": 450
+        "ttft": 32.96242367738294,
+        "tpot": 17.107102070826652,
+        "n": 382
       },
       "shape": {
-        "ttft": 30.37976626436944,
-        "tpot": 12.701749721702381,
-        "n": 365
+        "ttft": 32.33133286438709,
+        "tpot": 13.256699767490915,
+        "n": 311
       },
       "noise_floor_pct": 1.6
     }
@@ -112,8 +112,8 @@
       "source": "inferencex",
       "vllm_version": "0.25.0",
       "coverage": {
-        "scored": 112,
-        "total": 112
+        "scored": 88,
+        "total": 88
       },
       "metrics": {
         "measured_or_resolved": {
@@ -131,14 +131,14 @@
         },
         "all": {
           "mape": {
-            "ttft": 48.01899555623872,
-            "tpot": 34.590145320913905,
-            "n": 112
+            "ttft": 48.76893633850493,
+            "tpot": 35.43762977366809,
+            "n": 88
           },
           "shape": {
-            "ttft": 58.54195001274242,
-            "tpot": 18.481500916532884,
-            "n": 92
+            "ttft": 67.73343507740034,
+            "tpot": 21.044043594876733,
+            "n": 73
           },
           "noise_floor_pct": 1.6
         }
@@ -150,8 +150,8 @@
           "isl": 8192,
           "osl": 1024,
           "coverage": {
-            "scored": 53,
-            "total": 53
+            "scored": 43,
+            "total": 43
           },
           "metrics": {
             "measured_or_resolved": {
@@ -169,14 +169,14 @@
             },
             "all": {
               "mape": {
-                "ttft": 58.64479968720442,
-                "tpot": 37.67633946366035,
-                "n": 53
+                "ttft": 60.92845091367896,
+                "tpot": 39.26658997854577,
+                "n": 43
               },
               "shape": {
-                "ttft": 94.05478724140421,
-                "tpot": 20.488351157626585,
-                "n": 44
+                "ttft": 112.43498773923187,
+                "tpot": 23.884708845464935,
+                "n": 36
               },
               "noise_floor_pct": 1.6
             }
@@ -691,8 +691,8 @@
               "label": "b300",
               "precision": "fp4",
               "coverage": {
-                "scored": 20,
-                "total": 20
+                "scored": 10,
+                "total": 10
               },
               "metrics": {
                 "measured_or_resolved": {
@@ -710,216 +710,19 @@
                 },
                 "all": {
                   "mape": {
-                    "ttft": 44.53667218976672,
-                    "tpot": 23.610338292680712,
-                    "n": 20
+                    "ttft": 40.24824496616954,
+                    "tpot": 16.38241433570841,
+                    "n": 10
                   },
                   "shape": {
-                    "ttft": 14.56611801081753,
-                    "tpot": 6.483780141677747,
-                    "n": 16
+                    "ttft": 17.78835102045534,
+                    "tpot": 7.762818721001487,
+                    "n": 8
                   },
                   "noise_floor_pct": 1.6
                 }
               },
               "rows": [
-                {
-                  "level": "topology",
-                  "framework": "vllm",
-                  "engine_version": "0.21.0",
-                  "precision": "fp4",
-                  "is_multinode": false,
-                  "parallelism": {
-                    "dp": 1,
-                    "ep": 1,
-                    "pp": 1,
-                    "tp": 4
-                  },
-                  "serving": "aggregated",
-                  "spec_method": "none",
-                  "label": "dp1 \u00b7 ep1 \u00b7 pp1 \u00b7 tp4 \u00b7 fp4",
-                  "coverage": {
-                    "scored": 7,
-                    "total": 7
-                  },
-                  "metrics": {
-                    "measured_or_resolved": {
-                      "mape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "noise_floor_pct": 1.6
-                    },
-                    "all": {
-                      "mape": {
-                        "ttft": 47.66026045816326,
-                        "tpot": 28.68495052834255,
-                        "n": 7
-                      },
-                      "shape": {
-                        "ttft": 6.435305101316281,
-                        "tpot": 5.878313339650553,
-                        "n": 6
-                      },
-                      "noise_floor_pct": 1.6
-                    }
-                  },
-                  "rows": [
-                    {
-                      "level": "point",
-                      "concurrency": 1,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 393.2097,
-                        "tpot_ms": 12.5799
-                      },
-                      "predicted": {
-                        "ttft_ms": 216.3671,
-                        "tpot_ms": 8.5792
-                      },
-                      "error_pct": {
-                        "ttft": -44.9741,
-                        "tpot": -31.8022
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 2,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 410.0032,
-                        "tpot_ms": 13.689
-                      },
-                      "predicted": {
-                        "ttft_ms": 228.7287,
-                        "tpot_ms": 9.2508
-                      },
-                      "error_pct": {
-                        "ttft": -44.2129,
-                        "tpot": -32.4213
-                      },
-                      "shape": {
-                        "ttft": 1.3833,
-                        "tpot": -0.9078
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 4,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 449.8707,
-                        "tpot_ms": 15.5876
-                      },
-                      "predicted": {
-                        "ttft_ms": 249.6173,
-                        "tpot_ms": 10.5529
-                      },
-                      "error_pct": {
-                        "ttft": -44.5135,
-                        "tpot": -32.2993
-                      },
-                      "shape": {
-                        "ttft": 0.837,
-                        "tpot": -0.7289
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 8,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 638.9755,
-                        "tpot_ms": 18.8679
-                      },
-                      "predicted": {
-                        "ttft_ms": 287.5637,
-                        "tpot_ms": 13.0676
-                      },
-                      "error_pct": {
-                        "ttft": -54.9961,
-                        "tpot": -30.7415
-                      },
-                      "shape": {
-                        "ttft": -18.2133,
-                        "tpot": 1.5554
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 16,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 700.3927,
-                        "tpot_ms": 24.1746
-                      },
-                      "predicted": {
-                        "ttft_ms": 367.1915,
-                        "tpot_ms": 17.7714
-                      },
-                      "error_pct": {
-                        "ttft": -47.5735,
-                        "tpot": -26.4874
-                      },
-                      "shape": {
-                        "ttft": -4.7239,
-                        "tpot": 7.7933
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 32,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 978.5974,
-                        "tpot_ms": 33.558
-                      },
-                      "predicted": {
-                        "ttft_ms": 514.6815,
-                        "tpot_ms": 25.9427
-                      },
-                      "error_pct": {
-                        "ttft": -47.4062,
-                        "tpot": -22.693
-                      },
-                      "shape": {
-                        "ttft": -4.4199,
-                        "tpot": 13.3571
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 64,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 1533.5897,
-                        "tpot_ms": 51.3818
-                      },
-                      "predicted": {
-                        "ttft_ms": 767.6323,
-                        "tpot_ms": 38.8704
-                      },
-                      "error_pct": {
-                        "ttft": -49.9454,
-                        "tpot": -24.35
-                      },
-                      "shape": {
-                        "ttft": -9.0344,
-                        "tpot": 10.9274
-                      }
-                    }
-                  ]
-                },
                 {
                   "level": "topology",
                   "framework": "vllm",
@@ -1226,119 +1029,6 @@
                       "shape": {
                         "ttft": 48.8784,
                         "tpot": -4.483
-                      }
-                    }
-                  ]
-                },
-                {
-                  "level": "topology",
-                  "framework": "vllm",
-                  "engine_version": "0.21.0",
-                  "precision": "fp4",
-                  "is_multinode": false,
-                  "parallelism": {
-                    "dp": 1,
-                    "ep": 1,
-                    "pp": 1,
-                    "tp": 8
-                  },
-                  "serving": "aggregated",
-                  "spec_method": "none",
-                  "label": "dp1 \u00b7 ep1 \u00b7 pp1 \u00b7 tp8 \u00b7 fp4",
-                  "coverage": {
-                    "scored": 3,
-                    "total": 3
-                  },
-                  "metrics": {
-                    "measured_or_resolved": {
-                      "mape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "noise_floor_pct": 1.6
-                    },
-                    "all": {
-                      "mape": {
-                        "ttft": 51.54305697549876,
-                        "tpot": 35.86265626604409,
-                        "n": 3
-                      },
-                      "shape": {
-                        "ttft": 26.06962470077002,
-                        "tpot": 3.184026230464371,
-                        "n": 2
-                      },
-                      "noise_floor_pct": 1.6
-                    }
-                  },
-                  "rows": [
-                    {
-                      "level": "point",
-                      "concurrency": 1,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 491.1858,
-                        "tpot_ms": 12.1599
-                      },
-                      "predicted": {
-                        "ttft_ms": 202.7723,
-                        "tpot_ms": 7.9682
-                      },
-                      "error_pct": {
-                        "ttft": -58.7178,
-                        "tpot": -34.4717
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 2,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 444.5162,
-                        "tpot_ms": 13.0356
-                      },
-                      "predicted": {
-                        "ttft_ms": 215.8443,
-                        "tpot_ms": 8.3893
-                      },
-                      "error_pct": {
-                        "ttft": -51.4429,
-                        "tpot": -35.6427
-                      },
-                      "shape": {
-                        "ttft": 17.6224,
-                        "tpot": -1.7869
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 4,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 427.8165,
-                        "tpot_ms": 14.7336
-                      },
-                      "predicted": {
-                        "ttft_ms": 237.573,
-                        "tpot_ms": 9.2124
-                      },
-                      "error_pct": {
-                        "ttft": -44.4685,
-                        "tpot": -37.4736
-                      },
-                      "shape": {
-                        "ttft": 34.5168,
-                        "tpot": -4.5811
                       }
                     }
                   ]
@@ -1870,8 +1560,8 @@
           "isl": 1024,
           "osl": 1024,
           "coverage": {
-            "scored": 59,
-            "total": 59
+            "scored": 45,
+            "total": 45
           },
           "metrics": {
             "measured_or_resolved": {
@@ -1889,14 +1579,14 @@
             },
             "all": {
               "mape": {
-                "ttft": 38.4737816758797,
-                "tpot": 31.817801429972185,
-                "n": 59
+                "ttft": 37.149844633338624,
+                "tpot": 31.77884557789609,
+                "n": 45
               },
               "shape": {
-                "ttft": 25.988515886469116,
-                "tpot": 16.641888195530324,
-                "n": 48
+                "ttft": 24.240032487510216,
+                "tpot": 18.280153080790917,
+                "n": 37
               },
               "noise_floor_pct": 1.6
             }
@@ -2369,8 +2059,8 @@
               "label": "b300",
               "precision": "fp4",
               "coverage": {
-                "scored": 28,
-                "total": 28
+                "scored": 14,
+                "total": 14
               },
               "metrics": {
                 "measured_or_resolved": {
@@ -2388,237 +2078,19 @@
                 },
                 "all": {
                   "mape": {
-                    "ttft": 32.322299508271264,
-                    "tpot": 26.57855633666585,
-                    "n": 28
+                    "ttft": 21.915305418209357,
+                    "tpot": 21.214096004543485,
+                    "n": 14
                   },
                   "shape": {
-                    "ttft": 29.59110158455925,
-                    "tpot": 12.993915467949655,
-                    "n": 22
+                    "ttft": 27.312424940696715,
+                    "tpot": 14.856470081700065,
+                    "n": 11
                   },
                   "noise_floor_pct": 1.6
                 }
               },
               "rows": [
-                {
-                  "level": "topology",
-                  "framework": "vllm",
-                  "engine_version": "0.21.0",
-                  "precision": "fp4",
-                  "is_multinode": false,
-                  "parallelism": {
-                    "dp": 1,
-                    "ep": 1,
-                    "pp": 1,
-                    "tp": 4
-                  },
-                  "serving": "aggregated",
-                  "spec_method": "none",
-                  "label": "dp1 \u00b7 ep1 \u00b7 pp1 \u00b7 tp4 \u00b7 fp4",
-                  "coverage": {
-                    "scored": 8,
-                    "total": 8
-                  },
-                  "metrics": {
-                    "measured_or_resolved": {
-                      "mape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "noise_floor_pct": 1.6
-                    },
-                    "all": {
-                      "mape": {
-                        "ttft": 41.3450142179667,
-                        "tpot": 24.80271405707324,
-                        "n": 8
-                      },
-                      "shape": {
-                        "ttft": 30.264637295307868,
-                        "tpot": 8.86397748497783,
-                        "n": 7
-                      },
-                      "noise_floor_pct": 1.6
-                    }
-                  },
-                  "rows": [
-                    {
-                      "level": "point",
-                      "concurrency": 1,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 120.7449,
-                        "tpot_ms": 12.2701
-                      },
-                      "predicted": {
-                        "ttft_ms": 96.3335,
-                        "tpot_ms": 8.5715
-                      },
-                      "error_pct": {
-                        "ttft": -20.2173,
-                        "tpot": -30.1432
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 2,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 185.5412,
-                        "tpot_ms": 13.1097
-                      },
-                      "predicted": {
-                        "ttft_ms": 102.0684,
-                        "tpot_ms": 9.1173
-                      },
-                      "error_pct": {
-                        "ttft": -44.9888,
-                        "tpot": -30.4537
-                      },
-                      "shape": {
-                        "ttft": -31.0487,
-                        "tpot": -0.4446
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 4,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 158.1401,
-                        "tpot_ms": 14.4877
-                      },
-                      "predicted": {
-                        "ttft_ms": 110.9936,
-                        "tpot_ms": 10.1621
-                      },
-                      "error_pct": {
-                        "ttft": -29.8132,
-                        "tpot": -29.8572
-                      },
-                      "shape": {
-                        "ttft": -12.0275,
-                        "tpot": 0.4094
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 8,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 194.9655,
-                        "tpot_ms": 16.7203
-                      },
-                      "predicted": {
-                        "ttft_ms": 117.8265,
-                        "tpot_ms": 12.1953
-                      },
-                      "error_pct": {
-                        "ttft": -39.5655,
-                        "tpot": -27.0631
-                      },
-                      "shape": {
-                        "ttft": -24.2511,
-                        "tpot": 4.409
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 16,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 258.3551,
-                        "tpot_ms": 20.9868
-                      },
-                      "predicted": {
-                        "ttft_ms": 132.2907,
-                        "tpot_ms": 15.8865
-                      },
-                      "error_pct": {
-                        "ttft": -48.795,
-                        "tpot": -24.3023
-                      },
-                      "shape": {
-                        "ttft": -35.8194,
-                        "tpot": 8.3612
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 32,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 298.1142,
-                        "tpot_ms": 26.8899
-                      },
-                      "predicted": {
-                        "ttft_ms": 157.6645,
-                        "tpot_ms": 22.088
-                      },
-                      "error_pct": {
-                        "ttft": -47.1127,
-                        "tpot": -17.8576
-                      },
-                      "shape": {
-                        "ttft": -33.7108,
-                        "tpot": 17.5867
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 64,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 455.2585,
-                        "tpot_ms": 37.2709
-                      },
-                      "predicted": {
-                        "ttft_ms": 229.453,
-                        "tpot_ms": 30.8541
-                      },
-                      "error_pct": {
-                        "ttft": -49.5994,
-                        "tpot": -17.2167
-                      },
-                      "shape": {
-                        "ttft": -36.8276,
-                        "tpot": 18.5043
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 128,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 733.6496,
-                        "tpot_ms": 51.4566
-                      },
-                      "predicted": {
-                        "ttft_ms": 361.9222,
-                        "tpot_ms": 40.379
-                      },
-                      "error_pct": {
-                        "ttft": -50.6682,
-                        "tpot": -21.528
-                      },
-                      "shape": {
-                        "ttft": -38.1673,
-                        "tpot": 12.3326
-                      }
-                    }
-                  ]
-                },
                 {
                   "level": "topology",
                   "framework": "vllm",
@@ -2840,119 +2312,6 @@
                 {
                   "level": "topology",
                   "framework": "vllm",
-                  "engine_version": "0.21.0",
-                  "precision": "fp4",
-                  "is_multinode": false,
-                  "parallelism": {
-                    "dp": 1,
-                    "ep": 1,
-                    "pp": 1,
-                    "tp": 8
-                  },
-                  "serving": "aggregated",
-                  "spec_method": "none",
-                  "label": "dp1 \u00b7 ep1 \u00b7 pp1 \u00b7 tp8 \u00b7 fp4",
-                  "coverage": {
-                    "scored": 3,
-                    "total": 3
-                  },
-                  "metrics": {
-                    "measured_or_resolved": {
-                      "mape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "noise_floor_pct": 1.6
-                    },
-                    "all": {
-                      "mape": {
-                        "ttft": 26.37982126848554,
-                        "tpot": 33.498265074466474,
-                        "n": 3
-                      },
-                      "shape": {
-                        "ttft": 21.788315744846805,
-                        "tpot": 2.6034843993391235,
-                        "n": 2
-                      },
-                      "noise_floor_pct": 1.6
-                    }
-                  },
-                  "rows": [
-                    {
-                      "level": "point",
-                      "concurrency": 1,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 93.6373,
-                        "tpot_ms": 11.7624
-                      },
-                      "predicted": {
-                        "ttft_ms": 80.6509,
-                        "tpot_ms": 7.9604
-                      },
-                      "error_pct": {
-                        "ttft": -13.8688,
-                        "tpot": -32.3236
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 2,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 124.327,
-                        "tpot_ms": 12.2615
-                      },
-                      "predicted": {
-                        "ttft_ms": 89.9766,
-                        "tpot_ms": 8.2534
-                      },
-                      "error_pct": {
-                        "ttft": -27.6291,
-                        "tpot": -32.688
-                      },
-                      "shape": {
-                        "ttft": -15.976,
-                        "tpot": -0.5384
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 4,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 142.5387,
-                        "tpot_ms": 13.6661
-                      },
-                      "predicted": {
-                        "ttft_ms": 88.8849,
-                        "tpot_ms": 8.8169
-                      },
-                      "error_pct": {
-                        "ttft": -37.6416,
-                        "tpot": -35.4831
-                      },
-                      "shape": {
-                        "ttft": -27.6007,
-                        "tpot": -4.6685
-                      }
-                    }
-                  ]
-                },
-                {
-                  "level": "topology",
-                  "framework": "vllm",
                   "engine_version": "0.25.0",
                   "precision": "fp4",
                   "is_multinode": false,
@@ -3059,119 +2418,6 @@
                       "shape": {
                         "ttft": -16.4928,
                         "tpot": -3.7635
-                      }
-                    }
-                  ]
-                },
-                {
-                  "level": "topology",
-                  "framework": "vllm",
-                  "engine_version": "0.21.0",
-                  "precision": "fp4",
-                  "is_multinode": false,
-                  "parallelism": {
-                    "dp": 2,
-                    "ep": 4,
-                    "pp": 1,
-                    "tp": 4
-                  },
-                  "serving": "aggregated",
-                  "spec_method": "none",
-                  "label": "dp2 \u00b7 ep4 \u00b7 pp1 \u00b7 tp4 \u00b7 fp4",
-                  "coverage": {
-                    "scored": 3,
-                    "total": 3
-                  },
-                  "metrics": {
-                    "measured_or_resolved": {
-                      "mape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "noise_floor_pct": 1.6
-                    },
-                    "all": {
-                      "mape": {
-                        "ttft": 62.77017760915806,
-                        "tpot": 49.42857522768323,
-                        "n": 3
-                      },
-                      "shape": {
-                        "ttft": 47.569233977895486,
-                        "tpot": 27.595079101334317,
-                        "n": 2
-                      },
-                      "noise_floor_pct": 1.6
-                    }
-                  },
-                  "rows": [
-                    {
-                      "level": "point",
-                      "concurrency": 256,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 596.3607,
-                        "tpot_ms": 67.4818
-                      },
-                      "predicted": {
-                        "ttft_ms": 304.8204,
-                        "tpot_ms": 30.2172
-                      },
-                      "error_pct": {
-                        "ttft": -48.8866,
-                        "tpot": -55.2217
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 512,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 959.7708,
-                        "tpot_ms": 88.2418
-                      },
-                      "predicted": {
-                        "ttft_ms": 524.0568,
-                        "tpot_ms": 36.2774
-                      },
-                      "error_pct": {
-                        "ttft": -45.3977,
-                        "tpot": -58.8886
-                      },
-                      "shape": {
-                        "ttft": 6.8257,
-                        "tpot": -8.1889
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 2048,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 57933.5878,
-                        "tpot_ms": 106.1563
-                      },
-                      "predicted": {
-                        "ttft_ms": 3460.8093,
-                        "tpot_ms": 69.8769
-                      },
-                      "error_pct": {
-                        "ttft": -94.0262,
-                        "tpot": -34.1754
-                      },
-                      "shape": {
-                        "ttft": -88.3128,
-                        "tpot": 47.0013
                       }
                     }
                   ]
@@ -7138,8 +6384,8 @@
       "source": "inferencex",
       "vllm_version": "0.22.0",
       "coverage": {
-        "scored": 114,
-        "total": 114
+        "scored": 84,
+        "total": 84
       },
       "metrics": {
         "measured_or_resolved": {
@@ -7157,14 +6403,14 @@
         },
         "all": {
           "mape": {
-            "ttft": 21.45993263414176,
-            "tpot": 15.357893142953136,
-            "n": 114
+            "ttft": 23.359628806439947,
+            "tpot": 17.27962387948964,
+            "n": 84
           },
           "shape": {
-            "ttft": 17.48226582915235,
-            "tpot": 9.535025625410093,
-            "n": 92
+            "ttft": 19.531811261715166,
+            "tpot": 8.974413219114595,
+            "n": 68
           },
           "noise_floor_pct": 1.6
         }
@@ -7176,8 +6422,8 @@
           "isl": 1024,
           "osl": 1024,
           "coverage": {
-            "scored": 57,
-            "total": 57
+            "scored": 42,
+            "total": 42
           },
           "metrics": {
             "measured_or_resolved": {
@@ -7195,14 +6441,14 @@
             },
             "all": {
               "mape": {
-                "ttft": 16.567184222084588,
-                "tpot": 14.079370869348914,
-                "n": 57
+                "ttft": 17.945081709710948,
+                "tpot": 15.22830849124295,
+                "n": 42
               },
               "shape": {
-                "ttft": 13.755821714346501,
-                "tpot": 13.039921461170776,
-                "n": 46
+                "ttft": 15.174718714046715,
+                "tpot": 11.96668165961356,
+                "n": 34
               },
               "noise_floor_pct": 1.6
             }
@@ -7738,8 +6984,8 @@
               "label": "b300",
               "precision": "fp4",
               "coverage": {
-                "scored": 36,
-                "total": 36
+                "scored": 21,
+                "total": 21
               },
               "metrics": {
                 "measured_or_resolved": {
@@ -7757,174 +7003,19 @@
                 },
                 "all": {
                   "mape": {
-                    "ttft": 14.310154006912455,
-                    "tpot": 14.484321998258046,
-                    "n": 36
+                    "ttft": 15.453784542756509,
+                    "tpot": 17.071448048409785,
+                    "n": 21
                   },
                   "shape": {
-                    "ttft": 12.214476458316406,
-                    "tpot": 14.759338578287855,
-                    "n": 29
+                    "ttft": 13.96426204169559,
+                    "tpot": 13.826565175491359,
+                    "n": 17
                   },
                   "noise_floor_pct": 1.6
                 }
               },
               "rows": [
-                {
-                  "level": "topology",
-                  "framework": "vllm",
-                  "engine_version": "0.21.0",
-                  "precision": "fp4",
-                  "is_multinode": false,
-                  "parallelism": {
-                    "dp": 1,
-                    "ep": 1,
-                    "pp": 1,
-                    "tp": 4
-                  },
-                  "serving": "aggregated",
-                  "spec_method": "none",
-                  "label": "dp1 \u00b7 ep1 \u00b7 pp1 \u00b7 tp4 \u00b7 fp4",
-                  "coverage": {
-                    "scored": 5,
-                    "total": 5
-                  },
-                  "metrics": {
-                    "measured_or_resolved": {
-                      "mape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "noise_floor_pct": 1.6
-                    },
-                    "all": {
-                      "mape": {
-                        "ttft": 12.540949886418057,
-                        "tpot": 8.858952630790204,
-                        "n": 5
-                      },
-                      "shape": {
-                        "ttft": 14.910635247981393,
-                        "tpot": 2.133151908857575,
-                        "n": 4
-                      },
-                      "noise_floor_pct": 1.6
-                    }
-                  },
-                  "rows": [
-                    {
-                      "level": "point",
-                      "concurrency": 4,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 88.164,
-                        "tpot_ms": 7.8228
-                      },
-                      "predicted": {
-                        "ttft_ms": 89.8551,
-                        "tpot_ms": 8.6637
-                      },
-                      "error_pct": {
-                        "ttft": 1.9182,
-                        "tpot": 10.7489
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 8,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 94.471,
-                        "tpot_ms": 9.5449
-                      },
-                      "predicted": {
-                        "ttft_ms": 104.1851,
-                        "tpot_ms": 10.3922
-                      },
-                      "error_pct": {
-                        "ttft": 10.2827,
-                        "tpot": 8.8764
-                      },
-                      "shape": {
-                        "ttft": 8.2071,
-                        "tpot": -1.6907
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 16,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 115.7053,
-                        "tpot_ms": 12.5814
-                      },
-                      "predicted": {
-                        "ttft_ms": 118.6177,
-                        "tpot_ms": 13.4498
-                      },
-                      "error_pct": {
-                        "ttft": 2.517,
-                        "tpot": 6.9016
-                      },
-                      "shape": {
-                        "ttft": 0.5876,
-                        "tpot": -3.4739
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 32,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 177.5703,
-                        "tpot_ms": 16.934
-                      },
-                      "predicted": {
-                        "ttft_ms": 135.6045,
-                        "tpot_ms": 18.3479
-                      },
-                      "error_pct": {
-                        "ttft": -23.6333,
-                        "tpot": 8.3497
-                      },
-                      "shape": {
-                        "ttft": -25.0706,
-                        "tpot": -2.1664
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 64,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 212.2872,
-                        "tpot_ms": 22.651
-                      },
-                      "predicted": {
-                        "ttft_ms": 160.5877,
-                        "tpot_ms": 24.7843
-                      },
-                      "error_pct": {
-                        "ttft": -24.3536,
-                        "tpot": 9.4181
-                      },
-                      "shape": {
-                        "ttft": -25.7773,
-                        "tpot": -1.2016
-                      }
-                    }
-                  ]
-                },
                 {
                   "level": "topology",
                   "framework": "vllm",
@@ -8139,161 +7230,6 @@
                       "shape": {
                         "ttft": -29.4598,
                         "tpot": -8.6546
-                      }
-                    }
-                  ]
-                },
-                {
-                  "level": "topology",
-                  "framework": "vllm",
-                  "engine_version": "0.21.0",
-                  "precision": "int4",
-                  "is_multinode": false,
-                  "parallelism": {
-                    "dp": 1,
-                    "ep": 1,
-                    "pp": 1,
-                    "tp": 4
-                  },
-                  "serving": "aggregated",
-                  "spec_method": "none",
-                  "label": "dp1 \u00b7 ep1 \u00b7 pp1 \u00b7 tp4 \u00b7 int4",
-                  "coverage": {
-                    "scored": 5,
-                    "total": 5
-                  },
-                  "metrics": {
-                    "measured_or_resolved": {
-                      "mape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "noise_floor_pct": 1.6
-                    },
-                    "all": {
-                      "mape": {
-                        "ttft": 13.19129938042082,
-                        "tpot": 11.033625124113932,
-                        "n": 5
-                      },
-                      "shape": {
-                        "ttft": 7.907423974084085,
-                        "tpot": 20.19368765199132,
-                        "n": 4
-                      },
-                      "noise_floor_pct": 1.6
-                    }
-                  },
-                  "rows": [
-                    {
-                      "level": "point",
-                      "concurrency": 4,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 122.1272,
-                        "tpot_ms": 10.0948
-                      },
-                      "predicted": {
-                        "ttft_ms": 111.3254,
-                        "tpot_ms": 11.2739
-                      },
-                      "error_pct": {
-                        "ttft": -8.8447,
-                        "tpot": 11.6805
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 8,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 138.7112,
-                        "tpot_ms": 13.173
-                      },
-                      "predicted": {
-                        "ttft_ms": 130.2122,
-                        "tpot_ms": 13.1474
-                      },
-                      "error_pct": {
-                        "ttft": -6.1271,
-                        "tpot": -0.1942
-                      },
-                      "shape": {
-                        "ttft": 2.9813,
-                        "tpot": -10.6327
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 16,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 165.7409,
-                        "tpot_ms": 18.7922
-                      },
-                      "predicted": {
-                        "ttft_ms": 152.4605,
-                        "tpot_ms": 16.4954
-                      },
-                      "error_pct": {
-                        "ttft": -8.0127,
-                        "tpot": -12.222
-                      },
-                      "shape": {
-                        "ttft": 0.9127,
-                        "tpot": -21.4026
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 32,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 234.2738,
-                        "tpot_ms": 25.3214
-                      },
-                      "predicted": {
-                        "ttft_ms": 175.5569,
-                        "tpot_ms": 21.9875
-                      },
-                      "error_pct": {
-                        "ttft": -25.0634,
-                        "tpot": -13.1665
-                      },
-                      "shape": {
-                        "ttft": -17.7924,
-                        "tpot": -22.2483
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 64,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 295.8857,
-                        "tpot_ms": 36.0387
-                      },
-                      "predicted": {
-                        "ttft_ms": 242.8967,
-                        "tpot_ms": 29.586
-                      },
-                      "error_pct": {
-                        "ttft": -17.9086,
-                        "tpot": -17.905
-                      },
-                      "shape": {
-                        "ttft": -9.9434,
-                        "tpot": -26.4912
                       }
                     }
                   ]
@@ -8562,161 +7498,6 @@
                       "shape": {
                         "ttft": -2.2758,
                         "tpot": 4.7415
-                      }
-                    }
-                  ]
-                },
-                {
-                  "level": "topology",
-                  "framework": "vllm",
-                  "engine_version": "0.21.0",
-                  "precision": "int4",
-                  "is_multinode": false,
-                  "parallelism": {
-                    "dp": 1,
-                    "ep": 1,
-                    "pp": 1,
-                    "tp": 8
-                  },
-                  "serving": "aggregated",
-                  "spec_method": "none",
-                  "label": "dp1 \u00b7 ep1 \u00b7 pp1 \u00b7 tp8 \u00b7 int4",
-                  "coverage": {
-                    "scored": 5,
-                    "total": 5
-                  },
-                  "metrics": {
-                    "measured_or_resolved": {
-                      "mape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "noise_floor_pct": 1.6
-                    },
-                    "all": {
-                      "mape": {
-                        "ttft": 12.394964503353464,
-                        "tpot": 12.694458829232692,
-                        "n": 5
-                      },
-                      "shape": {
-                        "ttft": 6.388781423522208,
-                        "tpot": 25.91546313589977,
-                        "n": 4
-                      },
-                      "noise_floor_pct": 1.6
-                    }
-                  },
-                  "rows": [
-                    {
-                      "level": "point",
-                      "concurrency": 4,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 90.2144,
-                        "tpot_ms": 7.8071
-                      },
-                      "predicted": {
-                        "ttft_ms": 103.8623,
-                        "tpot_ms": 9.9665
-                      },
-                      "error_pct": {
-                        "ttft": 15.1282,
-                        "tpot": 27.6591
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 8,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 94.251,
-                        "tpot_ms": 10.3266
-                      },
-                      "predicted": {
-                        "ttft_ms": 110.8561,
-                        "tpot_ms": 11.0554
-                      },
-                      "error_pct": {
-                        "ttft": 17.6179,
-                        "tpot": 7.0579
-                      },
-                      "shape": {
-                        "ttft": 2.1625,
-                        "tpot": -16.1377
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 16,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 117.2003,
-                        "tpot_ms": 13.6981
-                      },
-                      "predicted": {
-                        "ttft_ms": 141.2452,
-                        "tpot_ms": 13.0321
-                      },
-                      "error_pct": {
-                        "ttft": 20.516,
-                        "tpot": -4.8617
-                      },
-                      "shape": {
-                        "ttft": 4.6798,
-                        "tpot": -25.4747
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 32,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 155.7617,
-                        "tpot_ms": 18.0836
-                      },
-                      "predicted": {
-                        "ttft_ms": 166.5695,
-                        "tpot_ms": 16.388
-                      },
-                      "error_pct": {
-                        "ttft": 6.9387,
-                        "tpot": -9.3764
-                      },
-                      "shape": {
-                        "ttft": -7.1134,
-                        "tpot": -29.0112
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 64,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 227.3105,
-                        "tpot_ms": 25.0594
-                      },
-                      "predicted": {
-                        "ttft_ms": 231.3431,
-                        "tpot_ms": 21.4215
-                      },
-                      "error_pct": {
-                        "ttft": 1.774,
-                        "tpot": -14.5172
-                      },
-                      "shape": {
-                        "ttft": -11.5994,
-                        "tpot": -33.0382
                       }
                     }
                   ]
@@ -9080,8 +7861,8 @@
           "isl": 8192,
           "osl": 1024,
           "coverage": {
-            "scored": 57,
-            "total": 57
+            "scored": 42,
+            "total": 42
           },
           "metrics": {
             "measured_or_resolved": {
@@ -9099,14 +7880,14 @@
             },
             "all": {
               "mape": {
-                "ttft": 26.352681046198942,
-                "tpot": 16.63641541655736,
-                "n": 57
+                "ttft": 28.774175903168945,
+                "tpot": 19.330939267736333,
+                "n": 42
               },
               "shape": {
-                "ttft": 21.208709943958198,
-                "tpot": 6.030129789649409,
-                "n": 46
+                "ttft": 23.888903809383617,
+                "tpot": 5.982144778615631,
+                "n": 34
               },
               "noise_floor_pct": 1.6
             }
@@ -9642,8 +8423,8 @@
               "label": "b300",
               "precision": "fp4",
               "coverage": {
-                "scored": 36,
-                "total": 36
+                "scored": 21,
+                "total": 21
               },
               "metrics": {
                 "measured_or_resolved": {
@@ -9661,174 +8442,19 @@
                 },
                 "all": {
                   "mape": {
-                    "ttft": 24.505698800788508,
-                    "tpot": 14.201552683718283,
-                    "n": 36
+                    "ttft": 28.029415482292496,
+                    "tpot": 17.85141271976261,
+                    "n": 21
                   },
                   "shape": {
-                    "ttft": 19.368030167327557,
-                    "tpot": 5.774756628130204,
-                    "n": 29
+                    "ttft": 23.429114526439115,
+                    "tpot": 5.498523197931444,
+                    "n": 17
                   },
                   "noise_floor_pct": 1.6
                 }
               },
               "rows": [
-                {
-                  "level": "topology",
-                  "framework": "vllm",
-                  "engine_version": "0.21.0",
-                  "precision": "fp4",
-                  "is_multinode": false,
-                  "parallelism": {
-                    "dp": 1,
-                    "ep": 1,
-                    "pp": 1,
-                    "tp": 4
-                  },
-                  "serving": "aggregated",
-                  "spec_method": "none",
-                  "label": "dp1 \u00b7 ep1 \u00b7 pp1 \u00b7 tp4 \u00b7 fp4",
-                  "coverage": {
-                    "scored": 5,
-                    "total": 5
-                  },
-                  "metrics": {
-                    "measured_or_resolved": {
-                      "mape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "noise_floor_pct": 1.6
-                    },
-                    "all": {
-                      "mape": {
-                        "ttft": 9.735237123064628,
-                        "tpot": 9.924755001718752,
-                        "n": 5
-                      },
-                      "shape": {
-                        "ttft": 15.600478534676565,
-                        "tpot": 3.3415943772679144,
-                        "n": 4
-                      },
-                      "noise_floor_pct": 1.6
-                    }
-                  },
-                  "rows": [
-                    {
-                      "level": "point",
-                      "concurrency": 4,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 233.8575,
-                        "tpot_ms": 8.6161
-                      },
-                      "predicted": {
-                        "ttft_ms": 248.0806,
-                        "tpot_ms": 9.2246
-                      },
-                      "error_pct": {
-                        "ttft": 6.082,
-                        "tpot": 7.0627
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 8,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 294.5618,
-                        "tpot_ms": 10.7351
-                      },
-                      "predicted": {
-                        "ttft_ms": 295.6294,
-                        "tpot_ms": 11.6092
-                      },
-                      "error_pct": {
-                        "ttft": 0.3624,
-                        "tpot": 8.1426
-                      },
-                      "shape": {
-                        "ttft": -5.3916,
-                        "tpot": 1.0087
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 16,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 416.0943,
-                        "tpot_ms": 14.8156
-                      },
-                      "predicted": {
-                        "ttft_ms": 374.3786,
-                        "tpot_ms": 16.06
-                      },
-                      "error_pct": {
-                        "ttft": -10.0255,
-                        "tpot": 8.3995
-                      },
-                      "shape": {
-                        "ttft": -15.184,
-                        "tpot": 1.2486
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 32,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 613.3793,
-                        "tpot_ms": 21.0638
-                      },
-                      "predicted": {
-                        "ttft_ms": 510.6404,
-                        "tpot_ms": 23.6792
-                      },
-                      "error_pct": {
-                        "ttft": -16.7497,
-                        "tpot": 12.4165
-                      },
-                      "shape": {
-                        "ttft": -21.5226,
-                        "tpot": 5.0006
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 64,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 910.6344,
-                        "tpot_ms": 31.4316
-                      },
-                      "predicted": {
-                        "ttft_ms": 769.8815,
-                        "tpot_ms": 35.7071
-                      },
-                      "error_pct": {
-                        "ttft": -15.4566,
-                        "tpot": 13.6026
-                      },
-                      "shape": {
-                        "ttft": -20.3037,
-                        "tpot": 6.1085
-                      }
-                    }
-                  ]
-                },
                 {
                   "level": "topology",
                   "framework": "vllm",
@@ -10043,161 +8669,6 @@
                       "shape": {
                         "ttft": -20.9781,
                         "tpot": -4.3707
-                      }
-                    }
-                  ]
-                },
-                {
-                  "level": "topology",
-                  "framework": "vllm",
-                  "engine_version": "0.21.0",
-                  "precision": "int4",
-                  "is_multinode": false,
-                  "parallelism": {
-                    "dp": 1,
-                    "ep": 1,
-                    "pp": 1,
-                    "tp": 4
-                  },
-                  "serving": "aggregated",
-                  "spec_method": "none",
-                  "label": "dp1 \u00b7 ep1 \u00b7 pp1 \u00b7 tp4 \u00b7 int4",
-                  "coverage": {
-                    "scored": 5,
-                    "total": 5
-                  },
-                  "metrics": {
-                    "measured_or_resolved": {
-                      "mape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "noise_floor_pct": 1.6
-                    },
-                    "all": {
-                      "mape": {
-                        "ttft": 14.849140339021853,
-                        "tpot": 4.5378100689854195,
-                        "n": 5
-                      },
-                      "shape": {
-                        "ttft": 13.659179545499505,
-                        "tpot": 5.055824206469542,
-                        "n": 4
-                      },
-                      "noise_floor_pct": 1.6
-                    }
-                  },
-                  "rows": [
-                    {
-                      "level": "point",
-                      "concurrency": 4,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 329.156,
-                        "tpot_ms": 11.4086
-                      },
-                      "predicted": {
-                        "ttft_ms": 424.4096,
-                        "tpot_ms": 12.429
-                      },
-                      "error_pct": {
-                        "ttft": 28.9387,
-                        "tpot": 8.9442
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 8,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 438.6628,
-                        "tpot_ms": 14.745
-                      },
-                      "predicted": {
-                        "ttft_ms": 510.9482,
-                        "tpot_ms": 15.6693
-                      },
-                      "error_pct": {
-                        "ttft": 16.4786,
-                        "tpot": 6.2684
-                      },
-                      "shape": {
-                        "ttft": -9.6636,
-                        "tpot": -2.4561
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 16,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 619.3718,
-                        "tpot_ms": 21.8598
-                      },
-                      "predicted": {
-                        "ttft_ms": 674.9875,
-                        "tpot_ms": 21.8853
-                      },
-                      "error_pct": {
-                        "ttft": 8.9794,
-                        "tpot": 0.117
-                      },
-                      "shape": {
-                        "ttft": -15.4797,
-                        "tpot": -8.1026
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 32,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 847.7024,
-                        "tpot_ms": 31.9648
-                      },
-                      "predicted": {
-                        "ttft_ms": 905.7032,
-                        "tpot_ms": 33.0368
-                      },
-                      "error_pct": {
-                        "ttft": 6.8421,
-                        "tpot": 3.3537
-                      },
-                      "shape": {
-                        "ttft": -17.1373,
-                        "tpot": -5.1316
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 64,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 1306.7765,
-                        "tpot_ms": 50.1395
-                      },
-                      "predicted": {
-                        "ttft_ms": 1476.7478,
-                        "tpot_ms": 52.1479
-                      },
-                      "error_pct": {
-                        "ttft": 13.0069,
-                        "tpot": 4.0058
-                      },
-                      "shape": {
-                        "ttft": -12.3561,
-                        "tpot": -4.533
                       }
                     }
                   ]
@@ -10466,161 +8937,6 @@
                       "shape": {
                         "ttft": -4.1399,
                         "tpot": 4.8108
-                      }
-                    }
-                  ]
-                },
-                {
-                  "level": "topology",
-                  "framework": "vllm",
-                  "engine_version": "0.21.0",
-                  "precision": "int4",
-                  "is_multinode": false,
-                  "parallelism": {
-                    "dp": 1,
-                    "ep": 1,
-                    "pp": 1,
-                    "tp": 8
-                  },
-                  "serving": "aggregated",
-                  "spec_method": "none",
-                  "label": "dp1 \u00b7 ep1 \u00b7 pp1 \u00b7 tp8 \u00b7 int4",
-                  "coverage": {
-                    "scored": 5,
-                    "total": 5
-                  },
-                  "metrics": {
-                    "measured_or_resolved": {
-                      "mape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "noise_floor_pct": 1.6
-                    },
-                    "all": {
-                      "mape": {
-                        "ttft": 34.1331088779623,
-                        "tpot": 12.812680829064504,
-                        "n": 5
-                      },
-                      "shape": {
-                        "ttft": 11.584823895582478,
-                        "tpot": 10.100843378997881,
-                        "n": 4
-                      },
-                      "noise_floor_pct": 1.6
-                    }
-                  },
-                  "rows": [
-                    {
-                      "level": "point",
-                      "concurrency": 4,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 254.3831,
-                        "tpot_ms": 8.9725
-                      },
-                      "predicted": {
-                        "ttft_ms": 376.0651,
-                        "tpot_ms": 11.012
-                      },
-                      "error_pct": {
-                        "ttft": 47.8342,
-                        "tpot": 22.7301
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 8,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 322.9868,
-                        "tpot_ms": 11.7855
-                      },
-                      "predicted": {
-                        "ttft_ms": 441.1546,
-                        "tpot_ms": 13.3325
-                      },
-                      "error_pct": {
-                        "ttft": 36.586,
-                        "tpot": 13.1265
-                      },
-                      "shape": {
-                        "ttft": -7.6087,
-                        "tpot": -7.825
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 16,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 477.8151,
-                        "tpot_ms": 16.7878
-                      },
-                      "predicted": {
-                        "ttft_ms": 594.9634,
-                        "tpot_ms": 17.8867
-                      },
-                      "error_pct": {
-                        "ttft": 24.5175,
-                        "tpot": 6.5463
-                      },
-                      "shape": {
-                        "ttft": -15.7722,
-                        "tpot": -13.1865
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 32,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 628.6349,
-                        "tpot_ms": 24.0778
-                      },
-                      "predicted": {
-                        "ttft_ms": 827.8442,
-                        "tpot_ms": 26.3003
-                      },
-                      "error_pct": {
-                        "ttft": 31.6892,
-                        "tpot": 9.2305
-                      },
-                      "shape": {
-                        "ttft": -10.921,
-                        "tpot": -10.9994
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 64,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 985.2528,
-                        "tpot_ms": 37.1183
-                      },
-                      "predicted": {
-                        "ttft_ms": 1281.2099,
-                        "tpot_ms": 41.7321
-                      },
-                      "error_pct": {
-                        "ttft": 30.0387,
-                        "tpot": 12.43
-                      },
-                      "shape": {
-                        "ttft": -12.0375,
-                        "tpot": -8.3925
                       }
                     }
                   ]
@@ -10986,8 +9302,8 @@
       "source": "inferencex",
       "vllm_version": "0.22.0",
       "coverage": {
-        "scored": 128,
-        "total": 128
+        "scored": 114,
+        "total": 114
       },
       "metrics": {
         "measured_or_resolved": {
@@ -11005,14 +9321,14 @@
         },
         "all": {
           "mape": {
-            "ttft": 28.878366973206393,
-            "tpot": 10.122447439971047,
-            "n": 128
+            "ttft": 26.870277908328205,
+            "tpot": 9.577723716922364,
+            "n": 114
           },
           "shape": {
-            "ttft": 19.092699052531845,
-            "tpot": 16.201398636427207,
-            "n": 104
+            "ttft": 17.99563942796036,
+            "tpot": 17.23317847300747,
+            "n": 93
           },
           "noise_floor_pct": 1.6
         }
@@ -11024,8 +9340,8 @@
           "isl": 1024,
           "osl": 1024,
           "coverage": {
-            "scored": 55,
-            "total": 55
+            "scored": 51,
+            "total": 51
           },
           "metrics": {
             "measured_or_resolved": {
@@ -11043,14 +9359,14 @@
             },
             "all": {
               "mape": {
-                "ttft": 27.459133047370155,
-                "tpot": 14.277113050672789,
-                "n": 55
+                "ttft": 25.369205469714835,
+                "tpot": 12.323664232348635,
+                "n": 51
               },
               "shape": {
-                "ttft": 21.54749108644882,
-                "tpot": 8.926618182007232,
-                "n": 44
+                "ttft": 20.483743611512498,
+                "tpot": 9.019889560856958,
+                "n": 41
               },
               "noise_floor_pct": 1.6
             }
@@ -11615,8 +9931,8 @@
               "label": "b300",
               "precision": "fp4",
               "coverage": {
-                "scored": 14,
-                "total": 14
+                "scored": 10,
+                "total": 10
               },
               "metrics": {
                 "measured_or_resolved": {
@@ -11634,14 +9950,14 @@
                 },
                 "all": {
                   "mape": {
-                    "ttft": 37.72699268225466,
-                    "tpot": 24.07220095287719,
-                    "n": 14
+                    "ttft": 31.175505890166328,
+                    "tpot": 18.027647140305767,
+                    "n": 10
                   },
                   "shape": {
-                    "ttft": 27.409076904267078,
-                    "tpot": 9.041211594489257,
-                    "n": 11
+                    "ttft": 24.15546577690026,
+                    "tpot": 9.56219994077486,
+                    "n": 8
                   },
                   "noise_floor_pct": 1.6
                 }
@@ -11953,140 +10269,6 @@
                       "shape": {
                         "ttft": -90.8046,
                         "tpot": 11.5492
-                      }
-                    }
-                  ]
-                },
-                {
-                  "level": "topology",
-                  "framework": "vllm",
-                  "engine_version": "0.21.0",
-                  "precision": "fp4",
-                  "is_multinode": false,
-                  "parallelism": {
-                    "dp": 2,
-                    "ep": 2,
-                    "pp": 1,
-                    "tp": 2
-                  },
-                  "serving": "aggregated",
-                  "spec_method": "none",
-                  "label": "dp2 \u00b7 ep2 \u00b7 pp1 \u00b7 tp2 \u00b7 fp4",
-                  "coverage": {
-                    "scored": 4,
-                    "total": 4
-                  },
-                  "metrics": {
-                    "measured_or_resolved": {
-                      "mape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "noise_floor_pct": 1.6
-                    },
-                    "all": {
-                      "mape": {
-                        "ttft": 54.10570966247548,
-                        "tpot": 39.18358548430575,
-                        "n": 4
-                      },
-                      "shape": {
-                        "ttft": 36.085373243911924,
-                        "tpot": 7.6519093377276475,
-                        "n": 3
-                      },
-                      "noise_floor_pct": 1.6
-                    }
-                  },
-                  "rows": [
-                    {
-                      "level": "point",
-                      "concurrency": 256,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 231.3678,
-                        "tpot_ms": 22.8826
-                      },
-                      "predicted": {
-                        "ttft_ms": 145.5861,
-                        "tpot_ms": 13.9742
-                      },
-                      "error_pct": {
-                        "ttft": -37.0759,
-                        "tpot": -38.9311
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 512,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 402.9147,
-                        "tpot_ms": 29.9965
-                      },
-                      "predicted": {
-                        "ttft_ms": 233.6104,
-                        "tpot_ms": 17.5567
-                      },
-                      "error_pct": {
-                        "ttft": -42.0199,
-                        "tpot": -41.4708
-                      },
-                      "shape": {
-                        "ttft": -7.8571,
-                        "tpot": -4.1588
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 1024,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 822.6004,
-                        "tpot_ms": 43.9454
-                      },
-                      "predicted": {
-                        "ttft_ms": 466.4671,
-                        "tpot_ms": 24.6509
-                      },
-                      "error_pct": {
-                        "ttft": -43.2936,
-                        "tpot": -43.9057
-                      },
-                      "shape": {
-                        "ttft": -9.8812,
-                        "tpot": -8.1459
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 2048,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 28239.9172,
-                        "tpot_ms": 56.6331
-                      },
-                      "predicted": {
-                        "ttft_ms": 1684.9581,
-                        "tpot_ms": 38.2689
-                      },
-                      "error_pct": {
-                        "ttft": -94.0334,
-                        "tpot": -32.4266
-                      },
-                      "shape": {
-                        "ttft": -90.5178,
-                        "tpot": 10.6511
                       }
                     }
                   ]
@@ -12925,8 +11107,8 @@
           "isl": 8192,
           "osl": 1024,
           "coverage": {
-            "scored": 73,
-            "total": 73
+            "scored": 63,
+            "total": 63
           },
           "metrics": {
             "measured_or_resolved": {
@@ -12944,14 +11126,14 @@
             },
             "all": {
               "mape": {
-                "ttft": 29.947652807740543,
-                "tpot": 6.9922199250587775,
-                "n": 73
+                "ttft": 28.085431787205696,
+                "tpot": 7.354819490148718,
+                "n": 63
               },
               "shape": {
-                "ttft": 17.292518227659397,
-                "tpot": 21.536237636335194,
-                "n": 60
+                "ttft": 16.033864975544255,
+                "tpot": 23.70904088451076,
+                "n": 52
               },
               "noise_floor_pct": 1.6
             }
@@ -12962,8 +11144,8 @@
               "label": "b200",
               "precision": "fp4",
               "coverage": {
-                "scored": 27,
-                "total": 27
+                "scored": 24,
+                "total": 24
               },
               "metrics": {
                 "measured_or_resolved": {
@@ -12981,14 +11163,14 @@
                 },
                 "all": {
                   "mape": {
-                    "ttft": 28.448897800477546,
-                    "tpot": 5.151429137095443,
-                    "n": 27
+                    "ttft": 29.2260964471304,
+                    "tpot": 5.1214893688209076,
+                    "n": 24
                   },
                   "shape": {
-                    "ttft": 15.370045416662885,
-                    "tpot": 10.70583818065447,
-                    "n": 22
+                    "ttft": 16.260375137729547,
+                    "tpot": 11.264052569694394,
+                    "n": 20
                   },
                   "noise_floor_pct": 1.6
                 }
@@ -13588,119 +11770,6 @@
                 {
                   "level": "topology",
                   "framework": "vllm",
-                  "engine_version": "0.21.0",
-                  "precision": "fp8",
-                  "is_multinode": false,
-                  "parallelism": {
-                    "dp": 1,
-                    "ep": 1,
-                    "pp": 1,
-                    "tp": 4
-                  },
-                  "serving": "aggregated",
-                  "spec_method": "none",
-                  "label": "dp1 \u00b7 ep1 \u00b7 pp1 \u00b7 tp4 \u00b7 fp8",
-                  "coverage": {
-                    "scored": 3,
-                    "total": 3
-                  },
-                  "metrics": {
-                    "measured_or_resolved": {
-                      "mape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "noise_floor_pct": 1.6
-                    },
-                    "all": {
-                      "mape": {
-                        "ttft": 22.23130862725473,
-                        "tpot": 5.390947283291726,
-                        "n": 3
-                      },
-                      "shape": {
-                        "ttft": 6.466748205996287,
-                        "tpot": 5.123694290255232,
-                        "n": 2
-                      },
-                      "noise_floor_pct": 1.6
-                    }
-                  },
-                  "rows": [
-                    {
-                      "level": "point",
-                      "concurrency": 8,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 211.2591,
-                        "tpot_ms": 8.7763
-                      },
-                      "predicted": {
-                        "ttft_ms": 171.6955,
-                        "tpot_ms": 8.1969
-                      },
-                      "error_pct": {
-                        "ttft": -18.7275,
-                        "tpot": -6.602
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 16,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 278.2333,
-                        "tpot_ms": 10.7143
-                      },
-                      "predicted": {
-                        "ttft_ms": 213.4746,
-                        "tpot_ms": 10.754
-                      },
-                      "error_pct": {
-                        "ttft": -23.2749,
-                        "tpot": 0.3704
-                      },
-                      "shape": {
-                        "ttft": -5.5953,
-                        "tpot": 7.4653
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 512,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 17066.0322,
-                        "tpot_ms": 77.176
-                      },
-                      "predicted": {
-                        "ttft_ms": 12852.178,
-                        "tpot_ms": 70.0755
-                      },
-                      "error_pct": {
-                        "ttft": -24.6915,
-                        "tpot": -9.2004
-                      },
-                      "shape": {
-                        "ttft": -7.3382,
-                        "tpot": -2.7821
-                      }
-                    }
-                  ]
-                },
-                {
-                  "level": "topology",
-                  "framework": "vllm",
                   "engine_version": "0.22.0",
                   "precision": "fp4",
                   "is_multinode": false,
@@ -13818,8 +11887,8 @@
               "label": "b300",
               "precision": "fp4",
               "coverage": {
-                "scored": 20,
-                "total": 20
+                "scored": 13,
+                "total": 13
               },
               "metrics": {
                 "measured_or_resolved": {
@@ -13837,14 +11906,14 @@
                 },
                 "all": {
                   "mape": {
-                    "ttft": 46.8458310831542,
-                    "tpot": 5.018122933267575,
-                    "n": 20
+                    "ttft": 45.13954578259596,
+                    "tpot": 5.342836451177319,
+                    "n": 13
                   },
                   "shape": {
-                    "ttft": 25.531994796522344,
-                    "tpot": 9.989375544996568,
-                    "n": 16
+                    "ttft": 21.765529822508753,
+                    "tpot": 11.077326511490357,
+                    "n": 10
                   },
                   "noise_floor_pct": 1.6
                 }
@@ -14043,203 +12112,6 @@
                       "shape": {
                         "ttft": 14.8119,
                         "tpot": 10.9316
-                      }
-                    }
-                  ]
-                },
-                {
-                  "level": "topology",
-                  "framework": "vllm",
-                  "engine_version": "0.21.0",
-                  "precision": "fp4",
-                  "is_multinode": false,
-                  "parallelism": {
-                    "dp": 1,
-                    "ep": 1,
-                    "pp": 1,
-                    "tp": 1
-                  },
-                  "serving": "aggregated",
-                  "spec_method": "none",
-                  "label": "dp1 \u00b7 ep1 \u00b7 pp1 \u00b7 tp1 \u00b7 fp4",
-                  "coverage": {
-                    "scored": 7,
-                    "total": 7
-                  },
-                  "metrics": {
-                    "measured_or_resolved": {
-                      "mape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null,
-                        "n": 0
-                      },
-                      "noise_floor_pct": 1.6
-                    },
-                    "all": {
-                      "mape": {
-                        "ttft": 50.0146466413338,
-                        "tpot": 4.415083542863767,
-                        "n": 7
-                      },
-                      "shape": {
-                        "ttft": 31.809436419878335,
-                        "tpot": 8.176123934173589,
-                        "n": 6
-                      },
-                      "noise_floor_pct": 1.6
-                    }
-                  },
-                  "rows": [
-                    {
-                      "level": "point",
-                      "concurrency": 4,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 183.0124,
-                        "tpot_ms": 7.5315
-                      },
-                      "predicted": {
-                        "ttft_ms": 120.0756,
-                        "tpot_ms": 6.7867
-                      },
-                      "error_pct": {
-                        "ttft": -34.3893,
-                        "tpot": -9.8886
-                      },
-                      "shape": {
-                        "ttft": null,
-                        "tpot": null
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 8,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 236.2178,
-                        "tpot_ms": 9.9892
-                      },
-                      "predicted": {
-                        "ttft_ms": 132.2646,
-                        "tpot_ms": 9.4892
-                      },
-                      "error_pct": {
-                        "ttft": -44.0074,
-                        "tpot": -5.0051
-                      },
-                      "shape": {
-                        "ttft": -14.6592,
-                        "tpot": 5.4194
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 16,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 303.0691,
-                        "tpot_ms": 14.0703
-                      },
-                      "predicted": {
-                        "ttft_ms": 160.9704,
-                        "tpot_ms": 14.2041
-                      },
-                      "error_pct": {
-                        "ttft": -46.8866,
-                        "tpot": 0.9508
-                      },
-                      "shape": {
-                        "ttft": -19.0475,
-                        "tpot": 12.029
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 32,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 445.564,
-                        "tpot_ms": 21.2329
-                      },
-                      "predicted": {
-                        "ttft_ms": 210.7324,
-                        "tpot_ms": 21.6564
-                      },
-                      "error_pct": {
-                        "ttft": -52.7043,
-                        "tpot": 1.9946
-                      },
-                      "shape": {
-                        "ttft": -27.9147,
-                        "tpot": 13.1873
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 64,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 677.188,
-                        "tpot_ms": 32.4893
-                      },
-                      "predicted": {
-                        "ttft_ms": 297.3656,
-                        "tpot_ms": 32.0718
-                      },
-                      "error_pct": {
-                        "ttft": -56.0882,
-                        "tpot": -1.285
-                      },
-                      "shape": {
-                        "ttft": -33.0721,
-                        "tpot": 9.5478
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 128,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 4764.5438,
-                        "tpot_ms": 50.6897
-                      },
-                      "predicted": {
-                        "ttft_ms": 497.4186,
-                        "tpot_ms": 46.5514
-                      },
-                      "error_pct": {
-                        "ttft": -89.56,
-                        "tpot": -8.1639
-                      },
-                      "shape": {
-                        "ttft": -84.0879,
-                        "tpot": 1.914
-                      }
-                    },
-                    {
-                      "level": "point",
-                      "concurrency": 256,
-                      "tier": "all",
-                      "measured": {
-                        "ttft_ms": 54175.3193,
-                        "tpot_ms": 50.9808
-                      },
-                      "predicted": {
-                        "ttft_ms": 39836.8698,
-                        "tpot_ms": 49.1365
-                      },
-                      "error_pct": {
-                        "ttft": -26.4668,
-                        "tpot": -3.6175
-                      },
-                      "shape": {
-                        "ttft": 12.0752,
-                        "tpot": 6.9593
                       }
                     }
                   ]
@@ -15303,10 +13175,7 @@
   ],
   "scope": {
     "multinode": "toggle (hidden by default; disabled in v0.1.0)",
-    "measured_exclusions": [
-      "ttft_spike",
-      "non_monotone_tpot_sweep"
-    ],
+    "measured_exclusions": [],
     "vllm_version_filter": "all"
   }
 }
