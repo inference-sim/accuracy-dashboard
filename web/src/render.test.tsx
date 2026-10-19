@@ -140,7 +140,11 @@ describe('App renders the real CI-shaped snapshot', () => {
     const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={index} />)
     expect(html).toContain('Nightly run')
     expect(html).toContain('does not re-run')
-    expect(html).toContain('<select') // the picker dropdown is present
+    // the picker is the styled dropdown (native <select> replaced per jgchn review); it shows the
+    // latest run's label and is interactive (not disabled) when >1 run exists
+    expect(html).toContain('dd-trigger box runsel')
+    expect(html).toContain('aria-label="Select a nightly run"')
+    expect(html).not.toContain('aria-label="Select a nightly run" disabled')
   })
 
   it('omits the run-picker entirely when there is no index', () => {

@@ -17,7 +17,12 @@ const MS_DIGITS = 2
 
 function Cell({ v, kind }: { v: number | null; kind: 'ms' | 'err' }) {
   const text = kind === 'ms' ? formatMs(v, MS_DIGITS) : formatSignedPct(v)
-  if (kind === 'err') return <span className="num">{text}</span>
+  if (kind === 'err') {
+    // Colour the error by sign so over- vs under-prediction reads at a glance: positive =
+    // BLIS predicted high (red), negative = predicted low (green). A null/zero stays neutral.
+    const sign = v == null ? 'zero' : v > 0 ? 'pos' : v < 0 ? 'neg' : 'zero'
+    return <span className={`num err-${sign}`}>{text}</span>
+  }
   return <>{text}</>
 }
 
@@ -42,9 +47,10 @@ export function PointsTable({ points, title }: Props) {
             <thead>
               <tr className="grp">
                 <th rowSpan={2} style={{ verticalAlign: 'bottom' }}>
-                  conc
+                  Concurrency
                 </th>
-                <th rowSpan={2} style={{ verticalAlign: 'bottom' }}>
+                {/* keep-case: the brand is vLLM, not VLLM — opt this header out of the grp uppercase rule */}
+                <th rowSpan={2} className="keepcase" style={{ verticalAlign: 'bottom' }}>
                   vLLM
                 </th>
                 <th className="sep" colSpan={3}>

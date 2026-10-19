@@ -128,7 +128,6 @@ export function SummaryTable(props: Props) {
                   <span className={`caret${canExpand ? ' clk' : ''}`}>{caret}</span>
                   {row.level === 'model' ? <b className="name">{row.label}</b> : row.label}
                   {row.facet && <span className="facet">{row.facet}</span>}
-                  {isSelected && <span className="facet">← selected</span>}
                 </td>
                 <td className="sep">
                   <Num v={b.mape.ttft} />
