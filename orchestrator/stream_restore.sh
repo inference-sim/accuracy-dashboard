@@ -36,30 +36,52 @@ fi
 log "streaming ${#PARTS[@]} parts of ${IX_TAG} → zstd -d → pg_restore (3 tables)"
 log "disk before restore:"; df -h / 2>/dev/null | tail -1 >&2 || true
 
-# Stream: each part to stdout in order → reassembled by cat ordering → zstd long-window decompress
-# → pg_restore filtering to the 3 tables. pg_restore reads the custom-format archive from a
-# non-seekable pipe (verified) and restores only -t tables. --no-owner/--no-privileges: the dump
-# is owned by neondb_owner, absent here. pg_restore's stderr goes to a FILE (not a process-sub,
-# which loses output when the pipe tears down) so a real failure reason survives.
+# Stream: each part to stdout in order → zstd long-window decompress → pg_restore filtering to the
+# 3 tables. pg_restore reads the custom-format archive from a non-seekable pipe (verified) and, with
+# -t, stops as soon as it has restored those 3 tables — it does NOT read the trailing ~300 GB. When
+# it closes the pipe early, the upstream zstd (and the download loop) die with EPIPE / "Broken pipe"
+# (exit 70). THAT IS EXPECTED AND MEANS SUCCESS — it's exactly why this is fast (~25 min, not hours).
+#
+# So correctness is keyed off pg_restore's OWN exit code (PIPESTATUS[2]) plus the row-count gate
+# below — NEVER the pipeline's aggregate status. An earlier version used `set -o pipefail` and the
+# benign broken-pipe (70) failed the whole step while pg_restore had in fact succeeded (run
+# 39274491628). We disable -e/pipefail around the pipe and read pg_restore's status directly.
+# --no-owner/--no-privileges: the dump is owned by neondb_owner, absent here. pg_restore's stderr
+# goes to a FILE (a process-sub would lose it on pipe teardown) so a real failure reason survives.
 PGERR="${WORK:-/tmp}/pg_restore.err"
-set -o pipefail
+set +e +o pipefail
 {
   for p in "${PARTS[@]}"; do
-    # A failed part download must abort the WHOLE stream, not feed pg_restore a truncated archive.
-    gh release download "$IX_TAG" --repo "$IX_REPO" -p "$p" -O - || { log "part $p failed to download"; exit 1; }
+    # A broken pipe here is just pg_restore having read enough and closed early — stop downloading
+    # the parts it will never read. A GENUINE download failure instead feeds a truncated archive,
+    # which makes pg_restore itself error (caught via pgrc) or leaves a table short (caught by the
+    # count gate) — so pg_restore's exit code + the counts are the authority, not this loop.
+    gh release download "$IX_TAG" --repo "$IX_REPO" -p "$p" -O - || { log "part stream ended at $p (rc=$?) — pg_restore likely closed the pipe early"; break; }
   done
 } | zstd -d --long=27 \
   | pg_restore --no-owner --no-privileges --no-tablespaces \
       -t benchmark_results -t configs -t server_logs \
-      -d "$PGDATABASE" 2>"$PGERR" \
-  || { rc=$?; log "stream restore failed (rc=$rc) — pg_restore said:"; tail -15 "$PGERR" >&2; log "disk after:"; df -h / 2>/dev/null | tail -1 >&2; exit "$rc"; }
+      -d "$PGDATABASE" 2>"$PGERR"
+pgrc=${PIPESTATUS[2]}
+set -e
+if [[ "$pgrc" -ne 0 ]]; then
+  log "pg_restore FAILED (rc=$pgrc) — pg_restore said:"; tail -15 "$PGERR" >&2
+  log "disk after:"; df -h / 2>/dev/null | tail -1 >&2
+  exit "$pgrc"
+fi
+log "pg_restore finished (rc=0); any upstream broken-pipe is the expected early close"
 
-# Prove the restore is the full corpus, not a truncated stream: the extractor needs non-empty
-# benchmark_results joined to configs + server_logs. Fail loud on an empty/partial restore rather
-# than letting signedprobe score a fraction of the dump.
-counts=$(psql -tAc "select count(*) from benchmark_results" 2>/dev/null || echo 0)
-if [[ "${counts:-0}" -lt 1 ]]; then
-  log "FATAL: benchmark_results is empty after restore — the stream did not complete."
+# Prove the restore is the full corpus, not a truncated stream: the extractor needs ALL THREE
+# tables non-empty (benchmark_results joined to configs + server_logs). A truncated stream could
+# land one table and not another, so check each — fail loud rather than letting signedprobe score
+# a fraction of the dump.
+read -r n_bench n_conf n_logs < <(psql -tAF' ' -c \
+  "select
+     (select count(*) from benchmark_results),
+     (select count(*) from configs),
+     (select count(*) from server_logs)" 2>/dev/null || echo "0 0 0")
+if [[ "${n_bench:-0}" -lt 1 || "${n_conf:-0}" -lt 1 || "${n_logs:-0}" -lt 1 ]]; then
+  log "FATAL: a required table is empty after restore (benchmark_results=$n_bench configs=$n_conf server_logs=$n_logs) — the stream was truncated."
   exit 3
 fi
-log "restore OK: benchmark_results=${counts} rows; footprint $(psql -tAc "select pg_size_pretty(pg_database_size('${PGDATABASE}'))" 2>/dev/null)"
+log "restore OK: benchmark_results=$n_bench configs=$n_conf server_logs=$n_logs; footprint $(psql -tAc "select pg_size_pretty(pg_database_size('${PGDATABASE}'))" 2>/dev/null)"
