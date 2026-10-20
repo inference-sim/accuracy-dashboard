@@ -13,6 +13,7 @@ import { useMemo } from 'react'
 import { flattenPoints, intersectByKey, type FlatPoint } from '../aggregate'
 import { buildRows, type RenderRow } from '../tree'
 import { formatSignedDelta, formatCount } from '../format'
+import { Term } from './Term'
 import type { Metric, Summary, TierKey } from '../types'
 
 interface Props {
@@ -75,7 +76,9 @@ export function Compare({ a, b, tier }: Props) {
 
   return (
     <>
-      <h2 className="viewhead">Compare runs — Δ accuracy (B − A)</h2>
+      <h2 className="viewhead">
+        Compare runs — <Term name="diff">Δ accuracy (B − A)</Term>
+      </h2>
       <div className="cmp-head">
         <div className="cmp-run">
           <span className="cmp-tag cmp-a">A</span> <b>{idA.slice(0, 10)}</b> · {blisA}

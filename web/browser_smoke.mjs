@@ -104,6 +104,25 @@ try {
     problems.push('styled vLLM dropdown not found')
   }
 
+  // Exercise a term tooltip (accessible hover/focus popover): focus a term → role=tooltip appears,
+  // Esc hides it. Covers the interactive a11y path SSR can't.
+  const term = await page.$('.term')
+  if (term) {
+    await term.focus()
+    await page.waitForSelector('[role="tooltip"]', { timeout: 2000 }).catch(() => {})
+    if (!(await page.$('[role="tooltip"]'))) problems.push('term tooltip did not appear on focus')
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(100)
+    if (await page.$('[role="tooltip"]')) problems.push('term tooltip did not hide on Esc')
+    // Esc must not strand the keyboard: focus stays on the trigger, so a subsequent keydown has to
+    // reopen it in place (jgchn review — the dismiss-latch re-arm path).
+    await page.keyboard.press('ArrowDown')
+    await page.waitForTimeout(100)
+    if (!(await page.$('[role="tooltip"]'))) problems.push('term tooltip did not reopen on keydown after Esc')
+  } else {
+    problems.push('no .term tooltip trigger found on the page')
+  }
+
   // Exercise the collapsible sidebar: collapse, assert the layout + rail shrink, then expand back.
   const collapseBtn = await page.$('.rail .railtoggle')
   if (collapseBtn) {

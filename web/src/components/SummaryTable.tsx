@@ -6,6 +6,7 @@
  * the visible points, so a filter never shows a stale aggregate (RFC B3).
  */
 import { formatPct } from '../format'
+import { Term } from './Term'
 import type { RenderRow } from '../tree'
 import type { SortKey, SortSpec } from '../sort'
 import type { MetricBlockPair, TierKey } from '../types'
@@ -66,24 +67,31 @@ export function SummaryTable(props: Props) {
               Model / workload / GPU / topology
             </th>
             <th className="sep" colSpan={2}>
-              mean TTFT
+              mean <Term name="ttft" />
             </th>
             <th className="sep" colSpan={2}>
-              mean TPOT
+              mean <Term name="tpot" />
             </th>
           </tr>
           <tr className="col">
+            {/* mape/shape live inside a sortable <button>; a focusable Term CANNOT nest in a button,
+                so the term affordance is a sibling info marker (<Term> as a superscript ⓘ) next to
+                the sort button, not wrapping its label. */}
             <th className="sep">
               <HeaderButton label="mape" k="ttft_mape" sort={sort} onSort={onSort} />
+              <Term name="mape"><sup className="term-info" aria-label="what is mape">ⓘ</sup></Term>
             </th>
             <th>
               <HeaderButton label="shape" k="ttft_shape" sort={sort} onSort={onSort} />
+              <Term name="shape"><sup className="term-info" aria-label="what is shape">ⓘ</sup></Term>
             </th>
             <th className="sep">
               <HeaderButton label="mape" k="tpot_mape" sort={sort} onSort={onSort} />
+              <Term name="mape"><sup className="term-info" aria-label="what is mape">ⓘ</sup></Term>
             </th>
             <th>
               <HeaderButton label="shape" k="tpot_shape" sort={sort} onSort={onSort} />
+              <Term name="shape"><sup className="term-info" aria-label="what is shape">ⓘ</sup></Term>
             </th>
           </tr>
         </thead>

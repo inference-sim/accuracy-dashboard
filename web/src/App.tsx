@@ -12,6 +12,7 @@ import { PointsTable } from './components/PointsTable'
 import { SummaryTable } from './components/SummaryTable'
 import { Dropdown } from './components/Dropdown'
 import { Compare } from './components/Compare'
+import { Term } from './components/Term'
 import { formatCount, formatVersion } from './format'
 import type { RunIndex } from './load'
 import { parseRoute, routeToHash, type RouteState } from './route'
@@ -242,7 +243,7 @@ function Overview({
           multi-node <span className="disabled-note">(disabled in v0.1.0)</span>
         </span>
         <span className="flt">
-          tier{' '}
+          <Term name="tier" />{' '}
           <span className="tierseg">
             <span
               className={`clk ${route.tier === 'measured_or_resolved' ? 'on' : ''}`}
@@ -292,7 +293,7 @@ function Overview({
           models <b>{formatCount(summary.matrix.length)}</b>
         </span>
         <span>
-          points scored <b>{formatCount(cov.scored)}</b>
+          <Term name="coverage">points scored</Term> <b>{formatCount(cov.scored)}</b>
         </span>
         <span>
           not scored <b>{formatCount(cov.not_scored)}</b>{' '}
@@ -321,7 +322,7 @@ function Overview({
           the row's measured vLLM version
         </span>
         <span>
-          <b>mape</b> absolute · <b>shape</b> curvature
+          <Term name="mape"><b>mape</b></Term> absolute · <Term name="shape"><b>shape</b></Term> curvature
         </span>
       </div>
     </>
