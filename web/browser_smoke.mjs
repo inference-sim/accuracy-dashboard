@@ -114,6 +114,11 @@ try {
     await page.keyboard.press('Escape')
     await page.waitForTimeout(100)
     if (await page.$('[role="tooltip"]')) problems.push('term tooltip did not hide on Esc')
+    // Esc must not strand the keyboard: focus stays on the trigger, so a subsequent keydown has to
+    // reopen it in place (jgchn review — the dismiss-latch re-arm path).
+    await page.keyboard.press('ArrowDown')
+    await page.waitForTimeout(100)
+    if (!(await page.$('[role="tooltip"]'))) problems.push('term tooltip did not reopen on keydown after Esc')
   } else {
     problems.push('no .term tooltip trigger found on the page')
   }

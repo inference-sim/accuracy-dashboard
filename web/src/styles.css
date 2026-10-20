@@ -205,8 +205,11 @@ thead tr.col .term-wrap { text-transform: none; }
   border-radius: 6px; padding: 7px 10px; box-shadow: 0 6px 20px rgba(23,28,26,0.14);
   text-transform: none; letter-spacing: normal; }
 /* Table-header terms sit inside .tscroll (overflow:hidden) and near the right edge, where a
-   left-anchored popover gets clipped / runs off-screen. Right-anchor it there so it grows LEFTWARD
-   into the visible table, and let it escape the clip via a higher stacking context. */
+   left-anchored popover runs off the table's right side. Right-anchor it there so it grows LEFTWARD
+   into the visible table. It stays visible because it opens DOWNWARD (top: 100%+4px) from a header
+   at the top of the table, landing inside the tbody region that's within the clip box — not because
+   of z-index (stacking context does NOT let an element escape an ancestor's overflow:hidden).
+   Edge case: on a heavily-filtered table with very few rows the popover's bottom could clip. */
 .readout thead .term-pop { left: auto; right: 0; }
 
 /* ---- A-vs-B compare view (RFC discussion #2 point 3) ---- */

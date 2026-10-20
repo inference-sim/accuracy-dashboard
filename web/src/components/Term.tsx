@@ -11,7 +11,7 @@
  * NOT be nested inside a real <button> (that would be a focusable-in-focusable a11y error); for the
  * sortable mape/shape headers the caller keeps the Term OUTSIDE the sort button.
  */
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { GLOSSARY } from '../glossary'
 
 interface Props {
@@ -23,10 +23,14 @@ interface Props {
 export function Term({ name, children }: Props) {
   const entry = GLOSSARY[name]
   const [open, setOpen] = useState(false)
+  // Esc closes the popover while the trigger keeps focus; without this latch onFocus would never
+  // fire again (focus never left), stranding keyboard users with no way to reopen (jgchn review).
+  // The latch suppresses the focus-reopen until it's cleared — on blur, or on the next keydown so
+  // the keyboard can reopen in place.
+  const escDismissed = useRef(false)
   const id = useId()
   if (!entry) return <>{children}</>
 
-  const show = () => setOpen(true)
   const hide = () => setOpen(false)
 
   return (
@@ -35,12 +39,24 @@ export function Term({ name, children }: Props) {
         className="term"
         tabIndex={0}
         aria-describedby={open ? id : undefined}
-        onMouseEnter={show}
+        onMouseEnter={() => setOpen(true)}
         onMouseLeave={hide}
-        onFocus={show}
-        onBlur={hide}
+        onFocus={() => {
+          if (!escDismissed.current) setOpen(true)
+        }}
+        onBlur={() => {
+          escDismissed.current = false
+          hide()
+        }}
         onKeyDown={(e) => {
-          if (e.key === 'Escape') hide()
+          if (e.key === 'Escape') {
+            escDismissed.current = true
+            hide()
+          } else {
+            // any other key re-arms focus-based showing and reopens in place
+            escDismissed.current = false
+            setOpen(true)
+          }
         }}
       >
         {children ?? entry.label}
