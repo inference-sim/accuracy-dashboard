@@ -176,9 +176,13 @@ jobs:
           NOOP: ${{ steps.changecheck.outputs.noop }}
         run: |
           snap_id=$(python3 -c "import json;print(json.load(open('incoming/summary.json'))['snapshot_id'])")
-          # Overwrite the published numbers + advance state only when the snapshot changed (a no-op
-          # keeps the prior data/latest, RFC D3/§4.6). ALWAYS write this run's snapshot dir and
-          # rebuild the index + prune >30d, so the picker index stays correct on unchanged days too.
+          # This job only runs when `evaluate` ran (i.e. detect-diff saw changed inputs, ~weekly when
+          # a new dump lands) — on a genuinely unchanged night evaluate is skipped, so this job is too
+          # and prior data/latest simply stands (RFC D3). When it DOES run: overwrite the published
+          # numbers + advance state only if this snapshot differs from the published one (NOOP guard);
+          # always write this run's snapshot dir and rebuild the index + prune >30d. So pruning
+          # happens on evaluated nights, which bounds the dated-snapshot history fine given the
+          # ~weekly cadence (it is NOT a nightly prune).
           if [ "$NOOP" != "true" ]; then
             mkdir -p data/latest
             cp incoming/summary.json data/latest/summary.json
