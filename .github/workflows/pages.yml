@@ -1,0 +1,76 @@
+name: pages
+
+# Build the dashboard SPA with the committed data/ staged in, and deploy it to GitHub Pages via the
+# Actions artifact path (Pages source = "GitHub Actions"; no gh-pages branch, no built assets in
+# git). The nightly `publish` job commits data/ (index + latest + snapshots) to the branch; this
+# workflow bundles THAT real data into dist/ so the live site's run-picker and A/B compare work.
+#
+# ONE-TIME repo setting required: Settings → Pages → Build and deployment → Source = "GitHub
+# Actions". Until that is set, the deploy job cannot publish (the build still runs).
+on:
+  push:
+    branches: [main]
+    paths: # only rebuild when something that affects the served site changes
+      - "web/**"
+      - "data/**"
+      - "schemas/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+# Least privilege: read-only by default; the deploy job alone gets the Pages tokens.
+permissions:
+  contents: read
+
+# GitHub's standard Pages concurrency — a newer deploy supersedes an in-flight one.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Stage the committed data/ (index + latest + ALL snapshots) for the build
+        run: |
+          # The live site needs the full retained history, not just data/latest — the run-picker
+          # reads data/index.json and the A/B compare loads data/snapshots/<id>/. Fail loud rather
+          # than deploy a dataless site (which would silently drop the picker + compare).
+          if [ ! -f data/index.json ] || [ ! -f data/latest/summary.json ]; then
+            echo "FATAL: data/index.json or data/latest/summary.json is missing — refusing to deploy a dataless site" >&2
+            exit 1
+          fi
+          rm -rf web/public/data
+          mkdir -p web/public/data
+          cp data/index.json web/public/data/index.json
+          cp -r data/latest web/public/data/latest
+          cp -r data/snapshots web/public/data/snapshots 2>/dev/null || mkdir -p web/public/data/snapshots
+          echo "staged runs: $(python3 -c "import json;print(len(json.load(open('data/index.json'))['runs']))")"
+      - name: Build the SPA (bundles the staged data into dist/)
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+          # Sanity: the built site must carry the index + at least one snapshot, else picker/compare
+          # break on the live site.
+          test -f dist/data/index.json || { echo "FATAL: dist/data/index.json missing after build" >&2; exit 1; }
+          ls dist/data/snapshots/*/summary.json >/dev/null 2>&1 || { echo "FATAL: dist/data/snapshots is empty after build" >&2; exit 1; }
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write # publish to Pages
+      id-token: write # OIDC token actions/deploy-pages requires
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

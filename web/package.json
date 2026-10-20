@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "stage:fixture": "mkdir -p public/data/latest && cp testdata/render-fixture.summary.json public/data/latest/summary.json",
-    "predev": "npm run stage:fixture",
+    "stage:data": "node scripts/stage-data.mjs",
+    "predev": "npm run stage:data",
     "dev": "vite",
-    "prebuild": "node -e \"require('fs').existsSync('public/data/latest/summary.json')||(require('child_process').execSync('npm run stage:fixture'))\"",
+    "prebuild": "npm run stage:data",
     "build": "tsc --noEmit -p tsconfig.build.json && vite build",
     "preview": "vite preview",
     "test": "vitest run",

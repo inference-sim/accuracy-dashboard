@@ -57,13 +57,23 @@ The real numbers come from CI (`orchestrator/evaluate.sh`); both inputs are reso
 dump is ingested by `orchestrator/stream_restore.sh` — it streams the resolved weekly dump into a
 Postgres service container, restoring only the 3 tables the extractor reads.
 
-## Deployment (GitHub Pages, one branch — RFC §4.2)
+## Deployment (GitHub Pages via Actions — RFC §4.2)
 
-The built site is self-contained: `web/` copies `data/latest/summary.json` into the bundle, so
-`vite build` emits a `dist/` carrying the SPA **and** its data. For production, enable GitHub
-Pages once (Settings → Pages) — no server, no container, no RITS/OpenShift. The nightly `publish`
-job commits the fresh snapshot to that same branch; a failed/partial run publishes nothing and
-the prior snapshot stands.
+Two separate concerns:
+
+1. **Data** — the nightly `publish` job commits `data/` (the run **index**, `data/latest/`, and
+   every retained `data/snapshots/<id>/`) to the default branch; a failed/partial run publishes
+   nothing and the prior snapshot stands.
+2. **Site** — `.github/workflows/pages.yml` builds the SPA and deploys it to GitHub Pages via the
+   Actions artifact path. The build **stages the full committed `data/`** (index + latest + all
+   snapshots) into the bundle, so the live site's **run-picker and A/B compare** work — not just a
+   single `data/latest`. It runs on push to `main` (paths `web/`, `data/`, `schemas/`) and on
+   demand; `vite`'s `base: './'` makes the bundle work under the project-pages subpath
+   (`…/accuracy-dashboard/`). No server, no container, no gh-pages branch, no built assets in git.
+
+**One-time setup:** Settings → Pages → Build and deployment → **Source = "GitHub Actions"**. Until
+that's set the deploy step can't publish (the build still runs). Least-privilege: the workflow is
+`contents: read` by default; only the deploy job gets `pages: write` + `id-token: write`.
 
 ### Fits a GitHub-hosted runner — streaming selective restore (RFC D3)
 
