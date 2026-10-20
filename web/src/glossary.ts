@@ -14,11 +14,13 @@ export interface GlossaryEntry {
 export const GLOSSARY: Record<string, GlossaryEntry> = {
   mape: {
     label: 'mape',
-    definition: 'How far off the predicted latency is, on average. Lower is better.',
+    definition:
+      'Mean absolute percentage error: on average, how far BLIS’s predicted latency is from the measured one. Measured 100 ms, predicted 120 ms → 20%. Lower is better.',
   },
   shape: {
     label: 'shape',
-    definition: 'How well the predicted curve’s shape matches, ignoring the overall level. Lower is better.',
+    definition:
+      'Does BLIS get the trend right as load grows? Compares how latency rises with concurrency, ignoring a constant offset. If BLIS is always 20% high, shape error is 0. Lower is better.',
   },
   ttft: {
     label: 'TTFT',
