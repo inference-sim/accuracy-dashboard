@@ -4,6 +4,7 @@
  * the orchestrator converts). A missing value renders an em dash, never NaN/blank (RFC B1).
  */
 import { formatMs, formatSignedPct, formatVersion } from '../format'
+import { Term } from './Term'
 import type { FlatPoint } from '../aggregate'
 
 interface Props {
@@ -67,10 +68,10 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
                   vLLM
                 </th>
                 <th className="sep" colSpan={3}>
-                  mean TTFT (ms)
+                  mean <Term name="ttft" /> (ms)
                 </th>
                 <th className="sep" colSpan={3}>
-                  mean TPOT (ms)
+                  mean <Term name="tpot" /> (ms)
                 </th>
               </tr>
               <tr className="col">
