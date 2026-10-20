@@ -26,8 +26,9 @@ describe('Term (accessible tooltip trigger)', () => {
   })
 
   it('an unknown term degrades to just its children (no crash)', () => {
-    // @ts-expect-error intentionally passing a non-glossary key
-    const html = renderToStaticMarkup(<Term name="nope">x</Term>)
+    // cast an invalid key (not in GLOSSARY) to exercise the runtime fallback without a directive
+    const bad = 'nope' as keyof typeof GLOSSARY
+    const html = renderToStaticMarkup(<Term name={bad}>x</Term>)
     expect(html).toContain('x')
     expect(html).not.toContain('class="term"')
   })
