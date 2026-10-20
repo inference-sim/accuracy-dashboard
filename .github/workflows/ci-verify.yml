@@ -1,0 +1,158 @@
+name: ci-verify
+
+# MANUAL, VERIFY-ONLY end-to-end proof of the real pipeline (RFC D1): resolve inputs live → stream
+# the InferenceX dump into a Postgres service container (3 tables, nothing on disk) → build
+# blis+signedprobe+metricscore from source → filter to the latest-N vLLM versions → signedprobe →
+# shape → schema-validate → headless + browser render. It does NOT publish: no data commit, no site
+# change (only nightly.yml publishes). An author/reviewer triggers it on demand for a PR branch:
+#   gh workflow run ci-verify.yml --ref <branch>
+# Nothing per-PR/per-commit runs this automatically — only the fast `checks` workflow runs on PRs.
+# The scheduled, publishing equivalent lives in nightly.yml (default branch only).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read  # verify-only — never commits data or touches the site
+
+concurrency:
+  group: ci-verify-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  detect-diff:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+      blis_tag: ${{ steps.resolve.outputs.blis_tag }}
+      ix_tag: ${{ steps.resolve.outputs.ix_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve both inputs live (never hardcoded) — RFC A2
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash orchestrator/resolve_inputs.sh
+      - name: Diff against state/last-run.json — RFC §4.6
+        id: diff
+        env:
+          BLIS_TAG: ${{ steps.resolve.outputs.blis_tag }}
+          IX_TAG: ${{ steps.resolve.outputs.ix_tag }}
+        run: bash orchestrator/detect_diff.sh
+
+  evaluate:
+    needs: detect-diff
+    # Always run in ci-verify so a snapshot is produced; the real nightly gates on `changed`.
+    runs-on: ubuntu-latest
+    timeout-minutes: 480  # long restore + signedprobe tail; above GitHub's 360-min default
+    # Postgres service container the streaming restore loads the 3 tables into. The restored
+    # footprint is ~6 GB — well within a hosted runner — because only benchmark_results/configs/
+    # server_logs are restored, not the full 323 GB dump.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 10s
+          --health-timeout 5s --health-retries 10
+    env:
+      # libpq picks these up; the extractor + stream_restore.sh connect via bare psql.
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: inferencex
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install --quiet jsonschema
+      - name: Install client tools (psql 17, zstd)
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17 zstd
+
+      - name: Evaluate — stream dump → build from source → signedprobe → summary.json (RFC M1/M2)
+        env:
+          BLIS_TAG: ${{ needs.detect-diff.outputs.blis_tag }}
+          IX_TAG: ${{ needs.detect-diff.outputs.ix_tag }}
+          GH_TOKEN: ${{ github.token }}
+          DASH_DIR: ${{ github.workspace }}
+          WORK: ${{ github.workspace }}/.work
+        run: |
+          export SNAPSHOT_DATE="$(date -u +%Y-%m-%d)"
+          bash orchestrator/evaluate.sh
+
+      - name: Stage the fresh snapshot for the site + tests
+        run: |
+          snap_id=$(python3 -c "import json;print(json.load(open('.work/summary.json'))['snapshot_id'])")
+          mkdir -p web/public/data/latest "web/public/data/snapshots/${snap_id}" data/latest
+          cp .work/summary.json web/public/data/latest/summary.json
+          cp .work/summary.json "web/public/data/snapshots/${snap_id}/summary.json"
+          cp .work/summary.json data/latest/summary.json
+          # The dev-server smoke needs a real index.json (production always has one); build it so
+          # loadIndex() gets 200, not a 404 that would surface as a console error.
+          python3 orchestrator/update_index.py --data-dir web/public/data --retention-days 30 --today "$(date -u +%F)"
+
+      - name: Headless render test (zero console errors, real data — RFC B1)
+        working-directory: web
+        run: |
+          npm ci
+          npm run test
+          npm run build
+
+      - name: Browser smoke-test (real Chromium, zero console errors — RFC B1)
+        working-directory: web
+        run: |
+          npm install --no-save playwright@1.56.0
+          npx playwright install --with-deps chromium
+          # 1) production build — catches runtime throws / failed fetches / NaN
+          node browser_smoke.mjs
+          # 2) DEV server — unminified React surfaces warnings (duplicate keys, etc.) the
+          #    production build strips. Start dev (predev stages the fixture), smoke, stop.
+          npm run dev > /tmp/dev.log 2>&1 &
+          DEV_PID=$!
+          for i in $(seq 1 30); do grep -q "Local:" /tmp/dev.log && break; sleep 1; done
+          SMOKE_URL=http://localhost:5173 node browser_smoke.mjs
+          kill $DEV_PID 2>/dev/null || true
+
+      - name: Upload snapshot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: summary-json
+          path: .work/summary.json
+
+  # Verify-only summary. Reports the result + the scored counts from the uploaded summary.json but
+  # NEVER commits data or touches the site — publishing is nightly.yml's job alone (user decision:
+  # a manual pre-merge run proves green, it does not publish).
+  verify-summary:
+    needs: [detect-diff, evaluate]
+    if: ${{ needs.evaluate.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: summary-json
+          path: incoming
+      - name: Report scored counts (no publish)
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          d = json.load(open("incoming/summary.json"))
+          cov = d.get("coverage", {})
+          f = (d.get("provenance") or {}).get("vllm_filter") or {}
+          print("### ci-verify result (verify-only — nothing published)")
+          print(f"- snapshot: `{d.get('snapshot_id')}`")
+          print(f"- blis: `${{ needs.detect-diff.outputs.blis_tag }}` / ix: `${{ needs.detect-diff.outputs.ix_tag }}`")
+          print(f"- scored: **{cov.get('scored')}**  not_scored: {cov.get('not_scored')}")
+          if f:
+              print(f"- vLLM filter: latest-{f.get('n')} {f.get('window_kept')}")
+          PY

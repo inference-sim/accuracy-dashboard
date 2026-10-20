@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-19T23:51:20Z",
+  "retention_days": 30,
+  "latest": "2026-10-19_blis-v0.10.0_ix-2026-09-28",
+  "runs": [
+    {
+      "snapshot_id": "2026-10-19_blis-v0.10.0_ix-2026-09-28",
+      "generated_at": "2026-10-19T00:00:00Z",
+      "blis_release": "v0.10.0",
+      "ix_release": "db-dump/2026-09-28",
+      "path": "snapshots/2026-10-19_blis-v0.10.0_ix-2026-09-28/summary.json"
+    }
+  ]
+}

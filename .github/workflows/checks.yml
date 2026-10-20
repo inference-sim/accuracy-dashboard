@@ -1,0 +1,71 @@
+name: checks
+
+# Fast, hosted-only guards: the orchestrator's arithmetic + fail-loud contract, the web unit/render
+# tests, and the C1 grep (no third-party baseline name in shipped code). These never need the dump
+# or a release build — this is the ONLY suite that runs per-PR (the ~90-min real pipeline is
+# nightly / manual ci-verify, never on arbitrary PRs).
+#
+# Triggers scoped so a PR commit runs this exactly ONCE: `pull_request` covers PR branches (incl.
+# forks); `push` is limited to the default branch so direct pushes to main are still checked
+# without double-firing alongside the PR event.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer commit supersedes an in-flight run on the same ref — no stacking of fast checks.
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  orchestrator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install --quiet jsonschema
+      - name: Orchestrator arithmetic + self-consistency oracle + column contract
+        run: python3 orchestrator/test_build_summary.py
+      - name: Schema validates the committed render fixture (RFC C3)
+        run: python3 orchestrator/validate_summary.py --schema schemas/summary.v1.json web/testdata/render-fixture.summary.json
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
+
+  grep-clean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No AISimulate / AIConfigurator / AIC in shipped code, config or data (RFC C1)
+        run: |
+          # The RFC + mockup legitimately reference the inspiration as prior art; the DASHBOARD's
+          # shipped surface must be clean. Scan authored code/config/data, not the spec docs and
+          # not this guard's own pattern (the workflows carry the term only to forbid it).
+          hits=$(grep -rniE 'aisimulate|aiconfigurator|\baic\b' \
+               --include='*.ts' --include='*.tsx' --include='*.py' --include='*.sh' \
+               --include='*.mjs' --include='*.json' --include='*.css' --include='*.html' \
+               orchestrator web/src web/browser_smoke.mjs web/package.json web/vite.config.ts \
+               schemas state data 2>/dev/null \
+             | grep -v node_modules | grep -v package-lock || true)
+          if [ -n "$hits" ]; then
+            echo "::error::forbidden term found in shipped surface (RFC C1)"
+            echo "$hits"
+            exit 1
+          fi
+          echo "grep-clean: no forbidden terms in the shipped surface"
