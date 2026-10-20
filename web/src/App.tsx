@@ -477,7 +477,7 @@ function Layout({
             {/* First slot. In single-run mode it's just "Nightly run"; in compare mode it is run A
                 (the baseline). The current A id — picker.run falls back to the latest snapshot. */}
             <div className="seclabel">
-              {comparing && <span className="cmp-tag cmp-a">A</span>} {comparing ? 'Baseline run' : 'Nightly run'}
+              {comparing && <span className="cmp-tag cmp-a">A</span>} {comparing ? 'Run' : 'Nightly run'}
             </div>
             <Dropdown
               className="runsel"
@@ -524,7 +524,7 @@ function Layout({
                   onChange={(id) => picker.onPickB(id === '__none__' ? null : id)}
                 />
                 {picker.runB && (
-                  <div className="runsel-note">Showing Δ (B − A) over the points both runs scored.</div>
+                  <div className="runsel-note">Showing Δ (newer − older) over the points both runs scored.</div>
                 )}
               </>
             )}

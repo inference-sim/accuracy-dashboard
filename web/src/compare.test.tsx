@@ -120,4 +120,37 @@ describe('A-vs-B compare (RFC discussion #2 point 3)', () => {
     expect(html).toContain(b.snapshot_id.slice(0, 10))
     expect(a.snapshot_id).not.toBe(b.snapshot_id)
   })
+
+  it('green means the NEWER run improved, whichever slot each run was picked in (#5)', () => {
+    // The newer run predicts TPOT exactly (error 0) at every point, a strict TPOT improvement over
+    // the older run. Snapshot ids lead with their date, so '2099-…' is the newer one.
+    const older = loadFixture()
+    const newer: Summary = JSON.parse(JSON.stringify(older))
+    newer.snapshot_id = '2099-01-01_blis-vNEW_ix-same'
+    const walk = (node: any) => {
+      if (Array.isArray(node)) return node.forEach(walk)
+      if (node && typeof node === 'object') {
+        if (node.level === 'point' && node.measured?.tpot_ms != null && node.error_pct?.tpot != null) {
+          node.predicted.tpot_ms = node.measured.tpot_ms
+          node.error_pct.tpot = 0
+        }
+        for (const v of Object.values(node)) walk(v)
+      }
+    }
+    walk(newer.matrix)
+    // Newer-in-A first: that is the order the old B − A convention coloured backwards.
+    for (const [slotA, slotB] of [[newer, older], [older, newer]] as const) {
+      const html = renderToStaticMarkup(
+        <App summary={slotA} summaryB={slotB} loadError={null} initialHash={`#/?run=${slotA.snapshot_id}&runB=${slotB.snapshot_id}`} />,
+      )
+      const body = html.slice(html.indexOf('<tbody'))
+      const firstRow = body.slice(0, body.indexOf('</tr>'))
+      // Cells in order: TTFT mape, TTFT shape, TPOT mape, TPOT shape. TPOT mape improved.
+      const cells = firstRow.match(/num d-[a-z]+/g) ?? []
+      expect(cells[2]).toBe('num d-better')
+      expect(firstRow).not.toContain('d-worse')
+      // The header always reads older → newer.
+      expect(html.indexOf('>older<')).toBeLessThan(html.indexOf('>newer<'))
+    }
+  })
 })

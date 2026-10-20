@@ -40,7 +40,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     definition: 'How many points were scored vs. not. Nothing is hidden — unscored points are counted and the reasons shown.',
   },
   diff: {
-    label: 'Δ (B − A)',
-    definition: 'Run B minus run A, over the points both runs scored. Green means B is more accurate; red means it got worse.',
+    label: 'Δ (newer − older)',
+    definition: 'The newer run minus the older run, over the points both runs scored. Green means the newer run is more accurate; red means it got worse.',
   },
 }
