@@ -151,6 +151,11 @@ describe('A-vs-B compare (RFC discussion #2 point 3)', () => {
       expect(firstRow).not.toContain('d-worse')
       // The header always reads older → newer.
       expect(html.indexOf('>older<')).toBeLessThan(html.indexOf('>newer<'))
+      // …but each run still carries the rail tag of the slot it was picked in.
+      const runs = html.match(/<div class="cmp-run">.*?<\/div>/g) ?? []
+      const runFor = (s: Summary) => runs.find((r) => r.includes(s.snapshot_id.slice(0, 10)))!
+      expect(runFor(slotA)).toContain('cmp-tag cmp-a">A<')
+      expect(runFor(slotB)).toContain('cmp-tag cmp-b">B<')
     }
   })
 })

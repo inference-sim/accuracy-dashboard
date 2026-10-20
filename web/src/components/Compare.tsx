@@ -82,6 +82,13 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
   const idB = b.snapshot_id
   const blisA = a.provenance?.blis?.release ?? '?'
   const blisB = b.provenance?.blis?.release ?? '?'
+  // Which rail slot each run was picked in, so the header's tags match the rail's A/B tags even
+  // though the Δ is ordered by date rather than by slot.
+  const slotOfA = a === slotA ? 'A' : 'B'
+  const slotOfB = slotOfA === 'A' ? 'B' : 'A'
+  const SlotTag = ({ slot }: { slot: 'A' | 'B' }) => (
+    <span className={`cmp-tag ${slot === 'A' ? 'cmp-a' : 'cmp-b'}`}>{slot}</span>
+  )
 
   return (
     <>
@@ -90,11 +97,11 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
       </h2>
       <div className="cmp-head">
         <div className="cmp-run">
-          <span className="cmp-tag cmp-a">older</span> <b>{idA.slice(0, 10)}</b> · {blisA}
+          <SlotTag slot={slotOfA} /> <span className="cmp-age">older</span> <b>{idA.slice(0, 10)}</b> · {blisA}
         </div>
         <div className="cmp-arrow">→</div>
         <div className="cmp-run">
-          <span className="cmp-tag cmp-b">newer</span> <b>{idB.slice(0, 10)}</b> · {blisB}
+          <SlotTag slot={slotOfB} /> <span className="cmp-age">newer</span> <b>{idB.slice(0, 10)}</b> · {blisB}
         </div>
         <div className="cmp-note">
           Δ = newer − older on each error metric over the <b>{formatCount(shared)}</b> points scored by

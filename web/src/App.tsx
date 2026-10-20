@@ -474,10 +474,10 @@ function Layout({
         </p>
         {runs.length >= 1 && (
           <>
-            {/* First slot. In single-run mode it's just "Nightly run"; in compare mode it is run A
-                (the baseline). The current A id — picker.run falls back to the latest snapshot. */}
+            {/* First slot: a nightly run, tagged A in compare mode. The compare view orders the two
+                runs by date, not by slot. picker.run falls back to the latest snapshot. */}
             <div className="seclabel">
-              {comparing && <span className="cmp-tag cmp-a">A</span>} {comparing ? 'Run' : 'Nightly run'}
+              {comparing && <span className="cmp-tag cmp-a">A</span>} Nightly run
             </div>
             <Dropdown
               className="runsel"

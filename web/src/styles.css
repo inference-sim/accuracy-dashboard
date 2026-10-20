@@ -221,6 +221,8 @@ thead tr.col .term-wrap { text-transform: none; }
   border: 1px solid var(--line-strong); margin-right: 4px; }
 .cmp-tag.cmp-a { background: var(--panel); color: var(--muted); }
 .cmp-tag.cmp-b { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent); }
+.cmp-head .cmp-age { font-family: var(--font-sans); font-size: 10.5px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--muted); margin-right: 2px; }
 .cmp-head .cmp-arrow { color: var(--muted); font-size: 14px; }
 .cmp-head .cmp-note { flex-basis: 100%; font-size: 11.5px; line-height: 1.5; }
 .cmp-head .cmp-cov { color: var(--muted); }
