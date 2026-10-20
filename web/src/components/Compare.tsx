@@ -3,9 +3,11 @@
  * changed?". Shows the per-metric Δ over the points BOTH runs scored (strict intersection), as an
  * EXPLICIT user-chosen comparison — distinct from the implicit vs-previous delta that was removed.
  *
- * Δ = B − A on each ERROR metric (MAPE / shape, TTFT / TPOT). Lower error is better, so Δ < 0 means
- * B is MORE accurate than A → green; Δ > 0 means B regressed → red. The convention is stated in the
- * header so the fixed direction is unambiguous.
+ * Δ = newer − older on each ERROR metric (MAPE / shape, TTFT / TPOT), whichever rail slot each run
+ * was picked in: the two runs are ordered by snapshot date. Lower error is better, so Δ < 0 means
+ * the newer run is MORE accurate → green; Δ > 0 means it regressed → red (#5). Ordering by date
+ * rather than by slot is what keeps that meaning stable: with Δ = B − A, the default (A = latest)
+ * showed a regression of the newer release in green.
  *
  * The single-run Overview, SummaryTable and PointsTable are untouched; this is a parallel view.
  */
@@ -25,16 +27,23 @@ interface Props {
 /** One signed, sign-coloured Δ (percentage points). Negative = improved (green), positive = red. */
 function DeltaCell({ v }: { v: number | null }) {
   const cls = v == null ? 'd-zero' : v < 0 ? 'd-better' : v > 0 ? 'd-worse' : 'd-zero'
-  return <span className={`num ${cls}`}>{formatSignedDelta(v)}</span>
+  const title = v == null || v === 0 ? undefined : v < 0 ? 'improved: lower error in the newer run' : 'regressed: higher error in the newer run'
+  return <span className={`num ${cls}`} title={title}>{formatSignedDelta(v)}</span>
 }
 
-/** B − A, guarding nulls (if either side is null the Δ is undefined → null → em dash). */
+/** newer − older, guarding nulls (if either side is null the Δ is undefined → null → em dash). */
 function delta(aVal: number | null, bVal: number | null): number | null {
   if (aVal == null || bVal == null) return null
   return bVal - aVal
 }
 
-export function Compare({ a, b, tier }: Props) {
+/** The two runs, older first: snapshot ids lead with their date, so they sort chronologically. */
+function chronological(a: Summary, b: Summary): [Summary, Summary] {
+  return a.snapshot_id <= b.snapshot_id ? [a, b] : [b, a]
+}
+
+export function Compare({ a: slotA, b: slotB, tier }: Props) {
+  const [a, b] = useMemo(() => chronological(slotA, slotB), [slotA, slotB])
   // Strict intersection: only points scored by BOTH runs, aligned by cross-snapshot point key.
   const { aShared, bShared, shared, onlyA, onlyB } = useMemo(() => {
     const { pairs, onlyA, onlyB } = intersectByKey(flattenPoints(a), flattenPoints(b))
@@ -73,27 +82,36 @@ export function Compare({ a, b, tier }: Props) {
   const idB = b.snapshot_id
   const blisA = a.provenance?.blis?.release ?? '?'
   const blisB = b.provenance?.blis?.release ?? '?'
+  // Which rail slot each run was picked in, so the header's tags match the rail's A/B tags even
+  // though the Δ is ordered by date rather than by slot.
+  const slotOfA = a === slotA ? 'A' : 'B'
+  const slotOfB = slotOfA === 'A' ? 'B' : 'A'
+  const SlotTag = ({ slot }: { slot: 'A' | 'B' }) => (
+    <span className={`cmp-tag ${slot === 'A' ? 'cmp-a' : 'cmp-b'}`}>{slot}</span>
+  )
 
   return (
     <>
       <h2 className="viewhead">
-        Compare runs — <Term name="diff">Δ accuracy (B − A)</Term>
+        Compare runs — <Term name="diff">Δ accuracy (newer − older)</Term>
       </h2>
       <div className="cmp-head">
         <div className="cmp-run">
-          <span className="cmp-tag cmp-a">A</span> <b>{idA.slice(0, 10)}</b> · {blisA}
+          <SlotTag slot={slotOfA} /> <span className="cmp-age">older</span> <b>{idA.slice(0, 10)}</b> · {blisA}
         </div>
         <div className="cmp-arrow">→</div>
         <div className="cmp-run">
-          <span className="cmp-tag cmp-b">B</span> <b>{idB.slice(0, 10)}</b> · {blisB}
+          <SlotTag slot={slotOfB} /> <span className="cmp-age">newer</span> <b>{idB.slice(0, 10)}</b> · {blisB}
         </div>
         <div className="cmp-note">
-          Δ = B − A on each error metric over the <b>{formatCount(shared)}</b> points scored by both
-          runs. <span className="d-better">green</span> = B more accurate · <span className="d-worse">red</span> = B regressed.
+          Δ = newer − older on each error metric over the <b>{formatCount(shared)}</b> points scored by
+          both runs. <span className="d-better">green</span> = the newer run is more accurate (lower
+          error) · <span className="d-worse">red</span> = the newer run regressed. Runs are ordered by
+          date, so swapping them in the rail doesn't change the meaning.
           {(onlyA > 0 || onlyB > 0) && (
             <span className="cmp-cov">
               {' '}
-              (coverage: {formatCount(onlyA)} only in A, {formatCount(onlyB)} only in B — excluded)
+              (coverage: {formatCount(onlyA)} only in the older run, {formatCount(onlyB)} only in the newer — excluded)
             </span>
           )}
           {tierFellBack && <span className="cmp-cov"> · no measured·resolved points — showing the all tier</span>}
