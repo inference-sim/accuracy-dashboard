@@ -73,7 +73,12 @@ def resolve(alias: str, out_dir: Path, expect: str | None) -> tuple[Path, str]:
     dest = out_dir / CORPUS_FILE
     url = dataset_url(repo, CORPUS_FILE)
     print(f"downloading {url} -> {dest}", file=sys.stderr)
-    with urllib.request.urlopen(url, timeout=600) as resp:  # noqa: S310 (fixed host)
+    # Identity encoding, and write the bytes EXACTLY as served: this file's sha256 is what
+    # `blis replay --corpus-sha256` verifies, so it must hash the raw file. (Unlike the JSON
+    # API, HuggingFace serves the dataset file uncompressed; forcing identity makes that
+    # explicit so a transfer-encoding change upstream can never silently alter the hash.)
+    req = urllib.request.Request(url, headers={"Accept-Encoding": "identity"})
+    with urllib.request.urlopen(req, timeout=600) as resp:  # noqa: S310 (fixed host)
         dest.write_bytes(resp.read())
     digest = sha256_file(dest)
 

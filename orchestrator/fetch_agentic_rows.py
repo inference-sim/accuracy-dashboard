@@ -40,8 +40,17 @@ AGENTIC_TYPE = "agentic_traces"
 
 
 def _get(url: str, timeout: int = 60) -> bytes:
-    with urllib.request.urlopen(url, timeout=timeout) as resp:  # noqa: S310 (fixed host)
-        return resp.read()
+    """GET url, returning decoded bytes. The API gzips SOME responses unpredictably (e.g.
+    DeepSeek-V4-Pro comes back gzipped, Kimi-K3 plain), and urllib does not auto-decompress,
+    so we ask for identity and still gunzip defensively if a gzip stream slips through --
+    otherwise json.loads chokes on the 0x1f 0x8b header."""
+    req = urllib.request.Request(url, headers={"Accept-Encoding": "identity"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (fixed host)
+        data = resp.read()
+    if data[:2] == b"\x1f\x8b" or resp.headers.get("Content-Encoding") == "gzip":
+        import gzip
+        data = gzip.decompress(data)
+    return data
 
 
 def fetch_rows(model_display: str) -> list[dict]:
