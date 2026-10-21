@@ -231,6 +231,20 @@ table.cmp td .num { font-variant-numeric: tabular-nums; font-weight: 600; }
 table.cmp td .num.d-better { color: var(--under-ink); }
 table.cmp td .num.d-worse { color: var(--over-ink); }
 table.cmp td .num.d-zero { color: var(--muted); font-weight: 400; }
+/* overall Δ headline (issue #17): the net, point-weighted change above the per-model table */
+.cmp-overall { margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--panel); }
+.cmp-overall-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--ink); margin: 0 0 10px; }
+.cmp-overall-sub { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--muted); }
+.cmp-overall-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 18px; }
+.cmp-overall-cell { display: flex; flex-direction: column; gap: 3px; }
+.cmp-overall-lbl { font-size: 10.5px; font-weight: 600; color: var(--muted); }
+.cmp-overall .num { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 20px; letter-spacing: -0.01em; }
+.cmp-overall .num.d-better { color: var(--under-ink); }
+.cmp-overall .num.d-worse { color: var(--over-ink); }
+.cmp-overall .num.d-zero { color: var(--muted); font-weight: 600; }
+@media (max-width: 560px) { .cmp-overall-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* rail provenance in compare mode: run A and run B side by side, each labelled, so the panel never
    misrepresents which run the BLIS release / commit / dump belong to */
 .prov-ab { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }

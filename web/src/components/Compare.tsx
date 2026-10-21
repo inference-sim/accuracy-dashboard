@@ -12,7 +12,7 @@
  * The single-run Overview, SummaryTable and PointsTable are untouched; this is a parallel view.
  */
 import { useMemo } from 'react'
-import { flattenPoints, intersectByKey, type FlatPoint } from '../aggregate'
+import { aggregate, flattenPoints, intersectByKey, type FlatPoint } from '../aggregate'
 import { buildRows, type RenderRow } from '../tree'
 import { formatSignedDelta, formatCount } from '../format'
 import { Term } from './Term'
@@ -64,6 +64,22 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
     aShared.length > 0 &&
     aShared.filter((p) => p.tier === 'measured_or_resolved').length === 0
   const effectiveTier: TierKey = tierFellBack ? 'all' : tier
+
+  // Overall Δ headline (issue #17): the net "did it change?" number, POOLED over every shared
+  // point — aggregate() on the full shared set, NOT the mean of the per-model rows below. Pooling
+  // weights each point once; a row-mean would give a 20-point model the same weight as a 200-point
+  // one and can flip sign (Simpson's paradox). This also keeps the headline equal to
+  // Overview(newer) − Overview(older) on the shared set, since the Overview uses the same aggregate().
+  const overall = useMemo(() => {
+    const oa = aggregate(aShared, effectiveTier)
+    const ob = aggregate(bShared, effectiveTier)
+    return {
+      mapeTtft: delta(oa.mape.ttft, ob.mape.ttft),
+      shapeTtft: delta(oa.shape.ttft, ob.shape.ttft),
+      mapeTpot: delta(oa.mape.tpot, ob.mape.tpot),
+      shapeTpot: delta(oa.shape.tpot, ob.shape.tpot),
+    }
+  }, [aShared, bShared, effectiveTier])
 
   // Build both trees over the SAME shared point set → identical structure/ids, so we can zip by id.
   // Everything is expanded so the full drill-down of what changed is visible at once.
@@ -121,6 +137,30 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
       {shared === 0 ? (
         <div className="pts-empty">These two runs share no scored points — nothing to compare.</div>
       ) : (
+        <>
+        <div className="cmp-overall" role="group" aria-label="Overall delta across all shared points">
+          <div className="cmp-overall-title">
+            Overall Δ <span className="cmp-overall-sub">· point-weighted over all {formatCount(shared)} shared points</span>
+          </div>
+          <div className="cmp-overall-grid">
+            <div className="cmp-overall-cell">
+              <span className="cmp-overall-lbl">Δ TTFT mape</span>
+              <DeltaCell v={overall.mapeTtft} />
+            </div>
+            <div className="cmp-overall-cell">
+              <span className="cmp-overall-lbl">Δ TTFT shape</span>
+              <DeltaCell v={overall.shapeTtft} />
+            </div>
+            <div className="cmp-overall-cell">
+              <span className="cmp-overall-lbl">Δ TPOT mape</span>
+              <DeltaCell v={overall.mapeTpot} />
+            </div>
+            <div className="cmp-overall-cell">
+              <span className="cmp-overall-lbl">Δ TPOT shape</span>
+              <DeltaCell v={overall.shapeTpot} />
+            </div>
+          </div>
+        </div>
         <div className="tscroll">
           <table className="readout cmp">
             <thead>
@@ -169,10 +209,12 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
             </tbody>
           </table>
         </div>
+        </>
       )}
       <div className="gate-legend">
         Δ in percentage points. A point counts only if BOTH runs scored it; coverage-only points are
-        excluded from every Δ. Pick a different second run (or "none") in the rail.
+        excluded from every Δ. The overall Δ is point-weighted over all shared points, so it need not
+        equal the average of the per-model rows. Pick a different second run (or "none") in the rail.
       </div>
     </>
   )

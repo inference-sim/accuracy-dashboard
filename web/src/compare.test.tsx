@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { App } from './App'
 import { validateSummary } from './load'
-import { flattenPoints, intersectByKey, pointKey } from './aggregate'
+import { aggregate, flattenPoints, intersectByKey, pointKey, type FlatPoint } from './aggregate'
 import type { Summary } from './types'
 
 function loadFixture(): Summary {
@@ -119,6 +119,39 @@ describe('A-vs-B compare (RFC discussion #2 point 3)', () => {
     expect(html).toContain(a.snapshot_id.slice(0, 10))
     expect(html).toContain(b.snapshot_id.slice(0, 10))
     expect(a.snapshot_id).not.toBe(b.snapshot_id)
+  })
+
+  it('renders the overall Δ headline above the per-model table (#17)', () => {
+    const a = loadFixture()
+    const b = perturb(a, 1.2, 'B')
+    const html = renderToStaticMarkup(
+      <App summary={a} summaryB={b} loadError={null} initialHash={`#/?run=${a.snapshot_id}&runB=${b.snapshot_id}`} />,
+    )
+    expect(html).toContain('Overall Δ')
+    expect(html).toContain('Δ TTFT mape')
+    expect(html).toContain('Δ TPOT shape')
+    // The headline strip comes BEFORE the per-model table (it's the net "did it change?" answer).
+    expect(html.indexOf('cmp-overall')).toBeLessThan(html.indexOf('table class="readout cmp"'))
+  })
+
+  it('overall Δ is point-weighted, not the mean of per-model Δs (Simpson guard, #17)', () => {
+    // Two "models", wildly unequal point counts and opposite error shifts. A row-mean of the two
+    // per-model Δs would lean one way; pooling every point weights the big group and leans the other.
+    const pt = (errTtft: number): FlatPoint =>
+      ({ tier: 'all', errTtft, errTpot: null, shapeTtft: null, shapeTpot: null } as unknown as FlatPoint)
+    // Big model: 100 points, A err 10 → B err 2  (improves 8). Small model: 4 points, A 2 → B 18 (worsens 16).
+    const aBig = Array.from({ length: 100 }, () => pt(10))
+    const bBig = Array.from({ length: 100 }, () => pt(2))
+    const aSmall = Array.from({ length: 4 }, () => pt(2))
+    const bSmall = Array.from({ length: 4 }, () => pt(18))
+    const aAll = aggregate([...aBig, ...aSmall], 'all')
+    const bAll = aggregate([...bBig, ...bSmall], 'all')
+    const overall = (bAll.mape.ttft ?? 0) - (aAll.mape.ttft ?? 0)
+    // Pooled: A mean = (100·10 + 4·2)/104 = 9.69, B mean = (100·2 + 4·18)/104 = 2.62 → Δ ≈ −7.08 (improved).
+    expect(overall).toBeLessThan(0)
+    // Mean of per-model Δs would be (−8 + +16)/2 = +4 (regressed) — the opposite sign. Prove they disagree.
+    const perModelMean = (-8 + 16) / 2
+    expect(Math.sign(overall)).not.toBe(Math.sign(perModelMean))
   })
 
   it('green means the NEWER run improved, whichever slot each run was picked in (#5)', () => {
