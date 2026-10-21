@@ -143,6 +143,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # ONLY this job may commit the snapshot to the Pages-served branch
+      actions: write # dispatch the Pages deploy after publishing (the [skip ci] commit can't)
     steps:
       - uses: actions/checkout@v4
         with:
@@ -170,6 +171,7 @@ jobs:
           fi
 
       - name: Publish snapshot + maintain the run index (RFC §4.2/§4.6)
+        id: publish
         env:
           BLIS_TAG: ${{ needs.detect-diff.outputs.blis_tag }}
           IX_TAG: ${{ needs.detect-diff.outputs.ix_tag }}
@@ -194,5 +196,22 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A data state/last-run.json
-          git commit -m "nightly: ${snap_id} [skip ci]" || { echo "nothing to commit (no-op, index unchanged)"; exit 0; }
-          git push
+          # [skip ci] stops this commit from re-triggering workflows (incl. nightly's own loop) — but
+          # it ALSO suppresses the Pages deploy that the new data needs. So we dispatch pages.yml
+          # explicitly in the next step whenever a commit actually lands here.
+          if git commit -m "nightly: ${snap_id} [skip ci]"; then
+            git push
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "nothing to commit (no-op, index unchanged)"
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy the published data to Pages
+        # Only when a commit actually landed. The nightly commit carries [skip ci], so the push-
+        # triggered pages.yml never fires — this manual dispatch is what publishes the new run to
+        # the live site.
+        if: ${{ steps.publish.outputs.pushed == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref "${GITHUB_REF_NAME}"
