@@ -36,7 +36,8 @@ the result rather than defaulted, so a caller can refuse a row it cannot replay 
 """
 
 import re
-import shlex
+
+from _argv import command_after, flag as flag_value
 
 # The AgentX scenario BLIS replays. A command line naming any other scenario is not a
 # benchmark `blis replay --agentic-scenario` reproduces.
@@ -57,28 +58,14 @@ def aiperf_command(job_log: str) -> list[str] | None:
     timestamp and `+` (and sometimes a wrapper such as `run_server_client`). The argv
     starts at `profile` so callers read flags by name rather than by position.
     """
+    # Line by line, because an earlier `aiperf …` line (e.g. a version check) is not the
+    # benchmark: only a `profile` invocation that names a scenario is.
     for line in job_log.splitlines():
-        i = line.find("aiperf profile ")
-        if i < 0 or "--scenario" not in line:
-            continue
-        try:
-            argv = shlex.split(line[i + len("aiperf "):])
-        except ValueError:
-            continue
-        if argv and argv[0] == "profile":
+        argv = command_after(line, "aiperf ")
+        if argv and argv[0] == "profile" and "--scenario" in argv:
             return argv
     return None
 
-
-def _flag(argv: list[str], name: str) -> str | None:
-    """The value of `--name v` or `--name=v`; the last occurrence wins, as argparse does."""
-    val = None
-    for k, a in enumerate(argv):
-        if a == name and k + 1 < len(argv):
-            val = argv[k + 1]
-        elif a.startswith(name + "="):
-            val = a.split("=", 1)[1]
-    return val
 
 
 def parse_job_log(job_log: str) -> dict:
@@ -96,9 +83,9 @@ def parse_job_log(job_log: str) -> dict:
     argv = aiperf_command(job_log)
     if argv is None:
         return out
-    if (s := _flag(argv, "--scenario")) is not None:
+    if (s := flag_value(argv, "--scenario")) is not None:
         out["scenario"] = s
-    if (alias := _flag(argv, "--public-dataset")) is not None:
+    if (alias := flag_value(argv, "--public-dataset")) is not None:
         out["corpus_alias"] = alias
         out["corpus_pinned"] = alias in PINNED_CORPORA
         if alias in PINNED_CORPORA:
@@ -107,7 +94,7 @@ def parse_job_log(job_log: str) -> dict:
                       ("--benchmark-duration", "benchmark_duration_s"),
                       ("--num-dataset-entries", "num_dataset_entries"),
                       ("--max-context-length", "max_context_length")):
-        v = _flag(argv, flag)
+        v = flag_value(argv, flag)
         if v is not None and re.fullmatch(r"\d+", v):
             out[key] = int(v)
     return out
@@ -137,7 +124,11 @@ def parse_server_log(server_log: str) -> dict:
     num_speculative_tokens, rejection_sample_method, synthetic_acceptance_length.
     """
     out: dict = {}
-    m = re.search(r"\bversion (\d+\.\d+\.\d+[0-9A-Za-z.+-]*)", server_log)
+    # Anchored on vLLM's own engine line, as the kernel's engine-settings parser is: a 180 KB
+    # server log carries other "version X.Y.Z" banners (a dependency's, CUDA's), and the first
+    # of those must not become the vLLM version. The ASCII-art startup banner is the fallback.
+    m = (re.search(r"V1 LLM engine \(v(\d+\.\d+\.\d+[0-9A-Za-z.+-]*)\)", server_log)
+         or re.search(r"█\s+version (\d+\.\d+\.\d+[0-9A-Za-z.+-]*)", server_log))
     if m:
         out["vllm_version"] = m.group(1)
     i = server_log.find("non-default args: {")
@@ -186,6 +177,9 @@ def replay_args(job: dict, server: dict) -> tuple[list[str], list[str]]:
         elif "synthetic_acceptance_length" not in server:
             refusals.append("synthetic speculative run with no synthetic_acceptance_length")
         else:
+            # repr, not str or a format: repr is the shortest text that reads back as the
+            # same float, so the flag carries exactly the value parsed from the log (3.1
+            # stays "3.1", 3.84 stays "3.84") with no rounding and no added digits.
             args += ["--speculative-acceptance-length",
                      repr(server["synthetic_acceptance_length"])]
     return args, refusals

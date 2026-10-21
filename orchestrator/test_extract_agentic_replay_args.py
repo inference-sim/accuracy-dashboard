@@ -103,6 +103,25 @@ def main() -> int:
        "--speculative-acceptance-length" not in args and any("synthetic" in r for r in refusals),
        repr(refusals))
 
+    # A real server log carries other "version X.Y.Z" lines (e.g. `version 2.30.7+cuda13.3`
+    # at line 200 of the Kimi-K3 log). Put one FIRST: it must not become the vLLM version.
+    decoy = ("INFO loading plugin flashinfer version 2.30.7+cuda13.3\n"
+             "(EngineCore pid=7) INFO [core.py:122] Initializing a V1 LLM engine "
+             "(v0.29.1rc1.dev128+gcd10ed6f9) with config: model=x\n")
+    ck("an earlier non-vLLM 'version' line does not become the vLLM version",
+       parse_server_log(decoy).get("vllm_version") == "0.29.1rc1.dev128+gcd10ed6f9",
+       repr(parse_server_log(decoy).get("vllm_version")))
+    ck("with no engine line, a lone dependency 'version' is not taken as vLLM's",
+       "vllm_version" not in parse_server_log("INFO loading plugin flashinfer version 2.30.7+cuda13.3\n"))
+
+    # The acceptance length reaches the flag exactly as written in the log.
+    for text, want in (("3.1", "3.1"), ("3.10", "3.1"), ("3.84", "3.84"), ("4.0", "4.0")):
+        srv = parse_server_log(KIMI_SERVER.replace("3.84}", text + "}"))
+        a, _ = replay_args(job, srv)
+        got = a[a.index("--speculative-acceptance-length") + 1]
+        ck(f"acceptance {text} reaches the flag as {want} and reads back to the same float",
+           got == want and float(got) == float(text), repr(got))
+
     ck("a job log with no aiperf command yields no seed and is refused",
        replay_args(parse_job_log("no command here\n"), {})[1] != [])
 

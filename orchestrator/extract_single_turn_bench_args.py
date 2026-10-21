@@ -22,8 +22,7 @@ ASSUMED from the constants, never as read, so a reader can tell the two apart.
 Nothing here is fetched: callers pass the log text.
 """
 
-import re
-import shlex
+from _argv import command_after, flag as flag_value
 
 # The harness's constants (inference-sim sim/kernelmodel/harness/workload.go). A row whose
 # client was given anything else is not the workload the harness replays.
@@ -35,26 +34,7 @@ HARNESS_SEED = 0  # benchmark_serving.py's default when --seed is not passed
 
 def bench_command(job_log: str) -> list[str] | None:
     """The argv of the `benchmark_serving.py` invocation in a CI job log, or None."""
-    for line in job_log.splitlines():
-        i = line.find("benchmark_serving.py ")
-        if i < 0:
-            continue
-        try:
-            return shlex.split(line[i + len("benchmark_serving.py "):])
-        except ValueError:
-            continue
-    return None
-
-
-def _flag(argv: list[str], name: str) -> str | None:
-    """The value of `--name v` or `--name=v`; the last occurrence wins, as argparse does."""
-    val = None
-    for k, a in enumerate(argv):
-        if a == name and k + 1 < len(argv):
-            val = argv[k + 1]
-        elif a.startswith(name + "="):
-            val = a.split("=", 1)[1]
-    return val
+    return command_after(job_log, "benchmark_serving.py ")
 
 
 def parse_job_log(job_log: str) -> dict:
@@ -78,7 +58,7 @@ def parse_job_log(job_log: str) -> dict:
                             ("--num-warmups", "num_warmups", int),
                             ("--request-rate", "request_rate", str),
                             ("--seed", "seed", int)):
-        v = _flag(argv, flag)
+        v = flag_value(argv, flag)
         if v is None:
             continue
         try:
