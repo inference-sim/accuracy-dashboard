@@ -164,8 +164,17 @@ fi
 log "assembling provenance from the resolved inputs"
 IX_DATE="${IX_TAG#db-dump/}"
 TODAY="${SNAPSHOT_DATE:-$IX_DATE}"
-MEAS_SHA=$(gh release download "$IX_TAG" --repo SemiAnalysisAI/InferenceX-app -p SHA256SUMS -O - 2>/dev/null \
-             | head -1 | awk '{print $1}' || echo "unknown")
+# measurement_sha256 identifies the WHOLE dump: the sha256 of the release's SHA256SUMS asset, which
+# lists every part's hash. (It used to be line 1 of that file, i.e. part00 only, so a change in any
+# other part left it unchanged; and any download failure became "unknown" in published provenance.)
+# A missing or empty SHA256SUMS now fails the run (#9).
+SUMS="$WORK/SHA256SUMS"
+gh release download "$IX_TAG" --repo SemiAnalysisAI/InferenceX-app -p SHA256SUMS -O "$SUMS" --clobber
+if [[ ! -s "$SUMS" ]]; then
+  log "FATAL: ${IX_TAG} has no usable SHA256SUMS asset — cannot pin the dump in provenance"
+  exit 7
+fi
+MEAS_SHA=$(sha256sum "$SUMS" | awk '{print $1}')
 PROV="$WORK/provenance.json"
 python3 - "$PROV" "$BLIS_TAG" "$SIM_SHA" "$catalog" "$registry" "$kernel" "$IX_TAG" "$IX_DATE" "$MEAS_SHA" "$TODAY" "$CSV" "$CORPUS" "$DIRECT" <<'PY'
 import json, sys, csv
