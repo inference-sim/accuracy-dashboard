@@ -10,9 +10,12 @@ CSV, so `build_summary.py` scores it with no new scoring code:
   the row            fetch_agentic_rows.py (API) -> measured mean_ttft / mean_tpot (the
                      MEASURED side) + the deployment topology (model, gpu, precision,
                      parallelism, spec method).
-  the replay args    extract_agentic_replay_args.py (PR #19) reads the row's two logs ->
-                     --seed/--concurrency/--benchmark-duration/--speculative-acceptance-
-                     length, or a REFUSAL the row cannot be replayed exactly.
+  the replay args    agentic_replay_args(row, server) -> --concurrency (from the row) and
+                     --speculative-acceptance-length (from the server log, with PR #19's
+                     no-guess rule). --seed and --benchmark-duration are left to blis's
+                     DEFAULTS, not read from the CI job log -- see that function for why
+                     (the job log is on an external repo whose Actions logs are unreadable)
+                     and what it costs (a FIXED workload, not a bit-exact per-row replay).
   the corpus         resolve_agentic_corpus.py -> --corpus traces.jsonl + --corpus-sha256.
   the scenario       gen_scenarios.emit() over the row's topology -> the Scenario +
                      Deployment YAML `blis replay` prices the server from (the SAME writer
@@ -20,8 +23,13 @@ CSV, so `build_summary.py` scores it with no new scoring code:
   the prediction     `blis replay … --metrics-path out.json` -> ttft_mean_ms / itl_mean_ms
                      (the PREDICTED side).
 
-A row whose replay args carry any refusal is emitted as NOT scored (never run with a
-guessed value), mirroring the no-tuning rule PR #19 enforces.
+A row with a refusal (unsupported model/hardware, or a speculative run with no stated
+synthetic acceptance) is emitted as NOT scored, never run with a guessed value.
+
+Fidelity: because seed and duration are defaulted, this scores blis against a FIXED agentic
+workload (a seed-0 trace sample over blis's default window), NOT a bit-exact reproduction
+of each measured run. The emitted corpus records this (AGENTIC_FIDELITY) so a reader does
+not read it as the latter.
 
 Mean TTFT + TPOT only: this reuses the existing summary.json shape and UI. An agentic row
 is a single concurrency point, so it has no shape curve -- build_summary.py already treats
@@ -35,10 +43,10 @@ Usage:
     python orchestrator/run_agentic.py \
         --row .work/agentic/row-439932.json \
         --server-log .work/agentic/server-439932.log \
-        --job-log .work/agentic/job-439932.log \
         --corpus .work/agentic/corpus/traces.jsonl --corpus-sha256 <hex> \
         --blis $WORK/inference-sim/blis --catalog $WORK/catalog --registry $WORK/registry \
         --out-dir .work/agentic/scored
+        # --job-log is optional: only pins --max-context-length when readable.
 """
 
 import argparse
@@ -50,7 +58,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from extract_agentic_replay_args import (AGENTX_SCENARIO, parse_job_log,  # noqa: E402
-                                         parse_server_log, replay_args)
+                                         parse_server_log)
 from gen_scenarios import emit  # noqa: E402
 
 # Agentic InferenceX model/GPU slug -> blis-catalog name. SEPARATE from the single-turn
@@ -85,10 +93,16 @@ CSV_HEADER = [
     "meas_tpot_us", "pred_tpot_us", "meas_ttft_us", "pred_ttft_us", "tier_unbracketed",
 ]
 
-# An agentic replay row is scored at the apples-to-apples tier: its settings are read from
-# the run's own logs, not assumed. build_summary.py folds MEASURED-OR-RESOLVED into the
-# "measured_or_resolved" bucket (and every point also into "all").
+# The scored tier. build_summary.py folds MEASURED-OR-RESOLVED into the "measured_or_resolved"
+# bucket (and every point also into "all"). The deployment config (parallelism, spec
+# acceptance) is read from the row + its server log; the client-side seed and sending-window
+# duration are left at blis's defaults rather than read from the CI job log -- see
+# agentic_replay_args for why, and what that costs.
 AGENTIC_TIER = "MEASURED-OR-RESOLVED"
+
+# Whether the agentic replay reproduces the exact measured run (bit-exact) or a fixed
+# workload. Surfaced in the emitted corpus so a reader never mistakes one for the other.
+AGENTIC_FIDELITY = "fixed-workload"
 
 # Agentic rows carry no isl/osl workload; label them by the scenario the harness replays.
 AGENTIC_LABEL = "agentx"
@@ -116,6 +130,55 @@ def support_refusals(row: dict) -> list[str]:
     if gpu_raw not in AGENTIC_CHIPS:
         out.append(f"hardware {gpu_raw!r} has no registry coefficients")
     return out
+
+
+def agentic_replay_args(row: dict, server: dict) -> tuple[list[str], list[str]]:
+    """The `blis replay --agentic-scenario` args for one row, and any refusals.
+
+    Unlike PR #19's `replay_args` (which reads every input from the CI job log and REFUSES a
+    row whose seed/corpus it cannot read), this builds the args from what is reachable
+    WITHOUT the job log, because the job log lives on an external GitHub repo
+    (SemiAnalysisAI/InferenceX) whose Actions logs the dashboard's token cannot read:
+
+      --concurrency                 from the row (the API states it)
+      --speculative-acceptance-length  from the SERVER log (restored in the dump / API),
+                                    with PR #19's rule: a speculative run is refused unless
+                                    its acceptance is a stated synthetic value, never guessed
+      --corpus / --corpus-sha256    supplied by the caller (the scenario pins the 256k corpus)
+
+    What it does NOT pass, and why that is a documented tradeoff rather than a refusal:
+
+      --seed              only the job log states the exact seed; omitted, blis uses its
+                          default. The seed selects WHICH traces populate the lanes, so a
+                          different seed is a different trace sample -- this replays a FIXED
+                          seed-0 sample, not the row's exact one (AGENTIC_FIDELITY).
+      --benchmark-duration  only the job log states it; omitted, blis uses its 1800s default.
+                          The window sets how many requests complete, so the mean is over a
+                          fixed population rather than the row's exact one.
+
+    So the comparison is blis-vs-InferenceX on a FIXED agentic workload, not a bit-exact
+    per-row reproduction. The emitted corpus records this (AGENTIC_FIDELITY) so a reader does
+    not mistake it for the latter. A speculative run with no stated synthetic acceptance is
+    still refused -- that one IS a value we would otherwise have to invent.
+    """
+    refusals = []
+    args = ["--agentic-scenario", AGENTX_SCENARIO]
+    conc = row.get("conc")
+    if conc is None:
+        refusals.append("row does not state concurrency")
+    else:
+        args += ["--concurrency", str(int(conc))]
+    if "speculative_method" in server:
+        if server.get("rejection_sample_method") != "synthetic":
+            refusals.append("speculative run without a synthetic acceptance setting: "
+                            "its acceptance is an outcome, not a stated value")
+        elif "synthetic_acceptance_length" not in server:
+            refusals.append("synthetic speculative run with no synthetic_acceptance_length")
+        else:
+            # repr: the shortest text that reads back as the same float (3.84 stays "3.84").
+            args += ["--speculative-acceptance-length",
+                     repr(server["synthetic_acceptance_length"])]
+    return args, refusals
 
 
 def sweep_from_row(row: dict, max_context: int | None = None) -> dict:
@@ -211,6 +274,13 @@ def facets_corpus(sweep: dict, row: dict) -> dict:
     return {
         "source": "SemiAnalysis InferenceX (agentic_traces, live API)",
         "benchmark_type": "agentic_traces",
+        # Not a bit-exact per-row replay: seed and sending-window duration are left at blis's
+        # defaults (the CI job log that states them is on an unreadable external repo), so the
+        # replay is a FIXED agentic workload. Recorded so a reader never reads these numbers
+        # as an exact reproduction of each measured run.
+        "fidelity": AGENTIC_FIDELITY,
+        "fidelity_note": ("seed and benchmark-duration are blis defaults, not the measured "
+                          "run's values; concurrency and speculative acceptance are read"),
         "sweeps": [{
             "scenario": sweep["scenario"],
             "label": AGENTIC_LABEL,
@@ -264,7 +334,10 @@ def main() -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--row", required=True, help="row-<id>.json from fetch_agentic_rows.py")
     ap.add_argument("--server-log", required=True)
-    ap.add_argument("--job-log", required=True)
+    ap.add_argument("--job-log", default=None,
+                    help="optional CI job log; only used to pin --max-context-length. "
+                         "Omit when the external repo's Actions logs are unreadable; "
+                         "seed/duration are left to blis's defaults regardless.")
     ap.add_argument("--corpus", required=True, help="traces.jsonl")
     ap.add_argument("--corpus-sha256", required=True)
     ap.add_argument("--blis", required=True, help="the blis binary evaluate.sh built")
@@ -277,15 +350,19 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
 
     row = json.loads(Path(args.row).read_text())
-    job_text = Path(args.job_log).read_text()
-    # An empty job log (e.g. expired -> HTTP 410, or gh unavailable at fetch) means the
-    # aiperf command could not be read, so seed/concurrency/scenario are unknown. PR #19's
-    # replay_args then refuses the row rather than defaulting them.
-    job = parse_job_log(job_text) if job_text.strip() else {}
     server = parse_server_log(Path(args.server_log).read_text())
-    replay, refusals = replay_args(job, server)
+    # The job log is OPTIONAL and used only as a hint for --max-context-length: the external
+    # repo's Actions logs are usually unreadable, and seed/duration are deliberately left to
+    # blis's defaults (see agentic_replay_args). When present, its --max-context-length pins
+    # max_model_len to exactly what the run used.
+    job = {}
+    if args.job_log:
+        jt = Path(args.job_log).read_text()
+        job = parse_job_log(jt) if jt.strip() else {}
+
+    replay, refusals = agentic_replay_args(row, server)
     # Unsupported model / new hardware (the #15 case) is a refusal too, read from the row
-    # itself rather than its logs. Combine both so an unscoreable row is not run at all.
+    # itself. Combine both so an unscoreable row is not run at all.
     refusals = support_refusals(row) + refusals
 
     if refusals:

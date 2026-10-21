@@ -40,13 +40,6 @@ SERVER_LOG = (
     "'speculative_config': {'method': 'dspark', 'num_speculative_tokens': 7, "
     "'rejection_sample_method': 'synthetic', 'synthetic_acceptance_length': 3.84}}\n"
 )
-JOB_LOG = (
-    "+ aiperf profile --scenario inferencex-agentx-mvp --model moonshotai/Kimi-K3 "
-    "--concurrency 2 --benchmark-duration 3600 --random-seed 42 --num-dataset-entries 393 "
-    "--public-dataset semianalysis_cc_traces_weka_062126\n"
-)
-
-
 def ck(label, ok, detail=""):
     print(f"  {'OK  ' if ok else 'FAIL'} {label}{(': ' + detail) if detail else ''}")
     if not ok:
@@ -87,19 +80,43 @@ def test_pure_functions():
     ck("the point is tagged the apples-to-apples tier",
        r["tier_unbracketed"] == "MEASURED-OR-RESOLVED", r["tier_unbracketed"])
 
+    # agentic_replay_args: built from row + server log, NOT the CI job log. Concurrency from
+    # the row, acceptance from the server log; seed/duration deliberately omitted (defaulted).
+    server = ra.parse_server_log(SERVER_LOG)
+    args, refusals = ra.agentic_replay_args(ROW, server)
+    ck("no refusals for a supported, synthetic-acceptance row", refusals == [], str(refusals))
+    ck("concurrency is taken from the row",
+       "--concurrency" in args and args[args.index("--concurrency") + 1] == "2")
+    ck("the synthetic acceptance length is passed from the server log",
+       "--speculative-acceptance-length" in args
+       and args[args.index("--speculative-acceptance-length") + 1] == "3.84")
+    ck("seed and duration are NOT passed (left to blis defaults)",
+       "--seed" not in args and "--benchmark-duration" not in args, str(args))
+    # A speculative run whose acceptance is an outcome (not synthetic) is still refused.
+    srv_nonsynth = {"speculative_method": "dspark", "rejection_sample_method": "rejection"}
+    _, ref2 = ra.agentic_replay_args(ROW, srv_nonsynth)
+    ck("a non-synthetic speculative run is refused (acceptance not a stated value)",
+       any("synthetic acceptance" in x for x in ref2), str(ref2))
+    # A row missing concurrency is refused rather than defaulted.
+    _, ref3 = ra.agentic_replay_args({k: v for k, v in ROW.items() if k != "conc"}, {})
+    ck("a row with no concurrency is refused", any("concurrency" in x for x in ref3), str(ref3))
+
 
 def run_driver(td: Path, row: dict, blis_stub: str) -> subprocess.CompletedProcess:
-    """Drive run_agentic.main() with a fake blis that writes a fixed metrics file."""
+    """Drive run_agentic.main() with a fake blis that writes a fixed metrics file.
+
+    Deliberately passes NO --job-log: the external repo's Actions log is usually unreadable,
+    and the driver must score without it (seed/duration default, concurrency from the row).
+    """
     (td / "row.json").write_text(json.dumps(row))
     (td / "server.log").write_text(SERVER_LOG)
-    (td / "job.log").write_text(JOB_LOG)
     blis = td / "blis_stub.sh"
     blis.write_text(blis_stub)
     blis.chmod(0o755)
     return subprocess.run(
         [sys.executable, str(HERE / "run_agentic.py"),
          "--row", str(td / "row.json"), "--server-log", str(td / "server.log"),
-         "--job-log", str(td / "job.log"), "--corpus", str(td / "traces.jsonl"),
+         "--corpus", str(td / "traces.jsonl"),
          "--corpus-sha256", "deadbeef", "--blis", str(blis),
          "--catalog", str(td), "--registry", str(td), "--out-dir", str(td / "out")],
         capture_output=True, text=True)
@@ -125,8 +142,12 @@ def test_driver_scores_a_supported_row():
             ck("the CSV has a header + one data row", len(lines) == 2, str(lines))
             ck("the header is build_summary's EXPECTED_HEADER",
                lines[0] == ",".join(ra.CSV_HEADER))
-        ck("a facets corpus is written",
-           (td / "out" / "agentic_corpus.json").exists())
+        corpus = td / "out" / "agentic_corpus.json"
+        ck("a facets corpus is written", corpus.exists())
+        if corpus.exists():
+            doc = json.loads(corpus.read_text())
+            ck("the corpus records the fixed-workload fidelity",
+               doc.get("fidelity") == "fixed-workload", str(doc.get("fidelity")))
 
 
 def test_driver_refuses_unsupported():
