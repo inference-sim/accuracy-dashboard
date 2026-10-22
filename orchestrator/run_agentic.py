@@ -10,12 +10,12 @@ CSV, so `build_summary.py` scores it with no new scoring code:
   the row            fetch_agentic_rows.py (API) -> measured mean_ttft / mean_tpot (the
                      MEASURED side) + the deployment topology (model, gpu, precision,
                      parallelism, spec method).
-  the replay args    agentic_replay_args(row, server) -> --concurrency (from the row) and
-                     --speculative-acceptance-length (from the server log, with PR #19's
-                     no-guess rule). --seed and --benchmark-duration are left to blis's
-                     DEFAULTS, not read from the CI job log -- see that function for why
-                     (the job log is on an external repo whose Actions logs are unreadable)
-                     and what it costs (a FIXED workload, not a bit-exact per-row replay).
+  the replay args    agentic_replay_args(row, server) -> --concurrency (from the row),
+                     --benchmark-duration 3600s (the documented AgentX window the measured
+                     runs used) and --speculative-acceptance-length (from the server log,
+                     with PR #19's no-guess rule). --seed is left to blis's default of 42,
+                     which matches InferenceX's --random-seed 42 -- not READ per row, so
+                     still a FIXED workload rather than a bit-exact per-row replay.
   the corpus         resolve_agentic_corpus.py -> --corpus traces.jsonl + --corpus-sha256.
   the scenario       gen_scenarios.emit() over the row's topology -> the Scenario +
                      Deployment YAML `blis replay` prices the server from (the SAME writer
@@ -26,10 +26,10 @@ CSV, so `build_summary.py` scores it with no new scoring code:
 A row with a refusal (unsupported model/hardware, or a speculative run with no stated
 synthetic acceptance) is emitted as NOT scored, never run with a guessed value.
 
-Fidelity: because seed and duration are defaulted, this scores blis against a FIXED agentic
-workload (a seed-0 trace sample over blis's default window), NOT a bit-exact reproduction
-of each measured run. The emitted corpus records this (AGENTIC_FIDELITY) so a reader does
-not read it as the latter.
+Fidelity: because the seed is not read per row (it is left at blis's default of 42, which
+matches InferenceX's runs) this scores blis against a FIXED agentic workload -- seed 42 over
+a 3600s window -- NOT a bit-exact reproduction of each measured run. The emitted corpus
+records this (AGENTIC_FIDELITY) so a reader does not read it as the latter.
 
 Mean TTFT + TPOT only: this reuses the existing summary.json shape and UI. An agentic row
 is a single concurrency point, so it has no shape curve -- build_summary.py already treats
@@ -93,16 +93,22 @@ CSV_HEADER = [
     "meas_tpot_us", "pred_tpot_us", "meas_ttft_us", "pred_ttft_us", "tier_unbracketed",
 ]
 
-# The scored tier. build_summary.py folds MEASURED-OR-RESOLVED into the "measured_or_resolved"
-# bucket (and every point also into "all"). The deployment config (parallelism, spec
-# acceptance) is read from the row + its server log; the client-side seed and sending-window
-# duration are left at blis's defaults rather than read from the CI job log -- see
-# agentic_replay_args for why, and what that costs.
-AGENTIC_TIER = "MEASURED-OR-RESOLVED"
+# The scored tier. build_summary.py maps "ALL (approximate)" to the "all" bucket ONLY --
+# NOT the stricter "measured_or_resolved". Agentic points belong in "all": the deployment is
+# rebuilt from API fields and seed/duration are defaulted (not read per row), so they are not
+# the bit-exact, fully-stated configuration the measured_or_resolved tier is for. Putting them
+# there would show them beside exactly-configured single-turn points as if equally pinned
+# (PR #21 review, point 5).
+AGENTIC_TIER = "ALL (approximate)"
 
 # Whether the agentic replay reproduces the exact measured run (bit-exact) or a fixed
 # workload. Surfaced in the emitted corpus so a reader never mistakes one for the other.
 AGENTIC_FIDELITY = "fixed-workload"
+
+# The AgentX sending window passed to every agentic replay. 3600s is the documented setting
+# every InferenceX agentic job log checked actually ran (blis's scenario default is 1800s),
+# so passing it matches the measured runs' request population without reading the job log.
+AGENTIC_DURATION_S = 3600
 
 # Agentic rows carry no isl/osl workload; label them by the scenario the harness replays.
 AGENTIC_LABEL = "agentx"
@@ -141,6 +147,11 @@ def agentic_replay_args(row: dict, server: dict) -> tuple[list[str], list[str]]:
     (SemiAnalysisAI/InferenceX) whose Actions logs the dashboard's token cannot read:
 
       --concurrency                 from the row (the API states it)
+      --benchmark-duration 3600s    the documented AgentX sending window: every InferenceX
+                                    agentic job log checked ran --benchmark-duration 3600,
+                                    so passing it (rather than blis's 1800s scenario default)
+                                    matches the measured runs' request population without
+                                    needing the job log (AGENTIC_DURATION_S).
       --speculative-acceptance-length  from the SERVER log (restored in the dump / API),
                                     with PR #19's rule: a speculative run is refused unless
                                     its acceptance is a stated synthetic value, never guessed
@@ -149,20 +160,20 @@ def agentic_replay_args(row: dict, server: dict) -> tuple[list[str], list[str]]:
     What it does NOT pass, and why that is a documented tradeoff rather than a refusal:
 
       --seed              only the job log states the exact seed; omitted, blis uses its
-                          default. The seed selects WHICH traces populate the lanes, so a
-                          different seed is a different trace sample -- this replays a FIXED
-                          seed-0 sample, not the row's exact one (AGENTIC_FIDELITY).
-      --benchmark-duration  only the job log states it; omitted, blis uses its 1800s default.
-                          The window sets how many requests complete, so the mean is over a
-                          fixed population rather than the row's exact one.
+                          default of 42 (cmd/root.go:853). That default HAPPENS to match
+                          InferenceX, whose job logs all run --random-seed 42, so the fixed
+                          workload likely matches the measured seed -- but we do not read it
+                          to confirm per row, so this is still a fixed, not bit-exact, replay.
+                          The seed selects WHICH traces populate the lanes.
 
-    So the comparison is blis-vs-InferenceX on a FIXED agentic workload, not a bit-exact
-    per-row reproduction. The emitted corpus records this (AGENTIC_FIDELITY) so a reader does
-    not mistake it for the latter. A speculative run with no stated synthetic acceptance is
-    still refused -- that one IS a value we would otherwise have to invent.
+    So the comparison is blis-vs-InferenceX on a FIXED agentic workload (seed 42, 3600s),
+    not a bit-exact per-row reproduction (the seed/duration are not read from each row's job
+    log). The emitted corpus records this (AGENTIC_FIDELITY). A speculative run with no stated
+    synthetic acceptance is still refused -- that one IS a value we would otherwise invent.
     """
     refusals = []
-    args = ["--agentic-scenario", AGENTX_SCENARIO]
+    args = ["--agentic-scenario", AGENTX_SCENARIO,
+            "--benchmark-duration", f"{AGENTIC_DURATION_S}s"]
     conc = row.get("conc")
     if conc is None:
         refusals.append("row does not state concurrency")
@@ -181,22 +192,47 @@ def agentic_replay_args(row: dict, server: dict) -> tuple[list[str], list[str]]:
     return args, refusals
 
 
-def sweep_from_row(row: dict, max_context: int | None = None) -> dict:
+def _attention_dp_size(row: dict) -> int:
+    """The attention-DP width of a DP-attention decode deployment, from the row.
+
+    A DP-attention run shards attention over num_decode_gpu / decode_tp replicas (e.g.
+    32 GPUs / tp8 = dp4). Derived rather than guessed; falls back to 1 when the row does
+    not mark DP attention, and to 2 only if the fields are missing on a DP-attention row
+    (a conservative non-1 default rather than a silent 1)."""
+    if not row.get("decode_dp_attention"):
+        return 1
+    gpus = int(row.get("num_decode_gpu") or 0)
+    tp = int(row.get("decode_tp") or 0)
+    if gpus and tp and gpus % tp == 0 and gpus // tp > 1:
+        return gpus // tp
+    return 2
+
+
+def sweep_from_row(row: dict, server: dict | None = None,
+                   max_context: int | None = None) -> dict:
     """A gen_scenarios.emit()-shaped deployment dict from an agentic API row.
 
     Maps the row's slugs to catalog names and its parallelism the same way the direct
     extractor does, so the scenario describes the measured deployment. The caller must
     first check support_refusals(row) is empty; this assumes the model and chip are known.
+
+    `server` (parse_server_log output) supplies the speculative method and K. A speculative
+    row's scenario MUST carry a `speculative:` block: `blis replay` refuses
+    --speculative-acceptance-length when the scenario drafts no tokens
+    (cmd/speculative_acceptance.go:87). So the method + num_speculative_tokens are written
+    into stated_config, and gen_scenarios.emit() renders the block.
+
     `max_context` (from the job log's --max-context-length, if the run pinned one) sizes
     the scenario's max_model_len; absent, the 256k corpus default is used.
     """
+    server = server or {}
     ctx = int(max_context) if max_context else AGENTIC_CONTEXT_DEFAULT
     slug, gpu_raw = row.get("model"), row.get("hardware")
     model = AGENTIC_MODELS[slug]
     chip = AGENTIC_CHIPS[gpu_raw]
     tp = int(row.get("decode_tp") or 1)
     ep = int(row.get("decode_ep") or 1)
-    dp = 2 if row.get("decode_dp_attention") else 1
+    dp = _attention_dp_size(row)
     precision = row.get("precision") or "fp8"
     spec = row.get("spec_method") or "none"
     tag = f"tp{tp}"
@@ -207,6 +243,14 @@ def sweep_from_row(row: dict, max_context: int | None = None) -> dict:
     if spec != "none":
         tag += f"-{spec}"
     scenario = f"{model}-{chip}-{precision}-vllm-{tag}-agentx.yaml"
+    # The scenario must draft for the acceptance-length flag to apply. method comes from the
+    # server log's speculative_config (its vLLM name, e.g. dspark/mtp/eagle3 -- all priced by
+    # blis, sim/config.go:317); K from num_speculative_tokens. gpu_memory_utilization etc.
+    # are left to emit()'s defaults, as on the single-turn path.
+    stated: dict = {}
+    if spec != "none" and server.get("num_speculative_tokens"):
+        stated["speculative_method"] = server.get("speculative_method") or spec
+        stated["num_speculative_tokens"] = int(server["num_speculative_tokens"])
     return {
         "scenario": scenario,
         "model": model,
@@ -219,11 +263,7 @@ def sweep_from_row(row: dict, max_context: int | None = None) -> dict:
                         "attention_dp_size": dp,
                         "moe_ep_size": ep,
                         "moe_tp_size": 1 if ep > 1 else tp},
-        # The speculative config is NOT written into the scenario: the acceptance length
-        # is passed to `blis replay` as --speculative-acceptance-length (from the server
-        # log, via PR #19). An unpriced drafter the catalog graph does not describe would
-        # be refused by the kernel; emit() handles that and leaves it out.
-        "stated_config": {},
+        "stated_config": stated,
         # A parseable "<ctx>:0" pair so gen_scenarios.emit() sizes max_model_len to the
         # agentic context window (emit expects isl:osl; agentic has no fixed osl).
         "workload": f"{ctx}:0",
@@ -242,13 +282,32 @@ def measured_us(row: dict) -> tuple[float, float]:
 
 
 def predicted_us(metrics_json: dict) -> tuple[float, float]:
-    """(pred_ttft_us, pred_tpot_us) from a blis --metrics-path MetricsOutput. blis reports
-    MILLISECONDS (ttft_mean_ms, itl_mean_ms); TPOT is modelled by inter-token latency."""
+    """(pred_ttft_us, pred_tpot_us) from a blis --metrics-path MetricsOutput, in microseconds.
+
+    TPOT comes from `request_itl_mean_ms`, NOT `itl_mean_ms`. The two differ under
+    speculative decoding, which every agentic row here uses (DSpark):
+
+      itl_mean_ms          the per-DECODE-STEP interval. A step accepts AL tokens (AL ~ 3.8
+                           for DSpark), so this is ~AL times the per-token value.
+      request_itl_mean_ms  aiperf's ITL, (latency - TTFT) / (OSL - 1), per TOKEN
+                           (sim/metrics_measured.go:64-67, pinned by
+                           TestMetricsPath_DSparkRequestITLIsTheStepIntervalOverTheAccepted-
+                           Length). This is what InferenceX/aiperf reports as mean_tpot.
+
+    Reading itl_mean_ms would make predicted TPOT ~AL times too high and read as a BLIS
+    accuracy failure that is really a metric mismatch (PR #21 review, point 1). TTFT is
+    ttft_mean_ms, which the file already restates over the measured window.
+    """
     ttft_ms = metrics_json.get("ttft_mean_ms")
-    itl_ms = metrics_json.get("itl_mean_ms")
-    if ttft_ms is None or itl_ms is None:
-        raise SystemExit("blis metrics JSON missing ttft_mean_ms/itl_mean_ms")
-    return float(ttft_ms) * 1e3, float(itl_ms) * 1e3
+    # request_itl_mean_ms is the per-token metric; fall back to itl_mean_ms only if a
+    # (non-speculative) build did not emit it, so a missing key fails loud rather than
+    # silently reverting to the step interval.
+    tpot_ms = metrics_json.get("request_itl_mean_ms")
+    if ttft_ms is None or tpot_ms is None:
+        raise SystemExit("blis metrics JSON missing ttft_mean_ms/request_itl_mean_ms "
+                         "(need a --metrics-path file from a build that emits the "
+                         "aiperf-defined measured metrics)")
+    return float(ttft_ms) * 1e3, float(tpot_ms) * 1e3
 
 
 def csv_row(row: dict, sweep: dict, pred_ttft_us: float, pred_tpot_us: float) -> dict:
@@ -376,9 +435,11 @@ def main() -> int:
             print(f"  - {r}", file=sys.stderr)
         return 0
 
-    # Supported and replayable: build the deployment sweep + its facets corpus. If the run
-    # pinned --max-context-length (job log), size max_model_len to it; else the 256k default.
-    sweep = sweep_from_row(row, job.get("max_context_length"))
+    # Supported and replayable: build the deployment sweep + its facets corpus. `server`
+    # supplies the speculative method/K the scenario must draft with; if the run pinned
+    # --max-context-length (job log), size max_model_len to it, else the 256k default.
+    sweep = sweep_from_row(row, server=server,
+                           max_context=job.get("max_context_length"))
     corpus_doc = facets_corpus(sweep, row)
     (out / "agentic_corpus.json").write_text(json.dumps(corpus_doc, indent=2) + "\n")
 
