@@ -40,6 +40,14 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
   // Surface why shape is absent for this sweep, if the scorer recorded a reason — previously
   // shapeReason was carried on every point but never shown (PR #3 review UI-c).
   const shapeReason = sorted.find((p) => p.shapeReason)?.shapeReason ?? null
+  // Nothing picked yet: one quiet hint instead of an empty boxed panel on first view (#23).
+  if (sorted.length === 0 && !selMissing) {
+    return (
+      <p className="pts-hint">
+        Expand a model above and pick a deployment to see each measurement next to its prediction.
+      </p>
+    )
+  }
   return (
     <>
       <div className="tbl-title" style={{ marginTop: 26 }}>

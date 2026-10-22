@@ -9,10 +9,11 @@
  * rather than by slot is what keeps that meaning stable: with Δ = B − A, the default (A = latest)
  * showed a regression of the newer release in green.
  *
- * The single-run Overview, SummaryTable and PointsTable are untouched; this is a parallel view.
+ * Lives on the "For BLIS developers" tab (#23): release-over-release change is for contributors,
+ * not for a visitor asking "how accurate is BLIS?".
  */
-import { useMemo } from 'react'
-import { aggregate, flattenPoints, intersectByKey, type FlatPoint } from '../aggregate'
+import { useMemo, useState } from 'react'
+import { aggregate, flattenPoints, intersectByKey } from '../aggregate'
 import { buildRows, type RenderRow } from '../tree'
 import { formatSignedDelta, formatCount } from '../format'
 import { Term } from './Term'
@@ -82,8 +83,15 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
   }, [aShared, bShared, effectiveTier])
 
   // Build both trees over the SAME shared point set → identical structure/ids, so we can zip by id.
-  // Everything is expanded so the full drill-down of what changed is visible at once.
-  const expanded = useMemo(() => allNodeIds(aShared), [aShared])
+  // Models start collapsed (#23): the verdict above answers "did it change?", and a reader opens
+  // only the model they care about instead of scrolling past every deployment.
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+  const onToggle = (id: string) => {
+    const next = new Set(expanded)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setExpanded(next)
+  }
   const aRows = useMemo(() => buildRows(aShared, expanded), [aShared, expanded])
   const bRows = useMemo(() => buildRows(bShared, expanded), [bShared, expanded])
   const bById = useMemo(() => new Map(bRows.map((r) => [r.id, r])), [bRows])
@@ -98,8 +106,8 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
   const idB = b.snapshot_id
   const blisA = a.provenance?.blis?.release ?? '?'
   const blisB = b.provenance?.blis?.release ?? '?'
-  // Which rail slot each run was picked in, so the header's tags match the rail's A/B tags even
-  // though the Δ is ordered by date rather than by slot.
+  // Which picker slot each run was chosen in, so the header's tags match the pickers' A/B tags
+  // even though the Δ is ordered by date rather than by slot.
   const slotOfA = a === slotA ? 'A' : 'B'
   const slotOfB = slotOfA === 'A' ? 'B' : 'A'
   const SlotTag = ({ slot }: { slot: 'A' | 'B' }) => (
@@ -108,86 +116,69 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
 
   return (
     <>
-      <h2 className="viewhead">
-        Compare runs — <Term name="diff">Δ accuracy (newer − older)</Term>
-      </h2>
       <div className="cmp-head">
         <div className="cmp-run">
-          <SlotTag slot={slotOfA} /> <span className="cmp-age">older</span> <b>{idA.slice(0, 10)}</b> · {blisA}
+          <SlotTag slot={slotOfA} /> <span className="cmp-age">older</span> <b>{blisA}</b> · {idA.slice(0, 10)}
         </div>
         <div className="cmp-arrow">→</div>
         <div className="cmp-run">
-          <SlotTag slot={slotOfB} /> <span className="cmp-age">newer</span> <b>{idB.slice(0, 10)}</b> · {blisB}
-        </div>
-        <div className="cmp-note">
-          Δ = newer − older on each error metric over the <b>{formatCount(shared)}</b> points scored by
-          both runs. <span className="d-better">green</span> = the newer run is more accurate (lower
-          error) · <span className="d-worse">red</span> = the newer run regressed. Runs are ordered by
-          date, so swapping them in the rail doesn't change the meaning.
-          {(onlyA > 0 || onlyB > 0) && (
-            <span className="cmp-cov">
-              {' '}
-              (coverage: {formatCount(onlyA)} only in the older run, {formatCount(onlyB)} only in the newer — excluded)
-            </span>
-          )}
-          {tierFellBack && <span className="cmp-cov"> · no measured·resolved points — showing the all tier</span>}
+          <SlotTag slot={slotOfB} /> <span className="cmp-age">newer</span> <b>{blisB}</b> · {idB.slice(0, 10)}
         </div>
       </div>
 
       {shared === 0 ? (
-        <div className="pts-empty">These two runs share no scored points — nothing to compare.</div>
+        <div className="pts-empty">These two runs share no scored measurements, so there is nothing to compare.</div>
       ) : (
         <>
-        <div className="cmp-overall" role="group" aria-label="Overall delta across all shared points">
-          <div className="cmp-overall-title">
-            Overall Δ <span className="cmp-overall-sub">· point-weighted over all {formatCount(shared)} shared points</span>
-          </div>
+        <div className="cmp-overall" role="group" aria-label="Overall change across all shared measurements">
           <div className="cmp-overall-grid">
-            <div className="cmp-overall-cell">
-              <span className="cmp-overall-lbl">Δ TTFT mape</span>
-              <DeltaCell v={overall.mapeTtft} />
-            </div>
-            <div className="cmp-overall-cell">
-              <span className="cmp-overall-lbl">Δ TTFT shape</span>
-              <DeltaCell v={overall.shapeTtft} />
-            </div>
-            <div className="cmp-overall-cell">
-              <span className="cmp-overall-lbl">Δ TPOT mape</span>
-              <DeltaCell v={overall.mapeTpot} />
-            </div>
-            <div className="cmp-overall-cell">
-              <span className="cmp-overall-lbl">Δ TPOT shape</span>
-              <DeltaCell v={overall.shapeTpot} />
-            </div>
+            <Verdict label="Time to first token" err={overall.mapeTtft} trend={overall.shapeTtft} />
+            <Verdict label="Time per output token" err={overall.mapeTpot} trend={overall.shapeTpot} />
           </div>
+          <p className="cmp-overall-sub">
+            Change in average error, newer minus older, over the {formatCount(shared)} measurements
+            scored by both runs. Lower error is better.
+            {(onlyA > 0 || onlyB > 0) && (
+              <> {formatCount(onlyA + onlyB)} measurements only one run scored are left out.</>
+            )}
+            {tierFellBack && <> Showing all measurements (none are measured·resolved yet).</>}
+          </p>
         </div>
+        <h2 className="sectitle">By model</h2>
         <div className="tscroll">
           <table className="readout cmp">
             <thead>
               <tr className="grp">
                 <th rowSpan={2} style={{ verticalAlign: 'bottom' }}>
-                  Model / workload / GPU / topology
+                  Model
                 </th>
                 <th className="sep" colSpan={2}>
-                  Δ mean TTFT
+                  Time to first token
                 </th>
                 <th className="sep" colSpan={2}>
-                  Δ mean TPOT
+                  Time per output token
                 </th>
               </tr>
               <tr className="col">
-                <th className="sep">mape</th>
-                <th>shape</th>
-                <th className="sep">mape</th>
-                <th>shape</th>
+                <th className="sep"><Term name="mape" /></th>
+                <th><Term name="shape" /></th>
+                <th className="sep"><Term name="mape" /></th>
+                <th><Term name="shape" /></th>
               </tr>
             </thead>
             <tbody>
               {aRows.map((row) => {
                 const bRow = bById.get(row.id)
+                const canExpand = row.level !== 'topology'
+                const caret = canExpand && expanded.has(row.id) ? '▾' : '▸'
                 return (
-                  <tr key={row.id} className={`r${row.depth}`}>
+                  <tr
+                    key={row.id}
+                    className={`r${row.depth}${canExpand ? ' selrow' : ''}`}
+                    onClick={canExpand ? () => onToggle(row.id) : undefined}
+                  >
                     <td className="name" style={{ paddingLeft: row.depth > 0 ? row.depth * 18 + 10 : undefined }}>
+                      {canExpand && <span className="caret clk">{caret}</span>}
                       {row.level === 'model' ? <b className="name">{row.label}</b> : row.label}
                       {row.facet && <span className="facet">{row.facet}</span>}
                     </td>
@@ -209,27 +200,29 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
             </tbody>
           </table>
         </div>
+        <div className="gate-legend">
+          Percentage points, newer minus older. <span className="d-better">Green</span> = the newer run is
+          more accurate, <span className="d-worse">red</span> = less accurate. Click a model to break it down.
+        </div>
         </>
       )}
-      <div className="gate-legend">
-        Δ in percentage points. A point counts only if BOTH runs scored it; coverage-only points are
-        excluded from every Δ. The overall Δ is point-weighted over all shared points, so it need not
-        equal the average of the per-model rows. Pick a different second run (or "none") in the rail.
-      </div>
     </>
   )
 }
 
-/** Every node id the drill-down would produce for a point set — so the compare tree is fully open. */
-function allNodeIds(points: FlatPoint[]): Set<string> {
-  const ids = new Set<string>()
-  for (const p of points) {
-    const m = `m:${p.model}`
-    const w = `${m}|w:${p.workloadLabel}`
-    const g = `${w}|g:${p.gpu}`
-    ids.add(m)
-    ids.add(w)
-    ids.add(g)
-  }
-  return ids
+/** The verdict for one metric, in words: how much the average error moved, and which way (#23). */
+function Verdict({ label, err, trend }: { label: string; err: number | null; trend: number | null }) {
+  const word = err == null || err === 0 ? 'no change' : err < 0 ? 'better' : 'worse'
+  return (
+    <div className="cmp-overall-cell">
+      <span className="cmp-overall-lbl">{label}</span>
+      <span>
+        <DeltaCell v={err} /> <span className="cmp-unit">points</span>{' '}
+        <span className={`cmp-word ${err == null || err === 0 ? 'd-zero' : err < 0 ? 'd-better' : 'd-worse'}`}>{word}</span>
+      </span>
+      <span className="cmp-trend">
+        trend error <DeltaCell v={trend} />
+      </span>
+    </div>
+  )
 }

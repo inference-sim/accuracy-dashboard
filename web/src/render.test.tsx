@@ -61,10 +61,19 @@ describe('App renders the real CI-shaped snapshot', () => {
     expect(errors.join('\n')).toBe('') // no "two children with the same key" warning
   })
 
-  it('shows the headline totals row and the title', () => {
-    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} />)
-    expect(html).toContain('ALL MODELS')
-    expect(html).toContain('How accurate is BLIS?')
+  it('leads with the title and the two headline numbers, computed from every visible point (#23)', () => {
+    const summary = loadFixture()
+    const html = renderToStaticMarkup(<App summary={summary} loadError={null} />)
+    expect(html).toContain('BLIS Accuracy')
+    // The headline cards carry the overall TTFT and TPOT error, over the tier actually shown.
+    const t = aggregatePair(flattenPoints(summary)).all.mape
+    const pct = (v: number) => `${v.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+    const stats = html.slice(html.indexOf('class="stats"'), html.indexOf('class="context"'))
+    expect(stats).toContain(pct(t.ttft!))
+    expect(stats).toContain(pct(t.tpot!))
+    expect(html).toContain('lower is better')
+    // ...and it appears once, as the headline, not again as a table row.
+    expect(html).not.toContain('ALL MODELS')
   })
 
   it('renders every model when the populated tier is viewed (via deep-link)', () => {
@@ -99,7 +108,8 @@ describe('App renders the real CI-shaped snapshot', () => {
     for (const internal of ['blis replay', 'BLIS vs InferenceX', 'disabled in v0.1.0', ' wl ·', ' topo<']) {
       expect(html).not.toContain(internal)
     }
-    expect(html).toMatch(/\d+ GPUs? · \d+ workloads? · \d+ deployments?/)
+    // model rows carry no facet: the expanded rows already show GPUs and workloads
+    expect(html).not.toMatch(/\d+ GPUs? · \d+ workloads? · \d+ deployments?/)
   })
 
   it('a deep-linked selected topology populates the points table with measured vs predicted', () => {
@@ -129,7 +139,7 @@ describe('App renders the real CI-shaped snapshot', () => {
 
   it('shows the future-metrics note and run-wide counts', () => {
     const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} />)
-    expect(html).toContain('E2E, tail-latency and throughput accuracy are planned for a future release')
+    expect(html).toContain('tail-latency and throughput accuracy are planned for a future release')
     expect(html).toContain('points scored')
     expect(html).toContain('not scored')
     expect(html).toContain('multi-node')
@@ -151,7 +161,7 @@ describe('App renders the real CI-shaped snapshot', () => {
         { snapshot_id: 'a', generated_at: null, blis_release: 'v0.10.0', ix_release: 'db-dump/2026-09-21', path: 'snapshots/a/summary.json' },
       ],
     }
-    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={index} />)
+    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={index} initialHash="#/?view=dev" />)
     expect(html).toContain('Nightly run')
     expect(html).toContain('does not re-run')
     // the picker is the styled dropdown (native <select> replaced per jgchn review); it shows the
@@ -161,8 +171,13 @@ describe('App renders the real CI-shaped snapshot', () => {
     expect(html).not.toContain('aria-label="Select the nightly run (A)" disabled')
   })
 
+  it('keeps the run-picker off the visitor Overview, even with an index (#23)', () => {
+    const index = { schema_version: 1 as const, latest: 'a', retention_days: 30, runs: [{ snapshot_id: 'a', generated_at: null, blis_release: 'v0.10.0', ix_release: 'db-dump/2026-09-28', path: 'snapshots/a/summary.json' }] }
+    expect(renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={index} />)).not.toContain('Nightly run')
+  })
+
   it('omits the run-picker entirely when there is no index', () => {
-    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={null} />)
+    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={null} initialHash="#/?view=dev" />)
     expect(html).not.toContain('Nightly run')
   })
 
@@ -173,7 +188,7 @@ describe('App renders the real CI-shaped snapshot', () => {
       retention_days: 30,
       runs: [{ snapshot_id: 'a', generated_at: null, blis_release: 'v0.10.0', ix_release: 'db-dump/2026-09-28', path: 'snapshots/a/summary.json' }],
     }
-    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={index} />)
+    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={index} initialHash="#/?view=dev" />)
     expect(html).toContain('Nightly run') // picker shown as provenance
     expect(html).toContain('disabled') // but not interactive with only one run
     expect(html).not.toContain('does not re-run') // note only when there are older runs

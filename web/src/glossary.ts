@@ -13,14 +13,14 @@ export interface GlossaryEntry {
 
 export const GLOSSARY: Record<string, GlossaryEntry> = {
   mape: {
-    label: 'mape',
+    label: 'error',
     definition:
-      'Mean absolute percentage error: on average, how far BLIS’s predicted latency is from the measured one. Measured 100 ms, predicted 120 ms → 20%. Lower is better.',
+      'Average error (mean absolute percentage error, MAPE): on average, how far BLIS’s predicted latency is from the measured one. Measured 100 ms, predicted 120 ms → 20%. Lower is better.',
   },
   shape: {
-    label: 'shape',
+    label: 'trend',
     definition:
-      'Does BLIS get the trend right as load grows? Compares how latency rises with concurrency, ignoring a constant offset. If BLIS is always 20% high, shape error is 0. Lower is better.',
+      'Trend error (shape): does BLIS get the trend right as load grows? Compares how latency rises with concurrency, ignoring a constant offset. If BLIS is always 20% high, trend error is 0. Lower is better.',
   },
   ttft: {
     label: 'TTFT',

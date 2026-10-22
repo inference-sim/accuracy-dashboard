@@ -1,6 +1,7 @@
 /**
  * Table 1 — the summary drill-down (model → workload → GPU → topology), as the approved
- * mockup lays it out. A totals/headline row sits above the models. Columns are mean TTFT/TPOT:
+ * mockup lays it out. The overall numbers are the Headline cards above the table (#23), so the
+ * table starts at the models. Columns are mean TTFT/TPOT:
  * MAPE & shape, one value per cell (no delta — the A-vs-B Δ is a separate Compare view). Selecting a topology row
  * populates the points table (handled by the parent). Numbers are recomputed client-side from
  * the visible points, so a filter never shows a stale aggregate (RFC B3).
@@ -12,8 +13,6 @@ import type { SortKey, SortSpec } from '../sort'
 import type { MetricBlockPair, TierKey } from '../types'
 
 interface Props {
-  totals: MetricBlockPair
-  totalsPointCount: number
   rows: RenderRow[]
   tier: TierKey
   sort: SortSpec | null
@@ -54,9 +53,8 @@ function HeaderButton({
 }
 
 export function SummaryTable(props: Props) {
-  const { totals, totalsPointCount, rows, tier, sort, onSort, selectedId } = props
+  const { rows, tier, sort, onSort, selectedId } = props
   const tb = (b: MetricBlockPair) => b[tier]
-  const t = tb(totals)
 
   return (
     <div className="tscroll">
@@ -64,13 +62,13 @@ export function SummaryTable(props: Props) {
         <thead>
           <tr className="grp">
             <th rowSpan={2} style={{ verticalAlign: 'bottom' }}>
-              Model / workload / GPU / topology
+              Model
             </th>
             <th className="sep" colSpan={2}>
-              mean <Term name="ttft" />
+              Time to first token
             </th>
             <th className="sep" colSpan={2}>
-              mean <Term name="tpot" />
+              Time per output token
             </th>
           </tr>
           <tr className="col">
@@ -78,44 +76,24 @@ export function SummaryTable(props: Props) {
                 so the term affordance is a sibling info marker (<Term> as a superscript ⓘ) next to
                 the sort button, not wrapping its label. */}
             <th className="sep">
-              <HeaderButton label="mape" k="ttft_mape" sort={sort} onSort={onSort} />
+              <HeaderButton label="error" k="ttft_mape" sort={sort} onSort={onSort} />
               <Term name="mape"><sup className="term-info" aria-label="what is mape">ⓘ</sup></Term>
             </th>
             <th>
-              <HeaderButton label="shape" k="ttft_shape" sort={sort} onSort={onSort} />
+              <HeaderButton label="trend" k="ttft_shape" sort={sort} onSort={onSort} />
               <Term name="shape"><sup className="term-info" aria-label="what is shape">ⓘ</sup></Term>
             </th>
             <th className="sep">
-              <HeaderButton label="mape" k="tpot_mape" sort={sort} onSort={onSort} />
+              <HeaderButton label="error" k="tpot_mape" sort={sort} onSort={onSort} />
               <Term name="mape"><sup className="term-info" aria-label="what is mape">ⓘ</sup></Term>
             </th>
             <th>
-              <HeaderButton label="shape" k="tpot_shape" sort={sort} onSort={onSort} />
+              <HeaderButton label="trend" k="tpot_shape" sort={sort} onSort={onSort} />
               <Term name="shape"><sup className="term-info" aria-label="what is shape">ⓘ</sup></Term>
             </th>
           </tr>
         </thead>
         <tbody>
-          {/* totals / headline row */}
-          <tr className="r0 totals">
-            <td className="name">
-              <b>ALL MODELS</b>
-              <span className="facet">headline · {totalsPointCount} pts</span>
-            </td>
-            <td className="sep">
-              <Num v={t.mape.ttft} />
-            </td>
-            <td>
-              <Num v={t.shape.ttft} />
-            </td>
-            <td className="sep">
-              <Num v={t.mape.tpot} />
-            </td>
-            <td>
-              <Num v={t.shape.tpot} />
-            </td>
-          </tr>
-
           {rows.map((row) => {
             const b = tb(row.metrics)
             const isSelected = row.level === 'topology' && selectedId === row.id

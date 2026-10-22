@@ -24,6 +24,9 @@ import type { TierKey } from './types'
 export type VllmFilter = 'all' | { version: string }
 
 export interface RouteState {
+  /** Which audience's page: "overview" (outside visitors, the latest run) or "dev" (BLIS
+   *  developers: pick and compare runs). #23 */
+  view: 'overview' | 'dev'
   /** snapshot_id of the run being viewed, or null for the latest. */
   run: string | null
   /** snapshot_id of the second run to compare against (A-vs-B); null = single-run mode. */
@@ -35,6 +38,7 @@ export interface RouteState {
 }
 
 export const DEFAULT_ROUTE: RouteState = {
+  view: 'overview',
   run: null,
   runB: null,
   sel: null,
@@ -63,7 +67,11 @@ export function parseRoute(hash: string): RouteState {
   const sel = p.get('sel')
   const run = p.get('run')
   const runB = p.get('runB')
+  // A link from before the developer tab existed that names a second run still opens the
+  // comparison, so old shared links keep working.
+  const view = p.get('view') === 'dev' || (runB && runB !== '') ? 'dev' : 'overview'
   return {
+    view,
     run: run && run !== '' ? run : null,
     runB: runB && runB !== '' ? runB : null,
     sel: sel && sel !== '' ? sel : null,
@@ -75,6 +83,7 @@ export function parseRoute(hash: string): RouteState {
 
 export function routeToHash(state: RouteState): string {
   const p = new URLSearchParams()
+  if (state.view === 'dev') p.set('view', 'dev')
   if (state.run) p.set('run', state.run)
   if (state.runB) p.set('runB', state.runB)
   if (state.sel) p.set('sel', state.sel)

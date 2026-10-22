@@ -13,7 +13,7 @@ describe('Term (accessible tooltip trigger)', () => {
     const html = renderToStaticMarkup(<Term name="mape" />)
     expect(html).toContain('class="term"')
     expect(html).toContain('tabindex="0"') // keyboard-focusable (not a bare title=)
-    expect(html).toContain('mape') // the visible label
+    expect(html).toContain('>error<') // the visible label, in plain words (#23)
   })
 
   it('renders custom children (e.g. the ⓘ info marker) instead of the label', () => {
