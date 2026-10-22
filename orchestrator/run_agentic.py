@@ -168,8 +168,10 @@ def agentic_replay_args(row: dict, server: dict) -> tuple[list[str], list[str]]:
 
     So the comparison is blis-vs-InferenceX on a FIXED agentic workload (seed 42, 3600s),
     not a bit-exact per-row reproduction (the seed/duration are not read from each row's job
-    log). The emitted corpus records this (AGENTIC_FIDELITY). A speculative run with no stated
-    synthetic acceptance is still refused -- that one IS a value we would otherwise invent.
+    log). The emitted corpus records this (AGENTIC_FIDELITY). Two speculation cases are
+    REFUSED rather than guessed: a run with no stated synthetic acceptance (its acceptance
+    would be invented), and a row the API marks speculative whose server log states no
+    speculative_config at all (it would otherwise be priced as plain decoding).
     """
     refusals = []
     args = ["--agentic-scenario", AGENTX_SCENARIO,
@@ -179,6 +181,16 @@ def agentic_replay_args(row: dict, server: dict) -> tuple[list[str], list[str]]:
         refusals.append("row does not state concurrency")
     else:
         args += ["--concurrency", str(int(conc))]
+    # A row the API marks speculative whose server log does NOT state a speculative_config
+    # must be refused, not scored. Most agentic server logs have no `non-default args` line
+    # (3 of 5 models sampled), so `server` is empty for them. Without this check the row is
+    # priced as PLAIN decoding -- a drafting deployment scored with no draft -- and the
+    # resulting error is reported as BLIS's, when it is really a dropped speculation setting
+    # (PR #21 review; #24 (c)). This is a WRONG number, worse than a missing one.
+    row_spec = (row.get("spec_method") or "none")
+    if row_spec != "none" and "speculative_method" not in server:
+        refusals.append(f"row is speculative (spec_method={row_spec!r}) but its server log "
+                        f"states no speculative_config: it would be priced as plain decoding")
     if "speculative_method" in server:
         if server.get("rejection_sample_method") != "synthetic":
             refusals.append("speculative run without a synthetic acceptance setting: "

@@ -121,6 +121,20 @@ def test_pure_functions():
     _, ref3 = ra.agentic_replay_args({k: v for k, v in ROW.items() if k != "conc"}, {})
     ck("a row with no concurrency is refused", any("concurrency" in x for x in ref3), str(ref3))
 
+    # The silent-speculation case (PR #21 re-review, #24c): the API row says spec_method=mtp
+    # but the server log states no speculative_config (empty server dict -- most agentic logs
+    # have no args line). Scoring it would price a drafting deployment as PLAIN decoding, so
+    # it must be REFUSED, not scored. A wrong number is worse than a missing one.
+    _, ref4 = ra.agentic_replay_args(dict(ROW, spec_method="mtp"), {})
+    ck("a speculative row whose server log has no speculative_config is refused",
+       any("priced as plain decoding" in x for x in ref4), str(ref4))
+    ck("the refusal names the row's spec_method",
+       any("mtp" in x for x in ref4), str(ref4))
+    # A NON-speculative row with an empty server log is fine (no speculation to lose).
+    _, ref5 = ra.agentic_replay_args(dict(ROW, spec_method="none"), {})
+    ck("a non-speculative row with an empty server log is not refused for speculation",
+       not any("plain decoding" in x for x in ref5), str(ref5))
+
     # Point 4: DP-attention width is derived from the row (num_decode_gpu / decode_tp),
     # not hard-coded to 2. A 32-GPU tp8 DP-attention row is dp4.
     dp_row = dict(ROW, decode_dp_attention=True, num_decode_gpu=32, decode_tp=8, decode_ep=32)
