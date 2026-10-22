@@ -34,6 +34,14 @@ jobs:
         run: python3 orchestrator/test_extract_agentic_replay_args.py
       - name: Single-turn bench settings read from a row's CI log, checked against the harness
         run: python3 orchestrator/test_extract_single_turn_bench_args.py
+      - name: Direct corpus shared args-line parser + catalog maps
+        run: python3 orchestrator/test_direct_corpus_common.py
+      - name: Scenario generator engine settings (relocated gen_scenarios.py)
+        run: python3 orchestrator/test_gen_scenarios.py
+      - name: Direct corpus carries no baseline-prediction keys (output-neutral drop)
+        run: python3 orchestrator/test_gen_direct_corpus.py
+      - name: Agentic scoring driver (row -> replay args -> CSV; refusals not scored)
+        run: python3 orchestrator/test_run_agentic.py
       - name: Schema validates the committed render fixture (RFC C3)
         run: python3 orchestrator/validate_summary.py --schema schemas/summary.v1.json web/testdata/render-fixture.summary.json
 

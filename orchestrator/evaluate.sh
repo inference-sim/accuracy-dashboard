@@ -3,8 +3,12 @@
 # at the resolved BLIS tag; derive catalog/registry; ingest the InferenceX dump via the DIRECT
 # extractor (vLLM-filtered); run signedprobe per point; shape the CSV into summary.json.
 #
-# This repo is glue only (RFC A4): it orchestrates upstream tools and shapes their output. No
-# scoring logic, no copied extractors, no log parsing lives here.
+# The dashboard OWNS the Python it runs (issue #20): the direct extractor, the three gen_direct_*
+# generators and the scenario generator live in orchestrator/ and are invoked from there, not
+# cloned from blis-latency-kernel each run. What is still built FROM the inference-sim source under
+# test is only what is being MEASURED — blis, signedprobe and metricscore. The kernel version is
+# still derived (resolve_versions.sh, from go.mod) and recorded in provenance, but no longer cloned.
+# No scoring logic lives here: signedprobe + build_summary do the scoring; this script is the glue.
 #
 # Ingest fits a GitHub-hosted runner via STREAMING SELECTIVE RESTORE (orchestrator/stream_restore.sh):
 # the ~31 GB compressed dump streams straight from the GitHub release through `zstd -d` into
@@ -67,12 +71,10 @@ git clone -q --depth 1 --branch "$catalog"  https://github.com/inference-sim/bli
 git clone -q --depth 1 --branch "$registry" https://github.com/inference-sim/blis-registry.git "$REG"
 
 # ---------------------------------------------------------------- 2. ingest (DIRECT path only)
-# Clone the kernel at the go.mod-pinned tag; its scripts are the extractors (not copied here).
-log "cloning blis-latency-kernel @ ${kernel} for the direct extractor"
-KER="$WORK/blis-latency-kernel"
-rm -rf "$KER"
-git clone -q --depth 1 --branch "$kernel" https://github.com/inference-sim/blis-latency-kernel.git "$KER"
-
+# The direct extractor + generators are dashboard-owned (orchestrator/, issue #20): no kernel
+# clone. The kernel tag is still DERIVED (resolve_versions.sh, from go.mod) and recorded in
+# provenance below, since it is what the registry coefficients were fitted against — but the
+# scripts that read the dump now live here and are run from $DASH_DIR/orchestrator.
 CORPUS="$WORK/inferencex_direct_corpus.json"
 ABS="$WORK/inferencex_direct_absolutes.json"
 SETTINGS="$WORK/inferencex_direct_settings.json"
@@ -86,9 +88,9 @@ log "streaming selective restore of ${IX_TAG} into Postgres (3 tables, no dump o
 bash "$DASH_DIR/orchestrator/stream_restore.sh"
 
 log "running the direct extractor (vLLM-filtered in SQL) + scenario generation"
-# The extractors run at the kernel tag; the corpus is restricted to framework=vllm by the
-# direct extractor's own SQL (RFC §4.6). signedprobe has no -framework flag.
-python3 "$KER/scripts/extract_inferencex_direct.py"          --out "$WORK/inferencex_direct.raw.json"
+# The extractor is dashboard-owned (orchestrator/); the corpus is restricted to framework=vllm by
+# the direct extractor's own SQL (RFC §4.6). signedprobe has no -framework flag.
+python3 "$DASH_DIR/orchestrator/extract_inferencex_direct.py" --out "$WORK/inferencex_direct.raw.json"
 
 # Filter the direct corpus to the vLLM versions worth scoring BEFORE the gen_direct_* scripts read
 # it (RFC discussion #2, point 2 — replaces the on-target-v0.31.0 rule). Two reductions, both at the
@@ -105,22 +107,17 @@ python3 "$DASH_DIR/orchestrator/filter_latest_vllm.py" \
 # chains (PR #3 review point 1): a fallback to a different extractor either silently changes where
 # the data comes from, or (for absolutes) can't even run — and both hide the real error. Under
 # `set -e` a generation failure now fails the whole run, loud, as RFC §4.6 requires.
-python3 "$KER/scripts/gen_direct_corpus.py"          -c "$WORK/inferencex_direct.json" -o "$CORPUS"
-python3 "$KER/scripts/gen_direct_absolutes.py"       -c "$WORK/inferencex_direct.json" -o "$ABS"
-python3 "$KER/scripts/gen_direct_engine_settings.py" -c "$WORK/inferencex_direct.json" -o "$SETTINGS"
+python3 "$DASH_DIR/orchestrator/gen_direct_corpus.py"          -c "$WORK/inferencex_direct.json" -o "$CORPUS"
+python3 "$DASH_DIR/orchestrator/gen_direct_absolutes.py"       -c "$WORK/inferencex_direct.json" -o "$ABS"
+python3 "$DASH_DIR/orchestrator/gen_direct_engine_settings.py" -c "$WORK/inferencex_direct.json" -o "$SETTINGS"
 
 # Scenario files the direct corpus references are generated in-pipeline from the current dump
-# (RFC §4.6). The generator is discovered by glob (so this repo names no third-party baseline, RFC
-# C1) and MUST exist and succeed — NO `|| true`, and crucially NO `cp -n` of the kernel's frozen
-# testdata scenarios: that fallback would silently score a new dump against 591 stale committed
-# scenarios (PR #3 review point 1). It is run as-is from the pinned kernel checkout, not vendored.
-gen_scen=$(ls "$KER"/scripts/gen_*scenario*.py 2>/dev/null | head -1 || true)
-if [[ -z "$gen_scen" ]]; then
-  log "FATAL: no gen_*scenario*.py in the pinned kernel checkout ($KER/scripts) — cannot generate scenarios"
-  exit 5
-fi
-# The generator takes the corpus positionally; it has no -c form at the pinned tag.
-python3 "$gen_scen" "$CORPUS" -o "$SCENARIOS"
+# (RFC §4.6). The generator is dashboard-owned (orchestrator/gen_scenarios.py) and called by name
+# — no glob (there is exactly one, here), and crucially NO `cp -n` of frozen testdata scenarios:
+# that fallback would silently score a new dump against stale committed scenarios (PR #3 review
+# point 1). It MUST succeed (no `|| true`); under `set -e` a failure fails the whole run.
+# The generator takes the corpus positionally and writes into -o.
+python3 "$DASH_DIR/orchestrator/gen_scenarios.py" "$CORPUS" -o "$SCENARIOS"
 nscen=$(ls "$SCENARIOS"/*.yaml 2>/dev/null | wc -l | tr -d ' ')
 log "generated ${nscen} scenario file(s) from the current dump"
 if [[ "$nscen" -eq 0 ]]; then
