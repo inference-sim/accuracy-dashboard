@@ -206,22 +206,50 @@ describe('client-side aggregation keeps filters honest (RFC B3)', () => {
     expect(pinned.every((p) => p.engineVersion === version)).toBe(true)
   })
 
-  it('a version filter changes the RENDERED headline number (not just subset size) — T-b', () => {
+  it('a version filter changes the TABLE but never the headline (PR #26 review) — T-b', () => {
+    // The headline answers "how accurate is BLIS?" for the full latest run, so a filter must not
+    // move it; the per-model table below is what the filter acts on.
     const summary = loadFixture()
     const all = flattenPoints(summary)
-    // pick a version that is NOT the only one, so filtering genuinely changes the mean
-    const versions = [...new Set(all.map((p) => p.engineVersion).filter(Boolean))]
-    const version = versions.find((v) => all.filter((p) => p.engineVersion === v).length < all.length)!
-    // hand-compute the expected all-tier TTFT MAPE over just that version's points
-    const pinnedPts = all.filter((p) => p.engineVersion === version)
-    const errs = pinnedPts.map((p) => p.errTtft).filter((e): e is number => e != null)
-    const expected = errs.reduce((a, e) => a + Math.abs(e), 0) / errs.length
-    // render App with that version pinned + the all tier, and read the headline TTFT mape cell
+    // A version only ONE model carries, so the filtered table has a single model row whose mean we
+    // can check by hand. Found from the data rather than hard-coded, and asserted to exist.
+    const versions = [...new Set(all.map((p) => p.engineVersion).filter((v): v is string => !!v))]
+    const version = versions.find((v) => new Set(all.filter((p) => p.engineVersion === v).map((p) => p.model)).size === 1)
+    expect(version).toBeDefined()
+    const stats = (html: string) => html.slice(html.indexOf('class="stats"'), html.indexOf('class="context"'))
+    const table = (html: string) => html.slice(html.indexOf('<tbody'), html.indexOf('</tbody>'))
+    const base = renderToStaticMarkup(<App summary={summary} loadError={null} initialHash="#/?tier=all" />)
     const hash = `#/?tier=all&vllm=${encodeURIComponent('v:' + version)}`
-    const html = renderToStaticMarkup(<App summary={summary} loadError={null} initialHash={hash} />)
-    // the totals row renders mape as e.g. "32.9%"; assert the hand-computed mean appears
-    const want = `${expected.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
-    expect(html).toContain(want)
+    const pinned = renderToStaticMarkup(<App summary={summary} loadError={null} initialHash={hash} />)
+    expect(stats(pinned)).toBe(stats(base))
+    expect(table(pinned)).not.toBe(table(base))
+    // ...and the table shows the hand-computed mean over just that version's points.
+    const errs = all.filter((p) => p.engineVersion === version).map((p) => p.errTtft).filter((e): e is number => e != null)
+    const expected = errs.reduce((acc, e) => acc + Math.abs(e), 0) / errs.length
+    const pct = (v: number) => `${v.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+    expect(table(pinned)).toContain(pct(expected))
+  })
+
+  it('shows the error direction with an arrow, not a good/bad colour (PR #26 review)', () => {
+    const summary = loadFixture()
+    const mm = summary.matrix[0]!, w = mm.rows[0]!, g = w.rows[0]!, t = g.rows[0]!
+    const sweepKey = `${mm.model}|${w.label}|${g.label}|${t.label}`
+    const html = renderToStaticMarkup(
+      <App summary={summary} loadError={null} initialHash={`#/?sel=${encodeURIComponent(sweepKey)}&tier=all`} />,
+    )
+    const pts = html.slice(html.indexOf('readout pts'))
+    expect(pts).not.toMatch(/err-(pos|neg)/)
+    expect(pts).toMatch(/err-dir[^>]*>[▲▼]</)
+    expect(pts).toContain('BLIS predicted higher than measured')
+  })
+
+  it('links each provenance identifier to its source (PR #26 review)', () => {
+    const summary = loadFixture()
+    const html = renderToStaticMarkup(<App summary={summary} loadError={null} />)
+    const b = summary.provenance!.blis!
+    expect(html).toContain(`href="https://github.com/inference-sim/inference-sim/releases/tag/${b.release}"`)
+    expect(html).toContain(`href="https://github.com/inference-sim/inference-sim/commit/${b.commit_sha}"`)
+    expect(html).toContain(`href="${summary.provenance!.ground_truth!.source_url}"`)
   })
 
   it('totals recompute from visible points (not the stored node metrics)', () => {

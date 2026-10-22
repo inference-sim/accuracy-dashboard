@@ -22,10 +22,16 @@ const MS_DIGITS = 2
 function Cell({ v, kind }: { v: number | null; kind: 'ms' | 'err' }) {
   const text = kind === 'ms' ? formatMs(v, MS_DIGITS) : formatSignedPct(v)
   if (kind === 'err') {
-    // Colour the error by sign so over- vs under-prediction reads at a glance: positive =
-    // BLIS predicted high (red), negative = predicted low (green). A null/zero stays neutral.
-    const sign = v == null ? 'zero' : v > 0 ? 'pos' : v < 0 ? 'neg' : 'zero'
-    return <span className={`num err-${sign}`}>{text}</span>
+    // The sign is a DIRECTION, not a judgement: predicting 15% low is as far off as 15% high, so
+    // both share one neutral colour and an arrow says which way (PR #26 review). Green/red stays
+    // only in the compare view, where lower error than the other run really is better.
+    const dir = v == null || v === 0 ? null : v > 0 ? 'over' : 'under'
+    return (
+      <span className="num err" title={dir ? `BLIS predicted ${dir === 'over' ? 'higher' : 'lower'} than measured` : undefined}>
+        {dir && <span className="err-dir" aria-hidden="true">{dir === 'over' ? '▲' : '▼'}</span>}
+        {text}
+      </span>
+    )
   }
   return <>{text}</>
 }
@@ -127,6 +133,12 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
       {shapeReason && (
         <p className="pts-note notscored-detail">
           <b>shape not scored:</b> {shapeReason}
+        </p>
+      )}
+      {sorted.length > 0 && (
+        <p className="pts-note">
+          <b>▲</b> BLIS predicted higher than measured · <b>▼</b> lower. Both are equally off; the
+          size of the number is what matters.
         </p>
       )}
       {sorted.length > 0 && (

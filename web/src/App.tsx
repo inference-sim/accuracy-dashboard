@@ -16,7 +16,7 @@ import { Headline } from './components/Headline'
 import { Term } from './components/Term'
 import { formatCount, formatVersion } from './format'
 import type { RunIndex } from './load'
-import { parseRoute, routeToHash, type RouteState } from './route'
+import { DEFAULT_ROUTE, parseRoute, routeToHash, type RouteState } from './route'
 import { buildRows } from './tree'
 import { nextSort, sortModelKeys, type SortKey, type SortSpec } from './sort'
 import type { Summary } from './types'
@@ -160,7 +160,7 @@ function Shell({
           Overview
         </button>
         <button type="button" className={`tab${view === 'dev' ? ' on' : ''}`} onClick={() => onView('dev')}>
-          For BLIS developers
+          For developers
         </button>
         <a className="ghlink tabs-gh" href="https://github.com/inference-sim/accuracy-dashboard">
           <GithubMark />
@@ -209,8 +209,13 @@ function Overview({
     visible.length > 0
   const effectiveTier = tierFellBack ? 'all' : route.tier
 
-  // The totals block is recomputed from the visible points so the headline matches the filtered view.
-  const totals = useMemo(() => aggregatePair(visible), [visible])
+  // The headline always describes the full latest run under the default view, never the current
+  // filter, so the top-line "how accurate is BLIS?" number can't shift under a control (PR #26
+  // review). Only the per-model table and the points below respond to the filters.
+  const headlinePoints = useMemo(() => applyFilters(allPoints, DEFAULT_ROUTE), [allPoints])
+  const headlineTier =
+    headlinePoints.some((p) => p.tier === 'measured_or_resolved') ? DEFAULT_ROUTE.tier : 'all'
+  const totals = useMemo(() => aggregatePair(headlinePoints), [headlinePoints])
 
   const rows = useMemo(() => buildRows(visible, expanded), [visible, expanded])
 
@@ -271,14 +276,48 @@ function Overview({
 
       <Headline
         totals={totals}
-        tier={effectiveTier}
-        points={visible.length}
+        tier={headlineTier}
+        points={headlinePoints.length}
         models={summary.matrix.length}
         blisRelease={summary.provenance?.blis?.release ?? null}
         dataDate={summary.provenance?.ground_truth?.release_tag?.replace('db-dump/', '') ?? null}
       />
 
-      <h2 className="sectitle">By model</h2>
+      <h2 className="sectitle">Accuracy by model</h2>
+      {/* Filters sit beside the table they change; the headline above ignores them (PR #26 review). */}
+      <div className="chips">
+        <span className="flt">
+        <Term name="tier" />{' '}
+        <span className="tierseg">
+          {/* The highlighted option is the one actually shown: when the stricter tier has no
+              points the view falls back to "all", so "all" is highlighted then (#23). */}
+          <span
+            className={`clk ${effectiveTier === 'measured_or_resolved' ? 'on' : ''}`}
+            onClick={() => update({ tier: 'measured_or_resolved' })}
+          >
+            measured·resolved
+          </span>
+          <span className={`clk ${effectiveTier === 'all' ? 'on' : ''}`} onClick={() => update({ tier: 'all' })}>
+            all
+          </span>
+        </span>
+        {tierFellBack && <span className="disabled-note">(no measured·resolved points yet — showing all)</span>}
+      </span>
+      <span className="flt">
+        vLLM version{' '}
+        <Dropdown
+          className="vllmsel"
+          ariaLabel="Filter by vLLM version"
+          value={typeof route.vllm === 'object' ? `v:${route.vllm.version}` : 'all'}
+          options={[
+            { value: 'all', label: 'all versions' },
+            ...versions.map((v) => ({ value: `v:${v}`, label: formatVersion(v) })),
+          ]}
+          onChange={(v) => update({ vllm: v === 'all' ? 'all' : { version: v.replace(/^v:/, '') } })}
+        />
+      </span>
+    </div>
+
       <SummaryTable
         rows={orderedRows}
         tier={effectiveTier}
@@ -301,40 +340,6 @@ function Overview({
           how well BLIS follows the way latency changes with load, ignoring a constant offset. End-to-end,
           tail-latency and throughput accuracy are planned for a future release.
         </p>
-        {/* Filters live here, not above the table (#23): most visitors want the default view. */}
-        <div className="chips">
-        <span className="flt">
-          <Term name="tier" />{' '}
-          <span className="tierseg">
-            {/* The highlighted option is the one actually shown: when the stricter tier has no
-                points the view falls back to "all", so "all" is highlighted then (#23). */}
-            <span
-              className={`clk ${effectiveTier === 'measured_or_resolved' ? 'on' : ''}`}
-              onClick={() => update({ tier: 'measured_or_resolved' })}
-            >
-              measured·resolved
-            </span>
-            <span className={`clk ${effectiveTier === 'all' ? 'on' : ''}`} onClick={() => update({ tier: 'all' })}>
-              all
-            </span>
-          </span>
-          {tierFellBack && <span className="disabled-note">(no measured·resolved points yet — showing all)</span>}
-        </span>
-        <span className="flt">
-          vLLM version{' '}
-          <Dropdown
-            className="vllmsel"
-            ariaLabel="Filter by vLLM version"
-            value={typeof route.vllm === 'object' ? `v:${route.vllm.version}` : 'all'}
-            options={[
-              { value: 'all', label: 'all versions' },
-              ...versions.map((v) => ({ value: `v:${v}`, label: formatVersion(v) })),
-            ]}
-            onChange={(v) => update({ vllm: v === 'all' ? 'all' : { version: v.replace(/^v:/, '') } })}
-          />
-        </span>
-      </div>
-
         <div className="coverage">
         <span>
           models <b>{formatCount(summary.matrix.length)}</b>
@@ -381,25 +386,47 @@ function RunProvenance({ summary }: { summary: Summary }) {
   const b = p.blis ?? ({} as Partial<NonNullable<typeof p.blis>>)
   const gt = p.ground_truth ?? ({} as Partial<NonNullable<typeof p.ground_truth>>)
   const dash = (s: string | null | undefined, fn: (v: string) => string = (v) => v) => (s ? fn(s) : '—')
+  // Each identifier links to exactly what was run, so nobody has to hunt for the release or
+  // commit by hand (PR #26 review). Missing values stay a plain em dash, never a dead link.
+  const gh = 'https://github.com/inference-sim'
+  const link = (text: string, href: string | null) =>
+    href ? (
+      <a href={href} target="_blank" rel="noreferrer">
+        {text}
+      </a>
+    ) : (
+      text
+    )
+  const kernel = b.extractor_version?.replace(/^.*@/, '') ?? null
   return (
     <>
       <div className="seclabel">BLIS release (CI-resolved)</div>
-      <span className="pill">{b.release ?? '—'}</span>
+      <span className="pill">
+        {b.release ? link(b.release, `${gh}/inference-sim/releases/tag/${encodeURIComponent(b.release)}`) : '—'}
+      </span>
       <div className="kv" style={{ marginTop: 10 }}>
         <span className="k">commit</span>
-        <span className="v">{dash(b.commit_sha, (v) => `${v.slice(0, 7)}…`)}</span>
+        <span className="v">
+          {b.commit_sha ? link(`${b.commit_sha.slice(0, 7)}…`, `${gh}/inference-sim/commit/${b.commit_sha}`) : '—'}
+        </span>
       </div>
       <div className="kv">
         <span className="k">catalog</span>
-        <span className="v">{b.catalog ?? '—'}</span>
+        <span className="v">
+          {b.catalog ? link(b.catalog, `${gh}/blis-catalog/tree/${encodeURIComponent(b.catalog)}`) : '—'}
+        </span>
       </div>
       <div className="kv">
         <span className="k">kernel</span>
-        <span className="v">{dash(b.extractor_version, (v) => v.replace(/^.*@/, ''))}</span>
+        <span className="v">
+          {kernel ? link(kernel, `${gh}/blis-latency-kernel/releases/tag/${encodeURIComponent(kernel)}`) : '—'}
+        </span>
       </div>
       <div className="kv">
         <span className="k">registry</span>
-        <span className="v">{b.registry ?? '—'}</span>
+        <span className="v">
+          {b.registry ? link(b.registry, `${gh}/blis-registry/releases/tag/${encodeURIComponent(b.registry)}`) : '—'}
+        </span>
       </div>
       <div className="seclabel">Ground truth</div>
       <div className="kv">
@@ -408,7 +435,9 @@ function RunProvenance({ summary }: { summary: Summary }) {
       </div>
       <div className="kv">
         <span className="k">dump</span>
-        <span className="v">{dash(gt.release_tag, (v) => v.replace('db-dump/', ''))}</span>
+        <span className="v">
+          {gt.release_tag ? link(gt.release_tag.replace('db-dump/', ''), safeUrl(gt.source_url)) : '—'}
+        </span>
       </div>
       {gt.measurement_date_through && (
         <div className="kv">
@@ -431,6 +460,11 @@ function RunProvenance({ summary }: { summary: Summary }) {
       </div>
     </>
   )
+}
+
+/** source_url comes from the data file, so only an http(s) URL becomes a link. */
+function safeUrl(u: string | null | undefined): string | null {
+  return u && /^https?:\/\//.test(u) ? u : null
 }
 
 /** The GitHub mark (Octicon path), for the repo link in the rail. aria-hidden: the link text names it. */
@@ -463,7 +497,7 @@ function DevView({
     <>
       <h1 className="pagetitle">Compare runs</h1>
       <p className="dek">
-        For BLIS developers: see how accuracy changed between two nightly runs, for example between
+        For developers: see how accuracy changed between two nightly runs, for example between
         BLIS releases. Only measurements both runs scored are compared.
       </p>
       <div className="devpickers">
@@ -472,7 +506,8 @@ function DevView({
             {/* First slot: a nightly run, tagged A in compare mode. The compare view orders the two
                 runs by date, not by slot. picker.run falls back to the latest snapshot. */}
             <div className="seclabel">
-              {comparing && <span className="cmp-tag cmp-a">A</span>} Nightly run
+              {/* Always tagged A, so adding a B never leaves "which one is A?" (PR #26 review). */}
+              <span className="cmp-tag cmp-a">A</span> Nightly run
             </div>
             <Dropdown
               className="runsel"

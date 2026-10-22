@@ -29,8 +29,8 @@ export function Headline({ totals, tier, points, models, blisRelease, dataDate }
   return (
     <section className="headline" aria-label="Overall accuracy">
       <div className="stats">
-        <Stat value={t.mape.ttft} label="Time to first token" hint="average error" />
-        <Stat value={t.mape.tpot} label="Time per output token" hint="average error" />
+        <Stat value={t.mape.ttft} label="Mean time to first token" hint="average error" />
+        <Stat value={t.mape.tpot} label="Mean time per output token" hint="average error" />
       </div>
       <p className="context">
         {formatCount(points)} measurements · {models} models

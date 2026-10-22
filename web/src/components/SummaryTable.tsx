@@ -65,10 +65,10 @@ export function SummaryTable(props: Props) {
               Model
             </th>
             <th className="sep" colSpan={2}>
-              Time to first token
+              Mean time to first token
             </th>
             <th className="sep" colSpan={2}>
-              Time per output token
+              Mean time per output token
             </th>
           </tr>
           <tr className="col">
