@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "snapshot_id": "2026-10-21_blis-v0.11.0_ix-2026-09-28",
-  "generated_at": "2026-10-21T00:00:00Z",
+  "snapshot_id": "2026-10-22_blis-v0.12.0_ix-2026-09-28",
+  "generated_at": "2026-10-22T00:00:00Z",
   "provenance": {
     "blis": {
-      "release": "v0.11.0",
-      "commit_sha": "8e344596c35272e6f505df65c0935aeb5e0000ec",
+      "release": "v0.12.0",
+      "commit_sha": "f199223d701d96dddeb1c314509bed003515b599",
       "catalog": "0.3.0",
       "registry": "v0.2.0",
       "extractor_version": "blis-latency-kernel@v0.3.0"
@@ -15,9 +15,9 @@
       "source_url": "https://github.com/SemiAnalysisAI/InferenceX-app/releases/tag/db-dump/2026-09-28",
       "release_tag": "db-dump/2026-09-28",
       "measurement_date_through": null,
-      "measurement_sha256": "391a8eb04272f582a619d56b3e7d54f37bbc518b1588271ac79c48b9167a5218"
+      "measurement_sha256": "458f8273c09aa72f7b35af9f5e71aafe8daf9654755f2c0bb7c8383a7d0c8616"
     },
-    "evaluator_commit": "00003d070c3cecd3ecd33c2d66eba8358c470d6f",
+    "evaluator_commit": "a8ecc45d3b6cf9aedb259bcd0ba5927f8206987e",
     "scorer": "signedprobe",
     "vllm_filter": {
       "n": 5,
