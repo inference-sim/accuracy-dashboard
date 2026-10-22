@@ -200,8 +200,8 @@ describe('client-side aggregation keeps filters honest (RFC B3)', () => {
     const summary = loadFixture()
     const all = flattenPoints(summary)
     const version = all.find((p) => p.engineVersion)!.engineVersion!
-    const allVersions = applyFilters(all, { run: null, runB: null, sel: null, tier: 'all', vllm: 'all', multinode: false })
-    const pinned = applyFilters(all, { run: null, runB: null, sel: null, tier: 'all', vllm: { version }, multinode: false })
+    const allVersions = applyFilters(all, { view: 'overview', run: null, runB: null, sel: null, tier: 'all', vllm: 'all', multinode: false })
+    const pinned = applyFilters(all, { view: 'overview', run: null, runB: null, sel: null, tier: 'all', vllm: { version }, multinode: false })
     expect(pinned.length).toBeLessThanOrEqual(allVersions.length)
     expect(pinned.every((p) => p.engineVersion === version)).toBe(true)
   })
