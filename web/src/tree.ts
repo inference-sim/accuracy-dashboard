@@ -46,6 +46,11 @@ function distinctVersions(pts: FlatPoint[]): string[] {
   return [...new Set(pts.map((p) => p.engineVersion).filter((v): v is string => !!v))].sort()
 }
 
+/** "1 GPU", "3 GPUs": a count spelled out for a reader who doesn't know the abbreviations. */
+function plural(n: number, noun: string): string {
+  return `${n} ${noun}${n === 1 ? '' : 's'}`
+}
+
 /** Build the ordered, flattened render rows honoring which node ids are expanded. */
 export function buildRows(points: FlatPoint[], expanded: Set<string>): RenderRow[] {
   const rows: RenderRow[] = []
@@ -57,7 +62,7 @@ export function buildRows(points: FlatPoint[], expanded: Set<string>): RenderRow
     const modelId = `m:${model}`
     rows.push({
       level: 'model', label: model,
-      facet: `${nGpu} gpu · ${nWl} wl · ${nTopo} topo`,
+      facet: `${plural(nGpu, 'GPU')} · ${plural(nWl, 'workload')} · ${plural(nTopo, 'deployment')}`,
       metrics: aggregatePair(mpts), versions: distinctVersions(mpts),
       pointCount: mpts.length, depth: 0, id: modelId,
     })

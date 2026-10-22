@@ -93,7 +93,7 @@ describe('A-vs-B compare (RFC discussion #2 point 3)', () => {
   it('single-run mode is unchanged when summaryB is null (Overview, not Compare)', () => {
     const a = loadFixture()
     const html = renderToStaticMarkup(<App summary={a} summaryB={null} loadError={null} />)
-    expect(html).toContain('End-to-end accuracy — BLIS vs InferenceX') // Overview headline
+    expect(html).toContain('How accurate is BLIS?') // Overview headline
     expect(html).not.toContain('Compare runs')
   })
 
@@ -104,7 +104,7 @@ describe('A-vs-B compare (RFC discussion #2 point 3)', () => {
       <App summary={a} summaryB={a} loadError={null} initialHash={`#/?run=${a.snapshot_id}&runB=${a.snapshot_id}`} />,
     )
     expect(html).not.toContain('Compare runs')
-    expect(html).toContain('End-to-end accuracy — BLIS vs InferenceX') // Overview
+    expect(html).toContain('How accurate is BLIS?') // Overview
   })
 
   it('compare header shows the chosen A and B (A = run slot, not data/latest)', () => {
