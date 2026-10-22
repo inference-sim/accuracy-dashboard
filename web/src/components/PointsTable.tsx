@@ -54,7 +54,7 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
               by the current tier / vLLM-version filter). Pick a row below, or clear the filters.
             </div>
           ) : (
-            <div className="pts-empty">Select a topology row in the summary table above to see its per-concurrency points.</div>
+            <div className="pts-empty">Expand a model above and pick a deployment to see each measurement next to its prediction.</div>
           )
         ) : (
           <table className="readout pts">

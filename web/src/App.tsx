@@ -228,34 +228,30 @@ function Overview({
 
   return (
     <>
-      <h2 className="viewhead">End-to-end accuracy — BLIS vs InferenceX</h2>
+      <h2 className="viewhead">How accurate is BLIS?</h2>
       <p className="dek">
-        Every number is a full <b>blis replay</b> through the whole stack, scored against the pinned weekly
-        InferenceX dump. Two tables: a <b>summary</b> drill-down (model → workload → GPU → topology), and a{' '}
-        <b>points</b> table for the selected row (measured vs predicted per concurrency).
+        BLIS simulates LLM inference serving. Here, each of its latency predictions is checked against a
+        real measurement from InferenceX benchmarks, on the same model, hardware and load. Lower error is
+        better.
       </p>
 
       <div className="chips">
-        <span className={`toggle disabled`} title="Disabled in v0.1.0">
-          <span className="sw">
-            <span className="dot" />
-          </span>
-          multi-node <span className="disabled-note">(disabled in v0.1.0)</span>
-        </span>
         <span className="flt">
           <Term name="tier" />{' '}
           <span className="tierseg">
+            {/* The highlighted option is the one actually shown: when the stricter tier has no
+                points the view falls back to "all", so "all" is highlighted then (#23). */}
             <span
-              className={`clk ${route.tier === 'measured_or_resolved' ? 'on' : ''}`}
+              className={`clk ${effectiveTier === 'measured_or_resolved' ? 'on' : ''}`}
               onClick={() => update({ tier: 'measured_or_resolved' })}
             >
               measured·resolved
             </span>
-            <span className={`clk ${route.tier === 'all' ? 'on' : ''}`} onClick={() => update({ tier: 'all' })}>
+            <span className={`clk ${effectiveTier === 'all' ? 'on' : ''}`} onClick={() => update({ tier: 'all' })}>
               all
             </span>
           </span>
-          {tierFellBack && <span className="disabled-note">(no measured·resolved points — showing all)</span>}
+          {tierFellBack && <span className="disabled-note">(no measured·resolved points yet — showing all)</span>}
         </span>
         <span className="flt">
           vLLM version{' '}

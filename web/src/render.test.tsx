@@ -64,7 +64,7 @@ describe('App renders the real CI-shaped snapshot', () => {
   it('shows the headline totals row and the title', () => {
     const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} />)
     expect(html).toContain('ALL MODELS')
-    expect(html).toContain('End-to-end accuracy — BLIS vs InferenceX')
+    expect(html).toContain('How accurate is BLIS?')
   })
 
   it('renders every model when the populated tier is viewed (via deep-link)', () => {
@@ -81,8 +81,25 @@ describe('App renders the real CI-shaped snapshot', () => {
     // Default tier = measured·resolved; the real snapshot has zero such points (direct path), so
     // the UI must not show an empty headline — it falls back to the all tier and says so.
     const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} />)
-    expect(html).toContain('no measured·resolved points — showing all')
+    expect(html).toContain('no measured·resolved points yet — showing all')
     expect(html).toContain('deepseek-v4-pro') // data visible, not an empty table
+  })
+
+  it('highlights the tier actually shown, not the one requested (#23)', () => {
+    // The default request is measured·resolved, but this snapshot has none, so the view shows
+    // "all". The highlighted option must be "all": highlighting measured·resolved while showing
+    // all contradicts the banner beside it.
+    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} />)
+    expect(html).toContain('<span class="clk on">all</span>')
+    expect(html).toContain('<span class="clk ">measured·resolved</span>')
+  })
+
+  it('speaks to an outside reader: no internal terms, no disabled controls (#23)', () => {
+    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} />)
+    for (const internal of ['blis replay', 'BLIS vs InferenceX', 'disabled in v0.1.0', ' wl ·', ' topo<']) {
+      expect(html).not.toContain(internal)
+    }
+    expect(html).toMatch(/\d+ GPUs? · \d+ workloads? · \d+ deployments?/)
   })
 
   it('a deep-linked selected topology populates the points table with measured vs predicted', () => {
