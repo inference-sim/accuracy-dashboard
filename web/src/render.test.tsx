@@ -61,10 +61,19 @@ describe('App renders the real CI-shaped snapshot', () => {
     expect(errors.join('\n')).toBe('') // no "two children with the same key" warning
   })
 
-  it('shows the headline totals row and the title', () => {
-    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} />)
-    expect(html).toContain('ALL MODELS')
-    expect(html).toContain('How accurate is BLIS?')
+  it('leads with the title and the two headline numbers, computed from every visible point (#23)', () => {
+    const summary = loadFixture()
+    const html = renderToStaticMarkup(<App summary={summary} loadError={null} />)
+    expect(html).toContain('BLIS Accuracy')
+    // The headline cards carry the overall TTFT and TPOT error, over the tier actually shown.
+    const t = aggregatePair(flattenPoints(summary)).all.mape
+    const pct = (v: number) => `${v.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+    const stats = html.slice(html.indexOf('class="stats"'), html.indexOf('class="context"'))
+    expect(stats).toContain(pct(t.ttft!))
+    expect(stats).toContain(pct(t.tpot!))
+    expect(html).toContain('lower is better')
+    // ...and it appears once, as the headline, not again as a table row.
+    expect(html).not.toContain('ALL MODELS')
   })
 
   it('renders every model when the populated tier is viewed (via deep-link)', () => {
@@ -99,7 +108,8 @@ describe('App renders the real CI-shaped snapshot', () => {
     for (const internal of ['blis replay', 'BLIS vs InferenceX', 'disabled in v0.1.0', ' wl ·', ' topo<']) {
       expect(html).not.toContain(internal)
     }
-    expect(html).toMatch(/\d+ GPUs? · \d+ workloads? · \d+ deployments?/)
+    // model rows carry no facet: the expanded rows already show GPUs and workloads
+    expect(html).not.toMatch(/\d+ GPUs? · \d+ workloads? · \d+ deployments?/)
   })
 
   it('a deep-linked selected topology populates the points table with measured vs predicted', () => {
@@ -129,7 +139,7 @@ describe('App renders the real CI-shaped snapshot', () => {
 
   it('shows the future-metrics note and run-wide counts', () => {
     const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} />)
-    expect(html).toContain('E2E, tail-latency and throughput accuracy are planned for a future release')
+    expect(html).toContain('tail-latency and throughput accuracy are planned for a future release')
     expect(html).toContain('points scored')
     expect(html).toContain('not scored')
     expect(html).toContain('multi-node')
@@ -151,7 +161,7 @@ describe('App renders the real CI-shaped snapshot', () => {
         { snapshot_id: 'a', generated_at: null, blis_release: 'v0.10.0', ix_release: 'db-dump/2026-09-21', path: 'snapshots/a/summary.json' },
       ],
     }
-    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={index} />)
+    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={index} initialHash="#/?view=dev" />)
     expect(html).toContain('Nightly run')
     expect(html).toContain('does not re-run')
     // the picker is the styled dropdown (native <select> replaced per jgchn review); it shows the
@@ -161,8 +171,13 @@ describe('App renders the real CI-shaped snapshot', () => {
     expect(html).not.toContain('aria-label="Select the nightly run (A)" disabled')
   })
 
+  it('keeps the run-picker off the visitor Overview, even with an index (#23)', () => {
+    const index = { schema_version: 1 as const, latest: 'a', retention_days: 30, runs: [{ snapshot_id: 'a', generated_at: null, blis_release: 'v0.10.0', ix_release: 'db-dump/2026-09-28', path: 'snapshots/a/summary.json' }] }
+    expect(renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={index} />)).not.toContain('Nightly run')
+  })
+
   it('omits the run-picker entirely when there is no index', () => {
-    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={null} />)
+    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={null} initialHash="#/?view=dev" />)
     expect(html).not.toContain('Nightly run')
   })
 
@@ -173,7 +188,7 @@ describe('App renders the real CI-shaped snapshot', () => {
       retention_days: 30,
       runs: [{ snapshot_id: 'a', generated_at: null, blis_release: 'v0.10.0', ix_release: 'db-dump/2026-09-28', path: 'snapshots/a/summary.json' }],
     }
-    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={index} />)
+    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={index} initialHash="#/?view=dev" />)
     expect(html).toContain('Nightly run') // picker shown as provenance
     expect(html).toContain('disabled') // but not interactive with only one run
     expect(html).not.toContain('does not re-run') // note only when there are older runs
@@ -185,28 +200,56 @@ describe('client-side aggregation keeps filters honest (RFC B3)', () => {
     const summary = loadFixture()
     const all = flattenPoints(summary)
     const version = all.find((p) => p.engineVersion)!.engineVersion!
-    const allVersions = applyFilters(all, { run: null, runB: null, sel: null, tier: 'all', vllm: 'all', multinode: false })
-    const pinned = applyFilters(all, { run: null, runB: null, sel: null, tier: 'all', vllm: { version }, multinode: false })
+    const allVersions = applyFilters(all, { view: 'overview', run: null, runB: null, sel: null, tier: 'all', vllm: 'all', multinode: false })
+    const pinned = applyFilters(all, { view: 'overview', run: null, runB: null, sel: null, tier: 'all', vllm: { version }, multinode: false })
     expect(pinned.length).toBeLessThanOrEqual(allVersions.length)
     expect(pinned.every((p) => p.engineVersion === version)).toBe(true)
   })
 
-  it('a version filter changes the RENDERED headline number (not just subset size) — T-b', () => {
+  it('a version filter changes the TABLE but never the headline (PR #26 review) — T-b', () => {
+    // The headline answers "how accurate is BLIS?" for the full latest run, so a filter must not
+    // move it; the per-model table below is what the filter acts on.
     const summary = loadFixture()
     const all = flattenPoints(summary)
-    // pick a version that is NOT the only one, so filtering genuinely changes the mean
-    const versions = [...new Set(all.map((p) => p.engineVersion).filter(Boolean))]
-    const version = versions.find((v) => all.filter((p) => p.engineVersion === v).length < all.length)!
-    // hand-compute the expected all-tier TTFT MAPE over just that version's points
-    const pinnedPts = all.filter((p) => p.engineVersion === version)
-    const errs = pinnedPts.map((p) => p.errTtft).filter((e): e is number => e != null)
-    const expected = errs.reduce((a, e) => a + Math.abs(e), 0) / errs.length
-    // render App with that version pinned + the all tier, and read the headline TTFT mape cell
+    // A version only ONE model carries, so the filtered table has a single model row whose mean we
+    // can check by hand. Found from the data rather than hard-coded, and asserted to exist.
+    const versions = [...new Set(all.map((p) => p.engineVersion).filter((v): v is string => !!v))]
+    const version = versions.find((v) => new Set(all.filter((p) => p.engineVersion === v).map((p) => p.model)).size === 1)
+    expect(version).toBeDefined()
+    const stats = (html: string) => html.slice(html.indexOf('class="stats"'), html.indexOf('class="context"'))
+    const table = (html: string) => html.slice(html.indexOf('<tbody'), html.indexOf('</tbody>'))
+    const base = renderToStaticMarkup(<App summary={summary} loadError={null} initialHash="#/?tier=all" />)
     const hash = `#/?tier=all&vllm=${encodeURIComponent('v:' + version)}`
-    const html = renderToStaticMarkup(<App summary={summary} loadError={null} initialHash={hash} />)
-    // the totals row renders mape as e.g. "32.9%"; assert the hand-computed mean appears
-    const want = `${expected.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
-    expect(html).toContain(want)
+    const pinned = renderToStaticMarkup(<App summary={summary} loadError={null} initialHash={hash} />)
+    expect(stats(pinned)).toBe(stats(base))
+    expect(table(pinned)).not.toBe(table(base))
+    // ...and the table shows the hand-computed mean over just that version's points.
+    const errs = all.filter((p) => p.engineVersion === version).map((p) => p.errTtft).filter((e): e is number => e != null)
+    const expected = errs.reduce((acc, e) => acc + Math.abs(e), 0) / errs.length
+    const pct = (v: number) => `${v.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+    expect(table(pinned)).toContain(pct(expected))
+  })
+
+  it('shows the error direction with an arrow, not a good/bad colour (PR #26 review)', () => {
+    const summary = loadFixture()
+    const mm = summary.matrix[0]!, w = mm.rows[0]!, g = w.rows[0]!, t = g.rows[0]!
+    const sweepKey = `${mm.model}|${w.label}|${g.label}|${t.label}`
+    const html = renderToStaticMarkup(
+      <App summary={summary} loadError={null} initialHash={`#/?sel=${encodeURIComponent(sweepKey)}&tier=all`} />,
+    )
+    const pts = html.slice(html.indexOf('readout pts'))
+    expect(pts).not.toMatch(/err-(pos|neg)/)
+    expect(pts).toMatch(/err-dir[^>]*>[▲▼]</)
+    expect(pts).toContain('BLIS predicted higher than measured')
+  })
+
+  it('links each provenance identifier to its source (PR #26 review)', () => {
+    const summary = loadFixture()
+    const html = renderToStaticMarkup(<App summary={summary} loadError={null} />)
+    const b = summary.provenance!.blis!
+    expect(html).toContain(`href="https://github.com/inference-sim/inference-sim/releases/tag/${b.release}"`)
+    expect(html).toContain(`href="https://github.com/inference-sim/inference-sim/commit/${b.commit_sha}"`)
+    expect(html).toContain(`href="${summary.provenance!.ground_truth!.source_url}"`)
   })
 
   it('totals recompute from visible points (not the stored node metrics)', () => {

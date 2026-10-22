@@ -10,8 +10,12 @@
  * element's label without nesting interactive controls — but note it is still focusable, so it must
  * NOT be nested inside a real <button> (that would be a focusable-in-focusable a11y error); for the
  * sortable mape/shape headers the caller keeps the Term OUTSIDE the sort button.
+ *
+ * The popover is position:fixed, placed from the trigger's on-screen box when it opens, so no
+ * ancestor's overflow (the scrolling table wrapper) can clip it (PR #26 review). It flips above the
+ * trigger when there's no room below and is kept inside the window horizontally.
  */
-import { useId, useRef, useState } from 'react'
+import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { GLOSSARY } from '../glossary'
 
 interface Props {
@@ -29,6 +33,36 @@ export function Term({ name, children }: Props) {
   // the keyboard can reopen in place.
   const escDismissed = useRef(false)
   const id = useId()
+  const trigger = useRef<HTMLSpanElement>(null)
+  const pop = useRef<HTMLSpanElement>(null)
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
+
+  // Place the popover once it has rendered (so its own size is known), then on scroll/resize.
+  useLayoutEffect(() => {
+    if (!open) {
+      setPos(null)
+      return
+    }
+    const place = () => {
+      const t = trigger.current?.getBoundingClientRect()
+      const p = pop.current?.getBoundingClientRect()
+      if (!t || !p) return
+      const gap = 6
+      const margin = 8
+      const below = t.bottom + gap
+      const top = below + p.height > window.innerHeight - margin ? Math.max(margin, t.top - gap - p.height) : below
+      const left = Math.min(Math.max(margin, t.left), window.innerWidth - margin - p.width)
+      setPos({ left, top })
+    }
+    place()
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
+    return () => {
+      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('resize', place)
+    }
+  }, [open])
+
   if (!entry) return <>{children}</>
 
   const hide = () => setOpen(false)
@@ -36,6 +70,7 @@ export function Term({ name, children }: Props) {
   return (
     <span className="term-wrap">
       <span
+        ref={trigger}
         className="term"
         tabIndex={0}
         aria-describedby={open ? id : undefined}
@@ -63,7 +98,14 @@ export function Term({ name, children }: Props) {
       </span>
       {/* Rendered only when open so SSR/markup stays clean; role=tooltip + id for aria-describedby. */}
       {open && (
-        <span role="tooltip" id={id} className="term-pop">
+        <span
+          role="tooltip"
+          id={id}
+          ref={pop}
+          className="term-pop"
+          // hidden until measured, so it never flashes at the wrong spot
+          style={pos ? { left: pos.left, top: pos.top } : { visibility: 'hidden' }}
+        >
           {entry.definition}
         </span>
       )}

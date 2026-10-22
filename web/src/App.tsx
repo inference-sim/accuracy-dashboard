@@ -12,10 +12,11 @@ import { PointsTable } from './components/PointsTable'
 import { SummaryTable } from './components/SummaryTable'
 import { Dropdown } from './components/Dropdown'
 import { Compare } from './components/Compare'
+import { Headline } from './components/Headline'
 import { Term } from './components/Term'
 import { formatCount, formatVersion } from './format'
 import type { RunIndex } from './load'
-import { parseRoute, routeToHash, type RouteState } from './route'
+import { DEFAULT_ROUTE, parseRoute, routeToHash, type RouteState } from './route'
 import { buildRows } from './tree'
 import { nextSort, sortModelKeys, type SortKey, type SortSpec } from './sort'
 import type { Summary } from './types'
@@ -88,40 +89,45 @@ export function App({
 
   if (loadError) {
     return (
-      <Layout summary={null} picker={picker}>
+      <Shell view={route.view} onView={(view) => update({ view })}>
         <div className="viewerror" role="alert">
           <h3>Could not load this snapshot.</h3>
           <pre>
             <code>{loadError}</code>
           </pre>
         </div>
-      </Layout>
+      </Shell>
     )
   }
   if (!summary) {
     return (
-      <Layout summary={null} picker={picker}>
+      <Shell view={route.view} onView={(view) => update({ view })}>
         <div className="loading">Loading the snapshot…</div>
-      </Layout>
+      </Shell>
     )
   }
 
-  // A-vs-B compare mode: entered only when a second run is chosen AND its snapshot has loaded, and
-  // the two runs are DIFFERENT (a run compared with itself is meaningless — guard a hand-crafted
-  // run=X&runB=X URL by falling through to the single-run Overview). The dropdowns already prevent
-  // picking the same run on both sides. The single-run path below is otherwise unchanged.
-  if (route.runB && summaryB && summaryB.snapshot_id !== summary.snapshot_id) {
+  // Developer view (#23): pick runs and compare them. Kept off the Overview, which is for
+  // outside visitors and always shows the latest run.
+  if (route.view === 'dev') {
+    const comparing = route.runB != null && summaryB != null && summaryB.snapshot_id !== summary.snapshot_id
     return (
-      <Layout summary={summary} summaryB={summaryB} picker={picker}>
-        <ErrorBoundary resetKey={route.runB}>
-          <Compare a={summary} b={summaryB} tier={route.tier} />
-        </ErrorBoundary>
-      </Layout>
+      <Shell view="dev" onView={(view) => update({ view, runB: null, run: null, sel: null })}>
+        <DevView summary={summary} summaryB={comparing ? summaryB : null} picker={picker}>
+          {comparing ? (
+            <ErrorBoundary resetKey={route.runB}>
+              <Compare a={summary} b={summaryB!} tier={route.tier} />
+            </ErrorBoundary>
+          ) : (
+            <p className="pts-hint">Pick a second run above to see how accuracy changed between them.</p>
+          )}
+        </DevView>
+      </Shell>
     )
   }
 
   return (
-    <Layout summary={summary} picker={picker}>
+    <Shell view="overview" onView={(view) => update({ view, sel: null })}>
       <ErrorBoundary resetKey={route.sel}>
         <Overview
           summary={summary}
@@ -133,7 +139,36 @@ export function App({
           setExpanded={setExpanded}
         />
       </ErrorBoundary>
-    </Layout>
+    </Shell>
+  )
+}
+
+/** The page frame: one column, two tabs. No sidebar: the Overview needs no controls (#23). */
+function Shell({
+  view,
+  onView,
+  children,
+}: {
+  view: 'overview' | 'dev'
+  onView: (v: 'overview' | 'dev') => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="page">
+      <nav className="tabs" aria-label="Views">
+        <button type="button" className={`tab${view === 'overview' ? ' on' : ''}`} onClick={() => onView('overview')}>
+          Overview
+        </button>
+        <button type="button" className={`tab${view === 'dev' ? ' on' : ''}`} onClick={() => onView('dev')}>
+          For developers
+        </button>
+        <a className="ghlink tabs-gh" href="https://github.com/inference-sim/accuracy-dashboard">
+          <GithubMark />
+          <span>Source</span>
+        </a>
+      </nav>
+      <main className="main">{children}</main>
+    </div>
   )
 }
 
@@ -174,8 +209,13 @@ function Overview({
     visible.length > 0
   const effectiveTier = tierFellBack ? 'all' : route.tier
 
-  // The totals block is recomputed from the visible points so the headline matches the filtered view.
-  const totals = useMemo(() => aggregatePair(visible), [visible])
+  // The headline always describes the full latest run under the default view, never the current
+  // filter, so the top-line "how accurate is BLIS?" number can't shift under a control (PR #26
+  // review). Only the per-model table and the points below respond to the filters.
+  const headlinePoints = useMemo(() => applyFilters(allPoints, DEFAULT_ROUTE), [allPoints])
+  const headlineTier =
+    headlinePoints.some((p) => p.tier === 'measured_or_resolved') ? DEFAULT_ROUTE.tier : 'all'
+  const totals = useMemo(() => aggregatePair(headlinePoints), [headlinePoints])
 
   const rows = useMemo(() => buildRows(visible, expanded), [visible, expanded])
 
@@ -228,50 +268,57 @@ function Overview({
 
   return (
     <>
-      <h2 className="viewhead">How accurate is BLIS?</h2>
+      <h1 className="pagetitle">BLIS Accuracy</h1>
       <p className="dek">
-        BLIS simulates LLM inference serving. Here, each of its latency predictions is checked against a
-        real measurement from InferenceX benchmarks, on the same model, hardware and load. Lower error is
-        better.
+        How closely BLIS, an LLM inference-serving simulator, predicts real latency, checked against
+        InferenceX benchmark measurements on the same model, hardware and load.
       </p>
 
+      <Headline
+        totals={totals}
+        tier={headlineTier}
+        points={headlinePoints.length}
+        models={summary.matrix.length}
+        blisRelease={summary.provenance?.blis?.release ?? null}
+        dataDate={summary.provenance?.ground_truth?.release_tag?.replace('db-dump/', '') ?? null}
+      />
+
+      <h2 className="sectitle">Accuracy by model</h2>
+      {/* Filters sit beside the table they change; the headline above ignores them (PR #26 review). */}
       <div className="chips">
         <span className="flt">
-          <Term name="tier" />{' '}
-          <span className="tierseg">
-            {/* The highlighted option is the one actually shown: when the stricter tier has no
-                points the view falls back to "all", so "all" is highlighted then (#23). */}
-            <span
-              className={`clk ${effectiveTier === 'measured_or_resolved' ? 'on' : ''}`}
-              onClick={() => update({ tier: 'measured_or_resolved' })}
-            >
-              measured·resolved
-            </span>
-            <span className={`clk ${effectiveTier === 'all' ? 'on' : ''}`} onClick={() => update({ tier: 'all' })}>
-              all
-            </span>
+        <Term name="tier" />{' '}
+        <span className="tierseg">
+          {/* The highlighted option is the one actually shown: when the stricter tier has no
+              points the view falls back to "all", so "all" is highlighted then (#23). */}
+          <span
+            className={`clk ${effectiveTier === 'measured_or_resolved' ? 'on' : ''}`}
+            onClick={() => update({ tier: 'measured_or_resolved' })}
+          >
+            measured·resolved
           </span>
-          {tierFellBack && <span className="disabled-note">(no measured·resolved points yet — showing all)</span>}
+          <span className={`clk ${effectiveTier === 'all' ? 'on' : ''}`} onClick={() => update({ tier: 'all' })}>
+            all
+          </span>
         </span>
-        <span className="flt">
-          vLLM version{' '}
-          <Dropdown
-            className="vllmsel"
-            ariaLabel="Filter by vLLM version"
-            value={typeof route.vllm === 'object' ? `v:${route.vllm.version}` : 'all'}
-            options={[
-              { value: 'all', label: 'all versions' },
-              ...versions.map((v) => ({ value: `v:${v}`, label: formatVersion(v) })),
-            ]}
-            onChange={(v) => update({ vllm: v === 'all' ? 'all' : { version: v.replace(/^v:/, '') } })}
-          />
-        </span>
-      </div>
+        {tierFellBack && <span className="disabled-note">(no measured·resolved points yet — showing all)</span>}
+      </span>
+      <span className="flt">
+        vLLM version{' '}
+        <Dropdown
+          className="vllmsel"
+          ariaLabel="Filter by vLLM version"
+          value={typeof route.vllm === 'object' ? `v:${route.vllm.version}` : 'all'}
+          options={[
+            { value: 'all', label: 'all versions' },
+            ...versions.map((v) => ({ value: `v:${v}`, label: formatVersion(v) })),
+          ]}
+          onChange={(v) => update({ vllm: v === 'all' ? 'all' : { version: v.replace(/^v:/, '') } })}
+        />
+      </span>
+    </div>
 
-      <div className="tbl-title">Summary — mean TTFT/TPOT: MAPE &amp; shape</div>
       <SummaryTable
-        totals={totals}
-        totalsPointCount={visible.length}
         rows={orderedRows}
         tier={effectiveTier}
         sort={sort}
@@ -282,9 +329,18 @@ function Overview({
         expanded={expanded}
       />
 
-      <div className="gate-legend">E2E, tail-latency and throughput accuracy are planned for a future release.</div>
+      <PointsTable points={selectedPoints} title={pointsTitle} selMissing={selMissing} />
 
-      <div className="coverage" style={{ margin: '14px 0 4px' }}>
+      <details className="about">
+        <summary>How this was measured</summary>
+        <p>
+          Each InferenceX measurement is one benchmark run on a real vLLM server at one concurrency. BLIS
+          simulates the same deployment and the same requests, and the error is how far BLIS's mean latency
+          is from the measured one. <b>Error</b> is the average absolute difference; <b>trend error</b> is
+          how well BLIS follows the way latency changes with load, ignoring a constant offset. End-to-end,
+          tail-latency and throughput accuracy are planned for a future release.
+        </p>
+        <div className="coverage">
         <span>
           models <b>{formatCount(summary.matrix.length)}</b>
         </span>
@@ -306,21 +362,10 @@ function Overview({
         <span>
           failed <b>{formatCount(cov.failed)}</b>
         </span>
-      </div>
-
-      <PointsTable points={selectedPoints} title={pointsTitle} selMissing={selMissing} />
-
-      <div className="legend">
-        <span>
-          <span className="ver" style={{ margin: 0 }}>
-            vX.Y.Z
-          </span>{' '}
-          the row's measured vLLM version
-        </span>
-        <span>
-          <Term name="mape"><b>mape</b></Term> absolute · <Term name="shape"><b>shape</b></Term> curvature
-        </span>
-      </div>
+        </div>
+        <div className="about-prov"><RunProvenance summary={summary} /></div>
+        <a className="dl" href="data/latest/summary.json" download>⤓ summary.json</a>
+      </details>
     </>
   )
 }
@@ -341,25 +386,47 @@ function RunProvenance({ summary }: { summary: Summary }) {
   const b = p.blis ?? ({} as Partial<NonNullable<typeof p.blis>>)
   const gt = p.ground_truth ?? ({} as Partial<NonNullable<typeof p.ground_truth>>)
   const dash = (s: string | null | undefined, fn: (v: string) => string = (v) => v) => (s ? fn(s) : '—')
+  // Each identifier links to exactly what was run, so nobody has to hunt for the release or
+  // commit by hand (PR #26 review). Missing values stay a plain em dash, never a dead link.
+  const gh = 'https://github.com/inference-sim'
+  const link = (text: string, href: string | null) =>
+    href ? (
+      <a href={href} target="_blank" rel="noreferrer">
+        {text}
+      </a>
+    ) : (
+      text
+    )
+  const kernel = b.extractor_version?.replace(/^.*@/, '') ?? null
   return (
     <>
       <div className="seclabel">BLIS release (CI-resolved)</div>
-      <span className="pill">{b.release ?? '—'}</span>
+      <span className="pill">
+        {b.release ? link(b.release, `${gh}/inference-sim/releases/tag/${encodeURIComponent(b.release)}`) : '—'}
+      </span>
       <div className="kv" style={{ marginTop: 10 }}>
         <span className="k">commit</span>
-        <span className="v">{dash(b.commit_sha, (v) => `${v.slice(0, 7)}…`)}</span>
+        <span className="v">
+          {b.commit_sha ? link(`${b.commit_sha.slice(0, 7)}…`, `${gh}/inference-sim/commit/${b.commit_sha}`) : '—'}
+        </span>
       </div>
       <div className="kv">
         <span className="k">catalog</span>
-        <span className="v">{b.catalog ?? '—'}</span>
+        <span className="v">
+          {b.catalog ? link(b.catalog, `${gh}/blis-catalog/tree/${encodeURIComponent(b.catalog)}`) : '—'}
+        </span>
       </div>
       <div className="kv">
         <span className="k">kernel</span>
-        <span className="v">{dash(b.extractor_version, (v) => v.replace(/^.*@/, ''))}</span>
+        <span className="v">
+          {kernel ? link(kernel, `${gh}/blis-latency-kernel/releases/tag/${encodeURIComponent(kernel)}`) : '—'}
+        </span>
       </div>
       <div className="kv">
         <span className="k">registry</span>
-        <span className="v">{b.registry ?? '—'}</span>
+        <span className="v">
+          {b.registry ? link(b.registry, `${gh}/blis-registry/releases/tag/${encodeURIComponent(b.registry)}`) : '—'}
+        </span>
       </div>
       <div className="seclabel">Ground truth</div>
       <div className="kv">
@@ -368,7 +435,9 @@ function RunProvenance({ summary }: { summary: Summary }) {
       </div>
       <div className="kv">
         <span className="k">dump</span>
-        <span className="v">{dash(gt.release_tag, (v) => v.replace('db-dump/', ''))}</span>
+        <span className="v">
+          {gt.release_tag ? link(gt.release_tag.replace('db-dump/', ''), safeUrl(gt.source_url)) : '—'}
+        </span>
       </div>
       {gt.measurement_date_through && (
         <div className="kv">
@@ -393,6 +462,11 @@ function RunProvenance({ summary }: { summary: Summary }) {
   )
 }
 
+/** source_url comes from the data file, so only an http(s) URL becomes a link. */
+function safeUrl(u: string | null | undefined): string | null {
+  return u && /^https?:\/\//.test(u) ? u : null
+}
+
 /** The GitHub mark (Octicon path), for the repo link in the rail. aria-hidden: the link text names it. */
 function GithubMark() {
   return (
@@ -405,75 +479,35 @@ function GithubMark() {
   )
 }
 
-const RAIL_COLLAPSED_KEY = 'blis-rail-collapsed'
-
-function Layout({
+function DevView({
   summary,
   summaryB = null,
   picker,
   children,
 }: {
-  summary: Summary | null
-  /** present only in A-vs-B compare mode — the rail then shows both runs' provenance side by side. */
+  summary: Summary
+  /** the second run when comparing; both runs' details are then shown side by side. */
   summaryB?: Summary | null
   picker: Picker
   children: React.ReactNode
 }) {
   const runs = picker.index?.runs ?? []
   const comparing = summaryB != null
-
-  // The rail is collapsible so the tables can use the full width; the choice is remembered.
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (!hasWindow) return false
-    try {
-      return window.localStorage.getItem(RAIL_COLLAPSED_KEY) === '1'
-    } catch {
-      return false
-    }
-  })
-  const toggleCollapsed = () => {
-    setCollapsed((c) => {
-      const next = !c
-      if (hasWindow) {
-        try {
-          window.localStorage.setItem(RAIL_COLLAPSED_KEY, next ? '1' : '0')
-        } catch {
-          /* storage unavailable (private mode) — the toggle still works for this session */
-        }
-      }
-      return next
-    })
-  }
-
-  if (collapsed) {
-    return (
-      <div className="layout collapsed">
-        <aside className="rail railmini">
-          <button type="button" className="railtoggle" aria-label="Expand sidebar" title="Expand sidebar" onClick={toggleCollapsed}>
-            »
-          </button>
-        </aside>
-        <main className="main">{children}</main>
-      </div>
-    )
-  }
-
   return (
-    <div className="layout">
-      <aside className="rail">
-        <button type="button" className="railtoggle" aria-label="Collapse sidebar" title="Collapse sidebar" onClick={toggleCollapsed}>
-          «
-        </button>
-        <h1>BLIS Accuracy</h1>
-        <p className="sub">
-          How accurately BLIS predicts real inference latency, scored nightly against SemiAnalysis InferenceX.
-        </p>
+    <>
+      <h1 className="pagetitle">Compare runs</h1>
+      <p className="dek">
+        For developers: see how accuracy changed between two nightly runs, for example between
+        BLIS releases. Only measurements both runs scored are compared.
+      </p>
+      <div className="devpickers">
         {runs.length >= 1 && (
           <>
             {/* First slot: a nightly run, tagged A in compare mode. The compare view orders the two
                 runs by date, not by slot. picker.run falls back to the latest snapshot. */}
             <div className="seclabel">
-              {comparing && <span className="cmp-tag cmp-a">A</span>} Nightly run
+              {/* Always tagged A, so adding a B never leaves "which one is A?" (PR #26 review). */}
+              <span className="cmp-tag cmp-a">A</span> Nightly run
             </div>
             <Dropdown
               className="runsel"
@@ -519,47 +553,27 @@ function Layout({
                   ]}
                   onChange={(id) => picker.onPickB(id === '__none__' ? null : id)}
                 />
-                {picker.runB && (
-                  <div className="runsel-note">Showing Δ (newer − older) over the points both runs scored.</div>
-                )}
               </>
             )}
           </>
         )}
-        {/* Single-run: one provenance block (with the summary.json download). Compare mode: both
-            runs side by side (A = baseline, B = compared) so the rail never misrepresents which run
-            the BLIS release / commit / dump belong to. */}
-        {summary &&
-          (comparing ? (
-            <div className="prov-ab">
-              <div className="prov-col">
-                <div className="seclabel"><span className="cmp-tag cmp-a">A</span> run</div>
-                <RunProvenance summary={summary} />
-              </div>
-              <div className="prov-col">
-                <div className="seclabel"><span className="cmp-tag cmp-b">B</span> run</div>
-                <RunProvenance summary={summaryB!} />
-              </div>
-            </div>
-          ) : (
-            <>
+      </div>
+      {children}
+      {comparing && (
+        <details className="about">
+          <summary>Run details</summary>
+          <div className="prov-ab">
+            <div className="prov-col about-prov">
+              <div className="seclabel"><span className="cmp-tag cmp-a">A</span> run</div>
               <RunProvenance summary={summary} />
-              <a className="dl" href="data/latest/summary.json" download>
-                ⤓ summary.json
-              </a>
-            </>
-          ))}
-        <div style={{ marginTop: 18 }}>
-          <a className="ghlink" href="https://github.com/inference-sim/accuracy-dashboard">
-            <GithubMark />
-            inference-sim/accuracy-dashboard
-          </a>
-        </div>
-      </aside>
-      <main className="main">
-        {/* Overview is the only page in v0.1.0 (RFC §4.5), so no tab bar. */}
-        {children}
-      </main>
-    </div>
+            </div>
+            <div className="prov-col about-prov">
+              <div className="seclabel"><span className="cmp-tag cmp-b">B</span> run</div>
+              <RunProvenance summary={summaryB!} />
+            </div>
+          </div>
+        </details>
+      )}
+    </>
   )
 }

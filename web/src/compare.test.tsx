@@ -93,7 +93,7 @@ describe('A-vs-B compare (RFC discussion #2 point 3)', () => {
   it('single-run mode is unchanged when summaryB is null (Overview, not Compare)', () => {
     const a = loadFixture()
     const html = renderToStaticMarkup(<App summary={a} summaryB={null} loadError={null} />)
-    expect(html).toContain('How accurate is BLIS?') // Overview headline
+    expect(html).toContain('BLIS Accuracy') // Overview headline
     expect(html).not.toContain('Compare runs')
   })
 
@@ -103,8 +103,9 @@ describe('A-vs-B compare (RFC discussion #2 point 3)', () => {
     const html = renderToStaticMarkup(
       <App summary={a} summaryB={a} loadError={null} initialHash={`#/?run=${a.snapshot_id}&runB=${a.snapshot_id}`} />,
     )
-    expect(html).not.toContain('Compare runs')
-    expect(html).toContain('How accurate is BLIS?') // Overview
+    // the developer tab stays open, but no comparison is drawn
+    expect(html).not.toContain('class="cmp-overall"')
+    expect(html).toContain('Pick a second run')
   })
 
   it('compare header shows the chosen A and B (A = run slot, not data/latest)', () => {
@@ -127,9 +128,11 @@ describe('A-vs-B compare (RFC discussion #2 point 3)', () => {
     const html = renderToStaticMarkup(
       <App summary={a} summaryB={b} loadError={null} initialHash={`#/?run=${a.snapshot_id}&runB=${b.snapshot_id}`} />,
     )
-    expect(html).toContain('Overall Δ')
-    expect(html).toContain('Δ TTFT mape')
-    expect(html).toContain('Δ TPOT shape')
+    // the verdict is in words, per metric (#23)
+    const verdict = html.slice(html.indexOf('class="cmp-overall"'), html.indexOf('table class="readout cmp"'))
+    expect(verdict).toContain('Time to first token')
+    expect(verdict).toContain('Time per output token')
+    expect(verdict).toMatch(/cmp-word d-(better|worse|zero)">(better|worse|no change)</)
     // The headline strip comes BEFORE the per-model table (it's the net "did it change?" answer).
     expect(html.indexOf('cmp-overall')).toBeLessThan(html.indexOf('table class="readout cmp"'))
   })
