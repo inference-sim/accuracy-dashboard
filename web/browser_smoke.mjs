@@ -111,37 +111,24 @@ try {
     problems.push('no .term tooltip trigger found on the page')
   }
 
-  // Exercise the collapsible sidebar: collapse, assert the layout + rail shrink, then expand back.
-  const collapseBtn = await page.$('.rail .railtoggle')
-  if (collapseBtn) {
-    await collapseBtn.click()
-    await page.waitForSelector('.layout.collapsed', { timeout: 3000 })
-    if (!(await page.$('.rail.railmini'))) problems.push('rail did not switch to mini on collapse')
-    await page.click('.rail.railmini .railtoggle')
-    await page.waitForTimeout(150)
-    if (await page.$('.layout.collapsed')) problems.push('sidebar did not expand back')
-  } else {
-    problems.push('sidebar collapse toggle not found')
-  }
-
   const text = await page.textContent('body')
   // Explicit markers, never NaN/blank/undefined leaking to the DOM (RFC B1).
   for (const bad of ['NaN', 'undefined', 'Infinity']) {
     if (text && text.includes(bad)) problems.push(`DOM contains "${bad}"`)
   }
-  const title = await page.textContent('.viewhead')
-  if (!title || !title.includes('End-to-end accuracy')) problems.push('headline missing')
+  // The Overview's title and its headline numbers (#26 replaced the sidebar and .viewhead).
+  const title = await page.textContent('h1.pagetitle').catch(() => null)
+  if (!title || !title.includes('BLIS Accuracy')) problems.push('page title missing')
+  if (!(await page.$('section.headline .stat-value'))) problems.push('headline missing')
 
   // Exercise the styled dropdown (replaces native <select>) on the developer page's run picker:
   // open it, assert the popup listbox appears, pick the last option, confirm it closes. This is
-  // the interactive path SSR can't cover. With a single retained run the picker is disabled, so
-  // there's nothing to open; it must still render.
+  // the interactive path SSR can't cover. The picker needs data/index.json, which is optional
+  // (see above): without one there's no picker, and nothing to exercise.
   await page.goto(`${BASE}/#/?view=dev`, { waitUntil: 'networkidle', timeout: 30000 })
-  await page.waitForSelector('.dd-trigger.runsel', { timeout: 15000 }).catch(() => {})
+  await page.waitForSelector('.dd-trigger.runsel', { timeout: 5000 }).catch(() => {})
   const ddTrigger = await page.$('.dd-trigger.runsel')
-  if (!ddTrigger) {
-    problems.push('styled run-picker dropdown not found on the developer page')
-  } else if (await ddTrigger.isEnabled()) {
+  if (ddTrigger && (await ddTrigger.isEnabled())) {
     await ddTrigger.click()
     await page.waitForSelector('.dd-list [role="option"]', { timeout: 3000 })
     const opts = await page.$$('.dd-list .dd-opt')

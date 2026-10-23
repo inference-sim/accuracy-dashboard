@@ -44,6 +44,8 @@ export interface FlatPoint {
   sweepKey: string
   /** v2 only: when the point was measured, and what the run did versus what BLIS was given. */
   measuredDate?: string
+  /** v2: the point's contract id, stable across BLIS releases and catalog changes. */
+  pointId?: string
   fidelity?: Fidelity
 }
 
@@ -83,6 +85,7 @@ export function flattenPoints(summary: Summary): FlatPoint[] {
               shapeReason: p.shape_reason ?? null,
               sweepKey: `${m.model}|${w.label}|${g.label}|${t.label}`,
               ...(p.measured_date ? { measuredDate: p.measured_date } : {}),
+              ...(p.point_id ? { pointId: p.point_id } : {}),
               ...(p.fidelity ? { fidelity: p.fidelity } : {}),
             })
           }
@@ -129,8 +132,11 @@ export function aggregatePair(points: FlatPoint[]): MetricBlockPair {
  * see PointsTable). Two runs' points are "the same point" iff this key matches.
  */
 export function pointKey(p: FlatPoint): string {
-  // v2 points are re-measurable: a later measurement of the same recipe is a different point,
-  // so the date is part of the key. v1 points carry no date and keep their key unchanged.
+  // A v2 point carries its contract id (CONTRACT.md: Compare intersects on point_id), which no
+  // display label can collide on. Older v2 points without one fall back to the label key with
+  // their date (a later measurement of the same recipe is a different point); v1 points carry
+  // neither and keep their key unchanged.
+  if (p.pointId) return p.pointId
   const base = `${p.sweepKey}|${p.concurrency}|${p.engineVersion ?? ''}`
   return p.measuredDate ? `${base}|${p.measuredDate}` : base
 }

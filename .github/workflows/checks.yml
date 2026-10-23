@@ -81,6 +81,15 @@ jobs:
           npm install --no-save playwright@1.56.0
           npx playwright install --with-deps chromium
           node smoke_v2.mjs
+      - name: v1 browser smoke - the nightly's own smoke (browser_smoke.mjs) on the committed v1 snapshot
+        run: |
+          # The nightly runs browser_smoke.mjs on its fresh snapshot; run it here on the committed
+          # one, so a UI change that breaks it fails on the PR, not on the next nightly.
+          rm -rf public/data dist
+          mkdir -p public/data/latest
+          cp ../data/latest/summary.json public/data/latest/summary.json
+          npm run build
+          node browser_smoke.mjs
 
   grep-clean:
     runs-on: ubuntu-latest
@@ -94,7 +103,7 @@ jobs:
           hits=$(grep -rniE 'aisimulate|aiconfigurator|\baic\b' \
                --include='*.ts' --include='*.tsx' --include='*.py' --include='*.sh' \
                --include='*.mjs' --include='*.json' --include='*.css' --include='*.html' \
-               orchestrator web/src web/browser_smoke.mjs web/package.json web/vite.config.ts \
+               orchestrator web/src web/browser_smoke.mjs web/smoke_v2.mjs web/package.json web/vite.config.ts \
                schemas state data 2>/dev/null \
              | grep -v node_modules | grep -v package-lock || true)
           if [ -n "$hits" ]; then

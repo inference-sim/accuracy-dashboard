@@ -22,6 +22,9 @@ FIDELITY_SCHEMA = INGEST_DIR / "fidelity.schema.json"
 POINTS_CSV = "points.csv"
 FIDELITY_JSONL = "fidelity.jsonl"
 FACETS_JSON = "facets.json"
+# The facets every scored point must carry: what the summary builder groups and labels it by.
+FACET_KEYS = ("framework", "gpu", "identity", "model", "parallelism", "precision", "scenario", "serving",
+              "spec_method", "sweep_id", "workload")
 NOT_SCORED_JSONL = "not_scored.jsonl"
 PROVENANCE_JSON = "provenance.json"
 CONTRACT_FILES = (POINTS_CSV, FIDELITY_JSONL, FACETS_JSON, NOT_SCORED_JSONL, PROVENANCE_JSON)
@@ -84,7 +87,7 @@ def points_sort_key(row: dict) -> tuple:
 # counts in the "all" tier.
 TIER_BY_STATUS = {"exact": "MEASURED-OR-RESOLVED", "approximate": "ALL (approximate)"}
 PROVENANCE_KEYS = ("ingest", "blis", "vllm_ref", "vllm_max_distance", "policy_sha256", "pulled_at",
-                   "corpus", "pull_manifest_sha256")
+                   "corpus", "pull_manifest_sha256", "source")
 
 
 def _read_json(path: Path, problems: list[str]):
@@ -202,6 +205,10 @@ def validate_dir(directory: str | Path) -> list[str]:
             f = facets.get(pid)
             if not isinstance(f, dict):
                 problems.append(f"{FACETS_JSON}: {pid[:12]} missing or not an object")
+                continue
+            missing = [k for k in FACET_KEYS if k not in f]
+            if missing:
+                problems.append(f"{FACETS_JSON}: {pid[:12]} lacks {', '.join(missing)}")
                 continue
             ident = f.get("identity")
             try:

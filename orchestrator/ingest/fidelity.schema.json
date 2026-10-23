@@ -13,7 +13,7 @@
   ],
   "properties": {
     "status": {
-      "description": "exact: every timing-relevant setting is matched (recorded by the run, or BLIS's own default). approximate: scored, but at least one setting BLIS can't state was approximated (an args entry with match approximated, which says what BLIS used instead and why). not_scored: the point carries at least one reason code.",
+      "description": "exact: every timing-relevant setting is matched (recorded by the run, or BLIS's own default). approximate: scored, but at least one setting BLIS can't state was approximated (an args entry with match approximated, which says what BLIS used instead and why). not_scored: the point carries at least one reason code; approximate also when build.match is estimated (the run's vLLM build isn't the one BLIS models).",
       "enum": [
         "exact",
         "approximate",
@@ -146,6 +146,25 @@
               "required": [
                 "why"
               ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "why": {
+                "const": "outside_distance"
+              }
+            },
+            "required": [
+              "why"
+            ]
+          },
+          "then": {
+            "properties": {
+              "distance": {
+                "type": "integer"
+              }
             }
           }
         }

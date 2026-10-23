@@ -54,6 +54,13 @@ def test_point_error_and_shape_are_v1s_arithmetic_worked_by_hand():
     assert pts[2]["shape"] == {"ttft": -2.8099, "tpot": 0.1445}
 
 
+def test_a_drafter_is_part_of_the_deployment_row_label():
+    doc = _build()
+    labels = [t["label"] for m in doc["matrix"] for w in m["rows"] for g in w["rows"] for t in g["rows"]]
+    assert any(l.endswith(" · mtp") for l in labels)                  # DSv4.1-Flash with MTP
+    assert not any(l.endswith(" · none") for l in labels)             # no drafter: nothing added
+
+
 def test_a_sweep_with_fewer_than_three_points_has_no_shape():
     pts = _by_conc(_build(), "deepseek-v4.1-flash", "h200", "dp1 · ep1 · pp1 · tp8")
     assert pts[1]["shape"] is None and pts[1]["shape_reason"] == "< 3 concurrencies"
@@ -155,6 +162,26 @@ def test_the_validator_catches_coverage_that_doesnt_balance_and_malformed_fideli
     doc = _build()
     doc["schema_version"] = 1
     assert vs2.problems(doc) != []
+
+
+def test_the_validator_refuses_states_the_contract_forbids():
+    import copy
+    base = _build()
+
+    def bad(mutate):
+        doc = copy.deepcopy(base)
+        mutate(doc)
+        return vs2.problems(doc) != []
+    first = lambda d: _points(d)[0]
+    exact = lambda d: next(p for p in _points(d) if p["fidelity"]["status"] == "exact")
+    assert bad(lambda d: first(d)["fidelity"].update(status="not_scored", reasons=["blis_refused"]))
+    for m in ("differs", "absent_in_blis", "unreadable", "conflict"):       # a refusal can't be scored
+        assert bad(lambda d, m=m: exact(d)["fidelity"]["args"][0].update(match=m)), m
+    assert bad(lambda d: first(d)["fidelity"]["build"].update(ref="v0.99.0"))
+    assert bad(lambda d: exact(d)["fidelity"]["build"].update(distance=5000))
+    assert bad(lambda d: first(d)["fidelity"]["build"].update(match="estimated", why="outside_distance", distance=None))
+    assert bad(lambda d: d["not_scored"][0]["identity"].update(conc=999))
+    assert vs2.problems(copy.deepcopy(base)) == []
 
 
 def test_v1_documents_are_not_v2():

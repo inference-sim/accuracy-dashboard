@@ -354,6 +354,14 @@ def test_fidelity_schema_ties_status_to_reasons_and_match_to_its_fields():
     assert v.is_valid({**rec, "args": [{**dflt, "rule": "r"}]})
 
 
+def test_validator_rejects_a_facets_record_missing_a_key_the_builder_reads():
+    d = _copy("run-a")
+    facets = json.loads((d / c.FACETS_JSON).read_text())
+    del facets[next(iter(facets))]["sweep_id"]
+    (d / c.FACETS_JSON).write_text(c.canonical_dumps(facets) + "\n")
+    assert any("lacks sweep_id" in p for p in c.validate_dir(d))
+
+
 def test_cli_exit_codes():
     good = subprocess.run([sys.executable, str(HERE / "contract.py"), str(FIXTURE / "run-a")],
                           capture_output=True, text=True)

@@ -571,7 +571,7 @@
                   },
                   "serving": "aggregated",
                   "spec_method": "mtp",
-                  "label": "dp2 · ep2 · pp1 · tp1 · fp4",
+                  "label": "dp2 · ep2 · pp1 · tp1 · fp4 · mtp",
                   "coverage": {
                     "scored": 1,
                     "total": 1
@@ -792,7 +792,7 @@
                   },
                   "serving": "aggregated",
                   "spec_method": "mtp",
-                  "label": "dp1 · ep1 · pp1 · tp4 · fp4",
+                  "label": "dp1 · ep1 · pp1 · tp4 · fp4 · mtp",
                   "coverage": {
                     "scored": 2,
                     "total": 2
@@ -1004,7 +1004,7 @@
                   },
                   "serving": "aggregated",
                   "spec_method": "mtp",
-                  "label": "dp1 · ep1 · pp1 · tp8 · fp4",
+                  "label": "dp1 · ep1 · pp1 · tp8 · fp4 · mtp",
                   "coverage": {
                     "scored": 1,
                     "total": 1

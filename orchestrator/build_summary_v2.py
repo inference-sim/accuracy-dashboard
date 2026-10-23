@@ -125,7 +125,10 @@ def build_matrix(flat: list[dict], facets: dict, fidelity: dict) -> list[dict]:
                     tnode = {"level": "topology", "framework": f0["framework"], "engine_version": ver or None,
                              "precision": f0["precision"], "is_multinode": False, "parallelism": par,
                              "serving": f0["serving"], "spec_method": f0["spec_method"],
-                             "label": f"{base} · {f0['precision']}",
+                             # The drafter is part of the deployment: a spec and a no-spec run
+                             # of the same layout are two rows, never one.
+                             "label": f"{base} · {f0['precision']}" + (
+                                 f" · {f0['spec_method']}" if f0["spec_method"] not in (None, "", "none") else ""),
                              "coverage": {"scored": len(tpts), "total": len(tpts)},
                              "metrics": v1.metric_block_pair(tpts),
                              "rows": [point_node(p, fidelity[p["point_id"]])
@@ -176,7 +179,8 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     dates = sorted({p["measured_date"] for p in flat} | {ns["measured_date"] for ns in not_scored})
     provenance = {
         "blis": prov_in["blis"],
-        "ground_truth": {"source": "SemiAnalysis InferenceX API", "source_url": "https://inferencex.semianalysis.com/api/v1/",
+        # What the extractor pulled, as it recorded it (provenance.json's source).
+        "ground_truth": {"source": prov_in["source"]["name"], "source_url": prov_in["source"]["url"],
                          "release_tag": f"api-{pull_date}",
                          "measurement_date_through": dates[-1] if dates else None,
                          "measurement_sha256": prov_in["pull_manifest_sha256"]},

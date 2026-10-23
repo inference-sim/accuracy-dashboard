@@ -56,7 +56,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
 
   coverage: {
     label: 'coverage',
-    definition: 'How many points were scored vs. not. Nothing is hidden — unscored points are counted and the reasons shown.',
+    definition: 'How many points were scored vs. not. Nothing is hidden: unscored points are counted, and the reason for each is in the downloadable results.',
   },
   provenance: {
     label: 'match',

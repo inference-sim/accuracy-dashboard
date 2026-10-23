@@ -103,7 +103,12 @@ export function buildRows(points: FlatPoint[], expanded: Set<string>): RenderRow
             pointCount: tpts.length, depth: 3, id: topoId,
             sweepKey: t0.sweepKey,
             ...(withFid.length > 0
-              ? { fidelity: withFid[0]!.fidelity, approxCount: withFid.filter((p) => p.fidelity!.status === 'approximate').length }
+              ? {
+                  // The record shown for the row: an estimated one when any point is estimated,
+                  // so a mixed row's tooltip never reads "Exact match" under "N estimated".
+                  fidelity: (withFid.find((p) => p.fidelity!.status === 'approximate') ?? withFid[0]!).fidelity,
+                  approxCount: withFid.filter((p) => p.fidelity!.status === 'approximate').length,
+                }
               : {}),
           })
         }

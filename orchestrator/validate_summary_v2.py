@@ -3,8 +3,10 @@
 
 v2 $refs the fidelity record's schema (orchestrator/ingest/fidelity.schema.json) by its $id, so
 the validator is given a registry holding it. Beyond the schema: schema_version is 2, the
-coverage counts match the lists, not_scored_reasons count the not-scored codes, and no point is
-both scored and not scored. Exits non-zero on any problem, never a silent pass.
+coverage counts match the lists, not_scored_reasons count the not-scored codes, no point is
+both scored and not scored, every build is measured from the snapshot's own vllm_ref and an
+exact build sits within its vllm_max_distance, and every not-scored record's identity hashes to
+its point_id. Exits non-zero on any problem, never a silent pass.
 
 v1 snapshots keep using orchestrator/validate_summary.py, unchanged.
 """
@@ -17,6 +19,8 @@ from collections import Counter
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO / "orchestrator" / "ingest"))
+from contract import point_id  # noqa: E402
 SCHEMA = REPO / "schemas" / "summary.v2.json"
 FIDELITY = REPO / "orchestrator" / "ingest" / "fidelity.schema.json"
 
@@ -56,6 +60,17 @@ def problems(doc: dict) -> list[str]:
     both = set(scored) & {n["point_id"] for n in ns}
     if both:
         out.append(f"{len(both)} point(s) both scored and not scored")
+    prov = doc.get("provenance") or {}
+    ref, window = prov.get("vllm_ref"), prov.get("vllm_max_distance")
+    for p in pts:
+        b = p["fidelity"]["build"]
+        if ref and b["ref"] != ref:
+            out.append(f"{p['point_id'][:12]}: build measured from {b['ref']}, not the snapshot's vllm_ref {ref}")
+        if b.get("match") == "exact" and window is not None and (b["distance"] is None or abs(b["distance"]) > window):
+            out.append(f"{p['point_id'][:12]}: an exact build {b['distance']} commits from {b['ref']} (window {window})")
+    for n in ns:
+        if point_id(n["identity"]) != n["point_id"]:
+            out.append(f"not_scored {n['point_id'][:12]}: identity doesn't hash to its point_id")
     return out
 
 

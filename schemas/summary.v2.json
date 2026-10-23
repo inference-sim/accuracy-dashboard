@@ -691,6 +691,36 @@
               }
             }
           }
+        },
+        {
+          "properties": {
+            "fidelity": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "exact",
+                    "approximate"
+                  ]
+                },
+                "args": {
+                  "items": {
+                    "properties": {
+                      "match": {
+                        "not": {
+                          "enum": [
+                            "differs",
+                            "absent_in_blis",
+                            "unreadable",
+                            "conflict"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       ]
     },

@@ -290,7 +290,8 @@ def write_run(name: str, run: dict, base: Path) -> Path:
     (out / NOT_SCORED_JSONL).write_text("".join(canonical_dumps(r) + "\n" for r in not_scored))
     prov = {"ingest": "api", "blis": run["blis"], "vllm_ref": VLLM_REF, "vllm_max_distance": 2000,
             "policy_sha256": POLICY_SHA, "pulled_at": "2026-10-23T00:00:00Z", "corpus": CORPUS,
-            "pull_manifest_sha256": "2" * 64}
+            "pull_manifest_sha256": "2" * 64,
+            "source": {"name": "SemiAnalysis InferenceX API", "url": "https://inferencex.semianalysis.com/api/v1/"}}
     (out / PROVENANCE_JSON).write_text(canonical_dumps(prov) + "\n")
     return out
 

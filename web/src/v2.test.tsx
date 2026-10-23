@@ -233,6 +233,24 @@ describe('an estimated weight format reads plainly', () => {
   })
 })
 
+describe('a deployment row with some estimated points', () => {
+  it('shows an estimated record, never "Exact match" under a count of estimated points', () => {
+    const a = v2a()
+    const f = flattenPoints(a)
+    const exactP = f.find((p) => p.fidelity?.status === 'exact')!
+    const est = f.find((p) => p.fidelity?.status === 'approximate')!
+    // put an estimated point after an exact one inside the same deployment row
+    const mixed = [exactP, { ...est, sweepKey: exactP.sweepKey, model: exactP.model, workloadLabel: exactP.workloadLabel,
+                             gpu: exactP.gpu, topoLabel: exactP.topoLabel, pointId: 'e'.repeat(64) }]
+    // expand every level down to the deployment row
+    const ids = new Set<string>()
+    for (let i = 0; i < 4; i++) for (const r of buildRows(mixed, ids)) ids.add(r.id)
+    const row = buildRows(mixed, ids).find((r) => r.level === 'topology')!
+    expect(row.approxCount).toBe(1)
+    expect(row.fidelity!.status).toBe('approximate')
+  })
+})
+
 describe('the results download', () => {
   it('sits above "How this was measured", with a plain label', () => {
     const html = renderToStaticMarkup(<App summary={v2a()} loadError={null} />)
@@ -336,9 +354,18 @@ describe('the vLLM version says how far its build is from the release BLIS model
 })
 
 describe('Compare across v2 runs', () => {
-  it('keys points by date as well, so re-measurements stay distinct', () => {
-    const p = flattenPoints(v2a())[0]!
-    expect(pointKey(p).endsWith(`|${p.measuredDate}`)).toBe(true)
+  it('keys v2 points by their contract id; a v1 point keeps its label key', () => {
+    const pts = flattenPoints(v2a())
+    const p = pts[0]!
+    expect(pointKey(p)).toBe(p.pointId)
+    expect(new Set(pts.map(pointKey)).size).toBe(pts.length)
+    // two deployments with the same label (one copied with a drafter switched on) never share a
+    // key, so Compare can't pair one with the other
+    const twin = { ...p, pointId: 'f'.repeat(64) }
+    expect(pointKey(twin)).not.toBe(pointKey(p))
+    // an older v2 point without an id falls back to the label key with its date
+    const { pointId: _drop, ...noId } = p
+    expect(pointKey(noId).endsWith(`|${p.measuredDate}`)).toBe(true)
     const q = flattenPoints(v1())[0]!
     expect(pointKey(q).split('|').length).toBe(6)
   })

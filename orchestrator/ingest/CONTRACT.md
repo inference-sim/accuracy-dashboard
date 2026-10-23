@@ -87,8 +87,11 @@ One line per point, sorted by `point_id`. `reasons` is sorted and de-duplicated,
  "vllm_ref": "v0.31.0", "vllm_max_distance": 2000,
  "policy_sha256": "…", "pulled_at": "<UTC ISO-8601>",
  "corpus": {"dataset": "…", "revision": "…", "sha256": "…"} | null,
- "pull_manifest_sha256": "…"}
+ "pull_manifest_sha256": "…",
+ "source": {"name": "SemiAnalysis InferenceX API", "url": "https://inferencex.semianalysis.com/api/v1/"}}
 ```
+
+`source` names what was pulled: `{"name", "url"}` (the API the pull read), copied into summary.json's `ground_truth`.
 
 `pull_manifest_sha256` is the sha256 of the frozen pull's manifest (each point's frozen inputs and their sha256s), and identifies exactly what was scored.
 
