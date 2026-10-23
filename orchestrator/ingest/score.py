@@ -257,6 +257,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     (sdir / f"{name}.yaml").write_text(text)
     dep = _parse_back(text)
     args = c.args + b.defaults_used
+    o.reasons += fill_blis_side(args, env, sdir, f"{name}.yaml", sup.model)
     o.reasons += _diff_args(args, dep, b)
     args.sort(key=lambda a: a["arg"])
     o.reasons = sorted(set(o.reasons))
@@ -320,6 +321,45 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
                  round(float(m["mean_ttft"]) * 1e6, 3), round(pttft, 3),
                  contract.TIER_BY_STATUS[status], pid, ident["measured_date"]]
     return o
+
+
+def blis_resolution(env, scenarios: Path, scenario: str) -> dict | str:
+    """What BLIS resolves for the scenario as written (orchestrator/blisdefaults -resolve):
+    the kernel's own resolution, including every requested value it overrode and why. If BLIS
+    refuses the scenario, its refusal as a blis_refused reason instead."""
+    out = subprocess.run([env.defaults_helper, "-resolve", "-scenarios", str(scenarios), "-scenario", scenario,
+                          "-catalog", str(env.catalog), "-registry", str(env.registry)],
+                         capture_output=True, text=True)
+    if out.returncode != 0:
+        return _blis_refusal(out.stderr.replace("blisdefaults: ", ""), scenarios.parent)
+    return json.loads(out.stdout)
+
+
+def fill_blis_side(args: list, env, scenarios: Path, scenario: str, model: str) -> list[str]:
+    """For each approximated setting, record what BLIS actually used, read from BLIS -- never a
+    placeholder. A setting whose source BLIS can't report refuses the point."""
+    need = [a for a in args if a.get("_blis_from")]
+    if not need:
+        return []
+    reasons, res = [], None
+    for a in need:
+        src = a.pop("_blis_from")
+        if src.startswith("resolved."):
+            if res is None:
+                res = blis_resolution(env, scenarios, scenario)
+                if isinstance(res, str):
+                    # BLIS refuses the scenario itself: that is the point's reason, next to its others.
+                    reasons.append(res)
+            if isinstance(res, str):
+                continue
+            field = src.split(".", 1)[1]
+            hit = [o for o in res["overrides"] if o["field"] == field]
+            a["blis"] = hit[0]["resolved"] if hit else None
+        elif src == "graph.index_cache":
+            a["blis"] = env.catalog_obj.index_caches.get(model)
+        if a["blis"] is None:
+            reasons.append(f"setting_differs:{a['arg']}")
+    return reasons
 
 
 def row_vs_run(row: dict, c: st.Classified) -> list[str]:
@@ -395,7 +435,4 @@ def note_for(policy: dict, reason: str) -> dict | None:
     hit = st.lookup(policy, path)
     if not hit or not hit[1].get("note"):
         return None
-    n = {"text": hit[1]["note"]}
-    if hit[1].get("upstream"):
-        n["upstream"] = hit[1]["upstream"]
-    return n
+    return {"text": hit[1]["note"]}

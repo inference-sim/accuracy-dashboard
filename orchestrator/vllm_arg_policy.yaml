@@ -9,9 +9,13 @@
 # Classes:
 #   mapped       written into the BLIS scenario at `blis_field` (writer below), then compared.
 #   inert        recorded only: no effect on timing, or none BLIS prices differently.
-#   approximate  a quantized format BLIS can't state: written as `approximate_as`, scored as an
-#                `approximate` point, with `note` and `upstream`. Only quantization settings
-#                take this class (the user's rule, Discussion #28).
+#   approximate  a quantized format BLIS can't state, scored as an `approximate` point with `note`.
+#                What BLIS used instead is read from BLIS, never written here:
+#                `blis_from` names where (resolved.<field>: the kernel's own resolution of the
+#                scenario, e.g. the cache record its attention backend serves; graph.index_cache:
+#                the record the catalog graph prices the indexer cache at), or `approximate_as`
+#                gives it when BLIS has no setting at all (a switch BLIS can't turn on is off).
+#                Only quantization settings take this class (the user's rule, Discussion #28).
 #   refuse       timing-relevant and BLIS can't represent it: the point is not scored
 #                (`setting_not_modelled:<path>`), with `note`.
 #
@@ -123,9 +127,8 @@ entries:
   attention_backend:
     class: approximate
     unset: [null]
-    approximate_as: v0.31.0 selection
+    blis_from: resolved.cache_dtype
     note: "The run selected this attention backend explicitly (--attention-backend); it decides the KV cache record format. BLIS runs the backend vLLM v0.31.0 selects for the part and prices that backend's record."
-    upstream: inference-sim/blis-schemas#57
   linear_backend: {class: refuse, unset: [auto], note: "An explicitly selected linear-layer backend isn't stated by the Deployment."}
 
   # ---------------------------------------------------------------- CUDA graphs / compilation
@@ -160,21 +163,18 @@ entries:
   attention_config.backend:
     class: approximate
     unset: [null]
-    approximate_as: v0.31.0 selection
+    blis_from: resolved.cache_dtype
     note: "The run selected this attention backend explicitly; it decides the KV cache record format. BLIS runs the backend vLLM v0.31.0 selects for the part and prices that backend's record."
-    upstream: inference-sim/blis-schemas#57
   attention_config.indexer_kv_dtype:
     class: approximate
     unset: [auto]
-    approximate_as: catalog default
+    blis_from: graph.index_cache
     note: "No Deployment key states the indexer cache dtype, so BLIS prices the indexer record the catalog graph states (the model's default)."
-    upstream: inference-sim/blis-schemas#57
   attention_config.indexer_sparse_logits:
     class: approximate
     unset: [false]
     approximate_as: false
     note: "vLLM's sparse-logits indexer needs the MXFP4 indexer cache; with the FP8 record BLIS prices, it's the dense-logits indexer."
-    upstream: inference-sim/blis-schemas#57
   attention_config.use_trtllm_attention: {class: refuse, unset: [null], note: "An explicit TRT-LLM attention kernel choice isn't stated by the Deployment."}
   attention_config.mla_prefill_backend: {class: refuse, unset: [null], note: "An explicitly selected MLA prefill backend isn't stated by the Deployment."}
   attention_config.use_prefill_query_quantization:
@@ -182,7 +182,6 @@ entries:
     unset: [false]
     approximate_as: false
     note: "The run quantizes the query in prefill attention; the Deployment can't state it, so BLIS prices an unquantized query."
-    upstream: inference-sim/blis-schemas#57
   attention_config.*: {class: inert, note: "Attention kernel tuning knobs at vLLM's defaults or with no Deployment field BLIS prices them by."}
   kernel_config.moe_backend: {class: mapped, blis_field: engine.moe_backend, type: str, default: auto}
   moe_backend: {class: mapped, blis_field: engine.moe_backend, type: str, alias_of: kernel_config.moe_backend}

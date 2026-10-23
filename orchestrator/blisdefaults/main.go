@@ -1,12 +1,18 @@
-// Command blisdefaults prints the batch settings BLIS assumes for a vLLM deployment that
-// states neither, for one part: inference-sim's own resolver
-// (sim/kernelmodel.ResolveVLLMBatchDefaults) at the BLIS release this module is built
-// against. The extractor (orchestrator/ingest/settings.py) calls it only when no source a
-// run left records max_num_seqs or max_num_batched_tokens; nothing here re-encodes the
-// resolver's tiers.
+// Command blisdefaults asks the BLIS release this module is built against what it assumes,
+// so the extractor never encodes BLIS's rules itself.
 //
-// Usage: blisdefaults -memory-gib <GiB> -device <catalog hardware name>
-// Prints one canonical JSON object: {"device":…,"max_num_batched_tokens":…,"max_num_seqs":…,"memory_gib":…}.
+//	blisdefaults -memory-gib <GiB> -device <catalog hardware name>
+//	    The batch settings BLIS assumes for a vLLM deployment that states neither, for one
+//	    part (sim/kernelmodel.ResolveVLLMBatchDefaults). The extractor uses them only when no
+//	    source a run left records max_num_seqs or max_num_batched_tokens.
+//	    Prints {"device":…,"max_num_batched_tokens":…,"max_num_seqs":…,"memory_gib":…}.
+//
+//	blisdefaults -resolve -scenarios <dir> -scenario <file> -catalog <dir> -registry <dir>
+//	    What BLIS resolves for one scenario as written: the kernel's own resolution
+//	    (kernel.Resolution), including every override of a requested value with BLIS's reason.
+//	    The extractor records these as what BLIS used for a setting the run stated but BLIS
+//	    can't (e.g. the cache record its attention backend serves).
+//	    Prints {"overrides":[{"field","requested","resolved","reason"}…],"tp":…,"dp":…,"ep":…}.
 package main
 
 import (
@@ -34,12 +40,58 @@ func Resolve(memoryGiB float64, device string) Defaults {
 		MaxNumSeqs: d.MaxNumSeqs, MemoryGiB: memoryGiB}
 }
 
+// Override is one value BLIS resolved differently from what the scenario requested.
+type Override struct {
+	Field     string `json:"field"`
+	Reason    string `json:"reason"`
+	Requested string `json:"requested"`
+	Resolved  string `json:"resolved"`
+}
+
+// Resolution is what BLIS resolved for a scenario.
+type Resolution struct {
+	DP        int        `json:"dp"`
+	EP        int        `json:"ep"`
+	Overrides []Override `json:"overrides"`
+	TP        int        `json:"tp"`
+}
+
+// ResolveScenario opens a scenario with inference-sim's kernel and reports its resolution.
+func ResolveScenario(r kernelmodel.Repos, scenario string) (Resolution, error) {
+	m, err := kernelmodel.Open(scenario, r)
+	if err != nil {
+		return Resolution{}, err
+	}
+	res := m.Kernel().Resolved()
+	out := Resolution{TP: res.TensorParallel(), DP: res.DataParallel(), EP: res.ExpertParallel(), Overrides: []Override{}}
+	for _, o := range res.Overrides {
+		out.Overrides = append(out.Overrides, Override{Field: o.Field, Requested: fmt.Sprint(o.Requested),
+			Resolved: fmt.Sprint(o.Resolved), Reason: o.Reason})
+	}
+	return out, nil
+}
+
 func run(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("blisdefaults", flag.ContinueOnError)
 	mem := fs.Float64("memory-gib", 0, "the part's total device memory in GiB (catalog hardware MemoryGiB)")
 	dev := fs.String("device", "", "the part's catalog hardware name")
+	resolve := fs.Bool("resolve", false, "report BLIS's resolution of one scenario instead")
+	scenarios := fs.String("scenarios", "", "with -resolve: the scenario directory")
+	scenario := fs.String("scenario", "", "with -resolve: the scenario file name")
+	catalog := fs.String("catalog", "", "with -resolve: the blis-catalog root")
+	registry := fs.String("registry", "", "with -resolve: the blis-registry root")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *resolve {
+		if *scenarios == "" || *scenario == "" || *catalog == "" || *registry == "" {
+			return fmt.Errorf("-resolve needs -scenarios, -scenario, -catalog and -registry")
+		}
+		res, err := ResolveScenario(kernelmodel.Repos{Scenarios: *scenarios, Catalog: *catalog, Registry: *registry}, *scenario)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(out).Encode(res)
 	}
 	if *mem <= 0 || *dev == "" {
 		return fmt.Errorf("-memory-gib > 0 and -device are required")

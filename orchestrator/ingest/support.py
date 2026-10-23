@@ -35,6 +35,7 @@ class Catalog:
     root: Path
     models: dict = field(default_factory=dict)        # catalog name -> source.repo
     speculators: dict = field(default_factory=dict)   # catalog name -> speculator method | None
+    index_caches: dict = field(default_factory=dict)  # catalog name -> the indexer cache record, e.g. "fp8 (132 B per 2 tokens)"
     hardware: dict = field(default_factory=dict)      # part -> MemoryGiB
 
     @staticmethod
@@ -55,11 +56,45 @@ class Catalog:
                 graph = yaml.safe_load(g.read_text()) or {}
                 spec = graph.get("speculator") if isinstance(graph, dict) else None
                 c.speculators[d.name] = spec.get("method") if isinstance(spec, dict) else None
+                rec = _index_cache(graph)
+                if rec:
+                    c.index_caches[d.name] = rec
         for h in sorted((root / "hardware").glob("*.yaml")):
             doc = yaml.safe_load(h.read_text()) or {}
             if "MemoryGiB" in doc:
                 c.hardware[h.stem] = float(doc["MemoryGiB"])
         return c
+
+
+# The indexer K record's width per entry, by format: d_h values plus per-group scales. For the
+# DeepSeek sparse indexer (d_h 128): FP8 is 128 B + one 4-byte scale = 132 B; MXFP4 is 64 B + four
+# 1-byte scales = 68 B (blis-schemas docs/reference/model.md: "the 68-byte MXFP4 indexer record";
+# vLLM v1/attention/backends/mla/indexer.py). A record of another width is reported in bytes.
+INDEX_RECORD_FORMAT = {132: "fp8", 68: "mxfp4", 256: "bf16"}
+
+
+def _index_cache(graph) -> str | None:
+    """The indexer cache format the graph prices (its `kind: index` caches), named from the
+    record's width -- what BLIS uses for a run whose indexer format it can't state. None for a
+    graph with no indexer, or whose indexer records differ in width."""
+    widths = set()
+
+    def walk(n):
+        if isinstance(n, dict):
+            for c in n.get("caches") or []:
+                if isinstance(c, dict) and c.get("kind") == "index" and c.get("bytes_per_entry"):
+                    widths.add(int(c["bytes_per_entry"]))
+            for v in n.values():
+                walk(v)
+        elif isinstance(n, list):
+            for v in n:
+                walk(v)
+
+    walk(graph)
+    if len(widths) != 1:
+        return None
+    w = widths.pop()
+    return INDEX_RECORD_FORMAT.get(w, f"{w}-byte record")
 
 
 def registry_parts(registry_root) -> set[str]:

@@ -91,7 +91,7 @@ def test_every_policy_entry_is_well_formed():
         if e["class"] == "mapped":
             assert e.get("blis_field"), path
         if e["class"] == "approximate":
-            assert e.get("note") and e.get("upstream"), path
+            assert e.get("note") and "upstream" not in e, path
         if e["class"] == "refuse":
             assert e.get("note"), path
 
@@ -148,12 +148,12 @@ def test_a_field_printed_at_its_default_is_not_a_request():
     assert c.reasons == [] and not c.approximated
 
 
-def test_the_indexer_cache_dtype_is_approximated_with_its_upstream_issue():
+def test_the_indexer_cache_dtype_is_approximated_with_its_note():
     c = _classify(_log("'attention_config': AttentionConfig(indexer_kv_dtype='mxfp4', indexer_sparse_logits=True)"))
     assert c.reasons == [] and c.approximated
     rec = {a["arg"]: a for a in c.args}
     assert rec["attention_config.indexer_kv_dtype"]["match"] == "approximated"
-    assert rec["attention_config.indexer_kv_dtype"]["upstream"] == "inference-sim/blis-schemas#57"
+    assert rec["attention_config.indexer_kv_dtype"]["note"] and "upstream" not in rec["attention_config.indexer_kv_dtype"]
     assert rec["attention_config.indexer_sparse_logits"]["measured"] is True
 
 
@@ -412,6 +412,43 @@ def test_support_refuses_an_unknown_model_part_or_drafter():
     s = sp.check(cat, {"h200"}, checkpoints=["MiniMaxAI/MiniMax-M3"], base_models={}, hardware="h200",
                  spec_method="eagle3")
     assert s.reasons == ["drafter_not_in_catalog:eagle3"]
+
+
+def test_what_blis_used_for_an_estimated_setting_is_read_from_blis():
+    import score as sc
+
+    class Env:
+        catalog_obj = type("C", (), {"index_caches": {"m": "fp8"}})()
+
+    args = [{"arg": "attention_config.backend", "measured": "FLASHINFER_MLA_SPARSE_DSV41", "blis": None,
+             "match": "approximated", "_blis_from": "resolved.cache_dtype"},
+            {"arg": "attention_config.indexer_kv_dtype", "measured": "mxfp4", "blis": None,
+             "match": "approximated", "_blis_from": "graph.index_cache"}]
+    orig = sc.blis_resolution
+    sc.blis_resolution = lambda env, d, f: {"overrides": [{"field": "cache_dtype", "requested": "fp8",
+                                                           "resolved": "nvfp4_ds_mla", "reason": "r"}]}
+    try:
+        assert sc.fill_blis_side(args, Env(), Path("."), "s.yaml", "m") == []
+        assert [a["blis"] for a in args] == ["nvfp4_ds_mla", "fp8"]
+        assert all("_blis_from" not in a for a in args)
+        # BLIS reports nothing for it: the point is refused, never given a placeholder.
+        a = [{"arg": "attention_config.backend", "blis": None, "match": "approximated", "_blis_from": "resolved.cache_dtype"}]
+        sc.blis_resolution = lambda env, d, f: {"overrides": []}
+        assert sc.fill_blis_side(a, Env(), Path("."), "s.yaml", "m") == ["setting_differs:attention_config.backend"]
+        # BLIS refuses the scenario: its refusal is the reason (next to the point's others), never a crash.
+        a = [{"arg": "attention_backend", "blis": None, "match": "approximated", "_blis_from": "resolved.cache_dtype"}]
+        sc.blis_resolution = lambda env, d, f: "blis_refused:quantization_mxfp8_is_not_one_this_kernel_prices"
+        assert sc.fill_blis_side(a, Env(), Path("."), "s.yaml", "m") == ["blis_refused:quantization_mxfp8_is_not_one_this_kernel_prices"]
+    finally:
+        sc.blis_resolution = orig
+
+
+def test_the_indexer_record_is_named_from_the_catalog_graph():
+    g = {"layer_kinds": [{"nodes": [{"caches": [{"kind": "index", "bytes_per_entry": 132, "tokens_per_entry": 2}]}]},
+                         {"nodes": [{"caches": [{"kind": "index", "bytes_per_entry": 132}]}]}]}
+    assert sp._index_cache(g) == "fp8"
+    g["layer_kinds"][1]["nodes"][0]["caches"][0]["bytes_per_entry"] = 68
+    assert sp._index_cache(g) is None             # records that differ: not guessed
 
 
 # ------------------------------------------------------------------ artifacts

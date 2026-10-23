@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"os"
 	"testing"
 )
 
@@ -45,4 +47,42 @@ func TestRunRefusesMissingInputs(t *testing.T) {
 			t.Errorf("accepted %v", args)
 		}
 	}
+}
+
+func TestResolveRefusesMissingInputs(t *testing.T) {
+	for _, args := range [][]string{
+		{"-resolve", "-scenarios", "s", "-scenario", "x.yaml", "-catalog", "c"},
+		{"-resolve", "-scenario", "x.yaml", "-catalog", "c", "-registry", "r"},
+	} {
+		if err := run(args, &bytes.Buffer{}); err == nil {
+			t.Errorf("accepted %v", args)
+		}
+	}
+}
+
+// Against a real catalog and registry (BLIS_CATALOG, BLIS_REGISTRY) and a scenario written by
+// orchestrator/ingest (BLIS_SCENARIOS, BLIS_SCENARIO, BLIS_WANT_OVERRIDE as field=requested>resolved):
+// -resolve reports the kernel's own override. Skipped when they aren't given; CI has no catalog.
+func TestResolveReportsTheKernelsOverride(t *testing.T) {
+	env := map[string]string{}
+	for _, k := range []string{"BLIS_CATALOG", "BLIS_REGISTRY", "BLIS_SCENARIOS", "BLIS_SCENARIO", "BLIS_WANT_OVERRIDE"} {
+		if env[k] = os.Getenv(k); env[k] == "" {
+			t.Skipf("%s not set", k)
+		}
+	}
+	var b bytes.Buffer
+	if err := run([]string{"-resolve", "-scenarios", env["BLIS_SCENARIOS"], "-scenario", env["BLIS_SCENARIO"],
+		"-catalog", env["BLIS_CATALOG"], "-registry", env["BLIS_REGISTRY"]}, &b); err != nil {
+		t.Fatal(err)
+	}
+	var res Resolution
+	if err := json.Unmarshal(b.Bytes(), &res); err != nil {
+		t.Fatal(err)
+	}
+	for _, o := range res.Overrides {
+		if o.Field+"="+o.Requested+">"+o.Resolved == env["BLIS_WANT_OVERRIDE"] {
+			return
+		}
+	}
+	t.Fatalf("no override %s in %s", env["BLIS_WANT_OVERRIDE"], b.String())
 }

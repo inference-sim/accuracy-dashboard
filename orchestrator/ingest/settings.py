@@ -488,10 +488,12 @@ def classify(settings: dict[str, Setting], policy: dict, vllm_defaults: dict | N
             if _is_unset(entry, st.value):
                 continue
             c.approximated = True
+            # What BLIS used is filled in after the scenario is written (score.fill_blis_side),
+            # from BLIS itself; `approximate_as` is only for a switch BLIS has no setting for.
             rec.update(blis=_record_value(entry.get("approximate_as")), match="approximated",
                        note=entry["note"])
-            if entry.get("upstream"):
-                rec["upstream"] = entry["upstream"]
+            if entry.get("blis_from"):
+                rec["_blis_from"] = entry["blis_from"]
             c.args.append(rec)
             continue
         # mapped
