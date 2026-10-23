@@ -431,6 +431,20 @@ class Classified:
     roles: dict = field(default_factory=dict)          # role -> value (model, drafter, ...)
 
 
+def _inert_when(rule, settings: dict) -> bool:
+    """A refuse entry's condition under which the setting has no effect, from the run's own
+    other settings: {"ge": [a, b]} holds when both are recorded and a >= b. Unrecorded
+    values never satisfy it, so a setting is never assumed harmless."""
+    if not rule:
+        return False
+    a, b = rule["ge"]
+    va, vb = settings.get(a), settings.get(b)
+    try:
+        return va is not None and vb is not None and int(va.value) >= int(vb.value)
+    except (TypeError, ValueError):
+        return False
+
+
 def part_default(entry: dict, settings: dict, family: int | None):
     """vLLM's own value for a setting whose default depends on the part (default_by_part), or
     None when the policy doesn't say or the part's architecture isn't known."""
@@ -510,6 +524,10 @@ def classify(settings: dict[str, Setting], policy: dict, vllm_defaults: dict | N
             continue
         if cls == "refuse":
             if _is_unset(entry, st.value):
+                continue
+            if _inert_when(entry.get("inert_when"), settings):
+                # The setting can't change anything under the run's other settings.
+                c.args.append({**rec, "blis": None, "match": "inert"})
                 continue
             c.reasons.append(f"setting_not_modelled:{path}")
             c.args.append({**rec, "blis": None, "match": "absent_in_blis"})

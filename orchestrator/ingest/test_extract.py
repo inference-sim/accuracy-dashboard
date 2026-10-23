@@ -281,6 +281,24 @@ def test_a_fusion_pass_at_vllms_own_default_for_the_part_is_inert():
     assert cls(4, True, None) == ([f"setting_not_modelled:{k}"], "absent_in_blis")
 
 
+def test_chunked_prefill_off_changes_nothing_when_the_budget_holds_the_longest_request():
+    def cls(mbt, mml):
+        args = "'enable_chunked_prefill': False"
+        if mbt is not None:
+            args += f", 'max_num_batched_tokens': {mbt}"
+        if mml is not None:
+            args += f", 'max_model_len': {mml}"
+        c = _classify(_log(args))
+        return c.reasons, next(a["match"] for a in c.args if a["arg"] == "enable_chunked_prefill")
+    # MiniMax-M3 b200 8k/1k (the runs seen): budget 16384, longest request 9472 -> never split
+    assert cls(16384, 9472) == ([], "inert")
+    assert cls(9472, 9472) == ([], "inert")
+    # a budget below the longest request: vLLM would hold, BLIS would split
+    assert cls(8192, 9472) == (["setting_not_modelled:enable_chunked_prefill"], "absent_in_blis")
+    # an unrecorded limit is never assumed to hold
+    assert cls(16384, None)[0] == ["setting_not_modelled:enable_chunked_prefill"]
+
+
 def test_moe_backend_is_mapped_to_its_blis_field():
     c = _classify(_log("'kernel_config': KernelConfig(moe_backend='deep_gemm_mega_moe')"))
     assert c.mapped["engine.moe_backend"][1] == "deep_gemm_mega_moe"

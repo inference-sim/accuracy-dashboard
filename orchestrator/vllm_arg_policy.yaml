@@ -94,7 +94,16 @@ entries:
   max_seq_len: {class: mapped, blis_field: engine.max_model_len, type: int, alias_of: max_model_len}
   gpu_memory_utilization: {class: mapped, blis_field: engine.gpu_memory_utilization, type: float}
   enable_prefix_caching: {class: mapped, blis_field: engine.enable_prefix_caching, type: bool}
-  enable_chunked_prefill: {class: refuse, unset: [true], note: "vLLM v1 always chunks prefills; BLIS models chunked prefill only."}
+  # Chunked prefill off: vLLM v0.31.0 then never splits a prompt, and a prompt longer than the
+  # step's token budget waits (v1/core/sched/scheduler.py: "If chunked_prefill is disabled, we
+  # can stop the scheduling here"). When the budget holds the longest request the run allows
+  # (max_num_batched_tokens >= max_model_len) no prompt is ever split either way, which is
+  # what BLIS's scheduler does too: off changes nothing then. Below that, it would.
+  enable_chunked_prefill:
+    class: refuse
+    unset: [true, null]
+    inert_when: {ge: [max_num_batched_tokens, max_model_len]}
+    note: "Chunked prefill off with a token budget below the longest request: vLLM holds a prompt that doesn't fit instead of splitting it, which BLIS's scheduler doesn't do."
   long_prefill_token_threshold: {class: mapped, blis_field: engine.long_prefill_token_threshold, type: int, default: 0}
   scheduling_policy: {class: mapped, blis_field: engine.scheduling_policy, type: str, default: fcfs}
   async_scheduling: {class: mapped, blis_field: engine.async_scheduling, type: bool}
