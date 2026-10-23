@@ -750,7 +750,11 @@ def test_display_map_is_read_from_the_site_and_rows_windowed_on_date():
                                     {"id": "1", "model": "dsv41flash", "framework": "vllm", "date": "2026-08-01",
                                      "curve_date": "2026-10-20"}],
             "GLM-5": [{"id": "3", "model": "glm5.1", "framework": "vllm", "date": "2026-10-21"},
-                      {"id": "4", "model": "glm5", "framework": "sglang", "date": "2026-10-21"}]}
+                      # every other serving stack InferenceX reports, including the ones that
+                      # wrap vLLM: only plain vLLM rows are pulled
+                      *[{"id": str(10 + i), "model": "glm5", "framework": f, "date": "2026-10-21"}
+                        for i, f in enumerate(("sglang", "trt", "dynamo-vllm", "vllm-disagg", "llmd-vllm",
+                                               "dynamo-sglang", "dynamo-trt", "atom", "VLLM", " vllm"))]]}
 
     def fetch(url):
         path = url[len(api.BASE):]
