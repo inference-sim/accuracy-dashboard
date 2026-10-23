@@ -32,13 +32,17 @@ CORPUS = {"dataset": "semianalysisai/cc-traces-weka-062126",
 # Builds, as #28's evidence resolved them.
 B_CD10 = {"image": "vllm/vllm-openai:nightly-cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3",
           "commit": "cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3", "source": "server_log_banner",
-          "ref": VLLM_REF, "distance": -738}
+          "ref": VLLM_REF, "distance": -738, "match": "exact"}
 B_AC91 = {"image": "vllm/vllm-openai:nightly-dev-x86_64-cu130-ac9126e58aa7",
           "commit": "ac9126e58aa7bbab1856ba6593ba4d5003fea516", "source": "label_by_tag",
-          "ref": VLLM_REF, "distance": 207}
+          "ref": VLLM_REF, "distance": 207, "match": "exact"}
 B_7C5D = {"image": "vllm/vllm-openai:nightly-7c5dc571cbd1064ecc8a9b1045637ff647aa22cb",
           "commit": "7c5dc571cbd1064ecc8a9b1045637ff647aa22cb", "source": "image_label",
-          "ref": VLLM_REF, "distance": -1435}
+          "ref": VLLM_REF, "distance": -1435, "match": "exact"}
+# A build BLIS doesn't model is still scored, as estimated: here a model-specific image built
+# from a vLLM fork (its commit is off vLLM's mainline).
+B_FORK = {"image": "vllm/vllm-openai:vllm-minimax-m3-perf-x86_64-13.0.1-8b00f41", "commit": None,
+          "source": None, "ref": VLLM_REF, "distance": None, "match": "estimated", "why": "custom_build"}
 
 REPLAY = {"client": "aiperf", "client_version": "0.12.0", "scenario": "inferencex-agentx-mvp",
           "replayed_as": "inferencex-agentx-mvp", "duration_s": 3600,
@@ -143,6 +147,21 @@ POINTS = [
                                 "match": "exact"}],
                   "replay": {**REPLAY, "concurrency": 8, "client_version": "1.0.11", "scenario": "agentx"},
                   "blis_kernel_provenance": {"method_counts": {"assumed": 50, "measured": 99}}}},
+    # MiniMax-M3 h200 TP8 c4 on a custom image: every setting matched, but the build isn't the
+    # one BLIS models, so the point is estimated.
+    {"row": {"model": "minimaxm3", "hardware": "h200", "precision": "fp8", "framework": "vllm",
+             "benchmark_type": "agentic_traces", "recipe_fingerprint": "e4" * 32, "conc": 4,
+             "date": "2026-10-11", "curve_workflow_run_id": "2610"},
+     "facets": {"scenario": "minimax-m3-h200-fp8-vllm-tp8-agentx.yaml", "label": "agentx", "workload": "agentx",
+                "model": "minimax-m3", "gpu": "h200", "spec_method": "none",
+                "parallelism": {"tp": 8, "pp": 1, "dp": 1, "ep": 1},
+                "image": B_FORK["image"], "vllm_version": "0.30.0rc2.dev44+g8b00f4123"},
+     "meas": (1630.0, 11.80), "pred": {"a": (1490.0, 10.90), "b": (1720.0, 10.40)},
+     "fidelity": {"status": "approximate", "build": B_FORK,
+                  "args": [arg("block_size", 16, 16, "exact", "engine_line"),
+                           arg("gpu_memory_utilization", "0.9", "0.9", "exact", "engine_line"),
+                           arg("max_num_seqs", 64, 64, "exact", "args")],
+                  "resolved": [], "replay": {**REPLAY, "concurrency": 4}, "blis_kernel_provenance": None}},
     # DeepSeek-V4-Pro b200 single-turn 8k1k TP8: one curve, conc 1/4/16.
     *[{
         "row": {"model": "dsv4", "hardware": "b200", "precision": "fp4", "framework": "vllm",
@@ -179,7 +198,7 @@ NOT_SCORED = [
       "benchmark_type": "agentic_traces", "recipe_fingerprint": "", "row_id": "445802", "conc": 1,
       "date": "2026-10-21"},
      "vllm/vllm-openai:nightly-dev-x86_64-cu13.0.1-20ebb28", (880.0, 11.2),
-     ["build_commit_unresolvable", "custom_build"]),
+     ["model_not_in_catalog"]),
     ({"model": "minimaxm3", "hardware": "h100", "precision": "fp8", "framework": "vllm",
       "benchmark_type": "agentic_traces", "recipe_fingerprint": "e6" * 32, "conc": 6, "date": "2026-09-27"},
      "vllm/vllm-openai:nightly-ddd6fbca148a867aad1fcab7ec72f582b9977db4", (2050.0, 12.4),

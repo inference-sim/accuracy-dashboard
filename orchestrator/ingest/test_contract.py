@@ -112,7 +112,7 @@ def test_fixture_run_b_shares_all_but_one_scored_point_with_run_a():
     def ids(run, name):
         return {json.loads(x)["point_id"] for x in (FIXTURE / run / name).read_text().splitlines() if x}
     a, b = ids("run-a", c.FIDELITY_JSONL), ids("run-b", c.FIDELITY_JSONL)
-    assert len(a) == 8 and len(b) == 7 and b < a
+    assert len(a) == 9 and len(b) == 8 and b < a
     dropped = (a - b).pop()
     assert dropped in ids("run-b", c.NOT_SCORED_JSONL)
 
@@ -290,7 +290,7 @@ def test_an_approximate_point_is_scored_in_the_all_tier_only():
     rows = {r["point_id"]: r for r in _csv.DictReader(open(FIXTURE / "run-a" / c.POINTS_CSV))}
     for rec in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL):
         approx = [a for a in rec["args"] if a["match"] == "approximated"]
-        assert (rec["status"] == "approximate") == bool(approx)
+        assert (rec["status"] == "approximate") == (bool(approx) or rec["build"]["match"] == "estimated")
         assert rows[rec["point_id"]]["tier_unbracketed"] == c.TIER_BY_STATUS[rec["status"]]
         for a in approx:
             assert a["note"] and "upstream" not in a, a
@@ -308,6 +308,24 @@ def test_fidelity_schema_ties_approximate_status_to_an_approximated_arg():
     assert not v.is_valid({**rec, "args": plain})                             # approximate with none
     bare = [{**a, "note": None} if a["match"] == "approximated" else a for a in rec["args"]]
     assert not v.is_valid({**rec, "args": [{k: x for k, x in a.items() if x is not None} for a in bare]})
+
+
+def test_an_estimated_build_is_scored_and_makes_the_point_approximate():
+    import jsonschema
+    v = jsonschema.Draft7Validator(json.loads(c.FIDELITY_SCHEMA.read_text()))
+    recs = [{k: x for k, x in r.items() if k != "point_id"} for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL)]
+    est = next(r for r in recs if r["build"]["match"] == "estimated")
+    assert est["status"] == "approximate" and est["build"]["why"] == "custom_build"
+    assert not any(a["match"] == "approximated" for a in est["args"])          # only the build differs
+    assert v.is_valid(est)
+    assert not v.is_valid({**est, "status": "exact"})                          # exact with an estimated build
+    exact = next(r for r in recs if r["status"] == "exact")
+    assert not v.is_valid({**exact, "build": {**exact["build"], "match": "estimated"}})   # estimated needs why
+    assert not v.is_valid({**exact, "build": {**exact["build"], "why": "custom_build"}})  # exact has no why
+    assert not v.is_valid({**exact, "build": {k: x for k, x in exact["build"].items() if k != "match"}})
+    # Build problems are no longer reasons a point isn't scored.
+    for code in ("custom_build", "outside_distance", "build_commit_unresolvable", "build_commit_conflict"):
+        assert not v.is_valid({**exact, "status": "not_scored", "reasons": [code]}), code
 
 
 def test_validator_requires_every_provenance_key():

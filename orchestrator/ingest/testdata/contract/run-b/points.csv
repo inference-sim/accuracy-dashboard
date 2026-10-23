@@ -6,3 +6,4 @@ deepseek-v4.1-flash-b200-fp4-vllm-tp1-ep2-dp2-dspark5-agentx.yaml,deepseek-v4.1-
 deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml,deepseek-v4.1-flash,h200,agentx,1,8100.0,7050.0,980000.0,1120000.0,MEASURED-OR-RESOLVED,ce649d8e02c65226590e9df810e594539b495a295d46ce659722a81c28071356,2026-09-21
 deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml,deepseek-v4.1-flash,h200,agentx,2,8650.0,7550.0,1210000.0,1380000.0,MEASURED-OR-RESOLVED,1cde80e14072cec25522c9361237fa84fea0c561f80f8126278281145c38db79,2026-09-21
 deepseek-v4.1-flash-h200-fp4-vllm-tp8-dspark5-agentx.yaml,deepseek-v4.1-flash,h200,agentx,1,6900.0,5950.0,760000.0,790000.0,MEASURED-OR-RESOLVED,59ed3ce626c2e97bbbf9de5d2b194d7dbf8b1b0430a74ef95dc3dff6f3e39723,2026-09-21
+minimax-m3-h200-fp8-vllm-tp8-agentx.yaml,minimax-m3,h200,agentx,4,11800.0,10400.0,1630000.0,1720000.0,ALL (approximate),339e2060a615a384023a4808efd7a69aa287c72daf463fc3a3f55c4da19fa52e,2026-10-11

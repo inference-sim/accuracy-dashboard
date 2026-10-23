@@ -145,7 +145,7 @@ describe('the tier controls what the table lists', () => {
 describe('dates are labelled for what they are', () => {
   it('the headline gives the data range and the API pull date, never a "data from <pull date>"', () => {
     const { html } = render(<App summary={v2a()} loadError={null} initialHash="#/?tier=all" />)
-    expect(html).toContain('InferenceX data range 2026-09-03 to 2026-10-03')
+    expect(html).toContain('InferenceX data range 2026-09-03 to 2026-10-11')
     expect(html).toContain('API pull date 2026-10-23')
     expect(html).not.toContain('InferenceX data from')
   })
@@ -170,7 +170,7 @@ describe('dates are labelled for what they are', () => {
   it('says "1 model", not "1 models"', () => {
     const { html } = render(<App summary={v2a()} loadError={null} initialHash="#/?tier=all" />)
     expect(html).not.toContain('1 models')
-    expect(html).toMatch(/\b\d+ measurements · 2 models/)
+    expect(html).toMatch(/\b\d+ measurements · 3 models/)
     const one = v2a()
     one.matrix = one.matrix.slice(0, 1)
     expect(render(<App summary={one} loadError={null} initialHash="#/?tier=all" />).html).toContain(' · 1 model · ')
@@ -220,6 +220,35 @@ describe('the match tooltip shows only what differs, in plain words', () => {
   })
 })
 
+describe('a build BLIS doesn’t model is scored as estimated', () => {
+  const custom = () => flattenPoints(v2a()).find((x) => x.fidelity?.build.match === 'estimated')!
+
+  it('is in the estimated and all tiers, not exact', () => {
+    const p = custom()
+    expect(p.fidelity!.status).toBe('approximate')
+    expect(p.tier).toBe('all')
+  })
+
+  it('the match tooltip names the build as the only difference', () => {
+    const html = renderToStaticMarkup(<ProvenanceBody fidelity={custom().fidelity!} />)
+    expect(html).toContain('BLIS simulated the exact settings this run used, but not its vLLM build:')
+    expect(html).toMatch(/vLLM build<\/span><span role="cell">a custom build<\/span><span role="cell">v0.31.0/)
+    expect(html.match(/role="row"/g)?.length).toBe(2)   // header + the build
+  })
+
+  it('a build too far from the release says how far, in the table', () => {
+    const f = custom().fidelity!
+    const far = { ...f, build: { ...f.build, commit: 'a'.repeat(40), distance: -2500, why: 'outside_distance' as const } }
+    const html = renderToStaticMarkup(<ProvenanceBody fidelity={far} />)
+    expect(html).toContain('2,500 commits older than v0.31.0')
+  })
+
+  it('its version tooltip says it isn’t the release BLIS models', () => {
+    const html = renderToStaticMarkup(<VersionBody build={custom().fidelity!.build} />)
+    expect(html).toContain('This run’s vLLM build is a custom build; BLIS models v0.31.0.')
+  })
+})
+
 describe('the vLLM version says how far its build is from the release BLIS models', () => {
   const tip = (gpu: string) => {
     const p = flattenPoints(v2a()).find((x) => x.gpu === gpu && x.engineVersion)!
@@ -257,9 +286,9 @@ describe('Compare across v2 runs', () => {
     expect(pointKey(q).split('|').length).toBe(6)
   })
 
-  it('intersects run-a and run-b: 7 shared, the refused point left out', () => {
+  it('intersects run-a and run-b: 8 shared, the refused point left out', () => {
     const { pairs, onlyA, onlyB } = intersectByKey(flattenPoints(v2a()), flattenPoints(v2b()))
-    expect(pairs.length).toBe(7)
+    expect(pairs.length).toBe(8)
     expect(onlyA + onlyB).toBe(1)
   })
 
@@ -270,7 +299,7 @@ describe('Compare across v2 runs', () => {
       <App summary={a} summaryB={b} loadError={null} initialHash={`#/?run=${a.snapshot_id}&runB=${b.snapshot_id}`} />,
     )
     expect(errors.join('\n')).toBe('')
-    expect(html).toContain('Comparing 7 of 8 points')
+    expect(html).toContain('Comparing 8 of 9 points')
     clean(html)
   })
 

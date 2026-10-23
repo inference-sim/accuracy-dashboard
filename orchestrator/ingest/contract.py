@@ -80,7 +80,8 @@ def points_sort_key(row: dict) -> tuple:
 
 # A scored point's points.csv tier, by its fidelity status, in the tier strings
 # build_summary.TIER_MAP already reads: an exact point is apples-to-apples; an approximate
-# one (a setting BLIS can't state was approximated) only counts in the "all" tier.
+# one (a setting BLIS can't state was approximated, or a vLLM build BLIS doesn't model) only
+# counts in the "all" tier.
 TIER_BY_STATUS = {"exact": "MEASURED-OR-RESOLVED", "approximate": "ALL (approximate)"}
 PROVENANCE_KEYS = ("ingest", "blis", "vllm_ref", "vllm_max_distance", "policy_sha256", "pulled_at",
                    "corpus", "pull_manifest_sha256")

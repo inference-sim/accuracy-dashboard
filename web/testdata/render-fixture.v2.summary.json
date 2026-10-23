@@ -31,14 +31,13 @@
     }
   },
   "coverage": {
-    "scored": 8,
+    "scored": 9,
     "not_scored": 4,
     "multinode_hidden": 0,
     "failed": 0,
     "not_scored_reasons": {
-      "build_commit_unresolvable": 1,
-      "custom_build": 1,
       "drafter_not_in_catalog": 2,
+      "model_not_in_catalog": 1,
       "setting_not_modelled": 2
     }
   },
@@ -64,9 +63,9 @@
     },
     "all": {
       "mape": {
-        "ttft": 6.5091558070040865,
-        "tpot": 8.73520528692363,
-        "n": 8
+        "ttft": 6.740244834583046,
+        "tpot": 8.61208454882854,
+        "n": 9
       },
       "shape": {
         "ttft": 8.074078665868909,
@@ -296,6 +295,7 @@
                           "commit": "7c5dc571cbd1064ecc8a9b1045637ff647aa22cb",
                           "distance": -1435,
                           "image": "vllm/vllm-openai:nightly-7c5dc571cbd1064ecc8a9b1045637ff647aa22cb",
+                          "match": "exact",
                           "ref": "v0.31.0",
                           "source": "image_label"
                         },
@@ -361,6 +361,7 @@
                           "commit": "7c5dc571cbd1064ecc8a9b1045637ff647aa22cb",
                           "distance": -1435,
                           "image": "vllm/vllm-openai:nightly-7c5dc571cbd1064ecc8a9b1045637ff647aa22cb",
+                          "match": "exact",
                           "ref": "v0.31.0",
                           "source": "image_label"
                         },
@@ -426,6 +427,7 @@
                           "commit": "7c5dc571cbd1064ecc8a9b1045637ff647aa22cb",
                           "distance": -1435,
                           "image": "vllm/vllm-openai:nightly-7c5dc571cbd1064ecc8a9b1045637ff647aa22cb",
+                          "match": "exact",
                           "ref": "v0.31.0",
                           "source": "image_label"
                         },
@@ -701,6 +703,7 @@
                           "commit": "ac9126e58aa7bbab1856ba6593ba4d5003fea516",
                           "distance": 207,
                           "image": "vllm/vllm-openai:nightly-dev-x86_64-cu130-ac9126e58aa7",
+                          "match": "exact",
                           "ref": "v0.31.0",
                           "source": "label_by_tag"
                         },
@@ -873,6 +876,7 @@
                           "commit": "cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3",
                           "distance": -738,
                           "image": "vllm/vllm-openai:nightly-cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3",
+                          "match": "exact",
                           "ref": "v0.31.0",
                           "source": "server_log_banner"
                         },
@@ -955,6 +959,7 @@
                           "commit": "cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3",
                           "distance": -738,
                           "image": "vllm/vllm-openai:nightly-cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3",
+                          "match": "exact",
                           "ref": "v0.31.0",
                           "source": "server_log_banner"
                         },
@@ -1037,6 +1042,7 @@
                           "commit": "cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3",
                           "distance": -738,
                           "image": "vllm/vllm-openai:nightly-cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3",
+                          "match": "exact",
                           "ref": "v0.31.0",
                           "source": "server_log_banner"
                         },
@@ -1168,6 +1174,7 @@
                           "commit": "cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3",
                           "distance": -738,
                           "image": "vllm/vllm-openai:nightly-cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3",
+                          "match": "exact",
                           "ref": "v0.31.0",
                           "source": "server_log_banner"
                         },
@@ -1195,6 +1202,248 @@
                           }
                         ],
                         "status": "exact"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "level": "model",
+      "model": "minimax-m3",
+      "source": "inferencex",
+      "vllm_version": "0.30.0rc2.dev44+g8b00f4123",
+      "coverage": {
+        "scored": 1,
+        "total": 1
+      },
+      "metrics": {
+        "measured_or_resolved": {
+          "mape": {
+            "ttft": null,
+            "tpot": null,
+            "n": 0
+          },
+          "shape": {
+            "ttft": null,
+            "tpot": null,
+            "n": 0
+          },
+          "noise_floor_pct": 1.6
+        },
+        "all": {
+          "mape": {
+            "ttft": 8.588957055214719,
+            "tpot": 7.6271186440677985,
+            "n": 1
+          },
+          "shape": {
+            "ttft": null,
+            "tpot": null,
+            "n": 0
+          },
+          "noise_floor_pct": 1.6
+        }
+      },
+      "rows": [
+        {
+          "level": "workload",
+          "label": "agentx",
+          "isl": null,
+          "osl": null,
+          "coverage": {
+            "scored": 1,
+            "total": 1
+          },
+          "metrics": {
+            "measured_or_resolved": {
+              "mape": {
+                "ttft": null,
+                "tpot": null,
+                "n": 0
+              },
+              "shape": {
+                "ttft": null,
+                "tpot": null,
+                "n": 0
+              },
+              "noise_floor_pct": 1.6
+            },
+            "all": {
+              "mape": {
+                "ttft": 8.588957055214719,
+                "tpot": 7.6271186440677985,
+                "n": 1
+              },
+              "shape": {
+                "ttft": null,
+                "tpot": null,
+                "n": 0
+              },
+              "noise_floor_pct": 1.6
+            }
+          },
+          "rows": [
+            {
+              "level": "gpu",
+              "label": "h200",
+              "precision": "fp8",
+              "coverage": {
+                "scored": 1,
+                "total": 1
+              },
+              "metrics": {
+                "measured_or_resolved": {
+                  "mape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "shape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                },
+                "all": {
+                  "mape": {
+                    "ttft": 8.588957055214719,
+                    "tpot": 7.6271186440677985,
+                    "n": 1
+                  },
+                  "shape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                }
+              },
+              "rows": [
+                {
+                  "level": "topology",
+                  "framework": "vllm",
+                  "engine_version": "0.30.0rc2.dev44+g8b00f4123",
+                  "precision": "fp8",
+                  "is_multinode": false,
+                  "parallelism": {
+                    "dp": 1,
+                    "ep": 1,
+                    "pp": 1,
+                    "tp": 8
+                  },
+                  "serving": "aggregated",
+                  "spec_method": "none",
+                  "label": "dp1 · ep1 · pp1 · tp8 · fp8",
+                  "coverage": {
+                    "scored": 1,
+                    "total": 1
+                  },
+                  "metrics": {
+                    "measured_or_resolved": {
+                      "mape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    },
+                    "all": {
+                      "mape": {
+                        "ttft": 8.588957055214719,
+                        "tpot": 7.6271186440677985,
+                        "n": 1
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    }
+                  },
+                  "rows": [
+                    {
+                      "level": "point",
+                      "concurrency": 4,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 1630.0,
+                        "tpot_ms": 11.8
+                      },
+                      "predicted": {
+                        "ttft_ms": 1490.0,
+                        "tpot_ms": 10.9
+                      },
+                      "error_pct": {
+                        "ttft": -8.589,
+                        "tpot": -7.6271
+                      },
+                      "shape": null,
+                      "shape_reason": "< 3 concurrencies",
+                      "point_id": "339e2060a615a384023a4808efd7a69aa287c72daf463fc3a3f55c4da19fa52e",
+                      "measured_date": "2026-10-11",
+                      "fidelity": {
+                        "args": [
+                          {
+                            "arg": "block_size",
+                            "blis": 16,
+                            "match": "exact",
+                            "measured": 16,
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "gpu_memory_utilization",
+                            "blis": "0.9",
+                            "match": "exact",
+                            "measured": "0.9",
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "max_num_seqs",
+                            "blis": 64,
+                            "match": "exact",
+                            "measured": 64,
+                            "source": "args"
+                          }
+                        ],
+                        "blis_kernel_provenance": null,
+                        "build": {
+                          "commit": null,
+                          "distance": null,
+                          "image": "vllm/vllm-openai:vllm-minimax-m3-perf-x86_64-13.0.1-8b00f41",
+                          "match": "estimated",
+                          "ref": "v0.31.0",
+                          "source": null,
+                          "why": "custom_build"
+                        },
+                        "replay": {
+                          "client": "aiperf",
+                          "client_version": "0.12.0",
+                          "concurrency": 4,
+                          "corpus": "semianalysis_cc_traces_weka_062126",
+                          "corpus_sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
+                          "duration_s": 3600,
+                          "replayed_as": "inferencex-agentx-mvp",
+                          "scenario": "inferencex-agentx-mvp",
+                          "seed": 42,
+                          "trajectory_start": {
+                            "max_ratio": 0.75,
+                            "min_ratio": 0.25
+                          }
+                        },
+                        "resolved": [],
+                        "status": "approximate"
                       }
                     }
                   ]
@@ -1237,8 +1486,7 @@
       "point_id": "012a621f883620b38ce6013d1c0f7b0ea03538d3c8413d3ecc982133e30a78f2",
       "precision": "fp4",
       "reasons": [
-        "build_commit_unresolvable",
-        "custom_build"
+        "model_not_in_catalog"
       ]
     },
     {

@@ -40,7 +40,7 @@ class ContractError(RuntimeError):
 
 # A point's tier comes from its fidelity record, not the harness's tier string: an exact point
 # (BLIS simulated exactly what the run used) is in the strict tier; an approximate one (a setting
-# BLIS can't state was estimated) only in "all".
+# BLIS can't state was estimated, or a vLLM build BLIS doesn't model) only in "all".
 TIER_BY_STATUS = {"exact": "measured_or_resolved", "approximate": "all"}
 
 

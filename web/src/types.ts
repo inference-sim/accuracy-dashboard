@@ -60,7 +60,16 @@ export interface FidelityResolved {
 export interface Fidelity {
   status: 'exact' | 'approximate' | 'not_scored'
   reasons?: string[]
-  build: { image: string; commit: string | null; source: string | null; ref: string; distance: number | null }
+  build: {
+    image: string
+    commit: string | null
+    source: string | null
+    ref: string
+    distance: number | null
+    /** exact: the build BLIS models. Older v2 records have no match and read as exact. */
+    match?: 'exact' | 'estimated'
+    why?: 'custom_build' | 'outside_distance' | 'commit_unresolvable' | 'commit_conflict'
+  }
   args: FidelityArg[]
   resolved: FidelityResolved[]
   replay?: {

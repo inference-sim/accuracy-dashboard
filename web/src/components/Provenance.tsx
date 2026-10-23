@@ -4,10 +4,11 @@
  * the measured run and what BLIS simulated, in plain words:
  *
  *   - settings BLIS couldn't match exactly (approximated), with what each side used;
+ *   - the run's vLLM build, when it isn't the one BLIS models;
  *   - settings the run didn't record, which BLIS filled with its own default.
  *
- * How far the run's vLLM build is from the release BLIS models is shown on the point's vLLM
- * version instead (VersionTip), since it's about the build, not the settings.
+ * How far the run's vLLM build is from the release BLIS models is also on the point's vLLM
+ * version (VersionTip).
  *
  * Everything that matched is summed up in one sentence. The full per-setting record stays in
  * summary.json (point.fidelity) for anyone who wants it. v1 points have no record and render
@@ -58,7 +59,7 @@ function value(v: unknown): string {
 
 /** The settings BLIS estimated, side by side. A popover lives inside a <span> trigger, so this
  *  uses spans laid out as a table (CSS display: table), never a real <table> element. */
-function DiffTable({ args }: { args: FidelityArg[] }) {
+function DiffTable({ args, build }: { args: FidelityArg[]; build: { run: string; ref: string } | null }) {
   return (
     <span className="prov-tbl" role="table" aria-label="settings BLIS estimated">
       <span className="prov-tr prov-th" role="row">
@@ -73,13 +74,34 @@ function DiffTable({ args }: { args: FidelityArg[] }) {
           <span role="cell">{value(a.blis)}</span>
         </span>
       ))}
+      {build && (
+        <span className="prov-tr" role="row">
+          <span role="cell">vLLM build</span>
+          <span role="cell">{build.run}</span>
+          <span role="cell">{build.ref}</span>
+        </span>
+      )}
     </span>
   )
+}
+
+/** Why a run's build isn't the one BLIS models, in plain words. */
+function buildDiff(b: Fidelity['build']): string | null {
+  if (b.match !== 'estimated') return null
+  switch (b.why) {
+    case 'outside_distance':
+      return `${Math.abs(b.distance ?? 0).toLocaleString('en-US')} commits ${(b.distance ?? 0) > 0 ? 'newer' : 'older'} than ${b.ref}`
+    case 'custom_build':
+      return 'a custom build'
+    default:
+      return 'a build that can’t be traced to a vLLM commit'
+  }
 }
 
 export function ProvenanceBody({ fidelity: f }: { fidelity: Fidelity }) {
   const approx = f.args.filter((a) => a.match === 'approximated')
   const defaults = f.args.filter((a) => a.match === 'blis_default')
+  const build = buildDiff(f.build)
   const exact = f.status !== 'approximate'
   return (
     <span className="prov-body">
@@ -87,9 +109,11 @@ export function ProvenanceBody({ fidelity: f }: { fidelity: Fidelity }) {
       <span className="prov-row">
         {exact
           ? 'BLIS simulated the exact settings this run used.'
-          : 'BLIS simulated this run’s settings, except these, which it estimated:'}
+          : approx.length > 0
+            ? 'BLIS simulated this run’s settings, except these, which it estimated:'
+            : 'BLIS simulated the exact settings this run used, but not its vLLM build:'}
       </span>
-      {approx.length > 0 && <DiffTable args={approx} />}
+      {(approx.length > 0 || build) && <DiffTable args={approx} build={build ? { run: build, ref: f.build.ref } : null} />}
       {defaults.map((a) => (
         <span className="prov-row" key={a.arg}>
           <b>{label(a.arg)}</b>: not recorded by the run, so BLIS used its default ({value(a.blis)})
@@ -120,7 +144,7 @@ export function ProvenanceTip({ fidelity }: { fidelity?: Fidelity }) {
  *  release BLIS models; a v1 point (no build record) shows the plain version. */
 export function VersionTip({ version, fidelity }: { version: string; fidelity?: Fidelity }) {
   const badge = <span className="ver neutral">{formatVersion(version)}</span>
-  if (fidelity?.build.distance == null) return badge
+  if (!fidelity || (fidelity.build.distance == null && fidelity.build.match !== 'estimated')) return badge
   return (
     <Term content={<VersionBody build={fidelity.build} />} ariaLabel="vLLM build">
       {badge}
@@ -133,7 +157,9 @@ export function VersionBody({ build: b }: { build: Fidelity['build'] }) {
   return (
     <span className="prov-body">
       <span className="prov-row">
-        {d === 0
+        {b.distance == null
+          ? `This run’s vLLM build is ${buildDiff(b) ?? 'not traced to a vLLM commit'}; BLIS models ${b.ref}.`
+          : d === 0
           ? `This run’s vLLM build is ${b.ref}, the release BLIS models.`
           : `This run’s vLLM build is ${Math.abs(d).toLocaleString('en-US')} commits ${d > 0 ? 'newer' : 'older'} than ${b.ref}, the release BLIS models.`}
       </span>

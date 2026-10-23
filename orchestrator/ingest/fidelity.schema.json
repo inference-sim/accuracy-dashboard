@@ -61,7 +61,7 @@
     "reason": {
       "description": "A reason code, optionally qualified by ':<qualifier>' naming the arg path, input or scenario involved (any non-space text, e.g. setting_not_modelled:prefill_schedule_interval or unclassified_arg:quantization_config.targets.*in_proj).",
       "type": "string",
-      "pattern": "^(custom_build|build_commit_conflict|build_commit_unresolvable|outside_distance|artifact_unmatched|server_log_missing|corpus_changed|conflict|unclassified_arg|setting_not_modelled|setting_differs|required_setting_missing|client_scenario_not_replayable|model_not_in_catalog|hardware_no_coefficients|drafter_not_in_catalog|blis_refused)(:[^\\s]+)?$"
+      "pattern": "^(artifact_unmatched|server_log_missing|corpus_changed|conflict|unclassified_arg|setting_not_modelled|setting_differs|required_setting_missing|client_scenario_not_replayable|model_not_in_catalog|hardware_no_coefficients|drafter_not_in_catalog|blis_refused)(:[^\\s]+)?$"
     },
     "build": {
       "type": "object",
@@ -71,7 +71,8 @@
         "commit",
         "source",
         "ref",
-        "distance"
+        "distance",
+        "match"
       ],
       "properties": {
         "image": {
@@ -99,13 +100,55 @@
           "type": "string"
         },
         "distance": {
-          "description": "Signed commits along main from VLLM_REF's branch point; null when unresolvable.",
+          "description": "Signed commits along main from VLLM_REF's branch point; null when the commit is unresolvable or off mainline.",
           "type": [
             "integer",
             "null"
           ]
+        },
+        "match": {
+          "enum": [
+            "exact",
+            "estimated"
+          ]
+        },
+        "why": {
+          "description": "Why an estimated build isn't the one BLIS models.",
+          "enum": [
+            "custom_build",
+            "outside_distance",
+            "commit_unresolvable",
+            "commit_conflict"
+          ]
         }
-      }
+      },
+      "description": "The vLLM build that measured the point. match is exact only for an official vllm/vllm-openai(-rocm) image whose commit is on vLLM's mainline within vllm_max_distance of ref's branch point; anything else is estimated, with why. A build never stops a point from being scored.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "const": "estimated"
+              }
+            },
+            "required": [
+              "match"
+            ]
+          },
+          "then": {
+            "required": [
+              "why"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "why"
+              ]
+            }
+          }
+        }
+      ]
     },
     "arg": {
       "type": "object",
@@ -436,40 +479,94 @@
         }
       },
       "then": {
-        "properties": {
-          "args": {
-            "type": "array",
-            "contains": {
-              "type": "object",
-              "properties": {
-                "match": {
-                  "const": "approximated"
+        "anyOf": [
+          {
+            "properties": {
+              "args": {
+                "type": "array",
+                "contains": {
+                  "type": "object",
+                  "properties": {
+                    "match": {
+                      "const": "approximated"
+                    }
+                  },
+                  "required": [
+                    "match"
+                  ]
                 }
-              },
-              "required": [
-                "match"
-              ]
+              }
             }
-          }
-        }
-      },
-      "else": {
-        "properties": {
-          "args": {
-            "not": {
-              "type": "array",
-              "contains": {
-                "type": "object",
+          },
+          {
+            "properties": {
+              "build": {
                 "properties": {
                   "match": {
-                    "const": "approximated"
+                    "const": "estimated"
                   }
                 },
                 "required": [
                   "match"
                 ]
               }
+            },
+            "required": [
+              "build"
+            ]
+          }
+        ]
+      },
+      "else": {
+        "if": {
+          "properties": {
+            "status": {
+              "const": "exact"
             }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        "then": {
+          "not": {
+            "anyOf": [
+              {
+                "properties": {
+                  "args": {
+                    "type": "array",
+                    "contains": {
+                      "type": "object",
+                      "properties": {
+                        "match": {
+                          "const": "approximated"
+                        }
+                      },
+                      "required": [
+                        "match"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "build": {
+                    "properties": {
+                      "match": {
+                        "const": "estimated"
+                      }
+                    },
+                    "required": [
+                      "match"
+                    ]
+                  }
+                },
+                "required": [
+                  "build"
+                ]
+              }
+            ]
           }
         }
       }

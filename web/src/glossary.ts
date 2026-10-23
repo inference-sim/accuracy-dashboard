@@ -38,7 +38,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   tierV2: {
     label: 'tier',
     definition:
-      'Which points are included. “exact”: BLIS simulated exactly the configuration that was measured. “estimated”: one or more settings BLIS can’t represent yet were estimated (marked ≈). “all”: both.',
+      'Which points are included. “exact”: BLIS simulated exactly the configuration that was measured. “estimated”: one or more settings BLIS can’t represent yet were estimated, or the run used a vLLM build other than the release BLIS models (marked ≈). “all”: both.',
   },
 
   coverage: {
@@ -48,7 +48,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   provenance: {
     label: 'match',
     definition:
-      '✓ exact: BLIS simulated exactly what the run used. ≈ estimated: one or more settings BLIS can’t represent yet were replaced by the nearest ones it can; hover to see which.',
+      '✓ exact: BLIS simulated exactly what the run used. ≈ estimated: one or more settings BLIS can’t represent yet were replaced by the nearest ones it can, or the run used a different vLLM build; hover to see what differs.',
   },
 
 

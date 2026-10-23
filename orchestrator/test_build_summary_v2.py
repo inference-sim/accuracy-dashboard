@@ -70,9 +70,11 @@ def test_each_point_carries_its_identity_date_and_fidelity_record():
 def test_an_approximate_point_counts_in_the_all_tier_only():
     doc = _build()
     approx = [p for p in _points(doc) if p["fidelity"]["status"] == "approximate"]
-    assert len(approx) == 1 and approx[0]["tier"] == "all"
-    # 8 scored points, 7 exact: the strict tier's TPOT error averages 7 points, "all" averages 8.
-    assert doc["totals"]["all"]["mape"]["n"] == 8
+    # one with approximated settings, one on a build BLIS doesn't model (a custom image)
+    assert len(approx) == 2 and all(p["tier"] == "all" for p in approx)
+    assert sorted(p["fidelity"]["build"]["match"] for p in approx) == ["estimated", "exact"]
+    # 9 scored points, 7 exact: the strict tier's TPOT error averages 7 points, "all" averages 9.
+    assert doc["totals"]["all"]["mape"]["n"] == 9
     assert doc["totals"]["measured_or_resolved"]["mape"]["n"] == 7
 
 
@@ -93,11 +95,11 @@ def test_the_tier_comes_from_the_fidelity_status_not_the_harness_tier_string():
 
 def test_coverage_balances_and_counts_reasons_by_code():
     doc = _build()
-    assert doc["coverage"]["scored"] == 8 and doc["coverage"]["not_scored"] == 4
+    assert doc["coverage"]["scored"] == 9 and doc["coverage"]["not_scored"] == 4
     # run-a's not-scored records: drafter_not_in_catalog:eagle3 (x2, one also setting_not_modelled),
-    # setting_not_modelled:prefill_schedule_interval, and build_commit_unresolvable + custom_build.
-    assert doc["coverage"]["not_scored_reasons"] == {"build_commit_unresolvable": 1, "custom_build": 1,
-                                                     "drafter_not_in_catalog": 2, "setting_not_modelled": 2}
+    # setting_not_modelled:prefill_schedule_interval, and model_not_in_catalog. A build is never one.
+    assert doc["coverage"]["not_scored_reasons"] == {"drafter_not_in_catalog": 2, "model_not_in_catalog": 1,
+                                                     "setting_not_modelled": 2}
     assert len(doc["not_scored"]) == 4
 
 
@@ -120,7 +122,7 @@ def test_provenance_names_the_api_ingest_and_the_frozen_pull():
 def test_run_b_scored_by_an_older_blis_drops_the_refused_point():
     a, b = _build("run-a"), _build("run-b")
     ids_a, ids_b = {p["point_id"] for p in _points(a)}, {p["point_id"] for p in _points(b)}
-    assert len(ids_b) == 7 and ids_b < ids_a
+    assert len(ids_b) == 8 and ids_b < ids_a
     assert b["coverage"]["not_scored_reasons"].get("blis_refused") == 1
 
 
@@ -145,7 +147,7 @@ def test_the_validator_catches_coverage_that_doesnt_balance_and_malformed_fideli
     doc["coverage"]["not_scored"] += 1
     assert any("coverage.not_scored" in p for p in vs2.problems(doc))
     doc = _build()
-    doc["coverage"]["not_scored_reasons"]["custom_build"] = 9
+    doc["coverage"]["not_scored_reasons"]["model_not_in_catalog"] = 9
     assert any("not_scored_reasons" in p for p in vs2.problems(doc))
     doc = _build()
     _points(doc)[0]["fidelity"]["build"]["distance"] = "near"
