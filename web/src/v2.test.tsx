@@ -251,6 +251,20 @@ describe('a deployment row with some estimated points', () => {
   })
 })
 
+describe('estimated kernel settings read plainly', () => {
+  it('names the MoE kernel each side ran, and the fusion pass', () => {
+    const f = flattenPoints(v2a()).find((x) => x.fidelity?.status === 'approximate')!.fidelity!
+    const q = { ...f, args: [
+      { arg: 'env.VLLM_MXFP4_USE_MARLIN', measured: true, blis: false, match: 'approximated' as const, source: 'engine_line' as const, note: 'n' },
+      { arg: 'compilation_config.pass_config.fuse_minimax_qk_norm', measured: true, blis: false, match: 'approximated' as const, source: 'args' as const, note: 'n' },
+    ] }
+    const html = renderToStaticMarkup(<ProvenanceBody fidelity={q} />)
+    expect(html).toMatch(/MoE kernel<\/span><span role="cell" class="mono">Marlin<\/span><span role="cell">default kernel/)
+    expect(html).toMatch(/QK-norm fusion<\/span><span role="cell" class="mono">on<\/span><span role="cell">off/)
+    for (const internal of ['VLLM_', 'fuse_minimax', 'env.']) expect(html).not.toContain(internal)
+  })
+})
+
 describe('the results download', () => {
   it('sits above "How this was measured", with a plain label', () => {
     const html = renderToStaticMarkup(<App summary={v2a()} loadError={null} />)
