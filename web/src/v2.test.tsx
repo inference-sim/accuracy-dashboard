@@ -152,6 +152,15 @@ describe('dates are labelled for what they are', () => {
     expect(html).not.toContain('>snapshot<')
   })
 
+  it('says "1 model", not "1 models"', () => {
+    const { html } = render(<App summary={v2a()} loadError={null} initialHash="#/?tier=all" />)
+    expect(html).not.toContain('1 models')
+    expect(html).toMatch(/\b\d+ measurements · 2 models/)
+    const one = v2a()
+    one.matrix = one.matrix.slice(0, 1)
+    expect(render(<App summary={one} loadError={null} initialHash="#/?tier=all" />).html).toContain(' · 1 model · ')
+  })
+
   it('a v1 snapshot keeps its dump wording', () => {
     const { html } = render(<App summary={v1()} loadError={null} initialHash="#/?tier=all" />)
     expect(html).toContain('InferenceX data from 2026-09-28')
@@ -178,8 +187,11 @@ describe('the match tooltip shows only what differs, in plain words', () => {
   it('an approximate point names each difference with both sides, and the issue once', () => {
     const html = body('approximate')
     expect(html).toContain('Estimated')
-    expect(html).toContain('Indexer cache format</b>: run used mxfp4, BLIS used fp8')
-    expect(html).toContain('Sparse indexer</b>: run used on, BLIS used off')
+    // a small table: setting | this run | BLIS, one row per estimated setting
+    expect(html).toContain('role="table"')
+    expect(html.match(/role="row"/g)?.length).toBe(1 + 2)   // header + the fixture's 2 estimated settings
+    expect(html).toMatch(/Indexer cache format<\/span><span role="cell" class="mono">mxfp4<\/span><span role="cell">fp8/)
+    expect(html).toMatch(/Sparse indexer<\/span><span role="cell" class="mono">on<\/span><span role="cell">off/)
     expect(html.match(/inference-sim\/blis-schemas#57/g)?.length).toBe(1)
     expect(html).toContain('Counted only in “all (including estimations)”')
   })
@@ -188,7 +200,7 @@ describe('the match tooltip shows only what differs, in plain words', () => {
     const html = body('approximate')
     for (const gone of ['moe_backend', 'engine.', 'router', 'kv cache tokens', 'from server args', 'attention_config', 'ResolveVLLMBatchDefaults'])
       expect(html).not.toContain(gone)
-    expect(html.length).toBeLessThan(900)
+    expect(html.replace(/<[^>]+>/g, '').length).toBeLessThan(400)   // what a reader actually reads
   })
 })
 

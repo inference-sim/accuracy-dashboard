@@ -37,7 +37,7 @@ export function Headline({ totals, tier, points, models, blisRelease, dataDate, 
         <Stat value={t.mape.tpot} label="Mean time per output token" hint="average error" />
       </div>
       <p className="context">
-        {formatCount(points)} measurements · {models} models
+        {formatCount(points)} measurement{points === 1 ? '' : 's'} · {models} model{models === 1 ? '' : 's'}
         {blisRelease && <> · BLIS {blisRelease}</>}
         {measuredRange ? (
           <>

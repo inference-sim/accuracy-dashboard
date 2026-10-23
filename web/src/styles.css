@@ -218,6 +218,13 @@ thead tr.col .term-wrap { text-transform: none; }
 .prov-row { display: block; }
 .prov-row .mono, .prov-h .mono { font-family: var(--font-mono); font-size: 11px; }
 .prov-dim { color: var(--muted); }
+/* the estimated-settings table inside the match tooltip (spans laid out as a table) */
+.prov-tbl { display: table; border-collapse: collapse; margin: 6px 0 4px; width: 100%; }
+.prov-tr { display: table-row; }
+.prov-tr > span { display: table-cell; padding: 3px 10px 3px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.prov-tr > span:first-child { font-weight: 600; }
+.prov-th > span { font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.prov-tr > span.mono { font-family: var(--font-mono); font-size: 11px; word-break: break-all; }
 
 /* ---- A-vs-B compare view (RFC discussion #2 point 3) ---- */
 .cmp-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 16px;

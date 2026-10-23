@@ -36,18 +36,44 @@ function label(arg: string): string {
   return LABEL[arg] ?? arg.split('.').slice(-1)[0]!.replace(/_/g, ' ')
 }
 
+/** vLLM's attention-backend enum names, as a reader would say them. An unknown name is shown as
+ *  is (lowercased, underscores as spaces) rather than guessed at. */
+const KERNEL: Record<string, string> = {
+  FLASHINFER_MLA_SPARSE_DSV41: 'FlashInfer sparse MLA',
+  FLASHMLA_MEGA_ATTN_DSV41: 'FlashMLA mega-attention',
+  FLASHMLA_SPARSE_DSV41: 'FlashMLA sparse',
+  FLASHINFER: 'FlashInfer',
+  FLASH_ATTN: 'FlashAttention',
+  TRITON_ATTN: 'Triton',
+}
+
 function value(v: unknown): string {
   if (v === true) return 'on'
   if (v === false) return 'off'
   if (v == null) return '—'
   const s = String(v)
-  return BLIS_SIDE[s] ?? s
+  if (BLIS_SIDE[s]) return BLIS_SIDE[s]!
+  if (KERNEL[s]) return KERNEL[s]!
+  return /^[A-Z0-9_]{12,}$/.test(s) ? s.toLowerCase().replace(/_/g, ' ') : s
 }
 
-function Diff({ a }: { a: FidelityArg }) {
+/** The settings BLIS estimated, side by side. A popover lives inside a <span> trigger, so this
+ *  uses spans laid out as a table (CSS display: table), never a real <table> element. */
+function DiffTable({ args }: { args: FidelityArg[] }) {
   return (
-    <span className="prov-row">
-      <b>{label(a.arg)}</b>: run used {value(a.measured)}, BLIS used {value(a.blis)}
+    <span className="prov-tbl" role="table" aria-label="settings BLIS estimated">
+      <span className="prov-tr prov-th" role="row">
+        <span role="columnheader">Setting</span>
+        <span role="columnheader">This run</span>
+        <span role="columnheader">BLIS</span>
+      </span>
+      {args.map((a) => (
+        <span className="prov-tr" role="row" key={a.arg}>
+          <span role="cell">{label(a.arg)}</span>
+          <span role="cell" className="mono">{value(a.measured)}</span>
+          <span role="cell">{value(a.blis)}</span>
+        </span>
+      ))}
     </span>
   )
 }
@@ -67,11 +93,9 @@ export function ProvenanceBody({ fidelity: f, measuredDate }: { fidelity: Fideli
       <span className="prov-row">
         {exact
           ? 'BLIS simulated the exact settings this run used.'
-          : 'BLIS simulated this run’s settings, except it estimated:'}
+          : 'BLIS simulated this run’s settings, except these, which it estimated:'}
       </span>
-      {approx.map((a) => (
-        <Diff key={a.arg} a={a} />
-      ))}
+      {approx.length > 0 && <DiffTable args={approx} />}
       {issues.length > 0 && (
         <span className="prov-row prov-dim">
           BLIS can’t represent {approx.length === 1 ? 'this setting' : 'these settings'} yet ({issues.join(', ')}). Counted
