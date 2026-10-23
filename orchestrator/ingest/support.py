@@ -66,6 +66,17 @@ class Catalog:
         return c
 
 
+def catalog_part(cat: Catalog, parts: set[str], label: str) -> str | None:
+    """The catalog part an InferenceX hardware label names: the part of that name, else the
+    one part named `<label>-<variant>` with registry coefficients (InferenceX's `gb200` is the
+    catalog's `gb200-nvl72`). None when there is none, or more than one, so a label is never
+    matched to a part by guess."""
+    if label in cat.hardware:
+        return label
+    hits = [p for p in cat.hardware if p.startswith(label + "-") and p in parts]
+    return hits[0] if len(hits) == 1 else None
+
+
 def index_record_format(bytes_per_entry: int, head_dim: int) -> str | None:
     """The format an indexer K record of this width holds, by vLLM v0.31.0's own layouts for a
     head of head_dim values: fp8 is one byte per value plus a 4-byte fp32 scale; mxfp4 packs two

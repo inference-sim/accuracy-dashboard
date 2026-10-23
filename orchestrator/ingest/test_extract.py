@@ -630,6 +630,16 @@ def test_what_blis_used_for_an_estimated_setting_is_read_from_blis():
         sc.blis_resolution = orig
 
 
+def test_an_inferencex_hardware_label_names_one_catalog_part():
+    cat = sp.Catalog(root=Path("."), hardware={"b200": 178.0, "gb200-nvl72": 184.0, "a100-80": 79.2, "a100-sxm": 39.4})
+    parts = {"b200", "gb200-nvl72", "a100-80", "a100-sxm"}
+    assert sp.catalog_part(cat, parts, "b200") == "b200"                 # the part of that name
+    assert sp.catalog_part(cat, parts, "gb200") == "gb200-nvl72"         # its one <label>-variant
+    assert sp.catalog_part(cat, parts, "a100") is None                   # two variants: not guessed
+    assert sp.catalog_part(cat, parts, "mi355x") is None                 # none
+    assert sp.catalog_part(cat, parts - {"gb200-nvl72"}, "gb200") is None   # no coefficients for it
+
+
 def test_an_indexer_record_is_named_by_vllms_layout_for_its_head_width():
     # vLLM v0.31.0: fp8 = d_h + 4-byte scale; mxfp4 = d_h/2 + d_h/32 ue8m0 scales; bf16 = 2*d_h.
     assert [sp.index_record_format(w, 128) for w in (132, 68, 256)] == ["fp8", "mxfp4", "bf16"]

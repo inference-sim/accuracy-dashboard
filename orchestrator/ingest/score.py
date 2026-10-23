@@ -220,8 +220,12 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         readings["api_row"].add("frontend.router", f"{rm['router_name']}/{rm.get('router_version') or ''}".rstrip("/"))
     if problems:
         o.reasons.append("conflict:server_log_unreadable")
+    # The catalog part the row's hardware label names (support.catalog_part); the label itself
+    # stays what the row is shown and keyed by.
+    part_name = (sp.catalog_part(env.catalog_obj, env.parts, row["hardware"]) if env.catalog_obj else None) \
+        or row["hardware"]
     c = st.classify(st.merge(readings, env.policy, env.vllm_defaults), env.policy, env.vllm_defaults,
-                    family=env.catalog_obj.capability.get(row["hardware"]) if env.catalog_obj else None)
+                    family=env.catalog_obj.capability.get(part_name) if env.catalog_obj else None)
     o.reasons += c.reasons
     o.reasons += row_vs_run(row, c)
 
@@ -232,7 +236,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         # The log served a local path; the run's own recipe names the checkpoint (pull.py).
         cks = [entry["checkpoint"]["repo"]]
     sup = sp.check(cat, env.parts, checkpoints=cks, base_models=env.base_models,
-                   hardware=row["hardware"], spec_method=spec)
+                   hardware=part_name, spec_method=spec)
     o.reasons += sup.reasons
 
     agentic = row["benchmark_type"] == "agentic_traces"
@@ -253,10 +257,10 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     else:
         o.reasons += single_turn_replayable(row, env)
 
-    if sup.model is None or row["hardware"] not in cat.hardware:
+    if sup.model is None or part_name not in cat.hardware:
         o.reasons = sorted(set(o.reasons))
         return o
-    part = st.Part(name=row["hardware"], memory_gib=cat.hardware[row["hardware"]])
+    part = st.Part(name=part_name, memory_gib=cat.hardware[part_name])
     defaults = st.blis_defaults(env.defaults_helper, part)
     name = f"p-{pid[:16]}"
     b = st.build(c, name=name, model=sup.model, part=part, engine_version=env.vllm_ref, defaults=defaults)
@@ -277,7 +281,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         return o
     o.reasons += kernel_defaults(args, b.kernel_resolves, env, sdir, f"{name}.yaml")
     if b.acceptance_needed:
-        o.reasons += acceptance_default(args, b, env, log, row["hardware"], sup.model)
+        o.reasons += acceptance_default(args, b, env, log, part_name, sup.model)
         if o.reasons:
             o.reasons = sorted(set(o.reasons))
             return o
