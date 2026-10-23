@@ -13,9 +13,10 @@
   ],
   "properties": {
     "status": {
-      "description": "exact: every timing-relevant setting is matched (recorded by the run, or BLIS's own default). not_scored: the point carries at least one reason code.",
+      "description": "exact: every timing-relevant setting is matched (recorded by the run, or BLIS's own default). approximate: scored, but at least one setting BLIS can't state was approximated (an args entry with match approximated, which says what BLIS used instead and why). not_scored: the point carries at least one reason code.",
       "enum": [
         "exact",
+        "approximate",
         "not_scored"
       ]
     },
@@ -157,6 +158,7 @@
             "mapped",
             "inert",
             "blis_default",
+            "approximated",
             "differs",
             "absent_in_blis",
             "unreadable",
@@ -184,6 +186,16 @@
         "ratio": {
           "description": "4 significant figures, as a string.",
           "type": "string"
+        },
+        "note": {
+          "description": "For approximated: why, and what BLIS used instead. Fixed text from the policy table, never composed per point.",
+          "type": "string",
+          "minLength": 1
+        },
+        "upstream": {
+          "description": "For approximated: the upstream issue that would remove the approximation, as owner/repo#number.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+$"
         }
       },
       "allOf": [
@@ -241,6 +253,23 @@
           "then": {
             "required": [
               "values"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "const": "approximated"
+              }
+            },
+            "required": [
+              "match"
+            ]
+          },
+          "then": {
+            "required": [
+              "note"
             ]
           }
         }
@@ -405,6 +434,53 @@
           "required": [
             "reasons"
           ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "approximate"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "array",
+            "contains": {
+              "type": "object",
+              "properties": {
+                "match": {
+                  "const": "approximated"
+                }
+              },
+              "required": [
+                "match"
+              ]
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "args": {
+            "not": {
+              "type": "array",
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "match": {
+                    "const": "approximated"
+                  }
+                },
+                "required": [
+                  "match"
+                ]
+              }
+            }
+          }
         }
       }
     }

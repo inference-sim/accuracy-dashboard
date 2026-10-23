@@ -29,7 +29,7 @@ scenario,model,gpu,label,concurrency,meas_tpot_us,pred_tpot_us,meas_ttft_us,pred
 - Latencies are **microseconds**. Measured values come from the InferenceX row; predicted values from BLIS.
 - `scenario` is the **deployment** name, shared by every concurrency of one sweep. (The agentic driver may write one scenario file per point; their names are an implementation detail and aren't carried here.)
 - `label` is the workload label: `8k1k`-style for single-turn, `agentx` for agentic.
-- `tier_unbracketed` is always `MEASURED-OR-RESOLVED`: every scored point is `exact`.
+- `tier_unbracketed` follows the point's fidelity `status`: `MEASURED-OR-RESOLVED` for `exact`, `ALL (approximate)` for `approximate` (the strings `build_summary.TIER_MAP` already reads). So an approximated point counts only in the `all` tier, never in `measured_or_resolved`.
 - `measured_date` is the InferenceX row's `date` (`YYYY-MM-DD`). It is **not** `curve_date`, which is InferenceX's curve grouping and can be later than the measurement (append-only points).
 
 ### `point_id`
@@ -51,7 +51,7 @@ A re-measurement of the same recipe and concurrency on another date is a differe
 
 ### `fidelity.jsonl`
 
-`{"point_id": …, <record>}`, one line per scored point, sorted by `point_id`. The record is described by `fidelity.schema.json`, and its shape is explained in Discussion #28 ("Per-point fidelity record"). For a scored point, `status` is `exact` and there is no `reasons` field (the schema enforces both ways: `not_scored` requires `reasons`, `exact` forbids it). A `mapped` arg must name its `blis_field`, a `blis_default` arg its `rule`, and a `conflict` arg its `values`.
+`{"point_id": …, <record>}`, one line per scored point, sorted by `point_id`. The record is described by `fidelity.schema.json`, and its shape is explained in Discussion #28 ("Per-point fidelity record"). For a scored point, `status` is `exact` or `approximate`, and there is no `reasons` field (the schema enforces both ways: `not_scored` requires `reasons`, a scored status forbids it). A point is `approximate` exactly when one of its `args` has `match: approximated`: a timing-relevant setting BLIS can't state, scored with what BLIS uses instead. That arg's `blis` is the value BLIS used, its `note` says why (fixed text from the policy table), and `upstream` names the issue that would remove it. A `mapped` arg must name its `blis_field`, a `blis_default` arg its `rule`, an `approximated` arg its `note`, and a `conflict` arg its `values`.
 
 ### `facets.json`
 

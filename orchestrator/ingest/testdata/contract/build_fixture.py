@@ -62,6 +62,20 @@ def common_args(seqs, seqs_src, block, gmu, gmu_src):
     ]
 
 
+# Approximations are fixed text per arg (the policy table's), with the upstream issue.
+APPROX = {
+    "attention_config.indexer_kv_dtype": {
+        "note": "No Deployment key states the indexer cache dtype, so BLIS prices the default FP8 "
+                "indexer record (132 B/entry) where the run used MXFP4 (68 B).",
+        "upstream": "inference-sim/blis-schemas#57"},
+    "attention_config.indexer_sparse_logits": {
+        "note": "vLLM's sparse-logits indexer needs the MXFP4 indexer cache; with the FP8 record BLIS "
+                "prices, it's the dense-logits indexer.",
+        "upstream": "inference-sim/blis-schemas#57"},
+}
+TIER_BY_STATUS = {"exact": "MEASURED-OR-RESOLVED", "approximate": "ALL (approximate)"}
+
+
 # Each scored point: identity, facets, CSV measurements (ms), predictions per run (ms), fidelity.
 POINTS = [
     # DeepSeek-V4.1-Flash h200 TP4, agentic, one curve: conc 1/2/4 (shape needs >= 3).
@@ -103,7 +117,8 @@ POINTS = [
                   "resolved": [{"quantity": "kv_cache_tokens_per_replica", "measured": 31006342,
                                 "blis": None, "match": "unreadable"}],
                   "replay": {**REPLAY, "concurrency": 1}, "blis_kernel_provenance": None}},
-    # DeepSeek-V4.1-Flash b200 DEP2 c8: MegaMoE mapped, router inert.
+    # DeepSeek-V4.1-Flash b200 DEP2 c8: MegaMoE mapped, router inert, and the MXFP4 indexer
+    # cache approximated (BLIS prices the default FP8 record), so the point is approximate.
     {"row": {"model": "dsv41flash", "hardware": "b200", "precision": "fp4", "framework": "vllm",
              "benchmark_type": "agentic_traces", "recipe_fingerprint": "c8" * 32, "conc": 8,
              "date": "2026-10-03", "curve_workflow_run_id": "2560"},
@@ -112,8 +127,12 @@ POINTS = [
                 "spec_method": "mtp", "parallelism": {"tp": 1, "pp": 1, "dp": 2, "ep": 2},
                 "image": B_AC91["image"], "vllm_version": "0.30.1rc1.dev493+gac9126e58"},
      "meas": (1180.0, 5.10), "pred": {"a": (1043.9, 4.447), "b": (1210.0, 4.30)},
-     "fidelity": {"status": "exact", "build": B_AC91,
-                  "args": [arg("block_size", 128, 128, "exact", "engine_line"),
+     "fidelity": {"status": "approximate", "build": B_AC91,
+                  "args": [arg("attention_config.indexer_kv_dtype", "mxfp4", "fp8", "approximated", "args",
+                               **APPROX["attention_config.indexer_kv_dtype"]),
+                           arg("attention_config.indexer_sparse_logits", True, False, "approximated", "args",
+                               **APPROX["attention_config.indexer_sparse_logits"]),
+                           arg("block_size", 128, 128, "exact", "engine_line"),
                            arg("data_parallel_size", 2, 2, "exact", "args"),
                            arg("enable_expert_parallel", True, True, "exact", "args"),
                            arg("frontend.router", "vllm-router/consistent_hash", None, "inert", "api_row"),
@@ -157,8 +176,7 @@ NOT_SCORED = [
     ({"model": "dsv41flash", "hardware": "b300", "precision": "fp4", "framework": "vllm",
       "benchmark_type": "agentic_traces", "recipe_fingerprint": "f8" * 32, "conc": 8, "date": "2026-10-20"},
      "vllm/vllm-openai:cu134-nightly-x86_64-dev-20261019-mk", (1490.0, 4.9),
-     ["setting_not_modelled:attention_config.indexer_kv_dtype",
-      "setting_not_modelled:prefill_schedule_interval"]),
+     ["setting_not_modelled:prefill_schedule_interval"]),
     ({"model": "dsv4", "hardware": "b200", "precision": "fp4", "framework": "vllm",
       "benchmark_type": "agentic_traces", "recipe_fingerprint": "", "row_id": "445802", "conc": 1,
       "date": "2026-10-21"},
@@ -172,10 +190,9 @@ NOT_SCORED = [
 
 # Notes are fixed text per reason (the policy table's), keyed by the full reason.
 NOTES = {
-    "setting_not_modelled:attention_config.indexer_kv_dtype": {
-        "text": "The run's MXFP4 indexer cache can't be stated to BLIS; it would price the default FP8 "
-                "indexer record. Scored once a deployment can state the attention config.",
-        "upstream": "inference-sim/blis-schemas#57"},
+    "setting_not_modelled:prefill_schedule_interval": {
+        "text": "No Deployment key states vLLM's prefill_schedule_interval, which holds prefills back "
+                "for decode-only steps; BLIS schedules a prefill every step."},
 }
 
 RUNS = {
@@ -224,7 +241,7 @@ def write_run(name: str, run: dict, base: Path) -> Path:
         rows.append([f["scenario"], f["model"], f["gpu"], f["label"], ident["conc"],
                      round(p["meas"][1] * 1000, 3), round(ptpot * 1000, 3),
                      round(p["meas"][0] * 1000, 3), round(pttft * 1000, 3),
-                     "MEASURED-OR-RESOLVED", pid, ident["measured_date"]])
+                     TIER_BY_STATUS[p["fidelity"]["status"]], pid, ident["measured_date"]])
         fid = {k: v for k, v in p["fidelity"].items() if v is not None or k == "blis_kernel_provenance"}
         fid["args"] = sorted(fid["args"], key=lambda a: a["arg"])
         fid["resolved"] = sorted(fid["resolved"], key=lambda r: r["quantity"])

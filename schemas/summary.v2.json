@@ -657,7 +657,42 @@
         "fidelity": {
           "$ref": "https://inference-sim.github.io/accuracy-dashboard/orchestrator/ingest/fidelity.schema.json"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "fidelity": {
+                "properties": {
+                  "status": {
+                    "const": "approximate"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            },
+            "required": [
+              "fidelity"
+            ]
+          },
+          "then": {
+            "properties": {
+              "tier": {
+                "const": "all"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "tier": {
+                "const": "measured_or_resolved"
+              }
+            }
+          }
+        }
+      ]
     },
     "pointId": {
       "type": "string",

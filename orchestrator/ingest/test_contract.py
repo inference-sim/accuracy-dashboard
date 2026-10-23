@@ -180,12 +180,10 @@ def _noted(rows: list[dict]) -> dict:
     return next(r for r in rows if "notes" in r)
 
 
-def test_fixture_notes_the_indexer_refusal_with_its_upstream_issue():
+def test_fixture_notes_the_not_modelled_setting_on_its_not_scored_point():
     noted = _noted(_lines(FIXTURE / "run-a" / c.NOT_SCORED_JSONL))
     assert noted["hardware"] == "b300"
-    assert noted["notes"] == [{"reason": "setting_not_modelled:attention_config.indexer_kv_dtype",
-                               "text": noted["notes"][0]["text"],
-                               "upstream": "inference-sim/blis-schemas#57"}]
+    assert [n["reason"] for n in noted["notes"]] == ["setting_not_modelled:prefill_schedule_interval"]
     assert noted["notes"][0]["reason"] in noted["reasons"]
 
 
@@ -211,6 +209,7 @@ def test_validator_rejects_malformed_duplicate_or_unsorted_notes():
     d = _copy("run-a")
     rows = _lines(d / c.NOT_SCORED_JSONL)
     noted = _noted(rows)
+    noted["reasons"] = ["conflict:max_num_seqs", "setting_not_modelled:prefill_schedule_interval"]
     noted["notes"] = [{"reason": noted["reasons"][1], "text": "b"}, {"reason": noted["reasons"][0], "text": "a"}]
     _write_lines(d / c.NOT_SCORED_JSONL, rows)
     assert any("sorted by reason" in p for p in c.validate_dir(d))
@@ -277,12 +276,38 @@ def test_validator_rejects_a_csv_concurrency_or_tier_that_disagrees():
     lines = (d / c.POINTS_CSV).read_text().splitlines()
     cols = lines[1].split(",")
     cols[4] = str(int(cols[4]) + 1)
-    cols[9] = "ALL (approximate)"
+    exact_tier = cols[9] == "MEASURED-OR-RESOLVED"
+    cols[9] = "ALL (approximate)" if exact_tier else "MEASURED-OR-RESOLVED"
     lines[1] = ",".join(cols)
     (d / c.POINTS_CSV).write_text("\n".join(lines) + "\n")
     problems = c.validate_dir(d)
     assert any("concurrency disagrees" in p for p in problems)
-    assert any("scored points are MEASURED-OR-RESOLVED" in p for p in problems)
+    assert any("so its tier is" in p for p in problems)
+
+
+def test_an_approximate_point_is_scored_in_the_all_tier_only():
+    import csv as _csv
+    rows = {r["point_id"]: r for r in _csv.DictReader(open(FIXTURE / "run-a" / c.POINTS_CSV))}
+    for rec in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL):
+        approx = [a for a in rec["args"] if a["match"] == "approximated"]
+        assert (rec["status"] == "approximate") == bool(approx)
+        assert rows[rec["point_id"]]["tier_unbracketed"] == c.TIER_BY_STATUS[rec["status"]]
+        for a in approx:
+            assert a["note"] and a["upstream"] == "inference-sim/blis-schemas#57", a
+    assert any(r["status"] == "approximate" for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL))
+
+
+def test_fidelity_schema_ties_approximate_status_to_an_approximated_arg():
+    import jsonschema
+    v = jsonschema.Draft7Validator(json.loads(c.FIDELITY_SCHEMA.read_text()))
+    rec = next({k: x for k, x in r.items() if k != "point_id"}
+               for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL) if r["status"] == "approximate")
+    assert v.is_valid(rec)
+    assert not v.is_valid({**rec, "status": "exact"})                         # exact with an approximation
+    plain = [a for a in rec["args"] if a["match"] != "approximated"]
+    assert not v.is_valid({**rec, "args": plain})                             # approximate with none
+    bare = [{**a, "note": None} if a["match"] == "approximated" else a for a in rec["args"]]
+    assert not v.is_valid({**rec, "args": [{k: x for k, x in a.items() if x is not None} for a in bare]})
 
 
 def test_validator_requires_every_provenance_key():
@@ -297,7 +322,8 @@ def test_validator_requires_every_provenance_key():
 def test_fidelity_schema_ties_status_to_reasons_and_match_to_its_fields():
     import jsonschema
     v = jsonschema.Draft7Validator(json.loads(c.FIDELITY_SCHEMA.read_text()))
-    rec = {k: x for k, x in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL)[0].items() if k != "point_id"}
+    rec = next({k: x for k, x in r.items() if k != "point_id"}
+               for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL) if r["status"] == "exact")
     assert v.is_valid(rec)
     assert not v.is_valid({**rec, "reasons": ["blis_refused"]})               # exact with reasons
     assert not v.is_valid({**rec, "status": "not_scored"})                    # not_scored without reasons
@@ -358,7 +384,7 @@ def _minimal_v2(point: dict) -> dict:
 
 
 def _fixture_point() -> dict:
-    rec = _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL)[0]
+    rec = next(r for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL) if r["status"] == "exact")
     fid = {k: v for k, v in rec.items() if k != "point_id"}
     return {"level": "point", "concurrency": 4, "tier": "measured_or_resolved", "point_id": rec["point_id"],
             "measured_date": "2026-09-21", "fidelity": fid,

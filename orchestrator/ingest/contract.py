@@ -78,8 +78,10 @@ def points_sort_key(row: dict) -> tuple:
     return (row["scenario"], row["label"], int(row["concurrency"]), row["measured_date"], row["point_id"])
 
 
-# A scored point's tier: every scored point is exact (CONTRACT.md, points.csv).
-SCORED_TIER = "MEASURED-OR-RESOLVED"
+# A scored point's points.csv tier, by its fidelity status, in the tier strings
+# build_summary.TIER_MAP already reads: an exact point is apples-to-apples; an approximate
+# one (a setting BLIS can't state was approximated) only counts in the "all" tier.
+TIER_BY_STATUS = {"exact": "MEASURED-OR-RESOLVED", "approximate": "ALL (approximate)"}
 PROVENANCE_KEYS = ("ingest", "blis", "vllm_ref", "vllm_max_distance", "policy_sha256", "pulled_at",
                    "corpus", "pull_manifest_sha256")
 
@@ -134,7 +136,7 @@ def validate_dir(directory: str | Path) -> list[str]:
     Checks: the five files exist and parse; JSON is canonical; the CSV header and its rows'
     order; every scored id is in points.csv, fidelity.jsonl and facets.json exactly once and
     nowhere else; each id hashes from its identity, and the CSV agrees with that identity
-    (concurrency, measured_date); scored points are exact with the scored tier; fidelity
+    (concurrency, measured_date); scored points are exact or approximate, with that status's tier; fidelity
     records and reasons pass the schema; lists are sorted; not-scored ids are unique, sorted,
     disjoint from scored ones, and carry sorted unique reasons; provenance has every key.
     """
@@ -179,8 +181,8 @@ def validate_dir(directory: str | Path) -> list[str]:
     if len(scored) != len(scored_ids):
         problems.append(f"{POINTS_CSV}: duplicate point_id")
     for r in point_rows:
-        if r["tier_unbracketed"] != SCORED_TIER:
-            problems.append(f"{POINTS_CSV}:{r['_line']}: tier {r['tier_unbracketed']!r}, scored points are {SCORED_TIER}")
+        if r["tier_unbracketed"] not in TIER_BY_STATUS.values():
+            problems.append(f"{POINTS_CSV}:{r['_line']}: tier {r['tier_unbracketed']!r} is not a scored tier")
         if not r["concurrency"].isdigit():
             problems.append(f"{POINTS_CSV}:{r['_line']}: concurrency {r['concurrency']!r} is not an integer")
     if all(r["concurrency"].isdigit() for r in point_rows) and not _sorted_by(point_rows, points_sort_key):
@@ -232,10 +234,16 @@ def validate_dir(directory: str | Path) -> list[str]:
         problems.append(f"{FIDELITY_JSONL}: lines are not sorted by point_id")
     if set(fidelity) != scored:
         problems.append(f"{FIDELITY_JSONL} ids != {POINTS_CSV} ids")
+    tiers = {r["point_id"]: r["tier_unbracketed"] for r in point_rows}
     for pid in scored_ids:
         rec = fidelity.get(pid)
-        if rec is not None and rec.get("status") != "exact":
-            problems.append(f"{FIDELITY_JSONL}: scored point {pid[:12]} must be status exact")
+        if rec is None:
+            continue
+        want = TIER_BY_STATUS.get(rec.get("status"))
+        if want is None:
+            problems.append(f"{FIDELITY_JSONL}: scored point {pid[:12]} must be status exact or approximate")
+        elif tiers[pid] != want:
+            problems.append(f"{POINTS_CSV}: {pid[:12]} is status {rec['status']}, so its tier is {want!r}")
 
     # ---- not_scored.jsonl
     ns_lines = _read_jsonl(d / NOT_SCORED_JSONL, problems)
