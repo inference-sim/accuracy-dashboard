@@ -223,6 +223,17 @@ describe('the match tooltip shows only what differs, in plain words', () => {
   })
 })
 
+describe('run details link InferenceX itself, not its API root', () => {
+  it('source links the InferenceX site; the API pull date is plain text', () => {
+    const html = renderToStaticMarkup(<App summary={v2a()} loadError={null} />)
+    const about = html.slice(html.indexOf('class="about-prov"'))
+    expect(about).toContain('href="https://inferencex.semianalysis.com/"')
+    expect(about).toContain('>InferenceX</a>')
+    expect(html).not.toContain('inferencex.semianalysis.com/api')
+    expect(about).toMatch(/API pull date<\/span><span class="v">2026-10-23 00:00 UTC<\/span>/)
+  })
+})
+
 describe('the default view is every point, and the tier text names the build window', () => {
   it('opens on all: the headline and the table cover every scored point', () => {
     const a = v2a()

@@ -453,7 +453,9 @@ function RunProvenance({ summary }: { summary: Summary }) {
       <div className="seclabel">Ground truth</div>
       <div className="kv">
         <span className="k">source</span>
-        <span className="v">{p.ingest === 'api' ? 'InferenceX API' : 'InferenceX'}</span>
+        <span className="v">
+          {p.ingest === 'api' ? link('InferenceX', INFERENCEX_SITE) : 'InferenceX'}
+        </span>
       </div>
       {p.ingest === 'api' ? (
         // v2: the data is a pull of the live API, not a dump. When it was pulled, and the span of
@@ -462,7 +464,7 @@ function RunProvenance({ summary }: { summary: Summary }) {
           <div className="kv">
             <span className="k">API pull date</span>
             <span className="v">
-              {p.pulled_at ? link(`${p.pulled_at.slice(0, 10)} ${p.pulled_at.slice(11, 16)} UTC`, safeUrl(gt.source_url)) : '—'}
+              {p.pulled_at ? `${p.pulled_at.slice(0, 10)} ${p.pulled_at.slice(11, 16)} UTC` : '—'}
             </span>
           </div>
           {range && (
@@ -511,6 +513,9 @@ function RunProvenance({ summary }: { summary: Summary }) {
     </>
   )
 }
+
+/** The public InferenceX site the API ingest pulls from (its API root isn't a page to visit). */
+const INFERENCEX_SITE = 'https://inferencex.semianalysis.com/'
 
 /** source_url comes from the data file, so only an http(s) URL becomes a link. */
 function safeUrl(u: string | null | undefined): string | null {
