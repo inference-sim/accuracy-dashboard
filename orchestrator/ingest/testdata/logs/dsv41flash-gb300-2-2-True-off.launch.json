@@ -1,0 +1,60 @@
+{
+ "engine": {
+  "type": "vllm"
+ },
+ "frontend": {
+  "args": {
+   "disable-retries": true,
+   "policy": "consistent_hash",
+   "prometheus-host": "127.0.0.1",
+   "prometheus-port": 18000,
+   "request-timeout-secs": 14400
+  },
+  "enable_multiple_frontends": false,
+  "type": "vllm-router"
+ },
+ "model": {
+  "container": "vllm/vllm-openai:nightly-dev-arm64-cu130-ac9126e58aa7",
+  "path": "hf:deepseek-ai/DeepSeek-V4.1-Flash",
+  "precision": "fp4"
+ },
+ "resources": {
+  "gpu_type": "gb300",
+  "gpus_per_node": 4
+ },
+ "roles": {
+  "agg": {
+   "args": {
+    "attention-config": "{\"backend\":\"FLASHINFER_MLA_SPARSE_DSV41\",\"indexer_kv_dtype\":\"mxfp4\",\"indexer_sparse_logits\":true}",
+    "compilation-config": "{\"mode\":\"VLLM_COMPILE\",\"cudagraph_mode\":\"FULL_AND_PIECEWISE\",\"cudagraph_capture_sizes\":[6,12,18,24,30,36,48,60,72,96,120,144,192,240,288,384,480,576,768,1020,1536,2046,3072,4092,6144,8190]}",
+    "data-parallel-size": 2,
+    "disable-uvicorn-access-log": true,
+    "enable-auto-tool-choice": true,
+    "enable-expert-parallel": true,
+    "engram-config": "{\"cpu_offload\":true,\"embedding_across_dp\":true}",
+    "kernel-config": "{\"enable_flashinfer_autotune\":true,\"moe_backend\":\"deep_gemm_mega_moe\"}",
+    "kv-cache-dtype": "fp8",
+    "language-model-only": true,
+    "max-cudagraph-capture-size": 8190,
+    "max-model-len": 1048576,
+    "max-num-batched-tokens": 8192,
+    "max-num-seqs": 16,
+    "reasoning-parser": "deepseek_v41",
+    "served-model-name": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "speculative-config": "{\"method\": \"dspark\", \"num_speculative_tokens\": 5, \"draft_sample_method\": \"probabilistic\", \"rejection_sample_method\": \"synthetic\", \"enable_adaptive_verification\": false, \"synthetic_acceptance_length\": 3.51}",
+    "tensor-parallel-size": 1,
+    "tokenizer-mode": "deepseek_v41",
+    "tool-call-parser": "deepseek_v41"
+   },
+   "env": {
+    "PYTHONUNBUFFERED": "1",
+    "VLLM_ENGINE_READY_TIMEOUT_S": "7200",
+    "VLLM_USE_RUST_FRONTEND": "1",
+    "VLLM_USE_V2_MODEL_RUNNER": "1"
+   },
+   "gpus": 2,
+   "nodes": 1,
+   "workers": 1
+  }
+ }
+}

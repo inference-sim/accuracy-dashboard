@@ -78,6 +78,7 @@ class Pull:
     """One API pull: the rows in the window and what couldn't be pulled."""
     rows: list[dict] = field(default_factory=list)
     unnamed_slugs: list[str] = field(default_factory=list)   # in /availability, not on the site
+    undated: list[dict] = field(default_factory=list)        # rows whose date doesn't parse
     window: tuple[str, str] = ("", "")
 
 
@@ -108,8 +109,15 @@ def pull(fetch, *, today: date, window_days: int, framework: str = "vllm") -> Pu
         if isinstance(rows, dict) and "error" in rows:
             raise RuntimeError(f"/benchmarks?model={display}: {rows['error']}")
         for r in rows:
-            if (r.get("framework") == framework and r.get("model") in slugs
-                    and in_window(r.get("date"), start, today) and str(r["id"]) not in seen):
+            if r.get("framework") != framework or r.get("model") not in slugs or str(r["id"]) in seen:
+                continue
+            try:
+                date.fromisoformat(str(r.get("date"))[:10])
+            except ValueError:
+                seen.add(str(r["id"]))
+                out.undated.append(r)      # kept and reported, never silently dropped
+                continue
+            if in_window(r.get("date"), start, today):
                 seen.add(str(r["id"]))
                 out.rows.append(r)
     out.rows.sort(key=lambda r: int(r["id"]) if str(r["id"]).isdigit() else str(r["id"]))

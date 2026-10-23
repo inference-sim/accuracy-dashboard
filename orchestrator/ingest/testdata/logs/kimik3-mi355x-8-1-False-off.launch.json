@@ -1,0 +1,66 @@
+{
+ "engine": {
+  "connector": null,
+  "type": "vllm"
+ },
+ "frontend": {
+  "enable_multiple_frontends": false,
+  "type": "vllm"
+ },
+ "model": {
+  "container": "vllm/vllm-openai-rocm:nightly-rocm100-49cb2bbf71cfd36ee5aa33d1e184b1cddff55294",
+  "path": "hf:moonshotai/Kimi-K3",
+  "precision": "fp4"
+ },
+ "resources": {
+  "gpu_type": "mi355x",
+  "gpus_per_node": 8
+ },
+ "roles": {
+  "agg": {
+   "args": {
+    "attention-config": "{\"mla_prefill_backend\":\"ROCM_AITER_FA\"}",
+    "compilation-config": "{\"mode\":3,\"cudagraph_mode\":\"FULL_AND_PIECEWISE\",\"max_cudagraph_capture_size\":16,\"custom_ops\":[\"+fused_rms_norm_gated\"],\"cudagraph_capture_sizes\":[2,4,6,8,10,12,14,16]}",
+    "enable-auto-tool-choice": true,
+    "enable-prefix-caching": true,
+    "gpu-memory-utilization": 0.9,
+    "kv-cache-dtype": "fp8",
+    "language-model-only": true,
+    "max-model-len": 1048576,
+    "max-num-batched-tokens": 16384,
+    "max-num-seqs": 1,
+    "moe-backend": "auto",
+    "quantization-config": "{\"linear\":\"fp8_per_channel\",\"ignore\":[\"*kv_b_proj\",\"*vision_tower*\",\"*mm_projector*\",\"*f_b_proj\",\"*fused_qkv_a_proj\",\"*self_attn.g_proj\",\"*.layers.0.mlp.down_proj\"]}",
+    "reasoning-parser": "kimi_k3",
+    "served-model-name": "moonshotai/Kimi-K3",
+    "speculative-config": "{\"model\": \"Inferact/Kimi-K3-DSpark\", \"num_speculative_tokens\": 7, \"method\": \"dspark\", \"attention_backend\": \"ROCM_AITER_MLA\", \"kv_cache_dtype\": \"fp8\", \"draft_sample_method\": \"probabilistic\", \"rejection_sample_method\": \"synthetic\", \"synthetic_acceptance_length\": 3.84}",
+    "stream-interval": 10,
+    "tensor-parallel-size": 8,
+    "tool-call-parser": "kimi_k3",
+    "trust-remote-code": true
+   },
+   "env": {
+    "AITER_BF16_FP8_MOE_BOUND": "0",
+    "AITER_FLYDSL_STAGE2_FP8": "1",
+    "HSA_NO_SCRATCH_RECLAIM": "1",
+    "PYTHONNOUSERSITE": "1",
+    "SAFETENSORS_FAST_GPU": "1",
+    "VLLM_ENGINE_READY_TIMEOUT_S": "7200",
+    "VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS": "1200",
+    "VLLM_ROCM_AITER_MLA_ASM_PADDING": "asm",
+    "VLLM_ROCM_AITER_MLA_DCP_VERIFY": "asm",
+    "VLLM_ROCM_QUICK_REDUCE_MIN_SIZE_BYTES_MB": "16",
+    "VLLM_ROCM_QUICK_REDUCE_QUANTIZATION": "INT4",
+    "VLLM_ROCM_USE_AITER": "1",
+    "VLLM_ROCM_USE_AITER_MOE_SITUV2": "1",
+    "VLLM_USE_BREAKABLE_CUDAGRAPH": "0",
+    "VLLM_USE_DIRECT_DCP_A2A": "0",
+    "VLLM_USE_DIRECT_DCP_KV_GATHER": "0",
+    "VLLM_USE_DIRECT_DCP_Q_GATHER": "0"
+   },
+   "gpus": 8,
+   "nodes": 1,
+   "workers": 1
+  }
+ }
+}

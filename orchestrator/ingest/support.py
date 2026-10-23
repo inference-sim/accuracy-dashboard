@@ -52,14 +52,9 @@ class Catalog:
                 c.models[d.name] = repo
             g = d / "graph.yaml"
             if g.is_file():
-                spec = None
-                for line in g.read_text().splitlines():
-                    if line.startswith("speculator:"):
-                        spec = ""
-                    elif spec == "" and line.strip().startswith("method:"):
-                        spec = line.split(":", 1)[1].strip()
-                        break
-                c.speculators[d.name] = spec or None
+                graph = yaml.safe_load(g.read_text()) or {}
+                spec = graph.get("speculator") if isinstance(graph, dict) else None
+                c.speculators[d.name] = spec.get("method") if isinstance(spec, dict) else None
         for h in sorted((root / "hardware").glob("*.yaml")):
             doc = yaml.safe_load(h.read_text()) or {}
             if "MemoryGiB" in doc:
@@ -69,10 +64,22 @@ class Catalog:
 
 def registry_parts(registry_root) -> set[str]:
     """Every part some coefficient in the registry is scoped to."""
+    import yaml
     parts = set()
+
+    def scopes(node):
+        if isinstance(node, dict):
+            sc = node.get("scope")
+            if isinstance(sc, dict) and isinstance(sc.get("hardware"), list):
+                parts.update(str(h) for h in sc["hardware"])
+            for v in node.values():
+                scopes(v)
+        elif isinstance(node, list):
+            for v in node:
+                scopes(v)
+
     for f in sorted(Path(registry_root, "coefficients").glob("*.yaml")):
-        for m in re.finditer(r"scope:\s*\{[^}]*hardware:\s*\[([^\]]*)\]", f.read_text()):
-            parts |= {p.strip() for p in m.group(1).split(",") if p.strip()}
+        scopes(yaml.safe_load(f.read_text()))
     return parts
 
 
@@ -93,7 +100,11 @@ def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models:
     for name, repo in cat.models.items():
         by_repo.setdefault(repo.lower(), []).append(name)
     for ck in checkpoints:
-        for how, repo in (("checkpoint", ck), ("base_model", base_models.get(ck))):
+        bm = base_models.get(ck)
+        if isinstance(bm, dict):     # the pull couldn't read its HF card
+            s.reasons.append("model_not_in_catalog:base_model_lookup_failed")
+            bm = None
+        for how, repo in (("checkpoint", ck), ("base_model", bm)):
             hits = sorted(by_repo.get((repo or "").lower(), []))
             if len(hits) == 1:
                 s.model, s.matched_by, s.checkpoint = hits[0], how, ck

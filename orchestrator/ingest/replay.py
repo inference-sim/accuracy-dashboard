@@ -39,6 +39,34 @@ _FLAGS = {
 }
 
 
+# Every key a profiling phase / dataset / endpoint can carry, and what the extractor does with
+# it. A key not listed refuses the point (unclassified_arg:replay.<key>), so a client input added
+# later can't silently change the workload BLIS replays.
+#   read        passed to BLIS (or checked against the one value BLIS's scenario locks)
+#   inert       no effect on what is sent or when
+#   gap_1971    the two AgentX inputs BLIS can't state yet (inference-sim#1971): not passed, not
+#               recorded, and the point is still scored (Discussion #28)
+PHASE_KEYS = {
+    "name": "inert", "kind": "inert", "type": "read", "timing_mode": "read", "concurrency": "read",
+    "duration": "read", "grace_period": "read", "trajectory_start_min_ratio": "read",
+    "trajectory_start_max_ratio": "read", "system_idle_gap_cap_seconds": "read",
+    "failed_request_threshold": "inert",        # when the client aborts; a scored run didn't
+    "agentic_warmup_grace_period": "inert",     # how long warm-up may take before aborting
+    "warmup_requests_per_lane": "gap_1971",
+}
+DATASET_KEYS = {
+    "name": "inert", "type": "read", "dataset": "read", "random_seed": "read",
+    "entries": "inert",                         # the corpus' own trace count (393), not a sample
+    "trace_idle_gap_cap_seconds": "gap_1971",
+}
+ENDPOINT_KEYS = {"urls": "inert", "type": "read", "path": "inert", "streaming": "read",
+                 "use_server_token_count": "inert"}
+
+
+def _unknown_keys(where: str, doc: dict, known: dict) -> list[str]:
+    return [f"unclassified_arg:replay.{where}.{k}" for k in sorted(doc) if k not in known]
+
+
 @dataclass
 class Replay:
     client_version: str | None = None
@@ -78,6 +106,11 @@ def from_export(export: dict) -> Replay:
         r.reasons.append(f"client_scenario_not_replayable:{len(phases)}_profiling_phases_{len(datasets)}_datasets")
         return r
     ph, ds = phases[0], datasets[0]
+    ep = ic.get("endpoint") or {}
+    r.reasons += _unknown_keys("phase", ph, PHASE_KEYS) + _unknown_keys("dataset", ds, DATASET_KEYS) \
+        + _unknown_keys("endpoint", ep, ENDPOINT_KEYS)
+    if ep.get("type") not in (None, "chat"):
+        r.reasons.append(f"client_scenario_not_replayable:endpoint_{ep.get('type')}")
     r.concurrency = ph.get("concurrency")
     r.duration_s = ph.get("duration")
     r.grace_s = ph.get("grace_period")
@@ -102,7 +135,6 @@ def from_export(export: dict) -> Replay:
         r.replayed_as = REPLAYABLE[r.scenario]
     if r.system_idle_cap_s is not None and float(r.system_idle_cap_s) != LOCKED_SYSTEM_IDLE_CAP_S:
         r.reasons.append("setting_not_modelled:replay.system_idle_gap_cap_seconds")
-    ep = ic.get("endpoint") or {}
     if ep.get("streaming") is False:
         r.reasons.append("setting_not_modelled:replay.streaming")
     for need in ("concurrency", "duration_s", "seed", "corpus"):
@@ -111,12 +143,12 @@ def from_export(export: dict) -> Replay:
     return r
 
 
-def command_flags(command: str) -> dict:
-    """The replay inputs a client command line states."""
+def command_flags(command: str) -> dict | None:
+    """The replay inputs a client command line states; None when it can't be split."""
     try:
         argv = shlex.split(command)
     except ValueError:
-        return {}
+        return None
     out = {}
     for i, a in enumerate(argv):
         flag, eq, val = a.partition("=")
@@ -136,9 +168,13 @@ def command_flags(command: str) -> dict:
 def cross_check(r: Replay, command: str | None, row_conc) -> None:
     """Every source that states an input must agree with the export."""
     stated = command_flags(command) if command else {}
+    if stated is None:
+        r.reasons.append("conflict:replay.command_unreadable")
+        stated = {}
     for name, v in sorted(stated.items()):
         have = getattr(r, name)
         if have is None:
+            r.reasons.append(f"conflict:replay.{name}")   # the command sets it; the export doesn't
             continue
         if isinstance(have, (int, float)) and not isinstance(have, bool):
             if float(have) != float(v):

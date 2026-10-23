@@ -23,19 +23,26 @@ import settings as st  # noqa: E402
 import support as sp  # noqa: E402
 
 POLICY, POLICY_SHA = st.load_policy()
+DEFAULTS, _ = st.load_vllm_defaults()
+
+# A resolved engine-config line as vLLM v0.31.0 prints it (every engine log has one).
+RESOLVED = ("model='m', tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, "
+            "quantization=fp8, kv_cache_dtype=auto, enable_prefix_caching=True, "
+            "compilation_config={'mode': <CompilationMode.NONE: 0>, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>}")
 
 
-def _log(args: str, resolved: str = "", extra: str = "") -> str:
+def _log(args: str, resolved: str = RESOLVED, extra: str = "") -> str:
     out = f"INFO [api_utils.py:286] non-default args: {{{args}}}\n"
-    if resolved:
+    if resolved is not None:
         out += f"INFO [core.py:129] Initializing a V1 LLM engine (v0.30.1rc1.dev493+gac9126e58) with config: {resolved}\n"
     return out + extra
 
 
-def _classify(log: str, launch=None):
+def _classify(log: str, launch=None, extra_readings=None):
     readings, problems = st.read_all(log, launch)
     assert problems == [], problems
-    return st.classify(st.merge(readings, POLICY), POLICY)
+    readings.update(extra_readings or {})
+    return st.classify(st.merge(readings, POLICY, DEFAULTS), POLICY, DEFAULTS)
 
 
 # ------------------------------------------------------------------ pyrepr
@@ -122,9 +129,10 @@ def test_launch_config_and_args_that_disagree_conflict():
 def test_the_resolved_line_is_the_engines_resolution_not_a_conflict():
     # Asked VLLM_COMPILE; the engine ran NONE (vLLM runs DeepSeek-V4.1 uncompiled). Not a conflict,
     # and the compile mode is judged on what ran.
-    c = _classify(_log("'compilation_config': {'mode': <CompilationMode.VLLM_COMPILE: 3>}",
-                       "compilation_config={'mode': <CompilationMode.NONE: 0>}"))
+    c = _classify(_log("'compilation_config': {'mode': <CompilationMode.VLLM_COMPILE: 3>}"))
     assert c.reasons == []
+    c = _classify(_log("'max_num_seqs': 1", RESOLVED.replace("CompilationMode.NONE: 0", "CompilationMode.VLLM_COMPILE: 3")))
+    assert c.reasons == ["setting_not_modelled:compilation_config.mode"]
 
 
 def test_a_setting_the_run_asked_for_and_blis_cannot_state_is_not_modelled():
@@ -156,13 +164,109 @@ def test_moe_backend_is_mapped_to_its_blis_field():
 
 def test_the_rust_frontend_line_maps_to_engine_frontend():
     c = _classify(_log("'max_num_seqs': 1", extra="INFO Launching Rust frontend: /usr/bin/vllm\n"))
-    assert c.mapped["engine.frontend"][1] == "1"
+    assert c.mapped["engine.frontend"][1] is True
+    launch = {"roles": {"agg": {"args": {"max-num-seqs": 1}, "env": {"VLLM_USE_RUST_FRONTEND": "true"}}}}
+    assert _classify(_log("'max_num_seqs': 1"), launch).mapped["engine.frontend"][1] is True
+    launch["roles"]["agg"]["env"]["VLLM_USE_RUST_FRONTEND"] = "maybe"
+    assert "conflict:env.VLLM_USE_RUST_FRONTEND" in _classify(_log("'max_num_seqs': 1"), launch).reasons
 
 
 def test_served_model_name_is_a_list_in_args_and_a_scalar_in_the_launch_config():
     launch = {"roles": {"agg": {"args": {"served-model-name": "org/m"}}}}
     c = _classify(_log("'served_model_name': ['org/m']"), launch)
     assert c.reasons == []
+
+
+# ------------------------------------------------------------------ review findings: no silent passes
+
+def test_a_router_from_the_api_row_does_not_hide_what_the_args_line_asked_for():
+    router = st.Reading()
+    router.add("frontend.router", "vllm-router/consistent_hash")
+    c = _classify(_log("'prefill_schedule_interval': 32"), extra_readings={"api_row": router})
+    assert c.reasons == ["setting_not_modelled:prefill_schedule_interval"]
+
+
+def test_with_a_launch_config_an_args_only_request_still_counts():
+    launch = {"roles": {"agg": {"args": {"max-num-seqs": 8}}}}
+    c = _classify(_log("'max_num_seqs': 8, 'enforce_eager': True"), launch)
+    assert "setting_not_modelled:enforce_eager" in c.reasons
+
+
+def test_a_log_missing_its_args_or_resolved_line_is_unreadable():
+    _, problems = st.read_all(_log("'max_num_seqs': 8", resolved=None), None)
+    assert problems == ["server log has no resolved engine-config line"]
+    _, problems = st.read_all("INFO [core.py:129] Initializing a V1 LLM engine (v0.31.0) with config: " + RESOLVED + "\n", None)
+    assert problems == ["server log has no `non-default args` line"]
+
+
+def test_a_new_field_under_a_wildcard_entry_refuses_when_set():
+    c = _classify(_log("'attention_config': AttentionConfig(backend=None, flex_attn_block_m=64)"))
+    assert c.reasons == ["unclassified_arg:attention_config.flex_attn_block_m"]
+    c = _classify(_log("'attention_config': AttentionConfig(backend=None, mla_prefill_backend='TRTLLM_RAGGED')"))
+    assert c.reasons == ["setting_not_modelled:attention_config.mla_prefill_backend"]
+    c = _classify(_log("'compilation_config': {'brand_new_knob': 7}"))
+    assert c.reasons == ["unclassified_arg:compilation_config.brand_new_knob"]
+    # The same fields at vLLM's default are not requests.
+    c = _classify(_log("'attention_config': AttentionConfig(backend=None, flex_attn_block_m=None)"))
+    assert c.reasons == []
+
+
+def test_a_none_in_an_earlier_source_does_not_hide_a_later_value():
+    c = _classify(_log("'max_num_batched_tokens': None",
+                       extra="Chunked prefill is enabled with max_num_batched_tokens=8192.\n"))
+    assert c.mapped["engine.max_num_batched_tokens"][1] == 8192
+
+
+def test_real_rejection_without_a_recorded_acceptance_refuses():
+    c = _classify(_log("'speculative_config': {'method': 'dspark', 'num_speculative_tokens': 5, "
+                       "'rejection_sample_method': 'standard'}"))
+    assert "setting_not_modelled:speculative_config.rejection_sample_method" in c.reasons
+    c = _classify(_log("'tensor_parallel_size': 1, 'max_num_seqs': 8, 'max_num_batched_tokens': 4096, 'block_size': 128, "
+                       "'gpu_memory_utilization': 0.9, 'speculative_config': {'method': 'dspark', 'num_speculative_tokens': 5}"))
+    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="v0.31.0", defaults=H200_DEFAULTS)
+    assert b.reasons == ["required_setting_missing:speculative_config.synthetic_acceptance_length"]
+
+
+def test_the_flat_and_nested_spellings_of_one_setting_agree_or_conflict():
+    c = _classify(_log("'moe_backend': 'deep_gemm_mega_moe'"))
+    assert c.mapped["engine.moe_backend"][1] == "deep_gemm_mega_moe" and c.reasons == []
+    c = _classify(_log("'moe_backend': 'aiter', 'kernel_config': KernelConfig(moe_backend='deep_gemm_mega_moe')"))
+    assert c.reasons == ["conflict:moe_backend"]
+
+
+def test_offload_bytes_printed_as_floats_and_ranks_that_disagree():
+    base = ("'tensor_parallel_size': 1, 'max_num_seqs': 8, 'max_num_batched_tokens': 4096, 'block_size': 128, "
+            "'gpu_memory_utilization': 0.9, 'kv_transfer_config': KVTransferConfig(kv_connector='SimpleCPUOffloadConnector', "
+            "kv_connector_extra_config={'cpu_bytes_to_use': 53687091200.0})")
+    c = _classify(_log(base))
+    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="v0.31.0", defaults=H200_DEFAULTS)
+    assert b.reasons == [] and b.deployment["offload"]["tiers"][0]["bytes"] == 53687091200
+    lines = "SimpleCPUOffloadConnector: role=WORKER, per_rank=50.00 GB, world_size=1\n" \
+            "SimpleCPUOffloadConnector: role=WORKER, per_rank=40.00 GB, world_size=1\n"
+    b = st.build(_classify(_log(base, extra=lines)), name="p", model="m", part=PART_H200,
+                 engine_version="v0.31.0", defaults=H200_DEFAULTS)
+    assert b.reasons == ["conflict:offload.per_rank_gib"]
+
+
+def test_parallelism_must_come_from_the_run():
+    c = _classify(_log("'max_num_seqs': 8", "model='m', quantization=fp8"))
+    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="v0.31.0", defaults=H200_DEFAULTS)
+    assert {"required_setting_missing:parallel.tp", "required_setting_missing:parallel.dp"} <= set(b.reasons)
+
+
+def test_an_unknown_client_input_refuses():
+    r = rp.from_export(_export(phase={"brand_new_pacing": 2}))
+    assert "unclassified_arg:replay.phase.brand_new_pacing" in r.reasons
+    r = rp.from_export(_export())
+    rp.cross_check(r, "aiperf profile --benchmark-grace-period 30 'unterminated", 8)
+    assert r.reasons == ["conflict:replay.command_unreadable"]
+
+
+def test_the_vllm_defaults_table_is_read_from_vllm_and_covers_printed_configs():
+    assert DEFAULTS["attention_config.indexer_kv_dtype"] == "auto"
+    assert DEFAULTS["kernel_config.moe_backend"] == "auto"
+    assert DEFAULTS["prefill_schedule_interval"] == 1 and DEFAULTS["enforce_eager"] is False
+    assert DEFAULTS["compilation_config.dynamic_shapes_config.type"] == "BACKED"
 
 
 # ------------------------------------------------------------------ the deployment written
@@ -173,7 +277,8 @@ H200_DEFAULTS = {"device": "h200", "max_num_batched_tokens": 8192, "max_num_seqs
 
 def test_a_required_setting_nothing_recorded_takes_the_blis_default():
     c = _classify(_log("'tensor_parallel_size': 8, 'max_num_batched_tokens': 8192",
-                       extra="Setting kv cache block size to 64 for X\n"))
+                       RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=8"),
+                       extra="Setting kv cache block size to 64 for X\nDesired GPU memory utilization is (0.92, 128 GiB).\n"))
     b = st.build(c, name="p", model="deepseek-v4.1-flash", part=PART_H200, engine_version="v0.31.0",
                  defaults=H200_DEFAULTS)
     eng = b.deployment["pools"][0]["engine"]
@@ -184,15 +289,16 @@ def test_a_required_setting_nothing_recorded_takes_the_blis_default():
 
 
 def test_a_required_setting_with_no_source_and_no_default_refuses():
-    c = _classify(_log("'tensor_parallel_size': 8"))
+    c = _classify(_log("'tensor_parallel_size': 1"))
     b = st.build(c, name="p", model="m", part=PART_H200, engine_version="v0.31.0", defaults=None)
-    assert sorted(b.reasons) == ["required_setting_missing:block_size", "required_setting_missing:max_num_batched_tokens",
-                                 "required_setting_missing:max_num_seqs"]
+    assert sorted(b.reasons) == ["required_setting_missing:block_size", "required_setting_missing:gpu_memory_utilization",
+                                 "required_setting_missing:max_num_batched_tokens", "required_setting_missing:max_num_seqs"]
 
 
 def test_the_cluster_is_sized_to_the_runs_own_gpus():
     c = _classify(_log("'tensor_parallel_size': 1, 'data_parallel_size': 2, 'enable_expert_parallel': True, "
-                       "'max_num_seqs': 16, 'max_num_batched_tokens': 4096, 'block_size': 128"))
+                       "'max_num_seqs': 16, 'max_num_batched_tokens': 4096, 'block_size': 128, 'gpu_memory_utilization': 0.9",
+                       RESOLVED.replace("data_parallel_size=1", "data_parallel_size=2")))
     b = st.build(c, name="p", model="m", part=PART_H200, engine_version="v0.31.0", defaults=H200_DEFAULTS)
     assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 1, "gpus_per_node": 2}
     assert b.scenario["engine_version"] == "0.31.0"
@@ -204,9 +310,11 @@ def test_offload_bytes_are_the_engines_from_the_server_wide_total():
     # cpu_bytes_to_use is server-wide and vLLM divides it by the engine's world size (TP4 here);
     # BLIS's tier is the engine's, so the bytes are per_rank x world.
     args = ("'tensor_parallel_size': 4, 'max_num_seqs': 8, 'max_num_batched_tokens': 4096, 'block_size': 128, "
+            "'gpu_memory_utilization': 0.9, "
             "'kv_transfer_config': KVTransferConfig(kv_connector='SimpleCPUOffloadConnector', kv_role='kv_both', "
             "kv_connector_extra_config={'cpu_bytes_to_use': 1000000000003, 'lazy_offload': True})")
-    c = _classify(_log(args, extra="SimpleCPUOffloadConnector: role=WORKER, per_rank=232.83 GB, world_size=4\n"))
+    c = _classify(_log(args, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=4"),
+                       extra="SimpleCPUOffloadConnector: role=WORKER, per_rank=232.83 GB, world_size=4\n"))
     b = st.build(c, name="p", model="m", part=PART_H200, engine_version="v0.31.0", defaults=H200_DEFAULTS)
     assert b.reasons == [], b.reasons
     assert b.deployment["offload"] == {"connector": "SimpleCPUOffloadConnector", "spec": "lazy",
@@ -215,9 +323,11 @@ def test_offload_bytes_are_the_engines_from_the_server_wide_total():
 
 def test_offload_bytes_that_disagree_with_the_logged_per_rank_figure_conflict():
     args = ("'tensor_parallel_size': 4, 'max_num_seqs': 8, 'max_num_batched_tokens': 4096, 'block_size': 128, "
+            "'gpu_memory_utilization': 0.9, "
             "'kv_transfer_config': KVTransferConfig(kv_connector='SimpleCPUOffloadConnector', "
             "kv_connector_extra_config={'cpu_bytes_to_use': 1000000000000})")
-    c = _classify(_log(args, extra="SimpleCPUOffloadConnector: role=WORKER, per_rank=50.00 GB, world_size=4\n"))
+    c = _classify(_log(args, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=4"),
+                       extra="SimpleCPUOffloadConnector: role=WORKER, per_rank=50.00 GB, world_size=4\n"))
     b = st.build(c, name="p", model="m", part=PART_H200, engine_version="v0.31.0", defaults=H200_DEFAULTS)
     assert b.reasons == ["conflict:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use"]
 
@@ -324,6 +434,33 @@ def test_join_goes_through_the_result_json_and_ignores_attempt_only_uploads():
     assert j.reasons == [] and j.result_filename == RF and j.server_logs.id == 3 and j.agentic.id == 4
 
 
+def test_several_uploads_for_one_point_are_ambiguous_not_guessed():
+    arts = [_A(1, "bmk_" + RF, "2026-10-01T10:00:00Z"),
+            _A(2, "server_logs_" + RF, "2026-10-01T10:00:05Z"), _A(3, "server_logs_" + RF, "2026-10-01T10:00:09Z")]
+    j = art.join({"recipe_fingerprint": "f" * 64, "conc": 8}, arts,
+                 lambda a: {"recipe_fingerprint": "f" * 64, "conc": 8} if a.id == 1 else None, agentic=False)
+    assert j.reasons == ["artifact_unmatched:several_server_logs"]
+    arts = [_A(1, "bmk_" + RF, "2026-10-01T10:00:00Z"),
+            _A(2, "server_logs_" + RF, "2026-10-01T09:00:00Z"), _A(3, "server_logs_" + RF, "2026-10-01T09:30:00Z")]
+    j = art.join({"recipe_fingerprint": "f" * 64, "conc": 8}, arts,
+                 lambda a: {"recipe_fingerprint": "f" * 64, "conc": 8} if a.id == 1 else None, agentic=False)
+    assert j.reasons == ["artifact_unmatched:several_server_logs"]
+
+
+def test_unreadable_archive_members_raise_instead_of_being_skipped():
+    try:
+        list(art.iter_files(_zip({"bad.tar.gz": b"\x1f\x8b" + b"not gzip"})))
+    except art.Unreadable:
+        pass
+    else:
+        raise AssertionError("a corrupt member was skipped")
+    try:
+        art.find_launch_config([("c.yaml", f"benchmark: {{env: {{RESULT_FILENAME: {RF}}}\n  : [".encode())], RF)
+    except ValueError:
+        return
+    raise AssertionError("an unparseable launch config was treated as absent")
+
+
 def test_join_reports_no_match_and_several_matches():
     arts = [_A(1, "bmk_" + RF, "t1"), _A(2, "bmk_" + RF + "2", "t2")]
     same = {"recipe_fingerprint": "f" * 64, "conc": 8}
@@ -413,6 +550,28 @@ def test_run_and_attempt_from_run_url():
     assert api.run_of({"run_url": "https://github.com/o/r/actions/runs/123/attempts/2"}) == ("123", 2)
     assert api.run_of({"run_url": "https://github.com/o/r/actions/runs/123"}) == ("123", 1)
     assert api.run_of({"run_url": None}) is None
+
+
+# ------------------------------------------------------------------ policy coverage on real logs
+
+LOGS = HERE / "testdata" / "logs"
+
+
+def test_every_arg_in_the_committed_real_logs_classifies_as_recorded():
+    """One excerpt per InferenceX deployment shape seen in the 2026-09-20..10-23 window (the
+    lines the extractor reads, verbatim). Every path classifies (no unclassified_arg), the
+    logs read whole, and each deployment's outcome is the one expected.json records. A policy
+    edit that changes any of them shows up here and has to be re-recorded on purpose."""
+    expected = json.loads((LOGS / "expected.json").read_text())
+    assert len(expected) >= 40
+    for name, want in sorted(expected.items()):
+        launch_path = LOGS / f"{name}.launch.json"
+        launch = json.loads(launch_path.read_text()) if launch_path.exists() else None
+        readings, problems = st.read_all((LOGS / f"{name}.log").read_text(), launch)
+        c = st.classify(st.merge(readings, POLICY, DEFAULTS), POLICY, DEFAULTS)
+        got = {"problems": problems, "reasons": c.reasons, "approximate": c.approximated}
+        assert got == want, (name, got, want)
+        assert not [r for r in c.reasons if r.startswith("unclassified_arg")], name
 
 
 if __name__ == "__main__":

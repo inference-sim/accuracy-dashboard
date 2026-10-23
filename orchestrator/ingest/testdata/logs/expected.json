@@ -1,0 +1,413 @@
+{
+ "dsv4-b200-8-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:env.VLLM_DSV4_MEGA_FP8_COMBINE",
+   "setting_not_modelled:env.VLLM_PREFIX_CACHE_RETENTION_INTERVAL",
+   "setting_not_modelled:kv_cache_memory_bytes"
+  ]
+ },
+ "dsv4-b200-8-8-True-on": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:env.VLLM_DSV4_MEGA_FP8_COMBINE",
+   "setting_not_modelled:env.VLLM_PREFIX_CACHE_RETENTION_INTERVAL",
+   "setting_not_modelled:kv_cache_memory_bytes",
+   "setting_not_modelled:kv_transfer_config.kv_connector_extra_config.enable_cross_layers_blocks",
+   "setting_not_modelled:prefill_schedule_interval"
+  ]
+ },
+ "dsv4-b300-4-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:env.NCCL_NVLS_ENABLE",
+   "setting_not_modelled:env.VLLM_ALLREDUCE_USE_FLASHINFER",
+   "setting_not_modelled:env.VLLM_DSV4_MEGA_FP8_COMBINE",
+   "setting_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND",
+   "setting_not_modelled:env.VLLM_PREFIX_CACHE_RETENTION_INTERVAL"
+  ]
+ },
+ "dsv4-b300-8-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:env.NCCL_NVLS_ENABLE",
+   "setting_not_modelled:env.VLLM_ALLREDUCE_USE_FLASHINFER",
+   "setting_not_modelled:env.VLLM_DSV4_MEGA_FP8_COMBINE",
+   "setting_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND",
+   "setting_not_modelled:env.VLLM_PREFIX_CACHE_RETENTION_INTERVAL"
+  ]
+ },
+ "dsv4-b300-8-8-True-on": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:env.NCCL_NVLS_ENABLE",
+   "setting_not_modelled:env.VLLM_DSV4_MEGA_FP8_COMBINE",
+   "setting_not_modelled:env.VLLM_PREFIX_CACHE_RETENTION_INTERVAL",
+   "setting_not_modelled:kv_cache_memory_bytes",
+   "setting_not_modelled:kv_transfer_config.kv_connector_extra_config.enable_cross_layers_blocks",
+   "setting_not_modelled:prefill_schedule_interval"
+  ]
+ },
+ "dsv4-mi355x-8-1-False-off": {
+  "approximate": false,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:compilation_config.mode"
+  ]
+ },
+ "dsv4-mi355x-8-1-True-off": {
+  "approximate": false,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:compilation_config.mode",
+   "setting_not_modelled:prefill_schedule_interval"
+  ]
+ },
+ "dsv41flash-b200-2-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": []
+ },
+ "dsv41flash-b200-2-2-True-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:prefill_schedule_interval"
+  ]
+ },
+ "dsv41flash-b200-2-2-True-on": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:kv_offloading_size"
+  ]
+ },
+ "dsv41flash-b200-4-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes"
+  ]
+ },
+ "dsv41flash-b200-4-4-True-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes",
+   "setting_not_modelled:prefill_schedule_interval"
+  ]
+ },
+ "dsv41flash-b300-2-2-True-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes",
+   "setting_not_modelled:prefill_schedule_interval"
+  ]
+ },
+ "dsv41flash-b300-2-2-True-on": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes",
+   "setting_not_modelled:prefill_schedule_interval"
+  ]
+ },
+ "dsv41flash-b300-4-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:additional_config.decode_backend",
+   "setting_not_modelled:prefill_schedule_interval"
+  ]
+ },
+ "dsv41flash-gb200-2-2-True-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:speculative_config.enable_adaptive_verification"
+  ]
+ },
+ "dsv41flash-gb200-4-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": []
+ },
+ "dsv41flash-gb200-4-4-True-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes",
+   "setting_not_modelled:speculative_config.enable_adaptive_verification"
+  ]
+ },
+ "dsv41flash-gb300-2-2-True-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": []
+ },
+ "dsv41flash-gb300-4-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": []
+ },
+ "dsv41flash-h100-8-1-False-off": {
+  "approximate": false,
+  "problems": [],
+  "reasons": []
+ },
+ "dsv41flash-h200-4-1-False-off": {
+  "approximate": false,
+  "problems": [],
+  "reasons": []
+ },
+ "dsv41flash-h200-8-1-False-off": {
+  "approximate": false,
+  "problems": [],
+  "reasons": []
+ },
+ "dsv41flash-mi300x-4-1-False-off": {
+  "approximate": false,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:compilation_config.mode"
+  ]
+ },
+ "dsv41flash-mi300x-8-1-False-off": {
+  "approximate": false,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:compilation_config.mode"
+  ]
+ },
+ "dsv41flash-mi325x-2-1-False-off": {
+  "approximate": false,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:compilation_config.mode"
+  ]
+ },
+ "dsv41flash-mi325x-4-1-False-off": {
+  "approximate": false,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:compilation_config.mode"
+  ]
+ },
+ "dsv41flash-mi325x-8-1-False-off": {
+  "approximate": false,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:compilation_config.mode"
+  ]
+ },
+ "dsv41flash-mi355x-2-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+   "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+   "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+   "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+   "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+   "setting_not_modelled:monokernel"
+  ]
+ },
+ "dsv41flash-mi355x-4-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+   "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+   "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+   "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+   "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+   "setting_not_modelled:monokernel"
+  ]
+ },
+ "kimik3-mi355x-8-1-False-off": {
+  "approximate": false,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:attention_config.mla_prefill_backend",
+   "setting_not_modelled:compilation_config.custom_ops",
+   "setting_not_modelled:compilation_config.mode",
+   "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
+   "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
+   "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
+   "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
+   "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_MIN_SIZE_BYTES_MB",
+   "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+   "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+   "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
+   "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+   "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
+   "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
+   "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
+   "setting_not_modelled:speculative_config.kv_cache_dtype"
+  ]
+ },
+ "kimik3-mi355x-8-1-False-on": {
+  "approximate": false,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:attention_config.mla_prefill_backend",
+   "setting_not_modelled:compilation_config.custom_ops",
+   "setting_not_modelled:compilation_config.mode",
+   "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
+   "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
+   "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
+   "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
+   "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_MIN_SIZE_BYTES_MB",
+   "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+   "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+   "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
+   "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+   "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
+   "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
+   "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
+   "setting_not_modelled:speculative_config.kv_cache_dtype"
+  ]
+ },
+ "minimaxm3-b200-4-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:attention_config.use_trtllm_attention",
+   "setting_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND"
+  ]
+ },
+ "minimaxm3-b200-4-1-False-on": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:attention_config.use_trtllm_attention",
+   "setting_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND"
+  ]
+ },
+ "minimaxm3-b200-8-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:attention_config.use_trtllm_attention",
+   "setting_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND"
+  ]
+ },
+ "minimaxm3-b300-2-1-False-on": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:attention_config.use_trtllm_attention",
+   "setting_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND"
+  ]
+ },
+ "minimaxm3-b300-4-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:attention_config.use_trtllm_attention",
+   "setting_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND"
+  ]
+ },
+ "minimaxm3-b300-4-1-False-on": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:attention_config.use_trtllm_attention",
+   "setting_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND"
+  ]
+ },
+ "minimaxm3-b300-8-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:attention_config.use_trtllm_attention",
+   "setting_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND"
+  ]
+ },
+ "minimaxm3-h100-8-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:cpu_offload_gb"
+  ]
+ },
+ "minimaxm3-h100-8-1-False-on": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:cpu_offload_gb",
+   "setting_not_modelled:env.MC_ENABLE_DEST_DEVICE_AFFINITY",
+   "setting_not_modelled:env.MC_SLICE_SIZE",
+   "setting_not_modelled:env.MC_WORKERS_PER_CTX",
+   "setting_not_modelled:kv_transfer_config.kv_connector_extra_config.load_async"
+  ]
+ },
+ "minimaxm3-h200-8-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:env.VLLM_MARLIN_USE_ATOMIC_ADD",
+   "setting_not_modelled:linear_backend"
+  ]
+ },
+ "minimaxm3-mi300x-8-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:compilation_config.mode",
+   "setting_not_modelled:env.GPU_MAX_HW_QUEUES",
+   "setting_not_modelled:env.NCCL_MIN_NCHANNELS",
+   "setting_not_modelled:env.TORCH_BLAS_PREFER_HIPBLASLT",
+   "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+   "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MHA",
+   "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
+  ]
+ },
+ "minimaxm3-mi300x-8-1-False-on": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:compilation_config.mode",
+   "setting_not_modelled:connector.kv_connector",
+   "setting_not_modelled:connector.kv_connector_extra_config.lmcache.mp.host",
+   "setting_not_modelled:connector.kv_connector_extra_config.lmcache.mp.mq_timeout",
+   "setting_not_modelled:connector.kv_connector_extra_config.lmcache.mp.port",
+   "setting_not_modelled:connector.kv_connector_module_path",
+   "setting_not_modelled:connector.kv_role",
+   "setting_not_modelled:env.GPU_MAX_HW_QUEUES",
+   "setting_not_modelled:env.NCCL_MIN_NCHANNELS",
+   "setting_not_modelled:env.TORCH_BLAS_PREFER_HIPBLASLT",
+   "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+   "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MHA",
+   "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
+  ]
+ },
+ "minimaxm3-mi325x-8-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:compilation_config.mode",
+   "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
+  ]
+ },
+ "qwen3.5-tpuv7-1-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:compilation_config.mode"
+  ]
+ },
+ "qwen3.5-tpuv7-8-1-False-off": {
+  "approximate": true,
+  "problems": [],
+  "reasons": [
+   "setting_not_modelled:compilation_config.mode"
+  ]
+ }
+}

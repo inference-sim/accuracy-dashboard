@@ -71,12 +71,18 @@ class Join:
     reasons: list[str] = field(default_factory=list)
 
 
-def _first_at_or_after(candidates: list[Artifact], t: str) -> Artifact | None:
+def _pick(candidates: list[Artifact], t: str, what: str) -> tuple[Artifact | None, str | None]:
+    """The one upload that belongs with a result created at t: the only live one, else the
+    only one created at or after t (a retried job re-uploads). Anything else is ambiguous."""
     live = sorted((a for a in candidates if not a.expired), key=lambda a: (a.created_at, a.id))
+    if not live:
+        return None, ("artifact_expired" if candidates else None)
+    if len(live) == 1:
+        return live[0], None
     after = [a for a in live if a.created_at >= t]
-    if after:
-        return after[0]
-    return live[-1] if live else None
+    if len(after) == 1:
+        return after[0], None
+    return None, f"artifact_unmatched:several_{what}"
 
 
 def join(row: dict, artifacts: list[Artifact], read_result, *, agentic: bool) -> Join:
@@ -108,36 +114,42 @@ def join(row: dict, artifacts: list[Artifact], read_result, *, agentic: bool) ->
     j.result, j.result_json = matches[0]
     j.result_filename = result_filename(j.result.name)
     named = lambda prefix: [a for a in artifacts if a.name == prefix + j.result_filename]  # noqa: E731
-    j.server_logs = _first_at_or_after(named(SERVER_LOGS_PREFIX), j.result.created_at)
+    j.server_logs, why = _pick(named(SERVER_LOGS_PREFIX), j.result.created_at, "server_logs")
     if j.server_logs is None:
-        j.reasons.append("server_log_missing")
+        j.reasons.append(why if why and why.startswith("artifact_unmatched") else "server_log_missing")
     if agentic:
-        j.agentic = _first_at_or_after(named(AGENTIC_PREFIX), j.result.created_at)
+        j.agentic, why = _pick(named(AGENTIC_PREFIX), j.result.created_at, "agentic_exports")
         if j.agentic is None:
-            j.reasons.append("artifact_unmatched:agentic_export")
+            j.reasons.append(why if why and why.startswith("artifact_unmatched") else "artifact_unmatched:agentic_export")
     return j
 
 
 # ------------------------------------------------------------------ reading an artifact
 
+class Unreadable(ValueError):
+    """An artifact member that couldn't be read whole (too deep, too large, corrupt)."""
+
+
 def iter_files(blob: bytes, name: str = "", depth: int = 0):
     """(path, bytes) for every file in a zip / tar(.gz) / gzip blob, recursing into nested
-    archives. A non-archive yields itself."""
-    if depth > 3:
-        return
+    archives. A non-archive yields itself. Anything that can't be read whole raises
+    Unreadable rather than being skipped: a dropped member could be the log that disagrees."""
+    if depth > 4:
+        raise Unreadable(f"{name}: archives nested more than 4 deep")
     if blob[:4] == b"PK\x03\x04":
         with zipfile.ZipFile(io.BytesIO(blob)) as z:
             for info in sorted(z.infolist(), key=lambda i: i.filename):
-                if info.is_dir() or info.file_size > _MAX_MEMBER:
+                if info.is_dir():
                     continue
+                if info.file_size > _MAX_MEMBER:
+                    raise Unreadable(f"{name}/{info.filename}: {info.file_size} bytes")
                 yield from iter_files(z.read(info), f"{name}/{info.filename}" if name else info.filename, depth + 1)
         return
     if blob[:2] == b"\x1f\x8b":
         try:
             inner = gzip.decompress(blob)
-        except OSError:
-            yield name, blob
-            return
+        except (OSError, EOFError) as e:
+            raise Unreadable(f"{name}: corrupt gzip ({e})")
         if _is_tar(inner):
             yield from _iter_tar(inner, name, depth)
         else:
@@ -156,8 +168,10 @@ def _is_tar(b: bytes) -> bool:
 def _iter_tar(b: bytes, name: str, depth: int):
     with tarfile.open(fileobj=io.BytesIO(b)) as t:
         for m in sorted(t.getmembers(), key=lambda m: m.name):
-            if not m.isfile() or m.size > _MAX_MEMBER:
+            if not m.isfile():
                 continue
+            if m.size > _MAX_MEMBER:
+                raise Unreadable(f"{name}/{m.name}: {m.size} bytes")
             f = t.extractfile(m)
             if f is None:
                 continue
@@ -186,8 +200,8 @@ def find_launch_config(files: list[tuple[str, bytes]], result_fn: str):
             continue
         try:
             doc = yaml.safe_load(d)
-        except yaml.YAMLError:
-            continue
+        except yaml.YAMLError as e:
+            raise ValueError(f"{p} names {result_fn} but isn't valid YAML: {e}")
         env = ((doc or {}).get("benchmark") or {}).get("env") or {} if isinstance(doc, dict) else {}
         if env.get("RESULT_FILENAME") == result_fn:
             found.append((p, doc))
@@ -280,6 +294,9 @@ class GitHubArtifacts:
 
 
 def read_result_json(blob: bytes) -> dict | None:
+    """The result JSON in a bmk_* artifact: exactly one JSON object with a recipe_fingerprint.
+    None for an artifact with none (it isn't a point's result); several is an error."""
+    found = []
     for p, d in iter_files(blob):
         if p.endswith(".json"):
             try:
@@ -287,8 +304,10 @@ def read_result_json(blob: bytes) -> dict | None:
             except (json.JSONDecodeError, UnicodeDecodeError):
                 continue
             if isinstance(doc, dict) and "recipe_fingerprint" in doc:
-                return doc
-    return None
+                found.append(doc)
+    if len(found) > 1:
+        raise ValueError(f"{len(found)} result JSONs in one artifact")
+    return found[0] if found else None
 
 
 _RF = re.compile(r"[A-Za-z0-9_.\-]+")

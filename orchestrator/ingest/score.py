@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import csv
 import gzip
+import hashlib
 import io
 import json
 import re
@@ -49,6 +50,8 @@ class Env:
     policy_sha256: str = ""
     base_models: dict = field(default_factory=dict)   # HF repo -> base_model (frozen)
     timeout_s: int = 7200
+    vllm_defaults: dict = field(default_factory=dict)
+    vllm_defaults_sha256: str = ""
     catalog_obj: sp.Catalog | None = None
     parts: set = field(default_factory=set)
 
@@ -82,10 +85,15 @@ def _metrics_us(m: dict) -> tuple[float, float]:
     return float(m["ttft_mean_ms"]) * 1e3, float(m["request_itl_mean_ms"]) * 1e3
 
 
-def _blis_refusal(stderr: str) -> str:
+def _blis_refusal(stderr: str, work: Path) -> str:
+    """blis_refused:<slug> from BLIS's fatal message, with this run's paths removed so the
+    reason is the same on every machine."""
     m = re.findall(r'level=fatal msg="([^"]+)"', stderr) or re.findall(r"level=fatal msg=(.+)", stderr)
     text = (m[-1] if m else stderr.strip().splitlines()[-1] if stderr.strip() else "no output")
-    slug = re.sub(r"[^A-Za-z0-9_.:/=-]+", "_", text)[:80].strip("_")
+    text = text.replace(str(work), "").replace(str(work.resolve()), "")
+    text = re.sub(r"(/[^\s\"']+)+", "<path>", text)
+    text = re.sub(r"\bp-[0-9a-f]{16}\b", "<scenario>", text)
+    slug = re.sub(r"[^A-Za-z0-9_.:=-]+", "_", text)[:80].strip("_")
     return f"blis_refused:{slug}" if slug else "blis_refused"
 
 
@@ -101,6 +109,8 @@ def resolved_kv(log: str, metrics: dict | None) -> list[dict]:
     if len(found) > 1:
         rec["occurrences"] = len(found)
     blis = (metrics or {}).get("kv_capacity_tokens_per_replica")
+    # (No KV line at all returns [] above: the record then has no KV comparison, which the
+    # fidelity record states by its absence; the line is printed by every v1 engine.)
     if not blis:
         return [{**rec, "blis": None, "match": "unreadable"}]
     rec.update(blis=int(blis), delta=int(blis) - found[0], ratio=contract.ratio_str(int(blis), found[0]),
@@ -157,7 +167,7 @@ def _diff_args(args: list, dep: dict, b: st.Built) -> list[str]:
         else:
             got = _blis_value(dep, f)
             if f == "engine.frontend":
-                want = "rust" if str(want) == "1" else "python"
+                want = st.FRONTEND[want]
         a["blis"] = json.dumps(got) if isinstance(got, list) else (repr(got) if isinstance(got, float) else got)
         if got is None:
             a["match"] = "absent_in_blis"
@@ -196,15 +206,16 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     launch = json.loads(lc_b) if lc_b else None
 
     readings, problems = st.read_all(log, launch)
-    if row.get("metrics", {}).get("router_name"):
-        r = row["metrics"]
-        readings.setdefault("launch_config", st.Reading())
-        if "frontend.router" not in readings["launch_config"].values:
-            readings["launch_config"].add("frontend.router", f"{r['router_name']}/{r.get('router_version') or ''}".rstrip("/"))
+    # The API row's router is its own source: it states the frontend, nothing about the engine.
+    rm = row.get("metrics") or {}
+    if rm.get("router_name") and "frontend.router" not in readings["launch_config"].values:
+        readings["api_row"] = st.Reading()
+        readings["api_row"].add("frontend.router", f"{rm['router_name']}/{rm.get('router_version') or ''}".rstrip("/"))
     if problems:
         o.reasons.append("conflict:server_log_unreadable")
-    c = st.classify(st.merge(readings, env.policy), env.policy)
+    c = st.classify(st.merge(readings, env.policy, env.vllm_defaults), env.policy, env.vllm_defaults)
     o.reasons += c.reasons
+    o.reasons += row_vs_run(row, c)
 
     cat = env.catalog_obj
     spec = c.mapped.get("engine.speculative.method", (None, None, None))[1]
@@ -223,7 +234,9 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
             cmd = _read(pdir, entry["files"], "client_command")
             rp.cross_check(r, cmd.decode("utf-8", "replace") if cmd else None, row.get("conc"))
             o.reasons += r.reasons
-            if r.corpus_repo and r.corpus_repo != env.corpus["dataset"]:
+            if not r.corpus_repo:
+                o.reasons.append("required_setting_missing:replay.corpus_repo")
+            elif r.corpus_repo != env.corpus["dataset"]:
                 o.reasons.append(f"corpus_changed:{r.corpus_repo}")
     else:
         o.reasons.append("blis_refused:single_turn_scorer_pending")
@@ -268,13 +281,19 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         argv += ["--speculative-acceptance-length", b.acceptance_length]
     if env.corpus_cache:
         argv += ["--corpus-cache", str(env.corpus_cache)]
+    # The cached result is reused only for the exact same inputs: scenario, workload, argv.
+    key = hashlib.sha256((text + spec_path.read_text() + "\0".join(argv[1:])).encode()).hexdigest()
+    key_path = metrics_path.with_suffix(".key")
+    if metrics_path.exists() and (not key_path.exists() or key_path.read_text() != key):
+        metrics_path.unlink()
     if not metrics_path.exists():
         proc = subprocess.run(argv, capture_output=True, text=True, timeout=env.timeout_s)
         (work / "logs").mkdir(exist_ok=True)
         (work / "logs" / f"{pid}.err").write_text(proc.stderr[-20000:])
         if proc.returncode != 0 or not metrics_path.exists():
-            o.reasons = [_blis_refusal(proc.stderr)]
+            o.reasons = [_blis_refusal(proc.stderr, work)]
             return o
+        key_path.write_text(key)
     metrics = json.loads(metrics_path.read_text())
     try:
         pttft, ptpot = _metrics_us(metrics)
@@ -301,6 +320,26 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
                  round(float(m["mean_ttft"]) * 1e6, 3), round(pttft, 3),
                  contract.TIER_BY_STATUS[status], pid, ident["measured_date"]]
     return o
+
+
+def row_vs_run(row: dict, c: st.Classified) -> list[str]:
+    """The API row's summary fields must agree with what the run's own logs say; the logs
+    are what's scored, and a disagreement means the row and the artifacts aren't the same run."""
+    out = []
+    spec = c.mapped.get("engine.speculative.method", (None, None, None))[1]
+    row_spec = row.get("spec_method")
+    if row_spec and (row_spec == "none") != (spec is None):
+        out.append("conflict:spec_method")
+    offload = c.mapped.get("offload.connector", (None, None, None))[1]
+    row_off = row.get("offload_mode")
+    if row_off in ("on", "off") and (row_off == "on") != (offload is not None):
+        out.append("conflict:offload_mode")
+    tp = c.mapped.get("parallel.tp", (None, None, None))[1]
+    dp = c.mapped.get("parallel.dp", (None, None, None))[1] or 1
+    gpus = row.get("num_decode_gpu")
+    if tp and gpus and not row.get("disagg") and int(gpus) != int(tp) * int(dp):
+        out.append("conflict:num_gpus")
+    return out
 
 
 def _banner_version(log: str) -> str | None:

@@ -30,7 +30,13 @@ from pathlib import Path
 import pyrepr
 
 POLICY_PATH = Path(__file__).resolve().parent.parent / "vllm_arg_policy.yaml"
-SOURCES = ("launch_config", "args", "resolved_config", "engine_line", "blis_default")
+VLLM_DEFAULTS_PATH = Path(__file__).resolve().parent.parent / "vllm_defaults.json"
+
+
+def load_vllm_defaults(path: Path = VLLM_DEFAULTS_PATH) -> tuple[dict, str]:
+    raw = path.read_bytes()
+    return json.loads(raw)["defaults"], hashlib.sha256(raw).hexdigest()
+SOURCES = ("launch_config", "args", "resolved_config", "engine_line", "api_row", "blis_default")
 
 # Lines vLLM prints with what it resolved, whether or not the flag was passed. Each pattern's
 # groups become (path, value). A line printed once per rank must agree across ranks.
@@ -152,7 +158,7 @@ def read_engine_lines(log: str) -> Reading:
         for m in pattern.finditer(log):
             r.add(path, cast(m.group(1)))
     if _RUST_FRONTEND.search(log):
-        r.add("env.VLLM_USE_RUST_FRONTEND", "1")
+        r.add("env.VLLM_USE_RUST_FRONTEND", True)
     for m in _SIMPLE_OFFLOAD.finditer(log):
         # vLLM prints GiB under the "GB" label (bytes / 1024**3); kept as the per-rank figure.
         r.add("offload.per_rank_gib", pyrepr.Float(m.group(1)))
@@ -202,7 +208,12 @@ def read_launch_config(cfg: dict | None) -> Reading:
 # ------------------------------------------------------------------ merging
 
 def _norm(v):
-    """A value as compared across sources: Float/Opaque compare by number/text, lists whole."""
+    """A value as compared across sources: numbers by value (26 == 26.0 == '26.0' as printed),
+    Opaque by text, lists and dicts whole."""
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return float(v)
     if isinstance(v, pyrepr.Float):
         try:
             return float(v)
@@ -252,8 +263,12 @@ def _one(values: list):
     return values[0], len(values), None
 
 
-def merge(readings: dict[str, Reading], policy: dict) -> dict[str, Setting]:
-    """One Setting per path, by the source order and each entry's source rules."""
+def merge(readings: dict[str, Reading], policy: dict, vllm_defaults: dict | None = None) -> dict[str, Setting]:
+    """One Setting per path, by the source order and each entry's source rules.
+
+    A source that states a path as None ("let the engine decide") doesn't hide a later
+    source's value for it: the first non-None value wins."""
+    defaults = vllm_defaults or {}
     paths = set()
     for r in readings.values():
         paths |= set(r.values)
@@ -269,20 +284,21 @@ def merge(readings: dict[str, Reading], policy: dict) -> dict[str, Setting]:
         found = [(s, readings[s].values[path]) for s in order if s in readings and path in readings[s].values]
         if not found:
             continue
-        s, vals = found[0]
-        value, occ, conflict = _one(vals)
+        stated = [(s, v) for s, v in found if any(x is not None for x in v)]
+        s, vals = (stated or found)[0]
+        value, occ, conflict = _one([x for x in vals if x is not None] or vals)
         st = Setting(path=path, value=value, source=s, occurrences=occ, conflict=conflict,
-                     requested=_requested(path, readings, entry))
+                     requested=_requested(path, readings, entry, defaults))
         # Only what was ASKED can disagree: the launch config and the args line both state
         # the request, so a difference between them is a conflict. The resolved line and
         # engine lines are the engine's resolution of that request; where they differ from
         # it, that is vLLM resolving, not a disagreement (and an entry that wants the
         # resolved value says so with source_prefer / source_only).
         if conflict is None and s in REQUESTED:
-            for s2, vals2 in found[1:]:
+            for s2, vals2 in stated[1:]:
                 if s2 not in REQUESTED:
                     continue
-                v2, _, c2 = _one(vals2)
+                v2, _, c2 = _one([x for x in vals2 if x is not None])
                 if c2 is not None or not _same(v2, value):
                     st.conflict = sorted({_canon(value): value, **{_canon(x): x for x in (c2 or [v2])}}.values(), key=_canon)
                     break
@@ -293,25 +309,49 @@ def merge(readings: dict[str, Reading], policy: dict) -> dict[str, Setting]:
 REQUESTED = ("launch_config", "args")
 
 
-def _requested(path: str, readings: dict, entry: dict) -> bool:
+def _at_default(path: str, value, entry: dict, vllm_defaults: dict) -> bool:
+    """Whether a value is vLLM's own default for the path (at VLLM_REF), or one the policy
+    names as meaning "not set"."""
+    if _is_unset(entry, value):
+        return True
+    if path in vllm_defaults:
+        d = vllm_defaults[path]
+        return not (isinstance(d, dict) and "unliteral" in d) and _canon(value) == _canon(d)
+    return False
+
+
+def _requested(path: str, readings: dict, entry: dict, vllm_defaults: dict) -> bool:
     """Whether the run asked for this setting, rather than the build resolving it.
 
-    The launch config, when the run ships one, is exactly what was asked. Without one, the
-    args line is: vLLM prints the arguments that differ from its defaults, but a config
-    object passed as an argument is printed whole, defaults included, so a field inside one
-    counts as asked only when it isn't at its default (`unset`). A resolved-line or
-    engine-line value is the engine's resolution, never a request."""
+    Asked: the launch config states it, or the args line states it at a value other than
+    vLLM's default. (vLLM prints only the arguments that differ from their defaults, but a
+    config object passed as an argument is printed whole, defaults included, so a field
+    inside one counts only when it isn't at its default.) A resolved-line or engine-line
+    value alone is the engine's resolution, never a request; an entry about what the engine
+    ran (source_only: resolved_config) is judged on it."""
     if entry.get("source_only") == "resolved_config":
-        return True     # the entry is about what the engine ran, so its resolution is the setting
+        return True
     lc = readings.get("launch_config")
-    if lc is not None and lc.values:
-        return path in lc.values
+    has_lc = lc is not None and bool(lc.values)
+    if has_lc and path in lc.values:
+        return True
     a = readings.get("args")
     if a is None or path not in a.values:
         return False
+    value = _one(a.values[path])[0]
+    if value is None:
+        return False
     if "." not in path:
+        # A top-level arg in the args line differs from vLLM's default (that's what vLLM
+        # prints), whether the launch config or the launcher around it set it.
         return True
-    return not _is_unset(entry, _one(a.values[path])[0])
+    # A field inside a config object: vLLM prints the object whole, with values it resolved
+    # itself. The launch config, when the run ships one, says exactly which fields were set.
+    if has_lc:
+        return False
+    if path not in vllm_defaults:
+        return True     # a field VLLM_REF doesn't have: no default to say it wasn't set
+    return not _at_default(path, value, entry, vllm_defaults)
 
 
 def _same(a, b) -> bool:
@@ -332,6 +372,12 @@ def read_all(server_log: str, launch_config: dict | None) -> tuple[dict[str, Rea
         "engine_line": read_engine_lines(server_log),
     }
     problems = [p for r in readings.values() for p in r.problems]
+    # A vLLM engine log always prints both lines. A log missing either has changed shape (or
+    # isn't a whole log), and its settings can't be trusted to be complete.
+    if not readings["args"].values and _ARGS not in server_log:
+        problems.append("server log has no `non-default args` line")
+    if not readings["resolved_config"].values:
+        problems.append("server log has no resolved engine-config line")
     return readings, problems
 
 
@@ -382,7 +428,8 @@ class Classified:
     roles: dict = field(default_factory=dict)          # role -> value (model, drafter, ...)
 
 
-def classify(settings: dict[str, Setting], policy: dict) -> Classified:
+def classify(settings: dict[str, Setting], policy: dict, vllm_defaults: dict | None = None) -> Classified:
+    defaults = vllm_defaults or {}
     c = Classified(settings=settings)
     aliases = {}
     for path, st in settings.items():
@@ -390,22 +437,37 @@ def classify(settings: dict[str, Setting], policy: dict) -> Classified:
         if hit is None:
             c.reasons.append(f"unclassified_arg:{path}")
             continue
-        _, entry = hit
+        key, entry = hit
+        if key.endswith(".*") and entry["class"] == "inert" and st.requested and not entry.get("any_value"):
+            # A wildcard inert entry covers a config object's fields at vLLM's defaults. A field
+            # the run asked for at another value (or one vLLM didn't have at VLLM_REF) may pick a
+            # kernel, so it is unknown until the table names it.
+            c.reasons.append(f"unclassified_arg:{path}")
+            continue
         if entry.get("alias_of"):
             aliases[path] = (entry["alias_of"], st)
             continue
         if entry.get("role"):
             c.roles[entry["role"]] = st.value
         if st.conflict is not None:
+            vals = [_record_value(v) for v in st.conflict]
+            if entry["class"] == "inert":
+                # Disagreeing values of a setting with no timing effect (e.g. a per-host id).
+                c.args.append({"arg": path, "measured": None, "source": st.source, "blis": None,
+                               "match": "inert", "values": vals})
+                continue
             c.reasons.append(f"conflict:{path}")
             c.args.append({"arg": path, "measured": None, "source": st.source, "blis": None,
-                           "match": "conflict", "values": [_record_value(v) for v in st.conflict]})
+                           "match": "conflict", "values": vals})
             continue
         cls = entry["class"]
         rec = {"arg": path, "measured": _record_value(st.value), "source": st.source}
-        if cls in ("refuse", "approximate") and not st.requested:
+        if cls in ("refuse", "approximate") and not st.requested and not entry.get("always"):
             # The build's own resolution of a setting the run didn't ask for. The commit
-            # distance gate admitted this build; its defaults are part of it.
+            # distance gate admitted this build; its defaults are part of it. Recorded, so the
+            # record shows what the engine resolved.
+            if not _is_unset(entry, st.value):
+                c.args.append({**rec, "blis": None, "match": "inert"})
             continue
         if st.occurrences > 1:
             rec["occurrences"] = st.occurrences
@@ -449,15 +511,17 @@ def classify(settings: dict[str, Setting], policy: dict) -> Classified:
         except ValueError:
             c.reasons.append(f"conflict:{path}")
             continue
-        have = c.mapped.get(entry["blis_field"])
-        if have is None and canonical not in settings:
-            c.mapped[entry["blis_field"]] = (path, value, entry)
-            rec = {"arg": path, "measured": _record_value(st.value), "source": st.source,
-                   "blis_field": entry["blis_field"], "_value": value}
-            c.args.append(rec)
-        elif have is not None and _canon(have[1]) != _canon(value) and canonical in settings and \
-                settings[canonical].source in REQUESTED and st.source in REQUESTED:
+        canon = settings.get(canonical)
+        if canon is not None and canon.requested and st.requested and \
+                _canon(_typed(entry, canon.value) if canon.value is not None else None) != _canon(value):
             c.reasons.append(f"conflict:{path}")
+            continue
+        if canon is None or not canon.requested:
+            # The alias is what the run asked for (or the only statement of it).
+            c.args = [a for a in c.args if a["arg"] != canonical]
+            c.mapped[entry["blis_field"]] = (path, value, entry)
+            c.args.append({"arg": path, "measured": _record_value(st.value), "source": st.source,
+                           "blis_field": entry["blis_field"], "_value": value})
     c.args.sort(key=lambda a: a["arg"])
     c.reasons = sorted(set(c.reasons))
     return c
@@ -501,11 +565,11 @@ class Built:
     defaults_used: list = field(default_factory=list)  # fidelity args entries
 
 
-GPUS_PER_NODE = 8
+FRONTEND = {True: "rust", False: "python"}   # VLLM_USE_RUST_FRONTEND, parsed as a bool
 
 
 def build(c: Classified, *, name: str, model: str, part: Part, engine_version: str,
-          defaults: dict | None) -> Built:
+          defaults: dict | None, multinode: bool = False) -> Built:
     """The Scenario + Deployment for one point, from the classified settings.
 
     Only what the run recorded is written, plus BLIS's default for a setting BLIS requires
@@ -513,30 +577,43 @@ def build(c: Classified, *, name: str, model: str, part: Part, engine_version: s
     so BLIS never multiplies the deployment beyond what was measured.
     """
     b = Built()
+    acc = c.mapped.get("replay.acceptance_length")
+    if acc is not None:
+        b.acceptance_length = str(c.settings[acc[0]].value)
     pool = {"role": "colocated", "nodes": 1, "parallel": {}, "engine": {}}
     dep = {"kind": "Deployment", "name": name, "pools": [pool]}
     offload = {}
     for blis_field, (path, value, entry) in sorted(c.mapped.items()):
         top = blis_field.split(".")[0]
         if blis_field == "replay.acceptance_length":
-            b.acceptance_length = str(c.settings[path].value)
             continue
         if top == "offload":
             offload[blis_field] = (path, value)
             continue
         if blis_field == "engine.frontend":
-            value = "rust" if str(value) == "1" else "python"
+            value = FRONTEND[value]
         _set(pool, blis_field, value)
     par = pool["parallel"]
-    par.setdefault("tp", 1)
-    par.setdefault("pp", 1)
-    par.setdefault("dp", 1)
+    # Parallelism from the run: the resolved engine config always states tp/pp/dp, so a
+    # missing one means the log couldn't be read, not a default.
+    for k in ("tp", "pp", "dp"):
+        if k not in par:
+            b.reasons.append(f"required_setting_missing:parallel.{k}")
+            par[k] = 1
     par.setdefault("enable_expert_parallel", False)
     eng = pool["engine"]
-    # A speculative block needs both halves; one alone isn't a drafter BLIS can price.
-    if "speculative" in eng and set(eng["speculative"]) != {"method", "num_spec_tokens"}:
-        b.reasons.append("required_setting_missing:speculative_config.num_speculative_tokens")
+    # A speculative block needs both halves; one alone isn't a drafter BLIS can price. And the
+    # acceptance the run had must be stated: only synthetic rejection records it.
+    if "speculative" in eng:
+        if set(eng["speculative"]) != {"method", "num_spec_tokens"}:
+            b.reasons.append("required_setting_missing:speculative_config.num_speculative_tokens")
+        if b.acceptance_length is None:
+            b.reasons.append("required_setting_missing:speculative_config.synthetic_acceptance_length")
     # Required settings no source recorded: BLIS's own default, else refuse.
+    if "gpu_memory_utilization" not in eng:
+        # vLLM prints it (the "Desired GPU memory utilization" line) whether or not it was
+        # passed, and BLIS has no resolver for it: missing means the log changed shape.
+        b.reasons.append("required_setting_missing:gpu_memory_utilization")
     for path, field_ in (("max_num_seqs", "max_num_seqs"), ("max_num_batched_tokens", "max_num_batched_tokens"),
                          ("block_size", "block_size")):
         if field_ in eng:
@@ -554,14 +631,14 @@ def build(c: Classified, *, name: str, model: str, part: Part, engine_version: s
         b.reasons += _write_offload(dep, offload, c, par)
     ranks = par["tp"] * par["pp"] * par["dp"] * par.get("pcp", 1)
     b.gpus = ranks
-    nodes = max(1, -(-ranks // GPUS_PER_NODE))
-    pool["nodes"] = nodes
+    # The run's own GPUs, on one node: the API row says whether it spanned nodes, and a
+    # multi-node run needs a fabric the run doesn't record.
+    if multinode:
+        b.reasons.append("blis_refused:multi_node_fabric_unstated")
+    pool["nodes"] = 1
     b.scenario = {"kind": "Scenario", "name": name, "engine_version": engine_version.lstrip("v"),
                   "model": model, "coefficients": COEFFICIENTS,
-                  "cluster": {"hardware": part.name, "nodes": nodes,
-                              "gpus_per_node": min(ranks, GPUS_PER_NODE) if nodes == 1 else GPUS_PER_NODE}}
-    if nodes > 1:
-        b.reasons.append("blis_refused:multi_node_fabric_unstated")
+                  "cluster": {"hardware": part.name, "nodes": 1, "gpus_per_node": ranks}}
     b.deployment = dep
     return b
 
@@ -579,15 +656,22 @@ def _write_offload(dep: dict, offload: dict, c: Classified, par: dict) -> list[s
     per_rank = None
     pr = c.settings.get("kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use_per_rank")
     total = c.settings.get("kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use")
-    if pr is not None:
-        per_rank = int(pr.value)
-    elif total is not None:
-        per_rank = int(total.value) // world
+    try:
+        if pr is not None and pr.conflict is None:
+            per_rank = _bytes(pr.value)
+        elif total is not None and total.conflict is None:
+            per_rank = _bytes(total.value) // world
+    except ValueError:
+        return ["conflict:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use"]
     if per_rank is None:
         return ["required_setting_missing:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use"]
     logged = c.settings.get("offload.per_rank_gib")
-    if logged is not None and abs(float(logged.value) - per_rank / 1024 ** 3) > 0.005:
-        return ["conflict:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use"]
+    if logged is not None:
+        if logged.conflict is not None:
+            return ["conflict:offload.per_rank_gib"]
+        # vLLM prints the per-rank figure to two decimals of GiB.
+        if abs(float(logged.value) - per_rank / 1024 ** 3) > 0.005:
+            return ["conflict:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use"]
     # BLIS's tier is the engine's: the world-size ranks of one engine share it.
     block = {"connector": conn, "tiers": [{"tier": "cpu_dram", "bytes": per_rank * world}]}
     lazy = offload.get("offload.spec", (None, None))[1]
@@ -595,6 +679,14 @@ def _write_offload(dep: dict, offload: dict, c: Classified, par: dict) -> list[s
         block["spec"] = "lazy" if lazy else "eager"
     dep["offload"] = block
     return []
+
+
+def _bytes(v) -> int:
+    """A byte count as printed: an int, or a float with no fractional part."""
+    f = float(v)
+    if f != int(f) or f <= 0:
+        raise ValueError(f"{v!r} is not a whole number of bytes")
+    return int(f)
 
 
 def to_yaml(b: Built, header: list[str]) -> str:

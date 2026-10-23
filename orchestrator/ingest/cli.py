@@ -17,6 +17,7 @@ import argparse
 import json
 import subprocess
 import sys
+import urllib.error
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -42,7 +43,13 @@ def cmd_pull(a) -> int:
     out.mkdir(parents=True, exist_ok=True)
     today = date.fromisoformat(a.today) if a.today else date.today()
     p = api.pull(api.http_fetch, today=today, window_days=a.window_days)
-    _log(f"pull: {len(p.rows)} vllm rows in {p.window}; slugs with no site name: {p.unnamed_slugs}")
+    _log(f"pull: {len(p.rows)} vllm rows in {p.window}; slugs with no site name: {p.unnamed_slugs}; "
+         f"rows with an unreadable date: {len(p.undated)}")
+    if p.unnamed_slugs:
+        # /benchmarks takes display names, so these models' rows can't be listed at all. Fail
+        # rather than publish a pull that silently lacks a model.
+        _log("FATAL: the site names no display name for " + ", ".join(p.unnamed_slugs))
+        return 3
     token = clients._github_token()
     resolver = build.Resolver(registry=clients.DockerHubRegistry(), github=clients.GitHubREST(token))
     gh = art.GitHubArtifacts(pl.IX_REPO, token, Path(a.cache or out / "_artifacts"))
@@ -52,7 +59,7 @@ def cmd_pull(a) -> int:
         try:
             e = pl.freeze_point(row, resolver=resolver, gh=gh, fetch=api.http_fetch, out=out,
                                 run_artifacts=run_artifacts)
-        except Exception as ex:  # one bad row must not lose the pull; it's recorded
+        except (OSError, ValueError, KeyError, urllib.error.URLError) as ex:  # recorded, not lost
             ident = pl.identity(row)
             e = {"point_id": contract.point_id(ident), "identity": ident, "row": row, "files": {},
                  "build": None, "reasons": ["artifact_unmatched:pull_error"], "problems": [repr(ex)[:500]]}
@@ -84,11 +91,16 @@ def cmd_pull(a) -> int:
             doc = api.decode(api.http_fetch(f"https://huggingface.co/api/models/{repo}"))
             bm = (doc.get("cardData") or {}).get("base_model")
             base[repo] = (bm[0] if isinstance(bm, list) and len(bm) == 1 else bm if isinstance(bm, str) else None)
-        except Exception:
-            base[repo] = None
+        except urllib.error.HTTPError as e:
+            # A repo HF doesn't know is "no base_model"; any other failure is recorded as one,
+            # and scoring turns it into a reason rather than a silent catalog miss.
+            base[repo] = None if e.code == 404 else {"lookup_failed": f"HTTP {e.code}"}
+        except urllib.error.URLError as e:
+            base[repo] = {"lookup_failed": str(e.reason)[:200]}
     meta = {"window": list(p.window), "pulled_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "vllm_ref": build.VLLM_REF, "vllm_max_distance": build.VLLM_MAX_DISTANCE,
-            "unnamed_slugs": p.unnamed_slugs, "base_models": base}
+            "unnamed_slugs": p.unnamed_slugs, "base_models": base,
+            "undated_row_ids": sorted(str(r["id"]) for r in p.undated)}
     sha = pl.write_manifest(out, meta, points)
     _log(f"pull: wrote {out / 'manifest.json'} (sha256 {sha})")
     return 0
@@ -104,6 +116,7 @@ def cmd_score(a) -> int:
     manifest = json.loads(manifest_text)
     sim = Path(a.blis_dir)
     policy, policy_sha = st.load_policy()
+    vdefaults, vdefaults_sha = st.load_vllm_defaults()
     corpus_path = Path(a.corpus)
     corpus_sha = a.corpus_sha256 or art.sha256(corpus_path.read_bytes())
     env = sc.Env(
@@ -118,7 +131,8 @@ def cmd_score(a) -> int:
                 "path": str(corpus_path), "file": corpus_path.name},
         corpus_cache=Path(a.corpus_cache) if a.corpus_cache else None,
         vllm_ref=manifest["vllm_ref"], policy=policy, policy_sha256=policy_sha,
-        base_models=manifest.get("base_models") or {}, timeout_s=a.timeout)
+        base_models=manifest.get("base_models") or {}, timeout_s=a.timeout,
+        vllm_defaults=vdefaults, vllm_defaults_sha256=vdefaults_sha)
     env.catalog_obj = sp.Catalog.load(env.catalog)
     env.parts = sp.registry_parts(env.registry)
     work = Path(a.work or Path(a.out).parent / (Path(a.out).name + "-work"))
@@ -128,7 +142,13 @@ def cmd_score(a) -> int:
         points = [p for p in points if any(p["point_id"].startswith(x) for x in a.only)]
     outcomes = []
     for i, e in enumerate(points, 1):
-        o = sc.score_point(e, pull_dir, work, env)
+        try:
+            o = sc.score_point(e, pull_dir, work, env)
+        except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as ex:
+            # One point that can't be scored is recorded with why, never dropped.
+            o = sc.Outcome(point_id=e["point_id"], identity=e["identity"], row=e["row"],
+                           reasons=sorted(set(e["reasons"] + ["blis_refused:extractor_error"])))
+            _log(f"    extractor error on {e['point_id'][:12]}: {ex!r}"[:400])
         outcomes.append(o)
         _log(f"  [{i}/{len(points)}] {e['row']['model']} {e['row']['hardware']} c{e['row']['conc']} "
              f"{e['point_id'][:12]} -> {o.fidelity['status'] if o.fidelity else o.reasons}")
@@ -136,7 +156,7 @@ def cmd_score(a) -> int:
             "blis": {"release": env.blis_release, "commit_sha": env.blis_commit, "catalog": env.catalog_release,
                      "registry": env.registry_release, "extractor_version": f"blis-latency-kernel@{env.kernel}"},
             "vllm_ref": manifest["vllm_ref"], "vllm_max_distance": manifest["vllm_max_distance"],
-            "policy_sha256": policy_sha, "pulled_at": manifest["pulled_at"],
+            "policy_sha256": art.sha256((policy_sha + vdefaults_sha).encode()), "pulled_at": manifest["pulled_at"],
             "corpus": {"dataset": env.corpus["dataset"], "revision": env.corpus["revision"], "sha256": corpus_sha},
             "pull_manifest_sha256": art.sha256(manifest_text.encode()), "_policy": policy}
     sc.write_contract(Path(a.out), outcomes, prov)

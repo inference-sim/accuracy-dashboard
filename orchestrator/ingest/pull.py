@@ -24,6 +24,12 @@ import build  # noqa: E402
 import contract  # noqa: E402
 
 IX_REPO = "SemiAnalysisAI/InferenceX"
+_RUN_REPO = __import__("re").compile(r"github\.com/([^/]+/[^/]+)/actions/runs/")
+
+
+def run_repo(row: dict) -> str | None:
+    m = _RUN_REPO.search(str(row.get("run_url") or ""))
+    return m.group(1) if m else None
 
 
 def identity(row: dict) -> dict:
@@ -64,6 +70,10 @@ def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts
     server_log = None
     if run is None:
         entry["reasons"].append("artifact_unmatched:no_run_url")
+    elif run_repo(row) != gh.repo:
+        # The row's run lives in another repository (e.g. a private one) whose artifacts
+        # this pull can't read: no server log, so nothing to score from.
+        entry["reasons"].append(f"server_log_missing:run_in_{(run_repo(row) or 'unknown').replace('/', '_')}")
     else:
         run_id, attempt = run
         if run_id not in run_artifacts:
@@ -76,7 +86,12 @@ def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts
         if j.result_json is not None:
             frozen.put("result_json", json.dumps(j.result_json, sort_keys=True).encode(), j.result.name)
         if j.server_logs is not None:
-            files = list(art.iter_files(gh.download(j.server_logs)))
+            try:
+                files = list(art.iter_files(gh.download(j.server_logs)))
+            except art.Unreadable as e:
+                entry["reasons"].append("server_log_missing:unreadable_artifact")
+                entry.setdefault("problems", []).append(str(e))
+                files = []
             logs = art.find_server_logs(files)
             if logs:
                 # One log per engine host; a colocated single-node point has one. Several are
@@ -100,7 +115,12 @@ def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts
                 frozen.put("launch_config", json.dumps(cfg, sort_keys=True, default=str).encode(),
                            f"{j.server_logs.name}:{p}")
         if agentic and j.agentic is not None:
-            files = list(art.iter_files(gh.download(j.agentic)))
+            try:
+                files = list(art.iter_files(gh.download(j.agentic)))
+            except art.Unreadable as e:
+                entry["reasons"].append("artifact_unmatched:unreadable_agentic_export")
+                entry.setdefault("problems", []).append(str(e))
+                files = []
             for role, base in (("client_export", "profile_export_aiperf.json"),
                                ("client_command", "benchmark_command.txt")):
                 hits = art.find_named(files, base)
@@ -108,6 +128,8 @@ def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts
                     frozen.put(role, hits[0][1], f"{j.agentic.name}:{hits[0][0]}")
                 elif len(hits) > 1:
                     entry["reasons"].append(f"conflict:{role}")
+                elif role == "client_export":
+                    entry["reasons"].append("artifact_unmatched:client_export")
     if not agentic and server_log is None:
         text = api.server_log(fetch, row["id"])
         if text and art.is_server_log(text.encode()):
