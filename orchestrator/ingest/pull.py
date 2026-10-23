@@ -138,8 +138,8 @@ def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts
         else:
             entry["reasons"].append("server_log_missing")
     b = resolver.resolve(row.get("image") or "", server_log)
+    # The build never refuses a point; it makes it estimated unless it's the build BLIS models.
     entry["build"] = b.record()
-    entry["reasons"] += b.reasons
     entry["files"] = frozen.files
     entry["reasons"] = sorted(set(entry["reasons"]))
     return entry

@@ -443,6 +443,23 @@ def test_what_blis_used_for_an_estimated_setting_is_read_from_blis():
         sc.blis_resolution = orig
 
 
+def test_a_point_is_exact_only_on_the_build_blis_models_with_nothing_approximated():
+    import score as sc
+    near = {"match": "exact", "distance": -738}
+    assert sc.point_status(False, near) == "exact"
+    assert sc.point_status(True, near) == "approximate"
+    for why in ("custom_build", "outside_distance", "commit_unresolvable", "commit_conflict"):
+        assert sc.point_status(False, {"match": "estimated", "why": why}) == "approximate", why
+    assert sc.point_status(False, {}) == "approximate"          # no build record: never exact
+
+
+def test_a_build_never_refuses_a_point_at_pull_time():
+    import pull as pl
+    src = (HERE / "pull.py").read_text()
+    assert "b.reasons" not in src and 'entry["build"] = b.record()' in src
+    assert not hasattr(__import__("build").Build(image="x"), "reasons")
+
+
 def test_the_indexer_record_is_named_from_the_catalog_graph():
     g = {"layer_kinds": [{"nodes": [{"caches": [{"kind": "index", "bytes_per_entry": 132, "tokens_per_entry": 2}]}]},
                          {"nodes": [{"caches": [{"kind": "index", "bytes_per_entry": 132}]}]}]}

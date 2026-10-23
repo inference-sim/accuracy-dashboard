@@ -115,30 +115,32 @@ def test_tag_sha_takes_the_trailing_hex_run():
 
 
 # ------------------------------------------------------------------ the gate
+# A build never refuses a point: `why` is None for the build BLIS models (exact), else why
+# the point is estimated.
 
 def test_non_official_images_are_custom_builds():
     for image in ("vllm/vllm-openai-dev:nightly-" + ON_MAIN, "lmsysorg/sglang:v0.5.9", "", None,
                   "us-central1-docker.pkg.dev/x/torchtpu-vllm/torchtpu-vllm-prod:sa-oct-01"):
-        assert _resolver().resolve(image).reasons == ["custom_build"], image
+        assert _resolver().resolve(image).why == "custom_build", image
 
 
 def test_label_by_digest_wins_and_is_recorded_as_image_label():
     r = _resolver({("vllm/vllm-openai", DIGEST): ON_MAIN})
     got = r.resolve("vllm/vllm-openai:nightly-dev-x86_64-cu130-ac9126e58aa7@" + DIGEST)
-    assert got.reasons == [] and got.commit == ON_MAIN and got.source == "image_label" and got.distance == 207
+    assert got.why is None and got.commit == ON_MAIN and got.source == "image_label" and got.distance == 207
 
 
 def test_label_read_by_tag_is_recorded_as_label_by_tag():
     tag = "cu134-nightly-x86_64-dev-20261019-mk"
     got = _resolver({("vllm/vllm-openai", tag): ON_MAIN}).resolve(f"vllm/vllm-openai:{tag}")
-    assert (got.source, got.commit, got.reasons) == ("label_by_tag", ON_MAIN, [])
+    assert (got.source, got.commit, got.why) == ("label_by_tag", ON_MAIN, None)
 
 
 def test_unknown_label_falls_through_to_the_banner():
     tag = "nightly-dev-x86_64-cu13.0.1-zzzz"
     r = _resolver({("vllm/vllm-openai", tag): "unknown"})
     got = r.resolve(f"vllm/vllm-openai:{tag}", server_log=_log("cd10ed6f9"))
-    assert (got.source, got.commit, got.distance, got.reasons) == ("server_log_banner", OLDER, -738, [])
+    assert (got.source, got.commit, got.distance, got.why) == ("server_log_banner", OLDER, -738, None)
 
 
 def test_missing_label_and_banner_fall_through_to_the_tag_sha():
@@ -150,42 +152,42 @@ def test_build_tree_suffix_is_accepted_when_the_label_agrees():
     tag = "cu134-nightly-x86_64-dev-20261019-mk"
     got = _resolver({("vllm/vllm-openai", tag): ON_MAIN}).resolve(
         f"vllm/vllm-openai:{tag}", server_log=_log("ac9126e58", ".d20261016"))
-    assert got.reasons == [] and got.commit == ON_MAIN
+    assert got.why is None and got.commit == ON_MAIN
 
 
 def test_build_tree_suffix_without_a_confirming_label_is_unresolvable():
     for labels in ({}, {("vllm/vllm-openai", "t"): "unknown"}):
         got = _resolver(labels).resolve("vllm/vllm-openai:t", server_log=_log("ac9126e58", ".d20261016"))
-        assert got.reasons == ["build_commit_unresolvable"], labels
+        assert got.why == "commit_unresolvable", labels
 
 
 def test_banners_that_disagree_across_ranks_conflict_even_with_a_label():
     log = _log("ac9126e58") + "\n" + _log("cd10ed6f9")
     got = _resolver({("vllm/vllm-openai", "t"): ON_MAIN}).resolve("vllm/vllm-openai:t", server_log=log)
-    assert got.reasons == ["build_commit_conflict"]
+    assert got.why == "commit_conflict"
 
 
 def test_a_banner_commit_unknown_to_vllm_conflicts_with_the_label():
     # A patched local build: the label says ON_MAIN, the banner names a commit vLLM doesn't have.
     got = _resolver({("vllm/vllm-openai", "t"): ON_MAIN}).resolve("vllm/vllm-openai:t", server_log=_log("1234567"))
-    assert got.reasons == ["build_commit_conflict"]
+    assert got.why == "commit_conflict"
 
 
 def test_a_tag_ending_in_a_date_is_not_mistaken_for_a_commit():
     got = _resolver().resolve("vllm/vllm-openai:nightly-20261019", server_log=_log("cd10ed6f9"))
-    assert (got.source, got.commit, got.reasons) == ("server_log_banner", OLDER, [])
+    assert (got.source, got.commit, got.why) == ("server_log_banner", OLDER, None)
 
 
 def test_sources_naming_different_commits_conflict():
     got = _resolver({("vllm/vllm-openai", "nightly-x"): ON_MAIN}).resolve(
         "vllm/vllm-openai:nightly-x", server_log=_log("cd10ed6f9"))
-    assert got.reasons == ["build_commit_conflict"] and got.commit is None
+    assert got.why == "commit_conflict" and got.commit is None
 
 
 def test_a_commit_that_is_not_in_vllm_is_unresolvable():
     got = _resolver({("vllm/vllm-openai", "nightly-dev-x86_64-cu13.0.1-20ebb28"): "unknown"}).resolve(
         "vllm/vllm-openai:nightly-dev-x86_64-cu13.0.1-20ebb28", server_log=_log("1234567"))
-    assert got.reasons == ["build_commit_unresolvable"] and got.distance is None
+    assert got.why == "commit_unresolvable" and got.distance is None
 
 
 def test_a_full_sha_label_that_github_expands_differently_is_rejected():
@@ -193,39 +195,39 @@ def test_a_full_sha_label_that_github_expands_differently_is_rejected():
         def resolve_commit(self, repo, sha):
             return OLDER
     r = b.Resolver(registry=FakeRegistry({("vllm/vllm-openai", "t"): ON_MAIN}), github=Liar())
-    assert r.resolve("vllm/vllm-openai:t").reasons == ["build_commit_unresolvable"]
+    assert r.resolve("vllm/vllm-openai:t").why == "commit_unresolvable"
 
 
 def test_off_main_commit_is_a_custom_build():
     got = _resolver().resolve("vllm/vllm-openai:vllm-minimax-m3-perf-x86_64-13.0.1-8b00f41",
                               server_log=_log("8b00f4123"))
-    assert got.reasons == ["custom_build"] and got.commit == FORK and got.distance is None
+    assert got.why == "custom_build" and got.commit == FORK and got.distance is None
 
 
 def test_release_branch_commit_is_measured_from_its_branch_point():
     # The v0.31.0 tag is 27 commits up its release branch; its distance is 0, not +27.
     got = _resolver({("vllm/vllm-openai", "v0.31.0"): RELEASE_BRANCH}).resolve("vllm/vllm-openai:v0.31.0")
-    assert got.reasons == [] and got.commit == RELEASE_BRANCH and got.distance == 0
+    assert got.why is None and got.commit == RELEASE_BRANCH and got.distance == 0
 
 
 def test_branch_cut_after_the_reference_is_still_a_custom_build():
     # Strictly "ahead" of the branch point, but not on main and not on a release tag.
     got = _resolver().resolve("vllm/vllm-openai:x", server_log=_log("8b00f4123"))
-    assert got.reasons == ["custom_build"] and got.distance is None
+    assert got.why == "custom_build" and got.distance is None
 
 
 def test_distance_limit_is_inclusive_and_symmetric():
     r = b.Resolver(registry=FakeRegistry({}), github=FakeGitHub(), max_distance=738)
-    assert r.resolve("vllm/vllm-openai:nightly-" + OLDER).reasons == []          # -738: at the limit
+    assert r.resolve("vllm/vllm-openai:nightly-" + OLDER).why is None          # -738: at the limit
     r = b.Resolver(registry=FakeRegistry({}), github=FakeGitHub(), max_distance=737)
-    assert r.resolve("vllm/vllm-openai:nightly-" + OLDER).reasons == ["outside_distance"]
+    assert r.resolve("vllm/vllm-openai:nightly-" + OLDER).why == "outside_distance"
     got = _resolver().resolve("vllm/vllm-openai:nightly-" + FAR)                   # +2001 > 2000
-    assert got.reasons == ["outside_distance"] and got.distance == 2001 and got.commit == FAR
+    assert got.why == "outside_distance" and got.distance == 2001 and got.commit == FAR
 
 
 def test_rocm_images_are_official():
     got = _resolver().resolve("vllm/vllm-openai-rocm:nightly-rocm100-" + ON_MAIN)
-    assert got.reasons == [] and got.distance == 207
+    assert got.why is None and got.distance == 207
 
 
 def test_lookups_are_cached_per_image_and_per_commit():
@@ -244,7 +246,12 @@ def test_lookups_are_cached_per_image_and_per_commit():
 def test_record_matches_the_fidelity_build_shape():
     got = _resolver().resolve("vllm/vllm-openai:nightly-" + OLDER)
     assert got.record() == {"image": "vllm/vllm-openai:nightly-" + OLDER, "commit": OLDER,
-                            "source": "image_tag", "ref": "v0.31.0", "distance": -738}
+                            "source": "image_tag", "ref": "v0.31.0", "distance": -738, "match": "exact"}
+    far = _resolver().resolve("vllm/vllm-openai:nightly-" + FAR).record()
+    assert (far["match"], far["why"], far["distance"]) == ("estimated", "outside_distance", 2001)
+    custom = _resolver().resolve("lmsysorg/sglang:v0.5.9").record()
+    assert custom == {"image": "lmsysorg/sglang:v0.5.9", "commit": None, "source": None, "ref": "v0.31.0",
+                      "distance": None, "match": "estimated", "why": "custom_build"}
 
 
 # ------------------------------------------------------------------ the registry client

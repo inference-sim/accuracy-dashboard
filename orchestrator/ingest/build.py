@@ -1,4 +1,9 @@
-"""Which vLLM build measured a point, and whether it's close enough to score (Discussion #28).
+"""Which vLLM build measured a point, and whether it's the build BLIS models (Discussion #28).
+
+A build never stops a point from being scored. It decides whether the point is exact or
+estimated: `match` is "exact" only for an official image whose commit is on vLLM's mainline
+within VLLM_MAX_DISTANCE of VLLM_REF's branch point. Anything else is "estimated", with `why`:
+custom_build, outside_distance, commit_unresolvable or commit_conflict.
 
 Per point, in order:
 
@@ -12,7 +17,7 @@ Per point, in order:
      commits are a conflict. A banner with a build-tree suffix (.d<YYYYMMDD>) is fine as long as
      its SHA agrees.
   3. The commit is on vLLM's mainline: reachable from main or from a release tag.
-  4. Distance along main from VLLM_REF's branch point, within VLLM_MAX_DISTANCE.
+  4. Distance along main from VLLM_REF's branch point; within VLLM_MAX_DISTANCE is exact.
 
 Network access goes through two injected clients (Registry, GitHub) so the logic is testable
 with fakes and the results can be cached and frozen per point. Nothing here is used by the
@@ -116,19 +121,33 @@ def tag_sha(tag: str | None) -> str | None:
     return m.group(1) if m else None
 
 
+# Why a build is estimated rather than exact (fidelity.schema.json#/definitions/build.why).
+CUSTOM_BUILD = "custom_build"                  # not an official image, or its commit is off mainline
+OUTSIDE_DISTANCE = "outside_distance"          # more than max_distance commits from VLLM_REF
+COMMIT_UNRESOLVABLE = "commit_unresolvable"    # no source yields a commit in vllm-project/vllm
+COMMIT_CONFLICT = "commit_conflict"            # the sources name different commits
+
+
 @dataclass
 class Build:
-    """The build record for one point (fidelity.schema.json#/definitions/build) plus reasons."""
+    """The build record for one point (fidelity.schema.json#/definitions/build)."""
     image: str
     commit: str | None = None
     source: str | None = None
     ref: str = VLLM_REF
     distance: int | None = None
-    reasons: list[str] = field(default_factory=list)
+    why: str | None = None          # None: exact
+
+    @property
+    def match(self) -> str:
+        return "estimated" if self.why else "exact"
 
     def record(self) -> dict:
-        return {"image": self.image, "commit": self.commit, "source": self.source,
-                "ref": self.ref, "distance": self.distance}
+        rec = {"image": self.image, "commit": self.commit, "source": self.source,
+               "ref": self.ref, "distance": self.distance, "match": self.match}
+        if self.why:
+            rec["why"] = self.why
+        return rec
 
 
 @dataclass
@@ -140,7 +159,7 @@ class Resolver:
     repo: str = VLLM_REPO
     _commits: dict = field(default_factory=dict)       # sha prefix -> full sha | None
     _labels: dict = field(default_factory=dict)        # (repository, reference) -> label | None
-    _placement: dict = field(default_factory=dict)     # full sha -> (distance | None, reasons)
+    _placement: dict = field(default_factory=dict)     # full sha -> (distance | None, why | None)
     _ref_base: str | None = None
 
     def _full(self, sha: str) -> str | None:
@@ -163,8 +182,8 @@ class Resolver:
             self._ref_base = self.github.merge_base(self.repo, self.ref, "main")
         return self._ref_base
 
-    def _place(self, commit: str) -> tuple[int | None, list[str]]:
-        """(distance, reasons) for a resolved commit, cached per commit."""
+    def _place(self, commit: str) -> tuple[int | None, str | None]:
+        """(distance, why) for a resolved commit, cached per commit; why is None within distance."""
         if commit not in self._placement:
             # On main iff main contains the commit. (Comparing against the branch point instead
             # would call a release-branch commit, or a fork cut after that point, "ahead".)
@@ -175,19 +194,18 @@ class Resolver:
                 # A release-branch commit: measured from where its branch left main.
                 point = self.github.merge_base(self.repo, commit, "main")
             else:
-                self._placement[commit] = (None, ["custom_build"])
+                self._placement[commit] = (None, CUSTOM_BUILD)
                 return self._placement[commit]
             _, ahead, behind = self.github.compare(self.repo, self.ref_branch_point(), point)
             distance = ahead - behind
-            reasons = ["outside_distance"] if abs(distance) > self.max_distance else []
-            self._placement[commit] = (distance, reasons)
+            self._placement[commit] = (distance, OUTSIDE_DISTANCE if abs(distance) > self.max_distance else None)
         return self._placement[commit]
 
     def resolve(self, image: str, server_log: str | None = None) -> Build:
         build = Build(image=image or "", ref=self.ref)
         img = parse_image(image)
         if img is None or img.repository not in OFFICIAL_IMAGES:
-            build.reasons = ["custom_build"]
+            build.why = CUSTOM_BUILD
             return build
 
         label_commit, label_source = None, None
@@ -198,18 +216,18 @@ class Resolver:
 
         status, banner, dirty = banner_sha(server_log)
         if status == BANNER_CONFLICT:
-            build.reasons = ["build_commit_conflict"]
+            build.why = COMMIT_CONFLICT
             return build
         banner_commit = None
         if banner:
             if label_commit and not label_commit.startswith(banner):
                 # The log names a different (possibly patched, unpublished) commit than the image.
-                build.reasons = ["build_commit_conflict"]
+                build.why = COMMIT_CONFLICT
                 return build
             banner_commit = self._full(banner)
             if dirty and not label_commit:
                 # A build-tree suffix is a local build; it counts only when the label confirms it.
-                build.reasons = ["build_commit_unresolvable"]
+                build.why = COMMIT_UNRESOLVABLE
                 return build
 
         # A tag SHA only counts once it resolves: tags also end in dates (…-20261019) and words.
@@ -220,12 +238,11 @@ class Resolver:
                                                   ("server_log_banner", banner_commit),
                                                   ("image_tag", tag_commit)) if sha]
         if len({sha for _, sha in candidates}) > 1:
-            build.reasons = ["build_commit_conflict"]
+            build.why = COMMIT_CONFLICT
             return build
         if not candidates:
-            build.reasons = ["build_commit_unresolvable"]
+            build.why = COMMIT_UNRESOLVABLE
             return build
         build.source, build.commit = candidates[0]
-        build.distance, reasons = self._place(build.commit)
-        build.reasons = list(reasons)
+        build.distance, build.why = self._place(build.commit)
         return build

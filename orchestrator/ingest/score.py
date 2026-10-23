@@ -303,7 +303,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         return o
 
     m = row.get("metrics") or {}
-    status = "approximate" if c.approximated else "exact"
+    status = point_status(c.approximated, entry["build"])
     o.fidelity = {"status": status, "build": entry["build"], "args": args,
                   "resolved": resolved_kv(log, metrics), "replay": r.record(env.corpus["sha256"]),
                   "blis_kernel_provenance": metrics.get("kernel_provenance")}
@@ -360,6 +360,12 @@ def fill_blis_side(args: list, env, scenarios: Path, scenario: str, model: str) 
         if a["blis"] is None:
             reasons.append(f"setting_differs:{a['arg']}")
     return reasons
+
+
+def point_status(approximated: bool, build: dict) -> str:
+    """exact only when BLIS was given every setting as the run recorded it AND the run's build is
+    the one BLIS models; otherwise approximate (shown as "estimated"). A build never refuses."""
+    return "approximate" if approximated or build.get("match") != "exact" else "exact"
 
 
 def row_vs_run(row: dict, c: st.Classified) -> list[str]:
