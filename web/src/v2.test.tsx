@@ -106,6 +106,12 @@ describe('dates are labelled for what they are', () => {
     expect(html).not.toContain('>through<')
   })
 
+  it('drops the v1-only hidden/failed buckets and the duplicate generated time', () => {
+    const { html } = render(<App summary={v2a()} loadError={null} initialHash="#/?tier=all" />)
+    expect(html).not.toContain('(hidden)')
+    expect(html).not.toContain('>generated<')
+  })
+
   it('a v1 snapshot keeps its dump wording', () => {
     const { html } = render(<App summary={v1()} loadError={null} initialHash="#/?tier=all" />)
     expect(html).toContain('InferenceX data from 2026-09-28')

@@ -358,12 +358,18 @@ function Overview({
             excluded (measured) <b>{formatCount(cov.measured_excluded)}</b>
           </span>
         )}
-        <span>
-          multi-node <b>{formatCount(cov.multinode_hidden)}</b> (hidden)
-        </span>
-        <span>
-          failed <b>{formatCount(cov.failed)}</b>
-        </span>
+        {summary.schema_version === 1 && (
+          // v2 has no hidden or failed buckets: a multi-node or failed point is not scored, with its
+          // reason, and counted in the not-scored line above.
+          <>
+            <span>
+              multi-node <b>{formatCount(cov.multinode_hidden)}</b> (hidden)
+            </span>
+            <span>
+              failed <b>{formatCount(cov.failed)}</b>
+            </span>
+          </>
+        )}
         </div>
         <div className="about-prov"><RunProvenance summary={summary} /></div>
         <a className="dl" href="data/latest/summary.json" download>⤓ summary.json</a>
@@ -488,10 +494,13 @@ function RunProvenance({ summary }: { summary: Summary }) {
         <span className="k">snapshot</span>
         <span className="v">{dash(summary.snapshot_id, (v) => v.slice(0, 10))}</span>
       </div>
-      <div className="kv">
-        <span className="k">generated</span>
-        <span className="v">{dash(summary.generated_at, (v) => `${v.slice(11, 16)} UTC`)}</span>
-      </div>
+      {p.ingest !== 'api' && (
+        // v2's generated time is the pull time (shown above as "pulled"), so it isn't repeated.
+        <div className="kv">
+          <span className="k">generated</span>
+          <span className="v">{dash(summary.generated_at, (v) => `${v.slice(11, 16)} UTC`)}</span>
+        </div>
+      )}
     </>
   )
 }
