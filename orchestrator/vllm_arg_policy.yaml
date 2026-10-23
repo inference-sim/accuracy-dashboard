@@ -130,7 +130,7 @@ entries:
         note: "BLIS has no MXFP8 weight format; it prices FP8, the same 1-byte weights with one scale per 128 values instead of per 32."
       gpt_oss_mxfp4:
         as: mxfp4
-        note: "gpt-oss's own MXFP4 loader; BLIS prices the same MXFP4 weights under vLLM's generic MXFP4 method."
+        note: "vLLM's gpt-oss MXFP4 method: the same MXFP4 expert weights (4-bit, one scale per 32), run by gpt-oss's own MoE kernels with expert biases. BLIS prices them as MXFP4; the kernel choice isn't stated."
       modelopt_mixed:
         as: modelopt_fp4
         note: "A ModelOpt checkpoint mixing NVFP4 and MXFP8 layers; BLIS prices every layer as NVFP4."
