@@ -274,6 +274,50 @@ def test_record_matches_the_fidelity_build_shape():
                       "distance": None, "match": "estimated", "why": "custom_build"}
 
 
+# ------------------------------------------------------------------ retries
+
+def test_get_json_retries_rate_limits_and_server_errors_then_gives_up_loudly():
+    import io
+    import urllib.error
+    import clients as cl
+    calls, slept = [], []
+
+    def err(code, **h):
+        return urllib.error.HTTPError("u", code, "x", h, io.BytesIO(b""))
+    script = []
+
+    class Resp(io.BytesIO):
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def fake_open(req, timeout):
+        calls.append(req.full_url)
+        e = script.pop(0)
+        if isinstance(e, Exception):
+            raise e
+        return Resp(e)
+    orig = cl.urllib.request.urlopen
+    try:
+        cl.urllib.request.urlopen = fake_open
+        script[:] = [err(503), err(429, **{"Retry-After": "7"}), b'{"ok": 1}']
+        assert cl._get_json("https://h/x", {}, sleep=slept.append) == {"ok": 1}
+        assert slept == [1, 7]
+        script[:] = [err(404)]
+        try:
+            cl._get_json("https://h/x", {}, sleep=slept.append)
+            raise AssertionError("a 404 was retried")
+        except urllib.error.HTTPError as e:
+            assert e.code == 404
+        script[:] = [err(403, **{"x-ratelimit-remaining": "0", "x-ratelimit-reset": "0"})] * 5
+        try:
+            cl._get_json("https://h/x", {}, retries=4, sleep=slept.append)
+            raise AssertionError("a rate limit was swallowed")
+        except cl.RateLimited:
+            pass
+    finally:
+        cl.urllib.request.urlopen = orig
+
+
 # ------------------------------------------------------------------ the registry client
 
 class _Resp:
@@ -329,7 +373,8 @@ def test_registry_refreshes_an_expired_token_and_retries_a_401_once():
 
 
 def test_registry_treats_404_as_no_label_but_raises_on_other_errors():
-    orig = clients.urllib.request.urlopen
+    orig, orig_sleep = clients.urllib.request.urlopen, clients.time.sleep
+    clients.time.sleep = lambda s: None          # retries are tested above; don't wait here
     try:
         for code, expect_raise in ((404, False), (429, True), (500, True)):
             def handler(url, auth, code=code):
@@ -341,10 +386,10 @@ def test_registry_treats_404_as_no_label_but_raises_on_other_errors():
             try:
                 got = reg.revision_label("vllm/vllm-openai", "t")
                 assert not expect_raise and got is None, code
-            except urllib.error.HTTPError:
-                assert expect_raise, code
+            except (urllib.error.HTTPError, clients.RateLimited):
+                assert expect_raise, code        # 429 -> RateLimited, 500 -> HTTPError after retries
     finally:
-        clients.urllib.request.urlopen = orig
+        clients.urllib.request.urlopen, clients.time.sleep = orig, orig_sleep
 
 
 if __name__ == "__main__":

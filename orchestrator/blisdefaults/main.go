@@ -22,6 +22,11 @@
 //	    "caches":[{"name","kind","bytes_per_entry"}…],"overrides":[{"field","requested","resolved","reason"}…],
 //	    "tp":…,"dp":…,"ep":…}.
 //
+//	blisdefaults -version
+//	    The inference-sim, blis-latency-kernel and blis-schemas versions this binary was built
+//	    against, so a caller can refuse to mix it with a different BLIS release.
+//	    Prints {"blis-latency-kernel":…,"blis-schemas":…,"inference-sim":…}.
+//
 //	blisdefaults -acceptance -registry <dir> -model <catalog model> -method <m> -k <n> -thinking <on|off> [-category <c>] [-fallback-category <c>]
 //	    BLIS's own acceptance length for a drafter, when the run recorded none: blis-schemas'
 //	    acceptance.Resolve over the registry's acceptance profile sets (the layer BLIS falls
@@ -37,6 +42,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strings"
 
@@ -47,6 +53,34 @@ import (
 	blisschemas "github.com/inference-sim/blis-schemas"
 	"github.com/inference-sim/blis-schemas/spec/acceptance"
 )
+
+// BuildVersions is the version of each BLIS module compiled into this binary (a replace
+// directive reports the replacement's version, or "(devel)" for a local directory).
+func BuildVersions() map[string]string {
+	out := map[string]string{}
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return out
+	}
+	for _, d := range info.Deps {
+		name := strings.TrimPrefix(d.Path, "github.com/inference-sim/")
+		if name == d.Path {
+			continue
+		}
+		v := d.Version
+		if d.Replace != nil {
+			v = d.Replace.Version
+			if v == "" {
+				v = "(devel)"
+			}
+		}
+		switch name {
+		case "inference-sim", "blis-latency-kernel", "blis-schemas":
+			out[name] = v
+		}
+	}
+	return out
+}
 
 // Acceptance is BLIS's registry default for a drafter's acceptance.
 type Acceptance struct {
@@ -230,6 +264,7 @@ func run(args []string, out io.Writer) error {
 	mem := fs.Float64("memory-gib", 0, "the part's total device memory in GiB (catalog hardware MemoryGiB)")
 	dev := fs.String("device", "", "the part's catalog hardware name")
 	resolve := fs.Bool("resolve", false, "report BLIS's resolution of one scenario instead")
+	version := fs.Bool("version", false, "report the BLIS module versions this binary was built against")
 	accept := fs.Bool("acceptance", false, "report BLIS's registry acceptance length instead")
 	model := fs.String("model", "", "with -acceptance: the catalog model")
 	method := fs.String("method", "", "with -acceptance: the speculative method")
@@ -243,6 +278,9 @@ func run(args []string, out io.Writer) error {
 	registry := fs.String("registry", "", "with -resolve: the blis-registry root")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *version {
+		return json.NewEncoder(out).Encode(BuildVersions())
 	}
 	if *accept {
 		if *registry == "" || *model == "" || *method == "" || *k < 1 || *thinking == "" {

@@ -51,7 +51,7 @@ def cmd_pull(a) -> int:
         # rather than publish a pull that silently lacks a model.
         _log("FATAL: the site names no display name for " + ", ".join(p.unnamed_slugs))
         return 3
-    token = clients._github_token()
+    token = clients.require_github_token()
     resolver = build.Resolver(registry=clients.DockerHubRegistry(), github=clients.GitHubREST(token))
     gh = art.GitHubArtifacts(pl.IX_REPO, token, Path(a.cache or out / "_artifacts"))
     recipes = rcp.GitHubRecipes(clients.GitHubREST(token)._get, pl.IX_REPO)
@@ -61,7 +61,9 @@ def cmd_pull(a) -> int:
         try:
             e = pl.freeze_point(row, resolver=resolver, gh=gh, fetch=api.http_fetch, out=out,
                                 run_artifacts=run_artifacts, recipes=recipes)
-        except (OSError, ValueError, KeyError, urllib.error.URLError) as ex:  # recorded, not lost
+        except Exception as ex:  # noqa: BLE001 -- one row's failure is recorded with why, never kills the pull
+            if isinstance(ex, clients.RateLimited):
+                raise   # the whole pull is invalid, not this row: stop rather than record noise
             ident = pl.identity(row)
             e = {"point_id": contract.point_id(ident), "identity": ident, "row": row, "files": {},
                  "build": None, "reasons": ["artifact_unmatched:pull_error"], "problems": [repr(ex)[:500]]}
@@ -114,8 +116,51 @@ def _git(dirpath, *args) -> str:
     return subprocess.run(["git", "-C", str(dirpath), *args], capture_output=True, text=True).stdout.strip()
 
 
+def _go_require(gomod: Path, module: str) -> str | None:
+    """The version `gomod` requires of a module (`<module> vX.Y.Z` on a require line)."""
+    for line in gomod.read_text().splitlines():
+        parts = line.strip().split()
+        if len(parts) >= 2 and parts[0] == module:
+            return parts[1]
+    return None
+
+
+def check_blis_inputs(sim: Path, helper: str, catalog: Path, registry: Path) -> list[str]:
+    """Everything `score` needs to be one BLIS release, or what's wrong. The defaults helper is
+    built against an inference-sim tag; it must be --blis-dir's, with the same kernel and
+    schemas, or its defaults / resolutions / acceptance would come from another release. The
+    releases recorded in provenance must be real tags, never "unknown"."""
+    out = []
+    tag = _git(sim, "describe", "--tags", "--exact-match")
+    if not tag:
+        out.append(f"--blis-dir {sim} is not at a release tag (fetch tags, or check out the tag)")
+    for f in ("blis", "signedprobe", "testdata/inferencex-workloads/seed0.json"):
+        if not (sim / f).exists():
+            out.append(f"--blis-dir {sim} has no {f} (build blis and signedprobe in it)")
+    for repo, flag in ((catalog, "--catalog"), (registry, "--registry")):
+        if not _git(repo, "describe", "--tags", "--exact-match"):
+            out.append(f"{flag} {repo} is not at a release tag")
+    try:
+        got = json.loads(subprocess.run([helper, "-version"], capture_output=True, text=True,
+                                        check=True, timeout=60).stdout)
+    except (OSError, subprocess.SubprocessError, ValueError) as e:
+        return out + [f"--defaults-helper {helper} doesn't report its versions ({e})"]
+    want = {"inference-sim": tag,
+            "blis-latency-kernel": _go_require(sim / "go.mod", "github.com/inference-sim/blis-latency-kernel"),
+            "blis-schemas": _go_require(sim / "go.mod", "github.com/inference-sim/blis-schemas")}
+    for mod, v in want.items():
+        if v and got.get(mod) not in (v, "(devel)"):
+            out.append(f"--defaults-helper is built against {mod} {got.get(mod)}, --blis-dir is {v}")
+    return out
+
+
 def cmd_score(a) -> int:
     pull_dir = Path(a.pull)
+    bad = check_blis_inputs(Path(a.blis_dir), a.defaults_helper, Path(a.catalog), Path(a.registry))
+    if bad:
+        for b in bad:
+            _log(f"FATAL: {b}")
+        return 2
     manifest_text = (pull_dir / "manifest.json").read_text()
     manifest = json.loads(manifest_text)
     sim = Path(a.blis_dir)

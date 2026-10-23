@@ -127,10 +127,11 @@ def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models:
     by_repo = {}
     for name, repo in cat.models.items():
         by_repo.setdefault(repo.lower(), []).append(name)
+    lookup_failed = False
     for ck in checkpoints:
         bm = base_models.get(ck)
         if isinstance(bm, dict):     # the pull couldn't read its HF card
-            s.reasons.append("model_not_in_catalog:base_model_lookup_failed")
+            lookup_failed = True
             bm = None
         for how, repo in (("checkpoint", ck), ("base_model", bm)):
             hits = sorted(by_repo.get((repo or "").lower(), []))
@@ -142,6 +143,9 @@ def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models:
                 return s
         if s.model:
             break
+    if not s.model and lookup_failed:
+        # Only a reason when it could have mattered: a checkpoint that matched needs no base.
+        s.reasons.append("model_not_in_catalog:base_model_lookup_failed")
     if not s.model:
         s.reasons.append("model_not_in_catalog")
     if hardware not in cat.hardware or hardware not in parts:

@@ -12,6 +12,7 @@ its sha256 is the provenance's pull_manifest_sha256.
 from __future__ import annotations
 
 import json
+import urllib.error
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -74,9 +75,16 @@ def recipe_checkpoint(row: dict, server_log: str | None, recipes) -> dict | None
         return None
     paths = [x for x in named if isinstance(x, str) and x.startswith("/")]
     run = api.run_of(row)
-    if not paths or run is None:
+    if not paths or run is None or run_repo(row) != recipes.repo:
+        # Only a run of the repository whose recipes we read (another one, e.g. a private
+        # repository, isn't readable, and its recipes aren't these).
         return None
-    sha = recipes.run_commit(run[0])
+    try:
+        sha = recipes.run_commit(run[0])
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise
     repo = rcp.checkpoint(recipes.at(sha), row, paths[0])
     return {"repo": repo, "source": "inferencex_recipe", "commit": sha, "served_path": paths[0]} if repo else None
 
@@ -115,7 +123,9 @@ def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts
             try:
                 files = list(art.iter_files(gh.download(j.server_logs)))
             except art.Unreadable as e:
-                entry["reasons"].append("server_log_missing:unreadable_artifact")
+                # Single-turn takes its log from the API's /server-log below; a bad upload is
+                # a note there, a reason only where the upload is the log (agentic).
+                join_reasons.append("server_log_missing:unreadable_artifact")
                 entry.setdefault("problems", []).append(str(e))
                 files = []
             logs = art.find_server_logs(files)
@@ -134,8 +144,8 @@ def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts
             try:
                 p, cfg = art.find_launch_config(files, j.result_filename)
             except ValueError as e:
-                entry["reasons"].append("conflict:launch_config")
-                entry["problems"] = [str(e)]
+                join_reasons.append("conflict:launch_config")
+                entry.setdefault("problems", []).append(str(e))
                 p, cfg = None, None
             if cfg is not None:
                 frozen.put("launch_config", json.dumps(cfg, sort_keys=True, default=str).encode(),

@@ -275,29 +275,49 @@ def test_a_fusion_pass_at_vllms_own_default_for_the_part_is_inert():
     assert cls(4, True, 10) == ([], "inert") and cls(8, True, 9) == ([], "inert")
     # off where vLLM would turn it on, or on where it wouldn't (tp 1, an Ampere part): a choice
     assert cls(4, False, 10) == ([f"setting_not_modelled:{k}"], "absent_in_blis")
-    assert cls(1, True, 10) == ([f"setting_not_modelled:{k}"], "absent_in_blis")
+    # tp 1: the pass can't run (vLLM: "AllReduce fusion pass is disabled for tp_size <= 1"),
+    # so any value is the engine vLLM ran (gpt-oss-120b b200 v0.22.0, point 033685898e93569f)
+    assert cls(1, True, 10) == ([], "inert") and cls(1, False, 10) == ([], "inert")
     assert cls(4, True, 8) == ([f"setting_not_modelled:{k}"], "absent_in_blis")
     # the part's architecture unknown (an AMD part has no ComputeCapability): never assumed
     assert cls(4, True, None) == ([f"setting_not_modelled:{k}"], "absent_in_blis")
 
 
-def test_chunked_prefill_off_changes_nothing_when_the_budget_holds_the_longest_request():
-    def cls(mbt, mml):
-        args = "'enable_chunked_prefill': False"
-        if mbt is not None:
-            args += f", 'max_num_batched_tokens': {mbt}"
-        if mml is not None:
-            args += f", 'max_model_len': {mml}"
-        c = _classify(_log(args))
-        return c.reasons, next(a["match"] for a in c.args if a["arg"] == "enable_chunked_prefill")
-    # MiniMax-M3 b200 8k/1k (the runs seen): budget 16384, longest request 9472 -> never split
-    assert cls(16384, 9472) == ([], "inert")
-    assert cls(9472, 9472) == ([], "inert")
-    # a budget below the longest request: vLLM would hold, BLIS would split
-    assert cls(8192, 9472) == (["setting_not_modelled:enable_chunked_prefill"], "absent_in_blis")
-    # an unrecorded limit is never assumed to hold
-    assert cls(16384, None)[0] == ["setting_not_modelled:enable_chunked_prefill"]
+def test_chunked_prefill_off_is_refused_whatever_the_budget():
+    # vLLM holds a prompt that doesn't fit the budget LEFT after decodes; BLIS splits it. A run
+    # with chunking off always has max_num_batched_tokens >= max_model_len (vLLM refuses to start
+    # otherwise), so that condition can't make it inert.
+    for mbt, mml in ((16384, 9472), (9472, 9472)):
+        c = _classify(_log(f"'enable_chunked_prefill': False, 'max_num_batched_tokens': {mbt}, 'max_model_len': {mml}"))
+        assert c.reasons == ["setting_not_modelled:enable_chunked_prefill"], (mbt, mml)
 
+
+def test_an_env_var_vllm_warns_is_deprecated_is_read_as_set():
+    # gpt-oss-120b h200 v0.22.0 (point 0004425a4c559ee3): no launch config, but vLLM printed
+    log = ("(EngineCore pid=1) /usr/lib/python3/vllm/envs.py:358: FutureWarning: VLLM_MXFP4_USE_MARLIN is "
+           "deprecated and will be removed in v0.23. Use --moe-backend instead.\n")
+    r = st.read_engine_lines(log + log)
+    assert r.values["env.VLLM_MXFP4_USE_MARLIN"] == ["set"]          # once, however often it's printed
+    c = _classify(_log("'tensor_parallel_size': 1") + "\n" + log)
+    assert "setting_not_modelled:env.VLLM_MXFP4_USE_MARLIN" in c.reasons
+    # an unknown deprecated variable is unclassified, never silently passed
+    c = _classify(_log("'tensor_parallel_size': 1") + "\n" + log.replace("VLLM_MXFP4_USE_MARLIN", "VLLM_SOMETHING_NEW"))
+    assert "setting_not_modelled:env.VLLM_SOMETHING_NEW" in c.reasons
+
+
+def test_custom_ops_all_is_vllms_own_resolution_when_the_engine_runs_uncompiled():
+    def cls(ops, mode):
+        c = _classify(_log(f"'compilation_config': {{'custom_ops': {ops}}}", RESOLVED.replace(
+            "CompilationMode.NONE: 0", mode)))
+        return c.reasons
+    k = "setting_not_modelled:compilation_config.custom_ops"
+    # mode NONE: vLLM appends "all" itself (config/vllm.py:1788-1795), so ['all'] changes nothing
+    # (DeepSeek-V4-Pro b200/b300 v0.25, e.g. point 00870be2cd0c6428)
+    assert cls("['all']", "CompilationMode.NONE: 0") == []
+    # compiled with inductor, vLLM appends "none": ['all'] is a choice
+    assert k in cls("['all']", "CompilationMode.VLLM_COMPILE: 3")
+    # any other list picks kernels at any mode
+    assert k in cls("['+rotary_embedding']", "CompilationMode.NONE: 0")
 
 def test_moe_backend_is_mapped_to_its_blis_field():
     c = _classify(_log("'kernel_config': KernelConfig(moe_backend='deep_gemm_mega_moe')"))

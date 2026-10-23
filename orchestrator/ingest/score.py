@@ -5,8 +5,8 @@ Per point: settings (settings.py) -> support (support.py) -> replay inputs (repl
 -> the scenario file -> `blis replay --agentic-scenario` -> the diff of what BLIS was given
 against what the run recorded -> one fidelity record, or a not-scored record with reasons.
 
-Single-turn points go through the same extraction; their scoring (signedprobe) is not wired
-here yet, so they're recorded not scored with blis_refused:single_turn_scorer_pending.
+Single-turn points go through the same extraction and are scored with inference-sim's
+signedprobe at the same BLIS tag (score_single_turn).
 """
 from __future__ import annotations
 
@@ -261,7 +261,12 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         o.reasons = sorted(set(o.reasons))
         return o
     part = st.Part(name=part_name, memory_gib=cat.hardware[part_name])
-    defaults = st.blis_defaults(env.defaults_helper, part)
+    try:
+        defaults = st.blis_defaults(env.defaults_helper, part)
+    except subprocess.SubprocessError as ex:
+        # Kept with the point's own reasons, never replaced by a bare extractor error.
+        o.reasons = sorted(set(o.reasons + [_helper_failure(ex)]))
+        return o
     name = f"p-{pid[:16]}"
     b = st.build(c, name=name, model=sup.model, part=part, engine_version=env.vllm_ref, defaults=defaults)
     o.reasons += b.reasons
@@ -285,17 +290,24 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         if o.reasons:
             o.reasons = sorted(set(o.reasons))
             return o
-    if b.kernel_resolves or b.acceptance_needed:
+    if b.kernel_resolves or b.acceptance_needed or b.acceptance_length is not None:
         # State what the kernel resolved, so every consumer (signedprobe's harness requires a
         # stated block_size) runs the same value the kernel would have assumed.
         eng = b.deployment["pools"][0]["engine"]
         for a in args:
             if a["arg"] in b.kernel_resolves and a["match"] == "blis_default":
                 eng[a["arg"]] = a["blis"]
+        spec = eng.get("speculative") or {}
         if b.acceptance_needed:
-            # Pinned in the scenario, so every consumer (blis replay, signedprobe) runs it.
             al = float(next(a["blis"] for a in args if a["arg"] == ACCEPTANCE_ARG))
-            b.scenario["acceptance"] = {"value": {"num_spec_tokens": b.acceptance_needed[1],
+        elif b.acceptance_length is not None:
+            al = float(b.acceptance_length)       # the run's own synthetic acceptance
+        else:
+            al = None
+        if al is not None and spec.get("num_spec_tokens"):
+            # Pinned in the scenario, so every consumer runs it: blis replay (which also takes
+            # --speculative-acceptance-length) and signedprobe (which passes no acceptance flag).
+            b.scenario["acceptance"] = {"value": {"num_spec_tokens": int(spec["num_spec_tokens"]),
                                                   "acceptance_length": al}}
         text = st.to_yaml(b, header)
         (sdir / f"{name}.yaml").write_text(text)
@@ -334,7 +346,11 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     if metrics_path.exists() and (not key_path.exists() or key_path.read_text() != key):
         metrics_path.unlink()
     if not metrics_path.exists():
-        proc = subprocess.run(argv, capture_output=True, text=True, timeout=env.timeout_s)
+        try:
+            proc = subprocess.run(argv, capture_output=True, text=True, timeout=env.timeout_s)
+        except subprocess.TimeoutExpired:
+            o.reasons = ["blis_refused:timeout"]
+            return o
         (work / "logs").mkdir(exist_ok=True)
         (work / "logs" / f"{pid}.err").write_text(proc.stderr[-20000:])
         if proc.returncode != 0 or not metrics_path.exists():
@@ -375,7 +391,7 @@ def blis_resolution(env, scenarios: Path, scenario: str) -> dict | str:
     refuses the scenario, its refusal as a blis_refused reason instead."""
     out = subprocess.run([env.defaults_helper, "-resolve", "-scenarios", str(scenarios), "-scenario", scenario,
                           "-catalog", str(env.catalog), "-registry", str(env.registry)],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, timeout=600)
     if out.returncode != 0:
         return _blis_refusal(out.stderr.replace("blisdefaults: ", ""), scenarios.parent)
     return json.loads(out.stdout)
@@ -403,7 +419,7 @@ def acceptance_default(args: list, b, env, log: str, hardware: str, model: str) 
         return ["required_setting_missing:speculative_config.synthetic_acceptance_length"]
     out = subprocess.run([env.defaults_helper, "-acceptance", "-registry", str(env.registry), "-model", model,
                           "-method", method, "-k", str(k), "-thinking", thinking, "-device", hardware],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, timeout=120)
     if out.returncode != 0:
         return ["required_setting_missing:speculative_config.synthetic_acceptance_length"]
     res = json.loads(out.stdout)
@@ -572,7 +588,11 @@ def score_single_turn(o, entry, env, work: Path, sdir: Path, name: str, text: st
     key = hashlib.sha256((text + "".join(files[r].read_text() for r in sorted(files)) + "\0".join(argv[1:])).encode()).hexdigest()
     key_path = pdir / "signedprobe.key"
     if not (out_path.exists() and key_path.exists() and key_path.read_text() == key):
-        proc = subprocess.run(argv, capture_output=True, text=True, timeout=env.timeout_s)
+        try:
+            proc = subprocess.run(argv, capture_output=True, text=True, timeout=env.timeout_s)
+        except subprocess.TimeoutExpired:
+            o.reasons = ["blis_refused:timeout"]
+            return o
         (pdir / "signedprobe.err").write_text(proc.stderr[-20000:])
         if proc.returncode != 0:
             o.reasons = [_blis_refusal(_probe_error(proc.stderr), work)]
@@ -604,6 +624,10 @@ def score_single_turn(o, entry, env, work: Path, sdir: Path, name: str, text: st
                  float(pr["meas_ttft_us"]), float(pr["pred_ttft_us"]),
                  contract.TIER_BY_STATUS[status], pid, ident["measured_date"]]
     return o
+
+
+def _helper_failure(ex: Exception) -> str:
+    return "blis_refused:timeout" if isinstance(ex, subprocess.TimeoutExpired) else "blis_refused:defaults_helper_failed"
 
 
 def _probe_error(stderr: str) -> str:

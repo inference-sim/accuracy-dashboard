@@ -22,10 +22,41 @@ _MANIFEST_TYPES = ", ".join([
 ])
 
 
-def _get_json(url: str, headers: dict, timeout: int = 60):
-    req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (fixed hosts)
-        return json.loads(resp.read())
+class RateLimited(RuntimeError):
+    """A host kept refusing with a rate limit after the retries: the run is invalid as a whole
+    (every later row would fail the same way), so the pull stops rather than recording it as
+    a per-row data problem."""
+
+
+def _get_json(url: str, headers: dict, timeout: int = 60, *, retries: int = 4, sleep=None):
+    """GET JSON, retrying 5xx, connection errors and rate limits (429, or 403 with no quota
+    left) with backoff, honouring Retry-After / x-ratelimit-reset. Other 4xx raise at once."""
+    sleep = sleep or time.sleep
+    for attempt in range(retries + 1):
+        req = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (fixed hosts)
+                return json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            limited = e.code == 429 or (e.code == 403 and e.headers.get("x-ratelimit-remaining") == "0")
+            if not (limited or e.code >= 500) or attempt == retries:
+                if limited:
+                    raise RateLimited(f"{url.split('?')[0]}: HTTP {e.code} after {retries} retries") from e
+                raise
+            wait = e.headers.get("Retry-After")
+            reset = e.headers.get("x-ratelimit-reset")
+            if wait and wait.isdigit():
+                delay = int(wait)
+            elif limited and reset and reset.isdigit():
+                delay = max(1, int(reset) - int(time.time()))
+            else:
+                delay = 2 ** attempt
+            sleep(min(delay, 900))
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if attempt == retries:
+                raise
+            sleep(2 ** attempt)
+    raise AssertionError("unreachable")
 
 
 class DockerHubRegistry:
@@ -82,6 +113,15 @@ class DockerHubRegistry:
                 return None
             raise
         return ((config.get("config") or {}).get("Labels") or {}).get("org.opencontainers.image.revision")
+
+
+def require_github_token() -> str:
+    """The token the pull needs: artifact downloads require one, and an unauthenticated run is
+    rate-limited to 60 requests an hour. Refuse to start without it."""
+    tok = _github_token()
+    if not tok:
+        raise SystemExit("no GitHub token: set GH_TOKEN (or GITHUB_TOKEN) for the pull")
+    return tok
 
 
 def _github_token() -> str | None:

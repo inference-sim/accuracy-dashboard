@@ -49,6 +49,10 @@ ENGINE_LINES = (
     (re.compile(r"Chunked prefill is enabled with max_num_batched_tokens=(\d+)"), ("max_num_batched_tokens", int)),
 )
 _RUST_FRONTEND = re.compile(r"Launching Rust frontend")
+# vLLM warns about a deprecated environment variable only when it is set (envs.py deprecated_env:
+# "FutureWarning: <NAME> is deprecated and will be removed ..."), so the warning is the run
+# saying it set the variable, even with no launch config to show it.
+_DEPRECATED_ENV = re.compile(r"FutureWarning: ([A-Z][A-Z0-9_]+) is deprecated")
 _SIMPLE_OFFLOAD = re.compile(r"SimpleCPUOffloadConnector: role=\w+, per_rank=([0-9.]+) GB, world_size=(\d+)")
 _ARGS = "non-default args: {"
 _RESOLVED = re.compile(r"Initializing a V1 LLM engine \(v[^)]*\) with config: (.*)")
@@ -162,6 +166,9 @@ def read_engine_lines(log: str) -> Reading:
             r.add(path, cast(m.group(1)))
     if _RUST_FRONTEND.search(log):
         r.add("env.VLLM_USE_RUST_FRONTEND", True)
+    for name in sorted(set(_DEPRECATED_ENV.findall(log))):
+        # The value isn't printed; "set" is what the log states, and the policy decides.
+        r.add(f"env.{name}", "set")
     for m in _SIMPLE_OFFLOAD.finditer(log):
         # vLLM prints GiB under the "GB" label (bytes / 1024**3); kept as the per-rank figure.
         r.add("offload.per_rank_gib", pyrepr.Float(m.group(1)))
@@ -431,18 +438,18 @@ class Classified:
     roles: dict = field(default_factory=dict)          # role -> value (model, drafter, ...)
 
 
-def _inert_when(rule, settings: dict) -> bool:
-    """A refuse entry's condition under which the setting has no effect, from the run's own
-    other settings: {"ge": [a, b]} holds when both are recorded and a >= b. Unrecorded
-    values never satisfy it, so a setting is never assumed harmless."""
+def _inert_when(rule, value, settings: dict) -> bool:
+    """A refuse entry's condition under which the setting is the engine's own resolution, from
+    the run's recorded settings: {"value": v, "eq": [path, x]} holds when the setting's value
+    is v and the recorded `path` is x. Unrecorded values never satisfy it, so a setting is
+    never assumed harmless."""
     if not rule:
         return False
-    a, b = rule["ge"]
-    va, vb = settings.get(a), settings.get(b)
-    try:
-        return va is not None and vb is not None and int(va.value) >= int(vb.value)
-    except (TypeError, ValueError):
+    if "value" in rule and _canon(value) != _canon(rule["value"]):
         return False
+    path, want = rule["eq"]
+    other = settings.get(path)
+    return other is not None and other.value is not None and _canon(other.value) == _canon(want)
 
 
 def part_default(entry: dict, settings: dict, family: int | None):
@@ -453,8 +460,13 @@ def part_default(entry: dict, settings: dict, family: int | None):
         return None
     tp = settings.get("tensor_parallel_size")
     tp = int(tp.value) if tp is not None and tp.value is not None else 1
+    if "any_at_or_below_tp" in rule and tp <= rule["any_at_or_below_tp"]:
+        return ANY
     on = family in rule.get("families", []) and tp > rule.get("when_tp_gt", 0)
     return rule["value"] if on else rule["else"]
+
+
+ANY = object()   # part_default: every value is the engine vLLM runs
 
 
 def classify(settings: dict[str, Setting], policy: dict, vllm_defaults: dict | None = None,
@@ -471,7 +483,7 @@ def classify(settings: dict[str, Setting], policy: dict, vllm_defaults: dict | N
         key, entry = hit
         if entry.get("default_by_part") and st.requested:
             want = part_default(entry, settings, family)
-            if want is None or _canon(st.value) != _canon(want):
+            if want is not ANY and (want is None or _canon(st.value) != _canon(want)):
                 # Not vLLM's own value on this part (or the part isn't known): a choice the
                 # Deployment can't state.
                 if st.value is not None:
@@ -525,7 +537,7 @@ def classify(settings: dict[str, Setting], policy: dict, vllm_defaults: dict | N
         if cls == "refuse":
             if _is_unset(entry, st.value):
                 continue
-            if _inert_when(entry.get("inert_when"), settings):
+            if _inert_when(entry.get("inert_when"), st.value, settings):
                 # The setting can't change anything under the run's other settings.
                 c.args.append({**rec, "blis": None, "match": "inert"})
                 continue
@@ -604,7 +616,7 @@ def blis_defaults(helper: str, part: Part) -> dict:
     """BLIS's own batch defaults for a part, from orchestrator/blisdefaults."""
     import subprocess
     out = subprocess.run([helper, "-memory-gib", repr(part.memory_gib), "-device", part.name],
-                         capture_output=True, text=True, check=True)
+                         capture_output=True, text=True, check=True, timeout=120)
     return json.loads(out.stdout)
 
 

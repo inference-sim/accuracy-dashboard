@@ -137,13 +137,21 @@ def iter_files(blob: bytes, name: str = "", depth: int = 0):
     if depth > 4:
         raise Unreadable(f"{name}: archives nested more than 4 deep")
     if blob[:4] == b"PK\x03\x04":
-        with zipfile.ZipFile(io.BytesIO(blob)) as z:
+        try:
+            z = zipfile.ZipFile(io.BytesIO(blob))
+        except zipfile.BadZipFile as e:
+            raise Unreadable(f"{name}: corrupt zip ({e})")
+        with z:
             for info in sorted(z.infolist(), key=lambda i: i.filename):
                 if info.is_dir():
                     continue
                 if info.file_size > _MAX_MEMBER:
                     raise Unreadable(f"{name}/{info.filename}: {info.file_size} bytes")
-                yield from iter_files(z.read(info), f"{name}/{info.filename}" if name else info.filename, depth + 1)
+                try:
+                    data = z.read(info)
+                except (zipfile.BadZipFile, EOFError, OSError) as e:
+                    raise Unreadable(f"{name}/{info.filename}: corrupt member ({e})")
+                yield from iter_files(data, f"{name}/{info.filename}" if name else info.filename, depth + 1)
         return
     if blob[:2] == b"\x1f\x8b":
         try:

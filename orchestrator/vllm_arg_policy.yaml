@@ -94,16 +94,15 @@ entries:
   max_seq_len: {class: mapped, blis_field: engine.max_model_len, type: int, alias_of: max_model_len}
   gpu_memory_utilization: {class: mapped, blis_field: engine.gpu_memory_utilization, type: float}
   enable_prefix_caching: {class: mapped, blis_field: engine.enable_prefix_caching, type: bool}
-  # Chunked prefill off: vLLM v0.31.0 then never splits a prompt, and a prompt longer than the
-  # step's token budget waits (v1/core/sched/scheduler.py: "If chunked_prefill is disabled, we
-  # can stop the scheduling here"). When the budget holds the longest request the run allows
-  # (max_num_batched_tokens >= max_model_len) no prompt is ever split either way, which is
-  # what BLIS's scheduler does too: off changes nothing then. Below that, it would.
+  # Chunked prefill off: vLLM v0.31.0 never splits a prompt; one that doesn't fit the budget
+  # LEFT this step (after running decodes take theirs) waits (v1/core/sched/scheduler.py,
+  # "If chunked_prefill is disabled, we can stop the scheduling here"). BLIS splits it. That
+  # holds even when max_num_batched_tokens >= max_model_len, which vLLM requires to start with
+  # chunking off anyway (config/scheduler.py verify_max_model_len), so it is never inert.
   enable_chunked_prefill:
     class: refuse
     unset: [true, null]
-    inert_when: {ge: [max_num_batched_tokens, max_model_len]}
-    note: "Chunked prefill off with a token budget below the longest request: vLLM holds a prompt that doesn't fit instead of splitting it, which BLIS's scheduler doesn't do."
+    note: "Chunked prefill off: vLLM holds a prompt that doesn't fit the step's remaining budget instead of splitting it, which BLIS's scheduler doesn't do."
   long_prefill_token_threshold: {class: mapped, blis_field: engine.long_prefill_token_threshold, type: int, default: 0}
   scheduling_policy: {class: mapped, blis_field: engine.scheduling_policy, type: str, default: fcfs}
   async_scheduling: {class: mapped, blis_field: engine.async_scheduling, type: bool}
@@ -186,7 +185,15 @@ entries:
   compilation_config.debug_dump_path: {class: inert}
   compilation_config.inductor_compile_config.*: {class: inert, any_value: true, note: "Inductor options; used only when the engine compiles (compilation_config.mode)."}
   compilation_config.inductor_passes.*: {class: inert, any_value: true}
-  compilation_config.custom_ops: {class: refuse, unset: [[]], note: "Enabling or disabling vLLM custom ops changes which kernels run; the Deployment can't state it."}
+  # vLLM v0.31.0 appends "all" itself when the run states neither "all" nor "none" and the
+  # engine doesn't compile with inductor (config/vllm.py:1788-1795): an engine running
+  # uncompiled (compilation_config.mode NONE) runs every custom op whether ['all'] was passed
+  # or not. So ['all'] at mode NONE is vLLM's own resolution; anything else picks kernels.
+  compilation_config.custom_ops:
+    class: refuse
+    unset: [[]]
+    inert_when: {value: [all], eq: [compilation_config.mode, NONE]}
+    note: "Enabling or disabling vLLM custom ops changes which kernels run; the Deployment can't state it."
   # Fusion passes vLLM v0.31.0 turns on by itself where the part supports them (its O2/O3
   # pass_config). A run that sets one to its build's own value on that part changes nothing;
   # the kernel prices the fused graph vLLM runs. Matched by the part's architecture
@@ -195,17 +202,18 @@ entries:
   # (config/vllm.py enable_allreduce_rms_fusion); the extractor reads tp from the run.
   compilation_config.pass_config.fuse_allreduce_rms:
     class: inert
-    default_by_part: {families: [9, 10], when_tp_gt: 1, value: true, else: false}
+    # At tp <= 1 the pass can't run (vLLM logs "AllReduce fusion pass is disabled for
+    # tp_size <= 1"), so any value is the engine vLLM ran.
+    default_by_part: {families: [9, 10], when_tp_gt: 1, value: true, else: false, any_at_or_below_tp: 1}
     note: "Fused all-reduce + RMSNorm: vLLM v0.31.0 turns it on for tp > 1 on Hopper and Blackwell, so a run that set it to that value ran vLLM's default."
-  # fuse_minimax_qk_norm (v0.22 .. pre-v0.31, MiniMax only): the same fused all-reduce for the
-  # MiniMax QK norm; folded into the qk-norm passes in v0.31.0. Estimated: a fusion BLIS
-  # doesn't price separately.
+  # fuse_minimax_qk_norm (v0.22 .. pre-v0.31, MiniMax only): a fused all-reduce for the MiniMax
+  # QK norm, off unless asked for (not in v0.22's optimization-level pass_config). A fusion,
+  # not a format, so the only-quantization-is-estimated rule refuses it.
   compilation_config.pass_config.fuse_minimax_qk_norm:
-    class: approximate
+    class: refuse
     unset: [false, null]
     always: true
-    approximate_as: false
-    note: "A fused all-reduce for MiniMax's QK norm (a pre-v0.31 pass); BLIS prices the unfused norm and all-reduce."
+    note: "A fused all-reduce for MiniMax's QK norm (a pre-v0.31 pass the run turned on); the Deployment can't state it."
   compilation_config.*: {class: inert, note: "Compiler internals (inductor passes, cache paths, warm-up counts); BLIS prices graph replay, not compilation."}
 
   # ---------------------------------------------------------------- attention / kernels
@@ -302,6 +310,11 @@ entries:
 
   # ---------------------------------------------------------------- environment (launch config)
   env.VLLM_USE_RUST_FRONTEND: {class: mapped, blis_field: engine.frontend, type: bool}
+  # Deprecated MoE-kernel selectors, seen in a log only through vLLM's deprecation warning
+  # (the value isn't printed). Each forces an MXFP4 MoE kernel over the part's default
+  # (v0.22 fused_moe/oracle/mxfp4.py), which the Deployment can't state.
+  env.VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8: {class: refuse, always: true, note: "Forces FlashInfer's MXFP4-weight, MXFP8-activation MoE kernel; the Deployment can't state the MoE kernel."}
+  env.VLLM_MXFP4_USE_MARLIN: {class: refuse, always: true, note: "Forces the Marlin MXFP4 MoE kernel; the Deployment can't state the MoE kernel."}
   env.VLLM_USE_V2_MODEL_RUNNER: {class: inert, note: "Model Runner V2 is v0.31.0's runner unless a configuration needs V1; BLIS prices it."}
   env.VLLM_ENGINE_READY_TIMEOUT_S: {class: inert}
   env.PYTHONUNBUFFERED: {class: inert}
@@ -320,7 +333,8 @@ entries:
   env.TORCH_CUDA_ARCH_LIST: {class: inert, note: "Which architectures JIT kernels are built for; the part decides which runs."}
   env.VLLM_USE_SIMPLE_KV_OFFLOAD: {class: inert, note: "Selects SimpleCPUOffloadConnector for --kv-offloading-size; the connector is read from kv_transfer_config."}
   env.VLLM_FLASHINFER_ALLREDUCE_BACKEND: {class: refuse, note: "An explicit FlashInfer all-reduce backend isn't stated by the Deployment."}
-  env.*: {class: refuse, note: "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."}
+  # `always`: a variable is never "vLLM's default" (the run set it, or the log shows it set).
+  env.*: {class: refuse, always: true, note: "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."}
 
   # The srt launcher's own `connector:` block, which it turns into --kv-transfer-config. The
   # extractor reads the connector from the server log's kv_transfer_config, so a run that sets it

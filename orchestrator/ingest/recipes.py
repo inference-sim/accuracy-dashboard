@@ -44,12 +44,19 @@ class Recipes:
 
 
 def parse(master_docs: list[str], runners_doc: str | None) -> Recipes:
+    """A file that doesn't parse contributes nothing (so no checkpoint is named from it)."""
     out = Recipes()
     for text in master_docs:
-        doc = yaml.safe_load(text) or {}
+        try:
+            doc = yaml.safe_load(text) or {}
+        except yaml.YAMLError:
+            continue
         out.recipes += [v for v in doc.values() if isinstance(v, dict) and isinstance(v.get("model"), str)]
     if runners_doc:
-        doc = yaml.safe_load(runners_doc) or {}
+        try:
+            doc = yaml.safe_load(runners_doc) or {}
+        except yaml.YAMLError:
+            doc = {}
         for cluster in (doc.get("clusters") or {}).values():
             entries = ((cluster or {}).get("models") or {}).get("entries") or {}
             for name, e in entries.items():
