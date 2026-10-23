@@ -62,6 +62,8 @@ jobs:
         run: |
           pip install --quiet pyyaml
           python3 orchestrator/ingest/test_extract.py
+          # a point through score_point and write_contract, fake BLIS binaries (CI has no BLIS build)
+          python3 orchestrator/ingest/test_score_e2e.py
 
   blisdefaults:
     # The Go helper the extractor calls for BLIS's own batch defaults, built against the pinned
