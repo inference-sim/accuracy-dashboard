@@ -76,6 +76,21 @@ def test_an_approximate_point_counts_in_the_all_tier_only():
     assert doc["totals"]["measured_or_resolved"]["mape"]["n"] == 7
 
 
+def test_the_tier_comes_from_the_fidelity_status_not_the_harness_tier_string():
+    # Flip one exact point's points.csv tier string: the built tier still follows its fidelity record.
+    import build_summary as v1
+    orig = dict(v1.TIER_MAP)
+    try:
+        # If the builder read the harness string, every exact point would land in "all".
+        v1.TIER_MAP["MEASURED-OR-RESOLVED"] = "all"
+        doc = _build()
+    finally:
+        v1.TIER_MAP.clear()
+        v1.TIER_MAP.update(orig)
+    tiers = {p["fidelity"]["status"]: p["tier"] for p in _points(doc)}
+    assert tiers == {"exact": "measured_or_resolved", "approximate": "all"}
+
+
 def test_coverage_balances_and_counts_reasons_by_code():
     doc = _build()
     assert doc["coverage"]["scored"] == 8 and doc["coverage"]["not_scored"] == 4

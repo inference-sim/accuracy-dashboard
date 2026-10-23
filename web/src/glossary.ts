@@ -35,6 +35,11 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     definition:
       'Which points are included. “measured·resolved” keeps only apples-to-apples comparisons — where BLIS ran the same configuration that was actually measured. “all” also includes points where that match is only approximate.',
   },
+  tierV2: {
+    label: 'tier',
+    definition:
+      'Which points are included. “exact” keeps only points where BLIS simulated exactly the configuration that was measured. “all” also includes points where one setting BLIS can’t represent yet was estimated (marked ≈).',
+  },
   coverage: {
     label: 'coverage',
     definition: 'How many points were scored vs. not. Nothing is hidden — unscored points are counted and the reasons shown.',
@@ -42,8 +47,10 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   provenance: {
     label: 'match',
     definition:
-      'How closely BLIS’s input matches the measured run. ⓘ: exact — every setting the run recorded was given to BLIS. ≈: approximate — a quantized format BLIS can’t state yet was replaced by the nearest one it supports; these points count only in the “all” tier. Hover a mark for the details.',
+      '✓ exact: BLIS simulated exactly what the run used. ≈ estimated: one setting BLIS can’t represent yet was replaced by the nearest one it can; hover to see which. Estimated points count only in “all (including estimations)”.',
   },
+
+
   diff: {
     label: 'Δ (newer − older)',
     definition: 'The newer run minus the older run, over the points both runs scored. Green means the newer run is more accurate; red means it got worse.',

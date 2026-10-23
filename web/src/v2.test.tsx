@@ -53,8 +53,8 @@ describe('a v2 snapshot renders', () => {
     expect(errors.join('\n')).toBe('')
     expect(html).toContain('>Measured<')
     expect(html).toContain('2026-09-21')
-    // one ⓘ per exact point in that sweep (3 concurrencies), each focusable with an accessible label
-    expect(html.match(/aria-label="provenance: what the run did versus what BLIS was given"/g)?.length).toBe(3)
+    // one ✓ per exact point in that sweep (3 concurrencies), each focusable with an accessible label
+    expect(html.match(/aria-label="exact match"/g)?.length).toBe(3)
     clean(html)
   })
 
@@ -86,6 +86,22 @@ describe('a v2 snapshot renders', () => {
     )
     expect(html).not.toContain('>Measured<')
     expect(html).not.toContain('prov-mark')
+  })
+})
+
+describe('the tier follows the match record', () => {
+  it('reads exact / all (including estimations) on a v2 snapshot, and keeps the v1 wording on v1', () => {
+    const { html } = render(<App summary={v2a()} loadError={null} initialHash="#/" />)
+    expect(html).toContain('>exact<')
+    expect(html).toContain('>all (including estimations)<')
+    expect(html).not.toContain('measured·resolved')
+    const old = render(<App summary={v1()} loadError={null} initialHash="#/" />).html
+    expect(old).toContain('measured·resolved')
+  })
+
+  it('an estimated point is in all only; every exact point is in the exact tier', () => {
+    for (const p of flattenPoints(v2a()))
+      expect(p.tier).toBe(p.fidelity!.status === 'approximate' ? 'all' : 'measured_or_resolved')
   })
 })
 
@@ -121,7 +137,7 @@ describe('dates are labelled for what they are', () => {
   })
 })
 
-describe('the provenance tooltip', () => {
+describe('the match tooltip shows only what differs, in plain words', () => {
   const body = (status: 'exact' | 'approximate') => {
     // exact: DeepSeek-V4.1-Flash h200 TP8 c1 (its max_num_seqs is BLIS's default); approximate: b200 DEP2
     const p = flattenPoints(v2a()).find((x) =>
@@ -129,34 +145,28 @@ describe('the provenance tooltip', () => {
     return renderToStaticMarkup(<ProvenanceBody fidelity={p.fidelity!} measuredDate={p.measuredDate} />)
   }
 
-  it('states the build commit and its distance from VLLM_REF', () => {
+  it('an exact point says so in one line, plus any default BLIS filled in and the build distance', () => {
     const html = body('exact')
-    expect(html).toContain('cd10ed6f9f')
-    expect(html).toContain('738 commits before')
-    expect(html).toContain('v0.31.0')
+    expect(html).toContain('Exact match')
+    expect(html).toContain('BLIS simulated the exact settings this run used.')
+    expect(html).toContain('Max concurrent requests</b>: not recorded by the run, so BLIS used its default (1024)')
+    expect(html).toContain('738 commits older than v0.31.0, the release BLIS models')
   })
 
-  it('lists the BLIS default used, with its resolver rule', () => {
-    const html = body('exact')
-    expect(html).toContain('BLIS defaults')
-    expect(html).toContain('max_num_seqs')
-    expect(html).toContain('ResolveVLLMBatchDefaults')
-  })
-
-  it('names each setting’s source, the mapped BLIS field, the inert router and the KV comparison', () => {
+  it('an approximate point names each difference with both sides, and the issue once', () => {
     const html = body('approximate')
-    expect(html).toContain('kernel_config.moe_backend')
-    expect(html).toContain('engine.moe_backend')
-    expect(html).toContain('router vllm-router/consistent_hash')
-    expect(html).toContain('from server args')
-    expect(html).toContain('kv cache tokens per replica')
+    expect(html).toContain('Estimated')
+    expect(html).toContain('Indexer cache format</b>: run used mxfp4, BLIS used fp8')
+    expect(html).toContain('Sparse indexer</b>: run used on, BLIS used off')
+    expect(html.match(/inference-sim\/blis-schemas#57/g)?.length).toBe(1)
+    expect(html).toContain('Counted only in “all (including estimations)”')
   })
 
-  it('says what was approximated and links the upstream issue', () => {
+  it('leaves out everything that matched and all internal names', () => {
     const html = body('approximate')
-    expect(html).toContain('Approximate match')
-    expect(html).toContain('attention_config.indexer_kv_dtype')
-    expect(html).toContain('inference-sim/blis-schemas#57')
+    for (const gone of ['moe_backend', 'engine.', 'router', 'kv cache tokens', 'from server args', 'attention_config', 'ResolveVLLMBatchDefaults'])
+      expect(html).not.toContain(gone)
+    expect(html.length).toBeLessThan(900)
   })
 })
 

@@ -38,8 +38,14 @@ class ContractError(RuntimeError):
     """The contract directory isn't valid; never build a summary from it."""
 
 
-def read_points(directory: Path) -> list[dict]:
-    """points.csv rows with numbers parsed and the tier mapped, exactly as v1 reads the CSV."""
+# A point's tier comes from its fidelity record, not the harness's tier string: an exact point
+# (BLIS simulated exactly what the run used) is in the strict tier; an approximate one (a setting
+# BLIS can't state was estimated) only in "all".
+TIER_BY_STATUS = {"exact": "measured_or_resolved", "approximate": "all"}
+
+
+def read_points(directory: Path, fidelity: dict) -> list[dict]:
+    """points.csv rows with numbers parsed, each tiered by its fidelity status."""
     with open(directory / contract.POINTS_CSV, newline="") as fh:
         reader = csv.DictReader(fh)
         if reader.fieldnames != contract.POINTS_HEADER:
@@ -49,9 +55,10 @@ def read_points(directory: Path) -> list[dict]:
             r["concurrency"] = int(r["concurrency"])
             for k in ("meas_tpot_us", "pred_tpot_us", "meas_ttft_us", "pred_ttft_us"):
                 r[k] = float(r[k])
-            if r["tier_unbracketed"] not in v1.TIER_MAP:
-                raise ContractError(f"unknown tier {r['tier_unbracketed']!r}")
-            r["tier"] = v1.TIER_MAP[r["tier_unbracketed"]]
+            status = fidelity[r["point_id"]]["status"]
+            if status not in TIER_BY_STATUS:
+                raise ContractError(f"point {r['point_id'][:12]} is scored with status {status!r}")
+            r["tier"] = TIER_BY_STATUS[status]
             rows.append(r)
     return rows
 
@@ -143,9 +150,9 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     problems = contract.validate_dir(directory)
     if problems:
         raise ContractError("contract directory is invalid:\n  " + "\n  ".join(problems))
-    rows = read_points(directory)
-    facets = json.loads((directory / contract.FACETS_JSON).read_text())
     fidelity = {r["point_id"]: r for r in _lines(directory / contract.FIDELITY_JSONL)}
+    rows = read_points(directory, fidelity)
+    facets = json.loads((directory / contract.FACETS_JSON).read_text())
     not_scored = _lines(directory / contract.NOT_SCORED_JSONL)
     prov_in = json.loads((directory / contract.PROVENANCE_JSON).read_text())
 

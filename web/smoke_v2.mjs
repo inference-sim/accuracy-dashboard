@@ -77,8 +77,8 @@ try {
   await page.focus('table.pts td.prov-cell .term')
   const tip = await page.waitForSelector('[role="tooltip"]', { timeout: 3000 })
   const text = await tip.textContent()
-  for (const want of ['vLLM build', 'Settings given to BLIS']) if (!text.includes(want)) problems.push(`tooltip lacks "${want}"`)
-  if (!/commits (before|after)|at v/.test(text)) problems.push('tooltip states no distance from VLLM_REF')
+  if (!/Exact match|Estimated/.test(text)) problems.push('tooltip says neither "Exact match" nor "Estimated"')
+  if (/attention_config|engine\.|from server args/.test(text)) problems.push('tooltip shows internal setting names')
   await shot('3-provenance-tooltip')
   await page.keyboard.press('Escape')
 

@@ -262,6 +262,9 @@ function Overview({
   const selMissing = route.sel != null && selectedPoints.length === 0
 
   const cov = summary.coverage
+  // v2 tiers come from each point's match record: exact, or estimated (a setting BLIS can't
+  // represent yet was estimated). v1 keeps the harness's measured·resolved / all wording.
+  const v2 = summary.schema_version === 2
   const notScoredDetail = Object.entries(cov.not_scored_reasons || {})
     .map(([k, v]) => `${k.replace(/_/g, ' ')} ${v}`)
     .join(', ')
@@ -289,7 +292,7 @@ function Overview({
       {/* Filters sit beside the table they change; the headline above ignores them (PR #26 review). */}
       <div className="chips">
         <span className="flt">
-        <Term name="tier" />{' '}
+        <Term name={v2 ? 'tierV2' : 'tier'} />{' '}
         <span className="tierseg">
           {/* The highlighted option is the one actually shown: when the stricter tier has no
               points the view falls back to "all", so "all" is highlighted then (#23). */}
@@ -297,13 +300,17 @@ function Overview({
             className={`clk ${effectiveTier === 'measured_or_resolved' ? 'on' : ''}`}
             onClick={() => update({ tier: 'measured_or_resolved' })}
           >
-            measured·resolved
+            {v2 ? 'exact' : 'measured·resolved'}
           </span>
           <span className={`clk ${effectiveTier === 'all' ? 'on' : ''}`} onClick={() => update({ tier: 'all' })}>
-            all
+            {v2 ? 'all (including estimations)' : 'all'}
           </span>
         </span>
-        {tierFellBack && <span className="disabled-note">(no measured·resolved points yet — showing all)</span>}
+        {tierFellBack && (
+          <span className="disabled-note">
+            ({v2 ? 'no exact points yet' : 'no measured·resolved points yet'} — showing all)
+          </span>
+        )}
       </span>
       <span className="flt">
         vLLM version{' '}

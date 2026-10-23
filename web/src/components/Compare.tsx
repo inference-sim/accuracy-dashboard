@@ -159,7 +159,7 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
                 {formatCount(onlyA + onlyB)} measurements only one run scored are left out.
               </>
             )}
-            {tierFellBack && <> Showing all measurements (none are measured·resolved yet).</>}
+            {tierFellBack && <> Showing all measurements (none are {a.schema_version === 2 ? 'exact' : 'measured·resolved'} yet).</>}
           </p>
         </div>
         <h2 className="sectitle">By model</h2>

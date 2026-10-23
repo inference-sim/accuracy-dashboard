@@ -121,18 +121,19 @@ export function SummaryTable(props: Props) {
                       <Term
                         content={
                           <>
-                            <span className="prov-h">
-                              {row.pointCount} point{row.pointCount === 1 ? '' : 's'}
-                              {row.approxCount ? ` · ${row.approxCount} approximate` : ' · all exact'}
+                            <span className="prov-row prov-dim">
+                              {row.approxCount
+                                ? `${row.approxCount} of ${row.pointCount} points estimated`
+                                : `all ${row.pointCount} point${row.pointCount === 1 ? '' : 's'} exact`}
                             </span>
                             <ProvenanceBody fidelity={row.fidelity} />
                           </>
                         }
                         popClass="term-pop-wide"
-                        ariaLabel="provenance for this deployment"
+                        ariaLabel="how closely BLIS matched this deployment"
                       >
                         <span className={`prov-mark${row.approxCount ? ' approx' : ''}`} aria-hidden="true">
-                          {row.approxCount ? '≈' : 'ⓘ'}
+                          {row.approxCount ? '≈' : '✓'}
                         </span>
                       </Term>
                     </span>
