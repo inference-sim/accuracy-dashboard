@@ -15,7 +15,11 @@
 //	    Also every value the kernel supplied itself because the scenario stated none (its
 //	    assumptions, e.g. block_size), which the extractor uses only when no source a run left
 //	    records that setting.
-//	    Prints {"assumptions":[{"name","value","reason"}…],"overrides":[{"field","requested","resolved","reason"}…],
+//	    And the cache records the kernel prices, from the same graph and chip it loads (the
+//	    graph as served on this GPU architecture, under the resolved cache dtype): name, kind
+//	    and bytes per entry for every owned cache.
+//	    Prints {"assumptions":[{"name","value","reason"}…],"cache_dtype":…,
+//	    "caches":[{"name","kind","bytes_per_entry"}…],"overrides":[{"field","requested","resolved","reason"}…],
 //	    "tp":…,"dp":…,"ep":…}.
 package main
 
@@ -25,9 +29,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 
 	latencykernel "github.com/inference-sim/blis-latency-kernel"
+	schemamodel "github.com/inference-sim/blis-schemas/spec/model"
 	"github.com/inference-sim/inference-sim/sim/kernelmodel"
 )
 
@@ -61,10 +67,22 @@ type Assumption struct {
 	Value  string `json:"value"`
 }
 
+// CacheRecord is one owned cache the kernel prices, as served on the scenario's chip.
+// HeadDim is the head dimension of the node that owns it (0 when the node states none), so a
+// caller can name the record's format by vLLM's own layout rules.
+type CacheRecord struct {
+	BytesPerEntry int    `json:"bytes_per_entry"`
+	HeadDim       int    `json:"head_dim"`
+	Kind          string `json:"kind"`
+	Name          string `json:"name"`
+}
+
 // Resolution is what BLIS resolved for a scenario.
 type Resolution struct {
-	Assumptions []Assumption `json:"assumptions"`
-	DP          int          `json:"dp"`
+	Assumptions []Assumption  `json:"assumptions"`
+	CacheDType  string        `json:"cache_dtype"`
+	Caches      []CacheRecord `json:"caches"`
+	DP          int           `json:"dp"`
 	EP        int        `json:"ep"`
 	Overrides []Override `json:"overrides"`
 	TP        int        `json:"tp"`
@@ -73,6 +91,18 @@ type Resolution struct {
 // ResolveScenario opens a scenario with inference-sim's kernel and reports its resolution.
 func ResolveScenario(r kernelmodel.Repos, scenario string) (Resolution, error) {
 	m, err := kernelmodel.Open(scenario, r)
+	if err != nil {
+		return Resolution{}, err
+	}
+	// The same documents the kernel was built from (OpenInputs is its loading half), so the
+	// records below are the ones it priced, not a second reading of the catalog.
+	in, err := latencykernel.OpenInputs(scenario, latencykernel.Repos{Scenarios: r.Scenarios,
+		Catalog: r.Catalog, Registry: r.Registry}, 0)
+	if err != nil {
+		return Resolution{}, err
+	}
+	family, _ := in.Chip.CapabilityMajor()
+	g, err := in.Model.ForCapability(family)
 	if err != nil {
 		return Resolution{}, err
 	}
@@ -88,6 +118,25 @@ func ResolveScenario(r kernelmodel.Repos, scenario string) (Resolution, error) {
 		value, reason, _ := strings.Cut(o.Scope, ": ")
 		out.Assumptions = append(out.Assumptions, Assumption{Name: o.Name, Value: value, Reason: reason})
 	}
+	out.CacheDType = k.Deployment().Engine.CacheDType
+	for _, o := range res.Overrides {
+		if o.Field == "cache_dtype" {
+			out.CacheDType = fmt.Sprint(o.Resolved)
+		}
+	}
+	out.Caches = []CacheRecord{}
+	seen := map[string]bool{}
+	g.EachNode(func(_ string, n schemamodel.Node) {
+		for _, c := range n.Caches {
+			if !c.Owned || seen[c.Name] {
+				continue
+			}
+			seen[c.Name] = true
+			out.Caches = append(out.Caches, CacheRecord{Name: c.Name, Kind: string(c.Kind),
+				BytesPerEntry: c.EntryBytes(out.CacheDType), HeadDim: n.HeadDim})
+		}
+	})
+	sort.Slice(out.Caches, func(i, j int) bool { return out.Caches[i].Name < out.Caches[j].Name })
 	for _, o := range res.Overrides {
 		out.Overrides = append(out.Overrides, Override{Field: o.Field, Requested: fmt.Sprint(o.Requested),
 			Resolved: fmt.Sprint(o.Resolved), Reason: o.Reason})

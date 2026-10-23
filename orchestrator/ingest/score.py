@@ -393,11 +393,23 @@ def fill_blis_side(args: list, env, scenarios: Path, scenario: str, model: str) 
                     reasons.append(res)
             if isinstance(res, str):
                 continue
+            # The kernel's resolved value: reported whole for the fields blisdefaults states
+            # (cache_dtype), else the override it made of the requested one.
             field = src.split(".", 1)[1]
-            hit = [o for o in res["overrides"] if o["field"] == field]
-            a["blis"] = hit[0]["resolved"] if hit else None
-        elif src == "graph.index_cache":
-            a["blis"] = env.catalog_obj.index_caches.get(model)
+            hit = [o["resolved"] for o in res["overrides"] if o["field"] == field]
+            a["blis"] = res.get(field) or (hit[0] if hit else None)
+        elif src == "priced.index_cache":
+            # The indexer record the kernel prices on this chip, under the cache dtype it
+            # resolved, named by vLLM's layout for its head width. One record or none.
+            if res is None:
+                res = blis_resolution(env, scenarios, scenario)
+                if isinstance(res, str):
+                    reasons.append(res)
+            if isinstance(res, str):
+                continue
+            names = {sp.index_record_format(c["bytes_per_entry"], c.get("head_dim", 0))
+                     for c in res.get("caches", []) if c["kind"] == "index"}
+            a["blis"] = names.pop() if len(names) == 1 else None
         if a["blis"] is None:
             reasons.append(f"setting_differs:{a['arg']}")
     return reasons

@@ -92,6 +92,11 @@ def test_every_policy_entry_is_well_formed():
             assert e.get("blis_field"), path
         if e["class"] == "approximate":
             assert e.get("note") and "upstream" not in e, path
+            # What BLIS used must come from BLIS (a source score.py reads) or be a fixed
+            # switch value; never left for a placeholder.
+            src = e.get("blis_from")
+            assert (src is None) != ("approximate_as" not in e), path
+            assert src is None or src == "priced.index_cache" or src.startswith("resolved."), path
         if e["class"] == "refuse":
             assert e.get("note"), path
 
@@ -421,31 +426,48 @@ def test_support_refuses_an_unknown_model_part_or_drafter():
 
 def test_what_blis_used_for_an_estimated_setting_is_read_from_blis():
     import score as sc
+    res = {"cache_dtype": "nvfp4_ds_mla", "assumptions": [],
+           "overrides": [{"field": "cache_dtype", "requested": "fp8", "resolved": "nvfp4_ds_mla", "reason": "r"}],
+           "caches": [{"name": "index", "kind": "index", "bytes_per_entry": 132, "head_dim": 128},
+                      {"name": "swa", "kind": "window", "bytes_per_entry": 528, "head_dim": 512}]}
 
-    class Env:
-        catalog_obj = type("C", (), {"index_caches": {"m": "fp8"}})()
-
-    args = [{"arg": "attention_config.backend", "measured": "FLASHINFER_MLA_SPARSE_DSV41", "blis": None,
-             "match": "approximated", "_blis_from": "resolved.cache_dtype"},
-            {"arg": "attention_config.indexer_kv_dtype", "measured": "mxfp4", "blis": None,
-             "match": "approximated", "_blis_from": "graph.index_cache"}]
+    def args():
+        return [{"arg": "attention_config.backend", "measured": "FLASHINFER_MLA_SPARSE_DSV41", "blis": None,
+                 "match": "approximated", "_blis_from": "resolved.cache_dtype"},
+                {"arg": "attention_config.indexer_kv_dtype", "measured": "mxfp4", "blis": None,
+                 "match": "approximated", "_blis_from": "priced.index_cache"}]
     orig = sc.blis_resolution
-    sc.blis_resolution = lambda env, d, f: {"overrides": [{"field": "cache_dtype", "requested": "fp8",
-                                                           "resolved": "nvfp4_ds_mla", "reason": "r"}]}
     try:
-        assert sc.fill_blis_side(args, Env(), Path("."), "s.yaml", "m") == []
-        assert [a["blis"] for a in args] == ["nvfp4_ds_mla", "fp8"]
-        assert all("_blis_from" not in a for a in args)
-        # BLIS reports nothing for it: the point is refused, never given a placeholder.
-        a = [{"arg": "attention_config.backend", "blis": None, "match": "approximated", "_blis_from": "resolved.cache_dtype"}]
-        sc.blis_resolution = lambda env, d, f: {"overrides": []}
-        assert sc.fill_blis_side(a, Env(), Path("."), "s.yaml", "m") == ["setting_differs:attention_config.backend"]
-        # BLIS refuses the scenario: its refusal is the reason (next to the point's others), never a crash.
-        a = [{"arg": "attention_backend", "blis": None, "match": "approximated", "_blis_from": "resolved.cache_dtype"}]
+        sc.blis_resolution = lambda env, d, f: res
+        a = args()
+        assert sc.fill_blis_side(a, None, Path("."), "s.yaml", "m") == []
+        assert [x["blis"] for x in a] == ["nvfp4_ds_mla", "fp8"]
+        assert all("_blis_from" not in x for x in a)
+        # No override (the run's cache dtype is what BLIS runs): still read, from cache_dtype.
+        sc.blis_resolution = lambda env, d, f: {**res, "overrides": [], "cache_dtype": "fp8_ds_mla"}
+        a = args()
+        assert sc.fill_blis_side(a, None, Path("."), "s.yaml", "m") == [] and a[0]["blis"] == "fp8_ds_mla"
+        # An indexer record no vLLM layout names, or two that differ: refused, never named.
+        for caches in ([{"kind": "index", "bytes_per_entry": 100, "head_dim": 128}],
+                       [{"kind": "index", "bytes_per_entry": 132, "head_dim": 128},
+                        {"kind": "index", "bytes_per_entry": 68, "head_dim": 128}], []):
+            sc.blis_resolution = lambda env, d, f, c=caches: {**res, "caches": c}
+            assert sc.fill_blis_side(args(), None, Path("."), "s.yaml", "m") == \
+                ["setting_differs:attention_config.indexer_kv_dtype"], caches
+        # BLIS refuses the scenario: its refusal is the reason, never a crash.
         sc.blis_resolution = lambda env, d, f: "blis_refused:quantization_mxfp8_is_not_one_this_kernel_prices"
-        assert sc.fill_blis_side(a, Env(), Path("."), "s.yaml", "m") == ["blis_refused:quantization_mxfp8_is_not_one_this_kernel_prices"]
+        assert "blis_refused:quantization_mxfp8_is_not_one_this_kernel_prices" in sc.fill_blis_side(
+            args(), None, Path("."), "s.yaml", "m")
     finally:
         sc.blis_resolution = orig
+
+
+def test_an_indexer_record_is_named_by_vllms_layout_for_its_head_width():
+    # vLLM v0.31.0: fp8 = d_h + 4-byte scale; mxfp4 = d_h/2 + d_h/32 ue8m0 scales; bf16 = 2*d_h.
+    assert [sp.index_record_format(w, 128) for w in (132, 68, 256)] == ["fp8", "mxfp4", "bf16"]
+    assert [sp.index_record_format(w, 64) for w in (68, 34, 128)] == ["fp8", "mxfp4", "bf16"]
+    assert sp.index_record_format(100, 128) is None          # no layout gives 100 B
+    assert sp.index_record_format(132, 0) is None            # no head width stated: not guessed
 
 
 def test_a_point_is_exact_only_on_the_build_blis_models_with_nothing_approximated():
@@ -483,16 +505,6 @@ def test_a_block_size_no_source_recorded_is_the_one_blis_resolves():
     finally:
         sc.blis_resolution = orig
 
-
-def test_the_indexer_record_is_named_from_the_catalog_graph():
-    g = {"layer_kinds": [{"nodes": [{"caches": [{"kind": "index", "bytes_per_entry": 132, "tokens_per_entry": 2}]}]},
-                         {"nodes": [{"caches": [{"kind": "index", "bytes_per_entry": 132}]}]}]}
-    assert sp._index_cache(g) == "fp8"
-    g["layer_kinds"][1]["nodes"][0]["caches"][0]["bytes_per_entry"] = 68
-    assert sp._index_cache(g) is None             # records that differ: not guessed
-
-
-# ------------------------------------------------------------------ artifacts
 
 def _A(i, name, t, expired=False):
     return art.Artifact(id=i, name=name, created_at=t, expired=expired, size=1)
