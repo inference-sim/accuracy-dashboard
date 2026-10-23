@@ -85,19 +85,19 @@ describe('App renders the real CI-shaped snapshot', () => {
     expect(html).toContain('minimax-m2.5')
   })
 
-  it('falls back to the all tier (with a banner) when measured·resolved is empty', () => {
-    // Default tier = measured·resolved; the real snapshot has zero such points (direct path), so
-    // the UI must not show an empty headline — it falls back to the all tier and says so.
-    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} />)
+  it('falls back to the all tier (with a banner) when measured·resolved is asked for and empty', () => {
+    // The real snapshot has zero measured·resolved points (direct path), so a link asking for
+    // that tier must not show an empty table — it falls back to the all tier and says so.
+    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} initialHash="#/?tier=measured_or_resolved" />)
     expect(html).toContain('no measured·resolved points yet — showing all')
     expect(html).toContain('deepseek-v4-pro') // data visible, not an empty table
   })
 
   it('highlights the tier actually shown, not the one requested (#23)', () => {
-    // The default request is measured·resolved, but this snapshot has none, so the view shows
-    // "all". The highlighted option must be "all": highlighting measured·resolved while showing
-    // all contradicts the banner beside it.
-    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} />)
+    // measured·resolved is asked for, but this snapshot has none, so the view shows "all". The
+    // highlighted option must be "all": highlighting measured·resolved while showing all
+    // contradicts the banner beside it.
+    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} initialHash="#/?tier=measured_or_resolved" />)
     expect(html).toContain('<span class="clk on">all</span>')
     expect(html).toContain('<span class="clk ">measured·resolved</span>')
   })

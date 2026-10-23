@@ -10,7 +10,8 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { App } from './App'
 import { validateSummary } from './load'
-import { flattenPoints, intersectByKey, pointKey } from './aggregate'
+import { aggregatePair, flattenPoints, intersectByKey, pointKey } from './aggregate'
+import { tierV2Definition } from './glossary'
 import { ProvenanceBody, VersionBody, VersionTip } from './components/Provenance'
 import { buildRows } from './tree'
 import type { Summary } from './types'
@@ -219,6 +220,28 @@ describe('the match tooltip shows only what differs, in plain words', () => {
     for (const gone of ['moe_backend', 'engine.', 'router', 'kv cache tokens', 'from server args', 'attention_config', 'ResolveVLLMBatchDefaults'])
       expect(html).not.toContain(gone)
     expect(html.replace(/<[^>]+>/g, '').length).toBeLessThan(400)   // what a reader actually reads
+  })
+})
+
+describe('the default view is every point, and the tier text names the build window', () => {
+  it('opens on all: the headline and the table cover every scored point', () => {
+    const a = v2a()
+    const html = renderToStaticMarkup(<App summary={a} loadError={null} />)
+    expect(html).toContain('<span class="clk on">all</span>')
+    const n = flattenPoints(a).length
+    expect(html).toContain(`${n} measurements`)
+    const all = aggregatePair(flattenPoints(a)).all.mape.ttft!
+    const pct = (v: number) => `${v.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+    expect(html.slice(html.indexOf('class="stats"'), html.indexOf('class="context"'))).toContain(pct(all))
+  })
+
+  it('the tier explanation reads the release and commit window from the snapshot', () => {
+    const a = v2a()
+    expect(tierV2Definition(a.provenance.vllm_ref!, a.provenance.vllm_max_distance!)).toContain(
+      'within 2,000 commits of v0.31.0, the release BLIS is calibrated on')
+    // Another snapshot's window is its own, not a number written into the UI.
+    expect(tierV2Definition('v0.40.0', 500)).toContain('within 500 commits of v0.40.0')
+    expect(tierV2Definition('v0.40.0', 500)).not.toMatch(/2,000|v0\.31/)
   })
 })
 

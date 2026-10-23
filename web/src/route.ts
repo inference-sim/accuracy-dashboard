@@ -12,7 +12,8 @@
  * when present, the page shows the per-metric Δ over the points BOTH runs scored, instead of the
  * single-run Overview. Absent = single-run mode (the default; the Overview is untouched).
  * `sel` is the selected topology's sweepKey (model|workload|gpu|topoLabel). Absent = default
- * view (nothing selected). tier defaults to measured_or_resolved;
+ * view (nothing selected). tier defaults to all (every scored point); an old link that
+ * names no tier opens on all too.
  * mn (multi-node) defaults to 0 (hidden).
  *
  * An old link's `vllm=` parameter (a version filter that no longer exists) is ignored.
@@ -38,7 +39,7 @@ export const DEFAULT_ROUTE: RouteState = {
   run: null,
   runB: null,
   sel: null,
-  tier: 'measured_or_resolved',
+  tier: 'all',
   multinode: false,
 }
 
@@ -61,7 +62,7 @@ export function parseRoute(hash: string): RouteState {
     run: run && run !== '' ? run : null,
     runB: runB && runB !== '' ? runB : null,
     sel: sel && sel !== '' ? sel : null,
-    tier: tier === 'all' ? 'all' : tier === 'estimated' ? 'estimated' : 'measured_or_resolved',
+    tier: tier === 'measured_or_resolved' ? 'measured_or_resolved' : tier === 'estimated' ? 'estimated' : 'all',
     multinode: p.get('mn') === '1',
   }
 }

@@ -14,6 +14,7 @@ import { Dropdown } from './components/Dropdown'
 import { Compare } from './components/Compare'
 import { Headline } from './components/Headline'
 import { Term } from './components/Term'
+import { tierV2Definition } from './glossary'
 import { formatCount } from './format'
 import type { RunIndex } from './load'
 import { DEFAULT_ROUTE, parseRoute, routeToHash, type RouteState } from './route'
@@ -207,12 +208,12 @@ function Overview({
   const inTier = (p: FlatPoint) =>
     showEstimated ? p.fidelity?.status === 'approximate' : effectiveTier === 'all' || p.tier === 'measured_or_resolved'
 
-  // The headline always describes the full latest run under the default view, never the current
-  // filter, so the top-line "how accurate is BLIS?" number can't shift under a control (PR #26
-  // review). Only the per-model table and the points below respond to the filters.
+  // The headline always describes the full latest run under the default view (every scored
+  // point, the "all" tier), never the current filter, so the top-line "how accurate is BLIS?"
+  // number can't shift under a control (PR #26 review) and matches the point count beside it.
+  // Only the per-model table and the points below respond to the filters.
   const headlinePoints = useMemo(() => applyFilters(allPoints, DEFAULT_ROUTE), [allPoints])
-  const headlineTier: TierKey =
-    headlinePoints.some((p) => p.tier === 'measured_or_resolved') ? 'measured_or_resolved' : 'all'
+  const headlineTier: TierKey = 'all'
   const totals = useMemo(() => aggregatePair(headlinePoints), [headlinePoints])
 
   // A row is listed only if it has points in the tier being shown, so the exact tier never shows
@@ -264,6 +265,7 @@ function Overview({
   // v2 tiers come from each point's match record: exact, or estimated (a setting BLIS can't
   // represent yet was estimated). v1 keeps the harness's measured·resolved / all wording.
   const v2 = summary.schema_version === 2
+  const prov = summary.provenance
   const notScoredDetail = Object.entries(cov.not_scored_reasons || {})
     .map(([k, v]) => `${k.replace(/_/g, ' ')} ${v}`)
     .join(', ')
@@ -291,7 +293,11 @@ function Overview({
       {/* Filters sit beside the table they change; the headline above ignores them (PR #26 review). */}
       <div className="chips">
         <span className="flt">
-        <Term name={v2 ? 'tierV2' : 'tier'} />{' '}
+        {v2 && prov?.vllm_ref && prov.vllm_max_distance != null ? (
+          <Term content={tierV2Definition(prov.vllm_ref, prov.vllm_max_distance)}>tier</Term>
+        ) : (
+          <Term name={v2 ? 'tierV2' : 'tier'} />
+        )}{' '}
         <span className="tierseg">
           {/* The highlighted option is the one actually shown: when the stricter tier has no
               points the view falls back to "all", so "all" is highlighted then (#23). */}

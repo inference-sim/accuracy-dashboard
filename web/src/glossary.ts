@@ -11,6 +11,19 @@ export interface GlossaryEntry {
   definition: string
 }
 
+/** The v2 tier explanation, naming the snapshot's own build window: `ref` (the vLLM release
+ *  BLIS is calibrated on) and `maxDistance` (how many commits from it still count as that
+ *  build) come from the snapshot's provenance, never from here. */
+export function tierV2Definition(ref: string, maxDistance: number): string {
+  const n = maxDistance.toLocaleString('en-US')
+  return (
+    'Which points are included. “exact”: BLIS simulated exactly the configuration that was measured, ' +
+    `on a vLLM build within ${n} commits of ${ref}, the release BLIS is calibrated on. ` +
+    '“estimated”: one or more settings BLIS can’t represent yet were estimated, or the run’s ' +
+    `vLLM build is more than ${n} commits from ${ref} or a custom build (marked ≈). “all”: both.`
+  )
+}
+
 export const GLOSSARY: Record<string, GlossaryEntry> = {
   mape: {
     label: 'error',
@@ -38,7 +51,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   tierV2: {
     label: 'tier',
     definition:
-      'Which points are included. “exact”: BLIS simulated exactly the configuration that was measured. “estimated”: one or more settings BLIS can’t represent yet were estimated, or the run used a vLLM build other than the release BLIS models (marked ≈). “all”: both.',
+      'Which points are included. “exact”: BLIS simulated exactly the configuration that was measured, on a vLLM build close to the release BLIS is calibrated on. “estimated”: one or more settings BLIS can’t represent yet were estimated, or the run’s vLLM build is further from that release (marked ≈). “all”: both.',
   },
 
   coverage: {
