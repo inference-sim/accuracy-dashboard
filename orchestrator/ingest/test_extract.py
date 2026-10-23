@@ -165,6 +165,96 @@ def test_the_indexer_cache_dtype_is_approximated_with_its_note():
     assert rec["attention_config.indexer_sparse_logits"]["measured"] is True
 
 
+def test_a_weight_format_blis_cannot_state_is_estimated_as_the_nearest_it_prices():
+    import score as sc
+    for run, blis in (("mxfp8", "fp8"), ("gpt_oss_mxfp4", "mxfp4"), ("modelopt_mixed", "modelopt_fp4")):
+        c = _classify(_log("'max_num_seqs': 1", RESOLVED.replace("quantization=fp8", f"quantization={run}")))
+        assert c.approximated and c.reasons == [], run
+        assert c.mapped["engine.quantization"][1] == blis, run
+        a = next(x for x in c.args if x["arg"] == "quantization")
+        assert a["measured"] == run and a["note"], run
+        # the diff reads the scenario back: written as the estimate, it's "approximated"
+        args = [dict(a)]
+        assert sc._diff_args(args, {"pools": [{"engine": {"quantization": blis}}]}, None) == []
+        assert args[0]["match"] == "approximated" and args[0]["blis"] == blis and "_approximated" not in args[0]
+        # a scenario that lost it is still a refusal
+        assert sc._diff_args([dict(a)], {"pools": [{"engine": {}}]}, None) == ["setting_differs:quantization"]
+    # a format BLIS prices is passed as it is
+    c = _classify(_log("'max_num_seqs': 1", RESOLVED))
+    assert not c.approximated and c.mapped["engine.quantization"][1] == "fp8"
+
+
+def test_a_local_model_path_is_named_by_the_runs_own_recipe():
+    import recipes as rc
+    master = """
+minimaxm3-fp8-b200-vllm:
+  model: MiniMaxAI/MiniMax-M3-MXFP8
+  model-prefix: minimaxm3
+  image: vllm/vllm-openai:nightly-93d8f834
+  framework: vllm
+  precision: fp8
+  runner: cluster:b200-dgxc
+minimaxm3-fp4-b200-vllm:
+  model: nvidia/MiniMax-M3-NVFP4
+  model-prefix: minimaxm3
+  image: vllm/vllm-openai:nightly-93d8f834
+  framework: vllm
+  precision: fp4
+  runner: b200
+gptoss-fp4-b200-vllm:
+  model: openai/gpt-oss-120b
+  model-prefix: gptoss
+  image: vllm/vllm-openai:v0.22.0
+  framework: vllm
+  precision: fp4
+  runner: b200
+dsv4-fp4-b200-vllm:
+  model: deepseek-ai/DeepSeek-V4-Pro
+  model-prefix: dsv4
+  image: vllm/vllm-openai:nightly-7c5dc571
+  framework: vllm
+  precision: fp4
+  runner: b200-dsv4
+"""
+    runners = """
+clusters:
+  h200-dgxc:
+    models:
+      entries:
+        DeepSeek-V4-Pro-0813: {root: hf-hub-cache, dir: DeepSeek-V4-Pro}
+"""
+    r = rc.parse([master], runners)
+    row = lambda **kw: {"framework": "vllm", "hardware": "b200", "image": "vllm/vllm-openai:nightly-93d8f834", **kw}
+    # precision tells the two MiniMax-M3 checkpoints apart; the path agrees with each
+    assert rc.checkpoint(r, row(precision="fp8"), "/lustre/fsw/gharunners/models/MiniMax-M3-MXFP8") == "MiniMaxAI/MiniMax-M3-MXFP8"
+    assert rc.checkpoint(r, row(precision="fp4"), "/scratch/fsw/models/MiniMax-M3-NVFP4") == "nvidia/MiniMax-M3-NVFP4"
+    # the API slug (gptoss120b) and the recipe prefix (gptoss) differ: not used
+    assert rc.checkpoint(r, row(precision="fp4", image="vllm/vllm-openai:v0.22.0", model="gptoss120b"),
+                         "/lustre/fsw/models/gpt-oss-120b") == "openai/gpt-oss-120b"
+    # a path that isn't the recipe's model (a re-quantized copy) is never given its name
+    assert rc.checkpoint(r, row(precision="fp4", image="vllm/vllm-openai:nightly-7c5dc571"),
+                         "/scratch/models/DeepSeek-V4-Pro-NVFP4") is None
+    # the same image on another part, or a different image, matches nothing
+    assert rc.checkpoint(r, row(precision="fp8", hardware="h200"), "/x/MiniMax-M3-MXFP8") is None
+    assert rc.checkpoint(r, row(precision="fp8", image="vllm/vllm-openai:other"), "/x/MiniMax-M3-MXFP8") is None
+    assert rc.checkpoint(r, row(precision="fp8"), None) is None
+    # runners.yaml's staged directory names a recipe model by another name
+    r2 = rc.parse(["""
+dsv4-fp4-h200-vllm:
+  model: deepseek-ai/DeepSeek-V4-Pro-0813
+  image: vllm/vllm-openai:nightly-x
+  framework: vllm
+  precision: fp4
+  runner: h200-dgxc
+"""], runners)
+    assert rc.checkpoint(r2, row(precision="fp4", hardware="h200", image="vllm/vllm-openai:nightly-x"),
+                         "/models/gharunners/hf-hub-cache/DeepSeek-V4-Pro") == "deepseek-ai/DeepSeek-V4-Pro-0813"
+    # two recipes that both fit the path: refused, not picked
+    r3 = rc.parse([master, master.replace("MiniMaxAI/MiniMax-M3-MXFP8", "other/MiniMax-M3-MXFP8").replace("minimaxm3-fp8-b200-vllm", "dup")], None)
+    assert rc.checkpoint(r3, row(precision="fp8"), "/x/MiniMax-M3-MXFP8") is None
+    assert rc.runner_hardware("cluster:b200-dgxc") == rc.runner_hardware("b200-multinode") == "b200"
+
+
 def test_moe_backend_is_mapped_to_its_blis_field():
     c = _classify(_log("'kernel_config': KernelConfig(moe_backend='deep_gemm_mega_moe')"))
     assert c.mapped["engine.moe_backend"][1] == "deep_gemm_mega_moe"

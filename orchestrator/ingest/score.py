@@ -180,6 +180,8 @@ def _diff_args(args: list, dep: dict, b: st.Built) -> list[str]:
             a["match"] = "differs"
         else:
             a["match"] = "exact" if a["arg"].split(".")[-1] == f.split(".")[-1] else "mapped"
+        if a.pop("_approximated", False) and a["match"] in ("exact", "mapped"):
+            a["match"] = "approximated"
         if a["match"] in ("absent_in_blis", "differs"):
             reasons.append(f"setting_differs:{a['arg']}")
         if a["match"] != "mapped":
@@ -224,7 +226,11 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
 
     cat = env.catalog_obj
     spec = c.mapped.get("engine.speculative.method", (None, None, None))[1]
-    sup = sp.check(cat, env.parts, checkpoints=_checkpoints(c, launch), base_models=env.base_models,
+    cks = _checkpoints(c, launch)
+    if not cks and (entry.get("checkpoint") or {}).get("repo"):
+        # The log served a local path; the run's own recipe names the checkpoint (pull.py).
+        cks = [entry["checkpoint"]["repo"]]
+    sup = sp.check(cat, env.parts, checkpoints=cks, base_models=env.base_models,
                    hardware=row["hardware"], spec_method=spec)
     o.reasons += sup.reasons
 

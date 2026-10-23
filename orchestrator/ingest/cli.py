@@ -29,6 +29,7 @@ import build  # noqa: E402
 import clients  # noqa: E402
 import contract  # noqa: E402
 import pull as pl  # noqa: E402
+import recipes as rcp  # noqa: E402
 import score as sc  # noqa: E402
 import settings as st  # noqa: E402
 import support as sp  # noqa: E402
@@ -53,12 +54,13 @@ def cmd_pull(a) -> int:
     token = clients._github_token()
     resolver = build.Resolver(registry=clients.DockerHubRegistry(), github=clients.GitHubREST(token))
     gh = art.GitHubArtifacts(pl.IX_REPO, token, Path(a.cache or out / "_artifacts"))
+    recipes = rcp.GitHubRecipes(clients.GitHubREST(token)._get, pl.IX_REPO)
     run_artifacts: dict = {}
     points = []
     for i, row in enumerate(p.rows, 1):
         try:
             e = pl.freeze_point(row, resolver=resolver, gh=gh, fetch=api.http_fetch, out=out,
-                                run_artifacts=run_artifacts)
+                                run_artifacts=run_artifacts, recipes=recipes)
         except (OSError, ValueError, KeyError, urllib.error.URLError) as ex:  # recorded, not lost
             ident = pl.identity(row)
             e = {"point_id": contract.point_id(ident), "identity": ident, "row": row, "files": {},
@@ -77,6 +79,8 @@ def cmd_pull(a) -> int:
         for v in (e["row"].get("model"),):
             pass
     for e in points:
+        if (e.get("checkpoint") or {}).get("repo"):
+            base.setdefault(e["checkpoint"]["repo"], None)
         b = sc._read(out / "points" / e["point_id"], e["files"], "server_log")
         if b:
             rd = st.read_args(b.decode("utf-8", "replace"))

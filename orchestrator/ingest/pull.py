@@ -22,6 +22,7 @@ import api  # noqa: E402
 import artifacts as art  # noqa: E402
 import build  # noqa: E402
 import contract  # noqa: E402
+import recipes as rcp  # noqa: E402
 
 IX_REPO = "SemiAnalysisAI/InferenceX"
 _RUN_REPO = __import__("re").compile(r"github\.com/([^/]+/[^/]+)/actions/runs/")
@@ -59,8 +60,29 @@ def _row_reasons(row: dict) -> list[str]:
     return out
 
 
+def recipe_checkpoint(row: dict, server_log: str | None, recipes) -> dict | None:
+    """When the run's log serves a local path and names no HF repo, the checkpoint its own
+    InferenceX recipe served (recipes.py), with the commit it was read at. None otherwise."""
+    if recipes is None or not server_log:
+        return None
+    import settings as st
+    import support as sp
+    vals = st.read_args(server_log).values
+    named = [x for k in ("served_model_name", "model") for v in vals.get(k, [])
+             for x in (v if isinstance(v, list) else [v])]
+    if any(sp.hf_repo(x) for x in named):
+        return None
+    paths = [x for x in named if isinstance(x, str) and x.startswith("/")]
+    run = api.run_of(row)
+    if not paths or run is None:
+        return None
+    sha = recipes.run_commit(run[0])
+    repo = rcp.checkpoint(recipes.at(sha), row, paths[0])
+    return {"repo": repo, "source": "inferencex_recipe", "commit": sha, "served_path": paths[0]} if repo else None
+
+
 def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts, fetch, out: Path,
-                 run_artifacts: dict) -> dict:
+                 run_artifacts: dict, recipes=None) -> dict:
     ident = identity(row)
     pid = contract.point_id(ident)
     entry = {"point_id": pid, "identity": ident, "row": row, "reasons": _row_reasons(row), "files": {}}
@@ -144,6 +166,9 @@ def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts
     b = resolver.resolve(row.get("image") or "", server_log)
     # The build never refuses a point; it makes it estimated unless it's the build BLIS models.
     entry["build"] = b.record()
+    ck = recipe_checkpoint(row, server_log, recipes)
+    if ck:
+        entry["checkpoint"] = ck
     entry["files"] = frozen.files
     entry["reasons"] = sorted(set(entry["reasons"]))
     if entry.get("artifact_notes") is not None:

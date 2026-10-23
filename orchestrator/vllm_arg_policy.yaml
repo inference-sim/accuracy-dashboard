@@ -116,7 +116,24 @@ entries:
   # The cache offload flavour vLLM configures from --kv-offloading-size (OffloadingConnector).
   kv_offloading_size: {class: refuse, unset: [null], note: "--kv-offloading-size configures vLLM's OffloadingConnector, which the extractor doesn't yet translate into the Deployment offload block."}
   kv_offloading_backend: {class: inert, note: "Read with kv_offloading_size; the size decides whether offload runs."}
-  quantization: {class: mapped, blis_field: engine.quantization, type: str, source_only: resolved_config}
+  quantization:
+    class: mapped
+    blis_field: engine.quantization
+    type: str
+    source_only: resolved_config
+    # Weight formats BLIS can't state, each written as the nearest one it prices: the point is
+    # then estimated (the user's rule, Discussion #28: only quantization is approximated). Any
+    # other format BLIS doesn't price is refused by BLIS itself (blis_refused).
+    approximate_values:
+      mxfp8:
+        as: fp8
+        note: "BLIS has no MXFP8 weight format; it prices FP8, the same 1-byte weights with one scale per 128 values instead of per 32."
+      gpt_oss_mxfp4:
+        as: mxfp4
+        note: "gpt-oss's own MXFP4 loader; BLIS prices the same MXFP4 weights under vLLM's generic MXFP4 method."
+      modelopt_mixed:
+        as: modelopt_fp4
+        note: "A ModelOpt checkpoint mixing NVFP4 and MXFP8 layers; BLIS prices every layer as NVFP4."
   # The checkpoint's own quantization recipe (compressed-tensors / quark targets): the catalog graph
   # states the formats it serves, so a run can't change it beyond `quantization`.
   quantization_config.*: {class: inert, any_value: true, note: "The checkpoint's quantization recipe as vLLM read it; the catalog graph states the formats the checkpoint serves."}

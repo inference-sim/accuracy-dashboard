@@ -505,6 +505,13 @@ def classify(settings: dict[str, Setting], policy: dict, vllm_defaults: dict | N
             c.reasons.append(f"conflict:{path}")
             c.args.append({**rec, "blis": None, "match": "unreadable"})
             continue
+        approx = (entry.get("approximate_values") or {}).get(value) if isinstance(value, str) else None
+        if approx is not None:
+            # A value BLIS can't state, written as the nearest one it prices: the point is
+            # estimated, and the diff checks the scenario carries the value written.
+            c.approximated = True
+            value = approx["as"]
+            rec.update(note=approx["note"], _approximated=True)
         c.mapped[entry["blis_field"]] = (path, value, entry)
         c.args.append({**rec, "blis_field": entry["blis_field"], "_value": value})
     # An alias (max_cudagraph_capture_size beside compilation_config's) must agree with its
