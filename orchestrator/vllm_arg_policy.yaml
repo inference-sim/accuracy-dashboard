@@ -178,6 +178,25 @@ entries:
   compilation_config.inductor_compile_config.*: {class: inert, any_value: true, note: "Inductor options; used only when the engine compiles (compilation_config.mode)."}
   compilation_config.inductor_passes.*: {class: inert, any_value: true}
   compilation_config.custom_ops: {class: refuse, unset: [[]], note: "Enabling or disabling vLLM custom ops changes which kernels run; the Deployment can't state it."}
+  # Fusion passes vLLM v0.31.0 turns on by itself where the part supports them (its O2/O3
+  # pass_config). A run that sets one to its build's own value on that part changes nothing;
+  # the kernel prices the fused graph vLLM runs. Matched by the part's architecture
+  # (default_by_part: capability families; anything else is the `else` value).
+  # fuse_allreduce_rms: on for tp > 1 on Hopper (9.0) and Blackwell (10.x) with FlashInfer
+  # (config/vllm.py enable_allreduce_rms_fusion); the extractor reads tp from the run.
+  compilation_config.pass_config.fuse_allreduce_rms:
+    class: inert
+    default_by_part: {families: [9, 10], when_tp_gt: 1, value: true, else: false}
+    note: "Fused all-reduce + RMSNorm: vLLM v0.31.0 turns it on for tp > 1 on Hopper and Blackwell, so a run that set it to that value ran vLLM's default."
+  # fuse_minimax_qk_norm (v0.22 .. pre-v0.31, MiniMax only): the same fused all-reduce for the
+  # MiniMax QK norm; folded into the qk-norm passes in v0.31.0. Estimated: a fusion BLIS
+  # doesn't price separately.
+  compilation_config.pass_config.fuse_minimax_qk_norm:
+    class: approximate
+    unset: [false, null]
+    always: true
+    approximate_as: false
+    note: "A fused all-reduce for MiniMax's QK norm (a pre-v0.31 pass); BLIS prices the unfused norm and all-reduce."
   compilation_config.*: {class: inert, note: "Compiler internals (inductor passes, cache paths, warm-up counts); BLIS prices graph replay, not compilation."}
 
   # ---------------------------------------------------------------- attention / kernels
@@ -191,6 +210,20 @@ entries:
     unset: [auto]
     blis_from: priced.index_cache
     note: "No Deployment key states the indexer cache dtype, so BLIS prices the indexer record the catalog graph states (the model's default)."
+  # Fields of builds older than VLLM_REF, gone at v0.31.0 (which has no default to compare
+  # against), so each is classified with its own build's default.
+  # use_prefill_decode_attention (default False, v0.25 .. pre-v0.31 nightlies): separate
+  # prefill/decode kernels instead of the unified Triton one; off is what BLIS prices.
+  attention_config.use_prefill_decode_attention: {class: refuse, unset: [false], always: true, note: "Separate prefill and decode attention kernels instead of the unified one; the Deployment can't state the kernel split."}
+  # use_fp4_indexer_cache (default False): the older spelling of an FP4 indexer cache for the
+  # DeepSeek sparse indexer, now indexer_kv_dtype. A quantization format: estimated as the
+  # indexer record BLIS prices, as indexer_kv_dtype is.
+  attention_config.use_fp4_indexer_cache:
+    class: approximate
+    unset: [false]
+    always: true
+    blis_from: priced.index_cache
+    note: "The run stored the sparse-indexer cache as FP4 (this build's use_fp4_indexer_cache); no Deployment key states it, so BLIS prices the indexer record the catalog graph states."
   attention_config.indexer_sparse_logits:
     class: approximate
     unset: [false]

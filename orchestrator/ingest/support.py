@@ -36,6 +36,7 @@ class Catalog:
     models: dict = field(default_factory=dict)        # catalog name -> source.repo
     speculators: dict = field(default_factory=dict)   # catalog name -> speculator method | None
     hardware: dict = field(default_factory=dict)      # part -> MemoryGiB
+    capability: dict = field(default_factory=dict)    # part -> CUDA compute-capability major (catalog)
 
     @staticmethod
     def load(root) -> "Catalog":
@@ -59,6 +60,9 @@ class Catalog:
             doc = yaml.safe_load(h.read_text()) or {}
             if "MemoryGiB" in doc:
                 c.hardware[h.stem] = float(doc["MemoryGiB"])
+            cc = str(doc.get("ComputeCapability") or "")
+            if cc.split(".")[0].isdigit():
+                c.capability[h.stem] = int(cc.split(".")[0])
         return c
 
 

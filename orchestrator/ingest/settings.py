@@ -431,7 +431,21 @@ class Classified:
     roles: dict = field(default_factory=dict)          # role -> value (model, drafter, ...)
 
 
-def classify(settings: dict[str, Setting], policy: dict, vllm_defaults: dict | None = None) -> Classified:
+def part_default(entry: dict, settings: dict, family: int | None):
+    """vLLM's own value for a setting whose default depends on the part (default_by_part), or
+    None when the policy doesn't say or the part's architecture isn't known."""
+    rule = entry.get("default_by_part")
+    if not rule or family is None:
+        return None
+    tp = settings.get("tensor_parallel_size")
+    tp = int(tp.value) if tp is not None and tp.value is not None else 1
+    on = family in rule.get("families", []) and tp > rule.get("when_tp_gt", 0)
+    return rule["value"] if on else rule["else"]
+
+
+def classify(settings: dict[str, Setting], policy: dict, vllm_defaults: dict | None = None,
+             family: int | None = None) -> Classified:
+    """family: the part's CUDA compute-capability major, for defaults that depend on it."""
     defaults = vllm_defaults or {}
     c = Classified(settings=settings)
     aliases = {}
@@ -441,6 +455,19 @@ def classify(settings: dict[str, Setting], policy: dict, vllm_defaults: dict | N
             c.reasons.append(f"unclassified_arg:{path}")
             continue
         key, entry = hit
+        if entry.get("default_by_part") and st.requested:
+            want = part_default(entry, settings, family)
+            if want is None or _canon(st.value) != _canon(want):
+                # Not vLLM's own value on this part (or the part isn't known): a choice the
+                # Deployment can't state.
+                if st.value is not None:
+                    c.reasons.append(f"setting_not_modelled:{path}")
+                    c.args.append({"arg": path, "measured": _record_value(st.value), "source": st.source,
+                                   "blis": None, "match": "absent_in_blis"})
+                continue
+            c.args.append({"arg": path, "measured": _record_value(st.value), "source": st.source,
+                           "blis": None, "match": "inert"})
+            continue
         if key.endswith(".*") and entry["class"] == "inert" and st.requested and not entry.get("any_value"):
             # A wildcard inert entry covers a config object's fields at vLLM's defaults. A field
             # the run asked for at another value (or one vLLM didn't have at VLLM_REF) may pick a

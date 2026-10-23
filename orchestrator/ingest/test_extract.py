@@ -264,6 +264,23 @@ def test_gpu_memory_utilization_is_read_from_the_profiling_note_when_no_desired_
     assert [str(v) for v in r.values["gpu_memory_utilization"]] == ["0.9200"] * 2
 
 
+def test_a_fusion_pass_at_vllms_own_default_for_the_part_is_inert():
+    log = lambda tp, v: _log(f"'tensor_parallel_size': {tp}, 'compilation_config': {{'pass_config': {{'fuse_allreduce_rms': {v}}}}}")
+    k = "compilation_config.pass_config.fuse_allreduce_rms"
+
+    def cls(tp, v, family):
+        c = st.classify(st.merge(st.read_all(log(tp, v), None)[0], POLICY, DEFAULTS), POLICY, DEFAULTS, family=family)
+        return c.reasons, next(a["match"] for a in c.args if a["arg"] == k)
+    # on at tp > 1 on Blackwell / Hopper: vLLM's own default, so nothing differs
+    assert cls(4, True, 10) == ([], "inert") and cls(8, True, 9) == ([], "inert")
+    # off where vLLM would turn it on, or on where it wouldn't (tp 1, an Ampere part): a choice
+    assert cls(4, False, 10) == ([f"setting_not_modelled:{k}"], "absent_in_blis")
+    assert cls(1, True, 10) == ([f"setting_not_modelled:{k}"], "absent_in_blis")
+    assert cls(4, True, 8) == ([f"setting_not_modelled:{k}"], "absent_in_blis")
+    # the part's architecture unknown (an AMD part has no ComputeCapability): never assumed
+    assert cls(4, True, None) == ([f"setting_not_modelled:{k}"], "absent_in_blis")
+
+
 def test_moe_backend_is_mapped_to_its_blis_field():
     c = _classify(_log("'kernel_config': KernelConfig(moe_backend='deep_gemm_mega_moe')"))
     assert c.mapped["engine.moe_backend"][1] == "deep_gemm_mega_moe"
@@ -808,6 +825,11 @@ def test_run_and_attempt_from_run_url():
 LOGS = HERE / "testdata" / "logs"
 
 
+# The parts' CUDA compute-capability majors, as the pinned catalog states them (catalog
+# hardware/*.yaml ComputeCapability); AMD and TPU parts state none.
+CATALOG_FAMILY = {"h100": 9, "h200": 9, "b200": 10, "b300": 10, "gb200": 10, "gb300": 10}
+
+
 def test_every_arg_in_the_committed_real_logs_classifies_as_recorded():
     """One excerpt per InferenceX deployment shape seen in the 2026-09-20..10-23 window (the
     lines the extractor reads, verbatim). Every path classifies (no unclassified_arg), the
@@ -819,7 +841,8 @@ def test_every_arg_in_the_committed_real_logs_classifies_as_recorded():
         launch_path = LOGS / f"{name}.launch.json"
         launch = json.loads(launch_path.read_text()) if launch_path.exists() else None
         readings, problems = st.read_all((LOGS / f"{name}.server-log.txt").read_text(), launch)
-        c = st.classify(st.merge(readings, POLICY, DEFAULTS), POLICY, DEFAULTS)
+        part = name.split("-")[1]
+        c = st.classify(st.merge(readings, POLICY, DEFAULTS), POLICY, DEFAULTS, family=CATALOG_FAMILY.get(part))
         got = {"problems": problems, "reasons": c.reasons, "approximate": c.approximated}
         assert got == want, (name, got, want)
         assert not [r for r in c.reasons if r.startswith("unclassified_arg")], name

@@ -220,7 +220,8 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         readings["api_row"].add("frontend.router", f"{rm['router_name']}/{rm.get('router_version') or ''}".rstrip("/"))
     if problems:
         o.reasons.append("conflict:server_log_unreadable")
-    c = st.classify(st.merge(readings, env.policy, env.vllm_defaults), env.policy, env.vllm_defaults)
+    c = st.classify(st.merge(readings, env.policy, env.vllm_defaults), env.policy, env.vllm_defaults,
+                    family=env.catalog_obj.capability.get(row["hardware"]) if env.catalog_obj else None)
     o.reasons += c.reasons
     o.reasons += row_vs_run(row, c)
 
