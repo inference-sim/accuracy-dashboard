@@ -165,7 +165,8 @@ def cmd_score(a) -> int:
             "vllm_ref": manifest["vllm_ref"], "vllm_max_distance": manifest["vllm_max_distance"],
             "policy_sha256": art.sha256((policy_sha + vdefaults_sha).encode()), "pulled_at": manifest["pulled_at"],
             "corpus": {"dataset": env.corpus["dataset"], "revision": env.corpus["revision"], "sha256": corpus_sha},
-            "pull_manifest_sha256": art.sha256(manifest_text.encode()), "_policy": policy}
+            "pull_manifest_sha256": art.sha256(manifest_text.encode()),
+            "source": {"name": "SemiAnalysis InferenceX API", "url": api.API + "/"}, "_policy": policy}
     sc.write_contract(Path(a.out), outcomes, prov)
     problems = contract.validate_dir(a.out)
     for p in problems:
