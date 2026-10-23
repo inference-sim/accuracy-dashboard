@@ -58,6 +58,26 @@ jobs:
           python3 orchestrator/validate_summary_v2.py web/testdata/render-fixture.v2.summary.json web/testdata/render-fixture.v2b.summary.json
       - name: vLLM build resolution + commit-distance gate (#28; not used by the nightly)
         run: python3 orchestrator/ingest/test_build.py
+      - name: API ingest extractor - settings, policy table, replay inputs, support, artifacts (#29; not used by the nightly)
+        run: |
+          pip install --quiet pyyaml
+          python3 orchestrator/ingest/test_extract.py
+
+  blisdefaults:
+    # The Go helper the extractor calls for BLIS's own batch defaults, built against the pinned
+    # inference-sim tag in its go.mod (#29; not used by the nightly).
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: orchestrator/blisdefaults
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: orchestrator/blisdefaults/go.mod
+          cache-dependency-path: orchestrator/blisdefaults/go.sum
+      - run: go test ./...
+      - run: go build -o /tmp/blisdefaults .
 
   web:
     runs-on: ubuntu-latest

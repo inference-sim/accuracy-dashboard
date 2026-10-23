@@ -1,0 +1,199 @@
+# Every vLLM setting a run can record, and what the extractor does with it (Discussion #28).
+#
+# Keys are dotted paths into the run's settings: a top-level arg (`max_num_seqs`), a field of
+# a nested config (`attention_config.indexer_kv_dtype`), or an environment variable
+# (`env.VLLM_USE_RUST_FRONTEND`). A path the table doesn't list makes the point not scored
+# (`unclassified_arg:<path>`), so a flag InferenceX starts passing can't be silently ignored.
+# Most specific entry wins: `attention_config.backend` before `attention_config.*`.
+#
+# Classes:
+#   mapped       written into the BLIS scenario at `blis_field` (writer below), then compared.
+#   inert        recorded only: no effect on timing, or none BLIS prices differently.
+#   approximate  a quantized format BLIS can't state: written as `approximate_as`, scored as an
+#                `approximate` point, with `note` and `upstream`. Only quantization settings
+#                take this class (the user's rule, Discussion #28).
+#   refuse       timing-relevant and BLIS can't represent it: the point is not scored
+#                (`setting_not_modelled:<path>`), with `note`.
+#
+# `unset` lists the values that mean "not set" (vLLM's own default for that field). A
+# refuse/approximate/mapped entry whose value is in `unset` (or equals `default`) is treated as
+# not set: a run that prints a field at its default didn't change it.
+#
+# A rule is on vLLM's behaviour at VLLM_REF (v0.31.0); the BLIS fields are blis-schemas v0.5.0's
+# Deployment (the BLIS v0.12.0 pin). A BLIS release that adds a field moves an entry from
+# refuse to mapped; nothing else changes.
+
+version: 1
+
+entries:
+  # ---------------------------------------------------------------- identity / serving surface
+  # Which model and how clients reach it. Read by the support checks, not passed as settings.
+  model: {class: inert, role: model}
+  model_tag: {class: inert, role: model}
+  served_model_name: {class: inert, role: served_model}
+  tokenizer: {class: inert}
+  tokenizer_mode: {class: inert}
+  revision: {class: inert}
+  tokenizer_revision: {class: inert}
+  trust_remote_code: {class: inert}
+  host: {class: inert}
+  port: {class: inert}
+  device_ids: {class: inert}
+  api_server_count: {class: inert}       # BLIS resolves it from dp as vLLM does; see blis --api-server-count
+  disable_uvicorn_access_log: {class: inert}
+  enable_auto_tool_choice: {class: inert}
+  tool_call_parser: {class: inert}
+  reasoning_parser: {class: inert}
+  default_chat_template_kwargs.*: {class: inert}
+  enable_prompt_tokens_details: {class: inert}
+  language_model_only: {class: inert}    # the catalog graph is the text decoder
+  safetensors_load_strategy: {class: inert}
+  load_format: {class: inert}
+  download_dir: {class: inert}
+  seed: {class: inert}
+  dtype: {class: inert}                  # activation dtype; the graph states the model's
+  skip_tokenizer_init: {class: inert}
+  device_config: {class: inert}
+  structured_outputs_config.*: {class: inert}
+  observability_config.*: {class: inert}
+  aux_output_config.*: {class: inert}
+  enable_return_routed_experts: {class: inert}
+  pooler_config: {class: inert}
+  quantization_config: {class: inert}
+
+  # ---------------------------------------------------------------- parallelism
+  tensor_parallel_size: {class: mapped, blis_field: parallel.tp, type: int, default: 1}
+  pipeline_parallel_size: {class: mapped, blis_field: parallel.pp, type: int, default: 1}
+  data_parallel_size: {class: mapped, blis_field: parallel.dp, type: int, default: 1}
+  enable_expert_parallel: {class: mapped, blis_field: parallel.enable_expert_parallel, type: bool, default: false}
+  decode_context_parallel_size: {class: mapped, blis_field: parallel.dcp, type: int, default: 1}
+  prefill_context_parallel_size: {class: mapped, blis_field: parallel.pcp, type: int, default: 1}
+  dcp_comm_backend: {class: mapped, blis_field: engine.dcp_comm_backend, type: str, default: ag_rs}
+  data_parallel_size_local: {class: mapped, blis_field: parallel.dp_local, type: int}
+  disable_custom_all_reduce: {class: mapped, blis_field: engine.disable_custom_all_reduce, type: bool, default: false}
+
+  # ---------------------------------------------------------------- scheduler / memory
+  max_num_seqs: {class: mapped, blis_field: engine.max_num_seqs, type: int, required: true}
+  max_num_batched_tokens: {class: mapped, blis_field: engine.max_num_batched_tokens, type: int, required: true}
+  block_size: {class: mapped, blis_field: engine.block_size, type: int, required: true}
+  max_model_len: {class: mapped, blis_field: engine.max_model_len, type: int}
+  max_seq_len: {class: mapped, blis_field: engine.max_model_len, type: int, alias_of: max_model_len}
+  gpu_memory_utilization: {class: mapped, blis_field: engine.gpu_memory_utilization, type: float}
+  enable_prefix_caching: {class: mapped, blis_field: engine.enable_prefix_caching, type: bool}
+  enable_chunked_prefill: {class: refuse, unset: [true], note: "vLLM v1 always chunks prefills; BLIS models chunked prefill only."}
+  long_prefill_token_threshold: {class: mapped, blis_field: engine.long_prefill_token_threshold, type: int, default: 0}
+  scheduling_policy: {class: mapped, blis_field: engine.scheduling_policy, type: str, default: fcfs}
+  async_scheduling: {class: mapped, blis_field: engine.async_scheduling, type: bool}
+  kv_cache_dtype: {class: mapped, blis_field: engine.cache_dtype, type: str, default: auto}
+  quantization: {class: mapped, blis_field: engine.quantization, type: str, source_only: resolved_config}
+  enforce_eager: {class: refuse, unset: [false], note: "BLIS prices CUDA-graph replay; an eager engine isn't stated by the Deployment."}
+  cpu_offload_gb: {class: refuse, unset: [0, "0", "0.0"], note: "Weight offload to host memory isn't modelled by BLIS."}
+  stream_interval: {class: inert, note: "How often the API server flushes tokens to the client; it doesn't change engine steps."}
+  prefill_schedule_interval: {class: refuse, unset: [1], note: "No Deployment key states vLLM's prefill_schedule_interval, which holds prefills back for decode-only steps; BLIS schedules a prefill every step."}
+  enable_flashinfer_autotune: {class: inert, note: "Kernel autotuning at start-up; BLIS prices the kernels vLLM selects."}
+  attention_backend: {class: refuse, unset: [null], note: "An explicitly selected attention backend isn't stated by the Deployment; BLIS selects the backend vLLM v0.31.0 would."}
+  linear_backend: {class: refuse, unset: [auto], note: "An explicitly selected linear-layer backend isn't stated by the Deployment."}
+
+  # ---------------------------------------------------------------- CUDA graphs / compilation
+  compilation_config.cudagraph_mode: {class: mapped, blis_field: engine.cudagraph_mode, type: str, source_prefer: resolved_config}
+  compilation_config.cudagraph_capture_sizes: {class: mapped, blis_field: engine.cudagraph_capture_sizes, type: list, source_prefer: resolved_config}
+  compilation_config.max_cudagraph_capture_size: {class: mapped, blis_field: engine.max_cudagraph_capture_size, type: int, source_prefer: resolved_config}
+  max_cudagraph_capture_size: {class: mapped, blis_field: engine.max_cudagraph_capture_size, type: int, alias_of: compilation_config.max_cudagraph_capture_size}
+  compilation_config.mode:
+    class: refuse
+    # What the engine ran, not what was asked: vLLM v0.31.0 runs DeepSeek-V4.1 uncompiled
+    # whatever is requested, and BLIS prices that. Compared on the resolved value only.
+    source_only: resolved_config
+    unset: [NONE, null]
+    note: "BLIS prices the engine uncompiled (torch.compile mode NONE); a compiled engine isn't stated by the Deployment."
+  compilation_config.decoder_replay_cudagraph_capture_sizes: {class: refuse, unset: [[], null], note: "DeepSeek-V4.1 decoder-replay CUDA graphs (a nightly feature after v0.31.0) aren't modelled."}
+  # On by default in the builds that have it; switching it off moves the engine toward v0.31.0.
+  # Either way the build's default is the build's (admitted by the distance gate).
+  compilation_config.cudagraph_decoder_replay: {class: inert, note: "DeepSeek-V4.1 decoder-replay CUDA graphs (a nightly feature after v0.31.0); the switch alone is the build's default."}
+  compilation_config.decoder_replay_trim_threshold: {class: inert}
+  compilation_config.*: {class: inert, note: "Compiler internals (inductor passes, cache paths, warm-up counts); BLIS prices graph replay, not compilation."}
+
+  # ---------------------------------------------------------------- attention / kernels
+  attention_config.backend:
+    class: approximate
+    unset: [null]
+    approximate_as: v0.31.0 selection
+    note: "The run selected this attention backend explicitly; it decides the KV cache record format. BLIS runs the backend vLLM v0.31.0 selects for the part and prices that backend's record."
+    upstream: inference-sim/blis-schemas#57
+  attention_config.indexer_kv_dtype:
+    class: approximate
+    unset: [auto]
+    approximate_as: catalog default
+    note: "No Deployment key states the indexer cache dtype, so BLIS prices the indexer record the catalog graph states (the model's default)."
+    upstream: inference-sim/blis-schemas#57
+  attention_config.indexer_sparse_logits:
+    class: approximate
+    unset: [false]
+    approximate_as: false
+    note: "vLLM's sparse-logits indexer needs the MXFP4 indexer cache; with the FP8 record BLIS prices, it's the dense-logits indexer."
+    upstream: inference-sim/blis-schemas#57
+  attention_config.use_trtllm_attention: {class: refuse, unset: [null], note: "An explicit TRT-LLM attention kernel choice isn't stated by the Deployment."}
+  attention_config.*: {class: inert, note: "Attention kernel tuning knobs at vLLM's defaults or with no Deployment field BLIS prices them by."}
+  kernel_config.moe_backend: {class: mapped, blis_field: engine.moe_backend, type: str, default: auto}
+  kernel_config.linear_backend: {class: refuse, unset: [auto], note: "An explicitly selected linear-layer backend isn't stated by the Deployment."}
+  kernel_config.sparse_indexer_topk_backend: {class: refuse, unset: [auto], note: "An explicitly selected indexer top-k backend isn't stated by the Deployment."}
+  kernel_config.*: {class: inert, note: "Kernel warm-up and autotune switches."}
+  additional_config.*: {class: refuse, note: "A model-specific engine option (additional_config) has no Deployment field; e.g. DeepSeek-V4.1's latency-specialized decode."}
+
+  # ---------------------------------------------------------------- speculative decoding
+  speculative_config.method: {class: mapped, blis_field: engine.speculative.method, type: str}
+  speculative_config.num_speculative_tokens: {class: mapped, blis_field: engine.speculative.num_spec_tokens, type: int}
+  speculative_config.num_spec_tokens: {class: mapped, blis_field: engine.speculative.num_spec_tokens, type: int, alias_of: speculative_config.num_speculative_tokens}
+  speculative_config.model: {class: inert, role: drafter}
+  speculative_config.rejection_sample_method: {class: inert, role: acceptance_method}
+  speculative_config.synthetic_acceptance_length: {class: mapped, blis_field: replay.acceptance_length, type: float, role: acceptance}
+  speculative_config.draft_sample_method: {class: inert, note: "How drafts are sampled; with synthetic rejection the acceptance length is fixed."}
+  speculative_config.enable_adaptive_verification: {class: refuse, unset: [false], note: "Adaptive verification changes how many drafts are verified per step; BLIS verifies num_spec_tokens."}
+  speculative_config.attention_backend: {class: inert, note: "The drafter's attention backend; BLIS prices the drafter from the catalog graph."}
+  speculative_config.use_local_argmax_reduction: {class: inert}
+
+  # ---------------------------------------------------------------- engram (DeepSeek-V4.1)
+  engram_config.cpu_offload: {class: mapped, blis_field: engine.engram_config.cpu_offload, type: bool}
+  engram_config.dp_shared_memory: {class: mapped, blis_field: engine.engram_config.dp_shared_memory, type: bool}
+  engram_config.use_thp: {class: mapped, blis_field: engine.engram_config.use_thp, type: bool}
+  engram_config.embedding_across_dp: {class: inert, note: "Sizes a process group DeepSeek-V4.1's Engram path doesn't use at v0.31.0 (blis-schemas EngramConfig)."}
+
+  # ---------------------------------------------------------------- KV offload
+  kv_transfer_config.kv_connector: {class: mapped, blis_field: offload.connector, type: str, writer: offload}
+  kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use: {class: mapped, blis_field: offload.tiers.cpu_dram, type: int, writer: offload}
+  kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use_per_rank: {class: mapped, blis_field: offload.tiers.cpu_dram, type: int, writer: offload}
+  kv_transfer_config.kv_connector_extra_config.lazy_offload: {class: mapped, blis_field: offload.spec, type: bool, writer: offload}
+  kv_transfer_config.kv_connector_extra_config.*: {class: refuse, note: "A connector option BLIS's offload model doesn't state."}
+  kv_transfer_config.kv_role: {class: inert, note: "kv_both on a colocated engine: it both stores and loads."}
+  kv_transfer_config.*: {class: inert, note: "Connector plumbing (ids, ports, buffer devices) with no timing effect."}
+
+  # ---------------------------------------------------------------- environment (launch config)
+  env.VLLM_USE_RUST_FRONTEND: {class: mapped, blis_field: engine.frontend, type: str}
+  env.VLLM_USE_V2_MODEL_RUNNER: {class: inert, note: "Model Runner V2 is v0.31.0's runner unless a configuration needs V1; BLIS prices it."}
+  env.VLLM_ENGINE_READY_TIMEOUT_S: {class: inert}
+  env.PYTHONUNBUFFERED: {class: inert}
+  env.PYTHONNOUSERSITE: {class: inert}
+  env.VLLM_FLOAT32_MATMUL_PRECISION: {class: inert}
+  # Process plumbing: allocator, thread and Python settings that don't select a kernel.
+  env.PYTORCH_CUDA_ALLOC_CONF: {class: inert, note: "Caching-allocator tuning (e.g. expandable segments); it changes fragmentation, not kernels or steps."}
+  env.PYTORCH_ALLOC_CONF: {class: inert, note: "Caching-allocator tuning; it changes fragmentation, not kernels or steps."}
+  env.PYTHONHASHSEED: {class: inert}
+  env.OMP_NUM_THREADS: {class: inert}
+  env.VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS: {class: inert}
+  env.VLLM_FLASHINFER_ALLREDUCE_BACKEND: {class: refuse, note: "An explicit FlashInfer all-reduce backend isn't stated by the Deployment."}
+  env.*: {class: refuse, note: "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."}
+
+  # What vLLM's SimpleCPUOffloadConnector resolved per rank (engine line); read by the offload writer.
+  offload.per_rank_gib: {class: inert, role: offload}
+  offload.world_size: {class: inert, role: offload}
+
+  # ---------------------------------------------------------------- frontend router (API row / launch config)
+  frontend.router: {class: inert, note: "A router in front of DP ranks; BLIS spreads requests with vLLM's internal DP balancer."}
+
+# Engine outcomes compared after the replay, never passed to BLIS (Discussion #28).
+resolved:
+  kv_cache_tokens_per_replica:
+    log: 'GPU KV cache size: ([0-9,]+) tokens'
+    blis: kv_capacity_tokens_per_replica
+    # vLLM prints one line per engine core (per DP rank); BLIS reports its smallest instance.
+    scope: per_engine_core
