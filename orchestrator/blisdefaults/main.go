@@ -21,6 +21,12 @@
 //	    Prints {"assumptions":[{"name","value","reason"}…],"cache_dtype":…,
 //	    "caches":[{"name","kind","bytes_per_entry"}…],"overrides":[{"field","requested","resolved","reason"}…],
 //	    "tp":…,"dp":…,"ep":…}.
+//
+//	blisdefaults -acceptance -registry <dir> -model <catalog model> -method <m> -k <n> -thinking <on|off> [-category <c>] [-fallback-category <c>]
+//	    BLIS's own acceptance length for a drafter, when the run recorded none: blis-schemas'
+//	    acceptance.Resolve over the registry's acceptance profile sets (the layer BLIS falls
+//	    back to with no value stated). Refuses what it refuses: no profile, an ambiguous match.
+//	    Prints {"acceptance_length":…,"fallback_from":…,"measured_on":…,"profile":…,"set":…}.
 package main
 
 import (
@@ -28,14 +34,89 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	latencykernel "github.com/inference-sim/blis-latency-kernel"
 	schemamodel "github.com/inference-sim/blis-schemas/spec/model"
 	"github.com/inference-sim/inference-sim/sim/kernelmodel"
+
+	blisschemas "github.com/inference-sim/blis-schemas"
+	"github.com/inference-sim/blis-schemas/spec/acceptance"
 )
+
+// Acceptance is BLIS's registry default for a drafter's acceptance.
+type Acceptance struct {
+	AcceptanceLength float64 `json:"acceptance_length"`
+	FallbackFrom     string  `json:"fallback_from"`
+	MeasuredOn       string  `json:"measured_on"`
+	Profile          string  `json:"profile"`
+	Set              string  `json:"set"`
+}
+
+// RegistryAcceptance resolves acceptance from the registry layer alone, as BLIS does when no
+// command line, scenario or workload value states one.
+func RegistryAcceptance(registry, model, method string, k int, thinking, category, fallback, hardware string) (Acceptance, error) {
+	dir := filepath.Join(registry, "acceptance")
+	var paths []string
+	if err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.Type().IsRegular() && (strings.HasSuffix(p, ".yaml") || strings.HasSuffix(p, ".yml")) {
+			paths = append(paths, p)
+		}
+		return nil
+	}); err != nil {
+		return Acceptance{}, err
+	}
+	sort.Strings(paths)
+	var sets []*acceptance.ProfileSet
+	for _, p := range paths {
+		s, err := blisschemas.LoadAcceptanceProfileSet(p)
+		if err != nil {
+			return Acceptance{}, err
+		}
+		if pr := s.Validate(); !pr.OK() {
+			return Acceptance{}, fmt.Errorf("%s: %s", p, pr.Error())
+		}
+		sets = append(sets, s)
+	}
+	// A workload that states no category (InferenceX's random-token single-turn benchmark, for
+	// one) matches no profile. When the registry describes this drafter under exactly one
+	// category, that category is substituted -- recorded as fallback_from, never silent; with
+	// several, which one applies isn't knowable and the lookup is refused.
+	if category == "" && fallback == "" {
+		cats := map[string]bool{}
+		for _, s := range sets {
+			for _, p := range s.Profiles {
+				if p.Model == model && p.SpeculativeMethod == method && p.NumSpecTokens == k && string(p.Thinking) == thinking {
+					cats[p.Category] = true
+				}
+			}
+		}
+		if len(cats) == 1 {
+			for c := range cats {
+				fallback = c
+			}
+		}
+	}
+	res, err := acceptance.Resolve(acceptance.Request{Model: model, SpeculativeMethod: method, NumSpecTokens: k,
+		Hardware: hardware, Registry: sets, FallbackCategory: fallback,
+		Workload: acceptance.Workload{Thinking: acceptance.Thinking(thinking), Category: category}})
+	if err != nil {
+		return Acceptance{}, err
+	}
+	out := Acceptance{AcceptanceLength: res.AcceptanceLength, FallbackFrom: res.FallbackFrom,
+		MeasuredOn: res.MeasuredOn, Set: res.Set}
+	if res.Profile != nil {
+		out.Profile = res.Profile.Key().String()
+	}
+	return out, nil
+}
 
 // Defaults is the helper's output.
 type Defaults struct {
@@ -83,9 +164,9 @@ type Resolution struct {
 	CacheDType  string        `json:"cache_dtype"`
 	Caches      []CacheRecord `json:"caches"`
 	DP          int           `json:"dp"`
-	EP        int        `json:"ep"`
-	Overrides []Override `json:"overrides"`
-	TP        int        `json:"tp"`
+	EP          int           `json:"ep"`
+	Overrides   []Override    `json:"overrides"`
+	TP          int           `json:"tp"`
 }
 
 // ResolveScenario opens a scenario with inference-sim's kernel and reports its resolution.
@@ -149,12 +230,29 @@ func run(args []string, out io.Writer) error {
 	mem := fs.Float64("memory-gib", 0, "the part's total device memory in GiB (catalog hardware MemoryGiB)")
 	dev := fs.String("device", "", "the part's catalog hardware name")
 	resolve := fs.Bool("resolve", false, "report BLIS's resolution of one scenario instead")
+	accept := fs.Bool("acceptance", false, "report BLIS's registry acceptance length instead")
+	model := fs.String("model", "", "with -acceptance: the catalog model")
+	method := fs.String("method", "", "with -acceptance: the speculative method")
+	k := fs.Int("k", 0, "with -acceptance: num_spec_tokens")
+	thinking := fs.String("thinking", "", "with -acceptance: on or off")
+	category := fs.String("category", "", "with -acceptance: the workload category")
+	fallback := fs.String("fallback-category", "", "with -acceptance: a category to substitute, recorded")
 	scenarios := fs.String("scenarios", "", "with -resolve: the scenario directory")
 	scenario := fs.String("scenario", "", "with -resolve: the scenario file name")
 	catalog := fs.String("catalog", "", "with -resolve: the blis-catalog root")
 	registry := fs.String("registry", "", "with -resolve: the blis-registry root")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *accept {
+		if *registry == "" || *model == "" || *method == "" || *k < 1 || *thinking == "" {
+			return fmt.Errorf("-acceptance needs -registry, -model, -method, -k >= 1 and -thinking")
+		}
+		a, err := RegistryAcceptance(*registry, *model, *method, *k, *thinking, *category, *fallback, *dev)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(out).Encode(a)
 	}
 	if *resolve {
 		if *scenarios == "" || *scenario == "" || *catalog == "" || *registry == "" {

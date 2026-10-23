@@ -575,6 +575,9 @@ class Built:
     scenario: dict = field(default_factory=dict)      # the Scenario document
     deployment: dict = field(default_factory=dict)    # the Deployment document
     acceptance_length: str | None = None              # --speculative-acceptance-length
+    # A drafter whose acceptance the run didn't record: (method, num_spec_tokens), for score.py
+    # to take BLIS's own registry default (blisdefaults -acceptance) and pin it in the scenario.
+    acceptance_needed: tuple | None = None
     gpus: int = 0
     reasons: list = field(default_factory=list)
     defaults_used: list = field(default_factory=list)  # fidelity args entries
@@ -623,8 +626,8 @@ def build(c: Classified, *, name: str, model: str, part: Part, engine_version: s
     if "speculative" in eng:
         if set(eng["speculative"]) != {"method", "num_spec_tokens"}:
             b.reasons.append("required_setting_missing:speculative_config.num_speculative_tokens")
-        if b.acceptance_length is None:
-            b.reasons.append("required_setting_missing:speculative_config.synthetic_acceptance_length")
+        if b.acceptance_length is None and set(eng["speculative"]) == {"method", "num_spec_tokens"}:
+            b.acceptance_needed = (eng["speculative"]["method"], int(eng["speculative"]["num_spec_tokens"]))
     # Required settings no source recorded: BLIS's own default, else refuse.
     if "gpu_memory_utilization" not in eng:
         # vLLM prints it (the "Desired GPU memory utilization" line) whether or not it was

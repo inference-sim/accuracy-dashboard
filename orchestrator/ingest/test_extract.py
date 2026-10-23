@@ -324,14 +324,43 @@ def test_a_none_in_an_earlier_source_does_not_hide_a_later_value():
     assert c.mapped["engine.max_num_batched_tokens"][1] == 8192
 
 
-def test_real_rejection_without_a_recorded_acceptance_refuses():
+def test_a_drafter_without_a_recorded_acceptance_takes_blis_registry_default():
+    import score as sc
     c = _classify(_log("'speculative_config': {'method': 'dspark', 'num_speculative_tokens': 5, "
                        "'rejection_sample_method': 'standard'}"))
     assert "setting_not_modelled:speculative_config.rejection_sample_method" in c.reasons
     c = _classify(_log("'tensor_parallel_size': 1, 'max_num_seqs': 8, 'max_num_batched_tokens': 4096, 'block_size': 128, "
                        "'gpu_memory_utilization': 0.9, 'speculative_config': {'method': 'dspark', 'num_speculative_tokens': 5}"))
     b = st.build(c, name="p", model="m", part=PART_H200, engine_version="v0.31.0", defaults=H200_DEFAULTS)
-    assert b.reasons == ["required_setting_missing:speculative_config.synthetic_acceptance_length"]
+    assert b.reasons == [] and b.acceptance_needed == ("dspark", 5) and b.acceptance_length is None
+
+    class Env:
+        defaults_helper, registry = "blisdefaults", "reg"
+    calls = []
+
+    def fake_run(argv, **kw):
+        calls.append(argv)
+        return type("P", (), {"returncode": 0, "stdout": json.dumps(
+            {"acceptance_length": 4.07, "fallback_from": "(none)", "measured_on": "b200",
+             "profile": "m/dspark/k5/thinking-off/coding", "set": "s"})})()
+    orig = sc.subprocess.run
+    try:
+        sc.subprocess.run = fake_run
+        completions = '"POST /v1/completions HTTP/1.1" 200'
+        args = []
+        assert sc.acceptance_default(args, b, Env(), completions, "h200", "m") == []
+        assert args[0]["blis"] == "4.07" and args[0]["match"] == "approximated" and args[0]["measured"] is None
+        assert "registry default m/dspark/k5/thinking-off/coding (measured on b200)" in args[0]["note"]
+        assert calls[0][calls[0].index("-thinking") + 1] == "off"
+        # chat requests: the thinking mode depends on template arguments the log doesn't state
+        assert sc.acceptance_default([], b, Env(), '"POST /v1/chat/completions HTTP/1.1"', "h200", "m") == \
+            ["required_setting_missing:speculative_config.synthetic_acceptance_length"]
+        # BLIS has no profile for the drafter: refused, never guessed
+        sc.subprocess.run = lambda argv, **kw: type("P", (), {"returncode": 1, "stdout": ""})()
+        assert sc.acceptance_default([], b, Env(), completions, "h200", "m") == \
+            ["required_setting_missing:speculative_config.synthetic_acceptance_length"]
+    finally:
+        sc.subprocess.run = orig
 
 
 def test_the_flat_and_nested_spellings_of_one_setting_agree_or_conflict():

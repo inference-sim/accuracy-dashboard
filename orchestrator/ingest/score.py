@@ -275,13 +275,23 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         o.reasons = sorted(set(o.reasons))
         return o
     o.reasons += kernel_defaults(args, b.kernel_resolves, env, sdir, f"{name}.yaml")
-    if b.kernel_resolves:
+    if b.acceptance_needed:
+        o.reasons += acceptance_default(args, b, env, log, row["hardware"], sup.model)
+        if o.reasons:
+            o.reasons = sorted(set(o.reasons))
+            return o
+    if b.kernel_resolves or b.acceptance_needed:
         # State what the kernel resolved, so every consumer (signedprobe's harness requires a
         # stated block_size) runs the same value the kernel would have assumed.
         eng = b.deployment["pools"][0]["engine"]
         for a in args:
             if a["arg"] in b.kernel_resolves and a["match"] == "blis_default":
                 eng[a["arg"]] = a["blis"]
+        if b.acceptance_needed:
+            # Pinned in the scenario, so every consumer (blis replay, signedprobe) runs it.
+            al = float(next(a["blis"] for a in args if a["arg"] == ACCEPTANCE_ARG))
+            b.scenario["acceptance"] = {"value": {"num_spec_tokens": b.acceptance_needed[1],
+                                                  "acceptance_length": al}}
         text = st.to_yaml(b, header)
         (sdir / f"{name}.yaml").write_text(text)
         dep = _parse_back(text)
@@ -364,6 +374,43 @@ def blis_resolution(env, scenarios: Path, scenario: str) -> dict | str:
     if out.returncode != 0:
         return _blis_refusal(out.stderr.replace("blisdefaults: ", ""), scenarios.parent)
     return json.loads(out.stdout)
+
+
+ACCEPTANCE_ARG = "speculative_config.acceptance_length"
+_REQUEST = re.compile(r'"POST (/v1/[\w/]+)')
+
+
+def _thinking(log: str) -> str | None:
+    """The thinking mode a run's requests ran in, when the log shows it unambiguously: raw
+    /v1/completions prompts go through no chat template, so no reasoning mode applies ("off").
+    Chat requests' mode depends on their template arguments, which the log doesn't state."""
+    paths = set(_REQUEST.findall(log or ""))
+    return "off" if paths == {"/v1/completions"} else None
+
+
+def acceptance_default(args: list, b, env, log: str, hardware: str, model: str) -> list[str]:
+    """The run drafted without recording its acceptance: take BLIS's own registry default for
+    the drafter (blisdefaults -acceptance, blis-schemas' resolver) and record it as estimated.
+    Refused when the thinking mode can't be read, or BLIS has no profile."""
+    method, k = b.acceptance_needed
+    thinking = _thinking(log)
+    if thinking is None:
+        return ["required_setting_missing:speculative_config.synthetic_acceptance_length"]
+    out = subprocess.run([env.defaults_helper, "-acceptance", "-registry", str(env.registry), "-model", model,
+                          "-method", method, "-k", str(k), "-thinking", thinking, "-device", hardware],
+                         capture_output=True, text=True)
+    if out.returncode != 0:
+        return ["required_setting_missing:speculative_config.synthetic_acceptance_length"]
+    res = json.loads(out.stdout)
+    where = f" (measured on {res['measured_on']})" if res.get("measured_on") else ""
+    fell = f"; the run's requests state no category, so BLIS's only one for this drafter was used" \
+        if res.get("fallback_from") else ""
+    # As a decimal string: fidelity records hold no floats (contract canonical JSON).
+    args.append({"arg": ACCEPTANCE_ARG, "measured": None, "source": "blis_default", "blis": repr(float(res["acceptance_length"])),
+                 "match": "approximated",
+                 "note": f"The run didn't record its draft acceptance; BLIS used its registry default "
+                         f"{res['profile']}{where}{fell}."})
+    return []
 
 
 def kernel_defaults(args: list, paths: list, env, scenarios: Path, scenario: str) -> list[str]:
@@ -464,8 +511,9 @@ def single_turn_inputs(row: dict, dep: dict, scenario_file: str) -> tuple[dict, 
     (absolutes) and the engine settings, all keyed by the scenario file and workload label."""
     pool = dep["pools"][0]
     eng, par = pool["engine"], pool["parallel"]
-    if "speculative" in eng:
-        # signedprobe passes no acceptance length to blis replay, so a drafter can't be priced.
+    if "speculative" in eng and "acceptance" not in (dep.get("_scenario") or {}):
+        # signedprobe passes no acceptance flag to blis replay: a drafter is priced only when
+        # the scenario pins its acceptance.
         return ["client_scenario_not_replayable:single_turn_speculative"]
     m = row.get("metrics") or {}
     try:
@@ -499,8 +547,8 @@ def score_single_turn(o, entry, env, work: Path, sdir: Path, name: str, text: st
                       args: list, log: str, approximated: bool):
     """One single-turn point through signedprobe (inference-sim cmd/signedprobe at the BLIS tag)."""
     row, pid, ident = entry["row"], entry["point_id"], entry["identity"]
-    dep = {**dep, "_model": next((d.get("model") for d in __import__("yaml").safe_load_all(text)
-                                  if d.get("kind") == "Scenario"), "")}
+    scen_doc = next((d for d in __import__("yaml").safe_load_all(text) if d.get("kind") == "Scenario"), {})
+    dep = {**dep, "_model": scen_doc.get("model", ""), "_scenario": scen_doc}
     got = single_turn_inputs(row, dep, f"{name}.yaml")
     if isinstance(got, list):
         o.reasons = sorted(set(got))
