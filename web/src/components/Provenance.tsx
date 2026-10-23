@@ -44,7 +44,7 @@ const KERNEL: Record<string, string> = {
   // Weight formats as vLLM names them, said plainly (quantization).
   modelopt_fp4: 'nvfp4',
   modelopt_mixed: 'nvfp4 + mxfp8 (mixed)',
-  gpt_oss_mxfp4: 'mxfp4 (gpt-oss loader)',
+  gpt_oss_mxfp4: 'mxfp4 (gpt-oss MoE kernels)',
   nvfp4_ds_mla: 'default kernel, NVFP4 packed KV cache',
   fp8_ds_mla: 'default kernel, FP8 packed KV cache',
   FLASHINFER_MLA_SPARSE_DSV41: 'FlashInfer sparse MLA',
