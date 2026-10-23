@@ -491,7 +491,7 @@ function RunProvenance({ summary }: { summary: Summary }) {
       )}
       <div className="seclabel">Run</div>
       <div className="kv">
-        <span className="k">snapshot</span>
+        <span className="k">{p.ingest === 'api' ? 'latest run date' : 'snapshot'}</span>
         <span className="v">{dash(summary.snapshot_id, (v) => v.slice(0, 10))}</span>
       </div>
       {p.ingest !== 'api' && (

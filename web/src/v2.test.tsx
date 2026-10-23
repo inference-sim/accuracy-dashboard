@@ -110,6 +110,8 @@ describe('dates are labelled for what they are', () => {
     const { html } = render(<App summary={v2a()} loadError={null} initialHash="#/?tier=all" />)
     expect(html).not.toContain('(hidden)')
     expect(html).not.toContain('>generated<')
+    expect(html).toContain('>latest run date<')
+    expect(html).not.toContain('>snapshot<')
   })
 
   it('a v1 snapshot keeps its dump wording', () => {
