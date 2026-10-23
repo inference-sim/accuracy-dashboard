@@ -567,7 +567,7 @@ def test_every_arg_in_the_committed_real_logs_classifies_as_recorded():
     for name, want in sorted(expected.items()):
         launch_path = LOGS / f"{name}.launch.json"
         launch = json.loads(launch_path.read_text()) if launch_path.exists() else None
-        readings, problems = st.read_all((LOGS / f"{name}.log").read_text(), launch)
+        readings, problems = st.read_all((LOGS / f"{name}.server-log.txt").read_text(), launch)
         c = st.classify(st.merge(readings, POLICY, DEFAULTS), POLICY, DEFAULTS)
         got = {"problems": problems, "reasons": c.reasons, "approximate": c.approximated}
         assert got == want, (name, got, want)
