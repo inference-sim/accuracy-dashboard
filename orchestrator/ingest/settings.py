@@ -472,7 +472,10 @@ def classify(settings: dict[str, Setting], policy: dict, vllm_defaults: dict | N
         if st.occurrences > 1:
             rec["occurrences"] = st.occurrences
         if cls == "inert":
-            if entry.get("note") or path == "frontend.router":
+            # Recorded when the run set it: a named entry, or a field under a config object that
+            # isn't at vLLM's default. A field vLLM printed at its default is not something the
+            # run did, and isn't recorded.
+            if (not key.endswith(".*") or st.requested) and (entry.get("note") or path == "frontend.router" or st.requested):
                 c.args.append({**rec, "blis": None, "match": "inert"})
             continue
         if cls == "refuse":
