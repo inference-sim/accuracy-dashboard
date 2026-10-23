@@ -117,7 +117,6 @@ td .n{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-left
 .cov .fail{color:var(--crit-ink,#7a1f1f)}
 .coverage{margin-top:14px;font-size:12px;color:var(--muted);display:flex;gap:20px;flex-wrap:wrap}
 .coverage b{color:var(--ink);font-family:var(--font-mono);font-weight:600}
-.coverage .nscov{font-family:var(--font-sans);font-size:11px;color:var(--muted)}
 .legend{margin-top:10px;font-size:11px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;align-items:center}
 .foot{margin-top:20px;font-size:11.5px;color:var(--muted);max-width:900px;line-height:1.55}
 

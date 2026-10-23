@@ -266,9 +266,6 @@ function Overview({
   // represent yet was estimated). v1 keeps the harness's measured·resolved / all wording.
   const v2 = summary.schema_version === 2
   const prov = summary.provenance
-  const notScoredDetail = Object.entries(cov.not_scored_reasons || {})
-    .map(([k, v]) => `${k.replace(/_/g, ' ')} ${v}`)
-    .join(', ')
 
   return (
     <>
@@ -362,8 +359,8 @@ function Overview({
           <Term name="coverage">points scored</Term> <b>{formatCount(cov.scored)}</b>
         </span>
         <span>
-          not scored <b>{formatCount(cov.not_scored)}</b>{' '}
-          {notScoredDetail && <span className="nscov">({notScoredDetail})</span>}
+          {/* Only the count: the per-reason breakdown stays in summary.json (coverage.not_scored_reasons). */}
+          not scored <b>{formatCount(cov.not_scored)}</b>
         </span>
         {cov.measured_excluded != null && (
           <span>

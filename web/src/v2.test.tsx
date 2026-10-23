@@ -70,14 +70,15 @@ describe('a v2 snapshot renders', () => {
     expect(html).toContain('≈')
   })
 
-  it('keeps not-scored points out of the DOM and counts their reasons', () => {
+  it('keeps not-scored points out of the DOM and reports only how many', () => {
     const s = v2a()
     expect(s.not_scored!.length).toBe(4)
     const { html } = render(<App summary={s} loadError={null} initialHash="#/?tier=all" />)
     for (const ns of s.not_scored!) expect(html).not.toContain(ns.point_id)
     // the minimax-m3 rows are all not scored (EAGLE3): no minimax row is drawn
     expect(html).not.toContain('minimaxm3')
-    expect(html).toContain('drafter not in catalog 2')
+    expect(html).toMatch(/not scored <b>4<\/b>/)
+    for (const reason of ['drafter not in catalog', 'setting not modelled', 'model not in catalog']) expect(html).not.toContain(reason)
   })
 
   it('leaves the v1 fixture without a date column or provenance marks', () => {
