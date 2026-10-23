@@ -167,8 +167,8 @@ def read_engine_lines(log: str) -> Reading:
     if _RUST_FRONTEND.search(log):
         r.add("env.VLLM_USE_RUST_FRONTEND", True)
     for name in sorted(set(_DEPRECATED_ENV.findall(log))):
-        # The value isn't printed; "set" is what the log states, and the policy decides.
-        r.add(f"env.{name}", "set")
+        # The value isn't printed, only that it was set; the policy decides what that means.
+        r.add(f"env.{name}", True)
     for m in _SIMPLE_OFFLOAD.finditer(log):
         # vLLM prints GiB under the "GB" label (bytes / 1024**3); kept as the per-rank figure.
         r.add("offload.per_rank_gib", pyrepr.Float(m.group(1)))

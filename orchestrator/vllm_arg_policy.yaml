@@ -17,7 +17,10 @@
 #                prices on that chip, named by vLLM's layout for its head width), or
 #                `approximate_as` gives it when BLIS has no setting at all (a switch BLIS can't
 #                turn on is off). If BLIS reports nothing, the point isn't scored.
-#                Only quantization settings take this class (the user's rule, Discussion #28).
+#                Only the settings the user has agreed to estimate take this class (Discussion
+#                #28): quantization and cache formats, the drafter's acceptance, and the MoE
+#                kernels and fusion passes that serve those formats (fuse_minimax_qk_norm,
+#                the MXFP4 MoE-kernel environment variables). Anything else refuses.
 #   refuse       timing-relevant and BLIS can't represent it: the point is not scored
 #                (`setting_not_modelled:<path>`), with `note`.
 #
@@ -207,13 +210,14 @@ entries:
     default_by_part: {families: [9, 10], when_tp_gt: 1, value: true, else: false, any_at_or_below_tp: 1}
     note: "Fused all-reduce + RMSNorm: vLLM v0.31.0 turns it on for tp > 1 on Hopper and Blackwell, so a run that set it to that value ran vLLM's default."
   # fuse_minimax_qk_norm (v0.22 .. pre-v0.31, MiniMax only): a fused all-reduce for the MiniMax
-  # QK norm, off unless asked for (not in v0.22's optimization-level pass_config). A fusion,
-  # not a format, so the only-quantization-is-estimated rule refuses it.
+  # QK norm, off unless asked for (not in v0.22's optimization-level pass_config). Estimated,
+  # the user's call (2026-10-23): BLIS prices the unfused norm and all-reduce.
   compilation_config.pass_config.fuse_minimax_qk_norm:
-    class: refuse
+    class: approximate
     unset: [false, null]
     always: true
-    note: "A fused all-reduce for MiniMax's QK norm (a pre-v0.31 pass the run turned on); the Deployment can't state it."
+    approximate_as: false
+    note: "The run fused the all-reduce into MiniMax's QK norm (a pre-v0.31 pass); BLIS prices the unfused norm and all-reduce."
   compilation_config.*: {class: inert, note: "Compiler internals (inductor passes, cache paths, warm-up counts); BLIS prices graph replay, not compilation."}
 
   # ---------------------------------------------------------------- attention / kernels
@@ -311,10 +315,19 @@ entries:
   # ---------------------------------------------------------------- environment (launch config)
   env.VLLM_USE_RUST_FRONTEND: {class: mapped, blis_field: engine.frontend, type: bool}
   # Deprecated MoE-kernel selectors, seen in a log only through vLLM's deprecation warning
-  # (the value isn't printed). Each forces an MXFP4 MoE kernel over the part's default
-  # (v0.22 fused_moe/oracle/mxfp4.py), which the Deployment can't state.
-  env.VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8: {class: refuse, always: true, note: "Forces FlashInfer's MXFP4-weight, MXFP8-activation MoE kernel; the Deployment can't state the MoE kernel."}
-  env.VLLM_MXFP4_USE_MARLIN: {class: refuse, always: true, note: "Forces the Marlin MXFP4 MoE kernel; the Deployment can't state the MoE kernel."}
+  # (the value isn't printed). Each forces a kernel for MXFP4 MoE weights over the part's
+  # default (v0.22 fused_moe/oracle/mxfp4.py). Estimated, the user's call (2026-10-23): BLIS
+  # prices its default MoE kernel for the same MXFP4 weights.
+  env.VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8:
+    class: approximate
+    always: true
+    approximate_as: false
+    note: "The run forced FlashInfer's MXFP4-weight, MXFP8-activation MoE kernel; BLIS prices its default MoE kernel for the same MXFP4 weights."
+  env.VLLM_MXFP4_USE_MARLIN:
+    class: approximate
+    always: true
+    approximate_as: false
+    note: "The run forced the Marlin MXFP4 MoE kernel; BLIS prices its default MoE kernel for the same MXFP4 weights."
   env.VLLM_USE_V2_MODEL_RUNNER: {class: inert, note: "Model Runner V2 is v0.31.0's runner unless a configuration needs V1; BLIS prices it."}
   env.VLLM_ENGINE_READY_TIMEOUT_S: {class: inert}
   env.PYTHONUNBUFFERED: {class: inert}

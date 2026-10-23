@@ -297,9 +297,12 @@ def test_an_env_var_vllm_warns_is_deprecated_is_read_as_set():
     log = ("(EngineCore pid=1) /usr/lib/python3/vllm/envs.py:358: FutureWarning: VLLM_MXFP4_USE_MARLIN is "
            "deprecated and will be removed in v0.23. Use --moe-backend instead.\n")
     r = st.read_engine_lines(log + log)
-    assert r.values["env.VLLM_MXFP4_USE_MARLIN"] == ["set"]          # once, however often it's printed
+    assert r.values["env.VLLM_MXFP4_USE_MARLIN"] == [True]           # once, however often it's printed
+    # an MoE-kernel selector: estimated as BLIS's default MoE kernel, not refused (the user's call)
     c = _classify(_log("'tensor_parallel_size': 1") + "\n" + log)
-    assert "setting_not_modelled:env.VLLM_MXFP4_USE_MARLIN" in c.reasons
+    assert c.reasons == [] and c.approximated
+    a = next(x for x in c.args if x["arg"] == "env.VLLM_MXFP4_USE_MARLIN")
+    assert (a["measured"], a["blis"], a["match"]) == (True, False, "approximated") and a["note"]
     # an unknown deprecated variable is unclassified, never silently passed
     c = _classify(_log("'tensor_parallel_size': 1") + "\n" + log.replace("VLLM_MXFP4_USE_MARLIN", "VLLM_SOMETHING_NEW"))
     assert "setting_not_modelled:env.VLLM_SOMETHING_NEW" in c.reasons
