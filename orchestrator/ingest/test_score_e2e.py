@@ -120,6 +120,22 @@ def test_a_single_turn_drafter_point_scores_with_its_recorded_acceptance_and_res
         shutil.rmtree(tmp)
 
 
+def test_crosscheck_matches_the_contract_to_the_api_rows_and_catches_a_change():
+    import crosscheck as xc
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        _score(tmp, entry, env, tmp / "c1")
+        n, problems = xc.check(tmp / "c1" / "points.csv", [entry["row"]])
+        assert (n, problems) == (2, [])
+        changed = {**entry["row"], "metrics": {**entry["row"]["metrics"], "mean_tpot": 0.02}}
+        n, problems = xc.check(tmp / "c1" / "points.csv", [changed])
+        assert len(problems) == 1 and "meas_tpot_us" in problems[0]
+        assert xc.check(tmp / "c1" / "points.csv", [])[1][0].endswith("not in the API rows given")
+    finally:
+        shutil.rmtree(tmp)
+
+
 def test_a_point_refused_before_blis_never_calls_it():
     tmp = Path(tempfile.mkdtemp())
     try:
