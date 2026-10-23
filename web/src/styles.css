@@ -36,7 +36,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-sa
 .rail a{color:var(--accent);text-decoration:none;font-size:12.5px}
 .rail a.ghlink{display:inline-flex;align-items:center;gap:6px}
 .rail a.ghlink svg{flex:none;vertical-align:middle}
-.dl{margin-top:18px;display:inline-block;font-size:12px;font-family:var(--font-mono);border:1px solid var(--line-strong);padding:5px 10px;border-radius:4px;color:var(--accent-ink);text-decoration:none}
+.dl{margin:18px 0 6px;display:inline-block;font-size:12px;font-family:var(--font-mono);border:1px solid var(--line-strong);padding:5px 10px;border-radius:4px;color:var(--accent-ink);text-decoration:none}
 /* ---- main ---- */
 .main{padding:34px 40px 60px;max-width:1560px}
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:22px}

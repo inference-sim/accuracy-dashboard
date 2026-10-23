@@ -340,6 +340,11 @@ function Overview({
 
       <PointsTable points={selectedPoints} title={pointsTitle} selMissing={selMissing} />
 
+      {/* Every number on this page, per point, with what each one was compared against. */}
+      <a className="dl" href="data/latest/summary.json" download="blis-accuracy-results.json">
+        ⤓ Download all results (JSON)
+      </a>
+
       <details className="about">
         <summary>How this was measured</summary>
         <p>
@@ -379,7 +384,6 @@ function Overview({
         )}
         </div>
         <div className="about-prov"><RunProvenance summary={summary} /></div>
-        <a className="dl" href="data/latest/summary.json" download>⤓ summary.json</a>
       </details>
     </>
   )

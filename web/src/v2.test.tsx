@@ -223,6 +223,17 @@ describe('the match tooltip shows only what differs, in plain words', () => {
   })
 })
 
+describe('the results download', () => {
+  it('sits above "How this was measured", with a plain label', () => {
+    const html = renderToStaticMarkup(<App summary={v2a()} loadError={null} />)
+    const dl = html.indexOf('Download all results (JSON)')
+    expect(dl).toBeGreaterThan(-1)
+    expect(dl).toBeLessThan(html.indexOf('How this was measured'))
+    expect(html).toContain('download="blis-accuracy-results.json"')
+    expect(html).not.toContain('⤓ summary.json')
+  })
+})
+
 describe('run details link InferenceX itself, not its API root', () => {
   it('source links the InferenceX site; the API pull date is plain text', () => {
     const html = renderToStaticMarkup(<App summary={v2a()} loadError={null} />)
