@@ -59,9 +59,9 @@
   },
   "definitions": {
     "reason": {
-      "description": "A reason code, optionally qualified by ':<arg or name>' (e.g. setting_not_modelled:prefill_schedule_interval).",
+      "description": "A reason code, optionally qualified by ':<qualifier>' naming the arg path, input or scenario involved (any non-space text, e.g. setting_not_modelled:prefill_schedule_interval or unclassified_arg:quantization_config.targets.*in_proj).",
       "type": "string",
-      "pattern": "^(custom_build|build_commit_conflict|build_commit_unresolvable|outside_distance|artifact_unmatched|server_log_missing|corpus_changed|conflict|unclassified_arg|setting_not_modelled|setting_differs|required_setting_missing|client_scenario_not_replayable|model_not_in_catalog|hardware_no_coefficients|drafter_not_in_catalog|blis_refused)(:[A-Za-z0-9_.:/=-]+)?$"
+      "pattern": "^(custom_build|build_commit_conflict|build_commit_unresolvable|outside_distance|artifact_unmatched|server_log_missing|corpus_changed|conflict|unclassified_arg|setting_not_modelled|setting_differs|required_setting_missing|client_scenario_not_replayable|model_not_in_catalog|hardware_no_coefficients|drafter_not_in_catalog|blis_refused)(:[^\\s]+)?$"
     },
     "build": {
       "type": "object",
