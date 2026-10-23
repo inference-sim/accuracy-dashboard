@@ -92,6 +92,7 @@
             "label_by_tag",
             "server_log_banner",
             "image_tag",
+            "release_tag",
             null
           ]
         },
