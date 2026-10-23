@@ -3,9 +3,9 @@
  * per concurrency), the leaf view from the mockup. Absolute units in ms (signedprobe emits µs;
  * the orchestrator converts). A missing value renders an em dash, never NaN/blank (RFC B1).
  */
-import { formatMs, formatSignedPct, formatVersion } from '../format'
+import { formatMs, formatSignedPct } from '../format'
 import { Term } from './Term'
-import { ProvenanceTip } from './Provenance'
+import { ProvenanceTip, VersionTip } from './Provenance'
 import type { FlatPoint } from '../aggregate'
 
 interface Props {
@@ -73,7 +73,7 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
           selMissing ? (
             <div className="pts-empty">
               That topology isn’t in this snapshot (it may have aged out, differ by run, or be hidden
-              by the current tier / vLLM-version filter). Pick a row below, or clear the filters.
+              by the current tier). Pick a row below, or switch the tier.
             </div>
           ) : (
             <div className="pts-empty">Expand a model above and pick a deployment to see each measurement next to its prediction.</div>
@@ -91,7 +91,7 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
                 </th>
                 {dated && (
                   <th rowSpan={2} style={{ verticalAlign: 'bottom' }}>
-                    Measured
+                    InferenceX run date
                   </th>
                 )}
                 {withProv && (
@@ -122,12 +122,12 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
                 <tr key={`${p.concurrency}-${i}`}>
                   <td className="mono">{p.concurrency}</td>
                   <td className="mono">
-                    {p.engineVersion ? <span className="ver neutral">{formatVersion(p.engineVersion)}</span> : <span className="marker">—</span>}
+                    {p.engineVersion ? <VersionTip version={p.engineVersion} fidelity={p.fidelity} /> : <span className="marker">—</span>}
                   </td>
                   {dated && <td className="mono">{p.measuredDate ?? <span className="marker">—</span>}</td>}
                   {withProv && (
                     <td className="prov-cell">
-                      <ProvenanceTip fidelity={p.fidelity} measuredDate={p.measuredDate} />
+                      <ProvenanceTip fidelity={p.fidelity} />
                     </td>
                   )}
                   <td className="sep mono">

@@ -14,12 +14,12 @@ import { Dropdown } from './components/Dropdown'
 import { Compare } from './components/Compare'
 import { Headline } from './components/Headline'
 import { Term } from './components/Term'
-import { formatCount, formatVersion } from './format'
+import { formatCount } from './format'
 import type { RunIndex } from './load'
 import { DEFAULT_ROUTE, parseRoute, routeToHash, type RouteState } from './route'
 import { buildRows } from './tree'
 import { nextSort, sortModelKeys, type SortKey, type SortSpec } from './sort'
-import type { Summary } from './types'
+import type { Summary, TierKey } from './types'
 
 interface Picker {
   index: RunIndex | null
@@ -116,7 +116,7 @@ export function App({
         <DevView summary={summary} summaryB={comparing ? summaryB : null} picker={picker}>
           {comparing ? (
             <ErrorBoundary resetKey={route.runB}>
-              <Compare a={summary} b={summaryB!} tier={route.tier} />
+              <Compare a={summary} b={summaryB!} tier={route.tier === 'estimated' ? 'all' : route.tier} />
             </ErrorBoundary>
           ) : (
             <p className="pts-hint">Pick a second run above to see how accuracy changed between them.</p>
@@ -192,37 +192,32 @@ function Overview({
   const allPoints = useMemo(() => flattenPoints(summary), [summary])
   const visible = useMemo(() => applyFilters(allPoints, route), [allPoints, route])
 
-  // Distinct vLLM versions present in the snapshot, for the version dropdown (§4.5: version is a
-  // per-row filter). Sorted; the dropdown offers "all versions" + each of these.
-  const versions = useMemo(
-    () => [...new Set(allPoints.map((p) => p.engineVersion).filter((v): v is string => !!v))].sort(),
-    [allPoints],
-  )
-
   // Effective tier: the default is measured_or_resolved, but if a snapshot has zero
   // measured-or-resolved points (the direct dump path leaves settings resolved, so every point
   // lands in "all") we fall back to the "all" tier rather than show an empty headline. The
   // user's explicit tier click is always honoured; this only rescues the DEFAULT.
+  // 'estimated' is a view over the "all" tier: only the points BLIS estimated, aggregated as
+  // the "all" tier aggregates (none of them is in the strict one). v1 has no such points.
+  const showEstimated = route.tier === 'estimated' && summary.schema_version === 2
   const tierFellBack =
     route.tier === 'measured_or_resolved' &&
     visible.filter((p) => p.tier === 'measured_or_resolved').length === 0 &&
     visible.length > 0
-  const effectiveTier = tierFellBack ? 'all' : route.tier
+  const effectiveTier: TierKey = tierFellBack || route.tier !== 'measured_or_resolved' ? 'all' : 'measured_or_resolved'
+  const inTier = (p: FlatPoint) =>
+    showEstimated ? p.fidelity?.status === 'approximate' : effectiveTier === 'all' || p.tier === 'measured_or_resolved'
 
   // The headline always describes the full latest run under the default view, never the current
   // filter, so the top-line "how accurate is BLIS?" number can't shift under a control (PR #26
   // review). Only the per-model table and the points below respond to the filters.
   const headlinePoints = useMemo(() => applyFilters(allPoints, DEFAULT_ROUTE), [allPoints])
-  const headlineTier =
-    headlinePoints.some((p) => p.tier === 'measured_or_resolved') ? DEFAULT_ROUTE.tier : 'all'
+  const headlineTier: TierKey =
+    headlinePoints.some((p) => p.tier === 'measured_or_resolved') ? 'measured_or_resolved' : 'all'
   const totals = useMemo(() => aggregatePair(headlinePoints), [headlinePoints])
 
   // A row is listed only if it has points in the tier being shown, so the exact tier never shows
   // deployments that are entirely estimated as rows of dashes.
-  const tierPoints = useMemo(
-    () => (effectiveTier === 'all' ? visible : visible.filter((p) => p.tier === 'measured_or_resolved')),
-    [visible, effectiveTier],
-  )
+  const tierPoints = useMemo(() => visible.filter(inTier), [visible, effectiveTier, showEstimated])
   const rows = useMemo(() => buildRows(tierPoints, expanded), [tierPoints, expanded])
 
   // Sort reorders only the model-level rows; children follow their parent.
@@ -254,10 +249,8 @@ function Overview({
   // The selected topology's points, by sweepKey.
   const selectedPoints: FlatPoint[] = useMemo(() => {
     if (!route.sel) return []
-    const tierScoped =
-      effectiveTier === 'all' ? visible : visible.filter((p) => p.tier === 'measured_or_resolved')
-    return tierScoped.filter((p) => p.sweepKey === route.sel)
-  }, [visible, route.sel, effectiveTier])
+    return visible.filter(inTier).filter((p) => p.sweepKey === route.sel)
+  }, [visible, route.sel, effectiveTier, showEstimated])
 
   const selFirst = selectedPoints[0]
   const pointsTitle = selFirst
@@ -308,8 +301,16 @@ function Overview({
           >
             {v2 ? 'exact' : 'measured·resolved'}
           </span>
-          <span className={`clk ${effectiveTier === 'all' ? 'on' : ''}`} onClick={() => update({ tier: 'all', sel: null })}>
-            {v2 ? 'all (including estimations)' : 'all'}
+          {v2 && (
+            <span className={`clk ${showEstimated ? 'on' : ''}`} onClick={() => update({ tier: 'estimated', sel: null })}>
+              estimated
+            </span>
+          )}
+          <span
+            className={`clk ${effectiveTier === 'all' && !showEstimated ? 'on' : ''}`}
+            onClick={() => update({ tier: 'all', sel: null })}
+          >
+            all
           </span>
         </span>
         {tierFellBack && (
@@ -317,19 +318,6 @@ function Overview({
             ({v2 ? 'no exact points yet' : 'no measured·resolved points yet'} — showing all)
           </span>
         )}
-      </span>
-      <span className="flt">
-        vLLM version{' '}
-        <Dropdown
-          className="vllmsel"
-          ariaLabel="Filter by vLLM version"
-          value={typeof route.vllm === 'object' ? `v:${route.vllm.version}` : 'all'}
-          options={[
-            { value: 'all', label: 'all versions' },
-            ...versions.map((v) => ({ value: `v:${v}`, label: formatVersion(v) })),
-          ]}
-          onChange={(v) => update({ vllm: v === 'all' ? 'all' : { version: v.replace(/^v:/, '') } })}
-        />
       </span>
     </div>
 

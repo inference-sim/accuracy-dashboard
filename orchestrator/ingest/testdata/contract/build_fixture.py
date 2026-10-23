@@ -62,16 +62,14 @@ def common_args(seqs, seqs_src, block, gmu, gmu_src):
     ]
 
 
-# Approximations are fixed text per arg (the policy table's), with the upstream issue.
+# Approximations are fixed text per arg (the policy table's).
 APPROX = {
     "attention_config.indexer_kv_dtype": {
         "note": "No Deployment key states the indexer cache dtype, so BLIS prices the default FP8 "
-                "indexer record (132 B/entry) where the run used MXFP4 (68 B).",
-        "upstream": "inference-sim/blis-schemas#57"},
+                "indexer record (132 B/entry) where the run used MXFP4 (68 B)."},
     "attention_config.indexer_sparse_logits": {
         "note": "vLLM's sparse-logits indexer needs the MXFP4 indexer cache; with the FP8 record BLIS "
-                "prices, it's the dense-logits indexer.",
-        "upstream": "inference-sim/blis-schemas#57"},
+                "prices, it's the dense-logits indexer."},
 }
 TIER_BY_STATUS = {"exact": "MEASURED-OR-RESOLVED", "approximate": "ALL (approximate)"}
 

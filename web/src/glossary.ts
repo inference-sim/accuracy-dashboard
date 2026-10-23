@@ -38,8 +38,9 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   tierV2: {
     label: 'tier',
     definition:
-      'Which points are included. “exact” keeps only points where BLIS simulated exactly the configuration that was measured. “all” also includes points where one setting BLIS can’t represent yet was estimated (marked ≈).',
+      'Which points are included. “exact”: BLIS simulated exactly the configuration that was measured. “estimated”: one or more settings BLIS can’t represent yet were estimated (marked ≈). “all”: both.',
   },
+
   coverage: {
     label: 'coverage',
     definition: 'How many points were scored vs. not. Nothing is hidden — unscored points are counted and the reasons shown.',
@@ -47,8 +48,9 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   provenance: {
     label: 'match',
     definition:
-      '✓ exact: BLIS simulated exactly what the run used. ≈ estimated: one setting BLIS can’t represent yet was replaced by the nearest one it can; hover to see which. Estimated points count only in “all (including estimations)”.',
+      '✓ exact: BLIS simulated exactly what the run used. ≈ estimated: one or more settings BLIS can’t represent yet were replaced by the nearest ones it can; hover to see which.',
   },
+
 
 
   diff: {

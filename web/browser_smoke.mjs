@@ -89,20 +89,8 @@ try {
   const ptRows = await page.$$('table.pts tbody tr')
   if (ptRows.length === 0) problems.push('drill-down: points table rendered zero rows after selecting a topology')
 
-  // Exercise the styled dropdown (replaces native <select>): open it, assert the popup listbox
-  // appears, pick the last option, confirm it closes. This is the interactive path SSR can't cover.
-  const ddTrigger = await page.$('.dd-trigger.vllmsel')
-  if (ddTrigger) {
-    await ddTrigger.click()
-    await page.waitForSelector('.dd-list [role="option"]', { timeout: 3000 })
-    const opts = await page.$$('.dd-list .dd-opt')
-    if (opts.length < 1) problems.push('dropdown opened with no options')
-    await opts[opts.length - 1].click()
-    await page.waitForTimeout(150)
-    if (await page.$('.dd-list')) problems.push('dropdown did not close after selection')
-  } else {
-    problems.push('styled vLLM dropdown not found')
-  }
+  // The vLLM version is shown per point, never filtered on: no version dropdown.
+  if (await page.$('.dd-trigger.vllmsel')) problems.push('the removed vLLM version filter is back')
 
   // Exercise a term tooltip (accessible hover/focus popover): focus a term → role=tooltip appears,
   // Esc hides it. Covers the interactive a11y path SSR can't.
@@ -143,6 +131,25 @@ try {
   }
   const title = await page.textContent('.viewhead')
   if (!title || !title.includes('End-to-end accuracy')) problems.push('headline missing')
+
+  // Exercise the styled dropdown (replaces native <select>) on the developer page's run picker:
+  // open it, assert the popup listbox appears, pick the last option, confirm it closes. This is
+  // the interactive path SSR can't cover. With a single retained run the picker is disabled, so
+  // there's nothing to open; it must still render.
+  await page.goto(`${BASE}/#/?view=dev`, { waitUntil: 'networkidle', timeout: 30000 })
+  await page.waitForSelector('.dd-trigger.runsel', { timeout: 15000 }).catch(() => {})
+  const ddTrigger = await page.$('.dd-trigger.runsel')
+  if (!ddTrigger) {
+    problems.push('styled run-picker dropdown not found on the developer page')
+  } else if (await ddTrigger.isEnabled()) {
+    await ddTrigger.click()
+    await page.waitForSelector('.dd-list [role="option"]', { timeout: 3000 })
+    const opts = await page.$$('.dd-list .dd-opt')
+    if (opts.length < 1) problems.push('dropdown opened with no options')
+    await opts[opts.length - 1].click()
+    await page.waitForTimeout(150)
+    if (await page.$('.dd-list')) problems.push('dropdown did not close after selection')
+  }
 } catch (e) {
   problems.push(`navigation: ${e.message}`)
   ok = false

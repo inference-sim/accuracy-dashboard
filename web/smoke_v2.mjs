@@ -70,7 +70,7 @@ try {
   const marks = await page.$$('table.pts .prov-mark')
   if (marks.length !== rows.length) problems.push(`points table: ${rows.length} rows but ${marks.length} provenance marks`)
   const head = await page.textContent('table.pts thead')
-  if (!head.includes('Measured')) problems.push('points table has no Measured column')
+  if (!head.includes('InferenceX run date')) problems.push('points table has no InferenceX run date column')
   await shot('2-points')
 
   // Open a point's provenance tooltip by keyboard focus and read it.

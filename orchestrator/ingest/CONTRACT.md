@@ -51,7 +51,7 @@ A re-measurement of the same recipe and concurrency on another date is a differe
 
 ### `fidelity.jsonl`
 
-`{"point_id": …, <record>}`, one line per scored point, sorted by `point_id`. The record is described by `fidelity.schema.json`, and its shape is explained in Discussion #28 ("Per-point fidelity record"). For a scored point, `status` is `exact` or `approximate`, and there is no `reasons` field (the schema enforces both ways: `not_scored` requires `reasons`, a scored status forbids it). A point is `approximate` exactly when one of its `args` has `match: approximated`: a timing-relevant setting BLIS can't state, scored with what BLIS uses instead. That arg's `blis` is the value BLIS used, its `note` says why (fixed text from the policy table), and `upstream` names the issue that would remove it. A `mapped` arg must name its `blis_field`, a `blis_default` arg its `rule`, an `approximated` arg its `note`, and a `conflict` arg its `values`.
+`{"point_id": …, <record>}`, one line per scored point, sorted by `point_id`. The record is described by `fidelity.schema.json`, and its shape is explained in Discussion #28 ("Per-point fidelity record"). For a scored point, `status` is `exact` or `approximate`, and there is no `reasons` field (the schema enforces both ways: `not_scored` requires `reasons`, a scored status forbids it). A point is `approximate` exactly when one of its `args` has `match: approximated`: a timing-relevant setting BLIS can't state, scored with what BLIS uses instead. That arg's `blis` is the value BLIS used, and its `note` says why (fixed text from the policy table). A `mapped` arg must name its `blis_field`, a `blis_default` arg its `rule`, an `approximated` arg its `note`, and a `conflict` arg its `values`.
 
 ### `facets.json`
 
@@ -74,10 +74,10 @@ A re-measurement of the same recipe and concurrency on another date is a differe
 {"point_id": …, "identity": {…}, "measured_date": …, "model": …, "hardware": …, "precision": …,
  "framework": …, "benchmark_type": …, "conc": …, "image": …,
  "measured": {"ttft_ms": …, "tpot_ms": …}, "reasons": ["<code>[:<qualifier>]", …],
- "notes": [{"reason": "<one of reasons>", "text": "…", "upstream": "owner/repo#N"}, …]}
+ "notes": [{"reason": "<one of reasons>", "text": "…"}, …]}
 ```
 
-One line per point, sorted by `point_id`. `reasons` is sorted and de-duplicated, and each one matches `fidelity.schema.json#/definitions/reason`. `notes` is optional: at most one per reason, sorted by reason, each naming one of the point's own reasons. A note says why the reason applies and what would lift it, with the upstream issue when there is one. Its text is fixed per reason in the policy table, never composed per point, so it stays deterministic. These records are written into `summary.json` v2's `not_scored` list as-is (including `identity`, so the id can be re-derived) and counted in `coverage.not_scored_reasons` by code (the part before `:`). They are never rendered.
+One line per point, sorted by `point_id`. `reasons` is sorted and de-duplicated, and each one matches `fidelity.schema.json#/definitions/reason`. `notes` is optional: at most one per reason, sorted by reason, each naming one of the point's own reasons. A note says why the reason applies. Its text is fixed per reason in the policy table, never composed per point, so it stays deterministic. These records are written into `summary.json` v2's `not_scored` list as-is (including `identity`, so the id can be re-derived) and counted in `coverage.not_scored_reasons` by code (the part before `:`). They are never rendered.
 
 ### `provenance.json`
 

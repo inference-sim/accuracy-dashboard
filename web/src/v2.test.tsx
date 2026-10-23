@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { App } from './App'
 import { validateSummary } from './load'
 import { flattenPoints, intersectByKey, pointKey } from './aggregate'
-import { ProvenanceBody } from './components/Provenance'
+import { ProvenanceBody, VersionBody, VersionTip } from './components/Provenance'
 import { buildRows } from './tree'
 import type { Summary } from './types'
 
@@ -52,7 +52,7 @@ describe('a v2 snapshot renders', () => {
       <App summary={s} loadError={null} initialHash={`#/?sel=${encodeURIComponent(p.sweepKey)}&tier=all`} />,
     )
     expect(errors.join('\n')).toBe('')
-    expect(html).toContain('>Measured<')
+    expect(html).toContain('>InferenceX run date<')
     expect(html).toContain('2026-09-21')
     // one ✓ per exact point in that sweep (3 concurrencies), each focusable with an accessible label
     expect(html.match(/aria-label="exact match"/g)?.length).toBe(3)
@@ -85,19 +85,34 @@ describe('a v2 snapshot renders', () => {
     const { html } = render(
       <App summary={s} loadError={null} initialHash={`#/?sel=${encodeURIComponent(p.sweepKey)}&tier=all`} />,
     )
-    expect(html).not.toContain('>Measured<')
+    expect(html).not.toContain('>InferenceX run date<')
     expect(html).not.toContain('prov-mark')
   })
 })
 
 describe('the tier follows the match record', () => {
-  it('reads exact / all (including estimations) on a v2 snapshot, and keeps the v1 wording on v1', () => {
+  it('reads exact / estimated / all on a v2 snapshot, and keeps the v1 wording on v1', () => {
     const { html } = render(<App summary={v2a()} loadError={null} initialHash="#/" />)
     expect(html).toContain('>exact<')
-    expect(html).toContain('>all (including estimations)<')
+    expect(html).toContain('>estimated<')
+    expect(html).toContain('>all<')
+    expect(html).not.toContain('including estimations')
     expect(html).not.toContain('measured·resolved')
     const old = render(<App summary={v1()} loadError={null} initialHash="#/" />).html
     expect(old).toContain('measured·resolved')
+    expect(old).not.toContain('>estimated<')
+  })
+
+  it('the estimated tier lists only deployments with estimated points, and the headline is unchanged', () => {
+    const s = v2a()
+    const exact = render(<App summary={s} loadError={null} initialHash="#/" />).html
+    const est = render(<App summary={s} loadError={null} initialHash="#/?tier=estimated" />).html
+    const headline = (h: string) => h.match(/<section class="headline"[\s\S]*?<\/section>/)![0]
+    expect(headline(est)).toBe(headline(exact))
+    // the only estimated point is DeepSeek-V4.1-Flash; DeepSeek-V4-Pro (all exact) drops out
+    expect(est).toContain('deepseek-v4.1-flash')
+    expect(est).not.toContain('deepseek-v4-pro')
+    expect(exact).toContain('deepseek-v4-pro')
   })
 
   it('an estimated point is in all only; every exact point is in the exact tier', () => {
@@ -173,18 +188,18 @@ describe('the match tooltip shows only what differs, in plain words', () => {
     // exact: DeepSeek-V4.1-Flash h200 TP8 c1 (its max_num_seqs is BLIS's default); approximate: b200 DEP2
     const p = flattenPoints(v2a()).find((x) =>
       status === 'approximate' ? x.fidelity?.status === 'approximate' : x.gpu === 'h200' && x.topoLabel.includes('tp8'))!
-    return renderToStaticMarkup(<ProvenanceBody fidelity={p.fidelity!} measuredDate={p.measuredDate} />)
+    return renderToStaticMarkup(<ProvenanceBody fidelity={p.fidelity!} />)
   }
 
-  it('an exact point says so in one line, plus any default BLIS filled in and the build distance', () => {
+  it('an exact point says so in one line, plus any default BLIS filled in', () => {
     const html = body('exact')
     expect(html).toContain('Exact match')
     expect(html).toContain('BLIS simulated the exact settings this run used.')
     expect(html).toContain('Max concurrent requests</b>: not recorded by the run, so BLIS used its default (1024)')
-    expect(html).toContain('738 commits older than v0.31.0, the release BLIS models')
+    expect(html).not.toContain('commits')            // the build distance is on the vLLM version
   })
 
-  it('an approximate point names each difference with both sides, and the issue once', () => {
+  it('an approximate point names each difference with both sides, and nothing else', () => {
     const html = body('approximate')
     expect(html).toContain('Estimated')
     // a small table: setting | this run | BLIS, one row per estimated setting
@@ -192,15 +207,45 @@ describe('the match tooltip shows only what differs, in plain words', () => {
     expect(html.match(/role="row"/g)?.length).toBe(1 + 2)   // header + the fixture's 2 estimated settings
     expect(html).toMatch(/Indexer cache format<\/span><span role="cell" class="mono">mxfp4<\/span><span role="cell">fp8/)
     expect(html).toMatch(/Sparse indexer<\/span><span role="cell" class="mono">on<\/span><span role="cell">off/)
-    expect(html.match(/inference-sim\/blis-schemas#57/g)?.length).toBe(1)
-    expect(html).toContain('Counted only in “all (including estimations)”')
+    for (const gone of ['#57', 'blis-schemas', 'can’t represent', 'commits'])
+      expect(html).not.toContain(gone)
   })
 
   it('leaves out everything that matched and all internal names', () => {
     const html = body('approximate')
+    expect(html).not.toContain('measured')
     for (const gone of ['moe_backend', 'engine.', 'router', 'kv cache tokens', 'from server args', 'attention_config', 'ResolveVLLMBatchDefaults'])
       expect(html).not.toContain(gone)
     expect(html.replace(/<[^>]+>/g, '').length).toBeLessThan(400)   // what a reader actually reads
+  })
+})
+
+describe('the vLLM version says how far its build is from the release BLIS models', () => {
+  const tip = (gpu: string) => {
+    const p = flattenPoints(v2a()).find((x) => x.gpu === gpu && x.engineVersion)!
+    return renderToStaticMarkup(<VersionTip version={p.engineVersion!} fidelity={p.fidelity} />)
+  }
+
+  it('a v2 point: the badge is a tooltip trigger with the commit distance', () => {
+    const html = tip('h200')
+    expect(html).toContain('class="ver neutral"')
+    expect(html).toContain('aria-label="vLLM build"')
+    const p = flattenPoints(v2a()).find((x) => x.gpu === 'h200')!
+    expect(renderToStaticMarkup(<VersionBody build={p.fidelity!.build} />)).toContain(
+      'This run’s vLLM build is 738 commits older than v0.31.0, the release BLIS models.')
+  })
+
+  it('a v1 point (no build record) shows the plain badge', () => {
+    const p = flattenPoints(v1()).find((x) => x.engineVersion)!
+    const html = renderToStaticMarkup(<VersionTip version={p.engineVersion!} fidelity={p.fidelity} />)
+    expect(html).toMatch(/^<span class="ver neutral">[^<]+<\/span>$/)
+  })
+
+  it('the points table uses it', () => {
+    const a = v2a()
+    const p = flattenPoints(a).find((x) => x.gpu === 'h200')!
+    const html = renderToStaticMarkup(<App summary={a} loadError={null} initialHash={`#/?tier=all&sel=${encodeURIComponent(p.sweepKey)}`} />)
+    expect(html.slice(html.indexOf('readout pts'))).toContain('aria-label="vLLM build"')
   })
 })
 

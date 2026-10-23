@@ -41,7 +41,6 @@ export interface FidelityArg {
   match: 'exact' | 'mapped' | 'inert' | 'blis_default' | 'approximated' | 'differs' | 'absent_in_blis' | 'unreadable' | 'conflict'
   rule?: string
   note?: string
-  upstream?: string
   occurrences?: number
   values?: unknown[]
 }

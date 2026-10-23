@@ -198,7 +198,7 @@ def test_validator_rejects_a_note_for_a_reason_the_point_does_not_carry():
 def test_validator_rejects_malformed_duplicate_or_unsorted_notes():
     for mutate, expect in (
         (lambda n: n[0].pop("text"), "malformed note"),
-        (lambda n: n[0].update(upstream="blis-schemas 57"), "malformed note"),
+        (lambda n: n[0].update(link="inference-sim/blis-schemas#57"), "malformed note"),
         (lambda n: n.append(dict(n[0])), "one per reason"),
     ):
         d = _copy("run-a")
@@ -293,7 +293,7 @@ def test_an_approximate_point_is_scored_in_the_all_tier_only():
         assert (rec["status"] == "approximate") == bool(approx)
         assert rows[rec["point_id"]]["tier_unbracketed"] == c.TIER_BY_STATUS[rec["status"]]
         for a in approx:
-            assert a["note"] and a["upstream"] == "inference-sim/blis-schemas#57", a
+            assert a["note"] and "upstream" not in a, a
     assert any(r["status"] == "approximate" for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL))
 
 

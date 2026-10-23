@@ -4,14 +4,17 @@
  * the measured run and what BLIS simulated, in plain words:
  *
  *   - settings BLIS couldn't match exactly (approximated), with what each side used;
- *   - settings the run didn't record, which BLIS filled with its own default;
- *   - how far the run's vLLM build is from the release BLIS models.
+ *   - settings the run didn't record, which BLIS filled with its own default.
+ *
+ * How far the run's vLLM build is from the release BLIS models is shown on the point's vLLM
+ * version instead (VersionTip), since it's about the build, not the settings.
  *
  * Everything that matched is summed up in one sentence. The full per-setting record stays in
  * summary.json (point.fidelity) for anyone who wants it. v1 points have no record and render
  * nothing.
  */
 import { Term } from './Term'
+import { formatVersion } from '../format'
 import type { Fidelity, FidelityArg } from '../types'
 
 /** Plain names for settings a reader may see here. Anything else falls back to its own name. */
@@ -26,19 +29,16 @@ const LABEL: Record<string, string> = {
   block_size: 'KV cache block size',
 }
 
-/** What BLIS used, for the placeholder values the record carries for an approximation. */
-const BLIS_SIDE: Record<string, string> = {
-  'catalog default': 'the model’s default',
-  'v0.31.0 selection': 'the default for this GPU',
-}
 
 function label(arg: string): string {
   return LABEL[arg] ?? arg.split('.').slice(-1)[0]!.replace(/_/g, ' ')
 }
 
-/** vLLM's attention-backend enum names, as a reader would say them. An unknown name is shown as
- *  is (lowercased, underscores as spaces) rather than guessed at. */
+/** vLLM enum names (attention backends, packed KV-cache records) as a reader would say them. An
+ *  unknown name is shown as is (lowercased, underscores as spaces) rather than guessed at. */
 const KERNEL: Record<string, string> = {
+  nvfp4_ds_mla: 'default kernel, NVFP4 packed KV cache',
+  fp8_ds_mla: 'default kernel, FP8 packed KV cache',
   FLASHINFER_MLA_SPARSE_DSV41: 'FlashInfer sparse MLA',
   FLASHMLA_MEGA_ATTN_DSV41: 'FlashMLA mega-attention',
   FLASHMLA_SPARSE_DSV41: 'FlashMLA sparse',
@@ -52,7 +52,6 @@ function value(v: unknown): string {
   if (v === false) return 'off'
   if (v == null) return '—'
   const s = String(v)
-  if (BLIS_SIDE[s]) return BLIS_SIDE[s]!
   if (KERNEL[s]) return KERNEL[s]!
   return /^[A-Z0-9_]{12,}$/.test(s) ? s.toLowerCase().replace(/_/g, ' ') : s
 }
@@ -78,52 +77,35 @@ function DiffTable({ args }: { args: FidelityArg[] }) {
   )
 }
 
-export function ProvenanceBody({ fidelity: f, measuredDate }: { fidelity: Fidelity; measuredDate?: string }) {
+export function ProvenanceBody({ fidelity: f }: { fidelity: Fidelity }) {
   const approx = f.args.filter((a) => a.match === 'approximated')
   const defaults = f.args.filter((a) => a.match === 'blis_default')
-  const issues = [...new Set(approx.map((a) => a.upstream).filter((u): u is string => !!u))]
-  const dist = f.build.distance
   const exact = f.status !== 'approximate'
   return (
     <span className="prov-body">
-      <span className="prov-h">
-        {exact ? 'Exact match' : 'Estimated'}
-        {measuredDate && <span className="prov-dim"> · measured {measuredDate}</span>}
-      </span>
+      <span className="prov-h">{exact ? 'Exact match' : 'Estimated'}</span>
       <span className="prov-row">
         {exact
           ? 'BLIS simulated the exact settings this run used.'
           : 'BLIS simulated this run’s settings, except these, which it estimated:'}
       </span>
       {approx.length > 0 && <DiffTable args={approx} />}
-      {issues.length > 0 && (
-        <span className="prov-row prov-dim">
-          BLIS can’t represent {approx.length === 1 ? 'this setting' : 'these settings'} yet ({issues.join(', ')}). Counted
-          only in “all (including estimations)”.
-        </span>
-      )}
       {defaults.map((a) => (
         <span className="prov-row" key={a.arg}>
           <b>{label(a.arg)}</b>: not recorded by the run, so BLIS used its default ({value(a.blis)})
         </span>
       ))}
-      {dist != null && dist !== 0 && (
-        <span className="prov-row prov-dim">
-          vLLM build: {Math.abs(dist).toLocaleString('en-US')} commits {dist > 0 ? 'newer' : 'older'} than{' '}
-          {f.build.ref}, the release BLIS models.
-        </span>
-      )}
     </span>
   )
 }
 
 /** The ⓘ / ≈ trigger for a point's match details; nothing for a v1 point. */
-export function ProvenanceTip({ fidelity, measuredDate }: { fidelity?: Fidelity; measuredDate?: string }) {
+export function ProvenanceTip({ fidelity }: { fidelity?: Fidelity }) {
   if (!fidelity) return null
   const approx = fidelity.status === 'approximate'
   return (
     <Term
-      content={<ProvenanceBody fidelity={fidelity} measuredDate={measuredDate} />}
+      content={<ProvenanceBody fidelity={fidelity} />}
       popClass="term-pop-wide"
       ariaLabel={approx ? 'estimated: what differs' : 'exact match'}
     >
@@ -131,5 +113,30 @@ export function ProvenanceTip({ fidelity, measuredDate }: { fidelity?: Fidelity;
         {approx ? '≈' : '✓'}
       </span>
     </Term>
+  )
+}
+
+/** A point's vLLM version. On a v2 point, hovering it says how far the run's build is from the
+ *  release BLIS models; a v1 point (no build record) shows the plain version. */
+export function VersionTip({ version, fidelity }: { version: string; fidelity?: Fidelity }) {
+  const badge = <span className="ver neutral">{formatVersion(version)}</span>
+  if (fidelity?.build.distance == null) return badge
+  return (
+    <Term content={<VersionBody build={fidelity.build} />} ariaLabel="vLLM build">
+      {badge}
+    </Term>
+  )
+}
+
+export function VersionBody({ build: b }: { build: Fidelity['build'] }) {
+  const d = b.distance ?? 0
+  return (
+    <span className="prov-body">
+      <span className="prov-row">
+        {d === 0
+          ? `This run’s vLLM build is ${b.ref}, the release BLIS models.`
+          : `This run’s vLLM build is ${Math.abs(d).toLocaleString('en-US')} commits ${d > 0 ? 'newer' : 'older'} than ${b.ref}, the release BLIS models.`}
+      </span>
+    </span>
   )
 }

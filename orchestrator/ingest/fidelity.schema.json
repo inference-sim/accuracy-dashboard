@@ -191,11 +191,6 @@
           "description": "For approximated: why, and what BLIS used instead. Fixed text from the policy table, never composed per point.",
           "type": "string",
           "minLength": 1
-        },
-        "upstream": {
-          "description": "For approximated: the upstream issue that would remove the approximation, as owner/repo#number.",
-          "type": "string",
-          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+$"
         }
       },
       "allOf": [
@@ -406,11 +401,6 @@
         "text": {
           "type": "string",
           "minLength": 1
-        },
-        "upstream": {
-          "description": "The upstream issue tracking the fix, as owner/repo#number.",
-          "type": "string",
-          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+$"
         }
       }
     }

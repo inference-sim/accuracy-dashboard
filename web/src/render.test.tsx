@@ -10,7 +10,6 @@ import { fileURLToPath } from 'node:url'
 import { App } from './App'
 import { validateSummary } from './load'
 import { flattenPoints, aggregatePair } from './aggregate'
-import { applyFilters } from './filter'
 import type { Summary } from './types'
 
 function loadFixture(): Summary {
@@ -195,39 +194,13 @@ describe('App renders the real CI-shaped snapshot', () => {
   })
 })
 
-describe('client-side aggregation keeps filters honest (RFC B3)', () => {
-  it('a specific-version filter isolates that version; "all" shows every version', () => {
+describe('the vLLM version is shown, never filtered on', () => {
+  it('has no version filter, and an old vllm= link shows every point', () => {
     const summary = loadFixture()
-    const all = flattenPoints(summary)
-    const version = all.find((p) => p.engineVersion)!.engineVersion!
-    const allVersions = applyFilters(all, { view: 'overview', run: null, runB: null, sel: null, tier: 'all', vllm: 'all', multinode: false })
-    const pinned = applyFilters(all, { view: 'overview', run: null, runB: null, sel: null, tier: 'all', vllm: { version }, multinode: false })
-    expect(pinned.length).toBeLessThanOrEqual(allVersions.length)
-    expect(pinned.every((p) => p.engineVersion === version)).toBe(true)
-  })
-
-  it('a version filter changes the TABLE but never the headline (PR #26 review) — T-b', () => {
-    // The headline answers "how accurate is BLIS?" for the full latest run, so a filter must not
-    // move it; the per-model table below is what the filter acts on.
-    const summary = loadFixture()
-    const all = flattenPoints(summary)
-    // A version only ONE model carries, so the filtered table has a single model row whose mean we
-    // can check by hand. Found from the data rather than hard-coded, and asserted to exist.
-    const versions = [...new Set(all.map((p) => p.engineVersion).filter((v): v is string => !!v))]
-    const version = versions.find((v) => new Set(all.filter((p) => p.engineVersion === v).map((p) => p.model)).size === 1)
-    expect(version).toBeDefined()
-    const stats = (html: string) => html.slice(html.indexOf('class="stats"'), html.indexOf('class="context"'))
-    const table = (html: string) => html.slice(html.indexOf('<tbody'), html.indexOf('</tbody>'))
     const base = renderToStaticMarkup(<App summary={summary} loadError={null} initialHash="#/?tier=all" />)
-    const hash = `#/?tier=all&vllm=${encodeURIComponent('v:' + version)}`
-    const pinned = renderToStaticMarkup(<App summary={summary} loadError={null} initialHash={hash} />)
-    expect(stats(pinned)).toBe(stats(base))
-    expect(table(pinned)).not.toBe(table(base))
-    // ...and the table shows the hand-computed mean over just that version's points.
-    const errs = all.filter((p) => p.engineVersion === version).map((p) => p.errTtft).filter((e): e is number => e != null)
-    const expected = errs.reduce((acc, e) => acc + Math.abs(e), 0) / errs.length
-    const pct = (v: number) => `${v.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
-    expect(table(pinned)).toContain(pct(expected))
+    expect(base).not.toContain('Filter by vLLM version')
+    const old = renderToStaticMarkup(<App summary={summary} loadError={null} initialHash="#/?tier=all&vllm=v%3A0.29.0" />)
+    expect(old).toBe(base)
   })
 
   it('shows the error direction with an arrow, not a good/bad colour (PR #26 review)', () => {
