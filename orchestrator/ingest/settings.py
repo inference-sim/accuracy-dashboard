@@ -43,6 +43,9 @@ SOURCES = ("launch_config", "args", "resolved_config", "engine_line", "api_row",
 ENGINE_LINES = (
     (re.compile(r"Setting kv cache block size to (\d+) for"), ("block_size", int)),
     (re.compile(r"Desired GPU memory utilization is \(([0-9.]+), [0-9.]+ GiB\)"), ("gpu_memory_utilization", pyrepr.Float)),
+    # Builds that print no "Desired …" line (e.g. v0.25) state it in the CUDA-graph profiling
+    # note: "The current --gpu-memory-utilization=0.9200 is equivalent to …".
+    (re.compile(r"The current --gpu-memory-utilization=([0-9.]+) is equivalent to"), ("gpu_memory_utilization", pyrepr.Float)),
     (re.compile(r"Chunked prefill is enabled with max_num_batched_tokens=(\d+)"), ("max_num_batched_tokens", int)),
 )
 _RUST_FRONTEND = re.compile(r"Launching Rust frontend")

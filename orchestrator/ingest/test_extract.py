@@ -255,6 +255,15 @@ dsv4-fp4-h200-vllm:
     assert rc.runner_hardware("cluster:b200-dgxc") == rc.runner_hardware("b200-multinode") == "b200"
 
 
+def test_gpu_memory_utilization_is_read_from_the_profiling_note_when_no_desired_line():
+    # vLLM v0.25 prints no "Desired GPU memory utilization" line; its CUDA-graph note states it.
+    log = ("(Worker_TP0 pid=1) INFO [gpu_worker.py:481] CUDA graph memory profiling is enabled (default since "
+           "v0.21.0). The current --gpu-memory-utilization=0.9200 is equivalent to --gpu-memory-utilization=0.8794 "
+           "without CUDA graph memory profiling.")
+    r = st.read_engine_lines(log + "\n" + log.replace("TP0", "TP1"))
+    assert [str(v) for v in r.values["gpu_memory_utilization"]] == ["0.9200"] * 2
+
+
 def test_moe_backend_is_mapped_to_its_blis_field():
     c = _classify(_log("'kernel_config': KernelConfig(moe_backend='deep_gemm_mega_moe')"))
     assert c.mapped["engine.moe_backend"][1] == "deep_gemm_mega_moe"
@@ -540,10 +549,15 @@ def test_what_blis_used_for_an_estimated_setting_is_read_from_blis():
         # An indexer record no vLLM layout names, or two that differ: refused, never named.
         for caches in ([{"kind": "index", "bytes_per_entry": 100, "head_dim": 128}],
                        [{"kind": "index", "bytes_per_entry": 132, "head_dim": 128},
-                        {"kind": "index", "bytes_per_entry": 68, "head_dim": 128}], []):
+                        {"kind": "index", "bytes_per_entry": 68, "head_dim": 128}]):
             sc.blis_resolution = lambda env, d, f, c=caches: {**res, "caches": c}
             assert sc.fill_blis_side(args(), None, Path("."), "s.yaml", "m") == \
                 ["setting_differs:attention_config.indexer_kv_dtype"], caches
+        # A model with no sparse indexer (Kimi): the setting changes nothing; inert, not estimated.
+        sc.blis_resolution = lambda env, d, f: {**res, "caches": [{"kind": "kv", "bytes_per_entry": 576, "head_dim": 576}]}
+        a = args()[1:]
+        assert sc.fill_blis_side(a, None, Path("."), "s.yaml", "m") == [] and a[0]["match"] == "inert"
+        assert not sc._estimated(a)
         # BLIS refuses the scenario: its refusal is the reason, never a crash.
         sc.blis_resolution = lambda env, d, f: "blis_refused:quantization_mxfp8_is_not_one_this_kernel_prices"
         assert "blis_refused:quantization_mxfp8_is_not_one_this_kernel_prices" in sc.fill_blis_side(

@@ -268,6 +268,12 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     (sdir / f"{name}.yaml").write_text(text)
     dep = _parse_back(text)
     args = c.args + b.defaults_used
+    if o.reasons:
+        # Already not scored. BLIS is asked only about a point nothing else refused: its
+        # verdict on a known gap (e.g. a drafter the catalog doesn't describe) would restate
+        # that gap as a second reason and count the point twice.
+        o.reasons = sorted(set(o.reasons))
+        return o
     o.reasons += kernel_defaults(args, b.kernel_resolves, env, sdir, f"{name}.yaml")
     if b.kernel_resolves:
         # State what the kernel resolved, so every consumer (signedprobe's harness requires a
@@ -287,7 +293,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         return o
 
     if not agentic:
-        return score_single_turn(o, entry, env, work, sdir, name, text, dep, args, log, c.approximated)
+        return score_single_turn(o, entry, env, work, sdir, name, text, dep, args, log, _estimated(args))
 
     # ---- the replay
     metrics_path = work / "metrics" / f"{pid}.json"
@@ -328,7 +334,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         return o
 
     m = row.get("metrics") or {}
-    status = point_status(c.approximated, entry["build"])
+    status = point_status(_estimated(args), entry["build"])
     o.fidelity = {"status": status, "build": entry["build"], "args": args,
                   "resolved": resolved_kv(log, metrics), "replay": r.record(env.corpus["sha256"]),
                   "blis_kernel_provenance": metrics.get("kernel_provenance")}
@@ -413,8 +419,13 @@ def fill_blis_side(args: list, env, scenarios: Path, scenario: str, model: str) 
                     reasons.append(res)
             if isinstance(res, str):
                 continue
-            names = {sp.index_record_format(c["bytes_per_entry"], c.get("head_dim", 0))
-                     for c in res.get("caches", []) if c["kind"] == "index"}
+            index = [c for c in res.get("caches", []) if c["kind"] == "index"]
+            if not index:
+                # The model has no sparse indexer (Kimi, Qwen ...): vLLM reads the setting
+                # nowhere, so it changes nothing BLIS prices. Recorded, not estimated.
+                a.update(blis=None, match="inert", note="The model has no sparse indexer, so this setting has no effect.")
+                continue
+            names = {sp.index_record_format(c["bytes_per_entry"], c.get("head_dim", 0)) for c in index}
             a["blis"] = names.pop() if len(names) == 1 else None
         if a["blis"] is None:
             reasons.append(f"setting_differs:{a['arg']}")
@@ -548,6 +559,12 @@ def _probe_error(stderr: str) -> str:
         if line.startswith("first run error") or line.startswith("no latency observed"):
             return line.split(": ", 1)[-1]
     return stderr
+
+
+def _estimated(args: list) -> bool:
+    """Whether BLIS estimated any setting, from the final per-setting records (an estimate that
+    turned out to change nothing, e.g. an indexer setting on a model with no indexer, is inert)."""
+    return any(a.get("match") == "approximated" for a in args)
 
 
 def point_status(approximated: bool, build: dict) -> str:
