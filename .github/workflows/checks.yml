@@ -56,6 +56,8 @@ jobs:
           cmp /tmp/v2a.json web/testdata/render-fixture.v2.summary.json
           cmp /tmp/v2b.json web/testdata/render-fixture.v2b.summary.json
           python3 orchestrator/validate_summary_v2.py web/testdata/render-fixture.v2.summary.json web/testdata/render-fixture.v2b.summary.json
+      - name: vLLM build resolution + commit-distance gate (#28; not used by the nightly)
+        run: python3 orchestrator/ingest/test_build.py
 
   web:
     runs-on: ubuntu-latest
