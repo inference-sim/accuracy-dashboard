@@ -66,7 +66,7 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
     <>
       <div className="tbl-title" style={{ marginTop: 26 }}>
         {title}{' '}
-        <span className="facet">measured vs predicted per concurrency · vLLM build · absolute units · error %</span>
+        <span className="facet">measured vs predicted per concurrency · absolute units · error %</span>
       </div>
       <div className="tscroll">
         {sorted.length === 0 ? (
