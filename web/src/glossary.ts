@@ -39,6 +39,11 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     label: 'coverage',
     definition: 'How many points were scored vs. not. Nothing is hidden — unscored points are counted and the reasons shown.',
   },
+  provenance: {
+    label: 'match',
+    definition:
+      'How closely BLIS’s input matches the measured run. ⓘ: exact — every setting the run recorded was given to BLIS. ≈: approximate — a quantized format BLIS can’t state yet was replaced by the nearest one it supports; these points count only in the “all” tier. Hover a mark for the details.',
+  },
   diff: {
     label: 'Δ (newer − older)',
     definition: 'The newer run minus the older run, over the points both runs scored. Green means the newer run is more accurate; red means it got worse.',

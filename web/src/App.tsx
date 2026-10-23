@@ -280,7 +280,7 @@ function Overview({
         points={headlinePoints.length}
         models={summary.matrix.length}
         blisRelease={summary.provenance?.blis?.release ?? null}
-        dataDate={summary.provenance?.ground_truth?.release_tag?.replace('db-dump/', '') ?? null}
+        dataDate={summary.provenance?.ground_truth?.release_tag?.replace(/^(db-dump\/|api-)/, '') ?? null}
       />
 
       <h2 className="sectitle">Accuracy by model</h2>

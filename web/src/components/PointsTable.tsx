@@ -5,6 +5,7 @@
  */
 import { formatMs, formatSignedPct, formatVersion } from '../format'
 import { Term } from './Term'
+import { ProvenanceTip } from './Provenance'
 import type { FlatPoint } from '../aggregate'
 
 interface Props {
@@ -41,8 +42,15 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
   // in order. The version is where the repeated measured values come from (same deployment,
   // different vLLM build), so it earns its own column here.
   const sorted = [...points].sort(
-    (a, b) => a.concurrency - b.concurrency || (a.engineVersion ?? '').localeCompare(b.engineVersion ?? ''),
+    (a, b) =>
+      a.concurrency - b.concurrency ||
+      (a.engineVersion ?? '').localeCompare(b.engineVersion ?? '') ||
+      (a.measuredDate ?? '').localeCompare(b.measuredDate ?? ''),
   )
+  // v2 snapshots date each measurement and carry its provenance; v1 has neither, and then the
+  // table is exactly as before.
+  const dated = sorted.some((p) => p.measuredDate)
+  const withProv = sorted.some((p) => p.fidelity)
   // Surface why shape is absent for this sweep, if the scorer recorded a reason — previously
   // shapeReason was carried on every point but never shown (PR #3 review UI-c).
   const shapeReason = sorted.find((p) => p.shapeReason)?.shapeReason ?? null
@@ -81,6 +89,16 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
                 <th rowSpan={2} className="keepcase" style={{ verticalAlign: 'bottom' }}>
                   vLLM
                 </th>
+                {dated && (
+                  <th rowSpan={2} style={{ verticalAlign: 'bottom' }}>
+                    Measured
+                  </th>
+                )}
+                {withProv && (
+                  <th rowSpan={2} style={{ verticalAlign: 'bottom' }}>
+                    <Term name="provenance" />
+                  </th>
+                )}
                 <th className="sep" colSpan={3}>
                   mean <Term name="ttft" /> (ms)
                 </th>
@@ -106,6 +124,12 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
                   <td className="mono">
                     {p.engineVersion ? <span className="ver neutral">{formatVersion(p.engineVersion)}</span> : <span className="marker">—</span>}
                   </td>
+                  {dated && <td className="mono">{p.measuredDate ?? <span className="marker">—</span>}</td>}
+                  {withProv && (
+                    <td className="prov-cell">
+                      <ProvenanceTip fidelity={p.fidelity} measuredDate={p.measuredDate} />
+                    </td>
+                  )}
                   <td className="sep mono">
                     <Cell v={p.measTtftMs} kind="ms" />
                   </td>
@@ -146,9 +170,10 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
           Each value is a per-run <b>arithmetic mean over the benchmark's requests</b> (vLLM
           <span className="mono"> calculate_metrics</span>): mean TTFT over all main-phase requests;
           mean TPOT = mean of (latency − TTFT) ⁄ (output_len − 1) over requests with &gt;1 output token.
-          Not a median or tail — p99 is out of scope for v0.1.0. Measured means come from the
-          InferenceX dump; predicted means from BLIS replaying the same requests, same definition.
-          Repeated rows at one concurrency are the same deployment measured on different vLLM builds.
+          Not a median or tail — p99 is out of scope for v0.1.0. Measured means come from{' '}
+          {dated ? 'InferenceX' : 'the InferenceX dump'}; predicted means from BLIS replaying the same
+          requests, same definition. Repeated rows at one concurrency are the same deployment measured
+          on different vLLM builds{dated ? ' or dates' : ''}.
         </p>
       )}
     </>

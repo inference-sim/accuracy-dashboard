@@ -11,7 +11,7 @@
  * concurrency and excludes the anchor; every level averages |individual point errors|, never
  * child-node means.
  */
-import type { Metric, MetricBlock, MetricBlockPair, Summary, TierKey } from './types'
+import type { Fidelity, Metric, MetricBlock, MetricBlockPair, Summary, TierKey } from './types'
 
 /** A leaf point flattened out of the tree with its full ancestry, for filtering + regrouping. */
 export interface FlatPoint {
@@ -42,6 +42,9 @@ export interface FlatPoint {
   shapeReason: string | null
   /** Stable identity across snapshots for row-select + same-points work. */
   sweepKey: string
+  /** v2 only: when the point was measured, and what the run did versus what BLIS was given. */
+  measuredDate?: string
+  fidelity?: Fidelity
 }
 
 /** Flatten the whole matrix into leaf points carrying their ancestry. */
@@ -79,6 +82,8 @@ export function flattenPoints(summary: Summary): FlatPoint[] {
               shapeTpot: p.shape?.tpot ?? null,
               shapeReason: p.shape_reason ?? null,
               sweepKey: `${m.model}|${w.label}|${g.label}|${t.label}`,
+              ...(p.measured_date ? { measuredDate: p.measured_date } : {}),
+              ...(p.fidelity ? { fidelity: p.fidelity } : {}),
             })
           }
         }
@@ -124,7 +129,10 @@ export function aggregatePair(points: FlatPoint[]): MetricBlockPair {
  * see PointsTable). Two runs' points are "the same point" iff this key matches.
  */
 export function pointKey(p: FlatPoint): string {
-  return `${p.sweepKey}|${p.concurrency}|${p.engineVersion ?? ''}`
+  // v2 points are re-measurable: a later measurement of the same recipe is a different point,
+  // so the date is part of the key. v1 points carry no date and keep their key unchanged.
+  const base = `${p.sweepKey}|${p.concurrency}|${p.engineVersion ?? ''}`
+  return p.measuredDate ? `${base}|${p.measuredDate}` : base
 }
 
 /**

@@ -114,6 +114,21 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
     <span className={`cmp-tag ${slot === 'A' ? 'cmp-a' : 'cmp-b'}`}>{slot}</span>
   )
 
+  // A v1 snapshot (the db-dump pipeline) and a v2 one (the API ingest) identify points
+  // differently and drew their settings from different sources, so a Δ between them would
+  // mix two methods. Refused rather than shown (#30).
+  const ingestA = a.provenance?.ingest ?? 'db-dump'
+  const ingestB = b.provenance?.ingest ?? 'db-dump'
+  if (ingestA !== ingestB) {
+    return (
+      <div className="pts-empty" role="note">
+        These two runs came from different ingests ({ingestA === 'api' ? 'the InferenceX API' : 'the database dump'} and{' '}
+        {ingestB === 'api' ? 'the InferenceX API' : 'the database dump'}), so their measurements aren’t comparable point
+        for point. Pick two runs from the same ingest.
+      </div>
+    )
+  }
+
   return (
     <>
       <div className="cmp-head">
@@ -139,7 +154,10 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
             Change in average error, newer minus older, over the {formatCount(shared)} measurements
             scored by both runs. Lower error is better.
             {(onlyA > 0 || onlyB > 0) && (
-              <> {formatCount(onlyA + onlyB)} measurements only one run scored are left out.</>
+              <>
+                {' '}Comparing {formatCount(shared)} of {formatCount(shared + Math.max(onlyA, onlyB))} points:{' '}
+                {formatCount(onlyA + onlyB)} measurements only one run scored are left out.
+              </>
             )}
             {tierFellBack && <> Showing all measurements (none are measured·resolved yet).</>}
           </p>

@@ -205,6 +205,20 @@ thead tr.col .term-wrap { text-transform: none; }
   border-radius: 6px; padding: 7px 10px; box-shadow: 0 6px 20px rgba(23,28,26,0.14);
   text-transform: none; letter-spacing: normal; pointer-events: none; }
 
+/* ---- per-point provenance (v2 snapshots, #30): ⓘ exact / ≈ approximate, details on hover/focus ---- */
+.term-pop.term-pop-wide { max-width: 440px; }
+.prov-mark { font-size: 12px; color: var(--accent); cursor: help; }
+.prov-mark.approx { color: var(--warn-ink); font-weight: 700; }
+.prov-cell { text-align: center; }
+.prov-inrow { margin-left: 6px; }
+.prov-body { display: block; }
+.prov-h { display: block; font-weight: 600; margin-bottom: 4px; }
+.prov-sec { display: block; margin-top: 6px; }
+.prov-sec > b { display: block; font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.prov-row { display: block; }
+.prov-row .mono, .prov-h .mono { font-family: var(--font-mono); font-size: 11px; }
+.prov-dim { color: var(--muted); }
+
 /* ---- A-vs-B compare view (RFC discussion #2 point 3) ---- */
 .cmp-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 16px;
   font-size: 12.5px; color: var(--muted); }
