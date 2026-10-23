@@ -217,7 +217,13 @@ function Overview({
     headlinePoints.some((p) => p.tier === 'measured_or_resolved') ? DEFAULT_ROUTE.tier : 'all'
   const totals = useMemo(() => aggregatePair(headlinePoints), [headlinePoints])
 
-  const rows = useMemo(() => buildRows(visible, expanded), [visible, expanded])
+  // A row is listed only if it has points in the tier being shown, so the exact tier never shows
+  // deployments that are entirely estimated as rows of dashes.
+  const tierPoints = useMemo(
+    () => (effectiveTier === 'all' ? visible : visible.filter((p) => p.tier === 'measured_or_resolved')),
+    [visible, effectiveTier],
+  )
+  const rows = useMemo(() => buildRows(tierPoints, expanded), [tierPoints, expanded])
 
   // Sort reorders only the model-level rows; children follow their parent.
   const orderedRows = useMemo(() => {
@@ -298,11 +304,11 @@ function Overview({
               points the view falls back to "all", so "all" is highlighted then (#23). */}
           <span
             className={`clk ${effectiveTier === 'measured_or_resolved' ? 'on' : ''}`}
-            onClick={() => update({ tier: 'measured_or_resolved' })}
+            onClick={() => update({ tier: 'measured_or_resolved', sel: null })}
           >
             {v2 ? 'exact' : 'measured·resolved'}
           </span>
-          <span className={`clk ${effectiveTier === 'all' ? 'on' : ''}`} onClick={() => update({ tier: 'all' })}>
+          <span className={`clk ${effectiveTier === 'all' ? 'on' : ''}`} onClick={() => update({ tier: 'all', sel: null })}>
             {v2 ? 'all (including estimations)' : 'all'}
           </span>
         </span>

@@ -12,6 +12,7 @@ import { App } from './App'
 import { validateSummary } from './load'
 import { flattenPoints, intersectByKey, pointKey } from './aggregate'
 import { ProvenanceBody } from './components/Provenance'
+import { buildRows } from './tree'
 import type { Summary } from './types'
 
 const load = (name: string): Summary =>
@@ -102,6 +103,27 @@ describe('the tier follows the match record', () => {
   it('an estimated point is in all only; every exact point is in the exact tier', () => {
     for (const p of flattenPoints(v2a()))
       expect(p.tier).toBe(p.fidelity!.status === 'approximate' ? 'all' : 'measured_or_resolved')
+  })
+})
+
+describe('the tier controls what the table lists', () => {
+  it('the exact tier lists no estimated-only deployment (no rows of dashes)', () => {
+    const s = v2a()
+    // expand everything: model, workload and every GPU
+    const pts = flattenPoints(s)
+    const ids = new Set<string>()
+    for (const p of pts) {
+      ids.add(`m:${p.model}`)
+      ids.add(`m:${p.model}|w:${p.workloadLabel}`)
+      ids.add(`m:${p.model}|w:${p.workloadLabel}|g:${p.gpu}`)
+    }
+    const estimatedOnly = [...new Set(pts.map((p) => p.sweepKey))].filter((k) =>
+      pts.filter((p) => p.sweepKey === k).every((p) => p.fidelity!.status === 'approximate'))
+    expect(estimatedOnly.length).toBeGreaterThan(0)
+    const exact = buildRows(pts.filter((p) => p.tier === 'measured_or_resolved'), ids)
+    for (const k of estimatedOnly) expect(exact.some((r) => r.sweepKey === k)).toBe(false)
+    const all = buildRows(pts, ids)
+    for (const k of estimatedOnly) expect(all.some((r) => r.sweepKey === k)).toBe(true)
   })
 })
 
