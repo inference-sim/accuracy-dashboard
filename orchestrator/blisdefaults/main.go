@@ -12,7 +12,11 @@
 //	    (kernel.Resolution), including every override of a requested value with BLIS's reason.
 //	    The extractor records these as what BLIS used for a setting the run stated but BLIS
 //	    can't (e.g. the cache record its attention backend serves).
-//	    Prints {"overrides":[{"field","requested","resolved","reason"}…],"tp":…,"dp":…,"ep":…}.
+//	    Also every value the kernel supplied itself because the scenario stated none (its
+//	    assumptions, e.g. block_size), which the extractor uses only when no source a run left
+//	    records that setting.
+//	    Prints {"assumptions":[{"name","value","reason"}…],"overrides":[{"field","requested","resolved","reason"}…],
+//	    "tp":…,"dp":…,"ep":…}.
 package main
 
 import (
@@ -21,7 +25,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
+	latencykernel "github.com/inference-sim/blis-latency-kernel"
 	"github.com/inference-sim/inference-sim/sim/kernelmodel"
 )
 
@@ -48,9 +54,17 @@ type Override struct {
 	Resolved  string `json:"resolved"`
 }
 
+// Assumption is a value the kernel supplied because the scenario stated none.
+type Assumption struct {
+	Name   string `json:"name"`
+	Reason string `json:"reason"`
+	Value  string `json:"value"`
+}
+
 // Resolution is what BLIS resolved for a scenario.
 type Resolution struct {
-	DP        int        `json:"dp"`
+	Assumptions []Assumption `json:"assumptions"`
+	DP          int          `json:"dp"`
 	EP        int        `json:"ep"`
 	Overrides []Override `json:"overrides"`
 	TP        int        `json:"tp"`
@@ -62,8 +76,18 @@ func ResolveScenario(r kernelmodel.Repos, scenario string) (Resolution, error) {
 	if err != nil {
 		return Resolution{}, err
 	}
-	res := m.Kernel().Resolved()
-	out := Resolution{TP: res.TensorParallel(), DP: res.DataParallel(), EP: res.ExpertParallel(), Overrides: []Override{}}
+	k := m.Kernel()
+	res := k.Resolved()
+	out := Resolution{TP: res.TensorParallel(), DP: res.DataParallel(), EP: res.ExpertParallel(),
+		Overrides: []Override{}, Assumptions: []Assumption{}}
+	for _, o := range k.Provenance() {
+		// The kernel's own assumptions carry "<value>: <reason>" as their scope.
+		if o.Set != latencykernel.KernelAssumptionSet {
+			continue
+		}
+		value, reason, _ := strings.Cut(o.Scope, ": ")
+		out.Assumptions = append(out.Assumptions, Assumption{Name: o.Name, Value: value, Reason: reason})
+	}
 	for _, o := range res.Overrides {
 		out.Overrides = append(out.Overrides, Override{Field: o.Field, Requested: fmt.Sprint(o.Requested),
 			Resolved: fmt.Sprint(o.Resolved), Reason: o.Reason})

@@ -54,6 +54,11 @@ class Env:
     vllm_defaults_sha256: str = ""
     catalog_obj: sp.Catalog | None = None
     parts: set = field(default_factory=set)
+    # Single-turn: inference-sim's signedprobe at the same tag, and the benchmark workloads it
+    # replays (its testdata/inferencex-workloads/seed0.json: InferenceX's request lengths per
+    # (isl, osl, concurrency)).
+    signedprobe: str = ""
+    single_turn_workloads: set = field(default_factory=set)   # {(isl, osl, conc)}
 
 
 def _read(point_dir: Path, files: dict, role: str) -> bytes | None:
@@ -239,7 +244,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
             elif r.corpus_repo != env.corpus["dataset"]:
                 o.reasons.append(f"corpus_changed:{r.corpus_repo}")
     else:
-        o.reasons.append("blis_refused:single_turn_scorer_pending")
+        o.reasons += single_turn_replayable(row, env)
 
     if sup.model is None or row["hardware"] not in cat.hardware:
         o.reasons = sorted(set(o.reasons))
@@ -257,12 +262,26 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     (sdir / f"{name}.yaml").write_text(text)
     dep = _parse_back(text)
     args = c.args + b.defaults_used
+    o.reasons += kernel_defaults(args, b.kernel_resolves, env, sdir, f"{name}.yaml")
+    if b.kernel_resolves:
+        # State what the kernel resolved, so every consumer (signedprobe's harness requires a
+        # stated block_size) runs the same value the kernel would have assumed.
+        eng = b.deployment["pools"][0]["engine"]
+        for a in args:
+            if a["arg"] in b.kernel_resolves and a["match"] == "blis_default":
+                eng[a["arg"]] = a["blis"]
+        text = st.to_yaml(b, header)
+        (sdir / f"{name}.yaml").write_text(text)
+        dep = _parse_back(text)
     o.reasons += fill_blis_side(args, env, sdir, f"{name}.yaml", sup.model)
     o.reasons += _diff_args(args, dep, b)
     args.sort(key=lambda a: a["arg"])
     o.reasons = sorted(set(o.reasons))
     if o.reasons:
         return o
+
+    if not agentic:
+        return score_single_turn(o, entry, env, work, sdir, name, text, dep, args, log, c.approximated)
 
     # ---- the replay
     metrics_path = work / "metrics" / f"{pid}.json"
@@ -335,6 +354,28 @@ def blis_resolution(env, scenarios: Path, scenario: str) -> dict | str:
     return json.loads(out.stdout)
 
 
+def kernel_defaults(args: list, paths: list, env, scenarios: Path, scenario: str) -> list[str]:
+    """For each required setting no source recorded and the scenario leaves to BLIS, record the
+    value BLIS's kernel resolved, read from BLIS (blisdefaults -resolve). If BLIS reports none,
+    or refuses the scenario, the point isn't scored."""
+    if not paths:
+        return []
+    res = blis_resolution(env, scenarios, scenario)
+    if isinstance(res, str):
+        return [res]
+    got = {a["name"]: a for a in res.get("assumptions", [])}
+    reasons = []
+    for path in paths:
+        a = got.get(path)
+        if a is None:
+            reasons.append(f"required_setting_missing:{path}")
+            continue
+        v = int(a["value"]) if a["value"].isdigit() else a["value"]
+        args.append({"arg": path, "measured": None, "source": "blis_default", "blis": v,
+                     "match": "blis_default", "rule": f"BLIS kernel: {a['reason']}"[:300]})
+    return reasons
+
+
 def fill_blis_side(args: list, env, scenarios: Path, scenario: str, model: str) -> list[str]:
     """For each approximated setting, record what BLIS actually used, read from BLIS -- never a
     placeholder. A setting whose source BLIS can't report refuses the point."""
@@ -360,6 +401,135 @@ def fill_blis_side(args: list, env, scenarios: Path, scenario: str, model: str) 
         if a["blis"] is None:
             reasons.append(f"setting_differs:{a['arg']}")
     return reasons
+
+
+def single_turn_replayable(row: dict, env) -> list[str]:
+    """signedprobe replays InferenceX's single-turn benchmark from its own request-length
+    fixture; a (isl, osl, concurrency) the fixture doesn't hold can't be replayed."""
+    try:
+        key = (int(row["isl"]), int(row["osl"]), int(row["conc"]))
+    except (KeyError, TypeError, ValueError):
+        return ["required_setting_missing:replay.isl_osl"]
+    if key not in env.single_turn_workloads:
+        return [f"client_scenario_not_replayable:single_turn_{key[0]}:{key[1]}_c{key[2]}"]
+    return []
+
+
+def _single_turn_label(isl: int, osl: int) -> str:
+    k = lambda n: f"{n // 1024}k" if n % 1024 == 0 else str(n)
+    return f"{k(isl)}{k(osl)}"
+
+
+# The engine fields signedprobe sets on the scenario it runs (harness.applyPointConfig): each is
+# passed as the scenario we wrote states it, so signedprobe runs exactly that scenario and never
+# substitutes its own vLLM resolution for one of them.
+_PROBE_FIELDS = (("max_num_seqs", "max_num_seqs"), ("max_num_batched_tokens", "max_num_batched_tokens"),
+                 ("max_model_len", "max_model_len"), ("block_size", "block_size"),
+                 ("enable_prefix_caching", "enable_prefix_caching"),
+                 ("gpu_memory_utilization", "gpu_memory_utilization"),
+                 ("max_cudagraph_capture_size", "max_cudagraph_capture_size"))
+
+
+def single_turn_inputs(row: dict, dep: dict, scenario_file: str) -> tuple[dict, dict, dict] | list[str]:
+    """signedprobe's three inputs for one point: a one-sweep corpus, the measured means
+    (absolutes) and the engine settings, all keyed by the scenario file and workload label."""
+    pool = dep["pools"][0]
+    eng, par = pool["engine"], pool["parallel"]
+    if "speculative" in eng:
+        # signedprobe passes no acceptance length to blis replay, so a drafter can't be priced.
+        return ["client_scenario_not_replayable:single_turn_speculative"]
+    m = row.get("metrics") or {}
+    try:
+        ttft_us, tpot_us = float(m["mean_ttft"]) * 1e6, float(m["mean_tpot"]) * 1e6
+    except (KeyError, TypeError, ValueError):
+        return ["required_setting_missing:measured.mean_ttft_or_tpot"]
+    isl, osl, conc = int(row["isl"]), int(row["osl"]), int(row["conc"])
+    label = _single_turn_label(isl, osl)
+    ep = par["tp"] * par["dp"] if par.get("enable_expert_parallel") else 1
+    sweep = {"scenario": scenario_file, "model": dep.get("_model", ""), "gpu": row["hardware"],
+             "workload": f"{isl}:{osl}", "label": label, "framework": "vllm", "precision": row["precision"],
+             "serving": "aggregated", "spec_method": "none",
+             "parallelism": {"tp": par["tp"], "pp": par["pp"], "dp": par["dp"], "ep": ep},
+             "points": [{"concurrency": conc}]}
+    corpus = {"source": "orchestrator/ingest (one InferenceX API row)", "measurement_source": "InferenceX API",
+              "sweeps": [sweep]}
+    absolutes = {"source": "InferenceX API", "anchors": [
+        {"scenario": scenario_file, "label": label, "framework": "vllm", "gpu": row["hardware"],
+         "absolute_tpot_us": {str(conc): round(tpot_us, 3)}, "absolute_ttft_us": {str(conc): round(ttft_us, 3)}}]}
+    passed = {k: eng[f] for k, f in _PROBE_FIELDS if f in eng}
+    # vLLM v0.31.0 caches prefixes unless told not to; stated so signedprobe never decides it.
+    passed.setdefault("enable_prefix_caching", True)
+    passed["enable_expert_parallel"] = bool(par.get("enable_expert_parallel"))
+    settings = {"source": "orchestrator/ingest (the run's server log)", "settings": [
+        {"scenario": scenario_file, "label": label, "framework": "vllm", "gpu": row["hardware"],
+         "by_concurrency": {str(conc): {"passed": passed, "resolved": {}}}}]}
+    return corpus, absolutes, settings
+
+
+def score_single_turn(o, entry, env, work: Path, sdir: Path, name: str, text: str, dep: dict,
+                      args: list, log: str, approximated: bool):
+    """One single-turn point through signedprobe (inference-sim cmd/signedprobe at the BLIS tag)."""
+    row, pid, ident = entry["row"], entry["point_id"], entry["identity"]
+    dep = {**dep, "_model": next((d.get("model") for d in __import__("yaml").safe_load_all(text)
+                                  if d.get("kind") == "Scenario"), "")}
+    got = single_turn_inputs(row, dep, f"{name}.yaml")
+    if isinstance(got, list):
+        o.reasons = sorted(set(got))
+        return o
+    corpus, absolutes, settings = got
+    pdir = work / "single_turn" / pid
+    pdir.mkdir(parents=True, exist_ok=True)
+    files = {}
+    for role, doc in (("corpus", corpus), ("absolutes", absolutes), ("settings", settings)):
+        files[role] = pdir / f"{role}.json"
+        files[role].write_text(contract.canonical_dumps(doc) + "\n")
+    argv = [env.signedprobe, "-blis", env.blis, "-corpus", str(files["corpus"]), "-scenarios", str(sdir),
+            "-absolutes", str(files["absolutes"]), "-engine-settings", str(files["settings"]),
+            "-catalog", str(env.catalog), "-registry", str(env.registry)]
+    out_path = pdir / "signedprobe.csv"
+    key = hashlib.sha256((text + "".join(files[r].read_text() for r in sorted(files)) + "\0".join(argv[1:])).encode()).hexdigest()
+    key_path = pdir / "signedprobe.key"
+    if not (out_path.exists() and key_path.exists() and key_path.read_text() == key):
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=env.timeout_s)
+        (pdir / "signedprobe.err").write_text(proc.stderr[-20000:])
+        if proc.returncode != 0:
+            o.reasons = [_blis_refusal(_probe_error(proc.stderr), work)]
+            return o
+        out_path.write_text(proc.stdout)
+        key_path.write_text(key)
+    import csv as _csv
+    rows = list(_csv.DictReader(out_path.read_text().splitlines()))
+    if len(rows) != 1:
+        o.reasons = ["blis_refused:metrics_incomplete"]
+        return o
+    pr = rows[0]
+    status = point_status(approximated, entry["build"])
+    o.fidelity = {"status": status, "build": entry["build"], "args": args, "resolved": [],
+                  "blis_kernel_provenance": None}
+    pool = dep["pools"][0]
+    par = pool["parallel"]
+    ep = (par["tp"] * par["dp"]) if par.get("enable_expert_parallel") else 1
+    label = corpus["sweeps"][0]["label"]
+    scen = f"{dep['_model']}-{row['hardware']}-{row['precision']}-vllm-tp{par['tp']}-dp{par['dp']}-ep{ep}"
+    o.facets = {"identity": ident, "sweep_id": f"{row.get('curve_workflow_run_id')}|{scen}|{label}",
+                "scenario": scen, "label": label, "workload": corpus["sweeps"][0]["workload"],
+                "model": dep["_model"], "gpu": row["hardware"], "precision": row["precision"], "framework": "vllm",
+                "serving": "aggregated", "spec_method": row.get("spec_method") or "none",
+                "parallelism": {"tp": par["tp"], "pp": par["pp"], "dp": par["dp"], "ep": ep},
+                "image": row.get("image"), "vllm_version": _banner_version(log)}
+    o.csv_row = [scen, dep["_model"], row["hardware"], label, ident["conc"],
+                 float(pr["meas_tpot_us"]), float(pr["pred_tpot_us"]),
+                 float(pr["meas_ttft_us"]), float(pr["pred_ttft_us"]),
+                 contract.TIER_BY_STATUS[status], pid, ident["measured_date"]]
+    return o
+
+
+def _probe_error(stderr: str) -> str:
+    """signedprobe's own failure line (first run error / no latency), else its last line."""
+    for line in stderr.splitlines():
+        if line.startswith("first run error") or line.startswith("no latency observed"):
+            return line.split(": ", 1)[-1]
+    return stderr
 
 
 def point_status(approximated: bool, build: dict) -> str:

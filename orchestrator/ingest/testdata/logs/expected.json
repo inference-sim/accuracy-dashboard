@@ -56,15 +56,12 @@
  "dsv4-mi355x-8-1-False-off": {
   "approximate": false,
   "problems": [],
-  "reasons": [
-   "setting_not_modelled:compilation_config.mode"
-  ]
+  "reasons": []
  },
  "dsv4-mi355x-8-1-True-off": {
   "approximate": false,
   "problems": [],
   "reasons": [
-   "setting_not_modelled:compilation_config.mode",
    "setting_not_modelled:prefill_schedule_interval"
   ]
  },
@@ -174,37 +171,27 @@
  "dsv41flash-mi300x-4-1-False-off": {
   "approximate": false,
   "problems": [],
-  "reasons": [
-   "setting_not_modelled:compilation_config.mode"
-  ]
+  "reasons": []
  },
  "dsv41flash-mi300x-8-1-False-off": {
   "approximate": false,
   "problems": [],
-  "reasons": [
-   "setting_not_modelled:compilation_config.mode"
-  ]
+  "reasons": []
  },
  "dsv41flash-mi325x-2-1-False-off": {
   "approximate": false,
   "problems": [],
-  "reasons": [
-   "setting_not_modelled:compilation_config.mode"
-  ]
+  "reasons": []
  },
  "dsv41flash-mi325x-4-1-False-off": {
   "approximate": false,
   "problems": [],
-  "reasons": [
-   "setting_not_modelled:compilation_config.mode"
-  ]
+  "reasons": []
  },
  "dsv41flash-mi325x-8-1-False-off": {
   "approximate": false,
   "problems": [],
-  "reasons": [
-   "setting_not_modelled:compilation_config.mode"
-  ]
+  "reasons": []
  },
  "dsv41flash-mi355x-2-1-False-off": {
   "approximate": true,
@@ -236,7 +223,6 @@
   "reasons": [
    "setting_not_modelled:attention_config.mla_prefill_backend",
    "setting_not_modelled:compilation_config.custom_ops",
-   "setting_not_modelled:compilation_config.mode",
    "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
    "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
    "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
@@ -258,7 +244,6 @@
   "reasons": [
    "setting_not_modelled:attention_config.mla_prefill_backend",
    "setting_not_modelled:compilation_config.custom_ops",
-   "setting_not_modelled:compilation_config.mode",
    "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
    "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
    "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
@@ -360,7 +345,6 @@
   "approximate": true,
   "problems": [],
   "reasons": [
-   "setting_not_modelled:compilation_config.mode",
    "setting_not_modelled:env.GPU_MAX_HW_QUEUES",
    "setting_not_modelled:env.NCCL_MIN_NCHANNELS",
    "setting_not_modelled:env.TORCH_BLAS_PREFER_HIPBLASLT",
@@ -373,7 +357,6 @@
   "approximate": true,
   "problems": [],
   "reasons": [
-   "setting_not_modelled:compilation_config.mode",
    "setting_not_modelled:connector.kv_connector",
    "setting_not_modelled:connector.kv_connector_extra_config.lmcache.mp.host",
    "setting_not_modelled:connector.kv_connector_extra_config.lmcache.mp.mq_timeout",
@@ -392,22 +375,17 @@
   "approximate": true,
   "problems": [],
   "reasons": [
-   "setting_not_modelled:compilation_config.mode",
    "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
   ]
  },
  "qwen3.5-tpuv7-1-1-False-off": {
   "approximate": true,
   "problems": [],
-  "reasons": [
-   "setting_not_modelled:compilation_config.mode"
-  ]
+  "reasons": []
  },
  "qwen3.5-tpuv7-8-1-False-off": {
   "approximate": true,
   "problems": [],
-  "reasons": [
-   "setting_not_modelled:compilation_config.mode"
-  ]
+  "reasons": []
  }
 }

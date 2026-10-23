@@ -116,6 +116,17 @@ class GitHubREST:
                 return None
             raise
 
+    def tag_commit(self, repo: str, tag: str) -> str | None:
+        """The commit a release tag (vX.Y.Z) names in repo, or None if repo has no such tag."""
+        if not re.fullmatch(r"v\d+\.\d+\.\d+", tag):
+            return None
+        try:
+            return self._get(f"/repos/{repo}/commits/{tag}")["sha"]
+        except urllib.error.HTTPError as e:
+            if e.code in (404, 422):
+                return None
+            raise
+
     def compare(self, repo: str, base: str, head: str) -> tuple[str, int, int]:
         d = self._get(f"/repos/{repo}/compare/{base}...{head}?per_page=1")
         return d["status"], d["ahead_by"], d["behind_by"]
@@ -124,11 +135,17 @@ class GitHubREST:
         return self._get(f"/repos/{repo}/compare/{b}...{a}?per_page=1")["merge_base_commit"]["sha"]
 
     def is_on_release_tag(self, repo: str, sha: str) -> bool:
-        """Whether some vX.Y.Z tag contains sha. Checks the newest release tags (a build far from
-        any release is outside the distance window anyway)."""
+        """Whether some vX.Y.Z tag contains sha. Every release tag is listed (paged), since a build
+        far from VLLM_REF is still scored, as estimated."""
         if repo not in self._release_tags:
-            self._release_tags[repo] = [t["name"] for t in self._get(f"/repos/{repo}/tags?per_page=50")
-                                        if re.fullmatch(r"v\d+\.\d+\.\d+", t["name"])]
+            names, page = [], 1
+            while True:
+                got = self._get(f"/repos/{repo}/tags?per_page=100&page={page}")
+                names += [t["name"] for t in got if re.fullmatch(r"v\d+\.\d+\.\d+", t["name"])]
+                if len(got) < 100:
+                    break
+                page += 1
+            self._release_tags[repo] = names
         for name in self._release_tags[repo]:
             status = self.compare(repo, sha, name)[0]
             if status in ("ahead", "identical"):

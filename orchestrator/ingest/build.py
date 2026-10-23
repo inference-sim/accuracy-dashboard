@@ -12,7 +12,9 @@ Per point, in order:
        a. the image's OCI label org.opencontainers.image.revision (by digest when the row pins
           one, else by tag, which is recorded as label_by_tag);
        b. the +g<sha> in the vLLM server log's version banner;
-       c. a SHA embedded in the image tag.
+       c. a SHA embedded in the image tag;
+       d. a release image (tag vX.Y.Z): the commit vLLM's own vX.Y.Z git tag names, when the
+          server log's banner (if any) prints that same version.
      A label of "unknown" (vLLM's local/dev builds) doesn't count. Sources that name different
      commits are a conflict. A banner with a build-tree suffix (.d<YYYYMMDD>) is fine as long as
      its SHA agrees.
@@ -42,6 +44,10 @@ _BANNER = re.compile(r"V1 LLM engine \(v[0-9][0-9A-Za-z.]*\+g([0-9a-f]{7,40})(\.
 # A hex run of 7-40 chars at the end of the tag, after "-" or the start: nightly-<sha>,
 # nightly-dev-x86_64-cu130-<shortsha>, nightly-rocm100-<sha>.
 _TAG_SHA = re.compile(r"(?:^|-)([0-9a-f]{7,40})$")
+# A release image's tag: vX.Y.Z, with no build suffix.
+_RELEASE_TAG = re.compile(r"^v\d+\.\d+\.\d+$")
+# The version vLLM's engine banner prints, e.g. "V1 LLM engine (v0.22.0)" for a release.
+_BANNER_VERSION = re.compile(r"V1 LLM engine \((v[0-9][0-9A-Za-z.+]*)\)")
 
 
 class Registry(Protocol):
@@ -63,6 +69,9 @@ class GitHub(Protocol):
 
     def is_on_release_tag(self, repo: str, sha: str) -> bool:
         """Whether sha is reachable from some vX.Y.Z release tag."""
+
+    def tag_commit(self, repo: str, tag: str) -> str | None:
+        """The commit a vX.Y.Z release tag names, or None."""
 
 
 @dataclass(frozen=True)
@@ -234,9 +243,20 @@ class Resolver:
         tag = tag_sha(img.tag)
         tag_commit = self._full(tag) if tag else None
 
+        # A release image whose label and banner name no commit: vLLM's own release tag does,
+        # as long as the banner (if the log has one) prints that release and nothing else.
+        release_commit = None
+        if img.tag and _RELEASE_TAG.fullmatch(img.tag) and not (label_commit or banner_commit or tag_commit):
+            printed = set(_BANNER_VERSION.findall(server_log or ""))
+            if printed and printed != {img.tag}:
+                build.why = COMMIT_CONFLICT
+                return build
+            release_commit = self.github.tag_commit(self.repo, img.tag)
+
         candidates = [(src, sha) for src, sha in ((label_source, label_commit),
                                                   ("server_log_banner", banner_commit),
-                                                  ("image_tag", tag_commit)) if sha]
+                                                  ("image_tag", tag_commit),
+                                                  ("release_tag", release_commit)) if sha]
         if len({sha for _, sha in candidates}) > 1:
             build.why = COMMIT_CONFLICT
             return build

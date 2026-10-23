@@ -133,6 +133,9 @@ def cmd_score(a) -> int:
         vllm_ref=manifest["vllm_ref"], policy=policy, policy_sha256=policy_sha,
         base_models=manifest.get("base_models") or {}, timeout_s=a.timeout,
         vllm_defaults=vdefaults, vllm_defaults_sha256=vdefaults_sha)
+    env.signedprobe = str(sim / "signedprobe")
+    wl = json.loads((sim / "testdata" / "inferencex-workloads" / "seed0.json").read_text())
+    env.single_turn_workloads = {(p["isl"], p["osl"], p["concurrency"]) for p in wl["points"]}
     env.catalog_obj = sp.Catalog.load(env.catalog)
     env.parts = sp.registry_parts(env.registry)
     work = Path(a.work or Path(a.out).parent / (Path(a.out).name + "-work"))
@@ -179,7 +182,8 @@ def main(argv=None) -> int:
     s = sub.add_parser("score")
     s.add_argument("--pull", required=True)
     s.add_argument("--out", required=True)
-    s.add_argument("--blis-dir", required=True, help="an inference-sim checkout with blis built in it")
+    s.add_argument("--blis-dir", required=True,
+                   help="an inference-sim checkout with blis and signedprobe built in it")
     s.add_argument("--catalog", required=True)
     s.add_argument("--registry", required=True)
     s.add_argument("--defaults-helper", required=True, help="orchestrator/blisdefaults built against --blis-dir's tag")

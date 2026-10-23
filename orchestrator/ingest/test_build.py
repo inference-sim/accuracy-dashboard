@@ -68,6 +68,9 @@ class FakeGitHub:
         self.tag_checks.append(sha)
         return sha == RELEASE_BRANCH
 
+    def tag_commit(self, repo, tag):
+        return {"v0.31.0": RELEASE_BRANCH}.get(tag)
+
 
 def _resolver(labels=None):
     return b.Resolver(registry=FakeRegistry(labels or {}), github=FakeGitHub())
@@ -223,6 +226,23 @@ def test_distance_limit_is_inclusive_and_symmetric():
     assert r.resolve("vllm/vllm-openai:nightly-" + OLDER).why == "outside_distance"
     got = _resolver().resolve("vllm/vllm-openai:nightly-" + FAR)                   # +2001 > 2000
     assert got.why == "outside_distance" and got.distance == 2001 and got.commit == FAR
+
+
+def test_a_release_image_with_no_label_or_banner_sha_takes_vllms_release_tag():
+    # e.g. vllm/vllm-openai-rocm:v0.22.0: no OCI label, and a release banner prints no +g<sha>.
+    got = _resolver().resolve("vllm/vllm-openai-rocm:v0.31.0", server_log="… V1 LLM engine (v0.31.0) with config: …")
+    assert (got.source, got.commit, got.distance, got.why) == ("release_tag", RELEASE_BRANCH, 0, None)
+    got = _resolver().resolve("vllm/vllm-openai-rocm:v0.31.0")          # no log at all
+    assert got.source == "release_tag" and got.why is None
+
+
+def test_a_release_image_whose_banner_prints_another_version_conflicts():
+    got = _resolver().resolve("vllm/vllm-openai-rocm:v0.31.0", server_log="… V1 LLM engine (v0.30.0) with config: …")
+    assert got.why == "commit_conflict" and got.commit is None
+
+
+def test_a_release_tag_vllm_doesnt_have_is_unresolvable():
+    assert _resolver().resolve("vllm/vllm-openai:v9.9.9").why == "commit_unresolvable"
 
 
 def test_rocm_images_are_official():

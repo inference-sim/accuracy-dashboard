@@ -568,6 +568,7 @@ class Built:
     gpus: int = 0
     reasons: list = field(default_factory=list)
     defaults_used: list = field(default_factory=list)  # fidelity args entries
+    kernel_resolves: list = field(default_factory=list)  # settings left to the kernel's own resolution
 
 
 FRONTEND = {True: "rust", False: "python"}   # VLLM_USE_RUST_FRONTEND, parsed as a bool
@@ -622,6 +623,11 @@ def build(c: Classified, *, name: str, model: str, part: Part, engine_version: s
     for path, field_ in (("max_num_seqs", "max_num_seqs"), ("max_num_batched_tokens", "max_num_batched_tokens"),
                          ("block_size", "block_size")):
         if field_ in eng:
+            continue
+        if field_ == "block_size":
+            # Left unstated: the kernel resolves it itself, as vLLM v0.31.0 would for the model
+            # and part, and score.py records the value it reports (blisdefaults -resolve).
+            b.kernel_resolves.append(path)
             continue
         if defaults and field_ in defaults:
             eng[field_] = defaults[field_]

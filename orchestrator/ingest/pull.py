@@ -68,12 +68,16 @@ def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts
     run = api.run_of(row)
     frozen = Frozen(out / "points" / pid)
     server_log = None
+    # A single-turn point is scored from the API's /server-log (the vLLM log); its artifacts only
+    # add the launch config, so a run with none (no fingerprint, expired, another repository)
+    # still scores. An agentic point needs its artifacts: the server log and the client export.
+    join_reasons = entry["reasons"] if agentic else entry.setdefault("artifact_notes", [])
     if run is None:
-        entry["reasons"].append("artifact_unmatched:no_run_url")
+        join_reasons.append("artifact_unmatched:no_run_url")
     elif run_repo(row) != gh.repo:
         # The row's run lives in another repository (e.g. a private one) whose artifacts
         # this pull can't read: no server log, so nothing to score from.
-        entry["reasons"].append(f"server_log_missing:run_in_{(run_repo(row) or 'unknown').replace('/', '_')}")
+        join_reasons.append(f"server_log_missing:run_in_{(run_repo(row) or 'unknown').replace('/', '_')}")
     else:
         run_id, attempt = run
         if run_id not in run_artifacts:
@@ -81,7 +85,7 @@ def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts
         arts = run_artifacts[run_id]
         j = art.join({**row, "_attempt": attempt}, arts,
                      lambda a: art.read_result_json(gh.download(a)), agentic=agentic)
-        entry["reasons"] += j.reasons
+        join_reasons += j.reasons
         entry["result_filename"] = j.result_filename
         if j.result_json is not None:
             frozen.put("result_json", json.dumps(j.result_json, sort_keys=True).encode(), j.result.name)
@@ -142,6 +146,10 @@ def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts
     entry["build"] = b.record()
     entry["files"] = frozen.files
     entry["reasons"] = sorted(set(entry["reasons"]))
+    if entry.get("artifact_notes") is not None:
+        entry["artifact_notes"] = sorted(set(entry["artifact_notes"]))
+        if not entry["artifact_notes"]:
+            del entry["artifact_notes"]
     return entry
 
 

@@ -138,11 +138,13 @@ entries:
   max_cudagraph_capture_size: {class: mapped, blis_field: engine.max_cudagraph_capture_size, type: int, alias_of: compilation_config.max_cudagraph_capture_size}
   compilation_config.mode:
     class: refuse
-    # What the engine ran, not what was asked: vLLM v0.31.0 runs DeepSeek-V4.1 uncompiled
-    # whatever is requested, and BLIS prices that. Compared on the resolved value only.
+    # What the engine ran, not what was asked. BLIS prices vLLM v0.31.0's own choice per model:
+    # VLLM_COMPILE (its default, whose piecewise CUDA graphs the kernel prices), or NONE for a
+    # model vLLM can't torch.compile (DeepSeek-V4.1; blis-latency-kernel new.go). Compared on
+    # the resolved value only; the CUDA graph mode that follows from it is mapped separately.
     source_only: resolved_config
-    unset: [NONE, null]
-    note: "BLIS prices the engine uncompiled (torch.compile mode NONE); a compiled engine isn't stated by the Deployment."
+    unset: [NONE, VLLM_COMPILE, null]
+    note: "BLIS prices vLLM's default compilation (VLLM_COMPILE, or none for a model vLLM can't compile); STOCK_TORCH_COMPILE and DYNAMO_TRACE_ONCE aren't stated by the Deployment."
   compilation_config.decoder_replay_cudagraph_capture_sizes: {class: refuse, unset: [[], null], note: "DeepSeek-V4.1 decoder-replay CUDA graphs (a nightly feature after v0.31.0) aren't modelled."}
   # On by default in the builds that have it; switching it off moves the engine toward v0.31.0.
   # Either way the build's default is the build's (admitted by the distance gate).

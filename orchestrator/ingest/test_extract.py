@@ -131,7 +131,10 @@ def test_the_resolved_line_is_the_engines_resolution_not_a_conflict():
     # and the compile mode is judged on what ran.
     c = _classify(_log("'compilation_config': {'mode': <CompilationMode.VLLM_COMPILE: 3>}"))
     assert c.reasons == []
+    # VLLM_COMPILE (vLLM's default) and NONE are both what BLIS prices; another mode isn't.
     c = _classify(_log("'max_num_seqs': 1", RESOLVED.replace("CompilationMode.NONE: 0", "CompilationMode.VLLM_COMPILE: 3")))
+    assert c.reasons == []
+    c = _classify(_log("'max_num_seqs': 1", RESOLVED.replace("CompilationMode.NONE: 0", "CompilationMode.STOCK_TORCH_COMPILE: 1")))
     assert c.reasons == ["setting_not_modelled:compilation_config.mode"]
 
 
@@ -291,8 +294,10 @@ def test_a_required_setting_nothing_recorded_takes_the_blis_default():
 def test_a_required_setting_with_no_source_and_no_default_refuses():
     c = _classify(_log("'tensor_parallel_size': 1"))
     b = st.build(c, name="p", model="m", part=PART_H200, engine_version="v0.31.0", defaults=None)
-    assert sorted(b.reasons) == ["required_setting_missing:block_size", "required_setting_missing:gpu_memory_utilization",
+    assert sorted(b.reasons) == ["required_setting_missing:gpu_memory_utilization",
                                  "required_setting_missing:max_num_batched_tokens", "required_setting_missing:max_num_seqs"]
+    # block_size is left to BLIS's kernel, which resolves it as vLLM would; score.py records it.
+    assert b.kernel_resolves == ["block_size"] and "block_size" not in b.deployment["pools"][0]["engine"]
 
 
 def test_the_cluster_is_sized_to_the_runs_own_gpus():
@@ -458,6 +463,25 @@ def test_a_build_never_refuses_a_point_at_pull_time():
     src = (HERE / "pull.py").read_text()
     assert "b.reasons" not in src and 'entry["build"] = b.record()' in src
     assert not hasattr(__import__("build").Build(image="x"), "reasons")
+
+
+def test_a_block_size_no_source_recorded_is_the_one_blis_resolves():
+    import score as sc
+    orig = sc.blis_resolution
+    try:
+        sc.blis_resolution = lambda env, d, f: {"overrides": [], "assumptions": [
+            {"name": "block_size", "value": "16", "reason": "CacheConfig.DEFAULT_BLOCK_SIZE"}]}
+        args = []
+        assert sc.kernel_defaults(args, ["block_size"], None, Path("."), "s.yaml") == []
+        assert args == [{"arg": "block_size", "measured": None, "source": "blis_default", "blis": 16,
+                         "match": "blis_default", "rule": "BLIS kernel: CacheConfig.DEFAULT_BLOCK_SIZE"}]
+        sc.blis_resolution = lambda env, d, f: {"overrides": [], "assumptions": []}
+        assert sc.kernel_defaults([], ["block_size"], None, Path("."), "s.yaml") == ["required_setting_missing:block_size"]
+        sc.blis_resolution = lambda env, d, f: "blis_refused:x"
+        assert sc.kernel_defaults([], ["block_size"], None, Path("."), "s.yaml") == ["blis_refused:x"]
+        assert sc.kernel_defaults([], [], None, Path("."), "s.yaml") == []       # nothing left to BLIS
+    finally:
+        sc.blis_resolution = orig
 
 
 def test_the_indexer_record_is_named_from_the_catalog_graph():
