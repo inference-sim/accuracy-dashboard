@@ -1,0 +1,389 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://inference-sim.github.io/accuracy-dashboard/orchestrator/ingest/fidelity.schema.json",
+  "title": "Per-point fidelity record (Discussion #28)",
+  "description": "What a measured InferenceX run did versus what BLIS was given, for one point. A pure function of the frozen point inputs, the BLIS release, VLLM_REF, VLLM_MAX_DISTANCE and the policy-table sha256. Written by the extractor (#29), embedded in summary.v2 pointNode.fidelity (#30).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "build",
+    "args",
+    "resolved"
+  ],
+  "properties": {
+    "status": {
+      "description": "exact: every timing-relevant setting is matched (recorded by the run, or BLIS's own default). not_scored: the point carries at least one reason code.",
+      "enum": [
+        "exact",
+        "not_scored"
+      ]
+    },
+    "reasons": {
+      "description": "Present only when status is not_scored. Sorted, de-duplicated.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/definitions/reason"
+      }
+    },
+    "build": {
+      "$ref": "#/definitions/build"
+    },
+    "args": {
+      "description": "Every classified vLLM setting, sorted by arg.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/arg"
+      }
+    },
+    "resolved": {
+      "description": "Engine outcomes compared from both sides, sorted by quantity. Never passed to BLIS.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/resolved"
+      }
+    },
+    "replay": {
+      "$ref": "#/definitions/replay"
+    },
+    "blis_kernel_provenance": {
+      "description": "BLIS's own --metrics-path kernel_provenance, verbatim. Informational only.",
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "definitions": {
+    "reason": {
+      "description": "A reason code, optionally qualified by ':<arg or name>' (e.g. setting_not_modelled:prefill_schedule_interval).",
+      "type": "string",
+      "pattern": "^(custom_build|build_commit_conflict|build_commit_unresolvable|outside_distance|artifact_unmatched|server_log_missing|corpus_changed|conflict|unclassified_arg|setting_not_modelled|setting_differs|required_setting_missing|client_scenario_not_replayable|model_not_in_catalog|hardware_no_coefficients|drafter_not_in_catalog|blis_refused)(:[A-Za-z0-9_.:/=-]+)?$"
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "image",
+        "commit",
+        "source",
+        "ref",
+        "distance"
+      ],
+      "properties": {
+        "image": {
+          "type": "string"
+        },
+        "commit": {
+          "description": "Full 40-char vllm-project/vllm SHA, or null when unresolvable.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "source": {
+          "enum": [
+            "image_label",
+            "label_by_tag",
+            "server_log_banner",
+            "image_tag",
+            null
+          ]
+        },
+        "ref": {
+          "description": "VLLM_REF, e.g. v0.31.0.",
+          "type": "string"
+        },
+        "distance": {
+          "description": "Signed commits along main from VLLM_REF's branch point; null when unresolvable.",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      }
+    },
+    "arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arg",
+        "measured",
+        "blis",
+        "match"
+      ],
+      "properties": {
+        "arg": {
+          "type": "string"
+        },
+        "measured": {
+          "description": "As the run recorded it. Floats are the decimal string the log printed.",
+          "type": [
+            "string",
+            "integer",
+            "boolean",
+            "null"
+          ]
+        },
+        "source": {
+          "enum": [
+            "launch_config",
+            "args",
+            "resolved_config",
+            "engine_line",
+            "api_row",
+            "blis_default"
+          ]
+        },
+        "blis": {
+          "description": "Parsed back from the scenario / settings actually handed to BLIS.",
+          "type": [
+            "string",
+            "integer",
+            "boolean",
+            "null"
+          ]
+        },
+        "blis_field": {
+          "description": "The BLIS Deployment field a mapped arg was written to.",
+          "type": "string"
+        },
+        "match": {
+          "enum": [
+            "exact",
+            "mapped",
+            "inert",
+            "blis_default",
+            "differs",
+            "absent_in_blis",
+            "unreadable",
+            "conflict"
+          ]
+        },
+        "rule": {
+          "description": "For blis_default: the BLIS resolver rule used.",
+          "type": "string"
+        },
+        "occurrences": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "values": {
+          "description": "For conflict: every value found.",
+          "type": "array"
+        },
+        "delta": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        },
+        "ratio": {
+          "description": "4 significant figures, as a string.",
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "const": "mapped"
+              }
+            },
+            "required": [
+              "match"
+            ]
+          },
+          "then": {
+            "required": [
+              "blis_field"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "const": "blis_default"
+              }
+            },
+            "required": [
+              "match"
+            ]
+          },
+          "then": {
+            "required": [
+              "rule",
+              "source"
+            ],
+            "properties": {
+              "source": {
+                "const": "blis_default"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "const": "conflict"
+              }
+            },
+            "required": [
+              "match"
+            ]
+          },
+          "then": {
+            "required": [
+              "values"
+            ]
+          }
+        }
+      ]
+    },
+    "resolved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "quantity",
+        "measured",
+        "blis",
+        "match"
+      ],
+      "properties": {
+        "quantity": {
+          "type": "string"
+        },
+        "measured": {
+          "type": [
+            "integer",
+            "string",
+            "null"
+          ]
+        },
+        "blis": {
+          "type": [
+            "integer",
+            "string",
+            "null"
+          ]
+        },
+        "occurrences": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "delta": {
+          "type": [
+            "integer",
+            "string",
+            "null"
+          ]
+        },
+        "ratio": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "match": {
+          "enum": [
+            "exact",
+            "differs",
+            "unreadable",
+            "conflict",
+            "incomparable"
+          ]
+        },
+        "reason": {
+          "description": "For incomparable: why the scopes differ.",
+          "type": "string"
+        }
+      }
+    },
+    "replay": {
+      "description": "Agentic only: the client inputs passed to blis replay.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "client",
+        "client_version",
+        "scenario",
+        "concurrency",
+        "corpus",
+        "corpus_sha256",
+        "seed"
+      ],
+      "properties": {
+        "client": {
+          "type": "string"
+        },
+        "client_version": {
+          "type": "string"
+        },
+        "scenario": {
+          "type": "string"
+        },
+        "replayed_as": {
+          "type": "string"
+        },
+        "concurrency": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "duration_s": {
+          "type": "number"
+        },
+        "trajectory_start": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "min_ratio": {
+              "type": "number"
+            },
+            "max_ratio": {
+              "type": "number"
+            }
+          }
+        },
+        "corpus": {
+          "type": "string"
+        },
+        "corpus_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "seed": {
+          "type": "integer"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "not_scored"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "reasons"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "reasons"
+          ]
+        }
+      }
+    }
+  ]
+}

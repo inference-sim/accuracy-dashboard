@@ -44,6 +44,10 @@ jobs:
         run: python3 orchestrator/test_run_agentic.py
       - name: Schema validates the committed render fixture (RFC C3)
         run: python3 orchestrator/validate_summary.py --schema schemas/summary.v1.json web/testdata/render-fixture.summary.json
+      - name: Extractor-to-summary contract, fidelity schema and summary.v2 schema (#28; not used by the nightly)
+        run: |
+          python3 orchestrator/ingest/test_contract.py
+          python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/run-a orchestrator/ingest/testdata/contract/run-b
 
   web:
     runs-on: ubuntu-latest

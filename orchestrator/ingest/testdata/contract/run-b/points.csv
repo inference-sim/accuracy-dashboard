@@ -1,0 +1,8 @@
+scenario,model,gpu,label,concurrency,meas_tpot_us,pred_tpot_us,meas_ttft_us,pred_ttft_us,tier_unbracketed,point_id,measured_date
+deepseek-v4-pro-b200-fp4-vllm-tp8.yaml,deepseek-v4-pro,b200,8k1k,1,21500.0,19400.0,410000.0,430000.0,MEASURED-OR-RESOLVED,5a3fb11cd356440830825ea12907fc10ef0a7ae029a199142914ac989954fcc4,2026-09-03
+deepseek-v4-pro-b200-fp4-vllm-tp8.yaml,deepseek-v4-pro,b200,8k1k,4,23800.0,21700.0,620000.0,700000.0,MEASURED-OR-RESOLVED,a7952faab9382b04aa735bdbc410f3f218d77a6b78a8413922d68fbd3caab011,2026-09-03
+deepseek-v4-pro-b200-fp4-vllm-tp8.yaml,deepseek-v4-pro,b200,8k1k,16,29600.0,28900.0,1340000.0,1610000.0,MEASURED-OR-RESOLVED,a9d41834f0f7b8a82753aa70b443a591e2d0b72c8fca74d827de0dfd1660bb8e,2026-09-03
+deepseek-v4.1-flash-b200-fp4-vllm-tp1-ep2-dp2-dspark5-agentx.yaml,deepseek-v4.1-flash,b200,agentx,8,5100.0,4300.0,1180000.0,1210000.0,MEASURED-OR-RESOLVED,056cddbc496b43ff186e51b634dfbbfd07867f347482ff62d5d8b1391873a77d,2026-10-03
+deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml,deepseek-v4.1-flash,h200,agentx,1,8100.0,7050.0,980000.0,1120000.0,MEASURED-OR-RESOLVED,ce649d8e02c65226590e9df810e594539b495a295d46ce659722a81c28071356,2026-09-21
+deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml,deepseek-v4.1-flash,h200,agentx,2,8650.0,7550.0,1210000.0,1380000.0,MEASURED-OR-RESOLVED,1cde80e14072cec25522c9361237fa84fea0c561f80f8126278281145c38db79,2026-09-21
+deepseek-v4.1-flash-h200-fp4-vllm-tp8-dspark5-agentx.yaml,deepseek-v4.1-flash,h200,agentx,1,6900.0,5950.0,760000.0,790000.0,MEASURED-OR-RESOLVED,59ed3ce626c2e97bbbf9de5d2b194d7dbf8b1b0430a74ef95dc3dff6f3e39723,2026-09-21
