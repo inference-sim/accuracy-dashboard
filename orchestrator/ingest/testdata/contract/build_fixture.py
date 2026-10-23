@@ -157,7 +157,8 @@ NOT_SCORED = [
     ({"model": "dsv41flash", "hardware": "b300", "precision": "fp4", "framework": "vllm",
       "benchmark_type": "agentic_traces", "recipe_fingerprint": "f8" * 32, "conc": 8, "date": "2026-10-20"},
      "vllm/vllm-openai:cu134-nightly-x86_64-dev-20261019-mk", (1490.0, 4.9),
-     ["setting_not_modelled:prefill_schedule_interval"]),
+     ["setting_not_modelled:attention_config.indexer_kv_dtype",
+      "setting_not_modelled:prefill_schedule_interval"]),
     ({"model": "dsv4", "hardware": "b200", "precision": "fp4", "framework": "vllm",
       "benchmark_type": "agentic_traces", "recipe_fingerprint": "", "row_id": "445802", "conc": 1,
       "date": "2026-10-21"},
@@ -168,6 +169,14 @@ NOT_SCORED = [
      "vllm/vllm-openai:nightly-ddd6fbca148a867aad1fcab7ec72f582b9977db4", (2050.0, 12.4),
      ["drafter_not_in_catalog:eagle3", "setting_not_modelled:kv_transfer_config.kv_connector"]),
 ]
+
+# Notes are fixed text per reason (the policy table's), keyed by the full reason.
+NOTES = {
+    "setting_not_modelled:attention_config.indexer_kv_dtype": {
+        "text": "The run's MXFP4 indexer cache can't be stated to BLIS; it would price the default FP8 "
+                "indexer record. Scored once a deployment can state the attention config.",
+        "upstream": "inference-sim/blis-schemas#57"},
+}
 
 RUNS = {
     "a": {"blis": {"release": "v0.12.0", "commit_sha": "f199223d701d96dddeb1c314509bed003515b599",
@@ -222,13 +231,17 @@ def write_run(name: str, run: dict, base: Path) -> Path:
         fidelity.append({"point_id": pid, **fid})
     for row, image, meas, reasons in NOT_SCORED:
         ident = identity(row)
-        not_scored.append({"point_id": point_id(ident), "identity": ident,
-                           "measured_date": ident["measured_date"], "model": ident["model"],
-                           "hardware": ident["hardware"], "precision": ident["precision"],
-                           "framework": ident["framework"], "benchmark_type": ident["benchmark_type"],
-                           "conc": ident["conc"], "image": image,
-                           "measured": {"ttft_ms": meas[0], "tpot_ms": meas[1]},
-                           "reasons": sorted(set(reasons))})
+        rec = {"point_id": point_id(ident), "identity": ident,
+               "measured_date": ident["measured_date"], "model": ident["model"],
+               "hardware": ident["hardware"], "precision": ident["precision"],
+               "framework": ident["framework"], "benchmark_type": ident["benchmark_type"],
+               "conc": ident["conc"], "image": image,
+               "measured": {"ttft_ms": meas[0], "tpot_ms": meas[1]},
+               "reasons": sorted(set(reasons))}
+        notes = [{"reason": r, **NOTES[r]} for r in rec["reasons"] if r in NOTES]
+        if notes:
+            rec["notes"] = notes
+        not_scored.append(rec)
 
     rows.sort(key=lambda r: points_sort_key(dict(zip(POINTS_HEADER, map(str, r)))))
     buf = io.StringIO()

@@ -152,6 +152,8 @@ def validate_dir(directory: str | Path) -> list[str]:
     validator = jsonschema.Draft7Validator(schema)
     reason_validator = jsonschema.Draft7Validator(
         {**schema["definitions"]["reason"], "definitions": schema["definitions"]})
+    note_validator = jsonschema.Draft7Validator(
+        {**schema["definitions"]["note"], "definitions": schema["definitions"]})
 
     # ---- points.csv
     point_rows: list[dict] = []
@@ -255,6 +257,18 @@ def validate_dir(directory: str | Path) -> list[str]:
         for reason in reasons:
             if not reason_validator.is_valid(reason):
                 problems.append(f"{NOT_SCORED_JSONL}:{n}: unknown reason {reason!r}")
+        notes = ns.get("notes", [])
+        if not isinstance(notes, list):
+            problems.append(f"{NOT_SCORED_JSONL}:{n}: notes is not a list")
+            notes = []
+        for note in notes:
+            if not note_validator.is_valid(note):
+                problems.append(f"{NOT_SCORED_JSONL}:{n}: malformed note {note!r}")
+            elif note["reason"] not in reasons:
+                problems.append(f"{NOT_SCORED_JSONL}:{n}: note for {note['reason']!r}, which is not one of its reasons")
+        note_reasons = [str(x.get("reason")) for x in notes if isinstance(x, dict)]
+        if note_reasons != sorted(set(note_reasons)):
+            problems.append(f"{NOT_SCORED_JSONL}:{n}: notes must be sorted by reason, one per reason")
         try:
             if point_id(ns.get("identity")) != pid:
                 problems.append(f"{NOT_SCORED_JSONL}:{n}: identity hashes to a different id")

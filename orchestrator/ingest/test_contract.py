@@ -176,6 +176,46 @@ def test_validator_accepts_a_qualified_reason_and_rejects_unsorted_reasons():
     assert not any("unknown reason" in p for p in problems)
 
 
+def _noted(rows: list[dict]) -> dict:
+    return next(r for r in rows if "notes" in r)
+
+
+def test_fixture_notes_the_indexer_refusal_with_its_upstream_issue():
+    noted = _noted(_lines(FIXTURE / "run-a" / c.NOT_SCORED_JSONL))
+    assert noted["hardware"] == "b300"
+    assert noted["notes"] == [{"reason": "setting_not_modelled:attention_config.indexer_kv_dtype",
+                               "text": noted["notes"][0]["text"],
+                               "upstream": "inference-sim/blis-schemas#57"}]
+    assert noted["notes"][0]["reason"] in noted["reasons"]
+
+
+def test_validator_rejects_a_note_for_a_reason_the_point_does_not_carry():
+    d = _copy("run-a")
+    rows = _lines(d / c.NOT_SCORED_JSONL)
+    _noted(rows)["notes"][0]["reason"] = "drafter_not_in_catalog:eagle3"
+    _write_lines(d / c.NOT_SCORED_JSONL, rows)
+    assert any("which is not one of its reasons" in p for p in c.validate_dir(d))
+
+
+def test_validator_rejects_malformed_duplicate_or_unsorted_notes():
+    for mutate, expect in (
+        (lambda n: n[0].pop("text"), "malformed note"),
+        (lambda n: n[0].update(upstream="blis-schemas 57"), "malformed note"),
+        (lambda n: n.append(dict(n[0])), "one per reason"),
+    ):
+        d = _copy("run-a")
+        rows = _lines(d / c.NOT_SCORED_JSONL)
+        mutate(_noted(rows)["notes"])
+        _write_lines(d / c.NOT_SCORED_JSONL, rows)
+        assert any(expect in p for p in c.validate_dir(d)), expect
+    d = _copy("run-a")
+    rows = _lines(d / c.NOT_SCORED_JSONL)
+    noted = _noted(rows)
+    noted["notes"] = [{"reason": noted["reasons"][1], "text": "b"}, {"reason": noted["reasons"][0], "text": "a"}]
+    _write_lines(d / c.NOT_SCORED_JSONL, rows)
+    assert any("sorted by reason" in p for p in c.validate_dir(d))
+
+
 def test_validator_rejects_a_point_that_is_both_scored_and_not_scored():
     d = _copy("run-a")
     scored = _lines(d / c.FIDELITY_JSONL)[0]["point_id"]
@@ -356,6 +396,11 @@ def test_v2_schema_accepts_a_not_scored_record_exactly_as_the_contract_writes_it
         errors = list(_v2_validator().iter_errors(doc))
         assert errors == [], [e.message for e in errors]
     doc["not_scored"] = [{**ns, "reasons": ["looked_wrong"]}]
+    assert not _v2_validator().is_valid(doc)
+    noted = _noted(_lines(FIXTURE / "run-a" / c.NOT_SCORED_JSONL))
+    doc["not_scored"] = [noted]
+    assert _v2_validator().is_valid(doc)
+    doc["not_scored"] = [{**noted, "notes": [{"reason": noted["reasons"][0]}]}]   # no text
     assert not _v2_validator().is_valid(doc)
 
 

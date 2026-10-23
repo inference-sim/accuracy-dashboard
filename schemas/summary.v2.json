@@ -746,6 +746,13 @@
         },
         "identity": {
           "$ref": "#/definitions/pointIdentity"
+        },
+        "notes": {
+          "description": "Optional, sorted by reason, one per reason at most; each names one of this point's reasons.",
+          "type": "array",
+          "items": {
+            "$ref": "https://inference-sim.github.io/accuracy-dashboard/orchestrator/ingest/fidelity.schema.json#/definitions/note"
+          }
         }
       }
     },

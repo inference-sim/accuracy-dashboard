@@ -361,6 +361,29 @@
           "type": "integer"
         }
       }
+    },
+    "note": {
+      "description": "Why a reason applies and what would lift it. Fixed text from the policy table (orchestrator/vllm_arg_policy.yaml), never composed per point, so it's deterministic.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reason",
+        "text"
+      ],
+      "properties": {
+        "reason": {
+          "$ref": "#/definitions/reason"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "upstream": {
+          "description": "The upstream issue tracking the fix, as owner/repo#number.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+$"
+        }
+      }
     }
   },
   "allOf": [

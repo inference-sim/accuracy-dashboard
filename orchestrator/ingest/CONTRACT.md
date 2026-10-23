@@ -73,10 +73,11 @@ A re-measurement of the same recipe and concurrency on another date is a differe
 ```json
 {"point_id": …, "identity": {…}, "measured_date": …, "model": …, "hardware": …, "precision": …,
  "framework": …, "benchmark_type": …, "conc": …, "image": …,
- "measured": {"ttft_ms": …, "tpot_ms": …}, "reasons": ["<code>[:<qualifier>]", …]}
+ "measured": {"ttft_ms": …, "tpot_ms": …}, "reasons": ["<code>[:<qualifier>]", …],
+ "notes": [{"reason": "<one of reasons>", "text": "…", "upstream": "owner/repo#N"}, …]}
 ```
 
-One line per point, sorted by `point_id`. `reasons` is sorted and de-duplicated, and each one matches `fidelity.schema.json#/definitions/reason`. These records are written into `summary.json` v2's `not_scored` list as-is (including `identity`, so the id can be re-derived) and counted in `coverage.not_scored_reasons` by code (the part before `:`). They are never rendered.
+One line per point, sorted by `point_id`. `reasons` is sorted and de-duplicated, and each one matches `fidelity.schema.json#/definitions/reason`. `notes` is optional: at most one per reason, sorted by reason, each naming one of the point's own reasons. A note says why the reason applies and what would lift it, with the upstream issue when there is one. Its text is fixed per reason in the policy table, never composed per point, so it stays deterministic. These records are written into `summary.json` v2's `not_scored` list as-is (including `identity`, so the id can be re-derived) and counted in `coverage.not_scored_reasons` by code (the part before `:`). They are never rendered.
 
 ### `provenance.json`
 
