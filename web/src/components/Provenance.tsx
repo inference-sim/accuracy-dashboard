@@ -4,8 +4,10 @@
  * the measured run and what BLIS simulated, in plain words:
  *
  *   - settings BLIS couldn't match exactly (approximated), with what each side used;
- *   - the run's vLLM build, when it isn't the one BLIS models;
- *   - settings the run didn't record, which BLIS filled with its own default.
+ *   - the run's vLLM build, when it isn't the one BLIS models.
+ *
+ * A setting the run didn't pass isn't listed: vLLM then ran its own default, and BLIS uses the
+ * same default (vLLM v0.31.0's rule for the part), so both sides ran the same value.
  *
  * How far the run's vLLM build is from the release BLIS models is also on the point's vLLM
  * version (VersionTip).
@@ -100,7 +102,6 @@ function buildDiff(b: Fidelity['build']): string | null {
 
 export function ProvenanceBody({ fidelity: f }: { fidelity: Fidelity }) {
   const approx = f.args.filter((a) => a.match === 'approximated')
-  const defaults = f.args.filter((a) => a.match === 'blis_default')
   const build = buildDiff(f.build)
   const exact = f.status !== 'approximate'
   return (
@@ -114,11 +115,6 @@ export function ProvenanceBody({ fidelity: f }: { fidelity: Fidelity }) {
             : 'BLIS simulated the exact settings this run used, but not its vLLM build:'}
       </span>
       {(approx.length > 0 || build) && <DiffTable args={approx} build={build ? { run: build, ref: f.build.ref } : null} />}
-      {defaults.map((a) => (
-        <span className="prov-row" key={a.arg}>
-          <b>{label(a.arg)}</b>: not recorded by the run, so BLIS used its default ({value(a.blis)})
-        </span>
-      ))}
     </span>
   )
 }

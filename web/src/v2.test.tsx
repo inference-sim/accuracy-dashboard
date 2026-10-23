@@ -191,11 +191,13 @@ describe('the match tooltip shows only what differs, in plain words', () => {
     return renderToStaticMarkup(<ProvenanceBody fidelity={p.fidelity!} />)
   }
 
-  it('an exact point says so in one line, plus any default BLIS filled in', () => {
+  it('an exact point says so in one line, and nothing about settings vLLM and BLIS both defaulted', () => {
+    // h200 TP8 c1 didn't pass max_num_seqs: vLLM ran its default and BLIS the same one.
     const html = body('exact')
     expect(html).toContain('Exact match')
     expect(html).toContain('BLIS simulated the exact settings this run used.')
-    expect(html).toContain('Max concurrent requests</b>: not recorded by the run, so BLIS used its default (1024)')
+    expect(html).not.toContain('Max concurrent requests')
+    expect(html).not.toContain('default')
     expect(html).not.toContain('commits')            // the build distance is on the vLLM version
   })
 
