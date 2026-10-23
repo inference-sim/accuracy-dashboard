@@ -167,13 +167,12 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
       )}
       {sorted.length > 0 && (
         <p className="pts-note">
-          Each value is a per-run <b>arithmetic mean over the benchmark's requests</b> (vLLM
-          <span className="mono"> calculate_metrics</span>): mean TTFT over all main-phase requests;
-          mean TPOT = mean of (latency − TTFT) ⁄ (output_len − 1) over requests with &gt;1 output token.
-          Not a median or tail — p99 is out of scope for v0.1.0. Measured means come from{' '}
-          {dated ? 'InferenceX' : 'the InferenceX dump'}; predicted means from BLIS replaying the same
-          requests, same definition. Repeated rows at one concurrency are the same deployment measured
-          on different vLLM builds{dated ? ' or dates' : ''}.
+          Each value is a <b>mean over the run’s requests</b>: mean TTFT over every measured request, and
+          mean TPOT = (latency − TTFT) ÷ (output tokens − 1), averaged over requests with more than one
+          output token. Not a median or a tail percentile. Measured means come from InferenceX’s
+          benchmark client; predicted means from BLIS replaying the same requests, computed the same way.
+          Repeated rows at one concurrency are the same deployment measured on different vLLM builds
+          {dated ? ' or dates' : ''}.
         </p>
       )}
     </>
