@@ -90,18 +90,18 @@ describe('a v2 snapshot renders', () => {
 })
 
 describe('dates are labelled for what they are', () => {
-  it('the headline gives the measurement span and the pull date, never a "data from <pull date>"', () => {
+  it('the headline gives the data range and the API pull date, never a "data from <pull date>"', () => {
     const { html } = render(<App summary={v2a()} loadError={null} initialHash="#/?tier=all" />)
-    expect(html).toContain('InferenceX measurements 2026-09-03 to 2026-10-03')
-    expect(html).toContain('(pulled 2026-10-23)')
+    expect(html).toContain('InferenceX data range 2026-09-03 to 2026-10-03')
+    expect(html).toContain('API pull date 2026-10-23')
     expect(html).not.toContain('InferenceX data from')
   })
 
-  it('the run details say pulled / measured, not dump / through', () => {
+  it('the run details say API pull date / data range, not dump / through', () => {
     const { html } = render(<App summary={v2a()} loadError={null} initialHash="#/?tier=all" />)
-    expect(html).toContain('>pulled<')
+    expect(html).toContain('>API pull date<')
     expect(html).toContain('2026-10-23 00:00 UTC')
-    expect(html).toContain('>measured<')
+    expect(html).toContain('>data range<')
     expect(html).not.toContain('>dump<')
     expect(html).not.toContain('>through<')
   })

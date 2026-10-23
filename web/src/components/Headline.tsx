@@ -41,9 +41,9 @@ export function Headline({ totals, tier, points, models, blisRelease, dataDate, 
         {blisRelease && <> · BLIS {blisRelease}</>}
         {measuredRange ? (
           <>
-            {' '}· InferenceX measurements{' '}
-            {measuredRange.from === measuredRange.to ? `on ${measuredRange.to}` : `${measuredRange.from} to ${measuredRange.to}`}
-            {pulledAt && <> (pulled {pulledAt.slice(0, 10)})</>}
+            {' '}· InferenceX data range{' '}
+            {measuredRange.from === measuredRange.to ? measuredRange.to : `${measuredRange.from} to ${measuredRange.to}`}
+            {pulledAt && <> · API pull date {pulledAt.slice(0, 10)}</>}
           </>
         ) : (
           dataDate && <> · InferenceX data from {dataDate}</>

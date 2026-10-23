@@ -453,14 +453,14 @@ function RunProvenance({ summary }: { summary: Summary }) {
         // measurement dates it holds, are two different things, so each gets its own label.
         <>
           <div className="kv">
-            <span className="k">pulled</span>
+            <span className="k">API pull date</span>
             <span className="v">
               {p.pulled_at ? link(`${p.pulled_at.slice(0, 10)} ${p.pulled_at.slice(11, 16)} UTC`, safeUrl(gt.source_url)) : '—'}
             </span>
           </div>
           {range && (
             <div className="kv">
-              <span className="k">measured</span>
+              <span className="k">data range</span>
               <span className="v">{range.from === range.to ? range.to : `${range.from} to ${range.to}`}</span>
             </div>
           )}
