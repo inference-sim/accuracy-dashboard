@@ -223,6 +223,15 @@ describe('the match tooltip shows only what differs, in plain words', () => {
   })
 })
 
+describe('an estimated weight format reads plainly', () => {
+  it('names the setting and both formats', () => {
+    const f = flattenPoints(v2a()).find((x) => x.fidelity?.status === 'approximate')!.fidelity!
+    const q = { ...f, args: [{ arg: 'quantization', measured: 'modelopt_mixed', blis: 'modelopt_fp4', match: 'approximated' as const, source: 'resolved_config' as const, note: 'n' }] }
+    const html = renderToStaticMarkup(<ProvenanceBody fidelity={q} />)
+    expect(html).toMatch(/Weight format<\/span><span role="cell" class="mono">nvfp4 \+ mxfp8 \(mixed\)<\/span><span role="cell">nvfp4/)
+  })
+})
+
 describe('the results download', () => {
   it('sits above "How this was measured", with a plain label', () => {
     const html = renderToStaticMarkup(<App summary={v2a()} loadError={null} />)

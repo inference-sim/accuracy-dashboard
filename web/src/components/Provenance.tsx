@@ -22,6 +22,7 @@ import type { Fidelity, FidelityArg } from '../types'
 
 /** Plain names for settings a reader may see here. Anything else falls back to its own name. */
 const LABEL: Record<string, string> = {
+  quantization: 'Weight format',
   'attention_config.indexer_kv_dtype': 'Indexer cache format',
   'attention_config.indexer_sparse_logits': 'Sparse indexer',
   'attention_config.backend': 'Attention kernel',
@@ -40,6 +41,10 @@ function label(arg: string): string {
 /** vLLM enum names (attention backends, packed KV-cache records) as a reader would say them. An
  *  unknown name is shown as is (lowercased, underscores as spaces) rather than guessed at. */
 const KERNEL: Record<string, string> = {
+  // Weight formats as vLLM names them, said plainly (quantization).
+  modelopt_fp4: 'nvfp4',
+  modelopt_mixed: 'nvfp4 + mxfp8 (mixed)',
+  gpt_oss_mxfp4: 'mxfp4 (gpt-oss loader)',
   nvfp4_ds_mla: 'default kernel, NVFP4 packed KV cache',
   fp8_ds_mla: 'default kernel, FP8 packed KV cache',
   FLASHINFER_MLA_SPARSE_DSV41: 'FlashInfer sparse MLA',
