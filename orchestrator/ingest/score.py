@@ -562,12 +562,36 @@ def row_vs_run(row: dict, c: st.Classified) -> list[str]:
     row_off = row.get("offload_mode")
     if row_off in ("on", "off") and (row_off == "on") != (offload is not None):
         out.append("conflict:offload_mode")
-    tp = c.mapped.get("parallel.tp", (None, None, None))[1]
-    dp = c.mapped.get("parallel.dp", (None, None, None))[1] or 1
-    gpus = row.get("num_decode_gpu")
-    if tp and gpus and not row.get("disagg") and int(gpus) != int(tp) * int(dp):
-        out.append("conflict:num_gpus")
+    if not row.get("disagg"):
+        out += _row_topology_vs_run(row, c)
     return out
+
+
+def _row_topology_vs_run(row: dict, c: st.Classified) -> list[str]:
+    """The row's parallel layout against the one the run's log states.
+
+    InferenceX records a single-node point's layout in its own terms, which differ from vLLM's
+    in two known ways: with DP attention its "tp" is the attention width tp x dp (vLLM logs
+    tp=1, dp=8 for its "TP 8, DP attention"); and some rows count expert-parallel ranks on top
+    of tensor-parallel ones in num_decode_gpu (tp x ep), though EP shares the TP GPUs (its own
+    results/topology.py counts tp x pp x pcp). Either spelling of the same GPUs agrees; a row
+    whose width or GPU count matches neither describes a different run."""
+    def logged(field, default=1):
+        v = c.mapped.get(field, (None, None, None))[1]
+        return int(v) if v is not None else default
+    tp, dp, pp, pcp = logged("parallel.tp", 0), logged("parallel.dp"), logged("parallel.pp"), logged("parallel.pcp")
+    if not tp:
+        return []
+    world = tp * dp * pp * pcp
+    out = []
+    row_tp, row_ep = row.get("decode_tp"), row.get("decode_ep")
+    if row_tp and int(row_tp) not in ({tp, tp * dp} if row.get("decode_dp_attention") else {tp}):
+        out.append("conflict:tp")
+    gpus = row.get("num_decode_gpu")
+    if gpus and int(gpus) != world and not (row_tp and row_ep and int(gpus) == int(row_tp) * int(row_ep)
+                                             and int(row_tp) * pp * pcp == world):
+        out.append("conflict:num_gpus")
+    return sorted(out)
 
 
 def _banner_version(log: str) -> str | None:

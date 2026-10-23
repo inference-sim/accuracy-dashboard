@@ -470,6 +470,30 @@ def test_an_indexer_record_is_named_by_vllms_layout_for_its_head_width():
     assert sp.index_record_format(132, 0) is None            # no head width stated: not guessed
 
 
+def test_the_rows_gpu_count_is_read_in_inferencex_terms():
+    import score as sc
+
+    class C:
+        def __init__(self, **par):
+            self.mapped = {f"parallel.{k}": (None, v, None) for k, v in par.items()}
+    row = lambda **kw: {"disagg": False, "decode_dp_attention": False, **kw}
+    t = sc._row_topology_vs_run
+    # the plain case: tp 8 on 8 GPUs
+    assert t(row(decode_tp=8, decode_ep=1, num_decode_gpu=8), C(tp=8, dp=1)) == []
+    # MiniMax-M2.5 h100 TP8/EP8 (row 419573): the row counts 64 (tp x ep); the log runs 8 GPUs
+    assert t(row(decode_tp=8, decode_ep=8, num_decode_gpu=64), C(tp=8, dp=1)) == []
+    # and the same layout counted correctly
+    assert t(row(decode_tp=8, decode_ep=8, num_decode_gpu=8), C(tp=8, dp=1)) == []
+    # DeepSeek-V4-Pro h200 "TP 8, DP attention" (row 435219): vLLM logs tp 1, dp 8
+    assert t(row(decode_tp=8, decode_ep=8, decode_dp_attention=True, num_decode_gpu=64), C(tp=1, dp=8)) == []
+    # a different run: the row says 8 GPUs, the log ran 4
+    assert t(row(decode_tp=8, decode_ep=1, num_decode_gpu=8), C(tp=4, dp=1)) == ["conflict:num_gpus", "conflict:tp"]
+    # a tp x ep count that doesn't match the log's GPUs either is still a conflict
+    assert t(row(decode_tp=8, decode_ep=8, num_decode_gpu=64), C(tp=4, dp=1)) == ["conflict:num_gpus", "conflict:tp"]
+    # without DP attention, a row tp equal to tp x dp isn't the same layout
+    assert t(row(decode_tp=8, decode_ep=1, num_decode_gpu=8), C(tp=1, dp=8)) == ["conflict:tp"]
+
+
 def test_a_point_is_exact_only_on_the_build_blis_models_with_nothing_approximated():
     import score as sc
     near = {"match": "exact", "distance": -738}
