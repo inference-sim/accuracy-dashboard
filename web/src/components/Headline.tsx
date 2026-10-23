@@ -12,6 +12,10 @@ interface Props {
   models: number
   blisRelease: string | null
   dataDate: string | null
+  /** v2 (API ingest): the oldest and newest measurement dates among the points, and when the
+   *  API was pulled. Shown instead of `dataDate`, which for v1 is the database dump's date. */
+  measuredRange?: { from: string; to: string } | null
+  pulledAt?: string | null
 }
 
 function Stat({ value, label, hint }: { value: number | null; label: string; hint: string }) {
@@ -24,7 +28,7 @@ function Stat({ value, label, hint }: { value: number | null; label: string; hin
   )
 }
 
-export function Headline({ totals, tier, points, models, blisRelease, dataDate }: Props) {
+export function Headline({ totals, tier, points, models, blisRelease, dataDate, measuredRange, pulledAt }: Props) {
   const t = totals[tier]
   return (
     <section className="headline" aria-label="Overall accuracy">
@@ -35,7 +39,15 @@ export function Headline({ totals, tier, points, models, blisRelease, dataDate }
       <p className="context">
         {formatCount(points)} measurements · {models} models
         {blisRelease && <> · BLIS {blisRelease}</>}
-        {dataDate && <> · InferenceX data from {dataDate}</>}
+        {measuredRange ? (
+          <>
+            {' '}· InferenceX measurements{' '}
+            {measuredRange.from === measuredRange.to ? `on ${measuredRange.to}` : `${measuredRange.from} to ${measuredRange.to}`}
+            {pulledAt && <> (pulled {pulledAt.slice(0, 10)})</>}
+          </>
+        ) : (
+          dataDate && <> · InferenceX data from {dataDate}</>
+        )}
         <span className="lower"> · lower is better</span>
       </p>
     </section>

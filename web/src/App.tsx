@@ -280,7 +280,9 @@ function Overview({
         points={headlinePoints.length}
         models={summary.matrix.length}
         blisRelease={summary.provenance?.blis?.release ?? null}
-        dataDate={summary.provenance?.ground_truth?.release_tag?.replace(/^(db-dump\/|api-)/, '') ?? null}
+        dataDate={summary.provenance?.ground_truth?.release_tag?.replace(/^db-dump\//, '') ?? null}
+        measuredRange={measuredRange(headlinePoints)}
+        pulledAt={summary.provenance?.pulled_at ?? null}
       />
 
       <h2 className="sectitle">Accuracy by model</h2>
@@ -370,6 +372,12 @@ function Overview({
   )
 }
 
+/** The oldest and newest measurement date among the points (v2 only; v1 points carry none). */
+function measuredRange(points: FlatPoint[]): { from: string; to: string } | null {
+  const dates = points.map((p) => p.measuredDate).filter((d): d is string => !!d).sort()
+  return dates.length ? { from: dates[0]!, to: dates[dates.length - 1]! } : null
+}
+
 function findIdForSweep(rows: ReturnType<typeof buildRows>, sweepKey: string): string | null {
   const match = rows.find((r) => r.level === 'topology' && r.sweepKey === sweepKey)
   return match?.id ?? null
@@ -386,6 +394,7 @@ function RunProvenance({ summary }: { summary: Summary }) {
   const b = p.blis ?? ({} as Partial<NonNullable<typeof p.blis>>)
   const gt = p.ground_truth ?? ({} as Partial<NonNullable<typeof p.ground_truth>>)
   const dash = (s: string | null | undefined, fn: (v: string) => string = (v) => v) => (s ? fn(s) : '—')
+  const range = measuredRange(flattenPoints(summary))
   // Each identifier links to exactly what was run, so nobody has to hunt for the release or
   // commit by hand (PR #26 review). Missing values stay a plain em dash, never a dead link.
   const gh = 'https://github.com/inference-sim'
@@ -431,24 +440,49 @@ function RunProvenance({ summary }: { summary: Summary }) {
       <div className="seclabel">Ground truth</div>
       <div className="kv">
         <span className="k">source</span>
-        <span className="v">InferenceX</span>
+        <span className="v">{p.ingest === 'api' ? 'InferenceX API' : 'InferenceX'}</span>
       </div>
-      <div className="kv">
-        <span className="k">dump</span>
-        <span className="v">
-          {gt.release_tag ? link(gt.release_tag.replace('db-dump/', ''), safeUrl(gt.source_url)) : '—'}
-        </span>
-      </div>
-      {gt.measurement_date_through && (
-        <div className="kv">
-          <span className="k">through</span>
-          <span className="v">{gt.measurement_date_through}</span>
-        </div>
+      {p.ingest === 'api' ? (
+        // v2: the data is a pull of the live API, not a dump. When it was pulled, and the span of
+        // measurement dates it holds, are two different things, so each gets its own label.
+        <>
+          <div className="kv">
+            <span className="k">pulled</span>
+            <span className="v">
+              {p.pulled_at ? link(`${p.pulled_at.slice(0, 10)} ${p.pulled_at.slice(11, 16)} UTC`, safeUrl(gt.source_url)) : '—'}
+            </span>
+          </div>
+          {range && (
+            <div className="kv">
+              <span className="k">measured</span>
+              <span className="v">{range.from === range.to ? range.to : `${range.from} to ${range.to}`}</span>
+            </div>
+          )}
+          <div className="kv">
+            <span className="k">pull sha256</span>
+            <span className="v">{dash(gt.measurement_sha256, (v) => `${v.slice(0, 8)}…`)}</span>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="kv">
+            <span className="k">dump</span>
+            <span className="v">
+              {gt.release_tag ? link(gt.release_tag.replace('db-dump/', ''), safeUrl(gt.source_url)) : '—'}
+            </span>
+          </div>
+          {gt.measurement_date_through && (
+            <div className="kv">
+              <span className="k">through</span>
+              <span className="v">{gt.measurement_date_through}</span>
+            </div>
+          )}
+          <div className="kv">
+            <span className="k">sha256</span>
+            <span className="v">{dash(gt.measurement_sha256, (v) => `${v.slice(0, 8)}…`)}</span>
+          </div>
+        </>
       )}
-      <div className="kv">
-        <span className="k">sha256</span>
-        <span className="v">{dash(gt.measurement_sha256, (v) => `${v.slice(0, 8)}…`)}</span>
-      </div>
       <div className="seclabel">Run</div>
       <div className="kv">
         <span className="k">snapshot</span>

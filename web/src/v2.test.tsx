@@ -89,6 +89,30 @@ describe('a v2 snapshot renders', () => {
   })
 })
 
+describe('dates are labelled for what they are', () => {
+  it('the headline gives the measurement span and the pull date, never a "data from <pull date>"', () => {
+    const { html } = render(<App summary={v2a()} loadError={null} initialHash="#/?tier=all" />)
+    expect(html).toContain('InferenceX measurements 2026-09-03 to 2026-10-03')
+    expect(html).toContain('(pulled 2026-10-23)')
+    expect(html).not.toContain('InferenceX data from')
+  })
+
+  it('the run details say pulled / measured, not dump / through', () => {
+    const { html } = render(<App summary={v2a()} loadError={null} initialHash="#/?tier=all" />)
+    expect(html).toContain('>pulled<')
+    expect(html).toContain('2026-10-23 00:00 UTC')
+    expect(html).toContain('>measured<')
+    expect(html).not.toContain('>dump<')
+    expect(html).not.toContain('>through<')
+  })
+
+  it('a v1 snapshot keeps its dump wording', () => {
+    const { html } = render(<App summary={v1()} loadError={null} initialHash="#/?tier=all" />)
+    expect(html).toContain('InferenceX data from 2026-09-28')
+    expect(html).toContain('>dump<')
+  })
+})
+
 describe('the provenance tooltip', () => {
   const body = (status: 'exact' | 'approximate') => {
     // exact: DeepSeek-V4.1-Flash h200 TP8 c1 (its max_num_seqs is BLIS's default); approximate: b200 DEP2
