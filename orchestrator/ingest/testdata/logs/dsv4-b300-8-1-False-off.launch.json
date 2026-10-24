@@ -1,0 +1,61 @@
+{
+ "engine": {
+  "type": "vllm"
+ },
+ "frontend": {
+  "enable_multiple_frontends": false,
+  "type": "vllm"
+ },
+ "model": {
+  "container": "vllm/vllm-openai:nightly-dev-x86_64-cu13.0.1-20ebb28",
+  "path": "hf:deepseek-ai/DeepSeek-V4-Pro-0813",
+  "precision": "fp4"
+ },
+ "resources": {
+  "gpu_type": "b300",
+  "gpus_per_node": 8
+ },
+ "roles": {
+  "agg": {
+   "args": {
+    "attention-config": "{\"indexer_kv_dtype\":\"mxfp4\",\"backend\":\"FLASHINFER_MLA_SPARSE_DSV4\",\"use_prefill_query_quantization\":true}",
+    "block-size": 256,
+    "compilation-config": "{\"cudagraph_mode\":\"FULL_AND_PIECEWISE\",\"cudagraph_capture_sizes\":[6,7,12,14,18,21,24,28,100,200,300,400,500]}",
+    "data-parallel-size": 1,
+    "disable-custom-all-reduce": true,
+    "disable-uvicorn-access-log": true,
+    "enable-auto-tool-choice": true,
+    "gpu-memory-utilization": 0.95,
+    "kv-cache-dtype": "fp8",
+    "max-model-len": 1048576,
+    "max-num-seqs": 4,
+    "no-disable-hybrid-kv-cache-manager": true,
+    "no-enable-flashinfer-autotune": true,
+    "numa-bind": true,
+    "reasoning-parser": "deepseek_v4",
+    "served-model-name": "deepseek-ai/DeepSeek-V4-Pro-0813",
+    "speculative-config": "{\"method\": \"dspark\", \"num_speculative_tokens\": 6, \"draft_sample_method\": \"probabilistic\", \"rejection_sample_method\": \"synthetic\", \"synthetic_acceptance_length\": 3.77}",
+    "tensor-parallel-size": 8,
+    "tokenizer-mode": "deepseek_v4",
+    "tool-call-parser": "deepseek_v4",
+    "trust-remote-code": true
+   },
+   "env": {
+    "NCCL_NVLS_ENABLE": "1",
+    "PYTHONNOUSERSITE": "1",
+    "TORCH_CUDA_ARCH_LIST": "10.0",
+    "VLLM_ALLREDUCE_USE_FLASHINFER": "1",
+    "VLLM_DSV4_MEGA_FP8_COMBINE": "1",
+    "VLLM_ENGINE_READY_TIMEOUT_S": "7200",
+    "VLLM_FLASHINFER_ALLREDUCE_BACKEND": "auto",
+    "VLLM_FLOAT32_MATMUL_PRECISION": "high",
+    "VLLM_PREFIX_CACHE_RETENTION_INTERVAL": "32768",
+    "VLLM_USE_RUST_FRONTEND": "1",
+    "VLLM_USE_V2_MODEL_RUNNER": "1"
+   },
+   "gpus": 8,
+   "nodes": 1,
+   "workers": 1
+  }
+ }
+}

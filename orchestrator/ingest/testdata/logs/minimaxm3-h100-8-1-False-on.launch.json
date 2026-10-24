@@ -1,0 +1,57 @@
+{
+ "engine": {
+  "connector": null,
+  "type": "vllm"
+ },
+ "frontend": {
+  "enable_multiple_frontends": false,
+  "type": "vllm"
+ },
+ "model": {
+  "container": "vllm/vllm-openai:nightly-ddd6fbca148a867aad1fcab7ec72f582b9977db4",
+  "path": "hf:MiniMaxAI/MiniMax-M3-MXFP8",
+  "precision": "fp8"
+ },
+ "resources": {
+  "gpu_type": "h100",
+  "gpus_per_node": 8
+ },
+ "roles": {
+  "agg": {
+   "args": {
+    "attention-backend": "TRITON_ATTN",
+    "block-size": 128,
+    "cpu-offload-gb": 26,
+    "data-parallel-size": 1,
+    "default-chat-template-kwargs": "{\"thinking_mode\":\"enabled\"}",
+    "enable-auto-tool-choice": true,
+    "enable-prefix-caching": true,
+    "enable-prompt-tokens-details": true,
+    "gpu-memory-utilization": 0.9,
+    "kv-cache-dtype": "fp8",
+    "kv-transfer-config": "{\"kv_connector\":\"MooncakeStoreConnector\",\"kv_role\":\"kv_both\",\"kv_connector_extra_config\":{\"load_async\":true}}",
+    "language-model-only": true,
+    "max-cudagraph-capture-size": 48,
+    "max-num-seqs": 12,
+    "reasoning-parser": "minimax_m3",
+    "safetensors-load-strategy": "lazy",
+    "served-model-name": "MiniMaxAI/MiniMax-M3-MXFP8",
+    "speculative-config": "{\"method\": \"eagle3\", \"model\": \"Inferact/MiniMax-M3-EAGLE3-GQA\", \"num_speculative_tokens\": 3, \"attention_backend\": \"FLASH_ATTN\", \"rejection_sample_method\": \"synthetic\", \"synthetic_acceptance_length\": 2.78}",
+    "tensor-parallel-size": 8,
+    "tool-call-parser": "minimax_m3",
+    "trust-remote-code": true
+   },
+   "env": {
+    "MC_ENABLE_DEST_DEVICE_AFFINITY": "1",
+    "MC_SLICE_SIZE": "1048576",
+    "MC_WORKERS_PER_CTX": "4",
+    "PYTHONHASHSEED": "0",
+    "PYTHONNOUSERSITE": "1",
+    "VLLM_ENGINE_READY_TIMEOUT_S": "7200"
+   },
+   "gpus": 8,
+   "nodes": 1,
+   "workers": 1
+  }
+ }
+}

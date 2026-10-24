@@ -1,0 +1,54 @@
+{
+ "engine": {
+  "connector": null,
+  "type": "vllm"
+ },
+ "frontend": {
+  "enable_multiple_frontends": false,
+  "type": "vllm"
+ },
+ "model": {
+  "container": "vllm/vllm-openai:nightly-39983a5e7a5a575a7829f5d5ada50a33d9337ec1@sha256:9c482f0f927b7064777c7baf0faafe5721804a9eb8b9bfea9d939cfbc3138348",
+  "path": "hf:MiniMaxAI/MiniMax-M3-MXFP8",
+  "precision": "fp8"
+ },
+ "resources": {
+  "gpu_type": "h200",
+  "gpus_per_node": 8
+ },
+ "roles": {
+  "agg": {
+   "args": {
+    "attention-backend": "FLASH_ATTN",
+    "attention-config": "{\"indexer_kv_dtype\":\"fp8\"}",
+    "block-size": 128,
+    "data-parallel-size": 1,
+    "default-chat-template-kwargs": "{\"thinking_mode\":\"enabled\"}",
+    "enable-auto-tool-choice": true,
+    "enable-prefix-caching": true,
+    "enable-prompt-tokens-details": true,
+    "gpu-memory-utilization": 0.95,
+    "kv-cache-dtype": "fp8",
+    "language-model-only": true,
+    "linear-backend": "humming",
+    "max-cudagraph-capture-size": 32,
+    "max-num-seqs": 8,
+    "reasoning-parser": "minimax_m3",
+    "safetensors-load-strategy": "prefetch",
+    "served-model-name": "MiniMaxAI/MiniMax-M3-MXFP8",
+    "speculative-config": "{\"method\": \"eagle3\", \"model\": \"Inferact/MiniMax-M3-EAGLE3-GQA\", \"num_speculative_tokens\": 3, \"attention_backend\": \"FLASH_ATTN\", \"rejection_sample_method\": \"synthetic\", \"synthetic_acceptance_length\": 2.78}",
+    "tensor-parallel-size": 8,
+    "tool-call-parser": "minimax_m3",
+    "trust-remote-code": true
+   },
+   "env": {
+    "PYTHONNOUSERSITE": "1",
+    "VLLM_ENGINE_READY_TIMEOUT_S": "7200",
+    "VLLM_MARLIN_USE_ATOMIC_ADD": "1"
+   },
+   "gpus": 8,
+   "nodes": 1,
+   "workers": 1
+  }
+ }
+}

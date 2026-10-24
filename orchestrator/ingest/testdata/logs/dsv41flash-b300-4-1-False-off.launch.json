@@ -1,0 +1,53 @@
+{
+ "engine": {
+  "type": "vllm"
+ },
+ "frontend": {
+  "enable_multiple_frontends": false,
+  "type": "vllm"
+ },
+ "model": {
+  "container": "vllm/vllm-openai:cu134-nightly-x86_64-dev-20261019-mk@sha256:2b9fc4b18d0aaabe4d5cad020d9270106472ebe65f5d3bc02c50526b8d9fd280",
+  "path": "hf:deepseek-ai/DeepSeek-V4.1-Flash",
+  "precision": "fp4"
+ },
+ "resources": {
+  "gpu_type": "b300",
+  "gpus_per_node": 8
+ },
+ "roles": {
+  "agg": {
+   "args": {
+    "additional-config": "{\"decode_backend\":\"latency_specialized\"}",
+    "attention-config": "{\"backend\":\"FLASHINFER_MLA_SPARSE_DSV41\",\"indexer_kv_dtype\":\"mxfp4\",\"indexer_sparse_logits\":true}",
+    "compilation-config": "{\"mode\":\"VLLM_COMPILE\",\"cudagraph_mode\":\"FULL_AND_PIECEWISE\",\"cudagraph_capture_sizes\":[5,6,12,18,24,30,36,48,60,72,96,120,144,192,240,288,384,480,576,768,1020,1536,2046,3072,4092,6144,8190]}",
+    "disable-uvicorn-access-log": true,
+    "enable-auto-tool-choice": true,
+    "engram-config": "{\"cpu_offload\":true,\"use_thp\":true}",
+    "kernel-config": "{\"enable_flashinfer_autotune\":true}",
+    "kv-cache-dtype": "fp8",
+    "language-model-only": true,
+    "max-cudagraph-capture-size": 8190,
+    "max-model-len": 1048576,
+    "max-num-batched-tokens": 8192,
+    "max-num-seqs": 16,
+    "prefill-schedule-interval": 160,
+    "reasoning-parser": "deepseek_v41",
+    "served-model-name": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "speculative-config": "{\"method\": \"dspark\", \"num_speculative_tokens\": 5, \"draft_sample_method\": \"probabilistic\", \"rejection_sample_method\": \"synthetic\", \"enable_adaptive_verification\": false, \"synthetic_acceptance_length\": 3.51}",
+    "tensor-parallel-size": 4,
+    "tokenizer-mode": "deepseek_v41",
+    "tool-call-parser": "deepseek_v41"
+   },
+   "env": {
+    "PYTHONUNBUFFERED": "1",
+    "VLLM_ENGINE_READY_TIMEOUT_S": "7200",
+    "VLLM_USE_RUST_FRONTEND": "1",
+    "VLLM_USE_V2_MODEL_RUNNER": "1"
+   },
+   "gpus": 4,
+   "nodes": 1,
+   "workers": 1
+  }
+ }
+}
