@@ -28,21 +28,31 @@ class RateLimited(RuntimeError):
     a per-row data problem."""
 
 
-def _get_json(url: str, headers: dict, timeout: int = 60, *, retries: int = 4, sleep=None):
-    """GET JSON, retrying 5xx, connection errors and rate limits (429, or 403 with no quota
-    left) with backoff, honouring Retry-After / x-ratelimit-reset. Other 4xx raise at once."""
+class FetchFailed(RuntimeError):
+    """A host kept failing (5xx, connection errors, timeouts) after the retries. Like
+    RateLimited, it stops the pull: an outage would otherwise be filed as per-row data gaps."""
+
+
+def _get_bytes(url: str, headers: dict, timeout: int = 60, *, retries: int = 4, sleep=None, opener=None) -> bytes:
+    """GET a body, retrying 5xx, connection errors and rate limits (429, or 403 with no quota
+    left) with backoff, honouring Retry-After / x-ratelimit-reset. Other HTTP errors (4xx, and
+    a redirect the opener refuses to follow) raise at once as HTTPError; retries that run out
+    raise RateLimited or FetchFailed."""
     sleep = sleep or time.sleep
+    open_ = opener.open if opener else urllib.request.urlopen
     for attempt in range(retries + 1):
         req = urllib.request.Request(url, headers=headers)
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (fixed hosts)
-                return json.loads(resp.read())
+            with open_(req, timeout=timeout) as resp:  # noqa: S310 (fixed hosts)
+                return resp.read()
         except urllib.error.HTTPError as e:
             limited = e.code == 429 or (e.code == 403 and e.headers.get("x-ratelimit-remaining") == "0")
-            if not (limited or e.code >= 500) or attempt == retries:
+            if not (limited or e.code >= 500):
+                raise
+            if attempt == retries:
                 if limited:
                     raise RateLimited(f"{url.split('?')[0]}: HTTP {e.code} after {retries} retries") from e
-                raise
+                raise FetchFailed(f"{url.split('?')[0]}: HTTP {e.code} after {retries} retries") from e
             wait = e.headers.get("Retry-After")
             reset = e.headers.get("x-ratelimit-reset")
             if wait and wait.isdigit():
@@ -52,11 +62,16 @@ def _get_json(url: str, headers: dict, timeout: int = 60, *, retries: int = 4, s
             else:
                 delay = 2 ** attempt
             sleep(min(delay, 900))
-        except (urllib.error.URLError, TimeoutError, ConnectionError):
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
             if attempt == retries:
-                raise
+                raise FetchFailed(f"{url.split('?')[0]}: {e!r} after {retries} retries") from e
             sleep(2 ** attempt)
     raise AssertionError("unreachable")
+
+
+def _get_json(url: str, headers: dict, timeout: int = 60, *, retries: int = 4, sleep=None):
+    """GET JSON through _get_bytes's retries."""
+    return json.loads(_get_bytes(url, headers, timeout, retries=retries, sleep=sleep))
 
 
 class DockerHubRegistry:

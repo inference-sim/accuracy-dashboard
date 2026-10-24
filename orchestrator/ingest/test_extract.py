@@ -6,6 +6,7 @@ Run: python3 orchestrator/ingest/test_extract.py
 import gzip
 import io
 import json
+import re
 import sys
 import tarfile
 import tempfile
@@ -33,6 +34,12 @@ RESOLVED = ("model='m', tensor_parallel_size=1, pipeline_parallel_size=1, data_p
 
 def _log(args: str, resolved: str = RESOLVED, extra: str = "") -> str:
     out = f"INFO [api_utils.py:286] non-default args: {{{args}}}\n"
+    if resolved is RESOLVED:
+        # The engine runs the parallelism the args asked for, as in every real log.
+        for k in ("tensor_parallel_size", "pipeline_parallel_size", "data_parallel_size"):
+            m = re.search(rf"'{k}': (\d+)", args)
+            if m:
+                resolved = re.sub(rf"{k}=\d+", f"{k}={m.group(1)}", resolved)
     if resolved is not None:
         out += f"INFO [core.py:129] Initializing a V1 LLM engine (v0.30.1rc1.dev493+gac9126e58) with config: {resolved}\n"
     return out + extra
@@ -102,6 +109,16 @@ def test_every_policy_entry_is_well_formed():
 
 
 # ------------------------------------------------------------------ settings sources
+
+def test_a_request_the_engine_overrode_is_a_conflict():
+    # PR #32 review: vLLM can override a requested value (e.g. block size for a backend); BLIS
+    # was given the request. Now the engine's own report of a different value refuses the point.
+    log = _log("'block_size': 16", extra="INFO Setting kv cache block size to 64 for FLASHMLA backend(s).\n")
+    assert "conflict:block_size" in _classify(log).reasons
+    # the same value as the request, or the same once typed ('1' is True), is no conflict
+    log = _log("'block_size': 64", extra="INFO Setting kv cache block size to 64 for FLASHMLA backend(s).\n")
+    assert _classify(log).reasons == []
+
 
 def test_args_win_and_engine_lines_fill_what_args_omit():
     log = _log("'max_num_seqs': 16, 'tensor_parallel_size': 4", extra=(
@@ -774,6 +791,91 @@ def test_unreadable_archive_members_raise_instead_of_being_skipped():
     except ValueError:
         return
     raise AssertionError("an unparseable launch config was treated as absent")
+
+
+def test_an_oversized_member_the_point_does_not_need_is_skipped_not_fatal():
+    # PR #32 review: a 2.1 GB server_metrics_export.json beside the client export sank the whole
+    # agentic upload. The cap is lowered here so the test needs no 2 GiB of memory.
+    import pull as pl
+    old = art._MAX_MEMBER
+    art._MAX_MEMBER = 64
+    try:
+        export = b'{"records": []}'
+        blob = _zip({"profile_export_aiperf.json": export, "server_metrics_export.json": b"{" + b" " * 200 + b"}"})
+        entry: dict = {}
+        files = pl.read_needed(blob, entry, lambda o: o.path.rsplit("/", 1)[-1] in pl.AGENTIC_FILES)
+        assert [p for p, _ in files] == ["profile_export_aiperf.json"]
+        assert entry["skipped_members"] == ["server_metrics_export.json (202 bytes)"]
+        # the needed member oversized: the artifact is unreadable, as before
+        big = _zip({"profile_export_aiperf.json": b"{" + b" " * 200 + b"}"})
+        for blob, needed in ((big, lambda o: True), (_zip({"nested.zip": _zip({"a": b"x" * 200})}), lambda o: False)):
+            try:
+                pl.read_needed(blob, {}, needed)
+            except art.Unreadable:
+                continue
+            raise AssertionError("an oversized member the point needs (or an archive) was skipped")
+        # without an `oversized` list, iter_files still refuses
+        try:
+            list(art.iter_files(_zip({"x.json": b" " * 200})))
+        except art.Unreadable:
+            pass
+        else:
+            raise AssertionError("iter_files skipped silently")
+        # a tar member too
+        entry = {}
+        files = pl.read_needed(_targz({"./log.txt": LOG, "./m.json": b" " * 200}), entry, lambda o: False)
+        assert [p for p, _ in files] == ["log.txt"] and entry["skipped_members"] == ["m.json (200 bytes)"]
+    finally:
+        art._MAX_MEMBER = old
+
+
+def test_an_escaped_quote_inside_a_string_does_not_end_it():
+    # PR #32 review: `\\'` used to close the quote early, so a later brace was counted.
+    text = "non-default args: {'a': 'it\\'s {not} a brace', 'b': 1} tail }"
+    got = st._balanced(text, text.index("{"))
+    assert got == "{'a': 'it\\'s {not} a brace', 'b': 1}", got
+
+
+def test_a_list_setting_given_a_non_list_refuses_instead_of_writing_null():
+    entry = {"type": "list"}
+    assert st._typed(entry, [1, 2]) == [1, 2]
+    try:
+        st._typed(entry, 8)
+    except ValueError:
+        return
+    raise AssertionError("a non-list list value was accepted")
+
+
+def test_a_sweep_is_one_curve_of_inferencex_rows():
+    # PR #31 review: one InferenceX workflow ran DeepSeek-V4-Pro b200 tp8 with and without MTP,
+    # and MiniMax-M2.5 b300 tp2 with and without DP attention; the sweep id joined each pair, so
+    # two points sat at one concurrency. Rows of one curve differ only in per-point fields.
+    import score as sc
+    row = {"curve_workflow_run_id": "2151", "model": "dsv4pro", "hardware": "b200", "conc": 1, "id": "1",
+           "spec_method": "none", "decode_dp_attention": False, "recipe_fingerprint": "a" * 64,
+           "metrics": {"mean_ttft": 1.0}}
+    same_curve = {**row, "conc": 2, "id": "2", "recipe_fingerprint": "b" * 64, "metrics": {"mean_ttft": 2.0}}
+    sid = lambda r: sc.sweep_id(r, "scen", "1k1k")  # noqa: E731
+    assert sid(row) == sid(same_curve) and sid(row).startswith("2151|scen|1k1k|")
+    assert sid(row) != sid({**row, "spec_method": "mtp"})
+    assert sid(row) != sid({**row, "decode_dp_attention": True})
+
+
+def test_two_points_left_at_one_concurrency_in_a_sweep_get_a_sweep_each():
+    import score as sc
+    o = lambda pid, conc, recipe: sc.Outcome.__new__(sc.Outcome)  # noqa: E731
+    outs = []
+    for pid, conc, recipe in (("a", 1, "row:1"), ("b", 2, "row:2"), ("c", 2, "row:3")):
+        x = o(pid, conc, recipe)
+        x.identity = {"conc": conc, "recipe": recipe}
+        x.facets = {"sweep_id": "s"}
+        outs.append(x)
+    sc.split_repeated_sweeps(outs)
+    assert [x.facets["sweep_id"] for x in outs] == ["s|row:1", "s|row:2", "s|row:3"]
+    clean = [outs[0]]
+    clean[0].facets["sweep_id"] = "t"
+    sc.split_repeated_sweeps(clean)
+    assert clean[0].facets["sweep_id"] == "t"
 
 
 def test_join_reports_no_match_and_several_matches():

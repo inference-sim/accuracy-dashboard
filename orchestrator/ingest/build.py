@@ -132,8 +132,9 @@ def tag_sha(tag: str | None) -> str | None:
 
 # Why a build is estimated rather than exact (fidelity.schema.json#/definitions/build.why).
 CUSTOM_BUILD = "custom_build"                  # not an official image, or its commit is off mainline
+                                               # (or not in vllm-project/vllm at all: a fork)
 OUTSIDE_DISTANCE = "outside_distance"          # more than max_distance commits from VLLM_REF
-COMMIT_UNRESOLVABLE = "commit_unresolvable"    # no source yields a commit in vllm-project/vllm
+COMMIT_UNRESOLVABLE = "commit_unresolvable"    # no source names a commit at all
 COMMIT_CONFLICT = "commit_conflict"            # the sources name different commits
 
 
@@ -167,6 +168,7 @@ class Resolver:
     max_distance: int = VLLM_MAX_DISTANCE
     repo: str = VLLM_REPO
     _commits: dict = field(default_factory=dict)       # sha prefix -> full sha | None
+    _absent: set = field(default_factory=set)          # shas vllm-project/vllm doesn't have
     _labels: dict = field(default_factory=dict)        # (repository, reference) -> label | None
     _placement: dict = field(default_factory=dict)     # full sha -> (distance | None, why | None)
     _ref_base: str | None = None
@@ -177,6 +179,8 @@ class Resolver:
             full = sha if _FULL_SHA.fullmatch(sha) else None
             got = self.github.resolve_commit(self.repo, sha)
             self._commits[sha] = got if got and (full is None or got == full) else None
+            if got is None:
+                self._absent.add(sha)
         return self._commits[sha]
 
     def _label(self, repository: str, reference: str) -> str | None:
@@ -253,6 +257,10 @@ class Resolver:
                 return build
             release_commit = self.github.tag_commit(self.repo, img.tag)
 
+        # The image label or the log's banner named a commit vllm-project/vllm doesn't have
+        # (GitHub answers 422): the build is off vLLM's mainline, i.e. a custom build, not an
+        # unknown one. (An image tag's trailing hex is no such statement: it can be a date.)
+        named_unknown = (label and label != "unknown" and label in self._absent) or (banner and banner in self._absent)
         candidates = [(src, sha) for src, sha in ((label_source, label_commit),
                                                   ("server_log_banner", banner_commit),
                                                   ("image_tag", tag_commit),
@@ -260,8 +268,8 @@ class Resolver:
         if len({sha for _, sha in candidates}) > 1:
             build.why = COMMIT_CONFLICT
             return build
-        if not candidates:
-            build.why = COMMIT_UNRESOLVABLE
+        if not candidates or named_unknown:
+            build.why = CUSTOM_BUILD if named_unknown else COMMIT_UNRESOLVABLE
             return build
         build.source, build.commit = candidates[0]
         build.distance, build.why = self._place(build.commit)

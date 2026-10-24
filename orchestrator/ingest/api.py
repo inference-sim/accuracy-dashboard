@@ -17,7 +17,7 @@ from __future__ import annotations
 import gzip
 import json
 import re
-import urllib.request
+import urllib.parse
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
@@ -30,10 +30,11 @@ _SCRIPT = re.compile(r'(/_next/static/[^"\'\s]+\.js)')
 
 
 def http_fetch(url: str, timeout: int = 120) -> bytes:
-    """The body, decompressed: the API and site gzip their responses."""
-    req = urllib.request.Request(url, headers={"Accept-Encoding": "gzip", "User-Agent": "accuracy-dashboard-ingest"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (fixed host)
-        return gunzip(resp.read())
+    """The body, decompressed: the API and site gzip their responses. Retried like every other
+    fetch (clients._get_bytes); an outage that outlasts the retries stops the pull."""
+    import clients
+    return gunzip(clients._get_bytes(url, {"Accept-Encoding": "gzip", "User-Agent": "accuracy-dashboard-ingest"},
+                                     timeout))
 
 
 def gunzip(body: bytes) -> bytes:
@@ -105,7 +106,7 @@ def pull(fetch, *, today: date, window_days: int, framework: str = "vllm") -> Pu
     out = Pull(unnamed_slugs=sorted(slugs - set(names)), window=(start.isoformat(), today.isoformat()))
     seen = set()
     for display in sorted(set(names[s] for s in slugs if s in names)):
-        rows = decode(fetch(API + "/benchmarks?model=" + urllib.request.quote(display)))
+        rows = decode(fetch(API + "/benchmarks?model=" + urllib.parse.quote(display)))
         if isinstance(rows, dict) and "error" in rows:
             raise RuntimeError(f"/benchmarks?model={display}: {rows['error']}")
         for r in rows:

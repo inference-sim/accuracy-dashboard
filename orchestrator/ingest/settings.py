@@ -92,13 +92,16 @@ def flatten(value, prefix: str = "") -> dict:
 
 
 def _balanced(text: str, start: int) -> str | None:
-    depth, quote = 0, None
+    depth, quote, escaped = 0, None, False
     for i in range(start, len(text)):
         ch = text[i]
         if quote:
-            if ch == "\\":
-                continue
-            if ch == quote:
+            # Inside a string literal, a backslash escapes the next character (\' doesn't close).
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == quote:
                 quote = None
         elif ch in "'\"":
             quote = ch
@@ -299,11 +302,8 @@ def merge(readings: dict[str, Reading], policy: dict, vllm_defaults: dict | None
         value, occ, conflict = _one([x for x in vals if x is not None] or vals)
         st = Setting(path=path, value=value, source=s, occurrences=occ, conflict=conflict,
                      requested=_requested(path, readings, entry, defaults))
-        # Only what was ASKED can disagree: the launch config and the args line both state
-        # the request, so a difference between them is a conflict. The resolved line and
-        # engine lines are the engine's resolution of that request; where they differ from
-        # it, that is vLLM resolving, not a disagreement (and an entry that wants the
-        # resolved value says so with source_prefer / source_only).
+        # The launch config and the args line both state the request, so a difference
+        # between them is a conflict.
         if conflict is None and s in REQUESTED:
             for s2, vals2 in stated[1:]:
                 if s2 not in REQUESTED:
@@ -312,11 +312,32 @@ def merge(readings: dict[str, Reading], policy: dict, vllm_defaults: dict | None
                 if c2 is not None or not _same(v2, value):
                     st.conflict = sorted({_canon(value): value, **{_canon(x): x for x in (c2 or [v2])}}.values(), key=_canon)
                     break
+        # A mapped setting is written to BLIS from the request. If the engine then reports
+        # running a different value (and the entry doesn't already take the engine's), BLIS
+        # would simulate something the run didn't do, so that's a conflict too. Compared as
+        # the entry's type, so '1' and True are one value.
+        if st.conflict is None and s in REQUESTED and entry.get("class") == "mapped" \
+                and not (entry.get("source_prefer") or entry.get("source_only")):
+            for s2, vals2 in stated:
+                if s2 not in ENGINE_SOURCES:
+                    continue
+                v2, _, c2 = _one([x for x in vals2 if x is not None])
+                if c2 is None and not _same_typed(entry, value, v2):
+                    st.conflict = sorted({_canon(value): value, _canon(v2): v2}.values(), key=_canon)
+                    break
         out[path] = st
     return out
 
 
 REQUESTED = ("launch_config", "args")
+ENGINE_SOURCES = ("resolved_config", "engine_line")
+
+
+def _same_typed(entry: dict, a, b) -> bool:
+    try:
+        return _canon(_typed(entry, a)) == _canon(_typed(entry, b))
+    except ValueError:
+        return _same(a, b)
 
 
 def _at_default(path: str, value, entry: dict, vllm_defaults: dict) -> bool:
@@ -421,7 +442,9 @@ def _typed(entry: dict, value):
         if t == "str":
             return None if v is None else str(v)
         if t == "list":
-            return [int(x) for x in v] if isinstance(v, list) else None
+            if not isinstance(v, list):
+                raise ValueError     # never written as null: the point refuses (conflict)
+            return [int(x) for x in v]
     except (TypeError, ValueError):
         raise ValueError(f"{value!r} is not a {t}")
     return v

@@ -3,6 +3,7 @@
 Run: python3 orchestrator/ingest/test_build.py
 """
 import json
+import tempfile
 import sys
 import urllib.error
 from pathlib import Path
@@ -187,9 +188,16 @@ def test_sources_naming_different_commits_conflict():
     assert got.why == "commit_conflict" and got.commit is None
 
 
-def test_a_commit_that_is_not_in_vllm_is_unresolvable():
+def test_a_commit_vllm_does_not_have_is_a_custom_build():
+    # PR #32 review: a fork's commit (GitHub answers 422 for it in vllm-project/vllm) was labelled
+    # commit_unresolvable. The log named a commit; it just isn't vLLM's, so the build is custom.
     got = _resolver({("vllm/vllm-openai", "nightly-dev-x86_64-cu13.0.1-20ebb28"): "unknown"}).resolve(
         "vllm/vllm-openai:nightly-dev-x86_64-cu13.0.1-20ebb28", server_log=_log("1234567"))
+    assert got.why == "custom_build" and got.distance is None
+
+
+def test_no_commit_named_anywhere_is_unresolvable():
+    got = _resolver({("vllm/vllm-openai", "nightly-dev"): "unknown"}).resolve("vllm/vllm-openai:nightly-dev")
     assert got.why == "commit_unresolvable" and got.distance is None
 
 
@@ -314,8 +322,54 @@ def test_get_json_retries_rate_limits_and_server_errors_then_gives_up_loudly():
             raise AssertionError("a rate limit was swallowed")
         except cl.RateLimited:
             pass
+        # an outage that outlasts the retries stops the pull too (PR #32 review)
+        script[:] = [err(502)] * 5
+        try:
+            cl._get_json("https://h/x", {}, retries=4, sleep=slept.append)
+            raise AssertionError("a lasting 5xx was swallowed")
+        except cl.FetchFailed:
+            pass
+        script[:] = [urllib.error.URLError("reset")] * 2 + [b"body"]
+        assert cl._get_bytes("https://h/x", {}, sleep=slept.append) == b"body"
     finally:
         cl.urllib.request.urlopen = orig
+
+
+def test_the_inferencex_api_and_artifact_fetches_go_through_the_retries():
+    # PR #32 review: http_fetch and the artifact list/download used plain urllib, so a 503 became
+    # a per-row pull_error. Now each retries, and a lasting failure raises out of the pull.
+    import gzip as gz
+    import io
+    import urllib.error
+    import api
+    import artifacts as art
+    import clients as cl
+    seen = []
+
+    class Resp(io.BytesIO):
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    state = {"n": 0}
+
+    def fake_open(req, timeout):
+        seen.append(req.full_url)
+        state["n"] += 1
+        if state["n"] % 2:                      # every first try fails
+            raise urllib.error.HTTPError(req.full_url, 503, "x", {}, io.BytesIO(b""))
+        if "/artifacts?" in req.full_url:
+            return Resp(b'{"total_count": 1, "artifacts": [{"id": 7, "name": "a", "created_at": "t", "expired": false}]}')
+        return Resp(gz.compress(b'{"ok": true}'))
+    orig, orig_sleep = cl.urllib.request.urlopen, cl.time.sleep
+    try:
+        cl.urllib.request.urlopen = fake_open
+        cl.time.sleep = lambda s: None
+        assert api.decode(api.http_fetch("https://inferencex.semianalysis.com/api/v1/availability")) == {"ok": True}
+        gh = art.GitHubArtifacts("o/r", "tok", tempfile.mkdtemp(), sleep=lambda s: None)
+        assert [a.id for a in gh.list("1")] == [7]
+        assert len(seen) == 4
+    finally:
+        cl.urllib.request.urlopen, cl.time.sleep = orig, orig_sleep
 
 
 # ------------------------------------------------------------------ the registry client
@@ -386,8 +440,8 @@ def test_registry_treats_404_as_no_label_but_raises_on_other_errors():
             try:
                 got = reg.revision_label("vllm/vllm-openai", "t")
                 assert not expect_raise and got is None, code
-            except (urllib.error.HTTPError, clients.RateLimited):
-                assert expect_raise, code        # 429 -> RateLimited, 500 -> HTTPError after retries
+            except (clients.FetchFailed, clients.RateLimited):
+                assert expect_raise, code        # 429 -> RateLimited, 500 -> FetchFailed after retries
     finally:
         clients.urllib.request.urlopen, clients.time.sleep = orig, orig_sleep
 

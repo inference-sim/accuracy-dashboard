@@ -30,6 +30,19 @@ import support as sp  # noqa: E402
 
 AGENTIC_LABEL = "agentx"
 
+# The API row fields that vary from point to point within one InferenceX curve. Every other
+# field is the curve's (run, model, part, parallelism, drafter, DP attention, offload, ...), so
+# rows that differ in any of them are separate curves even inside one workflow run. A field the
+# API adds later counts as the curve's: at worst that splits a curve, never merges two.
+PER_POINT_ROW_FIELDS = ("conc", "id", "metrics", "power_audit", "power_invalid_reasons", "recipe_fingerprint")
+
+
+def sweep_id(row: dict, scenario: str, label: str) -> str:
+    """The measured curve a point belongs to (facets' sweep_id), for the shape metric."""
+    curve = {k: v for k, v in row.items() if k not in PER_POINT_ROW_FIELDS}
+    h = hashlib.sha256(contract.canonical_dumps(curve).encode()).hexdigest()[:12]
+    return f"{row.get('curve_workflow_run_id')}|{scenario}|{label}|{h}"
+
 
 @dataclass
 class Env:
@@ -372,7 +385,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     par = dep["pools"][0]["parallel"]
     ep = (par["tp"] * par["dp"]) if par.get("enable_expert_parallel") else 1
     scen = f"{sup.model}-{row['hardware']}-{row['precision']}-vllm-tp{par['tp']}-dp{par['dp']}-ep{ep}-agentx"
-    o.facets = {"identity": ident, "sweep_id": f"{row.get('curve_workflow_run_id')}|{scen}|{AGENTIC_LABEL}",
+    o.facets = {"identity": ident, "sweep_id": sweep_id(row, scen, AGENTIC_LABEL),
                 "scenario": scen, "label": AGENTIC_LABEL, "workload": AGENTIC_LABEL, "model": sup.model,
                 "gpu": row["hardware"], "precision": row["precision"], "framework": "vllm",
                 "serving": "aggregated", "spec_method": row.get("spec_method") or "none",
@@ -613,7 +626,7 @@ def score_single_turn(o, entry, env, work: Path, sdir: Path, name: str, text: st
     ep = (par["tp"] * par["dp"]) if par.get("enable_expert_parallel") else 1
     label = corpus["sweeps"][0]["label"]
     scen = f"{dep['_model']}-{row['hardware']}-{row['precision']}-vllm-tp{par['tp']}-dp{par['dp']}-ep{ep}"
-    o.facets = {"identity": ident, "sweep_id": f"{row.get('curve_workflow_run_id')}|{scen}|{label}",
+    o.facets = {"identity": ident, "sweep_id": sweep_id(row, scen, label),
                 "scenario": scen, "label": label, "workload": corpus["sweeps"][0]["workload"],
                 "model": dep["_model"], "gpu": row["hardware"], "precision": row["precision"], "framework": "vllm",
                 "serving": "aggregated", "spec_method": row.get("spec_method") or "none",
@@ -699,9 +712,25 @@ def _banner_version(log: str) -> str | None:
     return m.group(1) if m else None
 
 
+def split_repeated_sweeps(scored: list[Outcome]) -> None:
+    """A sweep holds one point per concurrency (CONTRACT.md). If two rows of one curve ever share
+    a concurrency, which point belongs with which can't be told, so each point of that sweep
+    becomes its own sweep: their errors are scored, their trend isn't. Never seen in the API so
+    far; this keeps a future row shape from failing the whole contract."""
+    by: dict = {}
+    for o in scored:
+        by.setdefault(o.facets["sweep_id"], []).append(o)
+    for sid, os_ in by.items():
+        concs = [o.identity["conc"] for o in os_]
+        if len(concs) != len(set(concs)):
+            for o in os_:
+                o.facets["sweep_id"] = f"{sid}|{o.identity['recipe']}"
+
+
 def write_contract(out: Path, outcomes: list[Outcome], provenance: dict) -> None:
     out.mkdir(parents=True, exist_ok=True)
     scored = [o for o in outcomes if o.fidelity is not None]
+    split_repeated_sweeps(scored)
     rows = sorted((o.csv_row for o in scored),
                   key=lambda r: contract.points_sort_key(dict(zip(contract.POINTS_HEADER, map(str, r)))))
     buf = io.StringIO()

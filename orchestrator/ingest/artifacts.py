@@ -28,8 +28,12 @@ import io
 import json
 import re
 import tarfile
+import urllib.error
+import urllib.request
 import zipfile
 from dataclasses import dataclass, field
+
+import clients
 
 RESULT_PREFIXES = ("bmk_agentic_", "bmk_")
 SERVER_LOGS_PREFIX = "server_logs_"
@@ -130,10 +134,28 @@ class Unreadable(ValueError):
     """An artifact member that couldn't be read whole (too deep, too large, corrupt)."""
 
 
-def iter_files(blob: bytes, name: str = "", depth: int = 0):
+# How much of an oversized member is read, to tell what it is.
+_HEAD = 1 << 20
+
+
+@dataclass
+class Oversized:
+    """A member too large to read whole, skipped; `head` is its first bytes, so the caller can
+    tell whether it's one it needs (a log, a config, a named export, a nested archive)."""
+    path: str
+    size: int
+    head: bytes
+
+    def is_archive(self) -> bool:
+        return self.head[:4] == b"PK\x03\x04" or self.head[:2] == b"\x1f\x8b" or _is_tar(self.head)
+
+
+def iter_files(blob: bytes, name: str = "", depth: int = 0, oversized: list | None = None):
     """(path, bytes) for every file in a zip / tar(.gz) / gzip blob, recursing into nested
     archives. A non-archive yields itself. Anything that can't be read whole raises
-    Unreadable rather than being skipped: a dropped member could be the log that disagrees."""
+    Unreadable rather than being skipped: a dropped member could be the log that disagrees.
+    The one exception: given an `oversized` list, a member over the size cap is appended to it
+    (an Oversized) instead, and the caller decides whether it was one it needed."""
     if depth > 4:
         raise Unreadable(f"{name}: archives nested more than 4 deep")
     if blob[:4] == b"PK\x03\x04":
@@ -145,13 +167,18 @@ def iter_files(blob: bytes, name: str = "", depth: int = 0):
             for info in sorted(z.infolist(), key=lambda i: i.filename):
                 if info.is_dir():
                     continue
-                if info.file_size > _MAX_MEMBER:
-                    raise Unreadable(f"{name}/{info.filename}: {info.file_size} bytes")
+                path = f"{name}/{info.filename}" if name else info.filename
                 try:
+                    if info.file_size > _MAX_MEMBER:
+                        if oversized is None:
+                            raise Unreadable(f"{path}: {info.file_size} bytes")
+                        with z.open(info) as f:
+                            oversized.append(Oversized(path, info.file_size, f.read(_HEAD)))
+                        continue
                     data = z.read(info)
                 except (zipfile.BadZipFile, EOFError, OSError) as e:
-                    raise Unreadable(f"{name}/{info.filename}: corrupt member ({e})")
-                yield from iter_files(data, f"{name}/{info.filename}" if name else info.filename, depth + 1)
+                    raise Unreadable(f"{path}: corrupt member ({e})")
+                yield from iter_files(data, path, depth + 1, oversized)
         return
     if blob[:2] == b"\x1f\x8b":
         try:
@@ -159,12 +186,12 @@ def iter_files(blob: bytes, name: str = "", depth: int = 0):
         except (OSError, EOFError) as e:
             raise Unreadable(f"{name}: corrupt gzip ({e})")
         if _is_tar(inner):
-            yield from _iter_tar(inner, name, depth)
+            yield from _iter_tar(inner, name, depth, oversized)
         else:
             yield name[:-3] if name.endswith(".gz") else name, inner
         return
     if _is_tar(blob):
-        yield from _iter_tar(blob, name, depth)
+        yield from _iter_tar(blob, name, depth, oversized)
         return
     yield name, blob
 
@@ -173,18 +200,21 @@ def _is_tar(b: bytes) -> bool:
     return len(b) > 262 and b[257:262] == b"ustar"
 
 
-def _iter_tar(b: bytes, name: str, depth: int):
+def _iter_tar(b: bytes, name: str, depth: int, oversized: list | None = None):
     with tarfile.open(fileobj=io.BytesIO(b)) as t:
         for m in sorted(t.getmembers(), key=lambda m: m.name):
             if not m.isfile():
                 continue
-            if m.size > _MAX_MEMBER:
-                raise Unreadable(f"{name}/{m.name}: {m.size} bytes")
+            path = f"{name}/{m.name.lstrip('./')}" if name else m.name.lstrip("./")
             f = t.extractfile(m)
             if f is None:
                 continue
-            path = f"{name}/{m.name.lstrip('./')}" if name else m.name.lstrip("./")
-            yield from iter_files(f.read(), path, depth + 1)
+            if m.size > _MAX_MEMBER:
+                if oversized is None:
+                    raise Unreadable(f"{path}: {m.size} bytes")
+                oversized.append(Oversized(path, m.size, f.read(_HEAD)))
+                continue
+            yield from iter_files(f.read(), path, depth + 1, oversized)
 
 
 def is_server_log(data: bytes) -> bool:
@@ -249,9 +279,9 @@ class GitHubArtifacts:
     """Lists a run's artifacts and downloads them (authenticated; the archive URL redirects to
     blob storage, which must not receive the GitHub token). Downloads are cached by artifact id."""
 
-    def __init__(self, repo: str, token: str | None, cache_dir):
+    def __init__(self, repo: str, token: str | None, cache_dir, sleep=None):
         from pathlib import Path
-        self.repo, self.token = repo, token
+        self.repo, self.token, self.sleep = repo, token, sleep
         self.cache = Path(cache_dir)
         self.cache.mkdir(parents=True, exist_ok=True)
 
@@ -262,12 +292,10 @@ class GitHubArtifacts:
         return h
 
     def list(self, run_id: str) -> list[Artifact]:
-        import urllib.request
         out, page = [], 1
         while True:
             url = f"https://api.github.com/repos/{self.repo}/actions/runs/{run_id}/artifacts?per_page=100&page={page}"
-            with urllib.request.urlopen(urllib.request.Request(url, headers=self._headers()), timeout=120) as r:  # noqa: S310
-                doc = json.loads(r.read())
+            doc = clients._get_json(url, self._headers(), 120, sleep=self.sleep)
             arts = doc.get("artifacts") or []
             out += [Artifact.from_api(a) for a in arts]
             if len(out) >= int(doc.get("total_count") or 0) or not arts:
@@ -275,8 +303,6 @@ class GitHubArtifacts:
             page += 1
 
     def download(self, art: Artifact) -> bytes:
-        import urllib.error
-        import urllib.request
         path = self.cache / f"{art.id}.zip"
         if path.exists():
             return path.read_bytes()
@@ -286,15 +312,14 @@ class GitHubArtifacts:
                 return None
 
         url = f"https://api.github.com/repos/{self.repo}/actions/artifacts/{art.id}/zip"
-        opener = urllib.request.build_opener(NoRedirect)
         try:
-            with opener.open(urllib.request.Request(url, headers=self._headers()), timeout=120) as r:
-                data = r.read()
+            data = clients._get_bytes(url, self._headers(), 120, sleep=self.sleep,
+                                      opener=urllib.request.build_opener(NoRedirect))
         except urllib.error.HTTPError as e:
             if e.code not in (301, 302, 303, 307, 308):
                 raise
-            with urllib.request.urlopen(e.headers["Location"], timeout=600) as r:  # noqa: S310
-                data = r.read()
+            # The blob URL is signed: no GitHub token goes to it.
+            data = clients._get_bytes(e.headers["Location"], {}, 600, sleep=self.sleep)
         tmp = path.with_suffix(".part")
         tmp.write_bytes(data)
         tmp.replace(path)

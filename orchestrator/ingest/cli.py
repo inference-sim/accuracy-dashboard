@@ -39,6 +39,10 @@ def _log(msg: str):
     print(msg, file=sys.stderr, flush=True)
 
 
+# A row whose pull raised something unexpected (a bug, not the data): never scored as a gap.
+PULL_ERROR = "artifact_unmatched:pull_error"
+
+
 def cmd_pull(a) -> int:
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -62,11 +66,11 @@ def cmd_pull(a) -> int:
             e = pl.freeze_point(row, resolver=resolver, gh=gh, fetch=api.http_fetch, out=out,
                                 run_artifacts=run_artifacts, recipes=recipes)
         except Exception as ex:  # noqa: BLE001 -- one row's failure is recorded with why, never kills the pull
-            if isinstance(ex, clients.RateLimited):
+            if isinstance(ex, (clients.RateLimited, clients.FetchFailed)):
                 raise   # the whole pull is invalid, not this row: stop rather than record noise
             ident = pl.identity(row)
             e = {"point_id": contract.point_id(ident), "identity": ident, "row": row, "files": {},
-                 "build": None, "reasons": ["artifact_unmatched:pull_error"], "problems": [repr(ex)[:500]]}
+                 "build": None, "reasons": [PULL_ERROR], "problems": [repr(ex)[:500]]}
         points.append(e)
         _log(f"  [{i}/{len(p.rows)}] {row['model']} {row['hardware']} c{row['conc']} -> {e['reasons'] or 'ok'}")
     # The served checkpoints' HF base_model, frozen here so scoring needs no network.
@@ -78,8 +82,6 @@ def cmd_pull(a) -> int:
                 r = sp.hf_repo((cfg.get("model") or {}).get("path"))
                 if r:
                     base.setdefault(r, None)
-        for v in (e["row"].get("model"),):
-            pass
     for e in points:
         if (e.get("checkpoint") or {}).get("repo"):
             base.setdefault(e["checkpoint"]["repo"], None)
@@ -98,17 +100,24 @@ def cmd_pull(a) -> int:
             bm = (doc.get("cardData") or {}).get("base_model")
             base[repo] = (bm[0] if isinstance(bm, list) and len(bm) == 1 else bm if isinstance(bm, str) else None)
         except urllib.error.HTTPError as e:
-            # A repo HF doesn't know is "no base_model"; any other failure is recorded as one,
-            # and scoring turns it into a reason rather than a silent catalog miss.
+            # A repo HF doesn't know is "no base_model"; another refusal (a gated repo) is
+            # recorded, and scoring turns it into a reason rather than a silent catalog miss. An
+            # outage outlasting the retries raises FetchFailed and stops the pull.
             base[repo] = None if e.code == 404 else {"lookup_failed": f"HTTP {e.code}"}
-        except urllib.error.URLError as e:
-            base[repo] = {"lookup_failed": str(e.reason)[:200]}
     meta = {"window": list(p.window), "pulled_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "vllm_ref": build.VLLM_REF, "vllm_max_distance": build.VLLM_MAX_DISTANCE,
             "unnamed_slugs": p.unnamed_slugs, "base_models": base,
             "undated_row_ids": sorted(str(r["id"]) for r in p.undated)}
     sha = pl.write_manifest(out, meta, points)
     _log(f"pull: wrote {out / 'manifest.json'} (sha256 {sha})")
+    failed = [e for e in points if PULL_ERROR in e["reasons"]]
+    if failed:
+        # A row the pull itself couldn't read isn't a fact about the data: the run fails, and
+        # `score` refuses the manifest, rather than publish a quietly smaller one.
+        for e in failed:
+            _log(f"  pull error {e['point_id'][:12]}: {e['problems'][0]}")
+        _log(f"FATAL: {len(failed)} row(s) failed in the pull itself")
+        return 4
     return 0
 
 
@@ -163,6 +172,10 @@ def cmd_score(a) -> int:
         return 2
     manifest_text = (pull_dir / "manifest.json").read_text()
     manifest = json.loads(manifest_text)
+    failed = [e["point_id"][:12] for e in manifest["points"] if PULL_ERROR in e["reasons"]]
+    if failed:
+        _log(f"FATAL: the pull has {len(failed)} row(s) it failed to read ({', '.join(failed[:5])}); re-run the pull")
+        return 2
     sim = Path(a.blis_dir)
     policy, policy_sha = st.load_policy()
     vdefaults, vdefaults_sha = st.load_vllm_defaults()

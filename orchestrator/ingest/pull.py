@@ -61,6 +61,24 @@ def _row_reasons(row: dict) -> list[str]:
     return out
 
 
+# What a point takes from its agentic upload, by file name -> role.
+AGENTIC_FILES = {"profile_export_aiperf.json": "client_export", "benchmark_command.txt": "client_command"}
+
+
+def read_needed(blob: bytes, entry: dict, needed) -> list[tuple[str, bytes]]:
+    """An artifact's files, skipping members over the size cap that the point doesn't need
+    (e.g. a multi-GB server_metrics_export.json next to the log). A skipped member that is one
+    it needs, or that is itself an archive (whose contents can't be told), makes the artifact
+    Unreadable, as before; one it doesn't need is recorded in the entry's problems."""
+    big: list = []
+    files = list(art.iter_files(blob, oversized=big))
+    for o in big:
+        if o.is_archive() or needed(o):
+            raise art.Unreadable(f"{o.path}: {o.size} bytes")
+        entry.setdefault("skipped_members", []).append(f"{o.path} ({o.size} bytes)")
+    return files
+
+
 def recipe_checkpoint(row: dict, server_log: str | None, recipes) -> dict | None:
     """When the run's log serves a local path and names no HF repo, the checkpoint its own
     InferenceX recipe served (recipes.py), with the commit it was read at. None otherwise."""
@@ -121,7 +139,9 @@ def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts
             frozen.put("result_json", json.dumps(j.result_json, sort_keys=True).encode(), j.result.name)
         if j.server_logs is not None:
             try:
-                files = list(art.iter_files(gh.download(j.server_logs)))
+                # A log can be named anything, so only an oversized JSON that isn't one is skipped.
+                files = read_needed(gh.download(j.server_logs), entry,
+                                    lambda o: art.is_server_log(o.head) or not o.path.endswith(".json"))
             except art.Unreadable as e:
                 # Single-turn takes its log from the API's /server-log below; a bad upload is
                 # a note there, a reason only where the upload is the log (agentic).
@@ -152,13 +172,13 @@ def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts
                            f"{j.server_logs.name}:{p}")
         if agentic and j.agentic is not None:
             try:
-                files = list(art.iter_files(gh.download(j.agentic)))
+                files = read_needed(gh.download(j.agentic), entry,
+                                    lambda o: o.path.rsplit("/", 1)[-1] in AGENTIC_FILES)
             except art.Unreadable as e:
                 entry["reasons"].append("artifact_unmatched:unreadable_agentic_export")
                 entry.setdefault("problems", []).append(str(e))
                 files = []
-            for role, base in (("client_export", "profile_export_aiperf.json"),
-                               ("client_command", "benchmark_command.txt")):
+            for base, role in AGENTIC_FILES.items():
                 hits = art.find_named(files, base)
                 if len({art.sha256(d) for _, d in hits}) == 1:
                     frozen.put(role, hits[0][1], f"{j.agentic.name}:{hits[0][0]}")
