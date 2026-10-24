@@ -11,7 +11,7 @@
  * concurrency and excludes the anchor; every level averages |individual point errors|, never
  * child-node means.
  */
-import type { Fidelity, Metric, MetricBlock, MetricBlockPair, Summary, TierKey } from './types'
+import type { Fidelity, Metric, MetricBlock, MetricBlockPair, PointNode, Summary, TierKey } from './types'
 
 /** A leaf point flattened out of the tree with its full ancestry, for filtering + regrouping. */
 export interface FlatPoint {
@@ -48,6 +48,8 @@ export interface FlatPoint {
   pointId?: string
   /** v2: the InferenceX sweep the point belongs to (its trend's curve). */
   sweepId?: string
+  /** v2: the InferenceX runs this measurement averages, when there was more than one. */
+  repeats?: PointNode['repeats']
   fidelity?: Fidelity
 }
 
@@ -90,6 +92,7 @@ export function flattenPoints(summary: Summary): FlatPoint[] {
               ...(p.measured_date ? { measuredDate: p.measured_date } : {}),
               ...(p.point_id ? { pointId: p.point_id } : {}),
               ...(p.sweep_id ? { sweepId: p.sweep_id } : {}),
+              ...(p.repeats ? { repeats: p.repeats } : {}),
               ...(p.fidelity ? { fidelity: p.fidelity } : {}),
             })
           }

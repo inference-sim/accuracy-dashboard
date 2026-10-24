@@ -35,6 +35,7 @@
     "not_scored": 4,
     "multinode_hidden": 0,
     "failed": 0,
+    "repeat_runs_folded": 0,
     "not_scored_reasons": {
       "drafter_not_in_catalog": 2,
       "model_not_in_catalog": 1,

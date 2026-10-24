@@ -497,3 +497,25 @@ describe('Compare counts a point in the exact tier only when both runs call it e
     expect(html(a, b2)).not.toEqual(before)
   })
 })
+
+describe('InferenceX runs of one measurement are shown once', () => {
+  it('marks a folded value ×N and lists each run in its tooltip', () => {
+    const one = flattenPoints(v2a()).filter((p) => p.model === 'deepseek-v4-pro')
+    const p = one[0]!
+    const folded = { ...p, repeats: [
+      { point_id: p.pointId!, measured: { ttft_ms: 100, tpot_ms: 5 } },
+      { point_id: `${p.pointId}z`, measured: { ttft_ms: 102, tpot_ms: 5.2 } },
+    ] }
+    const { html } = render(<PointsTable points={[folded, ...one.slice(1)]} title="t" />)
+    expect(html).toContain('×2')
+    expect(html).toContain('Mean of 2 InferenceX runs of this measurement')
+    expect(html).toContain('run 2: TTFT 102.00 ms')
+    expect(html).toContain('is the mean of N InferenceX runs')
+    expect(html).not.toContain('InferenceX sweep')
+  })
+
+  it('a table with no folded value says nothing about runs', () => {
+    const one = flattenPoints(v2a()).filter((p) => p.model === 'deepseek-v4-pro')
+    expect(render(<PointsTable points={one} title="t" />).html).not.toContain('×')
+  })
+})

@@ -102,6 +102,9 @@ export interface PointNode {
   /** v2: the measured curve the point's trend is computed in; repeats at one concurrency are
    *  separate sweeps of the same deployment. */
   sweep_id?: string
+  /** v2: InferenceX ran this measurement more than once with identical BLIS inputs; `measured`
+   *  is the runs' mean and each run is listed here. */
+  repeats?: { point_id: string; measured: { ttft_ms: number | null; tpot_ms: number | null } }[]
   fidelity?: Fidelity
 }
 
@@ -181,6 +184,8 @@ export interface Coverage {
   not_scored: number
   multinode_hidden: number
   failed: number
+  /** v2: InferenceX runs folded into another point as a repeat of it. */
+  repeat_runs_folded?: number
   measured_excluded?: number
   not_scored_reasons: Record<string, number>
 }

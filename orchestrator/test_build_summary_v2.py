@@ -292,6 +292,76 @@ def test_one_deployment_on_two_vllm_builds_is_two_rows_named_by_build():
     assert vs2.problems(doc) == []
 
 
+def _twin_contract(same_inputs: bool):
+    """run-a with the DSv4-Pro b200 c=4 point run twice by InferenceX: another recipe row, its own
+    sweep, the same day, a slightly different measured TTFT, and (if same_inputs) the same BLIS
+    inputs and prediction. PR #31's minimax-m2.5 b300 c=1024 pair, in miniature."""
+    import csv
+    sys.path.insert(0, str(HERE / "ingest"))
+    import contract
+    d = Path(tempfile.mkdtemp()) / "run-a"
+    shutil.copytree(FIXTURE / "run-a", d)
+    facets = json.loads((d / "facets.json").read_text())
+    fid = {r["point_id"]: r for r in map(json.loads, (d / "fidelity.jsonl").read_text().splitlines())}
+    with open(d / "points.csv", newline="") as fh:
+        rows = list(csv.DictReader(fh))
+    src = next(r for r in rows if facets[r["point_id"]]["model"] == "deepseek-v4-pro" and r["concurrency"] == "4")
+    f = json.loads(json.dumps(facets[src["point_id"]]))
+    f["identity"]["recipe"] = "row:999"
+    f["sweep_id"] += "|twin"
+    pid = contract.point_id(f["identity"])
+    facets[pid] = f
+    twin = {**src, "point_id": pid, "meas_ttft_us": str(float(src["meas_ttft_us"]) + 2000.0)}
+    if not same_inputs:
+        twin["pred_ttft_us"] = str(float(src["pred_ttft_us"]) * 1.2)
+    rows.append(twin)
+    fid[pid] = {**fid[src["point_id"]], "point_id": pid}
+    rows.sort(key=contract.points_sort_key)
+    with open(d / "points.csv", "w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=contract.POINTS_HEADER, lineterminator="\n")
+        w.writeheader()
+        w.writerows(rows)
+    (d / "facets.json").write_text(contract.canonical_dumps(facets) + "\n")
+    (d / "fidelity.jsonl").write_text("".join(contract.canonical_dumps(fid[k]) + "\n" for k in sorted(fid)))
+    return d, src, pid
+
+
+def test_two_inferencex_runs_of_one_measurement_are_shown_once_as_their_mean():
+    d, src, pid = _twin_contract(same_inputs=True)
+    doc = b2.build(d, generated_at=STAMP, evaluator_commit="test")
+    assert vs2.problems(doc) == []
+    pts = _by_conc(doc, "deepseek-v4-pro", "b200", "dp1")
+    p = pts[4]
+    assert sorted(r["point_id"] for r in p["repeats"]) == sorted([src["point_id"], pid])
+    assert p["point_id"] == min(src["point_id"], pid)
+    assert p["measured"]["ttft_ms"] == round((float(src["meas_ttft_us"]) * 2 + 2000.0) / 2 / 1000, 4)
+    assert doc["coverage"]["scored"] == 9 and doc["coverage"]["repeat_runs_folded"] == 1
+    # one curve again, so the trend is the same three-point sweep as without the twin
+    assert all(q["sweep_id"] == pts[1]["sweep_id"] for q in pts.values())
+    assert pts[1]["shape"] == {"ttft": None, "tpot": None} and pts[4]["shape"]["ttft"] is not None
+
+
+def test_runs_with_different_blis_inputs_are_not_folded():
+    d, _, _ = _twin_contract(same_inputs=False)
+    doc = b2.build(d, generated_at=STAMP, evaluator_commit="test")
+    assert doc["coverage"]["scored"] == 10 and doc["coverage"].get("repeat_runs_folded") == 0
+    assert not any(p.get("repeats") for p in _points(doc))
+    assert vs2.problems(doc) == []
+
+
+def test_the_validator_checks_folded_runs():
+    import copy
+    d, _, _ = _twin_contract(same_inputs=True)
+    base = b2.build(d, generated_at=STAMP, evaluator_commit="test")
+    folded = lambda doc: next(p for p in _points(doc) if p.get("repeats"))  # noqa: E731
+    doc = copy.deepcopy(base)
+    folded(doc)["measured"]["ttft_ms"] += 50
+    assert any("mean of its runs" in p for p in vs2.problems(doc))
+    doc = copy.deepcopy(base)
+    doc["coverage"]["repeat_runs_folded"] = 0
+    assert any("repeat_runs_folded" in p for p in vs2.problems(doc))
+
+
 def test_v1_documents_are_not_v2():
     v1 = json.loads((HERE.parent / "web" / "testdata" / "render-fixture.summary.json").read_text())
     assert vs2.problems(v1) != []

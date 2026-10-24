@@ -8,7 +8,8 @@ The arithmetic is v1's, imported from build_summary rather than copied: per-poin
 shape re-anchored at the lowest surviving concurrency, every level averaging |point errors|, and
 the self-consistency oracle. What v2 adds per point is its identity (point_id, measured_date)
 and its fidelity record; and at the top, the not-scored points (never rendered) with their
-reasons counted in coverage.
+reasons counted in coverage. Repeated InferenceX runs of one measurement (same deployment,
+concurrency, day and BLIS inputs) are folded into one point (merge_repeats).
 
 Nothing in the nightly pipeline calls this. v1 (build_summary.py) is unchanged.
 
@@ -67,14 +68,80 @@ def _lines(path: Path) -> list[dict]:
     return [json.loads(x) for x in path.read_text().splitlines() if x.strip()]
 
 
+MEAS_KEYS = ("meas_ttft_us", "meas_tpot_us")
+PRED_KEYS = ("pred_ttft_us", "pred_tpot_us")
+
+
+def merge_repeats(rows: list[dict], facets: dict, fidelity: dict) -> tuple[list[dict], dict]:
+    """Fold repeated InferenceX runs into one measurement.
+
+    Two runs are repeats when they are one deployment row (scenario, build, drafter, workload),
+    at one concurrency, on one day, and BLIS was given exactly the same inputs for both (the
+    whole fidelity record) and so predicted the same: InferenceX ran the same experiment twice
+    (e.g. two recipe rows whose engines logged identical settings). They become one point whose
+    measured value is the runs' mean, carrying every run in `repeats`. The InferenceX sweeps they
+    came from are joined into one curve for the trend; if that would put two different points at
+    one concurrency, nothing in that group of sweeps is merged. Runs on different days, or with
+    different inputs, stay separate points. Returns (rows, {point_id: [runs]}) where each kept
+    point's id is the smallest of its runs'."""
+    def key(r):
+        f = facets[r["point_id"]]
+        rec = {k: v for k, v in fidelity[r["point_id"]].items() if k != "point_id"}
+        return (f["model"], f["workload"], f["gpu"], f["scenario"], f["label"], f.get("vllm_version") or "",
+                f["spec_method"] or "none", r["concurrency"], r["measured_date"],
+                contract.canonical_dumps(rec), tuple(r[k] for k in PRED_KEYS))
+    groups = _group(sorted(rows, key=lambda r: r["point_id"]), key)
+    # Join the sweeps of each merge (union-find on sweep ids).
+    parent: dict = {}
+
+    def find(s):
+        parent.setdefault(s, s)
+        while parent[s] != s:
+            parent[s] = parent[parent[s]]
+            s = parent[s]
+        return s
+    for g in groups.values():
+        sids = sorted({facets[r["point_id"]]["sweep_id"] for r in g})
+        for s in sids[1:]:
+            parent[find(s)] = find(sids[0])
+    # A joined curve must still hold one point per concurrency once merged; else undo it.
+    by_curve: dict = {}
+    for g in groups.values():
+        by_curve.setdefault(find(facets[g[0]["point_id"]]["sweep_id"]), []).append(g)
+    bad = {c for c, gs in by_curve.items()
+           if len([g[0]["concurrency"] for g in gs]) != len({g[0]["concurrency"] for g in gs})}
+    out, runs = [], {}
+    for g in groups.values():
+        curve = find(facets[g[0]["point_id"]]["sweep_id"])
+        if len(g) == 1 or curve in bad:
+            for r in g:
+                r["_curve"] = facets[r["point_id"]]["sweep_id"] if curve in bad else curve
+                out.append(r)
+            continue
+        kept = dict(g[0])
+        for k in MEAS_KEYS:
+            kept[k] = sum(r[k] for r in g) / len(g)
+        kept["_curve"] = curve
+        runs[kept["point_id"]] = [{"point_id": r["point_id"],
+                                   "measured": {"ttft_ms": _ms(r["meas_ttft_us"]), "tpot_ms": _ms(r["meas_tpot_us"])}}
+                                  for r in g]
+        out.append(kept)
+    return out, runs
+
+
+def _ms(us):
+    return round(us / 1000.0, 4) if us and us > 0 else None
+
+
 def enrich(rows: list[dict], facets: dict) -> "OrderedDict[str, list[dict]]":
     """Per-point error and shape, the shape computed within each measured sweep (facets'
     sweep_id), so two dates or two curves never mix into one shape. A sweep is one curve, one
     point per concurrency (the contract validator already refuses anything else); it's checked
     again here because v1's sweep_shape keys by concurrency and would silently keep the last."""
+    curve = lambda r: r.get("_curve") or facets[r["point_id"]]["sweep_id"]  # noqa: E731 (merge_repeats' join)
     sweeps: "OrderedDict[str, list[dict]]" = OrderedDict()
-    for r in sorted(rows, key=lambda r: (facets[r["point_id"]]["sweep_id"], r["concurrency"], r["point_id"])):
-        sweeps.setdefault(facets[r["point_id"]]["sweep_id"], []).append(r)
+    for r in sorted(rows, key=lambda r: (curve(r), r["concurrency"], r["point_id"])):
+        sweeps.setdefault(curve(r), []).append(r)
     for sid, pts in sweeps.items():
         concs = [p["concurrency"] for p in pts]
         if len(concs) != len(set(concs)):
@@ -182,9 +249,12 @@ def _unique_labels(rows: list[dict]) -> None:
 def point_node(p: dict, fid: dict) -> dict:
     node = v1.point_node(p)
     node["point_id"] = p["point_id"]
-    # The measured curve the point's trend is computed in: repeats at one concurrency are
-    # separate InferenceX sweeps of the same deployment.
+    # The measured curve the point's trend is computed in.
     node["sweep_id"] = p["sweep_id"]
+    if p.get("_repeats"):
+        # InferenceX ran this measurement more than once with identical inputs; `measured` is
+        # the runs' mean, and each run is listed with its own measured value.
+        node["repeats"] = p["_repeats"]
     node["measured_date"] = p["measured_date"]
     node["fidelity"] = {k: v for k, v in fid.items() if k != "point_id"}
     return node
@@ -200,8 +270,12 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     not_scored = _lines(directory / contract.NOT_SCORED_JSONL)
     prov_in = json.loads((directory / contract.PROVENANCE_JSON).read_text())
 
+    rows, runs = merge_repeats(rows, facets, fidelity)
     sweeps = enrich(rows, facets)
     flat = [p for pts in sweeps.values() for p in pts]
+    for p in flat:
+        if p["point_id"] in runs:
+            p["_repeats"] = runs[p["point_id"]]
     matrix = build_matrix(flat, facets, fidelity)
     totals = v1.metric_block_pair(flat)
     v1.assert_self_consistent(flat, totals)
@@ -209,10 +283,15 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     # How many not-scored points carry each reason code (a point counts once per code, so a
     # code's count is a number of points; a point with two codes counts under both).
     reasons = Counter(code for ns in not_scored for code in sorted({r.split(":", 1)[0] for r in ns["reasons"]}))
+    folded = sum(len(r) - 1 for r in runs.values())
     coverage = {"scored": len(flat), "not_scored": len(not_scored), "multinode_hidden": 0, "failed": 0,
-                "not_scored_reasons": dict(sorted(reasons.items()))}
-    # The balance: every point the pull holds is scored or not scored, exactly once.
-    ids = [p["point_id"] for p in flat] + [ns["point_id"] for ns in not_scored]
+                "repeat_runs_folded": folded, "not_scored_reasons": dict(sorted(reasons.items()))}
+    # The balance: every point the pull holds is scored (alone or as a repeat run of one shown
+    # measurement) or not scored, exactly once.
+    ids = [p["point_id"] for p in flat if p["point_id"] not in runs] + \
+        [x["point_id"] for r in runs.values() for x in r] + [ns["point_id"] for ns in not_scored]
+    if len(ids) != len(rows) + folded + len(not_scored):
+        raise ContractError("repeat folding lost a point")
     if len(ids) != len(set(ids)):
         raise ContractError("a point is both scored and not scored")
 

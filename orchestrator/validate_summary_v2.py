@@ -62,6 +62,26 @@ def problems(doc: dict) -> list[str]:
     both = set(scored) & {n["point_id"] for n in ns}
     if both:
         out.append(f"{len(both)} point(s) both scored and not scored")
+    # Folded repeat runs: each shown point lists itself among its runs, a run appears once, and
+    # the shown measured value is the runs' mean.
+    folded = []
+    for p in pts:
+        rs = p.get("repeats") or []
+        if not rs:
+            continue
+        ids = [r["point_id"] for r in rs]
+        if p["point_id"] != min(ids):
+            out.append(f"{p['point_id'][:12]}: a folded point's id must be the smallest of its runs'")
+        folded += [i for i in ids if i != p["point_id"]]
+        for m in ("ttft_ms", "tpot_ms"):
+            vals = [r["measured"][m] for r in rs]
+            shown = (p.get("measured") or {}).get(m)
+            if None not in vals and shown is not None and abs(sum(vals) / len(vals) - shown) > METRIC_TOLERANCE:
+                out.append(f"{p['point_id'][:12]}: measured {m} {shown} isn't the mean of its runs")
+    if len(folded) != len(set(folded)) or set(folded) & (set(scored) | {n["point_id"] for n in ns}):
+        out.append("a folded repeat run also appears as another point")
+    if cov.get("repeat_runs_folded", 0) != len(folded):
+        out.append(f"coverage.repeat_runs_folded {cov.get('repeat_runs_folded', 0)} != {len(folded)} folded runs")
     prov = doc.get("provenance") or {}
     ref, window = prov.get("vllm_ref"), prov.get("vllm_max_distance")
     for p in pts:

@@ -198,6 +198,11 @@
           "type": "integer",
           "minimum": 0
         },
+        "repeat_runs_folded": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "v2: InferenceX runs folded into another point as a repeat of it (scored = matrix points; scored + repeat_runs_folded + not_scored = the pull's rows)."
+        },
         "measured_excluded": {
           "type": "integer",
           "minimum": 0,
@@ -656,9 +661,27 @@
           "$ref": "#/definitions/isoDate"
         },
         "sweep_id": {
-          "description": "The measured curve the point's trend (shape) is computed in (the contract's facets sweep_id). A deployment row holds one point per concurrency per sweep; repeats at one concurrency are separate InferenceX sweeps.",
+          "description": "The measured curve the point's trend (shape) is computed in (the contract's facets sweep_id, or several joined when repeat runs were folded). A deployment row holds one point per concurrency per sweep.",
           "type": "string",
           "minLength": 1
+        },
+        "repeats": {
+          "description": "Present when InferenceX ran this measurement more than once with identical BLIS inputs (same deployment, concurrency and day): every run, with its own measured value. The point's `measured` is their mean and `point_id` the smallest run id.",
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["point_id", "measured"],
+            "properties": {
+              "point_id": {"$ref": "#/definitions/pointId"},
+              "measured": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {"ttft_ms": {"type": ["number", "null"]}, "tpot_ms": {"type": ["number", "null"]}}
+              }
+            }
+          }
         },
         "fidelity": {
           "$ref": "https://inference-sim.github.io/accuracy-dashboard/orchestrator/ingest/fidelity.schema.json"

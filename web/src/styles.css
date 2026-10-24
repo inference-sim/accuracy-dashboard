@@ -139,6 +139,7 @@ thead tr.col th button.sortbtn:focus-visible { outline: 2px solid var(--accent);
 
 /* explicit missing / not-scored markers (RFC B1) — never NaN/blank */
 .marker { color: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+.runs { color: var(--muted); font-size: 11px; cursor: help; border-bottom: 1px dotted var(--muted); }
 td .na { color: var(--line-strong); font-family: var(--font-mono); }
 
 /* error boundary (verbatim message, never a blank app) */

@@ -20,6 +20,18 @@ interface Props {
 // precision, and a uniform precision keeps every cell (and both columns) directly comparable.
 const MS_DIGITS = 2
 
+/** "×N" beside a measured value that averages N InferenceX runs; the tooltip lists each run. */
+function Runs({ runs }: { runs: NonNullable<FlatPoint['repeats']> }) {
+  const lines = runs.map(
+    (r, i) => `run ${i + 1}: TTFT ${formatMs(r.measured.ttft_ms, MS_DIGITS)} ms · TPOT ${formatMs(r.measured.tpot_ms, MS_DIGITS)} ms`,
+  )
+  return (
+    <span className="runs" title={`Mean of ${runs.length} InferenceX runs of this measurement\n${lines.join('\n')}`}>
+      {' '}×{runs.length}
+    </span>
+  )
+}
+
 function Cell({ v, kind }: { v: number | null; kind: 'ms' | 'err' }) {
   const text = kind === 'ms' ? formatMs(v, MS_DIGITS) : formatSignedPct(v)
   if (kind === 'err') {
@@ -50,9 +62,10 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
   // table is exactly as before.
   const dated = sorted.some((p) => p.measuredDate)
   const withProv = sorted.some((p) => p.fidelity)
-  // v2: a deployment row holds one point per concurrency per InferenceX sweep. When a concurrency
-  // repeats, the repeats are separate sweeps of the same deployment (e.g. two recipe rows run
-  // the same day), so a column numbers the sweeps; each sweep's trend is computed on its own.
+  // v2: InferenceX runs of one measurement with identical BLIS inputs arrive folded into one point
+  // (`repeats`), shown once with the runs' mean. A concurrency still repeated here is two
+  // measurements that differ (rare): a column numbers their InferenceX sweeps, each with its trend.
+  const folded = sorted.some((p) => (p.repeats?.length ?? 0) > 1)
   const v2Sweeps = sorted.every((p) => p.sweepId)
   const repeated = new Set(sorted.map((p) => p.concurrency)).size < sorted.length
   const sweepCol = v2Sweeps && repeated
@@ -148,6 +161,7 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
                   )}
                   <td className="sep mono">
                     <Cell v={p.measTtftMs} kind="ms" />
+                    {p.repeats && p.repeats.length > 1 && <Runs runs={p.repeats} />}
                   </td>
                   <td className="mono">
                     <Cell v={p.predTtftMs} kind="ms" />
@@ -187,6 +201,12 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
           mean TPOT = (latency − TTFT) ÷ (output tokens − 1), averaged over requests with more than one
           output token. Not a median or a tail percentile. Measured means come from InferenceX’s
           benchmark client; predicted means from BLIS replaying the same requests, computed the same way.
+          {folded && (
+            <>
+              {' '}A value marked <b>×N</b> is the mean of N InferenceX runs of the same measurement: same
+              deployment, concurrency and day, and the same inputs to BLIS. Hover it for each run.
+            </>
+          )}
           {sweepCol ? (
             <>
               {' '}Rows repeated at one concurrency are separate InferenceX sweeps of this deployment, numbered
