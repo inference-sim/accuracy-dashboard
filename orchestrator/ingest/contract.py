@@ -86,6 +86,8 @@ def points_sort_key(row: dict) -> tuple:
 # one (a setting BLIS can't state was approximated, or a vLLM build BLIS doesn't model) only
 # counts in the "all" tier.
 TIER_BY_STATUS = {"exact": "MEASURED-OR-RESOLVED", "approximate": "ALL (approximate)"}
+# A row the pull itself failed to read. Never a valid not-scored reason in a published contract.
+PULL_ERROR = "artifact_unmatched:pull_error"
 PROVENANCE_KEYS = ("ingest", "blis", "vllm_ref", "vllm_max_distance", "policy_sha256", "pulled_at",
                    "corpus", "pull_manifest_sha256", "source")
 
@@ -166,7 +168,7 @@ def validate_dir(directory: str | Path) -> list[str]:
     (concurrency, measured_date); each sweep is one deployment with one point per concurrency;
     scored points are exact or approximate, with that status's tier; fidelity
     records and reasons pass the schema; lists are sorted; not-scored ids are unique, sorted,
-    disjoint from scored ones, and carry sorted unique reasons; provenance has every key.
+    disjoint from scored ones, and carry sorted unique reasons, none of them a pull error; provenance has every key.
     """
     import jsonschema
 
@@ -298,6 +300,9 @@ def validate_dir(directory: str | Path) -> list[str]:
         for reason in reasons:
             if not reason_validator.is_valid(reason):
                 problems.append(f"{NOT_SCORED_JSONL}:{n}: unknown reason {reason!r}")
+            elif reason == PULL_ERROR:
+                # The pull failing to read a row is a fault in the run, not a fact about the data.
+                problems.append(f"{NOT_SCORED_JSONL}:{n}: {PULL_ERROR}: the pull failed on this row; re-run it")
         notes = ns.get("notes", [])
         if not isinstance(notes, list):
             problems.append(f"{NOT_SCORED_JSONL}:{n}: notes is not a list")

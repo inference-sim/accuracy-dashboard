@@ -104,7 +104,7 @@ Defined once in `fidelity.schema.json` (`definitions/reason`). An optional `:<qu
 
 | Code | Meaning |
 |---|---|
-| `artifact_unmatched` | No result JSON (or more than one) matches the row's `recipe_fingerprint` + `conc`. |
+| `artifact_unmatched` | No result JSON (or more than one) matches the row's `recipe_fingerprint` + `conc`. `artifact_unmatched:pull_error` (the pull itself failed on the row) is never valid in a contract: the validator refuses it. |
 | `server_log_missing` | The point's vLLM server log is unavailable (e.g. artifacts expired). |
 | `corpus_changed` | The corpus file's sha256 differs from the one recorded at first use. |
 | `conflict` | Two sources disagree on a setting or replay input. |

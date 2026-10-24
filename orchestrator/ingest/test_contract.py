@@ -166,6 +166,16 @@ def test_validator_rejects_an_unknown_reason_code():
     assert any("unknown reason 'looked_wrong'" in p for p in c.validate_dir(d))
 
 
+def test_validator_rejects_a_pull_error():
+    # PR #32 review: a row the pull couldn't read must fail the run, not shrink it.
+    d = _copy("run-a")
+    rows = _lines(d / c.NOT_SCORED_JSONL)
+    rows[0]["reasons"] = [c.PULL_ERROR]
+    rows[0].pop("notes", None)
+    _write_lines(d / c.NOT_SCORED_JSONL, rows)
+    assert any("the pull failed on this row" in p for p in c.validate_dir(d))
+
+
 def test_validator_accepts_a_qualified_reason_and_rejects_unsorted_reasons():
     d = _copy("run-a")
     rows = _lines(d / c.NOT_SCORED_JSONL)
