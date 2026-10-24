@@ -178,10 +178,11 @@ def test_re_measurement_is_a_new_point_and_both_stay_in_the_window(tmp_path):
 
 def test_age_out_drops_today_minus_180_keeps_today_minus_179_updates_live_view(tmp_path):
     import api
+    from datetime import timedelta
     today = date(2026, 10, 23)
-    start, _ = api.window_bounds(today, 180)                 # 2026-04-27
+    start, _ = api.window_bounds(today, 180)                 # today-179
     keep = start.isoformat()                                 # today-179, stays
-    drop = (start.replace(day=26)).isoformat()               # 2026-04-26, today-180, ages out
+    drop = (start - timedelta(days=1)).isoformat()           # today-180, ages out
     w = World()
     w.rows = [("m", 1, keep), ("m", 2, drop)]
     _run(w, tmp_path, "2026-10-22", "v0.11.0")               # both present the night before

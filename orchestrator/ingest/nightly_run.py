@@ -102,15 +102,17 @@ def run_night(today: date, blis_tag: str, *, store_dir: Path, data_dir: Path, st
     if decision.is_noop:
         return NightResult(decision, scored=scored)
 
-    # 6. Publish.
+    # 6. Publish. Ordered so a failure can't half-publish: the snapshot dir and the index are
+    # written first (they don't touch the served latest), then the live view, then state last. If
+    # the index rebuild throws, data/latest and state both still describe last night's good run.
     snap_id = summary.get("snapshot_id") or snapshot_id(snapshot_date, blis_tag, pull_date)
+    if decision.freeze_snapshot:
+        _write_summary(data_dir / "snapshots" / snap_id / "summary.json", summary)
+    ui.main(["--data-dir", str(data_dir), "--keep-api", str(keep_api)])
     published = False
     if decision.update_live_view:
         _write_summary(data_dir / "latest" / "summary.json", summary)
         published = True
-    if decision.freeze_snapshot:
-        _write_summary(data_dir / "snapshots" / snap_id / "summary.json", summary)
-    ui.main(["--data-dir", str(data_dir), "--keep-api", str(keep_api), "--today", today.isoformat()])
     _write_state(state_path, blis_tag, snap_id, sorted(window_ids))
     return NightResult(decision, snapshot_id=snap_id if decision.freeze_snapshot else None,
                        scored=scored, published=published)

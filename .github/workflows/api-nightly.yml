@@ -107,14 +107,20 @@ jobs:
           echo "REGISTRY=$RUNNER_TEMP/registry" >> "$GITHUB_ENV"
           echo "DEFAULTS_HELPER=$RUNNER_TEMP/blisdefaults" >> "$GITHUB_ENV"
 
-      # Fetch the AgentX corpus once, cached by its sha256 (the extractor refuses a changed corpus).
-      - name: Resolve the AgentX corpus
-        env:
-          GH_TOKEN: ${{ github.token }}
+      # Fetch the pinned AgentX corpus once, by a resolved HF revision (not a floating ref), so the
+      # sha256 the pull records in provenance is reproducible and the extractor's corpus_changed
+      # guard is meaningful (#28 B6). The corpus is one public HF dataset file; score reads it as a
+      # path and refuses a later download whose sha differs.
+      - name: Resolve the AgentX corpus (pinned HF revision + sha256)
         run: |
-          # The corpus revision is pinned per #28; the pull records its sha256 in provenance and a
-          # later run refuses a download whose sha differs (corpus_changed).
-          echo "CORPUS_REVISION=main" >> "$GITHUB_ENV"
+          set -euo pipefail
+          repo="semianalysisai/cc-traces-weka-062126"
+          file="semianalysis_cc_traces_weka_062126.jsonl"
+          # Resolve the branch's current commit so the pull pins a revision, never a moving ref.
+          rev=$(curl -fsSL "https://huggingface.co/api/datasets/${repo}/revision/main" | python3 -c "import sys,json;print(json.load(sys.stdin)['sha'])")
+          curl -fsSL "https://huggingface.co/datasets/${repo}/resolve/${rev}/${file}" -o "$RUNNER_TEMP/corpus.json"
+          echo "CORPUS_REVISION=${rev}" >> "$GITHUB_ENV"
+          echo "fetched corpus ${repo}@${rev} ($(wc -c < "$RUNNER_TEMP/corpus.json") bytes)"
 
       # Pull the window into the store, decide, score (cached), and publish into ./data.
       - name: Run the night

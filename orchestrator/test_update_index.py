@@ -27,7 +27,7 @@ def test_dump_snapshots_are_never_pruned(tmp_path):
         _snap(tmp_path, f"2026-10-0{i+1}_blis-v0.1{i}.0_ix-2026-09-28", ingest="dump", ix="db-dump/2026-09-28")
     for i in range(6):
         _snap(tmp_path, f"2026-10-1{i}_blis-v0.12.0_ix-api-2026-10-23", ingest="api")
-    entries = ui.build_index(str(tmp_path), keep_api=5, today=None)
+    entries = ui.build_index(str(tmp_path), keep_api=5)
     by_ingest = {"api": 0, "db-dump": 0}
     for e in entries:
         by_ingest[e["ingest"]] += 1
@@ -48,7 +48,7 @@ def test_a_sixth_api_release_prunes_the_oldest_api_not_a_dump(tmp_path):
     _snap(tmp_path, "2026-01-01_blis-v0.10.0_ix-2026-09-28", ingest="dump", ix="db-dump/2026-09-28")
     for day in range(1, 7):     # five, then a sixth API release
         _snap(tmp_path, f"2026-10-0{day}_blis-v0.12.0_ix-api-2026-10-23", ingest="api")
-    entries = ui.build_index(str(tmp_path), keep_api=5, today=None)
+    entries = ui.build_index(str(tmp_path), keep_api=5)
     ids = [e["snapshot_id"] for e in entries]
     assert "2026-10-01_blis-v0.12.0_ix-api-2026-10-23" not in ids       # oldest API pruned
     assert "2026-01-01_blis-v0.10.0_ix-2026-09-28" in ids               # the old dump survives
@@ -59,7 +59,7 @@ def test_entries_are_newest_first_and_tagged_with_ingest(tmp_path):
     _snap(tmp_path, "2026-10-01_blis-v0.11.0_ix-api-2026-10-23", ingest="api")
     _snap(tmp_path, "2026-10-03_blis-v0.12.0_ix-api-2026-10-23", ingest="api")
     _snap(tmp_path, "2026-09-28_blis-v0.12.0_ix-2026-09-28", ingest="dump", ix="db-dump/2026-09-28")
-    entries = ui.build_index(str(tmp_path), keep_api=5, today=None)
+    entries = ui.build_index(str(tmp_path), keep_api=5)
     assert [e["snapshot_id"][:10] for e in entries] == ["2026-10-03", "2026-10-01", "2026-09-28"]
     assert {e["snapshot_id"][:10]: e["ingest"] for e in entries} == {
         "2026-10-03": "api", "2026-10-01": "api", "2026-09-28": "db-dump"}

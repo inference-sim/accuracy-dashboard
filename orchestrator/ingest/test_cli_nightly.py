@@ -50,8 +50,10 @@ def test_nightly_seeds_then_freezes_a_snapshot(tmp_path, monkeypatch):
         return 0
 
     def fake_score(a):
-        # write a minimal contract the fake build reads back via build_summary_v2
+        # write a minimal contract the fake build reads back via build_summary_v2; the real
+        # cmd_score writes provenance.json with pulled_at, which cmd_nightly reads for generated_at.
         Path(a.out).mkdir(parents=True, exist_ok=True)
+        (Path(a.out) / "provenance.json").write_text(json.dumps({"pulled_at": "2026-10-23T00:00:00Z"}))
         return 0
 
     def fake_build(contract_dir, *, generated_at, evaluator_commit):

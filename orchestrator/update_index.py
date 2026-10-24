@@ -37,15 +37,6 @@ API_INGEST = "api"
 DUMP_INGEST = "db-dump"
 
 
-def _snap_date(snapshot_id: str) -> dt.date | None:
-    """The YYYY-MM-DD prefix of a snapshot_id, or None if it doesn't parse."""
-    head = snapshot_id.split("_", 1)[0]
-    try:
-        return dt.date.fromisoformat(head)
-    except ValueError:
-        return None
-
-
 def _classify(doc: dict) -> str:
     """Which ingest a snapshot came from, read from its own summary.json."""
     return API_INGEST if doc.get("provenance", {}).get("ingest") == API_INGEST else DUMP_INGEST
@@ -64,9 +55,10 @@ def _entry(doc: dict, snap_id: str) -> dict:
     }
 
 
-def build_index(data_dir: str, keep_api: int, today: dt.date) -> list[dict]:
+def build_index(data_dir: str, keep_api: int) -> list[dict]:
     """Read every snapshot, prune API snapshots past the last `keep_api`, keep every dump one,
-    and return the retained entries newest-first. Pruning deletes the snapshot directory."""
+    and return the retained entries newest-first. Pruning deletes the snapshot directory.
+    Count-based, so no clock is needed: ranking is by snapshot_id, which leads with the date."""
     snaps_dir = os.path.join(data_dir, "snapshots")
     if not os.path.isdir(snaps_dir):
         return []
@@ -101,14 +93,14 @@ def main(argv=None) -> int:
     ap.add_argument("--data-dir", default="data")
     ap.add_argument("--keep-api", type=int, default=5,
                     help="how many API-release snapshots to keep (count-based, #15's last-5 rule)")
-    # Accepted for backward compatibility with the old dump pipeline's call; the new index is
-    # count-based, so a day window no longer drives pruning. Ignored.
+    # Accepted for backward compatibility with callers that pass them (the old dump pipeline's
+    # --retention-days, and run_night's --today); the new index is count-based, so neither a day
+    # window nor the clock drives pruning. Ignored.
     ap.add_argument("--retention-days", type=int, default=None, help=argparse.SUPPRESS)
-    ap.add_argument("--today", default=None, help="YYYY-MM-DD; defaults to UTC today")
+    ap.add_argument("--today", default=None, help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
 
-    today = dt.date.fromisoformat(args.today) if args.today else dt.datetime.now(dt.timezone.utc).date()
-    entries = build_index(args.data_dir, args.keep_api, today)
+    entries = build_index(args.data_dir, args.keep_api)
 
     index = {
         "schema_version": 1,

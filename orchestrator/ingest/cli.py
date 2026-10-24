@@ -61,6 +61,11 @@ def cmd_pull(a) -> int:
     # points leave the store. A cold pull (no --prior, or --prior == --out) freezes every row.
     prior_manifest = pl.load_prior_manifest(Path(a.prior)) if a.prior else None
     prior_points = prior_manifest["points"] if prior_manifest else []
+    if any(PULL_ERROR in (e.get("reasons") or []) for e in prior_points):
+        # A prior manifest that still carries a pull error was never a clean window; reusing its
+        # entries would re-raise the error (and wedge) every night. Start cold instead.
+        _log("pull: prior manifest holds a pull error -- ignoring it and pulling cold")
+        prior_manifest, prior_points = None, []
     inc = pl.plan_incremental(p.rows, prior_points)
     prior_dir = Path(a.prior) if a.prior else out
     _log(f"pull: reuse {len(inc.reuse)} frozen, freeze {len(inc.fresh)} fresh, drop {len(inc.dropped)} aged-out")
@@ -293,7 +298,11 @@ def cmd_nightly(a) -> int:
             timeout=a.timeout, only=None))
         if rc != 0:
             raise RuntimeError(f"score failed (rc={rc})")
-        summary = bsv2.build(contract_dir, generated_at=f"{a.today or today.isoformat()}T00:00:00Z",
+        # generated_at is the pull's own pulled_at, NOT the calendar day the score runs, so a
+        # rescore of the same frozen pull with the same BLIS is byte-identical whatever day it
+        # happens (the seed's "byte-identical rescore"; build_summary_v2.main defaults the same way).
+        prov = json.loads((contract_dir / contract.PROVENANCE_JSON).read_text())
+        summary = bsv2.build(contract_dir, generated_at=prov["pulled_at"],
                              evaluator_commit=a.evaluator_commit or "local")
         return summary, summary["coverage"]["scored"]
 
