@@ -133,6 +133,29 @@ def _sorted_by(items, key) -> bool:
     return keys == sorted(keys)
 
 
+# What every point of one sweep shares: a sweep is one measured curve of one deployment.
+SWEEP_SHARED = ("scenario", "label", "workload", "spec_method", "vllm_version", "precision", "parallelism")
+
+
+def _sweep_problems(facets: dict, point_rows: list[dict]) -> list[str]:
+    """A sweep (facets' sweep_id) holds at most one point per concurrency, and its points are
+    one deployment: the shape metric anchors each curve at its lowest concurrency."""
+    out = []
+    sweeps: dict = {}
+    for r in point_rows:
+        f = facets.get(r["point_id"])
+        if isinstance(f, dict) and "sweep_id" in f:
+            sweeps.setdefault(f["sweep_id"], []).append((r, f))
+    for sid, members in sorted(sweeps.items()):
+        concs = [r["concurrency"] for r, _ in members]
+        if len(concs) != len(set(concs)):
+            out.append(f"{FACETS_JSON}: sweep {sid} has two points at one concurrency")
+        for key in SWEEP_SHARED:
+            if len({canonical_dumps(f.get(key)) for _, f in members}) > 1:
+                out.append(f"{FACETS_JSON}: sweep {sid} mixes {key}")
+    return out
+
+
 def validate_dir(directory: str | Path) -> list[str]:
     """Every way a contract directory breaks CONTRACT.md; empty means valid. Never raises on
     malformed content: each problem is reported instead.
@@ -140,7 +163,8 @@ def validate_dir(directory: str | Path) -> list[str]:
     Checks: the five files exist and parse; JSON is canonical; the CSV header and its rows'
     order; every scored id is in points.csv, fidelity.jsonl and facets.json exactly once and
     nowhere else; each id hashes from its identity, and the CSV agrees with that identity
-    (concurrency, measured_date); scored points are exact or approximate, with that status's tier; fidelity
+    (concurrency, measured_date); each sweep is one deployment with one point per concurrency;
+    scored points are exact or approximate, with that status's tier; fidelity
     records and reasons pass the schema; lists are sorted; not-scored ids are unique, sorted,
     disjoint from scored ones, and carry sorted unique reasons; provenance has every key.
     """
@@ -221,6 +245,7 @@ def validate_dir(directory: str | Path) -> list[str]:
                 problems.append(f"{POINTS_CSV}:{r['_line']}: measured_date disagrees with its identity")
             if str(ident["conc"]) != r["concurrency"]:
                 problems.append(f"{POINTS_CSV}:{r['_line']}: concurrency disagrees with its identity")
+        problems += _sweep_problems(facets, point_rows)
 
     # ---- fidelity.jsonl
     fid_lines = _read_jsonl(d / FIDELITY_JSONL, problems)

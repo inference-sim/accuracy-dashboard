@@ -82,7 +82,8 @@ export function buildRows(points: FlatPoint[], expanded: Set<string>): RenderRow
         const gpuId = `${wlId}|g:${gpu}`
         rows.push({
           level: 'gpu', label: gpu,
-          facet: g0.precision ? g0.precision : '',
+          // A precision only when every deployment under the GPU shares it.
+          facet: new Set(gpts.map((p) => p.precision)).size === 1 && g0.precision ? g0.precision : '',
           metrics: aggregatePair(gpts), versions: distinctVersions(gpts),
           pointCount: gpts.length, depth: 2, id: gpuId,
         })

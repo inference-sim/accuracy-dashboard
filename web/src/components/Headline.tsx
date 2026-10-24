@@ -16,6 +16,9 @@ interface Props {
    *  API was pulled. Shown instead of `dataDate`, which for v1 is the database dump's date. */
   measuredRange?: { from: string; to: string } | null
   pulledAt?: string | null
+  /** v2: how many of the points are exact and how many estimated. The headline averages both
+   *  (the "all" tier), so it says so next to the count. */
+  split?: { exact: number; estimated: number } | null
 }
 
 function Stat({ value, label, hint }: { value: number | null; label: string; hint: string }) {
@@ -28,7 +31,7 @@ function Stat({ value, label, hint }: { value: number | null; label: string; hin
   )
 }
 
-export function Headline({ totals, tier, points, models, blisRelease, dataDate, measuredRange, pulledAt }: Props) {
+export function Headline({ totals, tier, points, models, blisRelease, dataDate, measuredRange, pulledAt, split }: Props) {
   const t = totals[tier]
   return (
     <section className="headline" aria-label="Overall accuracy">
@@ -37,7 +40,11 @@ export function Headline({ totals, tier, points, models, blisRelease, dataDate, 
         <Stat value={t.mape.tpot} label="Mean time per output token" hint="average error" />
       </div>
       <p className="context">
-        {formatCount(points)} measurement{points === 1 ? '' : 's'} · {models} model{models === 1 ? '' : 's'}
+        {formatCount(points)} measurement{points === 1 ? '' : 's'}
+        {split && split.estimated > 0 && (
+          <> ({formatCount(split.exact)} exact, {formatCount(split.estimated)} estimated)</>
+        )}{' '}
+        · {models} model{models === 1 ? '' : 's'}
         {blisRelease && <> · BLIS {blisRelease}</>}
         {measuredRange ? (
           <>

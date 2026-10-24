@@ -215,6 +215,10 @@ function Overview({
   const headlinePoints = useMemo(() => applyFilters(allPoints, DEFAULT_ROUTE), [allPoints])
   const headlineTier: TierKey = 'all'
   const totals = useMemo(() => aggregatePair(headlinePoints), [headlinePoints])
+  const headlineSplit = useMemo(() => {
+    const estimated = headlinePoints.filter((p) => p.fidelity?.status === 'approximate').length
+    return { exact: headlinePoints.length - estimated, estimated }
+  }, [headlinePoints])
 
   // A row is listed only if it has points in the tier being shown, so the exact tier never shows
   // deployments that are entirely estimated as rows of dashes.
@@ -284,6 +288,7 @@ function Overview({
         dataDate={summary.provenance?.ground_truth?.release_tag?.replace(/^db-dump\//, '') ?? null}
         measuredRange={measuredRange(headlinePoints)}
         pulledAt={summary.provenance?.pulled_at ?? null}
+        split={v2 ? headlineSplit : null}
       />
 
       <h2 className="sectitle">Accuracy by model</h2>

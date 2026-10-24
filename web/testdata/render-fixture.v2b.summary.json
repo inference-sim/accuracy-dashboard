@@ -259,6 +259,7 @@
                         "tpot": null
                       },
                       "point_id": "5a3fb11cd356440830825ea12907fc10ef0a7ae029a199142914ac989954fcc4",
+                      "sweep_id": "2301|deepseek-v4-pro-b200-fp4-vllm-tp8.yaml|8k1k",
                       "measured_date": "2026-09-03",
                       "fidelity": {
                         "args": [
@@ -325,6 +326,7 @@
                         "tpot": 1.0461
                       },
                       "point_id": "a7952faab9382b04aa735bdbc410f3f218d77a6b78a8413922d68fbd3caab011",
+                      "sweep_id": "2301|deepseek-v4-pro-b200-fp4-vllm-tp8.yaml|8k1k",
                       "measured_date": "2026-09-03",
                       "fidelity": {
                         "args": [
@@ -391,6 +393,7 @@
                         "tpot": 8.2039
                       },
                       "point_id": "a9d41834f0f7b8a82753aa70b443a591e2d0b72c8fca74d827de0dfd1660bb8e",
+                      "sweep_id": "2301|deepseek-v4-pro-b200-fp4-vllm-tp8.yaml|8k1k",
                       "measured_date": "2026-09-03",
                       "fidelity": {
                         "args": [
@@ -624,6 +627,7 @@
                       "shape": null,
                       "shape_reason": "< 3 concurrencies",
                       "point_id": "056cddbc496b43ff186e51b634dfbbfd07867f347482ff62d5d8b1391873a77d",
+                      "sweep_id": "2560|deepseek-v4.1-flash-b200-fp4-vllm-tp1-ep2-dp2-dspark5-agentx.yaml|agentx",
                       "measured_date": "2026-10-03",
                       "fidelity": {
                         "args": [
@@ -845,6 +849,7 @@
                       "shape": null,
                       "shape_reason": "< 3 concurrencies",
                       "point_id": "ce649d8e02c65226590e9df810e594539b495a295d46ce659722a81c28071356",
+                      "sweep_id": "2410|deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml|agentx",
                       "measured_date": "2026-09-21",
                       "fidelity": {
                         "args": [
@@ -926,6 +931,7 @@
                       "shape": null,
                       "shape_reason": "< 3 concurrencies",
                       "point_id": "1cde80e14072cec25522c9361237fa84fea0c561f80f8126278281145c38db79",
+                      "sweep_id": "2410|deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml|agentx",
                       "measured_date": "2026-09-21",
                       "fidelity": {
                         "args": [
@@ -1057,6 +1063,7 @@
                       "shape": null,
                       "shape_reason": "< 3 concurrencies",
                       "point_id": "59ed3ce626c2e97bbbf9de5d2b194d7dbf8b1b0430a74ef95dc3dff6f3e39723",
+                      "sweep_id": "2410|deepseek-v4.1-flash-h200-fp4-vllm-tp8-dspark5-agentx.yaml|agentx",
                       "measured_date": "2026-09-21",
                       "fidelity": {
                         "args": [
@@ -1306,6 +1313,7 @@
                       "shape": null,
                       "shape_reason": "< 3 concurrencies",
                       "point_id": "339e2060a615a384023a4808efd7a69aa287c72daf463fc3a3f55c4da19fa52e",
+                      "sweep_id": "2610|minimax-m3-h200-fp8-vllm-tp8-agentx.yaml|agentx",
                       "measured_date": "2026-10-11",
                       "fidelity": {
                         "args": [

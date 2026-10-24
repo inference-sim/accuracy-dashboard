@@ -362,6 +362,37 @@ def test_validator_rejects_a_facets_record_missing_a_key_the_builder_reads():
     assert any("lacks sweep_id" in p for p in c.validate_dir(d))
 
 
+def _sweep(points: list[tuple[str, int, str]]):
+    """facets + points.csv rows for (point id, concurrency, spec_method), all in one sweep."""
+    base = {"sweep_id": "2151|deepseek-v4-pro-b200-fp4-vllm-tp8|1k1k", "scenario": "deepseek-v4-pro-b200-fp4-vllm-tp8",
+            "label": "1k1k", "workload": "1024:1024", "vllm_version": "0.25.0", "precision": "fp4",
+            "parallelism": {"tp": 8, "pp": 1, "dp": 1, "ep": 1}}
+    facets = {pid: {**base, "spec_method": spec} for pid, _, spec in points}
+    rows = [{"point_id": pid, "concurrency": str(conc)} for pid, conc, _ in points]
+    return facets, rows
+
+
+def test_validator_rejects_a_sweep_with_two_points_at_one_concurrency():
+    # The InferenceX shape behind PR #31's review: one workflow ran a layout with and without MTP,
+    # and both shared a sweep, so two points sat at c=1 and the trend's anchor got a value.
+    facets, rows = _sweep([("a", 1, "none"), ("b", 2, "none"), ("c", 1, "none")])
+    assert any("two points at one concurrency" in p for p in c._sweep_problems(facets, rows))
+    facets, rows = _sweep([("a", 1, "none"), ("b", 2, "none"), ("c", 4, "none")])
+    assert c._sweep_problems(facets, rows) == []
+
+
+def test_validator_rejects_a_sweep_that_mixes_drafters():
+    facets, rows = _sweep([("a", 1, "mtp"), ("b", 2, "none")])
+    assert any("mixes spec_method" in p for p in c._sweep_problems(facets, rows))
+
+
+def test_the_fixture_sweeps_are_one_deployment_each():
+    d = FIXTURE / "run-a"
+    facets = json.loads((d / c.FACETS_JSON).read_text())
+    rows = [{"point_id": pid, "concurrency": str(f["identity"]["conc"])} for pid, f in facets.items()]
+    assert c._sweep_problems(facets, rows) == []
+
+
 def test_cli_exit_codes():
     good = subprocess.run([sys.executable, str(HERE / "contract.py"), str(FIXTURE / "run-a")],
                           capture_output=True, text=True)
@@ -413,7 +444,7 @@ def _fixture_point() -> dict:
     rec = next(r for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL) if r["status"] == "exact")
     fid = {k: v for k, v in rec.items() if k != "point_id"}
     return {"level": "point", "concurrency": 4, "tier": "measured_or_resolved", "point_id": rec["point_id"],
-            "measured_date": "2026-09-21", "fidelity": fid,
+            "measured_date": "2026-09-21", "sweep_id": "2410|deepseek-v4.1-flash-h200|agentx", "fidelity": fid,
             "measured": {"ttft_ms": 1650.0, "tpot_ms": 9.4}, "predicted": {"ttft_ms": 1590.0, "tpot_ms": 8.55},
             "error_pct": {"ttft": -3.6, "tpot": -9.0}, "shape": None, "shape_reason": "< 3 concurrencies"}
 
@@ -423,8 +454,8 @@ def test_v2_schema_accepts_a_point_carrying_a_fixture_fidelity_record():
     assert errors == [], [e.message for e in errors]
 
 
-def test_v2_schema_requires_fidelity_point_id_and_measured_date_on_every_point():
-    for field in ("fidelity", "point_id", "measured_date"):
+def test_v2_schema_requires_fidelity_point_id_measured_date_and_sweep_on_every_point():
+    for field in ("fidelity", "point_id", "measured_date", "sweep_id"):
         point = _fixture_point()
         del point[field]
         assert not _v2_validator().is_valid(_minimal_v2(point)), field

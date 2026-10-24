@@ -69,11 +69,18 @@ def _lines(path: Path) -> list[dict]:
 
 def enrich(rows: list[dict], facets: dict) -> "OrderedDict[str, list[dict]]":
     """Per-point error and shape, the shape computed within each measured sweep (facets'
-    sweep_id), so two dates or two curves never mix into one shape."""
+    sweep_id), so two dates or two curves never mix into one shape. A sweep is one curve, one
+    point per concurrency (the contract validator already refuses anything else); it's checked
+    again here because v1's sweep_shape keys by concurrency and would silently keep the last."""
     sweeps: "OrderedDict[str, list[dict]]" = OrderedDict()
     for r in sorted(rows, key=lambda r: (facets[r["point_id"]]["sweep_id"], r["concurrency"], r["point_id"])):
         sweeps.setdefault(facets[r["point_id"]]["sweep_id"], []).append(r)
-    for pts in sweeps.values():
+    for sid, pts in sweeps.items():
+        concs = [p["concurrency"] for p in pts]
+        if len(concs) != len(set(concs)):
+            raise ContractError(f"sweep {sid} has two points at one concurrency")
+        for p in pts:
+            p["sweep_id"] = sid
         for metric in ("ttft", "tpot"):
             for p in pts:
                 p[f"mape_{metric}"] = v1.point_mape(p[f"pred_{metric}_us"], p[f"meas_{metric}_us"])
@@ -113,27 +120,14 @@ def build_matrix(flat: list[dict], facets: dict, fidelity: dict) -> list[dict]:
                      "coverage": {"scored": len(wpts), "total": len(wpts)},
                      "metrics": v1.metric_block_pair(wpts), "rows": []}
             for gpu, gpts in sorted(_group(wpts, lambda p: p["_f"]["gpu"]).items()):
-                gnode = {"level": "gpu", "label": gpu, "precision": gpts[0]["_f"]["precision"],
+                # A GPU's precision only when its rows agree; one GPU can serve fp4 and int4 runs.
+                precs = {p["_f"]["precision"] for p in gpts}
+                gnode = {"level": "gpu", "label": gpu, "precision": precs.pop() if len(precs) == 1 else None,
                          "coverage": {"scored": len(gpts), "total": len(gpts)},
                          "metrics": v1.metric_block_pair(gpts), "rows": []}
-                # One topology row per deployment (scenario) and vLLM build.
-                for (scen, ver), tpts in sorted(_group(
-                        gpts, lambda p: (p["_f"]["scenario"], p["_f"].get("vllm_version") or "")).items()):
-                    f0 = tpts[0]["_f"]
-                    par = {k: v for k, v in sorted(f0["parallelism"].items()) if v is not None}
-                    base = " · ".join(f"{k}{v}" for k, v in par.items()) or "default"
-                    tnode = {"level": "topology", "framework": f0["framework"], "engine_version": ver or None,
-                             "precision": f0["precision"], "is_multinode": False, "parallelism": par,
-                             "serving": f0["serving"], "spec_method": f0["spec_method"],
-                             # The drafter is part of the deployment: a spec and a no-spec run
-                             # of the same layout are two rows, never one.
-                             "label": f"{base} · {f0['precision']}" + (
-                                 f" · {f0['spec_method']}" if f0["spec_method"] not in (None, "", "none") else ""),
-                             "coverage": {"scored": len(tpts), "total": len(tpts)},
-                             "metrics": v1.metric_block_pair(tpts),
-                             "rows": [point_node(p, fidelity[p["point_id"]])
-                                      for p in sorted(tpts, key=lambda p: (p["concurrency"], p["measured_date"], p["point_id"]))]}
-                    gnode["rows"].append(tnode)
+                for _, tpts in sorted(_group(gpts, _deployment).items()):
+                    gnode["rows"].append(topology_node(tpts, fidelity))
+                _unique_labels(gnode["rows"])
                 gnode["rows"].sort(key=lambda n: (n["label"], n["engine_version"] or ""))
                 wnode["rows"].append(gnode)
             mnode["rows"].append(wnode)
@@ -141,9 +135,56 @@ def build_matrix(flat: list[dict], facets: dict, fidelity: dict) -> list[dict]:
     return matrix
 
 
+def _deployment(p: dict) -> tuple:
+    """A topology row is one deployment on one vLLM build: the scenario (model, part, precision,
+    parallelism), the build, and the drafter, so a spec and a no-spec run never share a row."""
+    f = p["_f"]
+    return (f["scenario"], f.get("vllm_version") or "", f["spec_method"] or "none")
+
+
+def _spec(method) -> str | None:
+    return None if method in (None, "", "none") else method
+
+
+def topology_node(tpts: list[dict], fidelity: dict) -> dict:
+    f0 = tpts[0]["_f"]
+    for p in tpts:
+        # The row's labels describe every point under it (the key guarantees it; checked anyway).
+        if (p["_f"]["precision"], p["_f"]["parallelism"], p["_f"]["serving"], p["_f"]["framework"]) != \
+                (f0["precision"], f0["parallelism"], f0["serving"], f0["framework"]):
+            raise ContractError(f"scenario {f0['scenario']} mixes deployments")
+    par = {k: v for k, v in sorted(f0["parallelism"].items()) if v is not None}
+    base = " · ".join(f"{k}{v}" for k, v in par.items()) or "default"
+    spec = _spec(f0["spec_method"])
+    ver = f0.get("vllm_version") or None
+    return {"level": "topology", "framework": f0["framework"], "engine_version": ver,
+            "precision": f0["precision"], "is_multinode": False, "parallelism": par,
+            "serving": f0["serving"], "spec_method": f0["spec_method"],
+            "label": f"{base} · {f0['precision']}" + (f" · {spec}" if spec else ""),
+            "coverage": {"scored": len(tpts), "total": len(tpts)},
+            "metrics": v1.metric_block_pair(tpts),
+            "rows": [point_node(p, fidelity[p["point_id"]])
+                     for p in sorted(tpts, key=lambda p: (p["concurrency"], p["measured_date"], p["sweep_id"]))]}
+
+
+def _unique_labels(rows: list[dict]) -> None:
+    """One deployment measured on two vLLM builds is two rows; the UI keys rows by label, so
+    those rows name their build."""
+    seen = Counter(r["label"] for r in rows)
+    for r in rows:
+        if seen[r["label"]] > 1:
+            r["label"] += f" · vLLM {r['engine_version'] or 'unknown'}"
+    labels = [r["label"] for r in rows]
+    if len(labels) != len(set(labels)):
+        raise ContractError(f"two deployment rows share the label {Counter(labels).most_common(1)[0][0]!r}")
+
+
 def point_node(p: dict, fid: dict) -> dict:
     node = v1.point_node(p)
     node["point_id"] = p["point_id"]
+    # The measured curve the point's trend is computed in: repeats at one concurrency are
+    # separate InferenceX sweeps of the same deployment.
+    node["sweep_id"] = p["sweep_id"]
     node["measured_date"] = p["measured_date"]
     node["fidelity"] = {k: v for k, v in fid.items() if k != "point_id"}
     return node

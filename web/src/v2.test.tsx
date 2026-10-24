@@ -14,6 +14,8 @@ import { aggregatePair, flattenPoints, intersectByKey, pointKey } from './aggreg
 import { tierV2Definition } from './glossary'
 import { ProvenanceBody, VersionBody, VersionTip } from './components/Provenance'
 import { buildRows } from './tree'
+import { PointsTable } from './components/PointsTable'
+import { Compare } from './components/Compare'
 import type { Summary } from './types'
 
 const load = (name: string): Summary =>
@@ -172,7 +174,7 @@ describe('dates are labelled for what they are', () => {
   it('says "1 model", not "1 models"', () => {
     const { html } = render(<App summary={v2a()} loadError={null} initialHash="#/?tier=all" />)
     expect(html).not.toContain('1 models')
-    expect(html).toMatch(/\b\d+ measurements · 3 models/)
+    expect(html).toMatch(/\b\d+ measurements \(\d+ exact, \d+ estimated\) · 3 models/)
     const one = v2a()
     one.matrix = one.matrix.slice(0, 1)
     expect(render(<App summary={one} loadError={null} initialHash="#/?tier=all" />).html).toContain(' · 1 model · ')
@@ -410,5 +412,88 @@ describe('Compare across v2 runs', () => {
     expect(errors.join('\n')).toBe('')
     expect(html).toContain('different ingests')
     expect(html).not.toContain('Comparing')
+  })
+})
+
+describe('the headline says how many of its points are estimated', () => {
+  it('splits the count beside the all-tier headline', () => {
+    const { html } = render(<App summary={v2a()} loadError={null} initialHash="#/" />)
+    expect(html).toContain('9 measurements (7 exact, 2 estimated)')
+  })
+
+  it('a v1 snapshot shows the plain count', () => {
+    const { html } = render(<App summary={v1()} loadError={null} initialHash="#/" />)
+    expect(html).not.toMatch(/measurements \(\d+ exact/)
+  })
+})
+
+describe('repeats at one concurrency are separate InferenceX sweeps', () => {
+  const pts = () => {
+    const all = flattenPoints(v2a())
+    const t = all.find((p) => p.model === 'deepseek-v4-pro')!
+    return all.filter((p) => p.sweepKey === t.sweepKey)
+  }
+
+  it('one sweep per row: no sweep column and no repeat note', () => {
+    const { html } = render(<PointsTable points={pts()} title="t" />)
+    expect(html).not.toContain('InferenceX sweep')
+    expect(html).not.toContain('Repeated rows')
+    expect(html).not.toContain('different vLLM builds')
+  })
+
+  it('a repeated concurrency numbers its sweeps and says what they are', () => {
+    const one = pts()
+    const twin = one.map((p) => ({ ...p, sweepId: `${p.sweepId}|b`, pointId: `${p.pointId}b` }))
+    const { html } = render(<PointsTable points={[...one, ...twin]} title="t" />)
+    expect(html).toContain('InferenceX sweep')
+    expect(html).toContain('separate InferenceX sweeps of this deployment')
+    // each concurrency lists sweep 1 before sweep 2
+    const nums = [...html.matchAll(/\d{4}-\d\d-\d\d<\/td><td class="mono">([12])<\/td>/g)].map((m) => m[1])
+    expect(nums.length).toBe(2 * one.length)
+    expect(nums.join('')).toMatch(/^(12)+$/)
+    expect(html).not.toContain('different vLLM builds')
+  })
+})
+
+describe('a GPU row names a precision only when its deployments share one', () => {
+  it('leaves it blank for a GPU serving two precisions', () => {
+    const s = v2a()
+    const g = s.matrix.find((m) => m.model === 'deepseek-v4-pro')!.rows[0]!.rows[0]!
+    const t = g.rows[0]!
+    g.rows.push({ ...t, precision: 'fp8', label: t.label.replace('fp4', 'fp8'), rows: t.rows.map((p) => ({ ...p, point_id: `${p.point_id}x` })) })
+    g.precision = null
+    const all = flattenPoints(s).filter((p) => p.model === 'deepseek-v4-pro')
+    expect(new Set(all.map((p) => p.precision))).toEqual(new Set(['fp4', 'fp8']))
+    const wl = all[0]!.workloadLabel
+    const rows = buildRows(all, new Set(['m:deepseek-v4-pro', `m:deepseek-v4-pro|w:${wl}`]))
+    const gpu = rows.find((r) => r.level === 'gpu')!
+    expect(gpu.facet).toBe('')
+    // and a GPU whose deployments share one still names it
+    const same = buildRows(flattenPoints(v2a()).filter((p) => p.model === 'deepseek-v4-pro'),
+      new Set(['m:deepseek-v4-pro', `m:deepseek-v4-pro|w:${wl}`]))
+    expect(same.find((r) => r.level === 'gpu')!.facet).toBe('fp4')
+  })
+})
+
+describe('Compare counts a point in the exact tier only when both runs call it exact', () => {
+  it('drops a pair whose status differs between the runs', () => {
+    const a = v2a()
+    const b = v2b()
+    const html = (x: Summary, y: Summary) =>
+      render(<Compare a={x} b={y} tier="measured_or_resolved" />).html
+    const before = html(a, b)
+    // Mark one shared exact point estimated in run-b only: the strict Δ must leave it out on BOTH
+    // sides, so the result equals dropping that point from both runs.
+    const shared = intersectByKey(flattenPoints(a), flattenPoints(b)).pairs.find((p) => p.a.tier === 'measured_or_resolved')!
+    const flip = (s: Summary, id: string, tier: 'all' | 'measured_or_resolved') => {
+      for (const m of s.matrix) for (const w of m.rows) for (const g of w.rows) for (const t of g.rows)
+        for (const p of t.rows) if (p.point_id === id) p.tier = tier
+    }
+    const b2 = v2b()
+    flip(b2, shared.key, 'all')
+    const a2 = v2a()
+    flip(a2, shared.key, 'all')
+    expect(html(a, b2)).toEqual(html(a2, b2))
+    expect(html(a, b2)).not.toEqual(before)
   })
 })

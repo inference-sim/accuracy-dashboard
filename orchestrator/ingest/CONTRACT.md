@@ -64,7 +64,10 @@ A re-measurement of the same recipe and concurrency on another date is a differe
                 "image": "…", "vllm_version": "…"}}
 ```
 
-- `sweep_id` groups the points of one measured curve for the shape metric: the InferenceX row's `curve_workflow_run_id`, plus `scenario` and `label`. Shape is computed within a sweep only, so two dates never mix into one curve.
+- `sweep_id` groups the points of one measured curve for the shape metric. Shape is computed within a sweep only, so two dates never mix into one curve.
+  - A sweep is one deployment: its points share `scenario`, `label`, `workload`, `spec_method`, `vllm_version`, `precision` and `parallelism`.
+  - It holds **at most one point per concurrency**, since the trend is anchored at the lowest one. Two InferenceX rows of one deployment at the same concurrency (e.g. a spec and a no-spec run in one workflow, or two recipe rows) are two sweeps.
+  - The validator refuses a contract that breaks either rule.
 - `model` here is the catalog model BLIS priced, which is what the tables show. `identity.model` stays the InferenceX slug.
 - `vllm_version` is the build's version string from the server-log banner (e.g. `0.30.1rc1.dev493+gac9126e58`), shown as the row's vLLM badge.
 

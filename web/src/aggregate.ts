@@ -46,6 +46,8 @@ export interface FlatPoint {
   measuredDate?: string
   /** v2: the point's contract id, stable across BLIS releases and catalog changes. */
   pointId?: string
+  /** v2: the InferenceX sweep the point belongs to (its trend's curve). */
+  sweepId?: string
   fidelity?: Fidelity
 }
 
@@ -64,7 +66,8 @@ export function flattenPoints(summary: Summary): FlatPoint[] {
               isl: w.isl,
               osl: w.osl,
               gpu: g.label,
-              precision: g.precision,
+              // The deployment's own precision: one GPU can serve runs at two precisions.
+              precision: t.precision ?? g.precision,
               framework: t.framework,
               engineVersion: t.engine_version,
               isMultinode: t.is_multinode,
@@ -86,6 +89,7 @@ export function flattenPoints(summary: Summary): FlatPoint[] {
               sweepKey: `${m.model}|${w.label}|${g.label}|${t.label}`,
               ...(p.measured_date ? { measuredDate: p.measured_date } : {}),
               ...(p.point_id ? { pointId: p.point_id } : {}),
+              ...(p.sweep_id ? { sweepId: p.sweep_id } : {}),
               ...(p.fidelity ? { fidelity: p.fidelity } : {}),
             })
           }

@@ -99,6 +99,9 @@ export interface PointNode {
   /** v2 only: the point's identity hash, its measurement date and its fidelity record. */
   point_id?: string
   measured_date?: string
+  /** v2: the measured curve the point's trend is computed in; repeats at one concurrency are
+   *  separate sweeps of the same deployment. */
+  sweep_id?: string
   fidelity?: Fidelity
 }
 

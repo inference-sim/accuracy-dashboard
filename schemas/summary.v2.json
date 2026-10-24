@@ -551,6 +551,7 @@
         "tier",
         "point_id",
         "measured_date",
+        "sweep_id",
         "fidelity"
       ],
       "properties": {
@@ -653,6 +654,11 @@
         },
         "measured_date": {
           "$ref": "#/definitions/isoDate"
+        },
+        "sweep_id": {
+          "description": "The measured curve the point's trend (shape) is computed in (the contract's facets sweep_id). A deployment row holds one point per concurrency per sweep; repeats at one concurrency are separate InferenceX sweeps.",
+          "type": "string",
+          "minLength": 1
         },
         "fidelity": {
           "$ref": "https://inference-sim.github.io/accuracy-dashboard/orchestrator/ingest/fidelity.schema.json"

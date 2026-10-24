@@ -38,19 +38,29 @@ function Cell({ v, kind }: { v: number | null; kind: 'ms' | 'err' }) {
 }
 
 export function PointsTable({ points, title, selMissing = false }: Props) {
-  // Sort by concurrency, then group repeats by their vLLM version so the per-version rows read
-  // in order. The version is where the repeated measured values come from (same deployment,
-  // different vLLM build), so it earns its own column here.
+  // Sort by concurrency, then group repeats by vLLM version, date and sweep so they read in order.
   const sorted = [...points].sort(
     (a, b) =>
       a.concurrency - b.concurrency ||
       (a.engineVersion ?? '').localeCompare(b.engineVersion ?? '') ||
-      (a.measuredDate ?? '').localeCompare(b.measuredDate ?? ''),
+      (a.measuredDate ?? '').localeCompare(b.measuredDate ?? '') ||
+      (a.sweepId ?? '').localeCompare(b.sweepId ?? ''),
   )
   // v2 snapshots date each measurement and carry its provenance; v1 has neither, and then the
   // table is exactly as before.
   const dated = sorted.some((p) => p.measuredDate)
   const withProv = sorted.some((p) => p.fidelity)
+  // v2: a deployment row holds one point per concurrency per InferenceX sweep. When a concurrency
+  // repeats, the repeats are separate sweeps of the same deployment (e.g. two recipe rows run
+  // the same day), so a column numbers the sweeps; each sweep's trend is computed on its own.
+  const v2Sweeps = sorted.every((p) => p.sweepId)
+  const repeated = new Set(sorted.map((p) => p.concurrency)).size < sorted.length
+  const sweepCol = v2Sweeps && repeated
+  const sweepNo = new Map<string, number>()
+  for (const p of sorted) if (p.sweepId && !sweepNo.has(p.sweepId)) sweepNo.set(p.sweepId, sweepNo.size + 1)
+  // Repeats at one concurrency read in sweep order (1, 2, …), not by the sweep's id.
+  if (sweepCol)
+    sorted.sort((a, b) => a.concurrency - b.concurrency || sweepNo.get(a.sweepId!)! - sweepNo.get(b.sweepId!)!)
   // Surface why shape is absent for this sweep, if the scorer recorded a reason — previously
   // shapeReason was carried on every point but never shown (PR #3 review UI-c).
   const shapeReason = sorted.find((p) => p.shapeReason)?.shapeReason ?? null
@@ -94,6 +104,11 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
                     InferenceX run date
                   </th>
                 )}
+                {sweepCol && (
+                  <th rowSpan={2} style={{ verticalAlign: 'bottom' }}>
+                    InferenceX sweep
+                  </th>
+                )}
                 {withProv && (
                   <th rowSpan={2} style={{ verticalAlign: 'bottom' }}>
                     <Term name="provenance" />
@@ -117,14 +132,15 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
             </thead>
             <tbody>
               {sorted.map((p, i) => (
-                // InferenceX carries repeat benchmark runs at the SAME concurrency (different
-                // vLLM builds), so concurrency alone is not a unique key — index disambiguates.
+                // A concurrency can repeat (v1: different vLLM builds; v2: separate InferenceX
+                // sweeps), so concurrency alone is not a unique key — index disambiguates.
                 <tr key={`${p.concurrency}-${i}`}>
                   <td className="mono">{p.concurrency}</td>
                   <td className="mono">
                     {p.engineVersion ? <VersionTip version={p.engineVersion} fidelity={p.fidelity} /> : <span className="marker">—</span>}
                   </td>
                   {dated && <td className="mono">{p.measuredDate ?? <span className="marker">—</span>}</td>}
+                  {sweepCol && <td className="mono">{sweepNo.get(p.sweepId!)}</td>}
                   {withProv && (
                     <td className="prov-cell">
                       <ProvenanceTip fidelity={p.fidelity} />
@@ -171,8 +187,14 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
           mean TPOT = (latency − TTFT) ÷ (output tokens − 1), averaged over requests with more than one
           output token. Not a median or a tail percentile. Measured means come from InferenceX’s
           benchmark client; predicted means from BLIS replaying the same requests, computed the same way.
-          Repeated rows at one concurrency are the same deployment measured on different vLLM builds
-          {dated ? ' or dates' : ''}.
+          {sweepCol ? (
+            <>
+              {' '}Rows repeated at one concurrency are separate InferenceX sweeps of this deployment, numbered
+              in the sweep column. Each sweep’s trend is measured on its own.
+            </>
+          ) : (
+            !v2Sweeps && <> Repeated rows at one concurrency are the same deployment measured on different vLLM builds.</>
+          )}
         </p>
       )}
     </>

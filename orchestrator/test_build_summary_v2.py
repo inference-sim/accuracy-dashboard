@@ -184,6 +184,114 @@ def test_the_validator_refuses_states_the_contract_forbids():
     assert vs2.problems(copy.deepcopy(base)) == []
 
 
+def _spec_and_nospec_contract():
+    """run-a with the DSv4-Pro b200 sweep copied as a no-spec twin of one deployment, sharing its
+    InferenceX workflow, concurrencies and date: PR #31 review's 12 mixed rows, in miniature."""
+    import csv
+    sys.path.insert(0, str(HERE / "ingest"))
+    import contract
+    d = Path(tempfile.mkdtemp()) / "run-a"
+    shutil.copytree(FIXTURE / "run-a", d)
+    facets = json.loads((d / "facets.json").read_text())
+    fid = {r["point_id"]: r for r in map(json.loads, (d / "fidelity.jsonl").read_text().splitlines())}
+    with open(d / "points.csv", newline="") as fh:
+        rows = list(csv.DictReader(fh))
+    src = [r for r in rows if facets[r["point_id"]]["model"] == "deepseek-v4-pro"]
+    assert len(src) == 3
+    for r in src:
+        f = json.loads(json.dumps(facets[r["point_id"]]))
+        f["identity"]["recipe"] = "row:9" + f["identity"]["recipe"][-6:] if f["identity"]["recipe"].startswith("row:") \
+            else "9" + f["identity"]["recipe"][1:]
+        f["spec_method"] = "mtp"
+        f["sweep_id"] += "|mtp"
+        pid = contract.point_id(f["identity"])
+        facets[pid] = f
+        rows.append({**r, "point_id": pid, "pred_ttft_us": str(float(r["pred_ttft_us"]) * 1.1)})
+        fid[pid] = {**fid[r["point_id"]], "point_id": pid}
+    rows.sort(key=contract.points_sort_key)
+    with open(d / "points.csv", "w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=contract.POINTS_HEADER, lineterminator="\n")
+        w.writeheader()
+        w.writerows(rows)
+    (d / "facets.json").write_text(contract.canonical_dumps(facets) + "\n")
+    (d / "fidelity.jsonl").write_text("".join(contract.canonical_dumps(fid[k]) + "\n" for k in sorted(fid)))
+    return d, facets
+
+
+def test_a_spec_and_a_no_spec_sweep_of_one_layout_are_two_rows_each_with_its_own_trend():
+    d, _ = _spec_and_nospec_contract()
+    doc = b2.build(d, generated_at=STAMP, evaluator_commit="test")
+    assert vs2.problems(doc) == []
+    rows = {t["label"]: t for m in doc["matrix"] if m["model"] == "deepseek-v4-pro"
+            for w in m["rows"] for g in w["rows"] for t in g["rows"]}
+    assert sorted(rows) == ["dp1 · ep1 · pp1 · tp8 · fp4", "dp1 · ep1 · pp1 · tp8 · fp4 · mtp"]
+    for t in rows.values():
+        concs = [p["concurrency"] for p in t["rows"]]
+        assert concs == sorted(set(concs))                      # one point per concurrency
+        assert t["rows"][0]["shape"] == {"ttft": None, "tpot": None}  # each row's anchor
+
+
+def test_a_sweep_with_two_points_at_one_concurrency_is_refused_not_built():
+    d, facets = _spec_and_nospec_contract()
+    # Undo the split: both runs back in one sweep, as the extractor wrote them before the fix.
+    for f in facets.values():
+        f["sweep_id"] = f["sweep_id"].removesuffix("|mtp")
+        f["spec_method"] = "none"
+    import contract
+    (d / "facets.json").write_text(contract.canonical_dumps(facets) + "\n")
+    try:
+        b2.build(d, generated_at=STAMP, evaluator_commit="test")
+    except b2.ContractError as e:
+        assert "two points at one concurrency" in str(e)
+        return
+    raise AssertionError("built a summary whose sweep repeats a concurrency")
+
+
+def test_the_validator_checks_the_tree_against_its_points():
+    import copy
+    base = _build()
+
+    def found(mutate, text):
+        doc = copy.deepcopy(base)
+        mutate(doc)
+        return any(text in p for p in vs2.problems(doc))
+    topo = lambda d: d["matrix"][0]["rows"][0]["rows"][0]["rows"][0]
+    assert found(lambda d: d["totals"]["all"]["mape"].update(ttft=99.0), "totals: all mape.ttft")
+    assert found(lambda d: topo(d)["metrics"]["all"]["shape"].update(n=99), "shape n 99")
+    assert found(lambda d: topo(d).update(spec_method="eagle3"), "label doesn't state")
+    assert found(lambda d: topo(d).update(precision="int4"), "label doesn't state")
+    assert found(lambda d: topo(d)["rows"][0].update(shape={"ttft": 1.0, "tpot": 1.0}), "anchor")
+    assert found(lambda d: topo(d)["rows"].append(copy.deepcopy(topo(d)["rows"][0])), "two points at one concurrency")
+
+
+def test_a_gpu_whose_rows_differ_in_precision_states_none():
+    d, facets = _spec_and_nospec_contract()
+    import contract
+    for f in facets.values():
+        if f["spec_method"] == "mtp" and f["model"] == "deepseek-v4-pro":
+            f["precision"] = "fp8"
+    (d / "facets.json").write_text(contract.canonical_dumps(facets) + "\n")
+    doc = b2.build(d, generated_at=STAMP, evaluator_commit="test")
+    g = next(g for m in doc["matrix"] if m["model"] == "deepseek-v4-pro" for w in m["rows"] for g in w["rows"])
+    assert g["precision"] is None and sorted(t["precision"] for t in g["rows"]) == ["fp4", "fp8"]
+    assert vs2.problems(doc) == []
+
+
+def test_one_deployment_on_two_vllm_builds_is_two_rows_named_by_build():
+    d, facets = _spec_and_nospec_contract()
+    import contract
+    for f in facets.values():
+        if f["spec_method"] == "mtp" and f["model"] == "deepseek-v4-pro":
+            f["spec_method"] = "none"
+            f["vllm_version"] = "0.32.0"
+    (d / "facets.json").write_text(contract.canonical_dumps(facets) + "\n")
+    doc = b2.build(d, generated_at=STAMP, evaluator_commit="test")
+    labels = sorted(t["label"] for m in doc["matrix"] if m["model"] == "deepseek-v4-pro"
+                    for w in m["rows"] for g in w["rows"] for t in g["rows"])
+    assert len(labels) == 2 and len(set(labels)) == 2 and all(" · vLLM " in l for l in labels), labels
+    assert vs2.problems(doc) == []
+
+
 def test_v1_documents_are_not_v2():
     v1 = json.loads((HERE.parent / "web" / "testdata" / "render-fixture.summary.json").read_text())
     assert vs2.problems(v1) != []
