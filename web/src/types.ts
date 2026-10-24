@@ -1,7 +1,9 @@
 /**
- * TypeScript mirror of schemas/summary.v1.json (RFC §4.4). Hand-maintained alongside the
- * local schema: a format break is caught in CI by validate_summary.py against that schema,
- * and `schema_version` gates the loader here (load.ts) before the site renders anything.
+ * TypeScript mirror of schemas/summary.v1.json and schemas/summary.v2.json (RFC §4.4, #30).
+ * Hand-maintained alongside the local schemas: a format break is caught in CI by
+ * validate_summary.py / validate_summary_v2.py, and `schema_version` gates the loader here
+ * (load.ts) before the site renders anything. Everything v2 adds is optional, so v1 data
+ * types and renders exactly as before.
  */
 
 export type Metric = 'ttft' | 'tpot'
@@ -29,6 +31,62 @@ export interface CoverageCount {
   total: number
 }
 
+/** One classified vLLM setting in a v2 fidelity record (orchestrator/ingest/fidelity.schema.json). */
+export interface FidelityArg {
+  arg: string
+  measured: string | number | boolean | null
+  source?: 'launch_config' | 'args' | 'resolved_config' | 'engine_line' | 'api_row' | 'blis_default'
+  blis: string | number | boolean | null
+  blis_field?: string
+  match: 'exact' | 'mapped' | 'inert' | 'blis_default' | 'approximated' | 'differs' | 'absent_in_blis' | 'unreadable' | 'conflict'
+  rule?: string
+  note?: string
+  occurrences?: number
+  values?: unknown[]
+}
+
+export interface FidelityResolved {
+  quantity: string
+  measured: number | string | null
+  blis: number | string | null
+  match: 'exact' | 'differs' | 'unreadable' | 'conflict' | 'incomparable'
+  occurrences?: number
+  delta?: number | string | null
+  ratio?: string | null
+  reason?: string
+}
+
+/** What a point's run did versus what BLIS was given (v2, Discussion #28). */
+export interface Fidelity {
+  status: 'exact' | 'approximate' | 'not_scored'
+  reasons?: string[]
+  build: {
+    image: string
+    commit: string | null
+    source: string | null
+    ref: string
+    distance: number | null
+    /** exact: the build BLIS models. Older v2 records have no match and read as exact. */
+    match?: 'exact' | 'estimated'
+    why?: 'custom_build' | 'outside_distance' | 'commit_unresolvable' | 'commit_conflict'
+  }
+  args: FidelityArg[]
+  resolved: FidelityResolved[]
+  replay?: {
+    client: string
+    client_version: string
+    scenario: string
+    replayed_as?: string
+    concurrency: number
+    duration_s?: number
+    corpus: string
+    corpus_sha256: string
+    seed: number
+    trajectory_start?: { min_ratio?: number; max_ratio?: number }
+  }
+  blis_kernel_provenance?: unknown
+}
+
 export interface PointNode {
   level: 'point'
   concurrency: number
@@ -38,6 +96,16 @@ export interface PointNode {
   error_pct?: { ttft: number | null; tpot: number | null }
   shape?: { ttft: number | null; tpot: number | null } | null
   shape_reason?: string | null
+  /** v2 only: the point's identity hash, its measurement date and its fidelity record. */
+  point_id?: string
+  measured_date?: string
+  /** v2: the measured curve the point's trend is computed in; repeats at one concurrency are
+   *  separate sweeps of the same deployment. */
+  sweep_id?: string
+  /** v2: InferenceX ran this measurement more than once with identical BLIS inputs; `measured`
+   *  is the runs' mean and each run is listed here. */
+  repeats?: { point_id: string; measured: { ttft_ms: number | null; tpot_ms: number | null } }[]
+  fidelity?: Fidelity
 }
 
 export interface TopologyNode {
@@ -102,6 +170,13 @@ export interface Provenance {
   }
   evaluator_commit: string
   scorer: 'signedprobe'
+  /** v2 only: which ingest produced the snapshot ('api'); absent on v1 (the db-dump pipeline). */
+  ingest?: 'api'
+  vllm_ref?: string
+  vllm_max_distance?: number
+  policy_sha256?: string
+  pulled_at?: string
+  corpus?: { dataset: string; revision: string; sha256: string } | null
 }
 
 export interface Coverage {
@@ -109,12 +184,24 @@ export interface Coverage {
   not_scored: number
   multinode_hidden: number
   failed: number
+  /** v2: InferenceX runs folded into another point as a repeat of it. */
+  repeat_runs_folded?: number
   measured_excluded?: number
   not_scored_reasons: Record<string, number>
 }
 
+/** v2 only: a point InferenceX measured that this run didn't score. Never rendered. */
+export interface NotScoredPoint {
+  point_id: string
+  measured_date: string
+  model: string
+  hardware: string
+  reasons: string[]
+  [k: string]: unknown
+}
+
 export interface Summary {
-  schema_version: 1
+  schema_version: 1 | 2
   snapshot_id: string
   generated_at: string
   provenance: Provenance
@@ -129,6 +216,8 @@ export interface Summary {
     measured_exclusions?: string[]
     vllm_version_filter?: string
   }
+  /** v2 only. */
+  not_scored?: NotScoredPoint[]
 }
 
 /** Any non-leaf node in the drill-down tree carries metrics + coverage + child rows. */

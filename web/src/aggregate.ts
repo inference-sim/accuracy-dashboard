@@ -11,7 +11,7 @@
  * concurrency and excludes the anchor; every level averages |individual point errors|, never
  * child-node means.
  */
-import type { Metric, MetricBlock, MetricBlockPair, Summary, TierKey } from './types'
+import type { Fidelity, Metric, MetricBlock, MetricBlockPair, PointNode, Summary, TierKey } from './types'
 
 /** A leaf point flattened out of the tree with its full ancestry, for filtering + regrouping. */
 export interface FlatPoint {
@@ -42,6 +42,15 @@ export interface FlatPoint {
   shapeReason: string | null
   /** Stable identity across snapshots for row-select + same-points work. */
   sweepKey: string
+  /** v2 only: when the point was measured, and what the run did versus what BLIS was given. */
+  measuredDate?: string
+  /** v2: the point's contract id, stable across BLIS releases and catalog changes. */
+  pointId?: string
+  /** v2: the InferenceX sweep the point belongs to (its trend's curve). */
+  sweepId?: string
+  /** v2: the InferenceX runs this measurement averages, when there was more than one. */
+  repeats?: PointNode['repeats']
+  fidelity?: Fidelity
 }
 
 /** Flatten the whole matrix into leaf points carrying their ancestry. */
@@ -59,7 +68,8 @@ export function flattenPoints(summary: Summary): FlatPoint[] {
               isl: w.isl,
               osl: w.osl,
               gpu: g.label,
-              precision: g.precision,
+              // The deployment's own precision: one GPU can serve runs at two precisions.
+              precision: t.precision ?? g.precision,
               framework: t.framework,
               engineVersion: t.engine_version,
               isMultinode: t.is_multinode,
@@ -79,6 +89,11 @@ export function flattenPoints(summary: Summary): FlatPoint[] {
               shapeTpot: p.shape?.tpot ?? null,
               shapeReason: p.shape_reason ?? null,
               sweepKey: `${m.model}|${w.label}|${g.label}|${t.label}`,
+              ...(p.measured_date ? { measuredDate: p.measured_date } : {}),
+              ...(p.point_id ? { pointId: p.point_id } : {}),
+              ...(p.sweep_id ? { sweepId: p.sweep_id } : {}),
+              ...(p.repeats ? { repeats: p.repeats } : {}),
+              ...(p.fidelity ? { fidelity: p.fidelity } : {}),
             })
           }
         }
@@ -124,7 +139,13 @@ export function aggregatePair(points: FlatPoint[]): MetricBlockPair {
  * see PointsTable). Two runs' points are "the same point" iff this key matches.
  */
 export function pointKey(p: FlatPoint): string {
-  return `${p.sweepKey}|${p.concurrency}|${p.engineVersion ?? ''}`
+  // A v2 point carries its contract id (CONTRACT.md: Compare intersects on point_id), which no
+  // display label can collide on. Older v2 points without one fall back to the label key with
+  // their date (a later measurement of the same recipe is a different point); v1 points carry
+  // neither and keep their key unchanged.
+  if (p.pointId) return p.pointId
+  const base = `${p.sweepKey}|${p.concurrency}|${p.engineVersion ?? ''}`
+  return p.measuredDate ? `${base}|${p.measuredDate}` : base
 }
 
 /**

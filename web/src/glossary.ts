@@ -11,6 +11,19 @@ export interface GlossaryEntry {
   definition: string
 }
 
+/** The v2 tier explanation, naming the snapshot's own build window: `ref` (the vLLM release
+ *  BLIS is calibrated on) and `maxDistance` (how many commits from it still count as that
+ *  build) come from the snapshot's provenance, never from here. */
+export function tierV2Definition(ref: string, maxDistance: number): string {
+  const n = maxDistance.toLocaleString('en-US')
+  return (
+    'Which points are included. “exact”: BLIS simulated exactly the configuration that was measured, ' +
+    `on a vLLM build within ${n} commits of ${ref}, the release BLIS is calibrated on. ` +
+    '“estimated”: one or more settings BLIS can’t represent yet were estimated, or the run’s ' +
+    `vLLM build is more than ${n} commits from ${ref} or a custom build (marked ≈). “all”: both.`
+  )
+}
+
 export const GLOSSARY: Record<string, GlossaryEntry> = {
   mape: {
     label: 'error',
@@ -35,10 +48,24 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     definition:
       'Which points are included. “measured·resolved” keeps only apples-to-apples comparisons — where BLIS ran the same configuration that was actually measured. “all” also includes points where that match is only approximate.',
   },
+  tierV2: {
+    label: 'tier',
+    definition:
+      'Which points are included. “exact”: BLIS simulated exactly the configuration that was measured, on a vLLM build close to the release BLIS is calibrated on. “estimated”: one or more settings BLIS can’t represent yet were estimated, or the run’s vLLM build is further from that release (marked ≈). “all”: both.',
+  },
+
   coverage: {
     label: 'coverage',
-    definition: 'How many points were scored vs. not. Nothing is hidden — unscored points are counted and the reasons shown.',
+    definition: 'How many points were scored vs. not. Nothing is hidden: unscored points are counted, and the reason for each is in the downloadable results.',
   },
+  provenance: {
+    label: 'match',
+    definition:
+      '✓ exact: BLIS simulated exactly what the run used. ≈ estimated: one or more settings BLIS can’t represent yet were replaced by the nearest ones it can, or the run used a different vLLM build; hover to see what differs.',
+  },
+
+
+
   diff: {
     label: 'Δ (newer − older)',
     definition: 'The newer run minus the older run, over the points both runs scored. Green means the newer run is more accurate; red means it got worse.',

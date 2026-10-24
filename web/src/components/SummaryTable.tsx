@@ -8,6 +8,7 @@
  */
 import { formatPct } from '../format'
 import { Term } from './Term'
+import { ProvenanceBody } from './Provenance'
 import type { RenderRow } from '../tree'
 import type { SortKey, SortSpec } from '../sort'
 import type { MetricBlockPair, TierKey } from '../types'
@@ -114,6 +115,29 @@ export function SummaryTable(props: Props) {
                   <span className={`caret${canExpand ? ' clk' : ''}`}>{caret}</span>
                   {row.level === 'model' ? <b className="name">{row.label}</b> : row.label}
                   {row.facet && <span className="facet">{row.facet}</span>}
+                  {row.fidelity && (
+                    // stopPropagation: opening the tooltip by click/tap must not select the row
+                    <span className="prov-inrow" onClick={(e) => e.stopPropagation()}>
+                      <Term
+                        content={
+                          <>
+                            <span className="prov-row prov-dim">
+                              {row.approxCount
+                                ? `${row.approxCount} of ${row.pointCount} points estimated`
+                                : `all ${row.pointCount} point${row.pointCount === 1 ? '' : 's'} exact`}
+                            </span>
+                            <ProvenanceBody fidelity={row.fidelity} />
+                          </>
+                        }
+                        popClass="term-pop-wide"
+                        ariaLabel="how closely BLIS matched this deployment"
+                      >
+                        <span className={`prov-mark${row.approxCount ? ' approx' : ''}`} aria-hidden="true">
+                          {row.approxCount ? '≈' : '✓'}
+                        </span>
+                      </Term>
+                    </span>
+                  )}
                 </td>
                 <td className="sep">
                   <Num v={b.mape.ttft} />
