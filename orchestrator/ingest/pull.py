@@ -213,3 +213,54 @@ def write_manifest(out: Path, meta: dict, points: list[dict]) -> str:
     text = contract.canonical_dumps(doc) + "\n"
     (out / "manifest.json").write_text(text)
     return art.sha256(text.encode())
+
+
+@dataclass
+class Incremental:
+    """How tonight's window splits against a prior frozen pull (Discussion #15, "Store"):
+
+      reuse   point ids the prior pull already froze and this window still holds -- their files
+              and manifest entries carry over untouched (a measurement is immutable, so a frozen
+              point never needs re-freezing).
+      fresh   rows in this window the prior pull didn't hold -- freeze them now.
+      dropped point ids the prior pull froze that this window no longer holds -- their files and
+              manifest entries leave the store (aged out of the 180 days).
+    """
+    reuse: dict = field(default_factory=dict)    # point_id -> prior manifest entry
+    fresh: list = field(default_factory=list)    # API rows to freeze
+    dropped: set = field(default_factory=set)    # point_ids to remove
+
+
+def plan_incremental(rows: list[dict], prior_points: list[dict]) -> Incremental:
+    """Split this window's `rows` against a prior pull's manifest `points`. A point is reused iff
+    the prior pull holds its id; identity is immutable, so the id alone decides. The pull itself
+    never applies the window (api.pull already did) -- this only reconciles against what's frozen."""
+    want = {}
+    for r in rows:
+        want[contract.point_id(identity(r))] = r
+    prior = {e["point_id"]: e for e in prior_points}
+    inc = Incremental()
+    for pid, row in want.items():
+        if pid in prior:
+            inc.reuse[pid] = prior[pid]
+        else:
+            inc.fresh.append(row)
+    inc.dropped = set(prior) - set(want)
+    # Freeze fresh rows in the same order api.pull sorted them, so a pull is order-stable.
+    inc.fresh.sort(key=lambda r: int(r["id"]) if str(r["id"]).isdigit() else str(r["id"]))
+    return inc
+
+
+def prune_point_files(out: Path, point_id: str) -> None:
+    """Remove an aged-out point's frozen files (its points/<id>/ directory). The store keeps only
+    the current window, so an aged-out log is really gone (#15, "Store (ix-store)")."""
+    import shutil
+    shutil.rmtree(out / "points" / point_id, ignore_errors=True)
+
+
+def load_prior_manifest(prior: Path) -> dict | None:
+    """A prior frozen pull's manifest, or None if there isn't one to extend."""
+    m = prior / "manifest.json"
+    if not m.is_file():
+        return None
+    return json.loads(m.read_text())

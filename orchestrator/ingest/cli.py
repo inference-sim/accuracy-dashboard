@@ -44,6 +44,7 @@ PULL_ERROR = "artifact_unmatched:pull_error"
 
 
 def cmd_pull(a) -> int:
+    import shutil
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     today = date.fromisoformat(a.today) if a.today else date.today()
@@ -55,13 +56,28 @@ def cmd_pull(a) -> int:
         # rather than publish a pull that silently lacks a model.
         _log("FATAL: the site names no display name for " + ", ".join(p.unnamed_slugs))
         return 3
+    # Incremental: extend a prior frozen pull. A point's measurement is immutable, so one already
+    # frozen is reused verbatim (files + manifest entry), only fresh rows are fetched, and aged-out
+    # points leave the store. A cold pull (no --prior, or --prior == --out) freezes every row.
+    prior_manifest = pl.load_prior_manifest(Path(a.prior)) if a.prior else None
+    prior_points = prior_manifest["points"] if prior_manifest else []
+    inc = pl.plan_incremental(p.rows, prior_points)
+    prior_dir = Path(a.prior) if a.prior else out
+    _log(f"pull: reuse {len(inc.reuse)} frozen, freeze {len(inc.fresh)} fresh, drop {len(inc.dropped)} aged-out")
     token = clients.require_github_token()
     resolver = build.Resolver(registry=clients.DockerHubRegistry(), github=clients.GitHubREST(token))
     gh = art.GitHubArtifacts(pl.IX_REPO, token, Path(a.cache or out / "_artifacts"))
     recipes = rcp.GitHubRecipes(clients.GitHubREST(token)._get, pl.IX_REPO)
     run_artifacts: dict = {}
     points = []
-    for i, row in enumerate(p.rows, 1):
+    # Reused points: carry over the manifest entry and copy the frozen files (unless out IS prior).
+    for pid, e in sorted(inc.reuse.items()):
+        if prior_dir != out:
+            src = prior_dir / "points" / pid
+            if src.exists():
+                shutil.copytree(src, out / "points" / pid, dirs_exist_ok=True)
+        points.append(e)
+    for i, row in enumerate(inc.fresh, 1):
         try:
             e = pl.freeze_point(row, resolver=resolver, gh=gh, fetch=api.http_fetch, out=out,
                                 run_artifacts=run_artifacts, recipes=recipes)
@@ -72,7 +88,10 @@ def cmd_pull(a) -> int:
             e = {"point_id": contract.point_id(ident), "identity": ident, "row": row, "files": {},
                  "build": None, "reasons": [PULL_ERROR], "problems": [repr(ex)[:500]]}
         points.append(e)
-        _log(f"  [{i}/{len(p.rows)}] {row['model']} {row['hardware']} c{row['conc']} -> {e['reasons'] or 'ok'}")
+        _log(f"  [{i}/{len(inc.fresh)}] {row['model']} {row['hardware']} c{row['conc']} -> {e['reasons'] or 'ok'}")
+    # Aged-out points: drop their files so the store holds only the current window.
+    for pid in sorted(inc.dropped):
+        pl.prune_point_files(out, pid)
     # The served checkpoints' HF base_model, frozen here so scoring needs no network.
     base = {}
     for e in points:
@@ -94,7 +113,14 @@ def cmd_pull(a) -> int:
                         r = sp.hf_repo(x)
                         if r:
                             base.setdefault(r, None)
+    # Reuse a prior pull's base_model lookups for repos it already resolved: a base_model is a
+    # fact about the checkpoint, not about when it was pulled, so an incremental night needn't
+    # re-fetch HuggingFace for a repo it saw last night. Only genuinely new repos are looked up.
+    prior_base = (prior_manifest or {}).get("base_models") or {}
     for repo in sorted(base):
+        if repo in prior_base:
+            base[repo] = prior_base[repo]
+            continue
         try:
             doc = api.decode(api.http_fetch(f"https://huggingface.co/api/models/{repo}"))
             bm = (doc.get("cardData") or {}).get("base_model")
@@ -242,6 +268,8 @@ def main(argv=None) -> int:
     p.add_argument("--out", required=True)
     p.add_argument("--today")
     p.add_argument("--cache")
+    p.add_argument("--prior", help="a prior frozen pull to extend: reuse its frozen points, freeze "
+                                   "only new rows, drop aged-out ones. Omit for a cold pull.")
     s = sub.add_parser("score")
     s.add_argument("--pull", required=True)
     s.add_argument("--out", required=True)

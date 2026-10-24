@@ -23,6 +23,10 @@ export interface RunRef {
   generated_at: string | null
   blis_release: string | null
   ix_release: string | null
+  /** Which ingest produced the run: 'api' (the live InferenceX API) or 'db-dump' (the legacy
+   *  weekly dump). The picker labels a run · API / · dump from this, and Compare refuses to diff
+   *  across ingests. Absent on an index published before the field existed → treated as 'db-dump'. */
+  ingest?: 'api' | 'db-dump'
   /** path relative to data/ for this run's summary.json */
   path: string
 }
@@ -30,7 +34,11 @@ export interface RunRef {
 export interface RunIndex {
   schema_version: 1
   latest: string | null
-  retention_days: number
+  /** How many API-release snapshots the index keeps (#15's count-based last-5 rule). */
+  keep_api?: number
+  /** Legacy: the old dump pipeline's single day-based retention. Kept optional so an old index
+   *  still loads; the new index is count-based (keep_api). */
+  retention_days?: number
   runs: RunRef[]
 }
 

@@ -5,7 +5,7 @@
  * the URL hash for deep-linking (route.ts).
  */
 import { useEffect, useMemo, useState } from 'react'
-import { flattenPoints, aggregatePair, type FlatPoint } from './aggregate'
+import { flattenPoints, aggregatePair, latestPerConfig, type FlatPoint } from './aggregate'
 import { applyFilters } from './filter'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { PointsTable } from './components/PointsTable'
@@ -16,7 +16,7 @@ import { Headline } from './components/Headline'
 import { Term } from './components/Term'
 import { tierV2Definition } from './glossary'
 import { formatCount } from './format'
-import type { RunIndex } from './load'
+import type { RunIndex, RunRef } from './load'
 import { DEFAULT_ROUTE, parseRoute, routeToHash, type RouteState } from './route'
 import { buildRows } from './tree'
 import { nextSort, sortModelKeys, type SortKey, type SortSpec } from './sort'
@@ -190,7 +190,11 @@ function Overview({
   expanded: Set<string>
   setExpanded: (s: Set<string>) => void
 }) {
-  const allPoints = useMemo(() => flattenPoints(summary), [summary])
+  // The single-run view is the live view: for each config (deployment × concurrency) it shows
+  // only the newest measurement (Discussion #15, Decided). Older measurements stay in the snapshot
+  // and in Compare (which flattens independently), so release-over-release diffs still see every
+  // measurement. v1 dump points have no measured_date and pass through untouched.
+  const allPoints = useMemo(() => latestPerConfig(flattenPoints(summary)), [summary])
   const visible = useMemo(() => applyFilters(allPoints, route), [allPoints, route])
 
   // Effective tier: the default is measured_or_resolved, but if a snapshot has zero
@@ -523,6 +527,17 @@ function RunProvenance({ summary }: { summary: Summary }) {
 /** The public InferenceX site the API ingest pulls from (its API root isn't a page to visit). */
 const INFERENCEX_SITE = 'https://inferencex.semianalysis.com/'
 
+/**
+ * A picker option's label: date · BLIS release · ingest. The ingest tag (· API / · dump) is what
+ * #15 asks for, so a reader can tell an API-ingest run from a legacy db-dump one at a glance (and
+ * understand why Compare refuses to diff the two). An index entry with no ingest field predates the
+ * field and is a dump run.
+ */
+function runLabel(r: RunRef): string {
+  const ingest = (r.ingest ?? 'db-dump') === 'api' ? 'API' : 'dump'
+  return `${r.snapshot_id.slice(0, 10)} · ${r.blis_release ?? '?'} · ${ingest}`
+}
+
 /** source_url comes from the data file, so only an http(s) URL becomes a link. */
 function safeUrl(u: string | null | undefined): string | null {
   return u && /^https?:\/\//.test(u) ? u : null
@@ -580,7 +595,7 @@ function DevView({
                 .filter((r) => r.snapshot_id !== picker.runB)
                 .map((r, i) => ({
                   value: r.snapshot_id,
-                  label: `${r.snapshot_id.slice(0, 10)} · ${r.blis_release ?? '?'}${i === 0 ? ' · latest' : ''}`,
+                  label: `${runLabel(r)}${i === 0 ? ' · latest' : ''}`,
                 }))}
               // Single-run: picking the latest → null ("track latest", resolves via data/latest).
               // Compare mode: ALWAYS pin the explicit snapshot_id — a null-latest A can't be diffed
@@ -609,7 +624,7 @@ function DevView({
                       .filter((r) => r.snapshot_id !== (picker.run ?? runs[0]!.snapshot_id))
                       .map((r) => ({
                         value: r.snapshot_id,
-                        label: `${r.snapshot_id.slice(0, 10)} · ${r.blis_release ?? '?'}`,
+                        label: runLabel(r),
                       })),
                   ]}
                   onChange={(id) => picker.onPickB(id === '__none__' ? null : id)}

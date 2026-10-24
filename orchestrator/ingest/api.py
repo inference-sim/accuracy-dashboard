@@ -83,27 +83,44 @@ class Pull:
     window: tuple[str, str] = ("", "")
 
 
-def in_window(row_date: str, start: date, end: date) -> bool:
+# Exactly the past 180 days, both ends included: today-179 <= measured_date <= today
+# (Discussion #15, "Retention: 1. InferenceX data: exactly the past 180 days"). The window is
+# N calendar days inclusive, so its first day is today-(N-1), NOT today-N -- the old today-N
+# spanned 181 days and is the bug this fixes.
+WINDOW_DAYS = 180
+
+
+def window_bounds(today: date, window_days: int = WINDOW_DAYS) -> tuple[date, date]:
+    """The [start, end] of an N-day window ending today, both inclusive. end is today; start is
+    today-(N-1). One definition, so the pull, the store prune, the live view and the not-scored
+    list can never disagree on what "in the window" means."""
+    return today - timedelta(days=window_days - 1), today
+
+
+def in_window(measured_date, today: date, window_days: int = WINDOW_DAYS) -> bool:
+    """The single predicate every stage uses (Discussion #15): is `measured_date` within the
+    N-day window ending `today`? A date that doesn't parse is never in the window."""
+    start, end = window_bounds(today, window_days)
     try:
-        d = date.fromisoformat(str(row_date)[:10])
+        d = date.fromisoformat(str(measured_date)[:10])
     except ValueError:
         return False
     return start <= d <= end
 
 
-def pull(fetch, *, today: date, window_days: int, framework: str = "vllm") -> Pull:
-    """Every `framework` row measured within the last `window_days` days (inclusive of today),
+def pull(fetch, *, today: date, window_days: int = WINDOW_DAYS, framework: str = "vllm") -> Pull:
+    """Every `framework` row measured within the N-day window ending today (both ends included),
     for every model InferenceX lists. Sorted by row id, so a pull is order-stable."""
-    start = today - timedelta(days=window_days)
+    start, end = window_bounds(today, window_days)
     avail = decode(fetch(API + "/availability"))
     slugs = {a["model"] for a in avail
-             if a.get("framework") == framework and in_window(a.get("date"), start, today)}
+             if a.get("framework") == framework and in_window(a.get("date"), today, window_days)}
     names = display_names(fetch, slugs) if slugs else {}
     if slugs and not names:
         # Nothing at all named: the site changed shape, not the data. Fail rather than
         # publish an empty pull.
         raise RuntimeError("no slug -> display-name map found in the InferenceX site scripts")
-    out = Pull(unnamed_slugs=sorted(slugs - set(names)), window=(start.isoformat(), today.isoformat()))
+    out = Pull(unnamed_slugs=sorted(slugs - set(names)), window=(start.isoformat(), end.isoformat()))
     seen = set()
     for display in sorted(set(names[s] for s in slugs if s in names)):
         rows = decode(fetch(API + "/benchmarks?model=" + urllib.parse.quote(display)))
@@ -118,7 +135,7 @@ def pull(fetch, *, today: date, window_days: int, framework: str = "vllm") -> Pu
                 seen.add(str(r["id"]))
                 out.undated.append(r)      # kept and reported, never silently dropped
                 continue
-            if in_window(r.get("date"), start, today):
+            if in_window(r.get("date"), today, window_days):
                 seen.add(str(r["id"]))
                 out.rows.append(r)
     out.rows.sort(key=lambda r: int(r["id"]) if str(r["id"]).isdigit() else str(r["id"]))

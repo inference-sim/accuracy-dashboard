@@ -170,6 +170,34 @@ describe('App renders the real CI-shaped snapshot', () => {
     expect(html).not.toContain('aria-label="Select the nightly run (A)" disabled')
   })
 
+  it('tags an API-ingest run · API in the picker, per #15', () => {
+    // The picker trigger shows the selected (latest) run's label; its ingest tag is · API.
+    const index = {
+      schema_version: 1 as const,
+      latest: 'api1',
+      keep_api: 5,
+      runs: [
+        { snapshot_id: '2026-10-23_blis-v0.12.0_ix-api', generated_at: null, blis_release: 'v0.12.0', ix_release: 'api-2026-10-23', ingest: 'api' as const, path: 'snapshots/api1/summary.json' },
+        { snapshot_id: '2026-10-21_blis-v0.11.0_ix-api', generated_at: null, blis_release: 'v0.11.0', ix_release: 'api-2026-10-23', ingest: 'api' as const, path: 'snapshots/api2/summary.json' },
+      ],
+    }
+    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={index} initialHash="#/?view=dev" />)
+    expect(html).toContain('v0.12.0 · API · latest')
+  })
+
+  it('tags a legacy dump run · dump, and treats a missing ingest field as dump', () => {
+    const index = {
+      schema_version: 1 as const,
+      latest: 'a',
+      runs: [
+        // No ingest field: an index published before the field existed → a dump run.
+        { snapshot_id: '2026-09-28_blis-v0.12.0', generated_at: null, blis_release: 'v0.12.0', ix_release: 'db-dump/2026-09-28', path: 'snapshots/a/summary.json' },
+      ],
+    }
+    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={index} initialHash="#/?view=dev" />)
+    expect(html).toContain('v0.12.0 · dump')
+  })
+
   it('keeps the run-picker off the visitor Overview, even with an index (#23)', () => {
     const index = { schema_version: 1 as const, latest: 'a', retention_days: 30, runs: [{ snapshot_id: 'a', generated_at: null, blis_release: 'v0.10.0', ix_release: 'db-dump/2026-09-28', path: 'snapshots/a/summary.json' }] }
     expect(renderToStaticMarkup(<App summary={loadFixture()} loadError={null} index={index} />)).not.toContain('Nightly run')
