@@ -14,12 +14,13 @@ import { Dropdown } from './components/Dropdown'
 import { Compare } from './components/Compare'
 import { Headline } from './components/Headline'
 import { Term } from './components/Term'
-import { formatCount, formatVersion } from './format'
+import { tierV2Definition } from './glossary'
+import { formatCount } from './format'
 import type { RunIndex } from './load'
 import { DEFAULT_ROUTE, parseRoute, routeToHash, type RouteState } from './route'
 import { buildRows } from './tree'
 import { nextSort, sortModelKeys, type SortKey, type SortSpec } from './sort'
-import type { Summary } from './types'
+import type { Summary, TierKey } from './types'
 
 interface Picker {
   index: RunIndex | null
@@ -116,7 +117,7 @@ export function App({
         <DevView summary={summary} summaryB={comparing ? summaryB : null} picker={picker}>
           {comparing ? (
             <ErrorBoundary resetKey={route.runB}>
-              <Compare a={summary} b={summaryB!} tier={route.tier} />
+              <Compare a={summary} b={summaryB!} tier={route.tier === 'estimated' ? 'all' : route.tier} />
             </ErrorBoundary>
           ) : (
             <p className="pts-hint">Pick a second run above to see how accuracy changed between them.</p>
@@ -192,32 +193,37 @@ function Overview({
   const allPoints = useMemo(() => flattenPoints(summary), [summary])
   const visible = useMemo(() => applyFilters(allPoints, route), [allPoints, route])
 
-  // Distinct vLLM versions present in the snapshot, for the version dropdown (§4.5: version is a
-  // per-row filter). Sorted; the dropdown offers "all versions" + each of these.
-  const versions = useMemo(
-    () => [...new Set(allPoints.map((p) => p.engineVersion).filter((v): v is string => !!v))].sort(),
-    [allPoints],
-  )
-
   // Effective tier: the default is measured_or_resolved, but if a snapshot has zero
   // measured-or-resolved points (the direct dump path leaves settings resolved, so every point
   // lands in "all") we fall back to the "all" tier rather than show an empty headline. The
   // user's explicit tier click is always honoured; this only rescues the DEFAULT.
+  // 'estimated' is a view over the "all" tier: only the points BLIS estimated, aggregated as
+  // the "all" tier aggregates (none of them is in the strict one). v1 has no such points.
+  const showEstimated = route.tier === 'estimated' && summary.schema_version === 2
   const tierFellBack =
     route.tier === 'measured_or_resolved' &&
     visible.filter((p) => p.tier === 'measured_or_resolved').length === 0 &&
     visible.length > 0
-  const effectiveTier = tierFellBack ? 'all' : route.tier
+  const effectiveTier: TierKey = tierFellBack || route.tier !== 'measured_or_resolved' ? 'all' : 'measured_or_resolved'
+  const inTier = (p: FlatPoint) =>
+    showEstimated ? p.fidelity?.status === 'approximate' : effectiveTier === 'all' || p.tier === 'measured_or_resolved'
 
-  // The headline always describes the full latest run under the default view, never the current
-  // filter, so the top-line "how accurate is BLIS?" number can't shift under a control (PR #26
-  // review). Only the per-model table and the points below respond to the filters.
+  // The headline always describes the full latest run under the default view (every scored
+  // point, the "all" tier), never the current filter, so the top-line "how accurate is BLIS?"
+  // number can't shift under a control (PR #26 review) and matches the point count beside it.
+  // Only the per-model table and the points below respond to the filters.
   const headlinePoints = useMemo(() => applyFilters(allPoints, DEFAULT_ROUTE), [allPoints])
-  const headlineTier =
-    headlinePoints.some((p) => p.tier === 'measured_or_resolved') ? DEFAULT_ROUTE.tier : 'all'
+  const headlineTier: TierKey = 'all'
   const totals = useMemo(() => aggregatePair(headlinePoints), [headlinePoints])
+  const headlineSplit = useMemo(() => {
+    const estimated = headlinePoints.filter((p) => p.fidelity?.status === 'approximate').length
+    return { exact: headlinePoints.length - estimated, estimated }
+  }, [headlinePoints])
 
-  const rows = useMemo(() => buildRows(visible, expanded), [visible, expanded])
+  // A row is listed only if it has points in the tier being shown, so the exact tier never shows
+  // deployments that are entirely estimated as rows of dashes.
+  const tierPoints = useMemo(() => visible.filter(inTier), [visible, effectiveTier, showEstimated])
+  const rows = useMemo(() => buildRows(tierPoints, expanded), [tierPoints, expanded])
 
   // Sort reorders only the model-level rows; children follow their parent.
   const orderedRows = useMemo(() => {
@@ -248,10 +254,8 @@ function Overview({
   // The selected topology's points, by sweepKey.
   const selectedPoints: FlatPoint[] = useMemo(() => {
     if (!route.sel) return []
-    const tierScoped =
-      effectiveTier === 'all' ? visible : visible.filter((p) => p.tier === 'measured_or_resolved')
-    return tierScoped.filter((p) => p.sweepKey === route.sel)
-  }, [visible, route.sel, effectiveTier])
+    return visible.filter(inTier).filter((p) => p.sweepKey === route.sel)
+  }, [visible, route.sel, effectiveTier, showEstimated])
 
   const selFirst = selectedPoints[0]
   const pointsTitle = selFirst
@@ -262,9 +266,10 @@ function Overview({
   const selMissing = route.sel != null && selectedPoints.length === 0
 
   const cov = summary.coverage
-  const notScoredDetail = Object.entries(cov.not_scored_reasons || {})
-    .map(([k, v]) => `${k.replace(/_/g, ' ')} ${v}`)
-    .join(', ')
+  // v2 tiers come from each point's match record: exact, or estimated (a setting BLIS can't
+  // represent yet was estimated). v1 keeps the harness's measured·resolved / all wording.
+  const v2 = summary.schema_version === 2
+  const prov = summary.provenance
 
   return (
     <>
@@ -280,41 +285,47 @@ function Overview({
         points={headlinePoints.length}
         models={summary.matrix.length}
         blisRelease={summary.provenance?.blis?.release ?? null}
-        dataDate={summary.provenance?.ground_truth?.release_tag?.replace('db-dump/', '') ?? null}
+        dataDate={summary.provenance?.ground_truth?.release_tag?.replace(/^db-dump\//, '') ?? null}
+        measuredRange={measuredRange(headlinePoints)}
+        pulledAt={summary.provenance?.pulled_at ?? null}
+        split={v2 ? headlineSplit : null}
       />
 
       <h2 className="sectitle">Accuracy by model</h2>
       {/* Filters sit beside the table they change; the headline above ignores them (PR #26 review). */}
       <div className="chips">
         <span className="flt">
-        <Term name="tier" />{' '}
+        {v2 && prov?.vllm_ref && prov.vllm_max_distance != null ? (
+          <Term content={tierV2Definition(prov.vllm_ref, prov.vllm_max_distance)}>tier</Term>
+        ) : (
+          <Term name={v2 ? 'tierV2' : 'tier'} />
+        )}{' '}
         <span className="tierseg">
           {/* The highlighted option is the one actually shown: when the stricter tier has no
               points the view falls back to "all", so "all" is highlighted then (#23). */}
           <span
             className={`clk ${effectiveTier === 'measured_or_resolved' ? 'on' : ''}`}
-            onClick={() => update({ tier: 'measured_or_resolved' })}
+            onClick={() => update({ tier: 'measured_or_resolved', sel: null })}
           >
-            measured·resolved
+            {v2 ? 'exact' : 'measured·resolved'}
           </span>
-          <span className={`clk ${effectiveTier === 'all' ? 'on' : ''}`} onClick={() => update({ tier: 'all' })}>
+          {v2 && (
+            <span className={`clk ${showEstimated ? 'on' : ''}`} onClick={() => update({ tier: 'estimated', sel: null })}>
+              estimated
+            </span>
+          )}
+          <span
+            className={`clk ${effectiveTier === 'all' && !showEstimated ? 'on' : ''}`}
+            onClick={() => update({ tier: 'all', sel: null })}
+          >
             all
           </span>
         </span>
-        {tierFellBack && <span className="disabled-note">(no measured·resolved points yet — showing all)</span>}
-      </span>
-      <span className="flt">
-        vLLM version{' '}
-        <Dropdown
-          className="vllmsel"
-          ariaLabel="Filter by vLLM version"
-          value={typeof route.vllm === 'object' ? `v:${route.vllm.version}` : 'all'}
-          options={[
-            { value: 'all', label: 'all versions' },
-            ...versions.map((v) => ({ value: `v:${v}`, label: formatVersion(v) })),
-          ]}
-          onChange={(v) => update({ vllm: v === 'all' ? 'all' : { version: v.replace(/^v:/, '') } })}
-        />
+        {tierFellBack && (
+          <span className="disabled-note">
+            ({v2 ? 'no exact points yet' : 'no measured·resolved points yet'} — showing all)
+          </span>
+        )}
       </span>
     </div>
 
@@ -330,6 +341,11 @@ function Overview({
       />
 
       <PointsTable points={selectedPoints} title={pointsTitle} selMissing={selMissing} />
+
+      {/* Every number on this page, per point, with what each one was compared against. */}
+      <a className="dl" href="data/latest/summary.json" download="blis-accuracy-results.json">
+        ⤓ Download all results (JSON)
+      </a>
 
       <details className="about">
         <summary>How this was measured</summary>
@@ -348,26 +364,37 @@ function Overview({
           <Term name="coverage">points scored</Term> <b>{formatCount(cov.scored)}</b>
         </span>
         <span>
-          not scored <b>{formatCount(cov.not_scored)}</b>{' '}
-          {notScoredDetail && <span className="nscov">({notScoredDetail})</span>}
+          {/* Only the count: the per-reason breakdown stays in summary.json (coverage.not_scored_reasons). */}
+          not scored <b>{formatCount(cov.not_scored)}</b>
         </span>
         {cov.measured_excluded != null && (
           <span>
             excluded (measured) <b>{formatCount(cov.measured_excluded)}</b>
           </span>
         )}
-        <span>
-          multi-node <b>{formatCount(cov.multinode_hidden)}</b> (hidden)
-        </span>
-        <span>
-          failed <b>{formatCount(cov.failed)}</b>
-        </span>
+        {summary.schema_version === 1 && (
+          // v2 has no hidden or failed buckets: a multi-node or failed point is not scored, with its
+          // reason, and counted in the not-scored line above.
+          <>
+            <span>
+              multi-node <b>{formatCount(cov.multinode_hidden)}</b> (hidden)
+            </span>
+            <span>
+              failed <b>{formatCount(cov.failed)}</b>
+            </span>
+          </>
+        )}
         </div>
         <div className="about-prov"><RunProvenance summary={summary} /></div>
-        <a className="dl" href="data/latest/summary.json" download>⤓ summary.json</a>
       </details>
     </>
   )
+}
+
+/** The oldest and newest measurement date among the points (v2 only; v1 points carry none). */
+function measuredRange(points: FlatPoint[]): { from: string; to: string } | null {
+  const dates = points.map((p) => p.measuredDate).filter((d): d is string => !!d).sort()
+  return dates.length ? { from: dates[0]!, to: dates[dates.length - 1]! } : null
 }
 
 function findIdForSweep(rows: ReturnType<typeof buildRows>, sweepKey: string): string | null {
@@ -386,6 +413,7 @@ function RunProvenance({ summary }: { summary: Summary }) {
   const b = p.blis ?? ({} as Partial<NonNullable<typeof p.blis>>)
   const gt = p.ground_truth ?? ({} as Partial<NonNullable<typeof p.ground_truth>>)
   const dash = (s: string | null | undefined, fn: (v: string) => string = (v) => v) => (s ? fn(s) : '—')
+  const range = measuredRange(flattenPoints(summary))
   // Each identifier links to exactly what was run, so nobody has to hunt for the release or
   // commit by hand (PR #26 review). Missing values stay a plain em dash, never a dead link.
   const gh = 'https://github.com/inference-sim'
@@ -431,36 +459,69 @@ function RunProvenance({ summary }: { summary: Summary }) {
       <div className="seclabel">Ground truth</div>
       <div className="kv">
         <span className="k">source</span>
-        <span className="v">InferenceX</span>
-      </div>
-      <div className="kv">
-        <span className="k">dump</span>
         <span className="v">
-          {gt.release_tag ? link(gt.release_tag.replace('db-dump/', ''), safeUrl(gt.source_url)) : '—'}
+          {p.ingest === 'api' ? link('InferenceX', INFERENCEX_SITE) : 'InferenceX'}
         </span>
       </div>
-      {gt.measurement_date_through && (
-        <div className="kv">
-          <span className="k">through</span>
-          <span className="v">{gt.measurement_date_through}</span>
-        </div>
+      {p.ingest === 'api' ? (
+        // v2: the data is a pull of the live API, not a dump. When it was pulled, and the span of
+        // measurement dates it holds, are two different things, so each gets its own label.
+        <>
+          <div className="kv">
+            <span className="k">API pull date</span>
+            <span className="v">
+              {p.pulled_at ? `${p.pulled_at.slice(0, 10)} ${p.pulled_at.slice(11, 16)} UTC` : '—'}
+            </span>
+          </div>
+          {range && (
+            <div className="kv">
+              <span className="k">data range</span>
+              <span className="v">{range.from === range.to ? range.to : `${range.from} to ${range.to}`}</span>
+            </div>
+          )}
+          <div className="kv">
+            <span className="k">pull sha256</span>
+            <span className="v">{dash(gt.measurement_sha256, (v) => `${v.slice(0, 8)}…`)}</span>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="kv">
+            <span className="k">dump</span>
+            <span className="v">
+              {gt.release_tag ? link(gt.release_tag.replace('db-dump/', ''), safeUrl(gt.source_url)) : '—'}
+            </span>
+          </div>
+          {gt.measurement_date_through && (
+            <div className="kv">
+              <span className="k">through</span>
+              <span className="v">{gt.measurement_date_through}</span>
+            </div>
+          )}
+          <div className="kv">
+            <span className="k">sha256</span>
+            <span className="v">{dash(gt.measurement_sha256, (v) => `${v.slice(0, 8)}…`)}</span>
+          </div>
+        </>
       )}
-      <div className="kv">
-        <span className="k">sha256</span>
-        <span className="v">{dash(gt.measurement_sha256, (v) => `${v.slice(0, 8)}…`)}</span>
-      </div>
       <div className="seclabel">Run</div>
       <div className="kv">
-        <span className="k">snapshot</span>
+        <span className="k">{p.ingest === 'api' ? 'latest run date' : 'snapshot'}</span>
         <span className="v">{dash(summary.snapshot_id, (v) => v.slice(0, 10))}</span>
       </div>
-      <div className="kv">
-        <span className="k">generated</span>
-        <span className="v">{dash(summary.generated_at, (v) => `${v.slice(11, 16)} UTC`)}</span>
-      </div>
+      {p.ingest !== 'api' && (
+        // v2's generated time is the pull time (shown above as "pulled"), so it isn't repeated.
+        <div className="kv">
+          <span className="k">generated</span>
+          <span className="v">{dash(summary.generated_at, (v) => `${v.slice(11, 16)} UTC`)}</span>
+        </div>
+      )}
     </>
   )
 }
+
+/** The public InferenceX site the API ingest pulls from (its API root isn't a page to visit). */
+const INFERENCEX_SITE = 'https://inferencex.semianalysis.com/'
 
 /** source_url comes from the data file, so only an http(s) URL becomes a link. */
 function safeUrl(u: string | null | undefined): string | null {

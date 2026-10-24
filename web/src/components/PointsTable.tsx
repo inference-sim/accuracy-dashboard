@@ -3,8 +3,9 @@
  * per concurrency), the leaf view from the mockup. Absolute units in ms (signedprobe emits µs;
  * the orchestrator converts). A missing value renders an em dash, never NaN/blank (RFC B1).
  */
-import { formatMs, formatSignedPct, formatVersion } from '../format'
+import { formatMs, formatSignedPct } from '../format'
 import { Term } from './Term'
+import { ProvenanceTip, VersionTip } from './Provenance'
 import type { FlatPoint } from '../aggregate'
 
 interface Props {
@@ -18,6 +19,43 @@ interface Props {
 // Both TTFT and TPOT render at a fixed 2 decimals — the measured/predicted values carry sub-ms
 // precision, and a uniform precision keeps every cell (and both columns) directly comparable.
 const MS_DIGITS = 2
+
+/** "×N" beside a measured value that averages N InferenceX runs; its tooltip lists each run. */
+export function RunsBody({ runs }: { runs: NonNullable<FlatPoint['repeats']> }) {
+  return (
+    <span className="prov-body">
+      <span className="prov-row">
+        InferenceX ran this measurement {runs.length} times: same deployment, concurrency and day, and the same
+        inputs to BLIS. The value shown is their mean.
+      </span>
+      <span className="prov-tbl" role="table" aria-label="each InferenceX run">
+        <span className="prov-tr prov-th" role="row">
+          <span role="columnheader">Run</span>
+          <span role="columnheader">TTFT (ms)</span>
+          <span role="columnheader">TPOT (ms)</span>
+        </span>
+        {runs.map((r, i) => (
+          <span className="prov-tr" role="row" key={r.point_id}>
+            <span role="cell">{i + 1}</span>
+            <span role="cell" className="mono">{formatMs(r.measured.ttft_ms, MS_DIGITS)}</span>
+            <span role="cell" className="mono">{formatMs(r.measured.tpot_ms, MS_DIGITS)}</span>
+          </span>
+        ))}
+      </span>
+    </span>
+  )
+}
+
+function Runs({ runs }: { runs: NonNullable<FlatPoint['repeats']> }) {
+  return (
+    <>
+      {' '}
+      <Term content={<RunsBody runs={runs} />} ariaLabel={`mean of ${runs.length} InferenceX runs`} popClass="term-pop-wide">
+        <span className="runs">×{runs.length}</span>
+      </Term>
+    </>
+  )
+}
 
 function Cell({ v, kind }: { v: number | null; kind: 'ms' | 'err' }) {
   const text = kind === 'ms' ? formatMs(v, MS_DIGITS) : formatSignedPct(v)
@@ -37,12 +75,30 @@ function Cell({ v, kind }: { v: number | null; kind: 'ms' | 'err' }) {
 }
 
 export function PointsTable({ points, title, selMissing = false }: Props) {
-  // Sort by concurrency, then group repeats by their vLLM version so the per-version rows read
-  // in order. The version is where the repeated measured values come from (same deployment,
-  // different vLLM build), so it earns its own column here.
+  // Sort by concurrency, then group repeats by vLLM version, date and sweep so they read in order.
   const sorted = [...points].sort(
-    (a, b) => a.concurrency - b.concurrency || (a.engineVersion ?? '').localeCompare(b.engineVersion ?? ''),
+    (a, b) =>
+      a.concurrency - b.concurrency ||
+      (a.engineVersion ?? '').localeCompare(b.engineVersion ?? '') ||
+      (a.measuredDate ?? '').localeCompare(b.measuredDate ?? '') ||
+      (a.sweepId ?? '').localeCompare(b.sweepId ?? ''),
   )
+  // v2 snapshots date each measurement and carry its provenance; v1 has neither, and then the
+  // table is exactly as before.
+  const dated = sorted.some((p) => p.measuredDate)
+  const withProv = sorted.some((p) => p.fidelity)
+  // v2: InferenceX runs of one measurement with identical BLIS inputs arrive folded into one point
+  // (`repeats`), shown once with the runs' mean. A concurrency still repeated here is two
+  // measurements that differ (rare): a column numbers their InferenceX sweeps, each with its trend.
+  const folded = sorted.some((p) => (p.repeats?.length ?? 0) > 1)
+  const v2Sweeps = sorted.every((p) => p.sweepId)
+  const repeated = new Set(sorted.map((p) => p.concurrency)).size < sorted.length
+  const sweepCol = v2Sweeps && repeated
+  const sweepNo = new Map<string, number>()
+  for (const p of sorted) if (p.sweepId && !sweepNo.has(p.sweepId)) sweepNo.set(p.sweepId, sweepNo.size + 1)
+  // Repeats at one concurrency read in sweep order (1, 2, …), not by the sweep's id.
+  if (sweepCol)
+    sorted.sort((a, b) => a.concurrency - b.concurrency || sweepNo.get(a.sweepId!)! - sweepNo.get(b.sweepId!)!)
   // Surface why shape is absent for this sweep, if the scorer recorded a reason — previously
   // shapeReason was carried on every point but never shown (PR #3 review UI-c).
   const shapeReason = sorted.find((p) => p.shapeReason)?.shapeReason ?? null
@@ -58,14 +114,14 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
     <>
       <div className="tbl-title" style={{ marginTop: 26 }}>
         {title}{' '}
-        <span className="facet">measured vs predicted per concurrency · vLLM build · absolute units · error %</span>
+        <span className="facet">measured vs predicted per concurrency · absolute units · error %</span>
       </div>
       <div className="tscroll">
         {sorted.length === 0 ? (
           selMissing ? (
             <div className="pts-empty">
               That topology isn’t in this snapshot (it may have aged out, differ by run, or be hidden
-              by the current tier / vLLM-version filter). Pick a row below, or clear the filters.
+              by the current tier). Pick a row below, or switch the tier.
             </div>
           ) : (
             <div className="pts-empty">Expand a model above and pick a deployment to see each measurement next to its prediction.</div>
@@ -81,6 +137,21 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
                 <th rowSpan={2} className="keepcase" style={{ verticalAlign: 'bottom' }}>
                   vLLM
                 </th>
+                {dated && (
+                  <th rowSpan={2} style={{ verticalAlign: 'bottom' }}>
+                    InferenceX run date
+                  </th>
+                )}
+                {sweepCol && (
+                  <th rowSpan={2} style={{ verticalAlign: 'bottom' }}>
+                    InferenceX sweep
+                  </th>
+                )}
+                {withProv && (
+                  <th rowSpan={2} style={{ verticalAlign: 'bottom' }}>
+                    <Term name="provenance" />
+                  </th>
+                )}
                 <th className="sep" colSpan={3}>
                   mean <Term name="ttft" /> (ms)
                 </th>
@@ -99,15 +170,23 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
             </thead>
             <tbody>
               {sorted.map((p, i) => (
-                // InferenceX carries repeat benchmark runs at the SAME concurrency (different
-                // vLLM builds), so concurrency alone is not a unique key — index disambiguates.
+                // A concurrency can repeat (v1: different vLLM builds; v2: separate InferenceX
+                // sweeps), so concurrency alone is not a unique key — index disambiguates.
                 <tr key={`${p.concurrency}-${i}`}>
                   <td className="mono">{p.concurrency}</td>
                   <td className="mono">
-                    {p.engineVersion ? <span className="ver neutral">{formatVersion(p.engineVersion)}</span> : <span className="marker">—</span>}
+                    {p.engineVersion ? <VersionTip version={p.engineVersion} fidelity={p.fidelity} /> : <span className="marker">—</span>}
                   </td>
+                  {dated && <td className="mono">{p.measuredDate ?? <span className="marker">—</span>}</td>}
+                  {sweepCol && <td className="mono">{sweepNo.get(p.sweepId!)}</td>}
+                  {withProv && (
+                    <td className="prov-cell">
+                      <ProvenanceTip fidelity={p.fidelity} />
+                    </td>
+                  )}
                   <td className="sep mono">
                     <Cell v={p.measTtftMs} kind="ms" />
+                    {p.repeats && p.repeats.length > 1 && <Runs runs={p.repeats} />}
                   </td>
                   <td className="mono">
                     <Cell v={p.predTtftMs} kind="ms" />
@@ -143,12 +222,24 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
       )}
       {sorted.length > 0 && (
         <p className="pts-note">
-          Each value is a per-run <b>arithmetic mean over the benchmark's requests</b> (vLLM
-          <span className="mono"> calculate_metrics</span>): mean TTFT over all main-phase requests;
-          mean TPOT = mean of (latency − TTFT) ⁄ (output_len − 1) over requests with &gt;1 output token.
-          Not a median or tail — p99 is out of scope for v0.1.0. Measured means come from the
-          InferenceX dump; predicted means from BLIS replaying the same requests, same definition.
-          Repeated rows at one concurrency are the same deployment measured on different vLLM builds.
+          Each value is a <b>mean over the run’s requests</b>: mean TTFT over every measured request, and
+          mean TPOT = (latency − TTFT) ÷ (output tokens − 1), averaged over requests with more than one
+          output token. Not a median or a tail percentile. Measured means come from InferenceX’s
+          benchmark client; predicted means from BLIS replaying the same requests, computed the same way.
+          {folded && (
+            <>
+              {' '}A value marked <b>×N</b> is the mean of N InferenceX runs of the same measurement: same
+              deployment, concurrency and day, and the same inputs to BLIS. Hover it for each run.
+            </>
+          )}
+          {sweepCol ? (
+            <>
+              {' '}Rows repeated at one concurrency are separate InferenceX sweeps of this deployment, numbered
+              in the sweep column. Each sweep’s trend is measured on its own.
+            </>
+          ) : (
+            !v2Sweeps && <> Repeated rows at one concurrency are the same deployment measured on different vLLM builds.</>
+          )}
         </p>
       )}
     </>

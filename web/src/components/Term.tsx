@@ -20,12 +20,19 @@ import { GLOSSARY } from '../glossary'
 
 interface Props {
   /** key into GLOSSARY; the visible text is GLOSSARY[name].label unless `children` overrides it. */
-  name: keyof typeof GLOSSARY
+  name?: keyof typeof GLOSSARY
+  /** Popover content given directly (generalised for the provenance tooltip, #30); with `name`
+   *  absent, `children` is the visible trigger and this is the body. */
+  content?: React.ReactNode
+  /** an extra class on the popover, e.g. a wider one for structured content */
+  popClass?: string
+  /** accessible label for a trigger that is only a symbol */
+  ariaLabel?: string
   children?: React.ReactNode
 }
 
-export function Term({ name, children }: Props) {
-  const entry = GLOSSARY[name]
+export function Term({ name, content, popClass, ariaLabel, children }: Props) {
+  const entry = name ? GLOSSARY[name] : content != null ? { label: '', definition: content } : undefined
   const [open, setOpen] = useState(false)
   // Esc closes the popover while the trigger keeps focus; without this latch onFocus would never
   // fire again (focus never left), stranding keyboard users with no way to reopen (jgchn review).
@@ -73,6 +80,7 @@ export function Term({ name, children }: Props) {
         ref={trigger}
         className="term"
         tabIndex={0}
+        aria-label={ariaLabel}
         aria-describedby={open ? id : undefined}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={hide}
@@ -102,7 +110,7 @@ export function Term({ name, children }: Props) {
           role="tooltip"
           id={id}
           ref={pop}
-          className="term-pop"
+          className={popClass ? `term-pop ${popClass}` : 'term-pop'}
           // hidden until measured, so it never flashes at the wrong spot
           style={pos ? { left: pos.left, top: pos.top } : { visibility: 'hidden' }}
         >

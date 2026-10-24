@@ -39,9 +39,9 @@ export function validateSummary(raw: unknown): Summary {
     throw new SummaryLoadError('summary.json is not a JSON object')
   }
   const doc = raw as Record<string, unknown>
-  if (doc.schema_version !== 1) {
+  if (doc.schema_version !== 1 && doc.schema_version !== 2) {
     throw new SummaryLoadError(
-      `summary.json schema_version is ${JSON.stringify(doc.schema_version)}, this build renders version 1`,
+      `summary.json schema_version is ${JSON.stringify(doc.schema_version)}, this build renders versions 1 and 2`,
     )
   }
   for (const key of ['snapshot_id', 'provenance', 'coverage', 'totals', 'matrix']) {
@@ -69,6 +69,20 @@ export function validateSummary(raw: unknown): Summary {
   const totals = obj(doc.totals, 'totals')
   for (const tier of ['measured_or_resolved', 'all']) obj(totals[tier], `totals.${tier}`)
   need(obj(doc.coverage, 'coverage'), ['scored', 'not_scored'], 'coverage')
+  if (doc.schema_version === 2) {
+    // v2 (#30): every point carries its identity and fidelity record, and the snapshot says it
+    // came from the API ingest. Checked here so a half-v2 file fails loud, not mid-render.
+    if (prov.ingest !== 'api') throw new SummaryLoadError('summary.json v2 "provenance.ingest" is not "api"')
+    if (!Array.isArray(doc.not_scored)) throw new SummaryLoadError('summary.json v2 "not_scored" is not an array')
+    type Rows = { rows?: Rows[] } & Record<string, unknown>
+    for (const m of doc.matrix as Rows[]) {
+      for (const w of m.rows ?? []) for (const g of w.rows ?? []) for (const t of g.rows ?? []) for (const p of t.rows ?? []) {
+        for (const k of ['point_id', 'measured_date', 'fidelity']) {
+          if (!(k in p)) throw new SummaryLoadError(`summary.json v2 point is missing "${k}"`)
+        }
+      }
+    }
+  }
   return doc as unknown as Summary
 }
 

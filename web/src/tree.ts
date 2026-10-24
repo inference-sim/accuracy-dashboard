@@ -5,7 +5,7 @@
  * parent aggregate — the "filters never show stale numbers" guarantee (B3).
  */
 import { aggregatePair, type FlatPoint } from './aggregate'
-import type { MetricBlockPair } from './types'
+import type { Fidelity, MetricBlockPair } from './types'
 
 export interface RenderRow {
   level: 'model' | 'workload' | 'gpu' | 'topology'
@@ -28,6 +28,10 @@ export interface RenderRow {
   id: string
   /** for topology rows, the sweepKey identifying its points table */
   sweepKey?: string
+  /** v2 topology rows: a representative fidelity record (the first point's) and how many of the
+   *  row's points are approximate, for the row's provenance tooltip. */
+  fidelity?: Fidelity
+  approxCount?: number
 }
 
 function group<T>(items: T[], keyfn: (t: T) => string): Map<string, T[]> {
@@ -78,7 +82,8 @@ export function buildRows(points: FlatPoint[], expanded: Set<string>): RenderRow
         const gpuId = `${wlId}|g:${gpu}`
         rows.push({
           level: 'gpu', label: gpu,
-          facet: g0.precision ? g0.precision : '',
+          // A precision only when every deployment under the GPU shares it.
+          facet: new Set(gpts.map((p) => p.precision)).size === 1 && g0.precision ? g0.precision : '',
           metrics: aggregatePair(gpts), versions: distinctVersions(gpts),
           pointCount: gpts.length, depth: 2, id: gpuId,
         })
@@ -91,12 +96,21 @@ export function buildRows(points: FlatPoint[], expanded: Set<string>): RenderRow
           const facetBits = [t0.framework, t0.serving, t0.isMultinode ? 'multi-node' : 'single-node']
             .filter(Boolean)
             .join(' · ')
+          const withFid = tpts.filter((p) => p.fidelity)
           rows.push({
             level: 'topology', label: topo,
             facet: facetBits,
             metrics: aggregatePair(tpts), versions: distinctVersions(tpts),
             pointCount: tpts.length, depth: 3, id: topoId,
             sweepKey: t0.sweepKey,
+            ...(withFid.length > 0
+              ? {
+                  // The record shown for the row: an estimated one when any point is estimated,
+                  // so a mixed row's tooltip never reads "Exact match" under "N estimated".
+                  fidelity: (withFid.find((p) => p.fidelity!.status === 'approximate') ?? withFid[0]!).fidelity,
+                  approxCount: withFid.filter((p) => p.fidelity!.status === 'approximate').length,
+                }
+              : {}),
           })
         }
       }

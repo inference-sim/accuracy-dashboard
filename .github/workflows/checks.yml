@@ -44,6 +44,18 @@ jobs:
         run: python3 orchestrator/test_run_agentic.py
       - name: Schema validates the committed render fixture (RFC C3)
         run: python3 orchestrator/validate_summary.py --schema schemas/summary.v1.json web/testdata/render-fixture.summary.json
+      - name: Extractor-to-summary contract, fidelity schema and summary.v2 schema (#28; not used by the nightly)
+        run: |
+          python3 orchestrator/ingest/test_contract.py
+          python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/run-a orchestrator/ingest/testdata/contract/run-b
+      - name: summary.json v2 builder + validator, and the committed v2 web fixtures rebuild byte-for-byte (#30; not used by the nightly)
+        run: |
+          python3 orchestrator/test_build_summary_v2.py
+          python3 orchestrator/build_summary_v2.py --contract orchestrator/ingest/testdata/contract/run-a --out /tmp/v2a.json
+          python3 orchestrator/build_summary_v2.py --contract orchestrator/ingest/testdata/contract/run-b --out /tmp/v2b.json --generated-at 2026-10-22T00:00:00Z
+          cmp /tmp/v2a.json web/testdata/render-fixture.v2.summary.json
+          cmp /tmp/v2b.json web/testdata/render-fixture.v2b.summary.json
+          python3 orchestrator/validate_summary_v2.py web/testdata/render-fixture.v2.summary.json web/testdata/render-fixture.v2b.summary.json
 
   web:
     runs-on: ubuntu-latest
@@ -59,6 +71,25 @@ jobs:
       - run: npm run typecheck
       - run: npm run test
       - run: npm run build
+      - name: v2 browser smoke - real Chromium on the v2 fixture, zero console errors, provenance per point (#30)
+        run: |
+          rm -rf public/data dist
+          mkdir -p public/data/latest
+          cp testdata/render-fixture.v2.summary.json public/data/latest/summary.json
+          node -e "const s=require('./testdata/render-fixture.v2.summary.json');require('fs').writeFileSync('public/data/index.json',JSON.stringify({schema_version:1,latest:s.snapshot_id,retention_days:90,runs:[{snapshot_id:s.snapshot_id,generated_at:s.generated_at,blis_release:s.provenance.blis.release,ix_release:s.provenance.ground_truth.release_tag,path:'latest/summary.json'}]}))"
+          npm run build
+          npm install --no-save playwright@1.56.0
+          npx playwright install --with-deps chromium
+          node smoke_v2.mjs
+      - name: v1 browser smoke - the nightly's own smoke (browser_smoke.mjs) on the committed v1 snapshot
+        run: |
+          # The nightly runs browser_smoke.mjs on its fresh snapshot; run it here on the committed
+          # one, so a UI change that breaks it fails on the PR, not on the next nightly.
+          rm -rf public/data dist
+          mkdir -p public/data/latest
+          cp ../data/latest/summary.json public/data/latest/summary.json
+          npm run build
+          node browser_smoke.mjs
 
   grep-clean:
     runs-on: ubuntu-latest
@@ -72,7 +103,7 @@ jobs:
           hits=$(grep -rniE 'aisimulate|aiconfigurator|\baic\b' \
                --include='*.ts' --include='*.tsx' --include='*.py' --include='*.sh' \
                --include='*.mjs' --include='*.json' --include='*.css' --include='*.html' \
-               orchestrator web/src web/browser_smoke.mjs web/package.json web/vite.config.ts \
+               orchestrator web/src web/browser_smoke.mjs web/smoke_v2.mjs web/package.json web/vite.config.ts \
                schemas state data 2>/dev/null \
              | grep -v node_modules | grep -v package-lock || true)
           if [ -n "$hits" ]; then

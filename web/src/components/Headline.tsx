@@ -12,6 +12,13 @@ interface Props {
   models: number
   blisRelease: string | null
   dataDate: string | null
+  /** v2 (API ingest): the oldest and newest measurement dates among the points, and when the
+   *  API was pulled. Shown instead of `dataDate`, which for v1 is the database dump's date. */
+  measuredRange?: { from: string; to: string } | null
+  pulledAt?: string | null
+  /** v2: how many of the points are exact and how many estimated. The headline averages both
+   *  (the "all" tier), so it says so next to the count. */
+  split?: { exact: number; estimated: number } | null
 }
 
 function Stat({ value, label, hint }: { value: number | null; label: string; hint: string }) {
@@ -24,7 +31,7 @@ function Stat({ value, label, hint }: { value: number | null; label: string; hin
   )
 }
 
-export function Headline({ totals, tier, points, models, blisRelease, dataDate }: Props) {
+export function Headline({ totals, tier, points, models, blisRelease, dataDate, measuredRange, pulledAt, split }: Props) {
   const t = totals[tier]
   return (
     <section className="headline" aria-label="Overall accuracy">
@@ -33,9 +40,21 @@ export function Headline({ totals, tier, points, models, blisRelease, dataDate }
         <Stat value={t.mape.tpot} label="Mean time per output token" hint="average error" />
       </div>
       <p className="context">
-        {formatCount(points)} measurements · {models} models
+        {formatCount(points)} measurement{points === 1 ? '' : 's'}
+        {split && split.estimated > 0 && (
+          <> ({formatCount(split.exact)} exact, {formatCount(split.estimated)} estimated)</>
+        )}{' '}
+        · {models} model{models === 1 ? '' : 's'}
         {blisRelease && <> · BLIS {blisRelease}</>}
-        {dataDate && <> · InferenceX data from {dataDate}</>}
+        {measuredRange ? (
+          <>
+            {' '}· InferenceX data range{' '}
+            {measuredRange.from === measuredRange.to ? measuredRange.to : `${measuredRange.from} to ${measuredRange.to}`}
+            {pulledAt && <> · API pull date {pulledAt.slice(0, 10)}</>}
+          </>
+        ) : (
+          dataDate && <> · InferenceX data from {dataDate}</>
+        )}
         <span className="lower"> · lower is better</span>
       </p>
     </section>

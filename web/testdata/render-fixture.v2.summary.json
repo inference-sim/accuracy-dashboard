@@ -1,0 +1,1594 @@
+{
+  "schema_version": 2,
+  "snapshot_id": "2026-10-23_blis-v0.12.0_ix-api-2026-10-23",
+  "generated_at": "2026-10-23T00:00:00Z",
+  "provenance": {
+    "blis": {
+      "catalog": "0.3.0",
+      "commit_sha": "f199223d701d96dddeb1c314509bed003515b599",
+      "extractor_version": "blis-latency-kernel@v0.3.0",
+      "registry": "v0.2.0",
+      "release": "v0.12.0"
+    },
+    "ground_truth": {
+      "source": "SemiAnalysis InferenceX API",
+      "source_url": "https://inferencex.semianalysis.com/api/v1/",
+      "release_tag": "api-2026-10-23",
+      "measurement_date_through": "2026-10-21",
+      "measurement_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    "evaluator_commit": "local",
+    "scorer": "signedprobe",
+    "ingest": "api",
+    "vllm_ref": "v0.31.0",
+    "vllm_max_distance": 2000,
+    "policy_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "pulled_at": "2026-10-23T00:00:00Z",
+    "corpus": {
+      "dataset": "semianalysisai/cc-traces-weka-062126",
+      "revision": "23f152f6f0f9399a85901b89a6458def0ef16729",
+      "sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276"
+    }
+  },
+  "coverage": {
+    "scored": 9,
+    "not_scored": 4,
+    "multinode_hidden": 0,
+    "failed": 0,
+    "repeat_runs_folded": 0,
+    "not_scored_reasons": {
+      "drafter_not_in_catalog": 2,
+      "model_not_in_catalog": 1,
+      "setting_not_modelled": 2
+    }
+  },
+  "known_artefacts": [],
+  "metrics": [
+    "ttft",
+    "tpot"
+  ],
+  "metricscore_comparison": null,
+  "totals": {
+    "measured_or_resolved": {
+      "mape": {
+        "ttft": 5.7913354501354215,
+        "tpot": 8.153960103823085,
+        "n": 7
+      },
+      "shape": {
+        "ttft": 8.074078665868909,
+        "tpot": 4.173377256077881,
+        "n": 4
+      },
+      "noise_floor_pct": 1.6
+    },
+    "all": {
+      "mape": {
+        "ttft": 6.740244834583046,
+        "tpot": 8.61208454882854,
+        "n": 9
+      },
+      "shape": {
+        "ttft": 8.074078665868909,
+        "tpot": 4.173377256077881,
+        "n": 4
+      },
+      "noise_floor_pct": 1.6
+    }
+  },
+  "matrix": [
+    {
+      "level": "model",
+      "model": "deepseek-v4-pro",
+      "source": "inferencex",
+      "vllm_version": "0.28.1rc1.dev199+g7c5dc571c",
+      "coverage": {
+        "scored": 3,
+        "total": 3
+      },
+      "metrics": {
+        "measured_or_resolved": {
+          "mape": {
+            "ttft": 6.788246024010547,
+            "tpot": 4.78239818869094,
+            "n": 3
+          },
+          "shape": {
+            "ttft": 9.712895623748839,
+            "tpot": 7.110936347108421,
+            "n": 2
+          },
+          "noise_floor_pct": 1.6
+        },
+        "all": {
+          "mape": {
+            "ttft": 6.788246024010547,
+            "tpot": 4.78239818869094,
+            "n": 3
+          },
+          "shape": {
+            "ttft": 9.712895623748839,
+            "tpot": 7.110936347108421,
+            "n": 2
+          },
+          "noise_floor_pct": 1.6
+        }
+      },
+      "rows": [
+        {
+          "level": "workload",
+          "label": "8192:1024",
+          "isl": 8192,
+          "osl": 1024,
+          "coverage": {
+            "scored": 3,
+            "total": 3
+          },
+          "metrics": {
+            "measured_or_resolved": {
+              "mape": {
+                "ttft": 6.788246024010547,
+                "tpot": 4.78239818869094,
+                "n": 3
+              },
+              "shape": {
+                "ttft": 9.712895623748839,
+                "tpot": 7.110936347108421,
+                "n": 2
+              },
+              "noise_floor_pct": 1.6
+            },
+            "all": {
+              "mape": {
+                "ttft": 6.788246024010547,
+                "tpot": 4.78239818869094,
+                "n": 3
+              },
+              "shape": {
+                "ttft": 9.712895623748839,
+                "tpot": 7.110936347108421,
+                "n": 2
+              },
+              "noise_floor_pct": 1.6
+            }
+          },
+          "rows": [
+            {
+              "level": "gpu",
+              "label": "b200",
+              "precision": "fp4",
+              "coverage": {
+                "scored": 3,
+                "total": 3
+              },
+              "metrics": {
+                "measured_or_resolved": {
+                  "mape": {
+                    "ttft": 6.788246024010547,
+                    "tpot": 4.78239818869094,
+                    "n": 3
+                  },
+                  "shape": {
+                    "ttft": 9.712895623748839,
+                    "tpot": 7.110936347108421,
+                    "n": 2
+                  },
+                  "noise_floor_pct": 1.6
+                },
+                "all": {
+                  "mape": {
+                    "ttft": 6.788246024010547,
+                    "tpot": 4.78239818869094,
+                    "n": 3
+                  },
+                  "shape": {
+                    "ttft": 9.712895623748839,
+                    "tpot": 7.110936347108421,
+                    "n": 2
+                  },
+                  "noise_floor_pct": 1.6
+                }
+              },
+              "rows": [
+                {
+                  "level": "topology",
+                  "framework": "vllm",
+                  "engine_version": "0.28.1rc1.dev199+g7c5dc571c",
+                  "precision": "fp4",
+                  "is_multinode": false,
+                  "parallelism": {
+                    "dp": 1,
+                    "ep": 1,
+                    "pp": 1,
+                    "tp": 8
+                  },
+                  "serving": "aggregated",
+                  "spec_method": "none",
+                  "label": "dp1 · ep1 · pp1 · tp8 · fp4",
+                  "coverage": {
+                    "scored": 3,
+                    "total": 3
+                  },
+                  "metrics": {
+                    "measured_or_resolved": {
+                      "mape": {
+                        "ttft": 6.788246024010547,
+                        "tpot": 4.78239818869094,
+                        "n": 3
+                      },
+                      "shape": {
+                        "ttft": 9.712895623748839,
+                        "tpot": 7.110936347108421,
+                        "n": 2
+                      },
+                      "noise_floor_pct": 1.6
+                    },
+                    "all": {
+                      "mape": {
+                        "ttft": 6.788246024010547,
+                        "tpot": 4.78239818869094,
+                        "n": 3
+                      },
+                      "shape": {
+                        "ttft": 9.712895623748839,
+                        "tpot": 7.110936347108421,
+                        "n": 2
+                      },
+                      "noise_floor_pct": 1.6
+                    }
+                  },
+                  "rows": [
+                    {
+                      "level": "point",
+                      "concurrency": 1,
+                      "tier": "measured_or_resolved",
+                      "measured": {
+                        "ttft_ms": 410.0,
+                        "tpot_ms": 21.5
+                      },
+                      "predicted": {
+                        "ttft_ms": 380.0,
+                        "tpot_ms": 20.1
+                      },
+                      "error_pct": {
+                        "ttft": -7.3171,
+                        "tpot": -6.5116
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null
+                      },
+                      "point_id": "5a3fb11cd356440830825ea12907fc10ef0a7ae029a199142914ac989954fcc4",
+                      "sweep_id": "2301|deepseek-v4-pro-b200-fp4-vllm-tp8.yaml|8k1k",
+                      "measured_date": "2026-09-03",
+                      "fidelity": {
+                        "args": [
+                          {
+                            "arg": "block_size",
+                            "blis": 256,
+                            "match": "exact",
+                            "measured": 256,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "enable_prefix_caching",
+                            "blis": false,
+                            "match": "exact",
+                            "measured": false,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "max_model_len",
+                            "blis": 9472,
+                            "match": "exact",
+                            "measured": 9472,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "max_num_batched_tokens",
+                            "blis": 8192,
+                            "match": "exact",
+                            "measured": 8192,
+                            "source": "args"
+                          }
+                        ],
+                        "blis_kernel_provenance": null,
+                        "build": {
+                          "commit": "7c5dc571cbd1064ecc8a9b1045637ff647aa22cb",
+                          "distance": -1435,
+                          "image": "vllm/vllm-openai:nightly-7c5dc571cbd1064ecc8a9b1045637ff647aa22cb",
+                          "match": "exact",
+                          "ref": "v0.31.0",
+                          "source": "image_label"
+                        },
+                        "resolved": [],
+                        "status": "exact"
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 4,
+                      "tier": "measured_or_resolved",
+                      "measured": {
+                        "ttft_ms": 620.0,
+                        "tpot_ms": 23.8
+                      },
+                      "predicted": {
+                        "ttft_ms": 590.0,
+                        "tpot_ms": 22.9
+                      },
+                      "error_pct": {
+                        "ttft": -4.8387,
+                        "tpot": -3.7815
+                      },
+                      "shape": {
+                        "ttft": 2.674,
+                        "tpot": 2.9203
+                      },
+                      "point_id": "a7952faab9382b04aa735bdbc410f3f218d77a6b78a8413922d68fbd3caab011",
+                      "sweep_id": "2301|deepseek-v4-pro-b200-fp4-vllm-tp8.yaml|8k1k",
+                      "measured_date": "2026-09-03",
+                      "fidelity": {
+                        "args": [
+                          {
+                            "arg": "block_size",
+                            "blis": 256,
+                            "match": "exact",
+                            "measured": 256,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "enable_prefix_caching",
+                            "blis": false,
+                            "match": "exact",
+                            "measured": false,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "max_model_len",
+                            "blis": 9472,
+                            "match": "exact",
+                            "measured": 9472,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "max_num_batched_tokens",
+                            "blis": 8192,
+                            "match": "exact",
+                            "measured": 8192,
+                            "source": "args"
+                          }
+                        ],
+                        "blis_kernel_provenance": null,
+                        "build": {
+                          "commit": "7c5dc571cbd1064ecc8a9b1045637ff647aa22cb",
+                          "distance": -1435,
+                          "image": "vllm/vllm-openai:nightly-7c5dc571cbd1064ecc8a9b1045637ff647aa22cb",
+                          "match": "exact",
+                          "ref": "v0.31.0",
+                          "source": "image_label"
+                        },
+                        "resolved": [],
+                        "status": "exact"
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 16,
+                      "tier": "measured_or_resolved",
+                      "measured": {
+                        "ttft_ms": 1340.0,
+                        "tpot_ms": 29.6
+                      },
+                      "predicted": {
+                        "ttft_ms": 1450.0,
+                        "tpot_ms": 30.8
+                      },
+                      "error_pct": {
+                        "ttft": 8.209,
+                        "tpot": 4.0541
+                      },
+                      "shape": {
+                        "ttft": 16.7518,
+                        "tpot": 11.3016
+                      },
+                      "point_id": "a9d41834f0f7b8a82753aa70b443a591e2d0b72c8fca74d827de0dfd1660bb8e",
+                      "sweep_id": "2301|deepseek-v4-pro-b200-fp4-vllm-tp8.yaml|8k1k",
+                      "measured_date": "2026-09-03",
+                      "fidelity": {
+                        "args": [
+                          {
+                            "arg": "block_size",
+                            "blis": 256,
+                            "match": "exact",
+                            "measured": 256,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "enable_prefix_caching",
+                            "blis": false,
+                            "match": "exact",
+                            "measured": false,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "max_model_len",
+                            "blis": 9472,
+                            "match": "exact",
+                            "measured": 9472,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "max_num_batched_tokens",
+                            "blis": 8192,
+                            "match": "exact",
+                            "measured": 8192,
+                            "source": "args"
+                          }
+                        ],
+                        "blis_kernel_provenance": null,
+                        "build": {
+                          "commit": "7c5dc571cbd1064ecc8a9b1045637ff647aa22cb",
+                          "distance": -1435,
+                          "image": "vllm/vllm-openai:nightly-7c5dc571cbd1064ecc8a9b1045637ff647aa22cb",
+                          "match": "exact",
+                          "ref": "v0.31.0",
+                          "source": "image_label"
+                        },
+                        "resolved": [],
+                        "status": "exact"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "level": "model",
+      "model": "deepseek-v4.1-flash",
+      "source": "inferencex",
+      "vllm_version": null,
+      "coverage": {
+        "scored": 5,
+        "total": 5
+      },
+      "metrics": {
+        "measured_or_resolved": {
+          "mape": {
+            "ttft": 5.043652519729077,
+            "tpot": 10.682631540172194,
+            "n": 4
+          },
+          "shape": {
+            "ttft": 6.4352617079889765,
+            "tpot": 1.235818165047342,
+            "n": 2
+          },
+          "noise_floor_pct": 1.6
+        },
+        "all": {
+          "mape": {
+            "ttft": 6.341701676800211,
+            "tpot": 11.106889545863245,
+            "n": 5
+          },
+          "shape": {
+            "ttft": 6.4352617079889765,
+            "tpot": 1.235818165047342,
+            "n": 2
+          },
+          "noise_floor_pct": 1.6
+        }
+      },
+      "rows": [
+        {
+          "level": "workload",
+          "label": "agentx",
+          "isl": null,
+          "osl": null,
+          "coverage": {
+            "scored": 5,
+            "total": 5
+          },
+          "metrics": {
+            "measured_or_resolved": {
+              "mape": {
+                "ttft": 5.043652519729077,
+                "tpot": 10.682631540172194,
+                "n": 4
+              },
+              "shape": {
+                "ttft": 6.4352617079889765,
+                "tpot": 1.235818165047342,
+                "n": 2
+              },
+              "noise_floor_pct": 1.6
+            },
+            "all": {
+              "mape": {
+                "ttft": 6.341701676800211,
+                "tpot": 11.106889545863245,
+                "n": 5
+              },
+              "shape": {
+                "ttft": 6.4352617079889765,
+                "tpot": 1.235818165047342,
+                "n": 2
+              },
+              "noise_floor_pct": 1.6
+            }
+          },
+          "rows": [
+            {
+              "level": "gpu",
+              "label": "b200",
+              "precision": "fp4",
+              "coverage": {
+                "scored": 1,
+                "total": 1
+              },
+              "metrics": {
+                "measured_or_resolved": {
+                  "mape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "shape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                },
+                "all": {
+                  "mape": {
+                    "ttft": 11.533898305084744,
+                    "tpot": 12.803921568627452,
+                    "n": 1
+                  },
+                  "shape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                }
+              },
+              "rows": [
+                {
+                  "level": "topology",
+                  "framework": "vllm",
+                  "engine_version": "0.30.1rc1.dev493+gac9126e58",
+                  "precision": "fp4",
+                  "is_multinode": false,
+                  "parallelism": {
+                    "dp": 2,
+                    "ep": 2,
+                    "pp": 1,
+                    "tp": 1
+                  },
+                  "serving": "aggregated",
+                  "spec_method": "mtp",
+                  "label": "dp2 · ep2 · pp1 · tp1 · fp4 · mtp",
+                  "coverage": {
+                    "scored": 1,
+                    "total": 1
+                  },
+                  "metrics": {
+                    "measured_or_resolved": {
+                      "mape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    },
+                    "all": {
+                      "mape": {
+                        "ttft": 11.533898305084744,
+                        "tpot": 12.803921568627452,
+                        "n": 1
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    }
+                  },
+                  "rows": [
+                    {
+                      "level": "point",
+                      "concurrency": 8,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 1180.0,
+                        "tpot_ms": 5.1
+                      },
+                      "predicted": {
+                        "ttft_ms": 1043.9,
+                        "tpot_ms": 4.447
+                      },
+                      "error_pct": {
+                        "ttft": -11.5339,
+                        "tpot": -12.8039
+                      },
+                      "shape": null,
+                      "shape_reason": "< 3 concurrencies",
+                      "point_id": "056cddbc496b43ff186e51b634dfbbfd07867f347482ff62d5d8b1391873a77d",
+                      "sweep_id": "2560|deepseek-v4.1-flash-b200-fp4-vllm-tp1-ep2-dp2-dspark5-agentx.yaml|agentx",
+                      "measured_date": "2026-10-03",
+                      "fidelity": {
+                        "args": [
+                          {
+                            "arg": "attention_config.indexer_kv_dtype",
+                            "blis": "fp8",
+                            "match": "approximated",
+                            "measured": "mxfp4",
+                            "note": "No Deployment key states the indexer cache dtype, so BLIS prices the default FP8 indexer record (132 B/entry) where the run used MXFP4 (68 B).",
+                            "source": "args"
+                          },
+                          {
+                            "arg": "attention_config.indexer_sparse_logits",
+                            "blis": false,
+                            "match": "approximated",
+                            "measured": true,
+                            "note": "vLLM's sparse-logits indexer needs the MXFP4 indexer cache; with the FP8 record BLIS prices, it's the dense-logits indexer.",
+                            "source": "args"
+                          },
+                          {
+                            "arg": "block_size",
+                            "blis": 128,
+                            "match": "exact",
+                            "measured": 128,
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "data_parallel_size",
+                            "blis": 2,
+                            "match": "exact",
+                            "measured": 2,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "enable_expert_parallel",
+                            "blis": true,
+                            "match": "exact",
+                            "measured": true,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "frontend.router",
+                            "blis": null,
+                            "match": "inert",
+                            "measured": "vllm-router/consistent_hash",
+                            "source": "api_row"
+                          },
+                          {
+                            "arg": "gpu_memory_utilization",
+                            "blis": "0.97",
+                            "match": "exact",
+                            "measured": "0.97",
+                            "source": "args"
+                          },
+                          {
+                            "arg": "kernel_config.moe_backend",
+                            "blis": "deep_gemm_mega_moe",
+                            "blis_field": "engine.moe_backend",
+                            "match": "mapped",
+                            "measured": "deep_gemm_mega_moe",
+                            "source": "args"
+                          },
+                          {
+                            "arg": "max_num_seqs",
+                            "blis": 16,
+                            "match": "exact",
+                            "measured": 16,
+                            "source": "args"
+                          }
+                        ],
+                        "blis_kernel_provenance": {
+                          "method_counts": {
+                            "assumed": 50,
+                            "measured": 99
+                          }
+                        },
+                        "build": {
+                          "commit": "ac9126e58aa7bbab1856ba6593ba4d5003fea516",
+                          "distance": 207,
+                          "image": "vllm/vllm-openai:nightly-dev-x86_64-cu130-ac9126e58aa7",
+                          "match": "exact",
+                          "ref": "v0.31.0",
+                          "source": "label_by_tag"
+                        },
+                        "replay": {
+                          "client": "aiperf",
+                          "client_version": "1.0.11",
+                          "concurrency": 8,
+                          "corpus": "semianalysis_cc_traces_weka_062126",
+                          "corpus_sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
+                          "duration_s": 3600,
+                          "replayed_as": "inferencex-agentx-mvp",
+                          "scenario": "agentx",
+                          "seed": 42,
+                          "trajectory_start": {
+                            "max_ratio": 0.75,
+                            "min_ratio": 0.25
+                          }
+                        },
+                        "resolved": [
+                          {
+                            "blis": 9787503,
+                            "delta": 0,
+                            "match": "exact",
+                            "measured": 9787503,
+                            "occurrences": 2,
+                            "quantity": "kv_cache_tokens_per_replica",
+                            "ratio": "1.000"
+                          }
+                        ],
+                        "status": "approximate"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": "gpu",
+              "label": "h200",
+              "precision": "fp4",
+              "coverage": {
+                "scored": 4,
+                "total": 4
+              },
+              "metrics": {
+                "measured_or_resolved": {
+                  "mape": {
+                    "ttft": 5.043652519729077,
+                    "tpot": 10.682631540172194,
+                    "n": 4
+                  },
+                  "shape": {
+                    "ttft": 6.4352617079889765,
+                    "tpot": 1.235818165047342,
+                    "n": 2
+                  },
+                  "noise_floor_pct": 1.6
+                },
+                "all": {
+                  "mape": {
+                    "ttft": 5.043652519729077,
+                    "tpot": 10.682631540172194,
+                    "n": 4
+                  },
+                  "shape": {
+                    "ttft": 6.4352617079889765,
+                    "tpot": 1.235818165047342,
+                    "n": 2
+                  },
+                  "noise_floor_pct": 1.6
+                }
+              },
+              "rows": [
+                {
+                  "level": "topology",
+                  "framework": "vllm",
+                  "engine_version": "0.29.1rc1.dev128+gcd10ed6f9",
+                  "precision": "fp4",
+                  "is_multinode": false,
+                  "parallelism": {
+                    "dp": 1,
+                    "ep": 1,
+                    "pp": 1,
+                    "tp": 4
+                  },
+                  "serving": "aggregated",
+                  "spec_method": "mtp",
+                  "label": "dp1 · ep1 · pp1 · tp4 · fp4 · mtp",
+                  "coverage": {
+                    "scored": 3,
+                    "total": 3
+                  },
+                  "metrics": {
+                    "measured_or_resolved": {
+                      "mape": {
+                        "ttft": 4.9704840613931545,
+                        "tpot": 10.378774420712686,
+                        "n": 3
+                      },
+                      "shape": {
+                        "ttft": 6.4352617079889765,
+                        "tpot": 1.235818165047342,
+                        "n": 2
+                      },
+                      "noise_floor_pct": 1.6
+                    },
+                    "all": {
+                      "mape": {
+                        "ttft": 4.9704840613931545,
+                        "tpot": 10.378774420712686,
+                        "n": 3
+                      },
+                      "shape": {
+                        "ttft": 6.4352617079889765,
+                        "tpot": 1.235818165047342,
+                        "n": 2
+                      },
+                      "noise_floor_pct": 1.6
+                    }
+                  },
+                  "rows": [
+                    {
+                      "level": "point",
+                      "concurrency": 1,
+                      "tier": "measured_or_resolved",
+                      "measured": {
+                        "ttft_ms": 980.0,
+                        "tpot_ms": 8.1
+                      },
+                      "predicted": {
+                        "ttft_ms": 1050.0,
+                        "tpot_ms": 7.2
+                      },
+                      "error_pct": {
+                        "ttft": 7.1429,
+                        "tpot": -11.1111
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null
+                      },
+                      "point_id": "ce649d8e02c65226590e9df810e594539b495a295d46ce659722a81c28071356",
+                      "sweep_id": "2410|deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml|agentx",
+                      "measured_date": "2026-09-21",
+                      "fidelity": {
+                        "args": [
+                          {
+                            "arg": "block_size",
+                            "blis": 64,
+                            "match": "exact",
+                            "measured": 64,
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "gpu_memory_utilization",
+                            "blis": "0.92",
+                            "match": "exact",
+                            "measured": "0.92",
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "max_num_seqs",
+                            "blis": 16,
+                            "match": "exact",
+                            "measured": 16,
+                            "source": "args"
+                          }
+                        ],
+                        "blis_kernel_provenance": null,
+                        "build": {
+                          "commit": "cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3",
+                          "distance": -738,
+                          "image": "vllm/vllm-openai:nightly-cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3",
+                          "match": "exact",
+                          "ref": "v0.31.0",
+                          "source": "server_log_banner"
+                        },
+                        "replay": {
+                          "client": "aiperf",
+                          "client_version": "0.12.0",
+                          "concurrency": 1,
+                          "corpus": "semianalysis_cc_traces_weka_062126",
+                          "corpus_sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
+                          "duration_s": 3600,
+                          "replayed_as": "inferencex-agentx-mvp",
+                          "scenario": "inferencex-agentx-mvp",
+                          "seed": 42,
+                          "trajectory_start": {
+                            "max_ratio": 0.75,
+                            "min_ratio": 0.25
+                          }
+                        },
+                        "resolved": [
+                          {
+                            "blis": 21002240,
+                            "delta": 962252,
+                            "match": "differs",
+                            "measured": 20039988,
+                            "quantity": "kv_cache_tokens_per_replica",
+                            "ratio": "1.048"
+                          }
+                        ],
+                        "status": "exact"
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 2,
+                      "tier": "measured_or_resolved",
+                      "measured": {
+                        "ttft_ms": 1210.0,
+                        "tpot_ms": 8.65
+                      },
+                      "predicted": {
+                        "ttft_ms": 1260.0,
+                        "tpot_ms": 7.7
+                      },
+                      "error_pct": {
+                        "ttft": 4.1322,
+                        "tpot": -10.9827
+                      },
+                      "shape": {
+                        "ttft": -2.8099,
+                        "tpot": 0.1445
+                      },
+                      "point_id": "1cde80e14072cec25522c9361237fa84fea0c561f80f8126278281145c38db79",
+                      "sweep_id": "2410|deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml|agentx",
+                      "measured_date": "2026-09-21",
+                      "fidelity": {
+                        "args": [
+                          {
+                            "arg": "block_size",
+                            "blis": 64,
+                            "match": "exact",
+                            "measured": 64,
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "gpu_memory_utilization",
+                            "blis": "0.92",
+                            "match": "exact",
+                            "measured": "0.92",
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "max_num_seqs",
+                            "blis": 16,
+                            "match": "exact",
+                            "measured": 16,
+                            "source": "args"
+                          }
+                        ],
+                        "blis_kernel_provenance": null,
+                        "build": {
+                          "commit": "cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3",
+                          "distance": -738,
+                          "image": "vllm/vllm-openai:nightly-cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3",
+                          "match": "exact",
+                          "ref": "v0.31.0",
+                          "source": "server_log_banner"
+                        },
+                        "replay": {
+                          "client": "aiperf",
+                          "client_version": "0.12.0",
+                          "concurrency": 2,
+                          "corpus": "semianalysis_cc_traces_weka_062126",
+                          "corpus_sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
+                          "duration_s": 3600,
+                          "replayed_as": "inferencex-agentx-mvp",
+                          "scenario": "inferencex-agentx-mvp",
+                          "seed": 42,
+                          "trajectory_start": {
+                            "max_ratio": 0.75,
+                            "min_ratio": 0.25
+                          }
+                        },
+                        "resolved": [
+                          {
+                            "blis": 21002240,
+                            "delta": 962252,
+                            "match": "differs",
+                            "measured": 20039988,
+                            "quantity": "kv_cache_tokens_per_replica",
+                            "ratio": "1.048"
+                          }
+                        ],
+                        "status": "exact"
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 4,
+                      "tier": "measured_or_resolved",
+                      "measured": {
+                        "ttft_ms": 1650.0,
+                        "tpot_ms": 9.4
+                      },
+                      "predicted": {
+                        "ttft_ms": 1590.0,
+                        "tpot_ms": 8.55
+                      },
+                      "error_pct": {
+                        "ttft": -3.6364,
+                        "tpot": -9.0426
+                      },
+                      "shape": {
+                        "ttft": -10.0606,
+                        "tpot": 2.3271
+                      },
+                      "point_id": "553a53676cb345f42e9745446b737a2cc806b750008f587282003b2a939e4225",
+                      "sweep_id": "2410|deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml|agentx",
+                      "measured_date": "2026-09-21",
+                      "fidelity": {
+                        "args": [
+                          {
+                            "arg": "block_size",
+                            "blis": 64,
+                            "match": "exact",
+                            "measured": 64,
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "gpu_memory_utilization",
+                            "blis": "0.92",
+                            "match": "exact",
+                            "measured": "0.92",
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "max_num_seqs",
+                            "blis": 16,
+                            "match": "exact",
+                            "measured": 16,
+                            "source": "args"
+                          }
+                        ],
+                        "blis_kernel_provenance": null,
+                        "build": {
+                          "commit": "cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3",
+                          "distance": -738,
+                          "image": "vllm/vllm-openai:nightly-cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3",
+                          "match": "exact",
+                          "ref": "v0.31.0",
+                          "source": "server_log_banner"
+                        },
+                        "replay": {
+                          "client": "aiperf",
+                          "client_version": "0.12.0",
+                          "concurrency": 4,
+                          "corpus": "semianalysis_cc_traces_weka_062126",
+                          "corpus_sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
+                          "duration_s": 3600,
+                          "replayed_as": "inferencex-agentx-mvp",
+                          "scenario": "inferencex-agentx-mvp",
+                          "seed": 42,
+                          "trajectory_start": {
+                            "max_ratio": 0.75,
+                            "min_ratio": 0.25
+                          }
+                        },
+                        "resolved": [
+                          {
+                            "blis": 21002240,
+                            "delta": 962252,
+                            "match": "differs",
+                            "measured": 20039988,
+                            "quantity": "kv_cache_tokens_per_replica",
+                            "ratio": "1.048"
+                          }
+                        ],
+                        "status": "exact"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "level": "topology",
+                  "framework": "vllm",
+                  "engine_version": "0.29.1rc1.dev128+gcd10ed6f9",
+                  "precision": "fp4",
+                  "is_multinode": false,
+                  "parallelism": {
+                    "dp": 1,
+                    "ep": 1,
+                    "pp": 1,
+                    "tp": 8
+                  },
+                  "serving": "aggregated",
+                  "spec_method": "mtp",
+                  "label": "dp1 · ep1 · pp1 · tp8 · fp4 · mtp",
+                  "coverage": {
+                    "scored": 1,
+                    "total": 1
+                  },
+                  "metrics": {
+                    "measured_or_resolved": {
+                      "mape": {
+                        "ttft": 5.263157894736848,
+                        "tpot": 11.594202898550721,
+                        "n": 1
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    },
+                    "all": {
+                      "mape": {
+                        "ttft": 5.263157894736848,
+                        "tpot": 11.594202898550721,
+                        "n": 1
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    }
+                  },
+                  "rows": [
+                    {
+                      "level": "point",
+                      "concurrency": 1,
+                      "tier": "measured_or_resolved",
+                      "measured": {
+                        "ttft_ms": 760.0,
+                        "tpot_ms": 6.9
+                      },
+                      "predicted": {
+                        "ttft_ms": 720.0,
+                        "tpot_ms": 6.1
+                      },
+                      "error_pct": {
+                        "ttft": -5.2632,
+                        "tpot": -11.5942
+                      },
+                      "shape": null,
+                      "shape_reason": "< 3 concurrencies",
+                      "point_id": "59ed3ce626c2e97bbbf9de5d2b194d7dbf8b1b0430a74ef95dc3dff6f3e39723",
+                      "sweep_id": "2410|deepseek-v4.1-flash-h200-fp4-vllm-tp8-dspark5-agentx.yaml|agentx",
+                      "measured_date": "2026-09-21",
+                      "fidelity": {
+                        "args": [
+                          {
+                            "arg": "block_size",
+                            "blis": 64,
+                            "match": "exact",
+                            "measured": 64,
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "gpu_memory_utilization",
+                            "blis": "0.92",
+                            "match": "exact",
+                            "measured": "0.92",
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "max_num_seqs",
+                            "blis": 1024,
+                            "match": "blis_default",
+                            "measured": null,
+                            "rule": "ResolveVLLMBatchDefaults: >=70 GiB, not A100 (vLLM v0.31.0 OpenAI-server tier)",
+                            "source": "blis_default"
+                          }
+                        ],
+                        "blis_kernel_provenance": null,
+                        "build": {
+                          "commit": "cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3",
+                          "distance": -738,
+                          "image": "vllm/vllm-openai:nightly-cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3",
+                          "match": "exact",
+                          "ref": "v0.31.0",
+                          "source": "server_log_banner"
+                        },
+                        "replay": {
+                          "client": "aiperf",
+                          "client_version": "0.12.0",
+                          "concurrency": 1,
+                          "corpus": "semianalysis_cc_traces_weka_062126",
+                          "corpus_sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
+                          "duration_s": 3600,
+                          "replayed_as": "inferencex-agentx-mvp",
+                          "scenario": "inferencex-agentx-mvp",
+                          "seed": 42,
+                          "trajectory_start": {
+                            "max_ratio": 0.75,
+                            "min_ratio": 0.25
+                          }
+                        },
+                        "resolved": [
+                          {
+                            "blis": null,
+                            "match": "unreadable",
+                            "measured": 31006342,
+                            "quantity": "kv_cache_tokens_per_replica"
+                          }
+                        ],
+                        "status": "exact"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "level": "model",
+      "model": "minimax-m3",
+      "source": "inferencex",
+      "vllm_version": "0.30.0rc2.dev44+g8b00f4123",
+      "coverage": {
+        "scored": 1,
+        "total": 1
+      },
+      "metrics": {
+        "measured_or_resolved": {
+          "mape": {
+            "ttft": null,
+            "tpot": null,
+            "n": 0
+          },
+          "shape": {
+            "ttft": null,
+            "tpot": null,
+            "n": 0
+          },
+          "noise_floor_pct": 1.6
+        },
+        "all": {
+          "mape": {
+            "ttft": 8.588957055214719,
+            "tpot": 7.6271186440677985,
+            "n": 1
+          },
+          "shape": {
+            "ttft": null,
+            "tpot": null,
+            "n": 0
+          },
+          "noise_floor_pct": 1.6
+        }
+      },
+      "rows": [
+        {
+          "level": "workload",
+          "label": "agentx",
+          "isl": null,
+          "osl": null,
+          "coverage": {
+            "scored": 1,
+            "total": 1
+          },
+          "metrics": {
+            "measured_or_resolved": {
+              "mape": {
+                "ttft": null,
+                "tpot": null,
+                "n": 0
+              },
+              "shape": {
+                "ttft": null,
+                "tpot": null,
+                "n": 0
+              },
+              "noise_floor_pct": 1.6
+            },
+            "all": {
+              "mape": {
+                "ttft": 8.588957055214719,
+                "tpot": 7.6271186440677985,
+                "n": 1
+              },
+              "shape": {
+                "ttft": null,
+                "tpot": null,
+                "n": 0
+              },
+              "noise_floor_pct": 1.6
+            }
+          },
+          "rows": [
+            {
+              "level": "gpu",
+              "label": "h200",
+              "precision": "fp8",
+              "coverage": {
+                "scored": 1,
+                "total": 1
+              },
+              "metrics": {
+                "measured_or_resolved": {
+                  "mape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "shape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                },
+                "all": {
+                  "mape": {
+                    "ttft": 8.588957055214719,
+                    "tpot": 7.6271186440677985,
+                    "n": 1
+                  },
+                  "shape": {
+                    "ttft": null,
+                    "tpot": null,
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                }
+              },
+              "rows": [
+                {
+                  "level": "topology",
+                  "framework": "vllm",
+                  "engine_version": "0.30.0rc2.dev44+g8b00f4123",
+                  "precision": "fp8",
+                  "is_multinode": false,
+                  "parallelism": {
+                    "dp": 1,
+                    "ep": 1,
+                    "pp": 1,
+                    "tp": 8
+                  },
+                  "serving": "aggregated",
+                  "spec_method": "none",
+                  "label": "dp1 · ep1 · pp1 · tp8 · fp8",
+                  "coverage": {
+                    "scored": 1,
+                    "total": 1
+                  },
+                  "metrics": {
+                    "measured_or_resolved": {
+                      "mape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    },
+                    "all": {
+                      "mape": {
+                        "ttft": 8.588957055214719,
+                        "tpot": 7.6271186440677985,
+                        "n": 1
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null,
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    }
+                  },
+                  "rows": [
+                    {
+                      "level": "point",
+                      "concurrency": 4,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 1630.0,
+                        "tpot_ms": 11.8
+                      },
+                      "predicted": {
+                        "ttft_ms": 1490.0,
+                        "tpot_ms": 10.9
+                      },
+                      "error_pct": {
+                        "ttft": -8.589,
+                        "tpot": -7.6271
+                      },
+                      "shape": null,
+                      "shape_reason": "< 3 concurrencies",
+                      "point_id": "339e2060a615a384023a4808efd7a69aa287c72daf463fc3a3f55c4da19fa52e",
+                      "sweep_id": "2610|minimax-m3-h200-fp8-vllm-tp8-agentx.yaml|agentx",
+                      "measured_date": "2026-10-11",
+                      "fidelity": {
+                        "args": [
+                          {
+                            "arg": "block_size",
+                            "blis": 16,
+                            "match": "exact",
+                            "measured": 16,
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "gpu_memory_utilization",
+                            "blis": "0.9",
+                            "match": "exact",
+                            "measured": "0.9",
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "max_num_seqs",
+                            "blis": 64,
+                            "match": "exact",
+                            "measured": 64,
+                            "source": "args"
+                          }
+                        ],
+                        "blis_kernel_provenance": null,
+                        "build": {
+                          "commit": null,
+                          "distance": null,
+                          "image": "vllm/vllm-openai:vllm-minimax-m3-perf-x86_64-13.0.1-8b00f41",
+                          "match": "estimated",
+                          "ref": "v0.31.0",
+                          "source": null,
+                          "why": "custom_build"
+                        },
+                        "replay": {
+                          "client": "aiperf",
+                          "client_version": "0.12.0",
+                          "concurrency": 4,
+                          "corpus": "semianalysis_cc_traces_weka_062126",
+                          "corpus_sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
+                          "duration_s": 3600,
+                          "replayed_as": "inferencex-agentx-mvp",
+                          "scenario": "inferencex-agentx-mvp",
+                          "seed": 42,
+                          "trajectory_start": {
+                            "max_ratio": 0.75,
+                            "min_ratio": 0.25
+                          }
+                        },
+                        "resolved": [],
+                        "status": "approximate"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scope": {
+    "multinode": "not scored by the API extractor (blis_refused:disaggregated_or_multinode)",
+    "measured_exclusions": [],
+    "vllm_version_filter": "all"
+  },
+  "not_scored": [
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 1,
+      "framework": "vllm",
+      "hardware": "b200",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 1,
+        "framework": "vllm",
+        "hardware": "b200",
+        "measured_date": "2026-10-21",
+        "model": "dsv4",
+        "precision": "fp4",
+        "recipe": "row:445802"
+      },
+      "image": "vllm/vllm-openai:nightly-dev-x86_64-cu13.0.1-20ebb28",
+      "measured": {
+        "tpot_ms": 11.2,
+        "ttft_ms": 880.0
+      },
+      "measured_date": "2026-10-21",
+      "model": "dsv4",
+      "point_id": "012a621f883620b38ce6013d1c0f7b0ea03538d3c8413d3ecc982133e30a78f2",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 6,
+      "framework": "vllm",
+      "hardware": "h100",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 6,
+        "framework": "vllm",
+        "hardware": "h100",
+        "measured_date": "2026-09-27",
+        "model": "minimaxm3",
+        "precision": "fp8",
+        "recipe": "e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6"
+      },
+      "image": "vllm/vllm-openai:nightly-ddd6fbca148a867aad1fcab7ec72f582b9977db4",
+      "measured": {
+        "tpot_ms": 12.4,
+        "ttft_ms": 2050.0
+      },
+      "measured_date": "2026-09-27",
+      "model": "minimaxm3",
+      "point_id": "8b51bc067b001668cdde3386d15c205410a31f461140bfa66229d5a19ae040d8",
+      "precision": "fp8",
+      "reasons": [
+        "drafter_not_in_catalog:eagle3",
+        "setting_not_modelled:kv_transfer_config.kv_connector"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 8,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 8,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-10-20",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8"
+      },
+      "image": "vllm/vllm-openai:cu134-nightly-x86_64-dev-20261019-mk",
+      "measured": {
+        "tpot_ms": 4.9,
+        "ttft_ms": 1490.0
+      },
+      "measured_date": "2026-10-20",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:prefill_schedule_interval",
+          "text": "No Deployment key states vLLM's prefill_schedule_interval, which holds prefills back for decode-only steps; BLIS schedules a prefill every step."
+        }
+      ],
+      "point_id": "cefb7a8bc91bf8efe67963ead7154970bb206bde0ac36c091f33643213871084",
+      "precision": "fp4",
+      "reasons": [
+        "setting_not_modelled:prefill_schedule_interval"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 1,
+      "framework": "vllm",
+      "hardware": "b200",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 1,
+        "framework": "vllm",
+        "hardware": "b200",
+        "measured_date": "2026-09-30",
+        "model": "minimaxm3",
+        "precision": "fp4",
+        "recipe": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+      },
+      "image": "vllm/vllm-openai:nightly-af7f9488c2210d67e1033ecdc845b087ee7fe92b",
+      "measured": {
+        "tpot_ms": 9.8,
+        "ttft_ms": 2310.0
+      },
+      "measured_date": "2026-09-30",
+      "model": "minimaxm3",
+      "point_id": "ed36f1f632cf954be99ac6e1ef48623197841190a670f1c3e7e82e40ae88b136",
+      "precision": "fp4",
+      "reasons": [
+        "drafter_not_in_catalog:eagle3"
+      ]
+    }
+  ]
+}

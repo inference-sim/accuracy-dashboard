@@ -60,11 +60,16 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
   // Effective tier: like the Overview, the default measured_or_resolved falls back to "all" when the
   // shared set has zero measured·resolved points (the direct path leaves settings resolved → every
   // point lands in "all"), so the Δ table isn't entirely em dashes. An explicit tier click is honoured.
-  const tierFellBack =
-    tier === 'measured_or_resolved' &&
-    aShared.length > 0 &&
-    aShared.filter((p) => p.tier === 'measured_or_resolved').length === 0
+  // A pair is in the strict tier only when it's strict on BOTH sides: a point whose status changed
+  // between the two runs (exact under one BLIS release, estimated under the other) would
+  // otherwise count on one side only, and the Δ would compare different point sets.
+  const strict = useMemo(() => {
+    const keep = aShared.map((p, i) => p.tier === 'measured_or_resolved' && bShared[i]!.tier === 'measured_or_resolved')
+    return { a: aShared.filter((_, i) => keep[i]), b: bShared.filter((_, i) => keep[i]) }
+  }, [aShared, bShared])
+  const tierFellBack = tier === 'measured_or_resolved' && aShared.length > 0 && strict.a.length === 0
   const effectiveTier: TierKey = tierFellBack ? 'all' : tier
+  const [aIn, bIn] = effectiveTier === 'measured_or_resolved' ? [strict.a, strict.b] : [aShared, bShared]
 
   // Overall Δ headline (issue #17): the net "did it change?" number, POOLED over every shared
   // point — aggregate() on the full shared set, NOT the mean of the per-model rows below. Pooling
@@ -72,15 +77,15 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
   // one and can flip sign (Simpson's paradox). This also keeps the headline equal to
   // Overview(newer) − Overview(older) on the shared set, since the Overview uses the same aggregate().
   const overall = useMemo(() => {
-    const oa = aggregate(aShared, effectiveTier)
-    const ob = aggregate(bShared, effectiveTier)
+    const oa = aggregate(aIn, effectiveTier)
+    const ob = aggregate(bIn, effectiveTier)
     return {
       mapeTtft: delta(oa.mape.ttft, ob.mape.ttft),
       shapeTtft: delta(oa.shape.ttft, ob.shape.ttft),
       mapeTpot: delta(oa.mape.tpot, ob.mape.tpot),
       shapeTpot: delta(oa.shape.tpot, ob.shape.tpot),
     }
-  }, [aShared, bShared, effectiveTier])
+  }, [aIn, bIn, effectiveTier])
 
   // Build both trees over the SAME shared point set → identical structure/ids, so we can zip by id.
   // Models start collapsed (#23): the verdict above answers "did it change?", and a reader opens
@@ -92,8 +97,8 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
     else next.add(id)
     setExpanded(next)
   }
-  const aRows = useMemo(() => buildRows(aShared, expanded), [aShared, expanded])
-  const bRows = useMemo(() => buildRows(bShared, expanded), [bShared, expanded])
+  const aRows = useMemo(() => buildRows(aIn, expanded), [aIn, expanded])
+  const bRows = useMemo(() => buildRows(bIn, expanded), [bIn, expanded])
   const bById = useMemo(() => new Map(bRows.map((r) => [r.id, r])), [bRows])
 
   const metricVal = (row: RenderRow | undefined, kind: 'mape' | 'shape', m: Metric): number | null => {
@@ -113,6 +118,21 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
   const SlotTag = ({ slot }: { slot: 'A' | 'B' }) => (
     <span className={`cmp-tag ${slot === 'A' ? 'cmp-a' : 'cmp-b'}`}>{slot}</span>
   )
+
+  // A v1 snapshot (the db-dump pipeline) and a v2 one (the API ingest) identify points
+  // differently and drew their settings from different sources, so a Δ between them would
+  // mix two methods. Refused rather than shown (#30).
+  const ingestA = a.provenance?.ingest ?? 'db-dump'
+  const ingestB = b.provenance?.ingest ?? 'db-dump'
+  if (ingestA !== ingestB) {
+    return (
+      <div className="pts-empty" role="note">
+        These two runs came from different ingests ({ingestA === 'api' ? 'the InferenceX API' : 'the database dump'} and{' '}
+        {ingestB === 'api' ? 'the InferenceX API' : 'the database dump'}), so their measurements aren’t comparable point
+        for point. Pick two runs from the same ingest.
+      </div>
+    )
+  }
 
   return (
     <>
@@ -139,9 +159,12 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
             Change in average error, newer minus older, over the {formatCount(shared)} measurements
             scored by both runs. Lower error is better.
             {(onlyA > 0 || onlyB > 0) && (
-              <> {formatCount(onlyA + onlyB)} measurements only one run scored are left out.</>
+              <>
+                {' '}Comparing {formatCount(shared)} of {formatCount(shared + Math.max(onlyA, onlyB))} points:{' '}
+                {formatCount(onlyA + onlyB)} measurements only one run scored are left out.
+              </>
             )}
-            {tierFellBack && <> Showing all measurements (none are measured·resolved yet).</>}
+            {tierFellBack && <> Showing all measurements (none are {a.schema_version === 2 ? 'exact' : 'measured·resolved'} yet).</>}
           </p>
         </div>
         <h2 className="sectitle">By model</h2>

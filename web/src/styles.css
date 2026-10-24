@@ -36,7 +36,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-sa
 .rail a{color:var(--accent);text-decoration:none;font-size:12.5px}
 .rail a.ghlink{display:inline-flex;align-items:center;gap:6px}
 .rail a.ghlink svg{flex:none;vertical-align:middle}
-.dl{margin-top:18px;display:inline-block;font-size:12px;font-family:var(--font-mono);border:1px solid var(--line-strong);padding:5px 10px;border-radius:4px;color:var(--accent-ink);text-decoration:none}
+.dl{margin:18px 0 6px;display:inline-block;font-size:12px;font-family:var(--font-mono);border:1px solid var(--line-strong);padding:5px 10px;border-radius:4px;color:var(--accent-ink);text-decoration:none}
 /* ---- main ---- */
 .main{padding:34px 40px 60px;max-width:1560px}
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:22px}
@@ -117,7 +117,6 @@ td .n{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-left
 .cov .fail{color:var(--crit-ink,#7a1f1f)}
 .coverage{margin-top:14px;font-size:12px;color:var(--muted);display:flex;gap:20px;flex-wrap:wrap}
 .coverage b{color:var(--ink);font-family:var(--font-mono);font-weight:600}
-.coverage .nscov{font-family:var(--font-sans);font-size:11px;color:var(--muted)}
 .legend{margin-top:10px;font-size:11px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;align-items:center}
 .foot{margin-top:20px;font-size:11.5px;color:var(--muted);max-width:900px;line-height:1.55}
 
@@ -140,6 +139,7 @@ thead tr.col th button.sortbtn:focus-visible { outline: 2px solid var(--accent);
 
 /* explicit missing / not-scored markers (RFC B1) — never NaN/blank */
 .marker { color: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+.runs { color: var(--muted); font-size: 11px; cursor: help; border-bottom: 1px dotted var(--muted); }
 td .na { color: var(--line-strong); font-family: var(--font-mono); }
 
 /* error boundary (verbatim message, never a blank app) */
@@ -204,6 +204,27 @@ thead tr.col .term-wrap { text-transform: none; }
   color: var(--ink); background: var(--panel); border: 1px solid var(--line-strong);
   border-radius: 6px; padding: 7px 10px; box-shadow: 0 6px 20px rgba(23,28,26,0.14);
   text-transform: none; letter-spacing: normal; pointer-events: none; }
+
+/* ---- per-point provenance (v2 snapshots, #30): ⓘ exact / ≈ approximate, details on hover/focus ---- */
+.term-pop.term-pop-wide { max-width: 440px; }
+.prov-mark { font-size: 12px; color: var(--accent); cursor: help; }
+.prov-mark.approx { color: var(--warn-ink); font-weight: 700; }
+.prov-cell { text-align: center; }
+.prov-inrow { margin-left: 6px; }
+.prov-body { display: block; }
+.prov-h { display: block; font-weight: 600; margin-bottom: 4px; }
+.prov-sec { display: block; margin-top: 6px; }
+.prov-sec > b { display: block; font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.prov-row { display: block; }
+.prov-row .mono, .prov-h .mono { font-family: var(--font-mono); font-size: 11px; }
+.prov-dim { color: var(--muted); }
+/* the estimated-settings table inside the match tooltip (spans laid out as a table) */
+.prov-tbl { display: table; border-collapse: collapse; margin: 6px 0 4px; width: 100%; }
+.prov-tr { display: table-row; }
+.prov-tr > span { display: table-cell; padding: 3px 10px 3px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.prov-tr > span:first-child { font-weight: 600; }
+.prov-th > span { font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.prov-tr > span.mono { font-family: var(--font-mono); font-size: 11px; word-break: break-all; }
 
 /* ---- A-vs-B compare view (RFC discussion #2 point 3) ---- */
 .cmp-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 16px;
