@@ -1,0 +1,221 @@
+name: api-nightly
+
+# The API-ingest nightly pipeline (Discussion #15). Replaces the db-dump nightly (nightly.yml):
+# instead of restoring a ~323 GB Postgres dump, it pulls the live InferenceX API incrementally,
+# scores the 180-day window with the resolved BLIS release, and publishes v2 `api` snapshots.
+#
+# Two triggers, detected inside `cli.py nightly`, never here (#15, "Two triggers, two actions"):
+#   * an IX data release (a new point id in the window)  -> score the new points, update the live
+#     view, no snapshot/diff;
+#   * a BLIS release (a new stable inference-sim tag)     -> rescore the whole window, freeze a
+#     snapshot, allow a diff.
+# A no-op night (neither trigger) writes nothing and the last good view stands.
+#
+# Off the :00 mark, and LATER than the old dump nightly's 06:17, so moving the nightly off the dump
+# is a clean cutover (the dump nightly.yml is retired in the same change). Also runnable on demand.
+on:
+  schedule:
+    - cron: "43 4 * * *" # nightly, off :00; the incremental pull + cached score fit the 6 h budget
+  workflow_dispatch:
+    inputs:
+      force_cold_pull:
+        description: "Ignore the ix-store cache and pull the whole window from scratch (~4.5 h)"
+        type: boolean
+        default: false
+
+# Least privilege: read-only by default. Only `publish` gets contents: write.
+permissions:
+  contents: read
+
+concurrency:
+  group: api-nightly
+  cancel-in-progress: false
+
+env:
+  STORE_BRANCH: ix-store # the frozen 180-day pull; one commit, no history, never on main or pages
+  WINDOW_DAYS: "180"
+  KEEP_API: "5"
+
+jobs:
+  # ----------------------------------------------------------------- 1. resolve BLIS (hosted-safe)
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      blis_tag: ${{ steps.r.outputs.blis_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: r
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash orchestrator/resolve_blis.sh
+
+  # ----------------------------------------------------------------- 2. run the night (pull+score)
+  run-night:
+    needs: resolve
+    runs-on: ubuntu-latest
+    # The cold-pull ceiling (~4.5 h, mostly GitHub-artifact downloads) plus the cached score; well
+    # under GitHub's 360-min default only when the store cache is warm, so give headroom for a cold
+    # pull and still land inside the 6 h budget #15 asks for.
+    timeout-minutes: 345
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install --quiet jsonschema pyyaml
+
+      # Restore the frozen pull from the ix-store branch into ./store (unless a cold pull is forced).
+      # The branch holds ONLY the current window as a single commit, so this is ~80 MB, not history.
+      - name: Restore the ix-store (the frozen 180-day pull)
+        if: ${{ !inputs.force_cold_pull }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git ls-remote --exit-code --heads origin "$STORE_BRANCH" >/dev/null 2>&1; then
+            git fetch --depth 1 origin "$STORE_BRANCH"
+            git worktree add --detach store FETCH_HEAD
+            echo "restored $(python3 -c "import json;print(len(json.load(open('store/manifest.json'))['points']))" 2>/dev/null || echo 0) frozen points"
+          else
+            echo "no ix-store branch yet — this run seeds it with a cold pull"
+            mkdir -p store
+          fi
+      - name: Cold pull (forced) — start from an empty store
+        if: ${{ inputs.force_cold_pull }}
+        run: rm -rf store && mkdir -p store
+
+      # Build blis + signedprobe FROM SOURCE at the resolved tag, and the blisdefaults helper against
+      # that release's own kernel/schemas (so a per-release score is sound; #15's seed rule).
+      - name: Build BLIS, signedprobe and the per-release defaults helper
+        env:
+          BLIS_TAG: ${{ needs.resolve.outputs.blis_tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          SIM="$RUNNER_TEMP/sim"
+          git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$SIM"
+          ( cd "$SIM" && GOFLAGS=-mod=mod go build -o blis main.go && GOFLAGS=-mod=mod go build -o signedprobe ./cmd/signedprobe )
+          # catalog + registry ride the BLIS tag (installation.md), derived never diffed.
+          eval "$(bash orchestrator/resolve_versions.sh "$SIM")"
+          git clone -q --depth 1 --branch "$catalog"  https://github.com/inference-sim/blis-catalog.git  "$RUNNER_TEMP/catalog"
+          git clone -q --depth 1 --branch "$registry" https://github.com/inference-sim/blis-registry.git "$RUNNER_TEMP/registry"
+          bash orchestrator/build_blisdefaults.sh "$SIM" "$RUNNER_TEMP/blisdefaults"
+          echo "SIM=$SIM" >> "$GITHUB_ENV"
+          echo "CATALOG=$RUNNER_TEMP/catalog" >> "$GITHUB_ENV"
+          echo "REGISTRY=$RUNNER_TEMP/registry" >> "$GITHUB_ENV"
+          echo "DEFAULTS_HELPER=$RUNNER_TEMP/blisdefaults" >> "$GITHUB_ENV"
+
+      # Fetch the AgentX corpus once, cached by its sha256 (the extractor refuses a changed corpus).
+      - name: Resolve the AgentX corpus
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The corpus revision is pinned per #28; the pull records its sha256 in provenance and a
+          # later run refuses a download whose sha differs (corpus_changed).
+          echo "CORPUS_REVISION=main" >> "$GITHUB_ENV"
+
+      # Pull the window into the store, decide, score (cached), and publish into ./data.
+      - name: Run the night
+        env:
+          BLIS_TAG: ${{ needs.resolve.outputs.blis_tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # data/ is the checkout's own main tree, so the dump snapshots and any prior API snapshots
+          # are already present; cli.py nightly adds/prunes only API snapshots and never touches a
+          # dump one (update_index.py keeps dump snapshots forever).
+          mkdir -p data state
+          python3 orchestrator/ingest/cli.py nightly \
+            --blis-tag "$BLIS_TAG" \
+            --store-dir store --data-dir data --state state/last-run-api.json \
+            --window-days "$WINDOW_DAYS" --keep-api "$KEEP_API" \
+            --today "$(date -u +%F)" \
+            --cache "$RUNNER_TEMP/artifacts" \
+            --work "$RUNNER_TEMP/contract" --score-work "$RUNNER_TEMP/scorework" \
+            --evaluator-commit "$GITHUB_SHA" \
+            --blis-dir "$SIM" --catalog "$CATALOG" --registry "$REGISTRY" \
+            --defaults-helper "$DEFAULTS_HELPER" \
+            --corpus "$RUNNER_TEMP/corpus.json" --corpus-revision "$CORPUS_REVISION"
+
+      - name: Package the store and the published data for the publish job
+        run: |
+          tar -czf store.tgz -C store . 2>/dev/null || tar -czf store.tgz --files-from /dev/null
+          tar -czf data.tgz -C data . 2>/dev/null || tar -czf data.tgz --files-from /dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: night
+          path: |
+            store.tgz
+            data.tgz
+            state/last-run-api.json
+          if-no-files-found: warn
+
+  # ----------------------------------------------------------------- 3. publish (hosted-safe)
+  publish:
+    needs: [resolve, run-night]
+    if: ${{ needs.run-night.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # commit data/ to main and the store to ix-store
+      actions: write # dispatch the Pages deploy (the [skip ci] commit can't)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: night
+          path: incoming
+      - name: Unpack
+        run: |
+          mkdir -p newdata newstore
+          tar -xzf incoming/data.tgz -C newdata 2>/dev/null || true
+          tar -xzf incoming/store.tgz -C newstore 2>/dev/null || true
+
+      - name: Publish data/ to main (index + latest + API snapshots; dump snapshots untouched)
+        id: pub
+        run: |
+          set -euo pipefail
+          if [ ! -f newdata/index.json ]; then
+            echo "no data produced (a no-op night) — nothing to publish"
+            echo "pushed=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          rm -rf data; mv newdata data
+          mkdir -p state; cp incoming/last-run-api.json state/last-run-api.json 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A data state/last-run-api.json
+          if git commit -m "api-nightly: ${{ needs.resolve.outputs.blis_tag }} $(date -u +%F) [skip ci]"; then
+            git push
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "nothing to commit (index unchanged)"
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The ix-store branch is rewritten from scratch each night: a single orphan commit holding
+      # only the current window, so it carries no history and an aged-out log is really gone (#15).
+      - name: Rewrite the ix-store branch (single commit, current window only)
+        if: ${{ hashFiles('newstore/manifest.json') != '' }}
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/store-wt"
+          rm -rf "$work"; mkdir -p "$work"
+          cp -r newstore/. "$work/"
+          cd "$work"
+          git init -q -b "$STORE_BRANCH"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Never ship the local artifact cache on the branch — it's a CI scratch dir, not the store.
+          rm -rf _artifacts
+          git add -A
+          git commit -q -m "ix-store: ${{ needs.resolve.outputs.blis_tag }} $(date -u +%F) window"
+          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          # Force-push: the branch is a snapshot, not a history. This is the ONLY writer.
+          git push -f origin "$STORE_BRANCH"
+
+      - name: Deploy the published data to Pages
+        if: ${{ steps.pub.outputs.pushed == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref "${GITHUB_REF_NAME}"

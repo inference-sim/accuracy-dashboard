@@ -1,10 +1,12 @@
-name: nightly-accuracy
+name: nightly-accuracy (legacy db-dump, manual only)
 
-# Nightly re-evaluation of BLIS accuracy vs the pinned weekly InferenceX dump (RFC §4.6).
-# Also runnable on demand. BOTH inputs are resolved live at run time — nothing is hardcoded.
+# The legacy db-dump pipeline (RFC §4.6). SUPERSEDED by api-nightly.yml (Discussion #15): the
+# nightly schedule moved off the ~323 GB Postgres dump and onto the live InferenceX API. This
+# workflow is kept — the dump is not yet confirmed discontinued (#15 open question 4), and its
+# three committed snapshots stay viewable — but it no longer runs on a schedule. Its `publish` job
+# only ever touched db-dump snapshots and state/last-run.json, so it can't disturb the API side.
+# Run it on demand only if a new dump lands and someone wants it scored.
 on:
-  schedule:
-    - cron: "17 6 * * *" # nightly, off the :00 mark (RFC §4.6)
   workflow_dispatch:
     inputs:
       force:

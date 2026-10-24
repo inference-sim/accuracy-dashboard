@@ -260,6 +260,52 @@ def cmd_score(a) -> int:
     return 1 if problems else 0
 
 
+def cmd_nightly(a) -> int:
+    """One night of the API-ingest pipeline (Discussion #15): pull the window into the store
+    incrementally, decide from the trigger table, score the window (cached), and publish -- the
+    live view always, a frozen snapshot on a BLIS release. Composes `cmd_pull`/`cmd_score` and
+    build_summary_v2 as the closures nightly_run.run_night orchestrates and unit-tests with fakes;
+    this wires the real ones. Resolve the BLIS tag outside (resolve_inputs.sh) and pass it in."""
+    import types
+    import nightly_run as nr
+    sys.path.insert(0, str(HERE.parent))
+    import build_summary_v2 as bsv2  # noqa: E402
+
+    today = date.fromisoformat(a.today) if a.today else date.today()
+    store_dir, data_dir, state_path = Path(a.store_dir), Path(a.data_dir), Path(a.state)
+    contract_dir = Path(a.work or data_dir.parent / "_contract")
+
+    def pull_fn(store: Path, today_: date) -> str:
+        # Incremental, in place: the store is its own prior, so frozen points are kept, only new
+        # rows are fetched, and aged-out points' files are pruned.
+        rc = cmd_pull(types.SimpleNamespace(out=str(store), today=today_.isoformat(),
+                                            window_days=a.window_days, cache=a.cache, prior=str(store)))
+        if rc != 0:
+            raise RuntimeError(f"pull failed (rc={rc}); the run stops rather than publish a partial pull")
+        return json.loads((store / "manifest.json").read_text())["pulled_at"][:10]
+
+    def score_build_fn(store: Path, blis_tag: str, score_ids, pull_date: str):
+        rc = cmd_score(types.SimpleNamespace(
+            pull=str(store), out=str(contract_dir), blis_dir=a.blis_dir, catalog=a.catalog,
+            registry=a.registry, defaults_helper=a.defaults_helper, corpus=a.corpus,
+            corpus_sha256=a.corpus_sha256, corpus_dataset=a.corpus_dataset,
+            corpus_revision=a.corpus_revision, corpus_cache=a.corpus_cache, work=a.score_work,
+            timeout=a.timeout, only=None))
+        if rc != 0:
+            raise RuntimeError(f"score failed (rc={rc})")
+        summary = bsv2.build(contract_dir, generated_at=f"{a.today or today.isoformat()}T00:00:00Z",
+                             evaluator_commit=a.evaluator_commit or "local")
+        return summary, summary["coverage"]["scored"]
+
+    res = nr.run_night(today, a.blis_tag, store_dir=store_dir, data_dir=data_dir, state_path=state_path,
+                       pull_fn=pull_fn, score_build_fn=score_build_fn,
+                       snapshot_date=a.today or today.isoformat(), keep_api=a.keep_api)
+    _log(f"nightly: {res.action} -- {res.decision.reason}")
+    if res.snapshot_id:
+        _log(f"nightly: froze snapshot {res.snapshot_id}")
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -286,8 +332,32 @@ def main(argv=None) -> int:
     s.add_argument("--work")
     s.add_argument("--timeout", type=int, default=7200)
     s.add_argument("--only", nargs="*")
+
+    n = sub.add_parser("nightly", help="one night: pull (incremental) -> decide -> score -> publish")
+    n.add_argument("--blis-tag", required=True, help="the stable inference-sim tag resolve_inputs.sh resolved")
+    n.add_argument("--store-dir", required=True, help="the ix-store working tree (the frozen pull)")
+    n.add_argument("--data-dir", required=True, help="the published data tree (latest/, snapshots/, index.json)")
+    n.add_argument("--state", required=True, help="state/last-run.json for the API pipeline")
+    n.add_argument("--window-days", type=int, default=180)
+    n.add_argument("--keep-api", type=int, default=5)
+    n.add_argument("--today")
+    n.add_argument("--cache")
+    n.add_argument("--work", help="the contract directory the scored window is written to")
+    n.add_argument("--score-work")
+    n.add_argument("--evaluator-commit")
+    n.add_argument("--blis-dir", required=True)
+    n.add_argument("--catalog", required=True)
+    n.add_argument("--registry", required=True)
+    n.add_argument("--defaults-helper", required=True)
+    n.add_argument("--corpus", required=True)
+    n.add_argument("--corpus-sha256")
+    n.add_argument("--corpus-dataset", default="semianalysisai/cc-traces-weka-062126")
+    n.add_argument("--corpus-revision", required=True)
+    n.add_argument("--corpus-cache")
+    n.add_argument("--timeout", type=int, default=7200)
+
     a = ap.parse_args(argv)
-    return cmd_pull(a) if a.cmd == "pull" else cmd_score(a)
+    return {"pull": cmd_pull, "score": cmd_score, "nightly": cmd_nightly}[a.cmd](a)
 
 
 if __name__ == "__main__":

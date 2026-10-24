@@ -64,6 +64,13 @@ jobs:
           python3 orchestrator/ingest/test_extract.py
           # a point through score_point and write_contract, fake BLIS binaries (CI has no BLIS build)
           python3 orchestrator/ingest/test_score_e2e.py
+      - name: API nightly pipeline - window, trigger table, incremental pull, two-retention index, fabricated-release combos (#15)
+        run: |
+          python3 -m pytest -q \
+            orchestrator/ingest/test_nightly.py \
+            orchestrator/ingest/test_incremental.py \
+            orchestrator/ingest/test_nightly_run.py \
+            orchestrator/test_update_index.py
 
   blisdefaults:
     # The Go helper the extractor calls for BLIS's own batch defaults, built against the pinned
@@ -100,7 +107,7 @@ jobs:
           rm -rf public/data dist
           mkdir -p public/data/latest
           cp testdata/render-fixture.v2.summary.json public/data/latest/summary.json
-          node -e "const s=require('./testdata/render-fixture.v2.summary.json');require('fs').writeFileSync('public/data/index.json',JSON.stringify({schema_version:1,latest:s.snapshot_id,retention_days:90,runs:[{snapshot_id:s.snapshot_id,generated_at:s.generated_at,blis_release:s.provenance.blis.release,ix_release:s.provenance.ground_truth.release_tag,path:'latest/summary.json'}]}))"
+          node -e "const s=require('./testdata/render-fixture.v2.summary.json');require('fs').writeFileSync('public/data/index.json',JSON.stringify({schema_version:1,latest:s.snapshot_id,keep_api:5,runs:[{snapshot_id:s.snapshot_id,generated_at:s.generated_at,blis_release:s.provenance.blis.release,ix_release:s.provenance.ground_truth.release_tag,ingest:'api',path:'latest/summary.json'}]}))"
           npm run build
           npm install --no-save playwright@1.56.0
           npx playwright install --with-deps chromium
