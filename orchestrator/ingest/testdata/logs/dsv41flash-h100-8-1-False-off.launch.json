@@ -1,0 +1,49 @@
+{
+ "engine": {
+  "connector": null,
+  "type": "vllm"
+ },
+ "frontend": {
+  "enable_multiple_frontends": false,
+  "type": "vllm"
+ },
+ "model": {
+  "container": "vllm/vllm-openai:nightly-49cb2bbf71cfd36ee5aa33d1e184b1cddff55294@sha256:a8d84c552462d1c60da4d7fc97f8f8f48a8fbfbf6820f73477fa0efe2571bf9d",
+  "path": "hf:deepseek-ai/DeepSeek-V4.1-Flash",
+  "precision": "fp4"
+ },
+ "resources": {
+  "gpu_type": "h100",
+  "gpus_per_node": 8
+ },
+ "roles": {
+  "agg": {
+   "args": {
+    "disable-uvicorn-access-log": true,
+    "enable-auto-tool-choice": true,
+    "engram-config": "{\"cpu_offload\":true}",
+    "gpu-memory-utilization": 0.92,
+    "language-model-only": true,
+    "max-cudagraph-capture-size": 128,
+    "max-model-len": 1048576,
+    "max-num-batched-tokens": 4096,
+    "max-num-seqs": 16,
+    "reasoning-parser": "deepseek_v41",
+    "served-model-name": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "speculative-config": "{\"method\": \"dspark\", \"num_speculative_tokens\": 5, \"draft_sample_method\": \"probabilistic\", \"rejection_sample_method\": \"synthetic\", \"enable_adaptive_verification\": false, \"synthetic_acceptance_length\": 3.51}",
+    "tensor-parallel-size": 8,
+    "tokenizer-mode": "deepseek_v41",
+    "tool-call-parser": "deepseek_v41"
+   },
+   "env": {
+    "PYTHONUNBUFFERED": "1",
+    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+    "VLLM_USE_RUST_FRONTEND": "1",
+    "VLLM_USE_V2_MODEL_RUNNER": "1"
+   },
+   "gpus": 8,
+   "nodes": 1,
+   "workers": 1
+  }
+ }
+}

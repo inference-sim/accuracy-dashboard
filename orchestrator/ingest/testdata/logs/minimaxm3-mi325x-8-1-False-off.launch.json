@@ -1,0 +1,51 @@
+{
+ "engine": {
+  "connector": null,
+  "type": "vllm"
+ },
+ "frontend": {
+  "enable_multiple_frontends": false,
+  "type": "vllm"
+ },
+ "model": {
+  "container": "vllm/vllm-openai-rocm:v0.32.0@sha256:14f6a575e1fb0a580b0f633c09e06f648709d60405b85f6a7ff3f80d49f39905",
+  "path": "hf:MiniMaxAI/MiniMax-M3-MXFP8",
+  "precision": "fp8"
+ },
+ "resources": {
+  "gpu_type": "mi325x",
+  "gpus_per_node": 8
+ },
+ "roles": {
+  "agg": {
+   "args": {
+    "attention-backend": "TRITON_ATTN",
+    "block-size": 128,
+    "default-chat-template-kwargs": "{\"thinking_mode\":\"enabled\"}",
+    "enable-auto-tool-choice": true,
+    "enable-chunked-prefill": true,
+    "enable-prefix-caching": true,
+    "gpu-memory-utilization": 0.9,
+    "kv-cache-dtype": "fp8",
+    "language-model-only": true,
+    "max-num-batched-tokens": 32768,
+    "max-num-seqs": 2,
+    "reasoning-parser": "minimax_m3",
+    "served-model-name": "MiniMaxAI/MiniMax-M3-MXFP8",
+    "speculative-config": "{\"method\": \"eagle3\", \"model\": \"Inferact/MiniMax-M3-EAGLE3-GQA\", \"num_speculative_tokens\": 3, \"attention_backend\": \"TRITON_ATTN\", \"rejection_sample_method\": \"synthetic\", \"synthetic_acceptance_length\": 2.78}",
+    "stream-interval": 20,
+    "tensor-parallel-size": 8,
+    "tool-call-parser": "minimax_m3",
+    "trust-remote-code": true
+   },
+   "env": {
+    "PYTHONNOUSERSITE": "1",
+    "VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS": "1800",
+    "VLLM_USE_BREAKABLE_CUDAGRAPH": "0"
+   },
+   "gpus": 8,
+   "nodes": 1,
+   "workers": 1
+  }
+ }
+}

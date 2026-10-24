@@ -1,0 +1,54 @@
+{
+ "engine": {
+  "connector": null,
+  "type": "vllm"
+ },
+ "frontend": {
+  "enable_multiple_frontends": false,
+  "type": "vllm"
+ },
+ "model": {
+  "container": "vllm/vllm-openai:nightly-af7f9488c2210d67e1033ecdc845b087ee7fe92b",
+  "path": "hf:nvidia/MiniMax-M3-NVFP4",
+  "precision": "fp4"
+ },
+ "resources": {
+  "gpu_type": "b200",
+  "gpus_per_node": 8
+ },
+ "roles": {
+  "agg": {
+   "args": {
+    "attention-config": "{\"backend\":\"FLASHINFER\",\"use_trtllm_attention\":true,\"indexer_kv_dtype\":\"fp8\"}",
+    "block-size": 128,
+    "default-chat-template-kwargs": "{\"thinking_mode\":\"enabled\"}",
+    "enable-auto-tool-choice": true,
+    "enable-chunked-prefill": true,
+    "enable-prefix-caching": true,
+    "gpu-memory-utilization": 0.95,
+    "kv-cache-dtype": "fp8",
+    "language-model-only": true,
+    "max-cudagraph-capture-size": 40,
+    "max-num-batched-tokens": 16384,
+    "max-num-seqs": 10,
+    "no-enable-flashinfer-autotune": true,
+    "reasoning-parser": "minimax_m3",
+    "served-model-name": "nvidia/MiniMax-M3-NVFP4",
+    "speculative-config": "{\"method\": \"eagle3\", \"model\": \"Inferact/MiniMax-M3-EAGLE3-GQA\", \"num_speculative_tokens\": 3, \"attention_backend\": \"FLASHINFER\", \"use_local_argmax_reduction\": true, \"rejection_sample_method\": \"synthetic\", \"synthetic_acceptance_length\": 2.78}",
+    "stream-interval": 20,
+    "tensor-parallel-size": 4,
+    "tool-call-parser": "minimax_m3",
+    "trust-remote-code": true
+   },
+   "env": {
+    "PYTHONNOUSERSITE": "1",
+    "VLLM_ENGINE_READY_TIMEOUT_S": "3600",
+    "VLLM_FLASHINFER_ALLREDUCE_BACKEND": "trtllm",
+    "VLLM_FLOAT32_MATMUL_PRECISION": "high"
+   },
+   "gpus": 4,
+   "nodes": 1,
+   "workers": 1
+  }
+ }
+}

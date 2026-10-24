@@ -1,0 +1,157 @@
+"""Whether the pinned BLIS release can price a point at all, decided before calling blis
+(Discussion #28, "Model, hardware and drafter support").
+
+Everything is read from the catalog and registry the BLIS release pins, so a release that
+adds a model, part or drafter changes the outcome with no code change here:
+
+  model     the served checkpoint, or its HuggingFace base_model, is some catalog model's
+            source.repo (exact checkpoint first, then the base) -> else model_not_in_catalog;
+  hardware  the catalog has the part and the registry scopes coefficients to it
+            -> else hardware_no_coefficients;
+  drafter   the run's speculative method is the catalog graph's speculator
+            -> else drafter_not_in_catalog:<method>.
+"""
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+
+_HF_REPO = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.\-]*/[A-Za-z0-9][A-Za-z0-9_.\-]*$")
+
+
+def hf_repo(name) -> str | None:
+    """A HuggingFace repo id from a checkpoint reference (`hf:org/name`, `org/name`)."""
+    if not isinstance(name, str):
+        return None
+    name = name.strip()
+    if name.startswith("hf:"):
+        name = name[3:]
+    return name if _HF_REPO.match(name) else None
+
+
+@dataclass
+class Catalog:
+    root: Path
+    models: dict = field(default_factory=dict)        # catalog name -> source.repo
+    speculators: dict = field(default_factory=dict)   # catalog name -> speculator method | None
+    hardware: dict = field(default_factory=dict)      # part -> MemoryGiB
+    capability: dict = field(default_factory=dict)    # part -> CUDA compute-capability major (catalog)
+
+    @staticmethod
+    def load(root) -> "Catalog":
+        import yaml
+        root = Path(root)
+        c = Catalog(root=root)
+        for d in sorted((root / "models").iterdir()):
+            m = d / "model.yaml"
+            if not m.is_file():
+                continue
+            doc = yaml.safe_load(m.read_text()) or {}
+            repo = ((doc.get("source") or {}).get("repo"))
+            if repo:
+                c.models[d.name] = repo
+            g = d / "graph.yaml"
+            if g.is_file():
+                graph = yaml.safe_load(g.read_text()) or {}
+                spec = graph.get("speculator") if isinstance(graph, dict) else None
+                c.speculators[d.name] = spec.get("method") if isinstance(spec, dict) else None
+        for h in sorted((root / "hardware").glob("*.yaml")):
+            doc = yaml.safe_load(h.read_text()) or {}
+            if "MemoryGiB" in doc:
+                c.hardware[h.stem] = float(doc["MemoryGiB"])
+            cc = str(doc.get("ComputeCapability") or "")
+            if cc.split(".")[0].isdigit():
+                c.capability[h.stem] = int(cc.split(".")[0])
+        return c
+
+
+def catalog_part(cat: Catalog, parts: set[str], label: str) -> str | None:
+    """The catalog part an InferenceX hardware label names: the part of that name, else the
+    one part named `<label>-<variant>` with registry coefficients (InferenceX's `gb200` is the
+    catalog's `gb200-nvl72`). None when there is none, or more than one, so a label is never
+    matched to a part by guess."""
+    if label in cat.hardware:
+        return label
+    hits = [p for p in cat.hardware if p.startswith(label + "-") and p in parts]
+    return hits[0] if len(hits) == 1 else None
+
+
+def index_record_format(bytes_per_entry: int, head_dim: int) -> str | None:
+    """The format an indexer K record of this width holds, by vLLM v0.31.0's own layouts for a
+    head of head_dim values: fp8 is one byte per value plus a 4-byte fp32 scale; mxfp4 packs two
+    values per byte plus a 1-byte ue8m0 scale per 32 (model_executor/layers/sparse_attn_indexer.py
+    MXFP4_BLOCK_SIZE, kv_cache_as_quant_view); bf16 is two bytes per value. None when the width
+    is none of these, so a record nobody can name is never given a name."""
+    if head_dim <= 0:
+        return None
+    layouts = {"fp8": head_dim + 4, "mxfp4": head_dim // 2 + head_dim // 32, "bf16": 2 * head_dim}
+    hits = [name for name, width in layouts.items() if width == bytes_per_entry]
+    return hits[0] if len(hits) == 1 else None
+
+
+def registry_parts(registry_root) -> set[str]:
+    """Every part some coefficient in the registry is scoped to."""
+    import yaml
+    parts = set()
+
+    def scopes(node):
+        if isinstance(node, dict):
+            sc = node.get("scope")
+            if isinstance(sc, dict) and isinstance(sc.get("hardware"), list):
+                parts.update(str(h) for h in sc["hardware"])
+            for v in node.values():
+                scopes(v)
+        elif isinstance(node, list):
+            for v in node:
+                scopes(v)
+
+    for f in sorted(Path(registry_root, "coefficients").glob("*.yaml")):
+        scopes(yaml.safe_load(f.read_text()))
+    return parts
+
+
+@dataclass
+class Support:
+    model: str | None = None
+    matched_by: str | None = None       # checkpoint | base_model
+    checkpoint: str | None = None
+    reasons: list = field(default_factory=list)
+
+
+def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models: dict,
+          hardware: str, spec_method: str | None) -> Support:
+    """checkpoints: candidate HF repos for the served model, most authoritative first.
+    base_models: repo -> its HF base_model (frozen at pull time)."""
+    s = Support()
+    by_repo = {}
+    for name, repo in cat.models.items():
+        by_repo.setdefault(repo.lower(), []).append(name)
+    lookup_failed = False
+    for ck in checkpoints:
+        bm = base_models.get(ck)
+        if isinstance(bm, dict):     # the pull couldn't read its HF card
+            lookup_failed = True
+            bm = None
+        for how, repo in (("checkpoint", ck), ("base_model", bm)):
+            hits = sorted(by_repo.get((repo or "").lower(), []))
+            if len(hits) == 1:
+                s.model, s.matched_by, s.checkpoint = hits[0], how, ck
+                break
+            if len(hits) > 1:
+                s.reasons.append("model_not_in_catalog:ambiguous")
+                return s
+        if s.model:
+            break
+    if not s.model and lookup_failed:
+        # Only a reason when it could have mattered: a checkpoint that matched needs no base.
+        s.reasons.append("model_not_in_catalog:base_model_lookup_failed")
+    if not s.model:
+        s.reasons.append("model_not_in_catalog")
+    if hardware not in cat.hardware or hardware not in parts:
+        s.reasons.append("hardware_no_coefficients")
+    if s.model and spec_method:
+        have = cat.speculators.get(s.model)
+        if have != spec_method:
+            s.reasons.append(f"drafter_not_in_catalog:{spec_method}")
+    return s
