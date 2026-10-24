@@ -20,15 +20,40 @@ interface Props {
 // precision, and a uniform precision keeps every cell (and both columns) directly comparable.
 const MS_DIGITS = 2
 
-/** "×N" beside a measured value that averages N InferenceX runs; the tooltip lists each run. */
-function Runs({ runs }: { runs: NonNullable<FlatPoint['repeats']> }) {
-  const lines = runs.map(
-    (r, i) => `run ${i + 1}: TTFT ${formatMs(r.measured.ttft_ms, MS_DIGITS)} ms · TPOT ${formatMs(r.measured.tpot_ms, MS_DIGITS)} ms`,
-  )
+/** "×N" beside a measured value that averages N InferenceX runs; its tooltip lists each run. */
+export function RunsBody({ runs }: { runs: NonNullable<FlatPoint['repeats']> }) {
   return (
-    <span className="runs" title={`Mean of ${runs.length} InferenceX runs of this measurement\n${lines.join('\n')}`}>
-      {' '}×{runs.length}
+    <span className="prov-body">
+      <span className="prov-row">
+        InferenceX ran this measurement {runs.length} times: same deployment, concurrency and day, and the same
+        inputs to BLIS. The value shown is their mean.
+      </span>
+      <span className="prov-tbl" role="table" aria-label="each InferenceX run">
+        <span className="prov-tr prov-th" role="row">
+          <span role="columnheader">Run</span>
+          <span role="columnheader">TTFT (ms)</span>
+          <span role="columnheader">TPOT (ms)</span>
+        </span>
+        {runs.map((r, i) => (
+          <span className="prov-tr" role="row" key={r.point_id}>
+            <span role="cell">{i + 1}</span>
+            <span role="cell" className="mono">{formatMs(r.measured.ttft_ms, MS_DIGITS)}</span>
+            <span role="cell" className="mono">{formatMs(r.measured.tpot_ms, MS_DIGITS)}</span>
+          </span>
+        ))}
+      </span>
     </span>
+  )
+}
+
+function Runs({ runs }: { runs: NonNullable<FlatPoint['repeats']> }) {
+  return (
+    <>
+      {' '}
+      <Term content={<RunsBody runs={runs} />} ariaLabel={`mean of ${runs.length} InferenceX runs`} popClass="term-pop-wide">
+        <span className="runs">×{runs.length}</span>
+      </Term>
+    </>
   )
 }
 

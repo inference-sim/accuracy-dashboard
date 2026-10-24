@@ -508,8 +508,7 @@ describe('InferenceX runs of one measurement are shown once', () => {
     ] }
     const { html } = render(<PointsTable points={[folded, ...one.slice(1)]} title="t" />)
     expect(html).toContain('×2')
-    expect(html).toContain('Mean of 2 InferenceX runs of this measurement')
-    expect(html).toContain('run 2: TTFT 102.00 ms')
+    expect(html).toContain('aria-label="mean of 2 InferenceX runs"')
     expect(html).toContain('is the mean of N InferenceX runs')
     expect(html).not.toContain('InferenceX sweep')
   })
@@ -517,5 +516,17 @@ describe('InferenceX runs of one measurement are shown once', () => {
   it('a table with no folded value says nothing about runs', () => {
     const one = flattenPoints(v2a()).filter((p) => p.model === 'deepseek-v4-pro')
     expect(render(<PointsTable points={one} title="t" />).html).not.toContain('×')
+  })
+})
+
+describe('the ×N tooltip lists each run', () => {
+  it('names the run count and each run\'s values', async () => {
+    const { RunsBody } = await import('./components/PointsTable')
+    const html = renderToStaticMarkup(
+      <RunsBody runs={[{ point_id: 'a', measured: { ttft_ms: 100, tpot_ms: 5 } }, { point_id: 'b', measured: { ttft_ms: 102, tpot_ms: 5.2 } }]} />,
+    )
+    expect(html).toContain('InferenceX ran this measurement 2 times')
+    expect(html).toContain('102.00')
+    expect(html).not.toContain('<table')
   })
 })
