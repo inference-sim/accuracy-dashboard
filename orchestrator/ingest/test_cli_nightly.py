@@ -115,6 +115,24 @@ def test_nightly_ix_only_fetches_only_the_delta(tmp_path, monkeypatch):
     assert fakes.pulled_only == [c.point_id(pl.identity(new))]   # delta only
 
 
+def test_nightly_noop_fetches_nothing_not_the_whole_window(tmp_path, monkeypatch):
+    # Regression: on a night with no new points (a no-op or a pure age-out), pull_fn computes
+    # `only = sorted(window - last) == []`. cmd_pull must read [] as "freeze nothing", NOT conflate
+    # it with None ("freeze the whole window") -- else every quiet night re-downloads and re-scores
+    # all ~2000 points (the full BLIS-release cost) for a result the merge then throws away.
+    rows = [_row("m", 1, "2026-10-01"), _row("m", 2, "2026-10-01")]
+    fakes = Fakes(rows)
+    _install(monkeypatch, fakes, [c.point_id(pl.identity(r)) for r in rows])
+    cli.cmd_nightly(_args(tmp_path))                       # seed: whole window
+    assert fakes.pulled_only is None
+
+    # Night 2: identical window, same BLIS -> no new points. The delta is empty.
+    cli.cmd_nightly(_args(tmp_path, today="2026-10-24"))
+    assert fakes.pulled_only == []                         # the empty delta, NOT None (whole window)
+    # and cmd_pull froze zero rows for that empty delta
+    assert json.loads((tmp_path / "work" / "manifest.json").read_text())["points"] == []
+
+
 def test_nightly_stops_when_the_pull_fails(tmp_path, monkeypatch):
     fakes = Fakes([_row("m", 1, "2026-10-01")])
     _install(monkeypatch, fakes, [])

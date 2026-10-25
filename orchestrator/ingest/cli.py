@@ -57,8 +57,10 @@ def cmd_pull(a) -> int:
         _log("FATAL: the site names no display name for " + ", ".join(p.unnamed_slugs))
         return 3
     # --only <point_id ...>: freeze just these window rows (the nightly's delta fetch). The manifest
-    # then holds only the fetched subset; the whole window is listed by the caller, not here.
-    if getattr(a, "only", None):
+    # then holds only the fetched subset; the whole window is listed by the caller, not here. `None`
+    # means "the whole window"; an EMPTY list means "none" (a night whose delta is empty -- an
+    # age-out or a true no-op) -- never conflate the two, or such a night re-freezes the whole window.
+    if getattr(a, "only", None) is not None:
         want = set(a.only)
         p.rows = [r for r in p.rows if contract.point_id(pl.identity(r)) in want]
         _log(f"pull: --only -> {len(p.rows)} of the window's rows")
@@ -265,7 +267,7 @@ def cmd_score(a) -> int:
     work = Path(a.work or Path(a.out).parent / (Path(a.out).name + "-work"))
     work.mkdir(parents=True, exist_ok=True)
     points = manifest["points"]
-    if a.only:
+    if a.only is not None:  # None = score the whole manifest; [] = score nothing (never "all")
         points = [p for p in points if any(p["point_id"].startswith(x) for x in a.only)]
     # Score serially or across a process pool. BLIS replays are CPU-bound subprocesses, so the
     # worker count is clamped to the machine's cores (4 on an ubuntu-latest runner) -- more would
