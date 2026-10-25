@@ -14,7 +14,7 @@ so every branch of the table is a unit test with no infrastructure.
 
 The triggers (#15, "Two triggers, two actions"):
   * An IX data release is any point id in the window that wasn't in the store last night.
-  * A BLIS release is a new stable inference-sim tag (resolve_inputs.sh resolves it).
+  * A BLIS release is a new stable inference-sim tag (resolve_blis.sh resolves it).
   * A night where points only age out of the window updates the live view and nothing else.
 
   IX   BLIS   Action

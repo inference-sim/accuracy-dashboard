@@ -2,7 +2,7 @@
 
 The extractor (#29) writes one **contract directory** per scored run (one BLIS release over one frozen API pull). The v2 summary builder (#30) reads it and writes `summary.json` v2 (`schemas/summary.v2.json`).
 
-Nothing here is used by the nightly pipeline. `evaluate.sh`, `build_summary.py`, `schemas/summary.v1.json` and the v1 snapshots are unchanged.
+The v1 db-dump pipeline has been retired (its workflows and dump-ingest scripts removed). `build_summary.py` (shared arithmetic), `schemas/summary.v1.json` and the three committed db-dump snapshots are unchanged and still read by the UI.
 
 `orchestrator/ingest/contract.py` holds the shared code (point identity, canonical JSON, `ratio_str`, row order, file names), and `python3 orchestrator/ingest/contract.py <dir>` validates a contract directory. The worked example is `testdata/contract/run-a/` and `run-b/`.
 
