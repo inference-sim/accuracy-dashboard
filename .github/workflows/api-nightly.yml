@@ -138,6 +138,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          # TEMP diagnostic: log free memory + disk every 15s so a SIGTERM (exit 143) shows whether
+          # the runner ran out of RAM or disk. Remove with the proving trigger.
+          ( while true; do echo "[res] $(date -u +%T) mem=$(free -m | awk '/Mem:/{print $7"MB avail"}') disk=$(df -m / | awk 'NR==2{print $4"MB free"}')"; sleep 15; done ) &
+          RESPID=$!; trap 'kill $RESPID 2>/dev/null || true' EXIT
           # data/ is the checkout's own main tree, so the dump snapshots and any prior API snapshots
           # (incl. the live view the merge reads) are present; cli.py nightly adds/prunes only API
           # snapshots and never touches a dump one.
