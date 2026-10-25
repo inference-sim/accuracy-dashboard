@@ -24,13 +24,6 @@ on:
         description: "Ignore the artifact-download cache and re-download everything"
         type: boolean
         default: false
-  # TEMPORARY, revert before merge: a proving run on the feature branch. workflow_dispatch can't
-  # reach a workflow not yet on the default branch (HTTP 404), so this push trigger is the only way
-  # to exercise the real workflow pre-merge. A proving run uses a 1-day window and SKIPS publish
-  # entirely (no commit to main, no Pages deploy) -- the scored data is the uploaded `night`
-  # artifact only. See the PROVING env + the publish job's event-name guard below.
-  push:
-    branches: [ingest/api-nightly-pipeline]
 
 # Least privilege: read-only by default. Only `publish` gets contents: write.
 permissions:
@@ -43,14 +36,6 @@ concurrency:
 env:
   WINDOW_DAYS: "180"
   KEEP_API: "5"
-  # A proving run (the temporary push trigger) runs a REAL nightly -- full 180-day cumulative
-  # window, real date -- and differs from a scheduled run in only one way: it never publishes (the
-  # publish job is skipped on push events; its scored data is the uploaded artifact). It does NOT
-  # shrink the window: shrinking the retention window would break the cumulative store (it would
-  # prune every point not measured that day), which is exactly the bug a 1-day window caused. With
-  # the committed seed state it's still fast -- the window is one cheap API listing, and only the
-  # delta is fetched + merged into the 761-point seed.
-  PROVING: ${{ github.event_name == 'push' }}
 
 jobs:
   # ----------------------------------------------------------------- 1. resolve BLIS (hosted-safe)
@@ -138,20 +123,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # TEMP diagnostic: log free memory + disk every 15s so a SIGTERM (exit 143) shows whether
-          # the runner ran out of RAM or disk. Remove with the proving trigger.
-          ( while true; do echo "[res] $(date -u +%T) mem=$(free -m | awk '/Mem:/{print $7"MB avail"}') disk=$(df -m / | awk 'NR==2{print $4"MB free"}')"; sleep 15; done ) &
-          RESPID=$!; trap 'kill $RESPID 2>/dev/null || true' EXIT
           # data/ is the checkout's own main tree, so the dump snapshots and any prior API snapshots
           # (incl. the live view the merge reads) are present; cli.py nightly adds/prunes only API
           # snapshots and never touches a dump one.
           mkdir -p data state
           # Always the full 180-day cumulative window ending the real UTC date -- never shrink it
-          # (that would prune the store). A proving run is a REAL nightly in every respect except it
-          # skips publish (push-event guard on the publish job); it pulls today's live data and
-          # merges the delta into the committed seed, so the newest days appear.
+          # (that would prune the store).
           TODAY="$(date -u +%F)"
-          [ "$PROVING" = "true" ] && echo "PROVING run: full $WINDOW_DAYS-day window ending $TODAY (publish skipped)"
           # OOM fix (diagnosed by local profiling): a single agentic blis replay's peak RSS is
           # trace-content-driven and unpredictable -- a c64 point used 11.5GB where a c128 used
           # 6.9GB, up to ~14.6GB -- so NO pre-filter (concurrency/model/hw) reliably fits 16GB, and
@@ -188,9 +166,7 @@ jobs:
   # ----------------------------------------------------------------- 3. publish (hosted-safe)
   publish:
     needs: [resolve, run-night]
-    # NEVER on a proving run (the push trigger): it must not commit to main or dispatch Pages. Its
-    # scored data is the uploaded `night` artifact only.
-    if: ${{ needs.run-night.result == 'success' && github.event_name != 'push' }}
+    if: ${{ needs.run-night.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write # commit data/ to main
