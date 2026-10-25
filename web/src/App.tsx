@@ -579,38 +579,38 @@ function DevView({
       <div className="devpickers">
         {runs.length >= 1 && (
           <>
-            {/* First slot: a nightly run, tagged A in compare mode. The compare view orders the two
-                runs by date, not by slot. picker.run falls back to the latest snapshot. */}
-            <div className="seclabel">
-              {/* Always tagged A, so adding a B never leaves "which one is A?" (PR #26 review). */}
-              <span className="cmp-tag cmp-a">A</span> Nightly run
+            {/* A and B sit side by side (each its own column: label above its dropdown). */}
+            <div className="devpicker-col">
+              {/* First slot: a nightly run, tagged A in compare mode. The compare view orders the
+                  two runs by date, not by slot. picker.run falls back to the latest snapshot. */}
+              <div className="seclabel">
+                {/* Always tagged A, so adding a B never leaves "which one is A?" (PR #26 review). */}
+                <span className="cmp-tag cmp-a">A</span> Nightly run
+              </div>
+              <Dropdown
+                className="runsel"
+                ariaLabel="Select the nightly run (A)"
+                disabled={runs.length === 1}
+                value={picker.run ?? runs[0]!.snapshot_id}
+                // A can never be the run already chosen as B — a run must not be compared with itself.
+                options={runs
+                  .filter((r) => r.snapshot_id !== picker.runB)
+                  .map((r, i) => ({
+                    value: r.snapshot_id,
+                    label: `${runLabel(r)}${i === 0 ? ' · latest' : ''}`,
+                  }))}
+                // Single-run: picking the latest → null ("track latest", resolves via data/latest).
+                // Compare mode: ALWAYS pin the explicit snapshot_id — a null-latest A can't be diffed
+                // reliably (data/latest may not be the labelled run), which showed the wrong A.
+                onChange={(id) =>
+                  picker.onPick(!comparing && id === runs[0]!.snapshot_id ? null : id)
+                }
+              />
             </div>
-            <Dropdown
-              className="runsel"
-              ariaLabel="Select the nightly run (A)"
-              disabled={runs.length === 1}
-              value={picker.run ?? runs[0]!.snapshot_id}
-              // A can never be the run already chosen as B — a run must not be compared with itself.
-              options={runs
-                .filter((r) => r.snapshot_id !== picker.runB)
-                .map((r, i) => ({
-                  value: r.snapshot_id,
-                  label: `${runLabel(r)}${i === 0 ? ' · latest' : ''}`,
-                }))}
-              // Single-run: picking the latest → null ("track latest", resolves via data/latest).
-              // Compare mode: ALWAYS pin the explicit snapshot_id — a null-latest A can't be diffed
-              // reliably (data/latest may not be the labelled run), which showed the wrong A.
-              onChange={(id) =>
-                picker.onPick(!comparing && id === runs[0]!.snapshot_id ? null : id)
-              }
-            />
-            {runs.length > 1 && !comparing && (
-              <div className="runsel-note">Viewing an older run shows its full results — it does not re-run.</div>
-            )}
             {/* Second slot = run B (compared). Only meaningful with ≥2 retained runs. "none" leaves
                 single-run mode (the Overview). */}
             {runs.length >= 2 && (
-              <>
+              <div className="devpicker-col">
                 <div className="seclabel">
                   <span className="cmp-tag cmp-b">B</span> Compare against
                 </div>
@@ -629,7 +629,10 @@ function DevView({
                   ]}
                   onChange={(id) => picker.onPickB(id === '__none__' ? null : id)}
                 />
-              </>
+              </div>
+            )}
+            {runs.length > 1 && !comparing && (
+              <div className="runsel-note">Viewing an older run shows its full results — it does not re-run.</div>
             )}
           </>
         )}

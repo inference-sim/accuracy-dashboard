@@ -333,7 +333,9 @@ details.about .about-prov .pill{font-family:var(--font-mono);font-size:11px;padd
 .tabs button.tab{background:none;border:0;border-bottom:2px solid transparent;cursor:pointer;font:inherit;font-size:13.5px}
 .tabs button.tab.on{border-bottom-color:var(--accent)}
 .tabs-gh{margin-left:auto;font-size:12.5px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
-.devpickers{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:14px 0 22px;padding:12px 14px;border:1px solid var(--line);border-radius:8px}
+.devpickers{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px 16px;margin:14px 0 22px;padding:12px 14px;border:1px solid var(--line);border-radius:8px}
+/* A and B each a column (label above its dropdown), side by side; they wrap on a narrow screen. */
+.devpicker-col{display:flex;flex-direction:column;gap:6px;flex:1 1 240px;min-width:220px;max-width:360px}
 .devpickers .seclabel{margin:0}
 .devpickers .runsel-note{flex-basis:100%;margin:0}
 details.about .chips{margin:12px 0}
