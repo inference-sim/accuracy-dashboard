@@ -85,7 +85,7 @@ export function validateSummary(raw: unknown): Summary {
     type Rows = { rows?: Rows[] } & Record<string, unknown>
     for (const m of doc.matrix as Rows[]) {
       for (const w of m.rows ?? []) for (const g of w.rows ?? []) for (const t of g.rows ?? []) for (const p of t.rows ?? []) {
-        for (const k of ['point_id', 'measured_date', 'fidelity']) {
+        for (const k of ['point_id', 'identity', 'measured_date', 'fidelity']) {
           if (!(k in p)) throw new SummaryLoadError(`summary.json v2 point is missing "${k}"`)
         }
       }

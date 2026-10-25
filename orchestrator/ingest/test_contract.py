@@ -453,8 +453,11 @@ def _minimal_v2(point: dict) -> dict:
 def _fixture_point() -> dict:
     rec = next(r for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL) if r["status"] == "exact")
     fid = {k: v for k, v in rec.items() if k != "point_id"}
-    return {"level": "point", "concurrency": 4, "tier": "measured_or_resolved", "point_id": rec["point_id"],
-            "measured_date": "2026-09-21", "sweep_id": "2410|deepseek-v4.1-flash-h200|agentx", "fidelity": fid,
+    # The identity that hashes to this point_id (a scored point now carries it, like not_scored).
+    ident = json.loads((FIXTURE / "run-a" / c.FACETS_JSON).read_text())[rec["point_id"]]["identity"]
+    return {"level": "point", "concurrency": ident["conc"], "tier": "measured_or_resolved", "point_id": rec["point_id"],
+            "identity": ident, "measured_date": ident["measured_date"],
+            "sweep_id": "2410|deepseek-v4.1-flash-h200|agentx", "fidelity": fid,
             "measured": {"ttft_ms": 1650.0, "tpot_ms": 9.4}, "predicted": {"ttft_ms": 1590.0, "tpot_ms": 8.55},
             "error_pct": {"ttft": -3.6, "tpot": -9.0}, "shape": None, "shape_reason": "< 3 concurrencies"}
 
@@ -465,7 +468,7 @@ def test_v2_schema_accepts_a_point_carrying_a_fixture_fidelity_record():
 
 
 def test_v2_schema_requires_fidelity_point_id_measured_date_and_sweep_on_every_point():
-    for field in ("fidelity", "point_id", "measured_date", "sweep_id"):
+    for field in ("fidelity", "point_id", "identity", "measured_date", "sweep_id"):
         point = _fixture_point()
         del point[field]
         assert not _v2_validator().is_valid(_minimal_v2(point)), field

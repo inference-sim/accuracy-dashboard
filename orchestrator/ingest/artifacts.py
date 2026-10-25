@@ -281,9 +281,24 @@ class GitHubArtifacts:
 
     def __init__(self, repo: str, token: str | None, cache_dir, sleep=None):
         from pathlib import Path
+        import threading
         self.repo, self.token, self.sleep = repo, token, sleep
         self.cache = Path(cache_dir)
         self.cache.mkdir(parents=True, exist_ok=True)
+        # Per-run artifact listings, memoized under a lock so a thread pool freezing many points of
+        # one run lists it once, not once per point (and never races the dict).
+        self._lists: dict = {}
+        self._list_locks: dict = {}
+        self._guard = threading.Lock()
+
+    def list_cached(self, run_id: str):
+        """gh.list(run_id), memoized and thread-safe: one HTTP listing per run even under a pool."""
+        with self._guard:
+            lock = self._list_locks.setdefault(run_id, __import__("threading").Lock())
+        with lock:
+            if run_id not in self._lists:
+                self._lists[run_id] = self.list(run_id)
+            return self._lists[run_id]
 
     def _headers(self):
         h = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
@@ -320,7 +335,12 @@ class GitHubArtifacts:
                 raise
             # The blob URL is signed: no GitHub token goes to it.
             data = clients._get_bytes(e.headers["Location"], {}, 600, sleep=self.sleep)
-        tmp = path.with_suffix(".part")
+        # A unique temp name per writer, so concurrent downloads of the same artifact id (two
+        # points can share one) don't race the same .part file; the atomic replace makes the
+        # winner's bytes the cache entry (both downloaded identical bytes anyway).
+        import os
+        import threading
+        tmp = path.with_suffix(f".part.{os.getpid()}.{threading.get_ident()}")
         tmp.write_bytes(data)
         tmp.replace(path)
         return data

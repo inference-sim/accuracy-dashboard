@@ -213,6 +213,72 @@ class Outcome:
     csv_row: list | None = None
 
 
+def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
+    """score_point with the uniform error capture the driver used to do inline, so both the serial
+    and the parallel path record a point that raises as not-scored (never drop it)."""
+    try:
+        return score_point(entry, pull_dir, work, env)
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+        return Outcome(point_id=entry["point_id"], identity=entry["identity"], row=entry["row"],
+                       reasons=sorted(set(entry["reasons"] + ["blis_refused:extractor_error"])))
+
+
+# A process-pool worker scores into its OWN work subdir, because score_point writes
+# work/scenarios/<scenario>.yaml keyed by scenario name, not point id -- two points that share a
+# scenario name would race that file across processes. Per-worker dirs isolate it; the per-point
+# metrics/<pid>.json cache stays correct either way (pid is unique). The worker's env and pull_dir
+# are set once per process in the initializer, so each task ships only the small `entry`.
+_W: dict = {}
+
+
+def _worker_init(pull_dir: str, env: Env, work: str):
+    _W["pull_dir"] = Path(pull_dir)
+    _W["env"] = env
+    # os.getpid() is stable for the life of a pool worker -> a fixed per-worker dir it reuses, so
+    # the scenario cache within one worker still helps across its tasks.
+    import os
+    _W["work"] = Path(work) / f"w{os.getpid()}"
+    _W["work"].mkdir(parents=True, exist_ok=True)
+
+
+def _worker_score(entry: dict) -> Outcome:
+    return _score_one(entry, _W["pull_dir"], _W["work"], _W["env"])
+
+
+def score_points(points: list, pull_dir: Path, work: Path, env: Env, *, workers: int = 1,
+                 log=lambda m: None) -> list:
+    """Score every point, serially (workers<=1) or across a process pool. The result is collected
+    in input order regardless of completion order, and write_contract re-sorts by point_id, so the
+    contract is identical whatever the worker count -- parallelism is a speed knob, never a
+    correctness or determinism lever. BLIS replays are CPU-bound subprocesses, so `workers` should
+    not exceed the machine's cores (the CLI clamps it)."""
+    n = len(points)
+    if workers <= 1:
+        out = []
+        for i, e in enumerate(points, 1):
+            o = _score_one(e, pull_dir, work, env)
+            out.append(o)
+            log(f"  [{i}/{n}] {e['row']['model']} {e['row']['hardware']} c{e['row']['conc']} "
+                f"{e['point_id'][:12]} -> {o.fidelity['status'] if o.fidelity else o.reasons}")
+        return out
+    from concurrent.futures import ProcessPoolExecutor
+    results: dict = {}
+    with ProcessPoolExecutor(max_workers=workers, initializer=_worker_init,
+                             initargs=(str(pull_dir), env, str(work))) as ex:
+        futs = {ex.submit(_worker_score, e): idx for idx, e in enumerate(points)}
+        done = 0
+        from concurrent.futures import as_completed
+        for fut in as_completed(futs):
+            idx = futs[fut]
+            o = fut.result()
+            results[idx] = o
+            done += 1
+            e = points[idx]
+            log(f"  [{done}/{n}] {e['row']['model']} {e['row']['hardware']} c{e['row']['conc']} "
+                f"{e['point_id'][:12]} -> {o.fidelity['status'] if o.fidelity else o.reasons}")
+    return [results[i] for i in range(n)]   # input order; write_contract re-sorts anyway
+
+
 def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     row, ident, pid = entry["row"], entry["identity"], entry["point_id"]
     o = Outcome(point_id=pid, identity=ident, row=row, reasons=list(entry["reasons"]))

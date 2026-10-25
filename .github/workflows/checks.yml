@@ -64,7 +64,7 @@ jobs:
           python3 orchestrator/ingest/test_extract.py
           # a point through score_point and write_contract, fake BLIS binaries (CI has no BLIS build)
           python3 orchestrator/ingest/test_score_e2e.py
-      - name: API nightly pipeline - window, trigger table, incremental pull, two-retention index, fabricated-release combos (#15)
+      - name: API nightly pipeline - window, trigger table, no-storage merge, two-retention index, parallel pools, fabricated-release combos (#15)
         run: |
           # These use pytest fixtures (tmp_path, monkeypatch), unlike the older standalone scripts.
           pip install --quiet pytest pyyaml
@@ -73,6 +73,7 @@ jobs:
             orchestrator/ingest/test_incremental.py \
             orchestrator/ingest/test_nightly_run.py \
             orchestrator/ingest/test_cli_nightly.py \
+            orchestrator/ingest/test_parallel.py \
             orchestrator/test_update_index.py
 
   blisdefaults:

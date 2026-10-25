@@ -39,34 +39,34 @@ class World:
     scored so a rescore can be checked for a cache hit."""
     def __init__(self):
         self.rows = []                  # list of (model, conc, measured_date)
-        self.scored_log = []            # (blis_tag, frozenset(point_ids)) per score call
+        self.fetched_log = []           # frozenset(point_ids) fetched per pull (delta vs window)
+        self.scored_log = []            # (blis_tag, frozenset(point_ids)) real work per score call
         self.score_cache = {}           # (blis_tag, point_id) -> stable fake metric
 
-    # -- pull_fn: rewrite the store to exactly self.rows (incremental vs the prior store)
-    def pull(self, store_dir: Path, today: date) -> str:
-        store_dir = Path(store_dir)
+    # -- pull_fn (no-storage): list the whole window (cheap) into window_ids, and FETCH inputs only
+    # for the points that will be scored -- the delta on an IX-only night, the whole window on a
+    # BLIS release. Nothing persists between runs; work_dir is this run's ephemeral pull.
+    def pull(self, work_dir: Path, today: date, last_ids: set, blis_changed: bool):
+        work_dir = Path(work_dir)
         want = {pid_of(*r): r for r in self.rows}
-        prior = pl.load_prior_manifest(store_dir)
-        prior_ids = {p["point_id"] for p in prior["points"]} if prior else set()
-        # drop aged-out point dirs
-        for pid in prior_ids - set(want):
-            pl.prune_point_files(store_dir, pid)
+        window_ids = set(want)
+        to_fetch = set(window_ids) if blis_changed else (window_ids - set(last_ids))
+        self.fetched_log.append(frozenset(to_fetch))
         points = []
-        for pid, (model, conc, md) in sorted(want.items()):
-            ident = _ident(model, conc, md)
-            (store_dir / "points" / pid).mkdir(parents=True, exist_ok=True)
-            points.append({"point_id": pid, "identity": ident,
+        for pid in sorted(to_fetch):
+            model, conc, md = want[pid]
+            (work_dir / "points" / pid).mkdir(parents=True, exist_ok=True)
+            points.append({"point_id": pid, "identity": _ident(model, conc, md),
                            "row": {"model": model, "conc": conc, "date": md}, "files": {}})
         pull_date = today.isoformat()
-        pl.write_manifest(store_dir, {"window": ["", pull_date], "pulled_at": pull_date + "T00:00:00Z"}, points)
-        return pull_date
+        pl.write_manifest(work_dir, {"window": ["", pull_date], "pulled_at": pull_date + "T00:00:00Z"}, points)
+        return pull_date, window_ids
 
-    # -- score_build_fn: build a minimal v2 summary; count cache hits
-    def score(self, store_dir: Path, blis_tag: str, score_ids: set, pull_date: str):
-        m = pl.load_prior_manifest(Path(store_dir))
+    # -- score_build_fn: score exactly what the pull fetched (the delta or the window); count cache
+    # hits so "cache honored" is observable. Returns a minimal v2 summary skeleton.
+    def score(self, work_dir: Path, blis_tag: str, score_ids: set, pull_date: str, window_ids: set):
+        m = pl.load_prior_manifest(Path(work_dir))
         entries = m["points"]
-        # Honour the cache: a point already scored under this BLIS tag isn't real work. score_ids
-        # is the compute hint; everything else must already be cached or this is a bug.
         real_work = set()
         for e in entries:
             key = (blis_tag, e["point_id"])
@@ -92,7 +92,7 @@ def _fake_summary(entries, blis_tag, pull_date):
 
 def _run(world, tmp, today, blis_tag, keep_api=5):
     return nr.run_night(date.fromisoformat(today), blis_tag,
-                        store_dir=tmp / "store", data_dir=tmp / "data",
+                        work_dir=tmp / "work", data_dir=tmp / "data",
                         state_path=tmp / "state.json",
                         pull_fn=world.pull, score_build_fn=world.score,
                         snapshot_date=today, keep_api=keep_api)
@@ -171,9 +171,11 @@ def test_re_measurement_is_a_new_point_and_both_stay_in_the_window(tmp_path):
     r = _run(w, tmp_path, "2026-10-02", "v0.11.0")
     assert r.action == nt.IX_ONLY
     assert r.decision.score_ids == {pid_of("m", 1, "2026-10-01")}
-    # Both measurements are still in the store (a measurement is immutable).
-    m = pl.load_prior_manifest(tmp_path / "store")
-    assert {e["point_id"] for e in m["points"]} == {pid_of("m", 1, "2026-09-01"), pid_of("m", 1, "2026-10-01")}
+    # Only the new measurement was fetched+scored; the old one carried over from the published view.
+    assert w.fetched_log[-1] == {pid_of("m", 1, "2026-10-01")}
+    # Both measurements are still in the window (a measurement is immutable): state records both.
+    state = json.loads((tmp_path / "state.json").read_text())
+    assert set(state["point_ids"]) == {pid_of("m", 1, "2026-09-01"), pid_of("m", 1, "2026-10-01")}
 
 
 def test_age_out_drops_today_minus_180_keeps_today_minus_179_updates_live_view(tmp_path):
@@ -191,10 +193,11 @@ def test_age_out_drops_today_minus_180_keeps_today_minus_179_updates_live_view(t
     r = _run(w, tmp_path, today.isoformat(), "v0.11.0")
     assert r.action == nt.AGE_OUT
     assert r.published and r.snapshot_id is None             # live view rebuilt, no snapshot/diff
-    # The aged-out point and its files are gone from the store.
-    m = pl.load_prior_manifest(tmp_path / "store")
-    assert {e["point_id"] for e in m["points"]} == {pid_of("m", 1, keep)}
-    assert not (tmp_path / "store" / "points" / pid_of("m", 2, drop)).exists()
+    # The aged-out point is gone from the window: state records only the kept one, and the aged-out
+    # point was not even fetched (nothing to re-fetch for a point leaving the window).
+    state = json.loads((tmp_path / "state.json").read_text())
+    assert set(state["point_ids"]) == {pid_of("m", 1, keep)}
+    assert pid_of("m", 2, drop) not in w.fetched_log[-1]
 
 
 def test_zero_scored_run_is_a_noop_and_keeps_last_good_view(tmp_path):
@@ -204,7 +207,7 @@ def test_zero_scored_run_is_a_noop_and_keeps_last_good_view(tmp_path):
     seed = _run(w, tmp_path, "2026-10-02", "v0.11.0")
     good = (tmp_path / "data" / "latest" / "summary.json").read_text()
     # Night 2: a BLIS release, but the scorer returns zero scored.
-    w.score = lambda store_dir, blis_tag, score_ids, pull_date: (_fake_summary([], blis_tag, pull_date), 0)
+    w.score = lambda work_dir, blis_tag, score_ids, pull_date, window_ids: (_fake_summary([], blis_tag, pull_date), 0)
     r = _run(w, tmp_path, "2026-10-03", "v0.12.0")
     assert r.decision.is_noop
     assert (tmp_path / "data" / "latest" / "summary.json").read_text() == good   # last good view stands
@@ -234,16 +237,14 @@ def test_sixth_api_release_prunes_oldest_api_never_a_dump(tmp_path):
 
 
 def test_seed_rescore_is_byte_identical(tmp_path):
-    # The seed's summary, rebuilt from the same frozen store with the same BLIS, is byte-identical
-    # (the cache does no new work and the inputs are unchanged).
+    # Re-running the same night (same window, same BLIS) is a no-op and leaves the published view
+    # byte-identical -- nothing changed, so nothing is re-fetched, re-scored or re-published.
     w = World()
     w.rows = [("m", 1, "2026-10-01"), ("m", 2, "2026-10-01")]
     _run(w, tmp_path, "2026-10-02", "v0.11.0")
     first = (tmp_path / "data" / "latest" / "summary.json").read_text()
-    cache_calls_before = len(w.scored_log)
-    # Re-run the very same night against the same store: no-op (nothing changed), view unchanged.
+    scored_before = len(w.scored_log)
     r = _run(w, tmp_path, "2026-10-02", "v0.11.0")
     assert r.decision.is_noop
     assert (tmp_path / "data" / "latest" / "summary.json").read_text() == first
-    # The score cache was fully warm: had it run, it would have done zero real work.
-    assert len(w.scored_log) == cache_calls_before        # no-op didn't even call the scorer
+    assert len(w.scored_log) == scored_before     # a no-op didn't even call the scorer

@@ -108,7 +108,7 @@ def recipe_checkpoint(row: dict, server_log: str | None, recipes) -> dict | None
 
 
 def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts, fetch, out: Path,
-                 run_artifacts: dict, recipes=None) -> dict:
+                 run_artifacts: dict = None, recipes=None) -> dict:
     ident = identity(row)
     pid = contract.point_id(ident)
     entry = {"point_id": pid, "identity": ident, "row": row, "reasons": _row_reasons(row), "files": {}}
@@ -128,9 +128,9 @@ def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts
         join_reasons.append(f"server_log_missing:run_in_{(run_repo(row) or 'unknown').replace('/', '_')}")
     else:
         run_id, attempt = run
-        if run_id not in run_artifacts:
-            run_artifacts[run_id] = gh.list(run_id)
-        arts = run_artifacts[run_id]
+        # Thread-safe memoized listing: one HTTP call per run even when a pool freezes many of its
+        # points concurrently. (run_artifacts kept as an optional no-op for older callers.)
+        arts = gh.list_cached(run_id)
         j = art.join({**row, "_attempt": attempt}, arts,
                      lambda a: art.read_result_json(gh.download(a)), agentic=agentic)
         join_reasons += j.reasons
@@ -253,7 +253,7 @@ def plan_incremental(rows: list[dict], prior_points: list[dict]) -> Incremental:
 
 def prune_point_files(out: Path, point_id: str) -> None:
     """Remove an aged-out point's frozen files (its points/<id>/ directory). The store keeps only
-    the current window, so an aged-out log is really gone (#15, "Store (ix-store)")."""
+    the current window (used when pruning an ephemeral work dir's aged-out points)."""
     import shutil
     shutil.rmtree(out / "points" / point_id, ignore_errors=True)
 

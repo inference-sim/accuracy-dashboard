@@ -1,25 +1,27 @@
 name: api-nightly
 
-# The API-ingest nightly pipeline (Discussion #15). Replaces the db-dump nightly (nightly.yml):
-# instead of restoring a ~323 GB Postgres dump, it pulls the live InferenceX API incrementally,
-# scores the 180-day window with the resolved BLIS release, and publishes v2 `api` snapshots.
+# The API-ingest nightly pipeline (Discussion #15, revised 2026-10-25: the no-storage design).
+# Replaces the db-dump nightly (nightly.yml): instead of restoring a ~323 GB Postgres dump, it
+# pulls the live InferenceX API, scores the 180-day window with the resolved BLIS release, and
+# publishes v2 `api` snapshots. NOTHING RAW IS PERSISTED -- no ix-store branch, no committed logs;
+# the work dir is ephemeral and summary.json IS the score store (an IX-only night merges the delta
+# into the published summary). Only the agentic artifact downloads are cached, via actions/cache
+# (ephemeral, not committed), to keep a BLIS-release night fast.
 #
-# Two triggers, detected inside `cli.py nightly`, never here (#15, "Two triggers, two actions"):
-#   * an IX data release (a new point id in the window)  -> score the new points, update the live
-#     view, no snapshot/diff;
-#   * a BLIS release (a new stable inference-sim tag)     -> rescore the whole window, freeze a
-#     snapshot, allow a diff.
+# Two triggers, detected inside `cli.py nightly` from last night's point-id set in state, never
+# here (#15, "Two triggers, two actions"):
+#   * an IX data release (a new point id)  -> fetch+score only the new points, merge into the live
+#     view; no snapshot/diff;
+#   * a BLIS release (a new stable inference-sim tag) -> re-fetch+rescore the whole window, freeze a
+#     snapshot, allow a diff. Agentic points whose artifacts expired (>90d) drop to not-scored.
 # A no-op night (neither trigger) writes nothing and the last good view stands.
-#
-# Off the :00 mark, and LATER than the old dump nightly's 06:17, so moving the nightly off the dump
-# is a clean cutover (the dump nightly.yml is retired in the same change). Also runnable on demand.
 on:
   schedule:
-    - cron: "43 4 * * *" # nightly, off :00; the incremental pull + cached score fit the 6 h budget
+    - cron: "43 4 * * *" # nightly, off :00
   workflow_dispatch:
     inputs:
-      force_cold_pull:
-        description: "Ignore the ix-store cache and pull the whole window from scratch (~4.5 h)"
+      ignore_cache:
+        description: "Ignore the artifact-download cache and re-download everything"
         type: boolean
         default: false
 
@@ -32,7 +34,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  STORE_BRANCH: ix-store # the frozen 180-day pull; one commit, no history, never on main or pages
   WINDOW_DAYS: "180"
   KEEP_API: "5"
 
@@ -53,9 +54,9 @@ jobs:
   run-night:
     needs: resolve
     runs-on: ubuntu-latest
-    # The cold-pull ceiling (~4.5 h, mostly GitHub-artifact downloads) plus the cached score; well
-    # under GitHub's 360-min default only when the store cache is warm, so give headroom for a cold
-    # pull and still land inside the 6 h budget #15 asks for.
+    # A BLIS-release night re-fetches the whole window (~4.5 h cold, mostly artifact downloads);
+    # parallel downloads + a warm artifact cache bring it well under GitHub's 360-min cap and inside
+    # #15's 6 h budget. An IX-only night fetches only the delta and is minutes.
     timeout-minutes: 345
     steps:
       - uses: actions/checkout@v4
@@ -67,24 +68,18 @@ jobs:
           python-version: "3.13"
       - run: pip install --quiet jsonschema pyyaml
 
-      # Restore the frozen pull from the ix-store branch into ./store (unless a cold pull is forced).
-      # The branch holds ONLY the current window as a single commit, so this is ~80 MB, not history.
-      - name: Restore the ix-store (the frozen 180-day pull)
-        if: ${{ !inputs.force_cold_pull }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if git ls-remote --exit-code --heads origin "$STORE_BRANCH" >/dev/null 2>&1; then
-            git fetch --depth 1 origin "$STORE_BRANCH"
-            git worktree add --detach store FETCH_HEAD
-            echo "restored $(python3 -c "import json;print(len(json.load(open('store/manifest.json'))['points']))" 2>/dev/null || echo 0) frozen points"
-          else
-            echo "no ix-store branch yet — this run seeds it with a cold pull"
-            mkdir -p store
-          fi
-      - name: Cold pull (forced) — start from an empty store
-        if: ${{ inputs.force_cold_pull }}
-        run: rm -rf store && mkdir -p store
+      # The ONLY thing cached across runs: the agentic artifact-download zips, keyed by artifact id
+      # on disk (GitHubArtifacts.download). Ephemeral and NOT committed -- a cold cache just means a
+      # slower night, never wrong data. Single-turn needs no artifact (its log is the live API's
+      # /server-log), so this holds only the agentic working set, well under the 10 GB cache limit.
+      - name: Restore the artifact-download cache
+        if: ${{ !inputs.ignore_cache }}
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/artifacts
+          key: ix-artifacts-${{ github.run_id }}
+          restore-keys: |
+            ix-artifacts-
 
       # Build blis + signedprobe FROM SOURCE at the resolved tag, and the blisdefaults helper against
       # that release's own kernel/schemas (so a per-release score is sound; #15's seed rule).
@@ -97,7 +92,6 @@ jobs:
           SIM="$RUNNER_TEMP/sim"
           git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$SIM"
           ( cd "$SIM" && GOFLAGS=-mod=mod go build -o blis main.go && GOFLAGS=-mod=mod go build -o signedprobe ./cmd/signedprobe )
-          # catalog + registry ride the BLIS tag (installation.md), derived never diffed.
           eval "$(bash orchestrator/resolve_versions.sh "$SIM")"
           git clone -q --depth 1 --branch "$catalog"  https://github.com/inference-sim/blis-catalog.git  "$RUNNER_TEMP/catalog"
           git clone -q --depth 1 --branch "$registry" https://github.com/inference-sim/blis-registry.git "$RUNNER_TEMP/registry"
@@ -107,22 +101,22 @@ jobs:
           echo "REGISTRY=$RUNNER_TEMP/registry" >> "$GITHUB_ENV"
           echo "DEFAULTS_HELPER=$RUNNER_TEMP/blisdefaults" >> "$GITHUB_ENV"
 
-      # Fetch the pinned AgentX corpus once, by a resolved HF revision (not a floating ref), so the
-      # sha256 the pull records in provenance is reproducible and the extractor's corpus_changed
-      # guard is meaningful (#28 B6). The corpus is one public HF dataset file; score reads it as a
-      # path and refuses a later download whose sha differs.
+      # Fetch the pinned AgentX corpus once, by a RESOLVED HF revision (not a floating ref), so the
+      # sha256 recorded in provenance is reproducible and the corpus_changed guard is meaningful.
       - name: Resolve the AgentX corpus (pinned HF revision + sha256)
         run: |
           set -euo pipefail
           repo="semianalysisai/cc-traces-weka-062126"
-          file="semianalysis_cc_traces_weka_062126.jsonl"
-          # Resolve the branch's current commit so the pull pins a revision, never a moving ref.
+          file="traces.jsonl"
           rev=$(curl -fsSL "https://huggingface.co/api/datasets/${repo}/revision/main" | python3 -c "import sys,json;print(json.load(sys.stdin)['sha'])")
           curl -fsSL "https://huggingface.co/datasets/${repo}/resolve/${rev}/${file}" -o "$RUNNER_TEMP/corpus.json"
           echo "CORPUS_REVISION=${rev}" >> "$GITHUB_ENV"
           echo "fetched corpus ${repo}@${rev} ($(wc -c < "$RUNNER_TEMP/corpus.json") bytes)"
 
-      # Pull the window into the store, decide, score (cached), and publish into ./data.
+      # One night: list the window, fetch+score the delta (or whole window on a BLIS release), merge
+      # into the published summary, and write data/ + state. The work dir is ephemeral ($RUNNER_TEMP),
+      # discarded with the runner -- nothing raw is persisted. state/last-run-api.json carries the
+      # window's point-id set, which is how the NEXT night detects the triggers (no raw store needed).
       - name: Run the night
         env:
           BLIS_TAG: ${{ needs.resolve.outputs.blis_tag }}
@@ -130,12 +124,12 @@ jobs:
         run: |
           set -euo pipefail
           # data/ is the checkout's own main tree, so the dump snapshots and any prior API snapshots
-          # are already present; cli.py nightly adds/prunes only API snapshots and never touches a
-          # dump one (update_index.py keeps dump snapshots forever).
+          # (incl. the live view the merge reads) are present; cli.py nightly adds/prunes only API
+          # snapshots and never touches a dump one.
           mkdir -p data state
           python3 orchestrator/ingest/cli.py nightly \
             --blis-tag "$BLIS_TAG" \
-            --store-dir store --data-dir data --state state/last-run-api.json \
+            --work-dir "$RUNNER_TEMP/pull" --data-dir data --state state/last-run-api.json \
             --window-days "$WINDOW_DAYS" --keep-api "$KEEP_API" \
             --today "$(date -u +%F)" \
             --cache "$RUNNER_TEMP/artifacts" \
@@ -145,15 +139,12 @@ jobs:
             --defaults-helper "$DEFAULTS_HELPER" \
             --corpus "$RUNNER_TEMP/corpus.json" --corpus-revision "$CORPUS_REVISION"
 
-      - name: Package the store and the published data for the publish job
-        run: |
-          tar -czf store.tgz -C store . 2>/dev/null || tar -czf store.tgz --files-from /dev/null
-          tar -czf data.tgz -C data . 2>/dev/null || tar -czf data.tgz --files-from /dev/null
+      - name: Package the published data for the publish job
+        run: tar -czf data.tgz -C data . 2>/dev/null || tar -czf data.tgz --files-from /dev/null
       - uses: actions/upload-artifact@v4
         with:
           name: night
           path: |
-            store.tgz
             data.tgz
             state/last-run-api.json
           if-no-files-found: warn
@@ -164,7 +155,7 @@ jobs:
     if: ${{ needs.run-night.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write # commit data/ to main and the store to ix-store
+      contents: write # commit data/ to main
       actions: write # dispatch the Pages deploy (the [skip ci] commit can't)
     steps:
       - uses: actions/checkout@v4
@@ -174,10 +165,17 @@ jobs:
           path: incoming
       - name: Unpack
         run: |
-          mkdir -p newdata newstore
+          mkdir -p newdata
           tar -xzf incoming/data.tgz -C newdata 2>/dev/null || true
-          tar -xzf incoming/store.tgz -C newstore 2>/dev/null || true
 
+      # KNOWN CEILING (accepted, documented): committing data/ to main grows main's GIT HISTORY,
+      # which neither the 180-day window nor the last-5 retention bounds -- those cap the summary's
+      # CONTENT and the working-tree snapshot COUNT, not the accumulation of nightly blobs. An
+      # IX-only night rewrites latest/summary.json (~6.5 MB) and commits it; git stores a whole new
+      # blob each time, so main's .git grows ~6.5 MB per active night, ~2 GB/year, while the
+      # checked-out tree stays ~35 MB. Tolerable for years (GitHub's soft guidance is <5 GB); when
+      # main approaches that, migrate data/ onto its own squashed branch that Pages deploys from (the
+      # cleaner long-term design) -- out of scope here. See PR notes.
       - name: Publish data/ to main (index + latest + API snapshots; dump snapshots untouched)
         id: pub
         run: |
@@ -198,27 +196,6 @@ jobs:
             echo "nothing to commit (index unchanged)"
             echo "pushed=false" >> "$GITHUB_OUTPUT"
           fi
-
-      # The ix-store branch is rewritten from scratch each night: a single orphan commit holding
-      # only the current window, so it carries no history and an aged-out log is really gone (#15).
-      - name: Rewrite the ix-store branch (single commit, current window only)
-        if: ${{ hashFiles('newstore/manifest.json') != '' }}
-        run: |
-          set -euo pipefail
-          work="$RUNNER_TEMP/store-wt"
-          rm -rf "$work"; mkdir -p "$work"
-          cp -r newstore/. "$work/"
-          cd "$work"
-          git init -q -b "$STORE_BRANCH"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Never ship the local artifact cache on the branch — it's a CI scratch dir, not the store.
-          rm -rf _artifacts
-          git add -A
-          git commit -q -m "ix-store: ${{ needs.resolve.outputs.blis_tag }} $(date -u +%F) window"
-          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
-          # Force-push: the branch is a snapshot, not a history. This is the ONLY writer.
-          git push -f origin "$STORE_BRANCH"
 
       - name: Deploy the published data to Pages
         if: ${{ steps.pub.outputs.pushed == 'true' }}
