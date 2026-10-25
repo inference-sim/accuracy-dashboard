@@ -245,38 +245,58 @@ def _worker_score(entry: dict) -> Outcome:
     return _score_one(entry, _W["pull_dir"], _W["work"], _W["env"])
 
 
+def _is_agentic(entry: dict) -> bool:
+    return entry["row"].get("benchmark_type") == "agentic_traces"
+
+
 def score_points(points: list, pull_dir: Path, work: Path, env: Env, *, workers: int = 1,
-                 log=lambda m: None) -> list:
-    """Score every point, serially (workers<=1) or across a process pool. The result is collected
-    in input order regardless of completion order, and write_contract re-sorts by point_id, so the
-    contract is identical whatever the worker count -- parallelism is a speed knob, never a
-    correctness or determinism lever. BLIS replays are CPU-bound subprocesses, so `workers` should
-    not exceed the machine's cores (the CLI clamps it)."""
+                 agentic_workers: int = 1, log=lambda m: None) -> list:
+    """Score every point. The result is collected in input order regardless of completion order,
+    and write_contract re-sorts by point_id, so the contract is identical whatever the worker
+    count -- concurrency is a speed knob, never a correctness or determinism lever.
+
+    Split by benchmark type, because the two kinds have opposite resource profiles:
+      * single-turn (signedprobe, no corpus): light RAM, safe to run `workers`-wide.
+      * agentic (blis replay + the 1.8GB corpus): each replay holds the parsed corpus in RAM, so
+        two at once OOM a 16GB runner -- capped at `agentic_workers` (default 1, serial).
+    So the light majority runs parallel while the heavy minority serializes, which keeps a
+    BLIS-release night (full-window rescore) inside the runner's memory without serializing the
+    whole window. On a big box pass agentic_workers > 1 if the RAM is there."""
+    agentic = [(i, e) for i, e in enumerate(points) if _is_agentic(e)]
+    single = [(i, e) for i, e in enumerate(points) if not _is_agentic(e)]
     n = len(points)
-    if workers <= 1:
-        out = []
-        for i, e in enumerate(points, 1):
-            o = _score_one(e, pull_dir, work, env)
-            out.append(o)
-            log(f"  [{i}/{n}] {e['row']['model']} {e['row']['hardware']} c{e['row']['conc']} "
-                f"{e['point_id'][:12]} -> {o.fidelity['status'] if o.fidelity else o.reasons}")
-        return out
-    from concurrent.futures import ProcessPoolExecutor
     results: dict = {}
+    done = [0]
+
+    def record(idx, o):
+        results[idx] = o
+        done[0] += 1
+        e = points[idx]
+        log(f"  [{done[0]}/{n}] {e['row']['model']} {e['row']['hardware']} c{e['row']['conc']} "
+            f"{e['point_id'][:12]} -> {o.fidelity['status'] if o.fidelity else o.reasons}")
+
+    if single:
+        log(f"score: {len(single)} single-turn on {max(workers, 1)} worker(s)")
+        _run_pool(single, pull_dir, work, env, max(workers, 1), record)
+    if agentic:
+        log(f"score: {len(agentic)} agentic on {max(agentic_workers, 1)} worker(s) (corpus-heavy)")
+        _run_pool(agentic, pull_dir, work, env, max(agentic_workers, 1), record)
+    return [results[i] for i in range(n)]   # input order; write_contract re-sorts anyway
+
+
+def _run_pool(indexed: list, pull_dir: Path, work: Path, env: Env, workers: int, record) -> None:
+    """Score a list of (index, entry) at the given concurrency, calling record(index, outcome) as
+    each finishes. workers<=1 runs in-process (no pool), else a ProcessPoolExecutor."""
+    if workers <= 1:
+        for idx, e in indexed:
+            record(idx, _score_one(e, pull_dir, work, env))
+        return
+    from concurrent.futures import ProcessPoolExecutor, as_completed
     with ProcessPoolExecutor(max_workers=workers, initializer=_worker_init,
                              initargs=(str(pull_dir), env, str(work))) as ex:
-        futs = {ex.submit(_worker_score, e): idx for idx, e in enumerate(points)}
-        done = 0
-        from concurrent.futures import as_completed
+        futs = {ex.submit(_worker_score, e): idx for idx, e in indexed}
         for fut in as_completed(futs):
-            idx = futs[fut]
-            o = fut.result()
-            results[idx] = o
-            done += 1
-            e = points[idx]
-            log(f"  [{done}/{n}] {e['row']['model']} {e['row']['hardware']} c{e['row']['conc']} "
-                f"{e['point_id'][:12]} -> {o.fidelity['status'] if o.fidelity else o.reasons}")
-    return [results[i] for i in range(n)]   # input order; write_contract re-sorts anyway
+            record(futs[fut], fut.result())
 
 
 def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:

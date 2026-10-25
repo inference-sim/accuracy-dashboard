@@ -272,8 +272,11 @@ def cmd_score(a) -> int:
     # identical whatever the worker count; parallelism is only a speed knob.
     import os
     workers = a.workers if a.workers and a.workers > 0 else min(os.cpu_count() or 1, 4)
-    _log(f"score: {len(points)} points on {workers} worker(s)")
-    outcomes = sc.score_points(points, pull_dir, work, env, workers=workers, log=_log)
+    # Agentic replays hold the 1.8GB corpus in RAM, so they serialize (default 1) even while
+    # single-turn runs `workers`-wide; override only on a box with the RAM for concurrent corpora.
+    agentic_workers = a.agentic_workers if getattr(a, "agentic_workers", 0) else 1
+    outcomes = sc.score_points(points, pull_dir, work, env, workers=workers,
+                               agentic_workers=agentic_workers, log=_log)
     prov = {"ingest": "api",
             "blis": {"release": env.blis_release, "commit_sha": env.blis_commit, "catalog": env.catalog_release,
                      "registry": env.registry_release, "extractor_version": f"blis-latency-kernel@{env.kernel}"},
@@ -332,7 +335,7 @@ def cmd_nightly(a) -> int:
             registry=a.registry, defaults_helper=a.defaults_helper, corpus=a.corpus,
             corpus_sha256=a.corpus_sha256, corpus_dataset=a.corpus_dataset,
             corpus_revision=a.corpus_revision, corpus_cache=a.corpus_cache, work=a.score_work,
-            timeout=a.timeout, only=None, workers=a.workers))
+            timeout=a.timeout, only=None, workers=a.workers, agentic_workers=a.agentic_workers))
         if rc != 0:
             raise RuntimeError(f"score failed (rc={rc})")
         prov = json.loads((contract_dir / contract.PROVENANCE_JSON).read_text())
@@ -387,7 +390,9 @@ def main(argv=None) -> int:
     s.add_argument("--timeout", type=int, default=7200)
     s.add_argument("--only", nargs="*")
     s.add_argument("--workers", type=int, default=0,
-                   help="score this many points in parallel (default: min(cores, 4); CPU-bound, don't exceed cores)")
+                   help="single-turn scoring parallelism (default: min(cores, 4))")
+    s.add_argument("--agentic-workers", type=int, default=0,
+                   help="agentic scoring parallelism (default 1: each replay holds the 1.8GB corpus; raise only with RAM)")
 
     n = sub.add_parser("nightly", help="one night: list window -> fetch+score delta -> merge -> publish")
     n.add_argument("--blis-tag", required=True, help="the stable inference-sim tag resolve_blis.sh resolved")
@@ -411,7 +416,8 @@ def main(argv=None) -> int:
     n.add_argument("--corpus-revision", required=True)
     n.add_argument("--corpus-cache")
     n.add_argument("--timeout", type=int, default=7200)
-    n.add_argument("--workers", type=int, default=0, help="parallel scoring workers (default: min(cores, 4))")
+    n.add_argument("--workers", type=int, default=0, help="single-turn scoring parallelism (default: min(cores, 4))")
+    n.add_argument("--agentic-workers", type=int, default=0, help="agentic scoring parallelism (default 1, corpus-heavy)")
     n.add_argument("--download-workers", type=int, default=0, help="parallel artifact-download workers (default: min(2*cores, 8))")
 
     a = ap.parse_args(argv)

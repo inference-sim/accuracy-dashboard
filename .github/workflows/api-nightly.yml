@@ -153,19 +153,20 @@ jobs:
           TODAY="$(date -u +%F)"
           [ "$PROVING" = "true" ] && echo "PROVING run: full $WINDOW_DAYS-day window ending $TODAY (publish skipped)"
           # OOM fix (diagnosed from the mem/disk log: avail RAM sawtoothed to ~43MB then SIGTERM;
-          # disk flat at ~80GB -> memory). Each AGENTIC blis replay holds the parsed 1.8GB corpus +
-          # graph in RAM; two concurrent don't fit the 16GB runner (--corpus-cache only skips the
-          # re-parse, it doesn't shrink resident RAM; confirmed it still OOM'd at 2 workers). Free
-          # GitHub runners are fixed at 16GB (larger runners need a paid plan), so the fix is to
-          # serialize scoring: --workers 1 never holds two corpora at once. Scale-independent --
-          # robust to any delta size and a full-window rescore, bounded by the job timeout, not
-          # tuned to one run's point count. --corpus-cache stays for parse-speed (output identical).
+          # disk flat at ~80GB -> memory). Only AGENTIC blis replays are heavy -- each holds the
+          # parsed 1.8GB corpus + graph in RAM, and two concurrent don't fit the 16GB runner
+          # (--corpus-cache skips the re-parse but not resident RAM; it still OOM'd at 2 workers).
+          # Free runners are fixed at 16GB, so scoring is split by type: single-turn (signedprobe,
+          # no corpus -- light) runs --workers-wide, agentic runs --agentic-workers=1 (serial).
+          # Scale-independent: a full-window BLIS rescore keeps the light 83% parallel while the
+          # heavy 16% serializes, never holding two corpora at once. --corpus-cache stays for
+          # agentic parse-speed (blis: output identical with or without it).
           python3 orchestrator/ingest/cli.py nightly \
             --blis-tag "$BLIS_TAG" \
             --work-dir "$RUNNER_TEMP/pull" --data-dir data --state state/last-run-api.json \
             --window-days "$WINDOW_DAYS" --keep-api "$KEEP_API" \
             --today "$TODAY" \
-            --workers 1 --download-workers 8 \
+            --workers 4 --agentic-workers 1 --download-workers 8 \
             --cache "$RUNNER_TEMP/artifacts" --corpus-cache "$RUNNER_TEMP/corpus-cache" \
             --work "$RUNNER_TEMP/contract" --score-work "$RUNNER_TEMP/scorework" \
             --evaluator-commit "$GITHUB_SHA" \

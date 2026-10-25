@@ -74,6 +74,7 @@ jobs:
             orchestrator/ingest/test_nightly_run.py \
             orchestrator/ingest/test_cli_nightly.py \
             orchestrator/ingest/test_parallel.py \
+            orchestrator/ingest/test_score_pool.py \
             orchestrator/test_update_index.py
 
   blisdefaults:
