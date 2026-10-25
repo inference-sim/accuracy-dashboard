@@ -53,3 +53,22 @@ def test_all_agentic_window_still_scores_everything(tmp_path, monkeypatch):
 def test_is_agentic_classifies_by_benchmark_type():
     assert sc._is_agentic(_pt("x", True))
     assert not sc._is_agentic(_pt("y", False))
+
+
+# ---------------------------------------------------------------- run_capped (per-replay RSS cap)
+
+def test_run_capped_kills_a_process_over_the_rss_ceiling():
+    import pytest
+    prog = "a=[]\nimport time\nfor i in range(60): a.append(bytearray(10*1024*1024)); time.sleep(0.05)\ntime.sleep(5)"
+    with pytest.raises(sc.MemoryExceeded):
+        sc.run_capped(["python3", "-c", prog], timeout=30, max_rss_mb=100, poll_s=0.3)
+
+
+def test_run_capped_lets_a_small_process_finish():
+    r = sc.run_capped(["python3", "-c", "print('ok')"], timeout=30, max_rss_mb=4000, poll_s=0.3)
+    assert r.returncode == 0 and r.stdout.strip() == "ok"
+
+
+def test_run_capped_zero_is_a_plain_run():
+    r = sc.run_capped(["python3", "-c", "print('nocap')"], timeout=30, max_rss_mb=0)
+    assert r.returncode == 0 and r.stdout.strip() == "nocap"

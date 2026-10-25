@@ -152,21 +152,22 @@ jobs:
           # merges the delta into the committed seed, so the newest days appear.
           TODAY="$(date -u +%F)"
           [ "$PROVING" = "true" ] && echo "PROVING run: full $WINDOW_DAYS-day window ending $TODAY (publish skipped)"
-          # OOM fix (diagnosed from the mem/disk log: avail RAM sawtoothed to ~43MB then SIGTERM;
-          # disk flat at ~80GB -> memory). Only AGENTIC blis replays are heavy -- each holds the
-          # parsed 1.8GB corpus + graph in RAM, and two concurrent don't fit the 16GB runner
-          # (--corpus-cache skips the re-parse but not resident RAM; it still OOM'd at 2 workers).
-          # Free runners are fixed at 16GB, so scoring is split by type: single-turn (signedprobe,
-          # no corpus -- light) runs --workers-wide, agentic runs --agentic-workers=1 (serial).
-          # Scale-independent: a full-window BLIS rescore keeps the light 83% parallel while the
-          # heavy 16% serializes, never holding two corpora at once. --corpus-cache stays for
-          # agentic parse-speed (blis: output identical with or without it).
+          # OOM fix (diagnosed by local profiling): a single agentic blis replay's peak RSS is
+          # trace-content-driven and unpredictable -- a c64 point used 11.5GB where a c128 used
+          # 6.9GB, up to ~14.6GB -- so NO pre-filter (concurrency/model/hw) reliably fits 16GB, and
+          # reducing concurrency or the window doesn't help (it's one replay's footprint, not
+          # accumulation). The reliable bound is reactive: --max-rss-mb caps each replay's resident
+          # memory; one that exceeds ~13GB is killed alone and recorded not_scored:insufficient_memory
+          # (counted, visible, no fidelity change -- a larger-RAM run can score it later), while the
+          # job survives and scores the rest. Scoring is also split by type: single-turn (light,
+          # no corpus) runs --workers-wide, agentic runs --agentic-workers=1. --corpus-cache stays
+          # for agentic parse-speed (blis: output identical with or without it).
           python3 orchestrator/ingest/cli.py nightly \
             --blis-tag "$BLIS_TAG" \
             --work-dir "$RUNNER_TEMP/pull" --data-dir data --state state/last-run-api.json \
             --window-days "$WINDOW_DAYS" --keep-api "$KEEP_API" \
             --today "$TODAY" \
-            --workers 4 --agentic-workers 1 --download-workers 8 \
+            --workers 4 --agentic-workers 1 --download-workers 8 --max-rss-mb 13000 \
             --cache "$RUNNER_TEMP/artifacts" --corpus-cache "$RUNNER_TEMP/corpus-cache" \
             --work "$RUNNER_TEMP/contract" --score-work "$RUNNER_TEMP/scorework" \
             --evaluator-commit "$GITHUB_SHA" \

@@ -255,7 +255,8 @@ def cmd_score(a) -> int:
         corpus_cache=Path(a.corpus_cache) if a.corpus_cache else None,
         vllm_ref=manifest["vllm_ref"], policy=policy, policy_sha256=policy_sha,
         base_models=manifest.get("base_models") or {}, timeout_s=a.timeout,
-        vllm_defaults=vdefaults, vllm_defaults_sha256=vdefaults_sha)
+        vllm_defaults=vdefaults, vllm_defaults_sha256=vdefaults_sha,
+        max_rss_mb=getattr(a, "max_rss_mb", 0) or 0)
     env.signedprobe = str(sim / "signedprobe")
     wl = json.loads((sim / "testdata" / "inferencex-workloads" / "seed0.json").read_text())
     env.single_turn_workloads = {(p["isl"], p["osl"], p["concurrency"]) for p in wl["points"]}
@@ -335,7 +336,8 @@ def cmd_nightly(a) -> int:
             registry=a.registry, defaults_helper=a.defaults_helper, corpus=a.corpus,
             corpus_sha256=a.corpus_sha256, corpus_dataset=a.corpus_dataset,
             corpus_revision=a.corpus_revision, corpus_cache=a.corpus_cache, work=a.score_work,
-            timeout=a.timeout, only=None, workers=a.workers, agentic_workers=a.agentic_workers))
+            timeout=a.timeout, only=None, workers=a.workers, agentic_workers=a.agentic_workers,
+            max_rss_mb=a.max_rss_mb))
         if rc != 0:
             raise RuntimeError(f"score failed (rc={rc})")
         prov = json.loads((contract_dir / contract.PROVENANCE_JSON).read_text())
@@ -393,6 +395,8 @@ def main(argv=None) -> int:
                    help="single-turn scoring parallelism (default: min(cores, 4))")
     s.add_argument("--agentic-workers", type=int, default=0,
                    help="agentic scoring parallelism (default 1: each replay holds the 1.8GB corpus; raise only with RAM)")
+    s.add_argument("--max-rss-mb", type=int, default=0,
+                   help="per-replay resident-memory ceiling MB (0=none); over-limit agentic replays -> not_scored:insufficient_memory")
 
     n = sub.add_parser("nightly", help="one night: list window -> fetch+score delta -> merge -> publish")
     n.add_argument("--blis-tag", required=True, help="the stable inference-sim tag resolve_blis.sh resolved")
@@ -419,6 +423,7 @@ def main(argv=None) -> int:
     n.add_argument("--workers", type=int, default=0, help="single-turn scoring parallelism (default: min(cores, 4))")
     n.add_argument("--agentic-workers", type=int, default=0, help="agentic scoring parallelism (default 1, corpus-heavy)")
     n.add_argument("--download-workers", type=int, default=0, help="parallel artifact-download workers (default: min(2*cores, 8))")
+    n.add_argument("--max-rss-mb", type=int, default=0, help="per-replay RSS ceiling MB (0=none); over-limit agentic -> not_scored:insufficient_memory")
 
     a = ap.parse_args(argv)
     return {"pull": cmd_pull, "score": cmd_score, "nightly": cmd_nightly}[a.cmd](a)

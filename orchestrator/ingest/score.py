@@ -72,6 +72,12 @@ class Env:
     # (isl, osl, concurrency)).
     signedprobe: str = ""
     single_turn_workloads: set = field(default_factory=set)   # {(isl, osl, conc)}
+    # A per-replay resident-memory ceiling in MB (0 = none). An agentic replay whose RSS exceeds
+    # it is killed individually and the point is not-scored with an insufficient_memory reason, so
+    # one memory-heavy trace can't OOM the whole CI job. Peak RAM is trace-content-driven and
+    # unpredictable per point (profiled: a c64 point used 11.5GB where a c128 used 6.9GB), so a
+    # reactive RSS cap is the only reliable bound on a fixed-RAM runner; 0 locally scores everything.
+    max_rss_mb: int = 0
 
 
 def _read(point_dir: Path, files: dict, role: str) -> bytes | None:
@@ -113,6 +119,89 @@ def _blis_refusal(stderr: str, work: Path) -> str:
     text = re.sub(r"\bp-[0-9a-f]{16}\b", "<scenario>", text)
     slug = re.sub(r"[^A-Za-z0-9_.:=-]+", "_", text)[:80].strip("_")
     return f"blis_refused:{slug}" if slug else "blis_refused"
+
+
+class MemoryExceeded(Exception):
+    """A capped subprocess's RSS exceeded the ceiling and it was killed."""
+
+
+def _rss_mb(pid: int) -> float:
+    """Resident memory (MB) of a process and its children. Go reserves huge VIRTUAL address space,
+    so only RSS is meaningful -- an RLIMIT_AS cap would kill blis on startup. Reads /proc on Linux
+    (the CI runner); falls back to `ps` elsewhere (local macOS). Best-effort: returns 0 if unknown."""
+    import os
+    total = 0.0
+    try:
+        # Linux: sum this pid + descendants from /proc/*/statm (field 2 = resident pages).
+        pagesize = os.sysconf("SC_PAGE_SIZE")
+        pids = _proc_tree(pid)
+        for p in pids:
+            try:
+                with open(f"/proc/{p}/statm") as fh:
+                    total += int(fh.read().split()[1]) * pagesize
+            except (OSError, ValueError, IndexError):
+                pass
+        if total:
+            return total / 1024 / 1024
+    except (OSError, ValueError, AttributeError):
+        pass
+    # Fallback (macOS/local): ps rss is in KB, for the single pid.
+    try:
+        out = subprocess.run(["ps", "-o", "rss=", "-p", str(pid)], capture_output=True, text=True, timeout=5)
+        return int(out.stdout.strip() or 0) / 1024
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return 0.0
+
+
+def _proc_tree(root: int) -> list:
+    """`root` and all its descendant pids (Linux /proc). Just [root] if the tree can't be read."""
+    import os
+    children: dict = {}
+    try:
+        for p in os.listdir("/proc"):
+            if not p.isdigit():
+                continue
+            try:
+                with open(f"/proc/{p}/stat") as fh:
+                    ppid = int(fh.read().split()[3])
+                children.setdefault(ppid, []).append(int(p))
+            except (OSError, ValueError, IndexError):
+                pass
+    except OSError:
+        return [root]
+    out, stack = [], [root]
+    while stack:
+        cur = stack.pop()
+        out.append(cur)
+        stack.extend(children.get(cur, []))
+    return out
+
+
+def run_capped(argv, *, timeout, max_rss_mb=0, poll_s=2):
+    """subprocess.run(capture_output, text) with an optional RSS ceiling. If max_rss_mb > 0 and the
+    process tree's resident memory exceeds it, the process is killed and MemoryExceeded is raised --
+    so one memory-heavy replay is killed alone, never taking down the whole job. With max_rss_mb==0
+    this is a plain subprocess.run (local / big-runner scores everything)."""
+    if not max_rss_mb:
+        return subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+    import time
+    proc = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    start = 0.0
+    while True:
+        try:
+            out, err = proc.communicate(timeout=poll_s)
+            return subprocess.CompletedProcess(argv, proc.returncode, out, err)
+        except subprocess.TimeoutExpired:
+            pass
+        if _rss_mb(proc.pid) > max_rss_mb:
+            proc.kill()
+            proc.communicate()
+            raise MemoryExceeded(f"replay RSS exceeded {max_rss_mb} MB")
+        start += poll_s
+        if start >= timeout:
+            proc.kill()
+            proc.communicate()
+            raise subprocess.TimeoutExpired(argv, timeout)
 
 
 def resolved_kv(log: str, metrics: dict | None) -> list[dict]:
@@ -446,9 +535,16 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         metrics_path.unlink()
     if not metrics_path.exists():
         try:
-            proc = subprocess.run(argv, capture_output=True, text=True, timeout=env.timeout_s)
+            proc = run_capped(argv, timeout=env.timeout_s, max_rss_mb=env.max_rss_mb)
         except subprocess.TimeoutExpired:
             o.reasons = ["blis_refused:timeout"]
+            return o
+        except MemoryExceeded:
+            # This agentic replay's resident memory exceeded the runner's ceiling; it's killed
+            # alone and the point is not scored, so one heavy trace can't OOM the whole job. The
+            # score is unchanged for every other point -- this is a runner-capacity limit, not a
+            # fidelity choice, so a larger-RAM run can score it later.
+            o.reasons = ["blis_refused:insufficient_memory"]
             return o
         (work / "logs").mkdir(exist_ok=True)
         (work / "logs" / f"{pid}.err").write_text(proc.stderr[-20000:])

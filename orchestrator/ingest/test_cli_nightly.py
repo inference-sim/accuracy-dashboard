@@ -26,7 +26,7 @@ def _args(tmp, **over):
              blis_dir=str(tmp / "sim"), catalog=str(tmp / "cat"), registry=str(tmp / "reg"),
              defaults_helper=str(tmp / "helper"), corpus=str(tmp / "corpus.json"),
              corpus_sha256=None, corpus_dataset="d", corpus_revision="main", corpus_cache=None,
-             timeout=7200, workers=1, download_workers=1, agentic_workers=1)
+             timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0)
     a.update(over)
     return types.SimpleNamespace(**a)
 
