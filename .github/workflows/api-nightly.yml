@@ -142,15 +142,12 @@ jobs:
           # (incl. the live view the merge reads) are present; cli.py nightly adds/prunes only API
           # snapshots and never touches a dump one.
           mkdir -p data state
-          # Always the full 180-day cumulative window (never shrink it -- that would prune the
-          # store). A proving run pins `today` to the seed's date for a reproducible, delta-free
-          # incremental night; a scheduled run uses the real UTC date.
-          if [ "$PROVING" = "true" ]; then
-            TODAY="2026-10-23"
-            echo "PROVING run: full $WINDOW_DAYS-day window ending $TODAY, incremental vs the seed (publish skipped)"
-          else
-            TODAY="$(date -u +%F)"
-          fi
+          # Always the full 180-day cumulative window ending the real UTC date -- never shrink it
+          # (that would prune the store). A proving run is a REAL nightly in every respect except it
+          # skips publish (push-event guard on the publish job); it pulls today's live data and
+          # merges the delta into the committed seed, so the newest days appear.
+          TODAY="$(date -u +%F)"
+          [ "$PROVING" = "true" ] && echo "PROVING run: full $WINDOW_DAYS-day window ending $TODAY (publish skipped)"
           python3 orchestrator/ingest/cli.py nightly \
             --blis-tag "$BLIS_TAG" \
             --work-dir "$RUNNER_TEMP/pull" --data-dir data --state state/last-run-api.json \
