@@ -148,11 +148,16 @@ jobs:
           # merges the delta into the committed seed, so the newest days appear.
           TODAY="$(date -u +%F)"
           [ "$PROVING" = "true" ] && echo "PROVING run: full $WINDOW_DAYS-day window ending $TODAY (publish skipped)"
+          # --workers 2: scoring is MEMORY-bound, not just CPU-bound. Each blis replay loads the
+          # catalog/registry/graph into RAM (several GB); 4 concurrent on a 16 GB ubuntu-latest
+          # runner OOM-killed the process (exit 143) mid-score. 2 fits the runner with headroom.
+          # The CPU default (min(cores,4)) is right on a bigger box; CI pins the memory-safe value.
           python3 orchestrator/ingest/cli.py nightly \
             --blis-tag "$BLIS_TAG" \
             --work-dir "$RUNNER_TEMP/pull" --data-dir data --state state/last-run-api.json \
             --window-days "$WINDOW_DAYS" --keep-api "$KEEP_API" \
             --today "$TODAY" \
+            --workers 2 --download-workers 8 \
             --cache "$RUNNER_TEMP/artifacts" \
             --work "$RUNNER_TEMP/contract" --score-work "$RUNNER_TEMP/scorework" \
             --evaluator-commit "$GITHUB_SHA" \
