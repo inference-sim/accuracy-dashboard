@@ -152,21 +152,20 @@ jobs:
           # merges the delta into the committed seed, so the newest days appear.
           TODAY="$(date -u +%F)"
           [ "$PROVING" = "true" ] && echo "PROVING run: full $WINDOW_DAYS-day window ending $TODAY (publish skipped)"
-          # OOM fix (diagnosed from the mem/disk log: avail RAM sawtoothed to ~177MB then SIGTERM;
-          # disk was flat -- so it's memory, during concurrent AGENTIC blis replays). Each agentic
-          # replay parses the 1.8GB corpus JSONL; concurrent parses spike RAM past the 16GB runner.
-          # Two levers, both scale-independent (robust to any delta size and to a full-window
-          # rescore, not tuned to one run's point count):
-          #   --corpus-cache: parse the corpus ONCE into a cached snapshot (keyed by sha256), so
-          #     every later replay skips the parse -- the big transient allocation is amortized,
-          #     not paid per replay. (blis docs: "output is identical with or without it".)
-          #   --workers 2: a headroom cap so the first (uncached) parses don't overlap 4-wide.
+          # OOM fix (diagnosed from the mem/disk log: avail RAM sawtoothed to ~43MB then SIGTERM;
+          # disk flat at ~80GB -> memory). Each AGENTIC blis replay holds the parsed 1.8GB corpus +
+          # graph in RAM; two concurrent don't fit the 16GB runner (--corpus-cache only skips the
+          # re-parse, it doesn't shrink resident RAM; confirmed it still OOM'd at 2 workers). Free
+          # GitHub runners are fixed at 16GB (larger runners need a paid plan), so the fix is to
+          # serialize scoring: --workers 1 never holds two corpora at once. Scale-independent --
+          # robust to any delta size and a full-window rescore, bounded by the job timeout, not
+          # tuned to one run's point count. --corpus-cache stays for parse-speed (output identical).
           python3 orchestrator/ingest/cli.py nightly \
             --blis-tag "$BLIS_TAG" \
             --work-dir "$RUNNER_TEMP/pull" --data-dir data --state state/last-run-api.json \
             --window-days "$WINDOW_DAYS" --keep-api "$KEEP_API" \
             --today "$TODAY" \
-            --workers 2 --download-workers 8 \
+            --workers 1 --download-workers 8 \
             --cache "$RUNNER_TEMP/artifacts" --corpus-cache "$RUNNER_TEMP/corpus-cache" \
             --work "$RUNNER_TEMP/contract" --score-work "$RUNNER_TEMP/scorework" \
             --evaluator-commit "$GITHUB_SHA" \
