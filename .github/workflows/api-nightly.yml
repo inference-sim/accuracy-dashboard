@@ -24,6 +24,13 @@ on:
         description: "Ignore the artifact-download cache and re-download everything"
         type: boolean
         default: false
+  # TEMPORARY, revert before merge: a proving run on the feature branch. workflow_dispatch can't
+  # reach a workflow not yet on the default branch (HTTP 404), so this push trigger is the only way
+  # to exercise the real workflow pre-merge. A proving run uses a 1-day window and SKIPS publish
+  # entirely (no commit to main, no Pages deploy) -- the scored data is the uploaded `night`
+  # artifact only. See the PROVING env + the publish job's event-name guard below.
+  push:
+    branches: [ingest/api-nightly-pipeline]
 
 # Least privilege: read-only by default. Only `publish` gets contents: write.
 permissions:
@@ -36,6 +43,11 @@ concurrency:
 env:
   WINDOW_DAYS: "180"
   KEEP_API: "5"
+  # A proving run (the temporary push trigger) scores a bounded, known-non-empty recent slice so it
+  # finishes fast, and never publishes. A real nightly (schedule/dispatch) uses the full window.
+  PROVING: ${{ github.event_name == 'push' }}
+  PROVING_TODAY: "2026-10-23"   # the slice documented in #28/#33 (non-empty near the data's end)
+  PROVING_WINDOW_DAYS: "1"
 
 jobs:
   # ----------------------------------------------------------------- 1. resolve BLIS (hosted-safe)
@@ -127,11 +139,17 @@ jobs:
           # (incl. the live view the merge reads) are present; cli.py nightly adds/prunes only API
           # snapshots and never touches a dump one.
           mkdir -p data state
+          if [ "$PROVING" = "true" ]; then
+            TODAY="$PROVING_TODAY"; WINDOW="$PROVING_WINDOW_DAYS"
+            echo "PROVING run: window $WINDOW day(s) ending $TODAY (publish is skipped)"
+          else
+            TODAY="$(date -u +%F)"; WINDOW="$WINDOW_DAYS"
+          fi
           python3 orchestrator/ingest/cli.py nightly \
             --blis-tag "$BLIS_TAG" \
             --work-dir "$RUNNER_TEMP/pull" --data-dir data --state state/last-run-api.json \
-            --window-days "$WINDOW_DAYS" --keep-api "$KEEP_API" \
-            --today "$(date -u +%F)" \
+            --window-days "$WINDOW" --keep-api "$KEEP_API" \
+            --today "$TODAY" \
             --cache "$RUNNER_TEMP/artifacts" \
             --work "$RUNNER_TEMP/contract" --score-work "$RUNNER_TEMP/scorework" \
             --evaluator-commit "$GITHUB_SHA" \
@@ -152,7 +170,9 @@ jobs:
   # ----------------------------------------------------------------- 3. publish (hosted-safe)
   publish:
     needs: [resolve, run-night]
-    if: ${{ needs.run-night.result == 'success' }}
+    # NEVER on a proving run (the push trigger): it must not commit to main or dispatch Pages. Its
+    # scored data is the uploaded `night` artifact only.
+    if: ${{ needs.run-night.result == 'success' && github.event_name != 'push' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write # commit data/ to main
