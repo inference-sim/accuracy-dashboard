@@ -43,11 +43,14 @@ concurrency:
 env:
   WINDOW_DAYS: "180"
   KEEP_API: "5"
-  # A proving run (the temporary push trigger) scores a bounded, known-non-empty recent slice so it
-  # finishes fast, and never publishes. A real nightly (schedule/dispatch) uses the full window.
+  # A proving run (the temporary push trigger) runs a REAL nightly -- full 180-day cumulative
+  # window, real date -- and differs from a scheduled run in only one way: it never publishes (the
+  # publish job is skipped on push events; its scored data is the uploaded artifact). It does NOT
+  # shrink the window: shrinking the retention window would break the cumulative store (it would
+  # prune every point not measured that day), which is exactly the bug a 1-day window caused. With
+  # the committed seed state it's still fast -- the window is one cheap API listing, and only the
+  # delta is fetched + merged into the 761-point seed.
   PROVING: ${{ github.event_name == 'push' }}
-  PROVING_TODAY: "2026-10-23"   # the slice documented in #28/#33 (non-empty near the data's end)
-  PROVING_WINDOW_DAYS: "1"
 
 jobs:
   # ----------------------------------------------------------------- 1. resolve BLIS (hosted-safe)
@@ -139,16 +142,19 @@ jobs:
           # (incl. the live view the merge reads) are present; cli.py nightly adds/prunes only API
           # snapshots and never touches a dump one.
           mkdir -p data state
+          # Always the full 180-day cumulative window (never shrink it -- that would prune the
+          # store). A proving run pins `today` to the seed's date for a reproducible, delta-free
+          # incremental night; a scheduled run uses the real UTC date.
           if [ "$PROVING" = "true" ]; then
-            TODAY="$PROVING_TODAY"; WINDOW="$PROVING_WINDOW_DAYS"
-            echo "PROVING run: window $WINDOW day(s) ending $TODAY (publish is skipped)"
+            TODAY="2026-10-23"
+            echo "PROVING run: full $WINDOW_DAYS-day window ending $TODAY, incremental vs the seed (publish skipped)"
           else
-            TODAY="$(date -u +%F)"; WINDOW="$WINDOW_DAYS"
+            TODAY="$(date -u +%F)"
           fi
           python3 orchestrator/ingest/cli.py nightly \
             --blis-tag "$BLIS_TAG" \
             --work-dir "$RUNNER_TEMP/pull" --data-dir data --state state/last-run-api.json \
-            --window-days "$WINDOW" --keep-api "$KEEP_API" \
+            --window-days "$WINDOW_DAYS" --keep-api "$KEEP_API" \
             --today "$TODAY" \
             --cache "$RUNNER_TEMP/artifacts" \
             --work "$RUNNER_TEMP/contract" --score-work "$RUNNER_TEMP/scorework" \
