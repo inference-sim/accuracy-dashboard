@@ -431,7 +431,10 @@ def build_merged(prior_summary: dict, delta_dir: Path, window_ids: set, *, gener
       window_ids     every point id in the current 180-day window; anything else is pruned.
 
     Reconstructs a full contract (prior inverted + delta overlaid − aged-out) in `work`, then runs
-    the same build() as a fresh night, so the merged summary is produced by one code path."""
+    the same build() as a fresh night, so the merged summary is produced by one code path. The
+    merged provenance keeps the prior run's BLIS/policy/corpus (nothing was re-scored) but takes the
+    delta pull's `pulled_at` / `pull_manifest_sha256`, so the API pull date tracks the newest data
+    (issue #35)."""
     merged = work / "merged-contract"
     summary_to_contract(prior_summary, merged)
     _overlay_delta(merged, delta_dir, window_ids)
@@ -478,7 +481,20 @@ def _overlay_delta(base: Path, delta_dir: Path, window_ids: set) -> None:
     bns.update({pid: n for pid, n in dns.items() if pid in keep})
     (base / contract.NOT_SCORED_JSONL).write_text(
         "".join(contract.canonical_dumps(bns[k]) + "\n" for k in sorted(bns)))
-    # provenance stays the prior summary's (same BLIS release on an IX-only night).
+
+    # Provenance stays the prior run's for everything that genuinely didn't change on an IX-only
+    # night -- BLIS release, policy, corpus, vllm_ref, source -- since nothing was re-scored. But a
+    # NEW pull DID fetch the delta, so the two fields that describe the pull event itself must come
+    # from the delta: `pulled_at` (the "API pull date" the UI shows, and what build() derives the
+    # release_tag / snapshot_id from) and `pull_manifest_sha256` (the "pull sha256", which must
+    # identify the same pull). Leaving these as the prior's would freeze the pull date to the base
+    # and, because each night merges the prior summary, chain it backwards to the oldest pull while
+    # the data range advances daily -- an API pull date that lags its own data (issue #35).
+    bprov = json.loads((base / contract.PROVENANCE_JSON).read_text())
+    dprov = json.loads((delta_dir / contract.PROVENANCE_JSON).read_text())
+    bprov["pulled_at"] = dprov["pulled_at"]
+    bprov["pull_manifest_sha256"] = dprov["pull_manifest_sha256"]
+    (base / contract.PROVENANCE_JSON).write_text(contract.canonical_dumps(bprov) + "\n")
 
 
 def dumps(summary: dict) -> str:
