@@ -224,12 +224,15 @@ jobs:
           rm -rf data; mv newdata data
           # The state file is this run's trigger-detection input for the NEXT night. Committing data
           # without it would make the next night re-score the same delta (wasted, not wrong), so a
-          # missing one is a hard error rather than a silent skip.
-          if [ ! -f incoming/last-run-api.json ]; then
-            echo "FATAL: run-night produced data but no state/last-run-api.json — refusing to publish data without its state"
+          # missing one is a hard error rather than a silent skip. upload-artifact@v4 preserves each
+          # path's directory, so the uploaded `state/last-run-api.json` downloads to
+          # incoming/state/last-run-api.json (the `state/` prefix is kept), not incoming/ flat.
+          STATE_IN="incoming/state/last-run-api.json"
+          if [ ! -f "$STATE_IN" ]; then
+            echo "FATAL: run-night produced data but no state file at $STATE_IN — refusing to publish data without its state"
             exit 1
           fi
-          mkdir -p state; cp incoming/last-run-api.json state/last-run-api.json
+          mkdir -p state; cp "$STATE_IN" state/last-run-api.json
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A data state/last-run-api.json
