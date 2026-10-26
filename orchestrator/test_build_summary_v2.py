@@ -418,6 +418,55 @@ def test_ix_only_merge_of_delta_reproduces_the_full_summary():
         shutil.rmtree(tmp)
 
 
+def test_merge_takes_the_pull_date_from_the_delta_not_the_prior():
+    # Issue #35: an IX-only merge keeps the prior run's BLIS/policy/corpus (nothing was re-scored)
+    # but a NEW pull fetched the delta, so `pulled_at`/`pull_manifest_sha256` -- the "API pull date"
+    # and "pull sha256" the UI shows, and what build() derives release_tag/snapshot_id from -- must
+    # come from the delta. Otherwise the pull date freezes to the base and chains backwards while
+    # the data range advances, showing a pull older than its own newest measurement.
+    import contract as c
+    full = _build()
+    all_ids = [p["point_id"] for p in _points(full)]
+    delta_ids = set(all_ids[:2])
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        prior_c = tmp / "prior"
+        b2.summary_to_contract(full, prior_c)
+        _strip_points(prior_c, delta_ids)
+        # The prior was pulled on the 20th; the delta's fresh pull is the 24th, a distinct manifest.
+        _set_prov(prior_c, pulled_at="2026-10-20T09:00:00Z", pull_manifest_sha256="a" * 64)
+        prior = b2.build(prior_c, generated_at="2026-10-20T09:00:00Z", evaluator_commit="test")
+        assert prior["provenance"]["pulled_at"] == "2026-10-20T09:00:00Z"
+
+        delta_c = tmp / "delta"
+        _subset_contract(FIXTURE / "run-a", delta_c, delta_ids)
+        _set_prov(delta_c, pulled_at="2026-10-24T11:30:00Z", pull_manifest_sha256="b" * 64)
+
+        window = set(all_ids) | {n["point_id"] for n in full["not_scored"]}
+        merged = b2.build_merged(prior, delta_c, window, generated_at="2026-10-25T06:00:00Z",
+                                 evaluator_commit="test", work=tmp / "wk")
+        p = merged["provenance"]
+        # The pull-event fields are the delta's...
+        assert p["pulled_at"] == "2026-10-24T11:30:00Z"
+        assert p["ground_truth"]["measurement_sha256"] == "b" * 64
+        assert p["ground_truth"]["release_tag"] == "api-2026-10-24"  # derived from the delta pull date
+        # ...and the release-identity fields stay the prior's (nothing was re-scored).
+        assert p["blis"] == prior["provenance"]["blis"]
+        assert p["policy_sha256"] == prior["provenance"]["policy_sha256"]
+        assert p["corpus"] == prior["provenance"]["corpus"]
+        assert c.validate_dir(delta_c) == []
+    finally:
+        shutil.rmtree(tmp)
+
+
+def _set_prov(contract_dir: Path, **fields):
+    """Overwrite named provenance.json fields in a contract directory (test helper)."""
+    import contract as c
+    p = json.loads((contract_dir / c.PROVENANCE_JSON).read_text())
+    p.update(fields)
+    (contract_dir / c.PROVENANCE_JSON).write_text(c.canonical_dumps(p) + "\n")
+
+
 def _strip_points(contract_dir: Path, drop: set):
     """Remove `drop` point ids from a contract directory (points.csv, fidelity, facets)."""
     import csv

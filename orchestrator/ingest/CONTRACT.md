@@ -96,7 +96,7 @@ One line per point, sorted by `point_id`. `reasons` is sorted and de-duplicated,
 
 `source` names what was pulled: `{"name", "url"}` (the API the pull read), copied into summary.json's `ground_truth`.
 
-`pull_manifest_sha256` is the sha256 of the frozen pull's manifest (each point's frozen inputs and their sha256s), and identifies exactly what was scored.
+`pull_manifest_sha256` is the sha256 of the frozen pull's manifest (each point's frozen inputs and their sha256s), and identifies exactly what that pull scored. On an IX-only nightly merge the published summary keeps this field (and `ground_truth.measurement_sha256`) from the **newest** pull — the one that fetched the delta — not from a manifest covering the whole merged window: the carried-over points come from the prior summary, which was scored under its own pull. So this hash verifies the delta's pull, not the entire window a merged summary shows (no single manifest covers a merged window). A whole-window pull — and a manifest that covers it — is only produced on a seed or a BLIS-release rebuild.
 
 ## Reason codes
 
