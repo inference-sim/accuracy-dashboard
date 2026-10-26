@@ -135,3 +135,51 @@ export async function loadIndex(fetchImpl: typeof fetch = fetch, url = INDEX_URL
 export async function loadSummaryAt(path: string, fetchImpl: typeof fetch = fetch): Promise<Summary> {
   return validateSummary(await fetchJson(`data/${path}`, fetchImpl))
 }
+
+/**
+ * Resolves a run selection (null = "latest", or a snapshot_id) to a summary, caching so each
+ * distinct run is fetched once and always resolves to the SAME object. Two subtleties it exists to
+ * get right:
+ *   - The newest snapshot id and "latest" are the same bytes (CI keeps data/latest mirroring
+ *     runs[0]), so they share one cache key. Entering/leaving the Compare view on the newest run —
+ *     which toggles the hash between ?run=<newest> and no run — must not refetch or hand React a
+ *     new-but-identical object, or the Overview headline flickers as its useMemos recompute.
+ *   - A failed load is not cached, so a transient fetch error is retryable on the next navigation.
+ * `want` must be in `index` unless it's null; an unknown id resolves to a loud "not in the index"
+ * error (it may have aged out of retention).
+ */
+export class RunLoader {
+  private readonly cache = new Map<string, Promise<Summary>>()
+  constructor(
+    private readonly index: RunIndex | null,
+    private readonly loaders: { latest: () => Promise<Summary>; at: (path: string) => Promise<Summary> } = {
+      latest: loadSummary,
+      at: loadSummaryAt,
+    },
+  ) {}
+
+  /** A stable cache key: null and the newest snapshot id both → 'latest'; unknown id → 'missing:<id>'. */
+  keyFor(want: string | null): string {
+    if (!want || (this.index && want === this.index.runs[0]?.snapshot_id)) return 'latest'
+    return this.index && this.index.runs.some((r) => r.snapshot_id === want) ? want : `missing:${want}`
+  }
+
+  load(want: string | null): Promise<Summary> {
+    const key = this.keyFor(want)
+    const hit = this.cache.get(key)
+    if (hit) return hit
+    const p =
+      key === 'latest'
+        ? this.loaders.latest()
+        : key.startsWith('missing:')
+          ? Promise.reject(
+              new SummaryLoadError(
+                `run "${want}" is not in the published index (it may have aged out of the retention window)`,
+              ),
+            )
+          : this.loaders.at(this.index!.runs.find((r) => r.snapshot_id === want)!.path)
+    this.cache.set(key, p)
+    p.catch(() => this.cache.delete(key)) // don't cache a rejection — let the next navigation retry
+    return p
+  }
+}
