@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "snapshot_id": "2026-10-25_blis-v0.12.0_ix-api-2026-10-23",
-  "generated_at": "2026-10-25T06:01:54Z",
+  "snapshot_id": "2026-10-26_blis-v0.12.0_ix-api-2026-10-26",
+  "generated_at": "2026-10-26T15:56:28Z",
   "provenance": {
     "blis": {
       "catalog": "0.3.0",
@@ -13,17 +13,17 @@
     "ground_truth": {
       "source": "SemiAnalysis InferenceX API",
       "source_url": "https://inferencex.semianalysis.com/api/v1/",
-      "release_tag": "api-2026-10-23",
+      "release_tag": "api-2026-10-26",
       "measurement_date_through": "2026-10-25",
-      "measurement_sha256": "bbc75a46317b77a8e80b0f8732aadf0781684e53ebcfae341cfcef758a28a26f"
+      "measurement_sha256": "435e496141f9b6efca0726e622a38ffc6f804b2ec585a1245465845e42525c75"
     },
-    "evaluator_commit": "fbb8fd0460f132e9dc4d9c88798af56f17fbf88a",
+    "evaluator_commit": "9bf7262f933780cfefda4561552bd467b9320523",
     "scorer": "signedprobe",
     "ingest": "api",
     "vllm_ref": "v0.31.0",
     "vllm_max_distance": 2000,
     "policy_sha256": "87253e5f2cc051e820e27d5e9ebee63d29364a743b8c43f64231fe519c48321d",
-    "pulled_at": "2026-10-23T15:31:41Z",
+    "pulled_at": "2026-10-26T15:56:28Z",
     "corpus": {
       "dataset": "semianalysisai/cc-traces-weka-062126",
       "revision": "main",
@@ -32,7 +32,7 @@
   },
   "coverage": {
     "scored": 759,
-    "not_scored": 1265,
+    "not_scored": 1273,
     "multinode_hidden": 0,
     "failed": 0,
     "repeat_runs_folded": 1,
@@ -43,10 +43,10 @@
       "conflict": 17,
       "drafter_not_in_catalog": 496,
       "hardware_no_coefficients": 650,
-      "model_not_in_catalog": 105,
+      "model_not_in_catalog": 113,
       "required_setting_missing": 13,
       "server_log_missing": 55,
-      "setting_not_modelled": 445,
+      "setting_not_modelled": 453,
       "unclassified_arg": 164
     }
   },
@@ -59,26 +59,26 @@
   "totals": {
     "measured_or_resolved": {
       "mape": {
-        "ttft": 85.16677291987929,
-        "tpot": 22.329347372152572,
+        "ttft": 85.16677053113443,
+        "tpot": 22.32937567037255,
         "n": 22
       },
       "shape": {
-        "ttft": 66.01276174833724,
-        "tpot": 20.50111624048226,
+        "ttft": 66.01276201195192,
+        "tpot": 20.501148669120845,
         "n": 19
       },
       "noise_floor_pct": 1.6
     },
     "all": {
       "mape": {
-        "ttft": 35.26911168167485,
-        "tpot": 17.081308382107018,
+        "ttft": 35.26911161243587,
+        "tpot": 17.081309202345277,
         "n": 759
       },
       "shape": {
-        "ttft": 22.057458033915612,
-        "tpot": 13.003122131027414,
+        "ttft": 22.057458042641535,
+        "tpot": 13.003123204449247,
         "n": 574
       },
       "noise_floor_pct": 1.6
@@ -59136,26 +59136,26 @@
       "metrics": {
         "measured_or_resolved": {
           "mape": {
-            "ttft": 85.16677291987929,
-            "tpot": 22.329347372152572,
+            "ttft": 85.16677053113443,
+            "tpot": 22.32937567037255,
             "n": 22
           },
           "shape": {
-            "ttft": 66.01276174833724,
-            "tpot": 20.50111624048226,
+            "ttft": 66.01276201195192,
+            "tpot": 20.501148669120845,
             "n": 19
           },
           "noise_floor_pct": 1.6
         },
         "all": {
           "mape": {
-            "ttft": 75.85718554404136,
-            "tpot": 25.768537695864303,
+            "ttft": 75.85718408425285,
+            "tpot": 25.76855498922096,
             "n": 36
           },
           "shape": {
-            "ttft": 51.94790505394921,
-            "tpot": 17.180990170668018,
+            "ttft": 51.94790525429637,
+            "tpot": 17.181014816433343,
             "n": 25
           },
           "noise_floor_pct": 1.6
@@ -59174,26 +59174,26 @@
           "metrics": {
             "measured_or_resolved": {
               "mape": {
-                "ttft": 85.16677291987929,
-                "tpot": 22.329347372152572,
+                "ttft": 85.16677053113443,
+                "tpot": 22.32937567037255,
                 "n": 22
               },
               "shape": {
-                "ttft": 66.01276174833724,
-                "tpot": 20.50111624048226,
+                "ttft": 66.01276201195192,
+                "tpot": 20.501148669120845,
                 "n": 19
               },
               "noise_floor_pct": 1.6
             },
             "all": {
               "mape": {
-                "ttft": 75.85718554404136,
-                "tpot": 25.768537695864303,
+                "ttft": 75.85718408425285,
+                "tpot": 25.76855498922096,
                 "n": 36
               },
               "shape": {
-                "ttft": 51.94790505394921,
-                "tpot": 17.180990170668018,
+                "ttft": 51.94790525429637,
+                "tpot": 17.181014816433343,
                 "n": 25
               },
               "noise_floor_pct": 1.6
@@ -76824,26 +76824,26 @@
               "metrics": {
                 "measured_or_resolved": {
                   "mape": {
-                    "ttft": 70.22102819168995,
-                    "tpot": 28.099392538040426,
+                    "ttft": 70.22102443794806,
+                    "tpot": 28.09943700667182,
                     "n": 14
                   },
                   "shape": {
-                    "ttft": 44.85394589189787,
-                    "tpot": 25.741919895814664,
+                    "ttft": 44.8539463092878,
+                    "tpot": 25.74197124115909,
                     "n": 12
                   },
                   "noise_floor_pct": 1.6
                 },
                 "all": {
                   "mape": {
-                    "ttft": 70.22102819168995,
-                    "tpot": 28.099392538040426,
+                    "ttft": 70.22102443794806,
+                    "tpot": 28.09943700667182,
                     "n": 14
                   },
                   "shape": {
-                    "ttft": 44.85394589189787,
-                    "tpot": 25.741919895814664,
+                    "ttft": 44.8539463092878,
+                    "tpot": 25.74197124115909,
                     "n": 12
                   },
                   "noise_floor_pct": 1.6
@@ -76872,26 +76872,26 @@
                   "metrics": {
                     "measured_or_resolved": {
                       "mape": {
-                        "ttft": 87.88984975441952,
-                        "tpot": 30.298353966172357,
+                        "ttft": 87.88984638410588,
+                        "tpot": 30.298470949728102,
                         "n": 8
                       },
                       "shape": {
-                        "ttft": 55.43525674531349,
-                        "tpot": 32.27055654383488,
+                        "ttft": 55.435259124310235,
+                        "tpot": 32.27060415502904,
                         "n": 7
                       },
                       "noise_floor_pct": 1.6
                     },
                     "all": {
                       "mape": {
-                        "ttft": 87.88984975441952,
-                        "tpot": 30.298353966172357,
+                        "ttft": 87.88984638410588,
+                        "tpot": 30.298470949728102,
                         "n": 8
                       },
                       "shape": {
-                        "ttft": 55.43525674531349,
-                        "tpot": 32.27055654383488,
+                        "ttft": 55.435259124310235,
+                        "tpot": 32.27060415502904,
                         "n": 7
                       },
                       "noise_floor_pct": 1.6
@@ -76912,7 +76912,7 @@
                       },
                       "error_pct": {
                         "ttft": 39.0142,
-                        "tpot": -6.5742
+                        "tpot": -6.5744
                       },
                       "shape": {
                         "ttft": null,
@@ -77678,11 +77678,11 @@
                       },
                       "error_pct": {
                         "ttft": 63.7311,
-                        "tpot": -12.1249
+                        "tpot": -12.124
                       },
                       "shape": {
                         "ttft": 17.7801,
-                        "tpot": -5.9413
+                        "tpot": -5.9401
                       },
                       "point_id": "2ddd729f8c5b781ad1e7f517af104f659c299f5200af7065bb00663cd2bdcbe1",
                       "identity": {
@@ -78444,11 +78444,11 @@
                       },
                       "error_pct": {
                         "ttft": 32.2443,
-                        "tpot": -2.5234
+                        "tpot": -2.5236
                       },
                       "shape": {
                         "ttft": -4.87,
-                        "tpot": 4.3358
+                        "tpot": 4.3359
                       },
                       "point_id": "fdd9d5be6051900d1eba8c20520cb5cdafa8af7405514d0d2c8d3a7d63590f53",
                       "identity": {
@@ -79210,11 +79210,11 @@
                       },
                       "error_pct": {
                         "ttft": 10.5807,
-                        "tpot": -23.7939
+                        "tpot": -23.7947
                       },
                       "shape": {
                         "ttft": -20.4536,
-                        "tpot": -18.4314
+                        "tpot": -18.4321
                       },
                       "point_id": "23edbcafcfad8fa881e05ed41fe71a455d4f4a3f41809e46a0bdf4b53a75f1c1",
                       "identity": {
@@ -79976,11 +79976,11 @@
                       },
                       "error_pct": {
                         "ttft": 105.2527,
-                        "tpot": -39.6279
+                        "tpot": -39.6283
                       },
                       "shape": {
                         "ttft": 47.6487,
-                        "tpot": -35.3797
+                        "tpot": -35.38
                       },
                       "point_id": "3bd722822222a6930fa48aa8f8a54d549d434291e2118991e6c1947dc6b426ec",
                       "identity": {
@@ -80742,7 +80742,7 @@
                       },
                       "error_pct": {
                         "ttft": 245.4963,
-                        "tpot": -18.4776
+                        "tpot": -18.4778
                       },
                       "shape": {
                         "ttft": 148.5331,
@@ -81508,11 +81508,11 @@
                       },
                       "error_pct": {
                         "ttft": 142.801,
-                        "tpot": -23.7312
+                        "tpot": -23.7313
                       },
                       "shape": {
                         "ttft": 74.6591,
-                        "tpot": -18.3643
+                        "tpot": -18.3642
                       },
                       "point_id": "3aca0a98e4f29a7519151ee887d0d173b1f5b904a2896d1ca66acad6f12105bf",
                       "identity": {
@@ -82278,7 +82278,7 @@
                       },
                       "shape": {
                         "ttft": -74.1022,
-                        "tpot": 130.7004
+                        "tpot": 130.7009
                       },
                       "point_id": "24cf591e70d179463fb92c714adc44adc6cdc8cd4ab99c95f289e456a187d120",
                       "identity": {
@@ -83050,26 +83050,26 @@
                   "metrics": {
                     "measured_or_resolved": {
                       "mape": {
-                        "ttft": 46.66259944138388,
-                        "tpot": 25.16744396719785,
+                        "ttft": 46.662595176404295,
+                        "tpot": 25.16739174926344,
                         "n": 6
                       },
                       "shape": {
-                        "ttft": 30.040110697116017,
-                        "tpot": 16.601828588586372,
+                        "ttft": 30.04010836825638,
+                        "tpot": 16.60188516174116,
                         "n": 5
                       },
                       "noise_floor_pct": 1.6
                     },
                     "all": {
                       "mape": {
-                        "ttft": 46.66259944138388,
-                        "tpot": 25.16744396719785,
+                        "ttft": 46.662595176404295,
+                        "tpot": 25.16739174926344,
                         "n": 6
                       },
                       "shape": {
-                        "ttft": 30.040110697116017,
-                        "tpot": 16.601828588586372,
+                        "ttft": 30.04010836825638,
+                        "tpot": 16.60188516174116,
                         "n": 5
                       },
                       "noise_floor_pct": 1.6
@@ -83090,7 +83090,7 @@
                       },
                       "error_pct": {
                         "ttft": 26.9456,
-                        "tpot": -13.2889
+                        "tpot": -13.2886
                       },
                       "shape": {
                         "ttft": null,
@@ -83856,12 +83856,12 @@
                         "tpot_ms": 2.6039
                       },
                       "error_pct": {
-                        "ttft": 40.5769,
+                        "ttft": 40.5768,
                         "tpot": -17.5981
                       },
                       "shape": {
                         "ttft": 10.7379,
-                        "tpot": -4.9697
+                        "tpot": -4.9699
                       },
                       "point_id": "ee257635e1f3f0638c4c37458d15d627f07172f2a1ad3697fd3febce311c3150",
                       "identity": {
@@ -84624,11 +84624,11 @@
                       },
                       "error_pct": {
                         "ttft": 16.8357,
-                        "tpot": -12.9355
+                        "tpot": -12.9357
                       },
                       "shape": {
                         "ttft": -7.9639,
-                        "tpot": 0.4075
+                        "tpot": 0.407
                       },
                       "point_id": "14ee440e8b595539ca3794e2c0aba498ab112c2795c79435b0d260a34341c7bc",
                       "identity": {
@@ -85391,11 +85391,11 @@
                       },
                       "error_pct": {
                         "ttft": 0.87,
-                        "tpot": -27.5306
+                        "tpot": -27.5313
                       },
                       "shape": {
-                        "ttft": -20.5407,
-                        "tpot": -16.4243
+                        "ttft": -20.5408,
+                        "tpot": -16.4254
                       },
                       "point_id": "15837eee9464351934664480fdf94255511b56a72c924139d60fe598eed1a27d",
                       "identity": {
@@ -86158,11 +86158,11 @@
                       },
                       "error_pct": {
                         "ttft": 61.4473,
-                        "tpot": -39.6273
+                        "tpot": -39.6267
                       },
                       "shape": {
                         "ttft": 27.1783,
-                        "tpot": -30.3749
+                        "tpot": -30.3745
                       },
                       "point_id": "eae0bbbab23e9b32aaf4185a7576a676b63bb4c0e1b0b8f53453c7c493b56aac",
                       "identity": {
@@ -86925,11 +86925,11 @@
                       },
                       "error_pct": {
                         "ttft": 133.3002,
-                        "tpot": -40.0243
+                        "tpot": -40.024
                       },
                       "shape": {
                         "ttft": 83.7797,
-                        "tpot": -30.8328
+                        "tpot": -30.8326
                       },
                       "point_id": "7c12f327382fd5d59956b90e53777099a9e20840feede1b40aa0f912f640b7f5",
                       "identity": {
@@ -149424,7 +149424,7 @@
                         "precision": "fp8",
                         "recipe": "row:411032"
                       },
-                      "sweep_id": "1883|minimax-m2.5-b300-fp8-vllm-tp2-dp1-ep2|1k1k|0bbc1a68e232#3dcd808d7fd1",
+                      "sweep_id": "1883|minimax-m2.5-b300-fp8-vllm-tp2-dp1-ep2|1k1k|0bbc1a68e232#3dcd808d7fd1#3dcd808d7fd1",
                       "repeats": [
                         {
                           "point_id": "3dcd808d7fd1180f1c3176ea7dffe0f9d4e0f84438e5c06a8428b5cf75cb428f",
@@ -264657,6 +264657,51 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 1,
+      "framework": "vllm",
+      "hardware": "b200",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 1,
+        "framework": "vllm",
+        "hardware": "b200",
+        "measured_date": "2026-10-25",
+        "model": "minimaxm31flash",
+        "precision": "fp4",
+        "recipe": "6b0d89bd9d15a7666bb3b58ef3ea5e80788f7f8c74b976a8373ac13c1b5a4969"
+      },
+      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
+      "measured": {
+        "tpot_ms": 1.69,
+        "ttft_ms": 828.52
+      },
+      "measured_date": "2026-10-25",
+      "model": "minimaxm31flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
+          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "197fbd7d089632ad9f8d9bbfa4dd688a5d1f2e28d971f08aac4ed30c03307252",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:disable_hybrid_kv_cache_manager",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+        "setting_not_modelled:speculative_config.kv_cache_dtype"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 2,
       "framework": "vllm",
@@ -265536,6 +265581,46 @@
       "reasons": [
         "hardware_no_coefficients",
         "unclassified_arg:mm_encoder_tp_mode"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 8,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 8,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-10-25",
+        "model": "minimaxm31flash",
+        "precision": "fp4",
+        "recipe": "e487a424b866415a6cbd92dda969cb6b21524357cfeaa13d34e25ddd54194a77"
+      },
+      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
+      "measured": {
+        "tpot_ms": 2.06,
+        "ttft_ms": 578.05
+      },
+      "measured_date": "2026-10-25",
+      "model": "minimaxm31flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
+          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "1f1ce9025cbd95c87554d6220426e139a19d87a335687f331507e3ae26d454ec",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:disable_hybrid_kv_cache_manager",
+        "setting_not_modelled:speculative_config.kv_cache_dtype"
       ]
     },
     {
@@ -267031,46 +267116,6 @@
       ]
     },
     {
-      "benchmark_type": "agentic_traces",
-      "conc": 32,
-      "framework": "vllm",
-      "hardware": "b200",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 32,
-        "framework": "vllm",
-        "hardware": "b200",
-        "measured_date": "2026-10-23",
-        "model": "minimaxm31flash",
-        "precision": "fp4",
-        "recipe": "457efb6ded35dd53ee34027d6eedda70f796118ace14dfab151474dded93e0db"
-      },
-      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
-      "measured": {
-        "tpot_ms": 3.98,
-        "ttft_ms": 888.02
-      },
-      "measured_date": "2026-10-23",
-      "model": "minimaxm31flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
-          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
-        },
-        {
-          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
-          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
-        }
-      ],
-      "point_id": "27762f2541379ab437379c6d42e2392268390c5f5716178d0e522234098bc4fb",
-      "precision": "fp4",
-      "reasons": [
-        "model_not_in_catalog",
-        "setting_not_modelled:disable_hybrid_kv_cache_manager",
-        "setting_not_modelled:speculative_config.kv_cache_dtype"
-      ]
-    },
-    {
       "benchmark_type": "single_turn",
       "conc": 4,
       "framework": "vllm",
@@ -267508,6 +267553,56 @@
       "precision": "fp4",
       "reasons": [
         "hardware_no_coefficients"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 40,
+      "framework": "vllm",
+      "hardware": "b200",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 40,
+        "framework": "vllm",
+        "hardware": "b200",
+        "measured_date": "2026-10-25",
+        "model": "minimaxm31flash",
+        "precision": "fp4",
+        "recipe": "975807e8688ab979f64cee7b3e80b086bb2b31aaec398c702707761f1f0e743a"
+      },
+      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
+      "measured": {
+        "tpot_ms": 4.11,
+        "ttft_ms": 866.28
+      },
+      "measured_date": "2026-10-25",
+      "model": "minimaxm31flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
+          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_CHAT_TEMPLATE_RENDER_TIMEOUT",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "2b4dde0005134b9c5b92f0692832a32da590c581ceeb83ba611d4cf365e0b2e7",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:disable_hybrid_kv_cache_manager",
+        "setting_not_modelled:env.VLLM_CHAT_TEMPLATE_RENDER_TIMEOUT",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+        "setting_not_modelled:speculative_config.kv_cache_dtype"
       ]
     },
     {
@@ -271600,6 +271695,46 @@
     },
     {
       "benchmark_type": "agentic_traces",
+      "conc": 4,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 4,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-10-25",
+        "model": "minimaxm31flash",
+        "precision": "fp4",
+        "recipe": "0b269d8482c635cfd54998a6be058fcb45be11ed044928828b57156a3c492be2"
+      },
+      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
+      "measured": {
+        "tpot_ms": 1.95,
+        "ttft_ms": 697.85
+      },
+      "measured_date": "2026-10-25",
+      "model": "minimaxm31flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
+          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "4693c0ef02bbdd39871aca2ad64fa539e53584b574ce236b19ad78e9acc256bd",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:disable_hybrid_kv_cache_manager",
+        "setting_not_modelled:speculative_config.kv_cache_dtype"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
       "conc": 2,
       "framework": "vllm",
       "hardware": "mi325x",
@@ -272295,46 +272430,6 @@
       "benchmark_type": "agentic_traces",
       "conc": 1,
       "framework": "vllm",
-      "hardware": "b200",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 1,
-        "framework": "vllm",
-        "hardware": "b200",
-        "measured_date": "2026-10-23",
-        "model": "minimaxm31flash",
-        "precision": "fp4",
-        "recipe": "11a9a017075eb886a338d3386ee5fc7b95e723a551f6bfd25e8b9ecb6413fb85"
-      },
-      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
-      "measured": {
-        "tpot_ms": 1.71,
-        "ttft_ms": 867.15
-      },
-      "measured_date": "2026-10-23",
-      "model": "minimaxm31flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
-          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
-        },
-        {
-          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
-          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
-        }
-      ],
-      "point_id": "4982c72904fadfa63e11693b9843286c82ede6075d7f0d0714d485b247ad5444",
-      "precision": "fp4",
-      "reasons": [
-        "model_not_in_catalog",
-        "setting_not_modelled:disable_hybrid_kv_cache_manager",
-        "setting_not_modelled:speculative_config.kv_cache_dtype"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 1,
-      "framework": "vllm",
       "hardware": "b300",
       "identity": {
         "benchmark_type": "agentic_traces",
@@ -272975,6 +273070,51 @@
         "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
         "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
         "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
+        "setting_not_modelled:speculative_config.kv_cache_dtype"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 32,
+      "framework": "vllm",
+      "hardware": "b200",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 32,
+        "framework": "vllm",
+        "hardware": "b200",
+        "measured_date": "2026-10-25",
+        "model": "minimaxm31flash",
+        "precision": "fp4",
+        "recipe": "831c403642c6f3c3657fe4e634ced675a055daea8f6c960dbde2e19bbace761e"
+      },
+      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
+      "measured": {
+        "tpot_ms": 3.58,
+        "ttft_ms": 823.58
+      },
+      "measured_date": "2026-10-25",
+      "model": "minimaxm31flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
+          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "4bb2db5f5956e1077cd053f5d423f20e1e6118e4bb4d37b207c5a8e0c141db66",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:disable_hybrid_kv_cache_manager",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
         "setting_not_modelled:speculative_config.kv_cache_dtype"
       ]
     },
@@ -274048,46 +274188,6 @@
       ]
     },
     {
-      "benchmark_type": "agentic_traces",
-      "conc": 8,
-      "framework": "vllm",
-      "hardware": "b200",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 8,
-        "framework": "vllm",
-        "hardware": "b200",
-        "measured_date": "2026-10-23",
-        "model": "minimaxm31flash",
-        "precision": "fp4",
-        "recipe": "9e12b30c45fcf44c40392ccd0dec2903a294ca2f6f5faaa7e595b1f8e87785ba"
-      },
-      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
-      "measured": {
-        "tpot_ms": 2.25,
-        "ttft_ms": 558.5
-      },
-      "measured_date": "2026-10-23",
-      "model": "minimaxm31flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
-          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
-        },
-        {
-          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
-          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
-        }
-      ],
-      "point_id": "5245d418bdde3c5622203b29f733a28a9e4775db943114d98e1a6216db3c51bd",
-      "precision": "fp4",
-      "reasons": [
-        "model_not_in_catalog",
-        "setting_not_modelled:disable_hybrid_kv_cache_manager",
-        "setting_not_modelled:speculative_config.kv_cache_dtype"
-      ]
-    },
-    {
       "benchmark_type": "single_turn",
       "conc": 16,
       "framework": "vllm",
@@ -274176,6 +274276,56 @@
       "reasons": [
         "drafter_not_in_catalog:eagle3",
         "setting_not_modelled:attention_config.use_trtllm_attention"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 56,
+      "framework": "vllm",
+      "hardware": "b200",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 56,
+        "framework": "vllm",
+        "hardware": "b200",
+        "measured_date": "2026-10-25",
+        "model": "minimaxm31flash",
+        "precision": "fp4",
+        "recipe": "1c4096da3efa5e721084b65613b14d3f05fbc66930a2d2939aa8255b63e539c8"
+      },
+      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
+      "measured": {
+        "tpot_ms": 6.77,
+        "ttft_ms": 1460.69
+      },
+      "measured_date": "2026-10-25",
+      "model": "minimaxm31flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
+          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_CHAT_TEMPLATE_RENDER_TIMEOUT",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "536ebdef11ad8955767902e88bfbdba674c1356bbd30d231e6793811e6a84a81",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:disable_hybrid_kv_cache_manager",
+        "setting_not_modelled:env.VLLM_CHAT_TEMPLATE_RENDER_TIMEOUT",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+        "setting_not_modelled:speculative_config.kv_cache_dtype"
       ]
     },
     {
@@ -274765,6 +274915,46 @@
       "precision": "fp8",
       "reasons": [
         "hardware_no_coefficients"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 32,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 32,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-10-25",
+        "model": "minimaxm31flash",
+        "precision": "fp4",
+        "recipe": "a3206a40d8f099669f7febb294e38682ffbf56b3c6700e962ea6e7a0639388e0"
+      },
+      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
+      "measured": {
+        "tpot_ms": 3.82,
+        "ttft_ms": 910.25
+      },
+      "measured_date": "2026-10-25",
+      "model": "minimaxm31flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
+          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "576ebb30f04acc4142851fb4ecf6d9ceabffc8e7f751147dbb743ee3da56b77a",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:disable_hybrid_kv_cache_manager",
+        "setting_not_modelled:speculative_config.kv_cache_dtype"
       ]
     },
     {
@@ -275838,6 +276028,96 @@
         "drafter_not_in_catalog:eagle3",
         "hardware_no_coefficients",
         "setting_not_modelled:linear_backend"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 48,
+      "framework": "vllm",
+      "hardware": "b200",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 48,
+        "framework": "vllm",
+        "hardware": "b200",
+        "measured_date": "2026-10-25",
+        "model": "minimaxm31flash",
+        "precision": "fp4",
+        "recipe": "3a7ffd2a215da839325be583af190bd42d35d976bcf0736c656afc90b581986e"
+      },
+      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
+      "measured": {
+        "tpot_ms": 4.93,
+        "ttft_ms": 1076.3
+      },
+      "measured_date": "2026-10-25",
+      "model": "minimaxm31flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
+          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_CHAT_TEMPLATE_RENDER_TIMEOUT",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "5e12ee1ce1e82ccc705edf7c25a96f5842d6944b2ab8128cf5c557b2bde4679e",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:disable_hybrid_kv_cache_manager",
+        "setting_not_modelled:env.VLLM_CHAT_TEMPLATE_RENDER_TIMEOUT",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+        "setting_not_modelled:speculative_config.kv_cache_dtype"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 64,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 64,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-10-25",
+        "model": "minimaxm31flash",
+        "precision": "fp4",
+        "recipe": "3a7c13484e0f69ce79a537d76ec572ccf295d4d192cfa32b9b5edd507fefd4d2"
+      },
+      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
+      "measured": {
+        "tpot_ms": 21.12,
+        "ttft_ms": 1507.89
+      },
+      "measured_date": "2026-10-25",
+      "model": "minimaxm31flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
+          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "5e4a273e2d72747fb4a732c40e3fb0506cc4bccf61334b3f70ebe64cf78e401e",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:disable_hybrid_kv_cache_manager",
+        "setting_not_modelled:speculative_config.kv_cache_dtype"
       ]
     },
     {
@@ -277646,46 +277926,6 @@
       "precision": "fp4",
       "reasons": [
         "hardware_no_coefficients"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 128,
-      "framework": "vllm",
-      "hardware": "b200",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 128,
-        "framework": "vllm",
-        "hardware": "b200",
-        "measured_date": "2026-10-23",
-        "model": "minimaxm31flash",
-        "precision": "fp4",
-        "recipe": "2c391ed50d2bf9845cca253704196024b5bbacb3f58dc5ea1d40b0b706ddf9cd"
-      },
-      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
-      "measured": {
-        "tpot_ms": 35.01,
-        "ttft_ms": 5529.18
-      },
-      "measured_date": "2026-10-23",
-      "model": "minimaxm31flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
-          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
-        },
-        {
-          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
-          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
-        }
-      ],
-      "point_id": "6a8d262733bd0d5a845be17b4095ac3558490f84a7afbe43ff9d4ffdc7cd1fc4",
-      "precision": "fp4",
-      "reasons": [
-        "model_not_in_catalog",
-        "setting_not_modelled:disable_hybrid_kv_cache_manager",
-        "setting_not_modelled:speculative_config.kv_cache_dtype"
       ]
     },
     {
@@ -282904,6 +283144,51 @@
     },
     {
       "benchmark_type": "agentic_traces",
+      "conc": 24,
+      "framework": "vllm",
+      "hardware": "b200",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 24,
+        "framework": "vllm",
+        "hardware": "b200",
+        "measured_date": "2026-10-25",
+        "model": "minimaxm31flash",
+        "precision": "fp4",
+        "recipe": "65f8dfee79e54478b76c4e5b6f06bc2fca5ce4b1ea0a22a111c4da1aaca07280"
+      },
+      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
+      "measured": {
+        "tpot_ms": 3.13,
+        "ttft_ms": 794.71
+      },
+      "measured_date": "2026-10-25",
+      "model": "minimaxm31flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
+          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "884aa1982efa3e2454a1620f67c898f76b81aa966418177fe0b9589af133bd08",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:disable_hybrid_kv_cache_manager",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+        "setting_not_modelled:speculative_config.kv_cache_dtype"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
       "conc": 12,
       "framework": "vllm",
       "hardware": "mi325x",
@@ -284117,46 +284402,6 @@
         "drafter_not_in_catalog:eagle3",
         "hardware_no_coefficients",
         "setting_not_modelled:linear_backend"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 24,
-      "framework": "vllm",
-      "hardware": "b200",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 24,
-        "framework": "vllm",
-        "hardware": "b200",
-        "measured_date": "2026-10-23",
-        "model": "minimaxm31flash",
-        "precision": "fp4",
-        "recipe": "b0dcc061b1938b8a89769c123f045b83714d85ab604750b5e50e1717a3f924a4"
-      },
-      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
-      "measured": {
-        "tpot_ms": 3.5,
-        "ttft_ms": 839.25
-      },
-      "measured_date": "2026-10-23",
-      "model": "minimaxm31flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
-          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
-        },
-        {
-          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
-          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
-        }
-      ],
-      "point_id": "8e72fe34a07e649678f61723321cd1fa3509a7c387eab1a3f3be4b7db3a47550",
-      "precision": "fp4",
-      "reasons": [
-        "model_not_in_catalog",
-        "setting_not_modelled:disable_hybrid_kv_cache_manager",
-        "setting_not_modelled:speculative_config.kv_cache_dtype"
       ]
     },
     {
@@ -285457,46 +285702,6 @@
       ]
     },
     {
-      "benchmark_type": "agentic_traces",
-      "conc": 96,
-      "framework": "vllm",
-      "hardware": "b200",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 96,
-        "framework": "vllm",
-        "hardware": "b200",
-        "measured_date": "2026-10-23",
-        "model": "minimaxm31flash",
-        "precision": "fp4",
-        "recipe": "fa77e278fc7cfde3fab0ed494936070372ea666d5006fc039a77863ee86f2a60"
-      },
-      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
-      "measured": {
-        "tpot_ms": 24.42,
-        "ttft_ms": 1463.15
-      },
-      "measured_date": "2026-10-23",
-      "model": "minimaxm31flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
-          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
-        },
-        {
-          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
-          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
-        }
-      ],
-      "point_id": "94528983a89aecd386a955de7489ae009fed1bc403d81837370fff7b20183dc2",
-      "precision": "fp4",
-      "reasons": [
-        "model_not_in_catalog",
-        "setting_not_modelled:disable_hybrid_kv_cache_manager",
-        "setting_not_modelled:speculative_config.kv_cache_dtype"
-      ]
-    },
-    {
       "benchmark_type": "single_turn",
       "conc": 32,
       "framework": "vllm",
@@ -285681,46 +285886,6 @@
       ]
     },
     {
-      "benchmark_type": "agentic_traces",
-      "conc": 16,
-      "framework": "vllm",
-      "hardware": "b200",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 16,
-        "framework": "vllm",
-        "hardware": "b200",
-        "measured_date": "2026-10-23",
-        "model": "minimaxm31flash",
-        "precision": "fp4",
-        "recipe": "a3210a8a6f18e30c51fa1d29f10922b5574ed2008864887d3e6ffa00aeb64967"
-      },
-      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
-      "measured": {
-        "tpot_ms": 2.77,
-        "ttft_ms": 625.08
-      },
-      "measured_date": "2026-10-23",
-      "model": "minimaxm31flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
-          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
-        },
-        {
-          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
-          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
-        }
-      ],
-      "point_id": "95932ff7eaa77c9571ca5385455e22ebb2f770ebcd74019ee807c6ed7f3af4af",
-      "precision": "fp4",
-      "reasons": [
-        "model_not_in_catalog",
-        "setting_not_modelled:disable_hybrid_kv_cache_manager",
-        "setting_not_modelled:speculative_config.kv_cache_dtype"
-      ]
-    },
-    {
       "benchmark_type": "single_turn",
       "conc": 1024,
       "framework": "vllm",
@@ -285774,6 +285939,46 @@
       "precision": "fp8",
       "reasons": [
         "hardware_no_coefficients"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 256,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 256,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-10-25",
+        "model": "minimaxm31flash",
+        "precision": "fp4",
+        "recipe": "ffd07cb241180f24dc48de28b7f88fdfd9b2db0436df2ac876e2f27db792316f"
+      },
+      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
+      "measured": {
+        "tpot_ms": 160.27,
+        "ttft_ms": 468014.31
+      },
+      "measured_date": "2026-10-25",
+      "model": "minimaxm31flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
+          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "96a486cfd244725d69e59079df13e2d39ecef23807fcdbeb5cca0aa158ac06a9",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:disable_hybrid_kv_cache_manager",
+        "setting_not_modelled:speculative_config.kv_cache_dtype"
       ]
     },
     {
@@ -286971,6 +287176,51 @@
       "precision": "fp8",
       "reasons": [
         "hardware_no_coefficients"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 16,
+      "framework": "vllm",
+      "hardware": "b200",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 16,
+        "framework": "vllm",
+        "hardware": "b200",
+        "measured_date": "2026-10-25",
+        "model": "minimaxm31flash",
+        "precision": "fp4",
+        "recipe": "e7f36d5b8f95e3a31859b81cc22303850066582e9f02bed01fc808f2038c0055"
+      },
+      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
+      "measured": {
+        "tpot_ms": 2.5,
+        "ttft_ms": 591.05
+      },
+      "measured_date": "2026-10-25",
+      "model": "minimaxm31flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
+          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "9d8f949d3a58d2303c4b20cb29bf5829f0de8e8ad6ab91b34587cd40db829cdc",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:disable_hybrid_kv_cache_manager",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+        "setting_not_modelled:speculative_config.kv_cache_dtype"
       ]
     },
     {
@@ -288322,6 +288572,51 @@
       "precision": "fp8",
       "reasons": [
         "hardware_no_coefficients"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 8,
+      "framework": "vllm",
+      "hardware": "b200",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 8,
+        "framework": "vllm",
+        "hardware": "b200",
+        "measured_date": "2026-10-25",
+        "model": "minimaxm31flash",
+        "precision": "fp4",
+        "recipe": "b2a8a40f4028cbebab55fb17324252f4b10d3e23acab2e765126b7765f20c2f5"
+      },
+      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
+      "measured": {
+        "tpot_ms": 2.09,
+        "ttft_ms": 485.94
+      },
+      "measured_date": "2026-10-25",
+      "model": "minimaxm31flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
+          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "a7e526c3beae25b5171e1a234ff6857bd87aa2b302985c2d347d6aba08b2aa34",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:disable_hybrid_kv_cache_manager",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+        "setting_not_modelled:speculative_config.kv_cache_dtype"
       ]
     },
     {
@@ -293853,6 +294148,51 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 4,
+      "framework": "vllm",
+      "hardware": "b200",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 4,
+        "framework": "vllm",
+        "hardware": "b200",
+        "measured_date": "2026-10-25",
+        "model": "minimaxm31flash",
+        "precision": "fp4",
+        "recipe": "bbbdca26699bea4e18706c28ea9307cbbbff105dda66e3b8e613065cf6fcc7ad"
+      },
+      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
+      "measured": {
+        "tpot_ms": 1.88,
+        "ttft_ms": 539.5
+      },
+      "measured_date": "2026-10-25",
+      "model": "minimaxm31flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
+          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "c79e915755712312410fbe1da12b5af2a5e8fe09725de7ae53d564550fd3f636",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:disable_hybrid_kv_cache_manager",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+        "setting_not_modelled:speculative_config.kv_cache_dtype"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 1024,
       "framework": "vllm",
@@ -294900,6 +295240,46 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 1,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 1,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-10-25",
+        "model": "minimaxm31flash",
+        "precision": "fp4",
+        "recipe": "752a0f83ea9ed9d1c2d1b3536e698fbe70cfa30847be6549e2403756c0cd1c33"
+      },
+      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
+      "measured": {
+        "tpot_ms": 1.56,
+        "ttft_ms": 934.42
+      },
+      "measured_date": "2026-10-25",
+      "model": "minimaxm31flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
+          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "d009ec39dcf514b491f7ad2fc74029bfe146b0fe53f66fa76f1aaee2c58ec922",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:disable_hybrid_kv_cache_manager",
+        "setting_not_modelled:speculative_config.kv_cache_dtype"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 256,
       "framework": "vllm",
@@ -295204,6 +295584,46 @@
       "precision": "fp4",
       "reasons": [
         "drafter_not_in_catalog:eagle3"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 128,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 128,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-10-25",
+        "model": "minimaxm31flash",
+        "precision": "fp4",
+        "recipe": "6c68c6022138e8b6ef32a0537169128d67ba35de268e556d8dc6636c94b7df26"
+      },
+      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
+      "measured": {
+        "tpot_ms": 93.51,
+        "ttft_ms": 94272.0
+      },
+      "measured_date": "2026-10-25",
+      "model": "minimaxm31flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
+          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "d1feb779c80ecd546af28427f59f544e92e0f8b1dde29005e06a8db4f6850278",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:disable_hybrid_kv_cache_manager",
+        "setting_not_modelled:speculative_config.kv_cache_dtype"
       ]
     },
     {
@@ -296497,46 +296917,6 @@
       ]
     },
     {
-      "benchmark_type": "agentic_traces",
-      "conc": 4,
-      "framework": "vllm",
-      "hardware": "b200",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 4,
-        "framework": "vllm",
-        "hardware": "b200",
-        "measured_date": "2026-10-23",
-        "model": "minimaxm31flash",
-        "precision": "fp4",
-        "recipe": "1262a2c2577a65722f8a45d95cdfb9aa4e52c9cb6d2d21e81ff01d9e8e0e2f7f"
-      },
-      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
-      "measured": {
-        "tpot_ms": 1.9,
-        "ttft_ms": 620.52
-      },
-      "measured_date": "2026-10-23",
-      "model": "minimaxm31flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
-          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
-        },
-        {
-          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
-          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
-        }
-      ],
-      "point_id": "db227112851e522350fc60ed3a677a81240e8a8a921f08323b5ab986eeb57bbd",
-      "precision": "fp4",
-      "reasons": [
-        "model_not_in_catalog",
-        "setting_not_modelled:disable_hybrid_kv_cache_manager",
-        "setting_not_modelled:speculative_config.kv_cache_dtype"
-      ]
-    },
-    {
       "benchmark_type": "single_turn",
       "conc": 128,
       "framework": "vllm",
@@ -296743,46 +297123,6 @@
         "hardware_no_coefficients",
         "setting_not_modelled:compilation_config.pass_config.fuse_allreduce_rms",
         "unclassified_arg:mm_encoder_tp_mode"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 64,
-      "framework": "vllm",
-      "hardware": "b200",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 64,
-        "framework": "vllm",
-        "hardware": "b200",
-        "measured_date": "2026-10-23",
-        "model": "minimaxm31flash",
-        "precision": "fp4",
-        "recipe": "837f1f680a701477df63e02214deaf23a2f308b8d669b08371d6dd57171da411"
-      },
-      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
-      "measured": {
-        "tpot_ms": 13.02,
-        "ttft_ms": 824.77
-      },
-      "measured_date": "2026-10-23",
-      "model": "minimaxm31flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
-          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
-        },
-        {
-          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
-          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
-        }
-      ],
-      "point_id": "dc75e8a03ffcb4116612b8a28b471e5d07524787c48183300faa673855810db6",
-      "precision": "fp4",
-      "reasons": [
-        "model_not_in_catalog",
-        "setting_not_modelled:disable_hybrid_kv_cache_manager",
-        "setting_not_modelled:speculative_config.kv_cache_dtype"
       ]
     },
     {
@@ -297266,6 +297606,46 @@
         "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
         "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MHA",
         "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 16,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 16,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-10-25",
+        "model": "minimaxm31flash",
+        "precision": "fp4",
+        "recipe": "4c49a8ec099902f3219a010ee9357134698645bb073f06fc4da3bf1fed7b7756"
+      },
+      "image": "vllm/vllm-openai:minimax-m31-flash@sha256:86f582dae25ea92802353727164ae4eb03b37b18baf9119b805ffaec2a7ef07c",
+      "measured": {
+        "tpot_ms": 2.76,
+        "ttft_ms": 653.26
+      },
+      "measured_date": "2026-10-25",
+      "model": "minimaxm31flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:disable_hybrid_kv_cache_manager",
+          "text": "Turning off the hybrid KV cache manager changes how sliding-window caches are pooled; BLIS models it on."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "e036a225cebe1ea56cc1d0c3209cead0b9ae6f1ebe056773c90a3e4539da2ba5",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:disable_hybrid_kv_cache_manager",
+        "setting_not_modelled:speculative_config.kv_cache_dtype"
       ]
     },
     {
