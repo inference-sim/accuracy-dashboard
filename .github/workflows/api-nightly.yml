@@ -229,7 +229,7 @@ jobs:
           # incoming/state/last-run-api.json (the `state/` prefix is kept), not incoming/ flat.
           STATE_IN="incoming/state/last-run-api.json"
           if [ ! -f "$STATE_IN" ]; then
-            echo "FATAL: run-night produced data but no state/last-run-api.json — refusing to publish data without its state"
+            echo "FATAL: run-night produced data but no state file at $STATE_IN — refusing to publish data without its state"
             exit 1
           fi
           mkdir -p state; cp "$STATE_IN" state/last-run-api.json
