@@ -1,9 +1,9 @@
 name: checks
 
 # Fast, hosted-only guards: the orchestrator's arithmetic + fail-loud contract, the web unit/render
-# tests, and the C1 grep (no third-party baseline name in shipped code). These never need the dump
-# or a release build — this is the ONLY suite that runs per-PR (the ~90-min real pipeline is
-# nightly / manual ci-verify, never on arbitrary PRs).
+# tests, and the C1 grep (no third-party baseline name in shipped code). These never need a release
+# build — this is the ONLY suite that runs per-PR (the real API-ingest pipeline is api-nightly.yml,
+# on a schedule or workflow_dispatch, never on arbitrary PRs).
 #
 # Triggers scoped so a PR commit runs this exactly ONCE: `pull_request` covers PR branches (incl.
 # forks); `push` is limited to the default branch so direct pushes to main are still checked
