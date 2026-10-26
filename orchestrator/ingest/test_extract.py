@@ -967,6 +967,40 @@ def test_display_map_is_read_from_the_site_and_rows_windowed_on_date():
     assert p.unnamed_slugs == ["newmodel"]                  # reported, not guessed
 
 
+def test_in_window_is_exactly_n_calendar_days_both_ends_included():
+    # Discussion #15: today-179 <= date <= today is 180 calendar days. The window spans exactly
+    # N days -- the old `start = today - N` bug spanned N+1.
+    today = date(2026, 10, 23)
+    start, end = api.window_bounds(today, 180)
+    assert (start, end) == (date(2026, 4, 27), today)       # 2026-04-27 .. 2026-10-23 == 180 days
+    assert (end - start).days == 179                        # inclusive span is N-1 days apart
+    assert api.in_window("2026-04-27", today, 180)          # today-179: the oldest day kept
+    assert not api.in_window("2026-04-26", today, 180)      # today-180: one day too old, dropped
+    assert api.in_window("2026-10-23", today, 180)          # today: kept
+    assert not api.in_window("2026-10-24", today, 180)      # after today: waits for a later run
+    assert not api.in_window("not-a-date", today, 180)      # unparseable: never in the window
+
+
+def test_pull_window_boundary_keeps_today_minus_179_drops_today_minus_180():
+    # The pull uses the same in_window, so its window is exactly 180 days too.
+    today = date(2026, 10, 23)
+    site = {"/": b'<script src="/_next/static/c/a.js"></script>',
+            "/_next/static/c/a.js": b'x={m:"M"}',
+            "/api/v1/availability": json.dumps([{"model": "m", "framework": "vllm", "date": "2026-10-20"}]).encode()}
+    rows = {"M": [{"id": "keep", "model": "m", "framework": "vllm", "date": "2026-04-27"},   # today-179
+                  {"id": "drop", "model": "m", "framework": "vllm", "date": "2026-04-26"}]}  # today-180
+
+    def fetch(url):
+        path = url[len(api.BASE):]
+        if path.startswith("/api/v1/benchmarks?model="):
+            return gzip.compress(json.dumps(rows["M"]).encode())
+        return site[path]
+
+    p = api.pull(fetch, today=today, window_days=180)
+    assert [r["id"] for r in p.rows] == ["keep"]
+    assert p.window == ("2026-04-27", "2026-10-23")
+
+
 def test_run_and_attempt_from_run_url():
     assert api.run_of({"run_url": "https://github.com/o/r/actions/runs/123/attempts/2"}) == ("123", 2)
     assert api.run_of({"run_url": "https://github.com/o/r/actions/runs/123"}) == ("123", 1)

@@ -1,0 +1,260 @@
+name: api-nightly
+
+# The API-ingest nightly pipeline (Discussion #15, revised 2026-10-25: the no-storage design).
+# Replaces the db-dump nightly (nightly.yml): instead of restoring a ~323 GB Postgres dump, it
+# pulls the live InferenceX API, scores the 180-day window with the resolved BLIS release, and
+# publishes v2 `api` snapshots. NOTHING RAW IS PERSISTED -- no ix-store branch, no committed logs;
+# the work dir is ephemeral and summary.json IS the score store (an IX-only night merges the delta
+# into the published summary). Only the agentic artifact downloads are cached, via actions/cache
+# (ephemeral, not committed), to keep a BLIS-release night fast.
+#
+# Two triggers, detected inside `cli.py nightly` from last night's point-id set in state, never
+# here (#15, "Two triggers, two actions"):
+#   * an IX data release (a new point id)  -> fetch+score only the new points, merge into the live
+#     view; no snapshot/diff;
+#   * a BLIS release (a new stable inference-sim tag) -> re-fetch+rescore the whole window, freeze a
+#     snapshot, allow a diff. Agentic points whose artifacts expired (>90d) drop to not-scored.
+# A no-op night (neither trigger) writes nothing and the last good view stands.
+on:
+  schedule:
+    - cron: "43 4 * * *" # nightly, off :00
+  workflow_dispatch:
+    inputs:
+      ignore_cache:
+        description: "Ignore the artifact-download cache and re-download everything"
+        type: boolean
+        default: false
+
+# Least privilege: read-only by default. Only `publish` gets contents: write.
+permissions:
+  contents: read
+
+concurrency:
+  group: api-nightly
+  cancel-in-progress: false
+
+env:
+  WINDOW_DAYS: "180"
+  KEEP_API: "5"
+
+jobs:
+  # ----------------------------------------------------------------- 1. resolve BLIS (hosted-safe)
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      blis_tag: ${{ steps.r.outputs.blis_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: r
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash orchestrator/resolve_blis.sh
+
+  # ----------------------------------------------------------------- 2. run the night (pull+score)
+  run-night:
+    needs: resolve
+    runs-on: ubuntu-latest
+    # A BLIS-release night re-fetches the whole window (~4.5 h cold, mostly artifact downloads);
+    # parallel downloads + a warm artifact cache bring it well under GitHub's 360-min cap and inside
+    # #15's 6 h budget. An IX-only night fetches only the delta and is minutes.
+    timeout-minutes: 345
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install --quiet jsonschema pyyaml
+
+      # The ONLY thing cached across runs: the agentic artifact-download zips, keyed by artifact id
+      # on disk (GitHubArtifacts.download). Ephemeral and NOT committed -- a cold cache just means a
+      # slower night, never wrong data. Single-turn needs no artifact (its log is the live API's
+      # /server-log), so this holds only the agentic working set, well under the 10 GB cache limit.
+      - name: Restore the artifact-download cache
+        if: ${{ !inputs.ignore_cache }}
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/artifacts
+          key: ix-artifacts-${{ github.run_id }}
+          restore-keys: |
+            ix-artifacts-
+
+      # Build blis + signedprobe FROM SOURCE at the resolved tag, and the blisdefaults helper against
+      # that release's own kernel/schemas (so a per-release score is sound; #15's seed rule).
+      - name: Build BLIS, signedprobe and the per-release defaults helper
+        env:
+          BLIS_TAG: ${{ needs.resolve.outputs.blis_tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          SIM="$RUNNER_TEMP/sim"
+          git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$SIM"
+          ( cd "$SIM" && GOFLAGS=-mod=mod go build -o blis main.go && GOFLAGS=-mod=mod go build -o signedprobe ./cmd/signedprobe )
+          eval "$(bash orchestrator/resolve_versions.sh "$SIM")"
+          git clone -q --depth 1 --branch "$catalog"  https://github.com/inference-sim/blis-catalog.git  "$RUNNER_TEMP/catalog"
+          git clone -q --depth 1 --branch "$registry" https://github.com/inference-sim/blis-registry.git "$RUNNER_TEMP/registry"
+          bash orchestrator/build_blisdefaults.sh "$SIM" "$RUNNER_TEMP/blisdefaults"
+          echo "SIM=$SIM" >> "$GITHUB_ENV"
+          echo "CATALOG=$RUNNER_TEMP/catalog" >> "$GITHUB_ENV"
+          echo "REGISTRY=$RUNNER_TEMP/registry" >> "$GITHUB_ENV"
+          echo "DEFAULTS_HELPER=$RUNNER_TEMP/blisdefaults" >> "$GITHUB_ENV"
+
+      # Fetch the pinned AgentX corpus once, by a RESOLVED HF revision (not a floating ref), so the
+      # sha256 recorded in provenance is reproducible and the corpus_changed guard is meaningful.
+      - name: Resolve the AgentX corpus (pinned HF revision + sha256)
+        run: |
+          set -euo pipefail
+          repo="semianalysisai/cc-traces-weka-062126"
+          file="traces.jsonl"
+          rev=$(curl -fsSL "https://huggingface.co/api/datasets/${repo}/revision/main" | python3 -c "import sys,json;print(json.load(sys.stdin)['sha'])")
+          curl -fsSL "https://huggingface.co/datasets/${repo}/resolve/${rev}/${file}" -o "$RUNNER_TEMP/corpus.json"
+          echo "CORPUS_REVISION=${rev}" >> "$GITHUB_ENV"
+          echo "fetched corpus ${repo}@${rev} ($(wc -c < "$RUNNER_TEMP/corpus.json") bytes)"
+
+      # One night: list the window, fetch+score the delta (or whole window on a BLIS release), merge
+      # into the published summary, and write data/ + state. The work dir is ephemeral ($RUNNER_TEMP),
+      # discarded with the runner -- nothing raw is persisted. state/last-run-api.json carries the
+      # window's point-id set, which is how the NEXT night detects the triggers (no raw store needed).
+      - name: Run the night
+        env:
+          BLIS_TAG: ${{ needs.resolve.outputs.blis_tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # data/ is the checkout's own main tree, so the dump snapshots and any prior API snapshots
+          # (incl. the live view the merge reads) are present; cli.py nightly adds/prunes only API
+          # snapshots and never touches a dump one.
+          mkdir -p data state
+          # Always the full 180-day cumulative window ending the real UTC date -- never shrink it
+          # (that would prune the store).
+          TODAY="$(date -u +%F)"
+          # OOM fix (diagnosed by local profiling): a single agentic blis replay's peak RSS is
+          # trace-content-driven and unpredictable -- a c64 point used 11.5GB where a c128 used
+          # 6.9GB, up to ~14.6GB -- so NO pre-filter (concurrency/model/hw) reliably fits 16GB, and
+          # reducing concurrency or the window doesn't help (it's one replay's footprint, not
+          # accumulation). The reliable bound is reactive: --max-rss-mb caps each replay's resident
+          # memory; one that exceeds ~13GB is killed alone and recorded not_scored:insufficient_memory
+          # (counted, visible, no fidelity change -- a larger-RAM run can score it later), while the
+          # job survives and scores the rest. Scoring is also split by type: single-turn (light,
+          # no corpus) runs --workers-wide, agentic runs --agentic-workers=1. --corpus-cache stays
+          # for agentic parse-speed (blis: output identical with or without it).
+          python3 orchestrator/ingest/cli.py nightly \
+            --blis-tag "$BLIS_TAG" \
+            --work-dir "$RUNNER_TEMP/pull" --data-dir data --state state/last-run-api.json \
+            --window-days "$WINDOW_DAYS" --keep-api "$KEEP_API" \
+            --today "$TODAY" \
+            --workers 4 --agentic-workers 1 --download-workers 8 --max-rss-mb 13000 \
+            --cache "$RUNNER_TEMP/artifacts" --corpus-cache "$RUNNER_TEMP/corpus-cache" \
+            --work "$RUNNER_TEMP/contract" --score-work "$RUNNER_TEMP/scorework" \
+            --evaluator-commit "$GITHUB_SHA" \
+            --blis-dir "$SIM" --catalog "$CATALOG" --registry "$REGISTRY" \
+            --defaults-helper "$DEFAULTS_HELPER" \
+            --corpus "$RUNNER_TEMP/corpus.json" --corpus-revision "$CORPUS_REVISION"
+
+      - name: Package the published data for the publish job
+        run: tar -czf data.tgz -C data . 2>/dev/null || tar -czf data.tgz --files-from /dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: night
+          path: |
+            data.tgz
+            state/last-run-api.json
+          if-no-files-found: warn
+
+  # ----------------------------------------------------------------- 3. publish (hosted-safe)
+  publish:
+    needs: [resolve, run-night]
+    if: ${{ needs.run-night.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # commit data/ to main
+      actions: write # dispatch the Pages deploy (the [skip ci] commit can't)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: night
+          path: incoming
+      - name: Unpack and validate the incoming data (never swap in a partial artifact)
+        run: |
+          set -euo pipefail
+          mkdir -p newdata
+          # A corrupt/truncated artifact must fail here, not be silently half-unpacked and then
+          # swapped over data/. If tar fails, the night is lost but data/ on main is untouched.
+          tar -xzf incoming/data.tgz -C newdata
+          if [ ! -f newdata/index.json ]; then
+            echo "no data produced (a no-op night) — nothing to validate or publish"; exit 0
+          fi
+          # Structural validation before the swap: the two files the dashboard loads must be present
+          # and well-formed JSON (catches a truncated upload), and every db-dump snapshot currently
+          # on main must survive byte-for-byte in the incoming tree (this pipeline never touches a
+          # dump snapshot; its absence or mutation means a bad artifact, so refuse the swap).
+          python3 -c "import json,sys; json.load(open('newdata/index.json')); json.load(open('newdata/latest/summary.json'))"
+          if [ -d data/snapshots ]; then
+            for d in data/snapshots/*/; do
+              name="$(basename "$d")"
+              case "$name" in
+                *_ix-api-*) continue ;;  # an API snapshot: this run may legitimately add/prune it
+              esac
+              if ! diff -rq "$d" "newdata/snapshots/$name" >/dev/null 2>&1; then
+                echo "FATAL: dump snapshot $name is missing or changed in the incoming data — refusing to publish"
+                exit 1
+              fi
+            done
+          fi
+
+      # KNOWN CEILING (accepted, documented): committing data/ to main grows main's GIT HISTORY,
+      # which neither the 180-day window nor the last-5 retention bounds -- those cap the summary's
+      # CONTENT and the working-tree snapshot COUNT, not the accumulation of nightly blobs. An
+      # IX-only night rewrites latest/summary.json (~6.5 MB) and commits it; git stores a whole new
+      # blob each time, so main's .git grows ~6.5 MB per active night, ~2 GB/year, while the
+      # checked-out tree stays ~35 MB. Tolerable for years (GitHub's soft guidance is <5 GB); when
+      # main approaches that, migrate data/ onto its own squashed branch that Pages deploys from (the
+      # cleaner long-term design) -- out of scope here. See PR notes.
+      - name: Publish data/ to main (index + latest + API snapshots; dump snapshots untouched)
+        id: pub
+        run: |
+          set -euo pipefail
+          if [ ! -f newdata/index.json ]; then
+            echo "no data produced (a no-op night) — nothing to publish"
+            echo "pushed=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          rm -rf data; mv newdata data
+          # The state file is this run's trigger-detection input for the NEXT night. Committing data
+          # without it would make the next night re-score the same delta (wasted, not wrong), so a
+          # missing one is a hard error rather than a silent skip.
+          if [ ! -f incoming/last-run-api.json ]; then
+            echo "FATAL: run-night produced data but no state/last-run-api.json — refusing to publish data without its state"
+            exit 1
+          fi
+          mkdir -p state; cp incoming/last-run-api.json state/last-run-api.json
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A data state/last-run-api.json
+          if git commit -m "api-nightly: ${{ needs.resolve.outputs.blis_tag }} $(date -u +%F) [skip ci]"; then
+            # A long rescore can finish after another commit landed on main; rebase onto it so the
+            # push doesn't fail and lose the night. Our commit only touches data/ + state/, which no
+            # other workflow writes, so a rebase can't conflict. A few retries absorb a tight race;
+            # if all fail the step errors (never report pushed=true for data that didn't land).
+            pushed=false
+            for attempt in 1 2 3; do
+              git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
+              if git push; then pushed=true; break; fi
+              echo "push rejected (main advanced); retry $attempt"; sleep 5
+            done
+            if [ "$pushed" != true ]; then
+              echo "FATAL: could not push after 3 rebase+retry attempts"; exit 1
+            fi
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "nothing to commit (index unchanged)"
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy the published data to Pages
+        if: ${{ steps.pub.outputs.pushed == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref "${GITHUB_REF_NAME}"

@@ -87,6 +87,18 @@ export interface Fidelity {
   blis_kernel_provenance?: unknown
 }
 
+/** v2: a point's identity in InferenceX's own terms; point_id is the sha256 of its canonical JSON. */
+export interface PointIdentity {
+  model: string
+  hardware: string
+  precision: string
+  framework: string
+  benchmark_type: string
+  recipe: string
+  conc: number
+  measured_date: string
+}
+
 export interface PointNode {
   level: 'point'
   concurrency: number
@@ -98,13 +110,16 @@ export interface PointNode {
   shape_reason?: string | null
   /** v2 only: the point's identity hash, its measurement date and its fidelity record. */
   point_id?: string
+  /** v2: the point's identity in InferenceX's own terms (point_id is the sha256 of it), so
+   *  summary.json inverts losslessly back to a contract for IX-only merges. */
+  identity?: PointIdentity
   measured_date?: string
   /** v2: the measured curve the point's trend is computed in; repeats at one concurrency are
    *  separate sweeps of the same deployment. */
   sweep_id?: string
   /** v2: InferenceX ran this measurement more than once with identical BLIS inputs; `measured`
    *  is the runs' mean and each run is listed here. */
-  repeats?: { point_id: string; measured: { ttft_ms: number | null; tpot_ms: number | null } }[]
+  repeats?: { point_id: string; identity: PointIdentity; measured: { ttft_ms: number | null; tpot_ms: number | null } }[]
   fidelity?: Fidelity
 }
 

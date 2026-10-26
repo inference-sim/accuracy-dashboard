@@ -502,9 +502,10 @@ describe('InferenceX runs of one measurement are shown once', () => {
   it('marks a folded value ×N and lists each run in its tooltip', () => {
     const one = flattenPoints(v2a()).filter((p) => p.model === 'deepseek-v4-pro')
     const p = one[0]!
+    const id0 = { model: 'm', hardware: 'h', precision: 'fp8', framework: 'vllm', benchmark_type: 'agentic_traces', recipe: 'r', conc: 1, measured_date: '2026-09-21' }
     const folded = { ...p, repeats: [
-      { point_id: p.pointId!, measured: { ttft_ms: 100, tpot_ms: 5 } },
-      { point_id: `${p.pointId}z`, measured: { ttft_ms: 102, tpot_ms: 5.2 } },
+      { point_id: p.pointId!, identity: id0, measured: { ttft_ms: 100, tpot_ms: 5 } },
+      { point_id: `${p.pointId}z`, identity: { ...id0, recipe: 'r2' }, measured: { ttft_ms: 102, tpot_ms: 5.2 } },
     ] }
     const { html } = render(<PointsTable points={[folded, ...one.slice(1)]} title="t" />)
     expect(html).toContain('×2')

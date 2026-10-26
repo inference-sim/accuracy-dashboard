@@ -93,6 +93,11 @@ def problems(doc: dict) -> list[str]:
     for n in ns:
         if point_id(n["identity"]) != n["point_id"]:
             out.append(f"not_scored {n['point_id'][:12]}: identity doesn't hash to its point_id")
+    # A scored point's identity must hash to its id too, so summary.json inverts losslessly back
+    # to a contract for IX-only merges (Discussion #15, revised 2026-10-25).
+    for p in pts:
+        if "identity" in p and point_id(p["identity"]) != p["point_id"]:
+            out.append(f"scored {p['point_id'][:12]}: identity doesn't hash to its point_id")
     return out + tree_problems(doc)
 
 

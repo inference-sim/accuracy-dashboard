@@ -108,7 +108,7 @@ def recipe_checkpoint(row: dict, server_log: str | None, recipes) -> dict | None
 
 
 def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts, fetch, out: Path,
-                 run_artifacts: dict, recipes=None) -> dict:
+                 run_artifacts: dict = None, recipes=None) -> dict:
     ident = identity(row)
     pid = contract.point_id(ident)
     entry = {"point_id": pid, "identity": ident, "row": row, "reasons": _row_reasons(row), "files": {}}
@@ -128,9 +128,9 @@ def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts
         join_reasons.append(f"server_log_missing:run_in_{(run_repo(row) or 'unknown').replace('/', '_')}")
     else:
         run_id, attempt = run
-        if run_id not in run_artifacts:
-            run_artifacts[run_id] = gh.list(run_id)
-        arts = run_artifacts[run_id]
+        # Thread-safe memoized listing: one HTTP call per run even when a pool freezes many of its
+        # points concurrently. (run_artifacts kept as an optional no-op for older callers.)
+        arts = gh.list_cached(run_id)
         j = art.join({**row, "_attempt": attempt}, arts,
                      lambda a: art.read_result_json(gh.download(a)), agentic=agentic)
         join_reasons += j.reasons
@@ -213,3 +213,54 @@ def write_manifest(out: Path, meta: dict, points: list[dict]) -> str:
     text = contract.canonical_dumps(doc) + "\n"
     (out / "manifest.json").write_text(text)
     return art.sha256(text.encode())
+
+
+@dataclass
+class Incremental:
+    """How tonight's window splits against a prior frozen pull (Discussion #15, "Store"):
+
+      reuse   point ids the prior pull already froze and this window still holds -- their files
+              and manifest entries carry over untouched (a measurement is immutable, so a frozen
+              point never needs re-freezing).
+      fresh   rows in this window the prior pull didn't hold -- freeze them now.
+      dropped point ids the prior pull froze that this window no longer holds -- their files and
+              manifest entries leave the store (aged out of the 180 days).
+    """
+    reuse: dict = field(default_factory=dict)    # point_id -> prior manifest entry
+    fresh: list = field(default_factory=list)    # API rows to freeze
+    dropped: set = field(default_factory=set)    # point_ids to remove
+
+
+def plan_incremental(rows: list[dict], prior_points: list[dict]) -> Incremental:
+    """Split this window's `rows` against a prior pull's manifest `points`. A point is reused iff
+    the prior pull holds its id; identity is immutable, so the id alone decides. The pull itself
+    never applies the window (api.pull already did) -- this only reconciles against what's frozen."""
+    want = {}
+    for r in rows:
+        want[contract.point_id(identity(r))] = r
+    prior = {e["point_id"]: e for e in prior_points}
+    inc = Incremental()
+    for pid, row in want.items():
+        if pid in prior:
+            inc.reuse[pid] = prior[pid]
+        else:
+            inc.fresh.append(row)
+    inc.dropped = set(prior) - set(want)
+    # Freeze fresh rows in the same order api.pull sorted them, so a pull is order-stable.
+    inc.fresh.sort(key=lambda r: int(r["id"]) if str(r["id"]).isdigit() else str(r["id"]))
+    return inc
+
+
+def prune_point_files(out: Path, point_id: str) -> None:
+    """Remove an aged-out point's frozen files (its points/<id>/ directory). The store keeps only
+    the current window (used when pruning an ephemeral work dir's aged-out points)."""
+    import shutil
+    shutil.rmtree(out / "points" / point_id, ignore_errors=True)
+
+
+def load_prior_manifest(prior: Path) -> dict | None:
+    """A prior frozen pull's manifest, or None if there isn't one to extend."""
+    m = prior / "manifest.json"
+    if not m.is_file():
+        return None
+    return json.loads(m.read_text())

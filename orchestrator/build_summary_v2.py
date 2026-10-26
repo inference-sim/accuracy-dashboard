@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import io
 import json
 import sys
 from collections import Counter, OrderedDict
@@ -122,7 +123,9 @@ def merge_repeats(rows: list[dict], facets: dict, fidelity: dict) -> tuple[list[
         for k in MEAS_KEYS:
             kept[k] = sum(r[k] for r in g) / len(g)
         kept["_curve"] = curve
-        runs[kept["point_id"]] = [{"point_id": r["point_id"],
+        # Each run keeps its own identity (not just the shown point's), so a folded repeat inverts
+        # losslessly back to one contract row per run -- the merge reads summary.json as its store.
+        runs[kept["point_id"]] = [{"point_id": r["point_id"], "identity": facets[r["point_id"]]["identity"],
                                    "measured": {"ttft_ms": _ms(r["meas_ttft_us"]), "tpot_ms": _ms(r["meas_tpot_us"])}}
                                   for r in g]
         out.append(kept)
@@ -249,6 +252,10 @@ def _unique_labels(rows: list[dict]) -> None:
 def point_node(p: dict, fid: dict) -> dict:
     node = v1.point_node(p)
     node["point_id"] = p["point_id"]
+    # The point's InferenceX identity, so summary.json is losslessly invertible back to a contract
+    # row -- an IX-only night merges new points into the published summary without any raw store
+    # (Discussion #15, revised 2026-10-25). It's the same identity not_scored records already carry.
+    node["identity"] = p["_f"]["identity"]
     # The measured curve the point's trend is computed in.
     node["sweep_id"] = p["sweep_id"]
     if p.get("_repeats"):
@@ -323,6 +330,155 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
                   "measured_exclusions": [], "vllm_version_filter": "all"},
         "not_scored": not_scored,
     }
+
+
+def _us(ms):
+    """ms (as summary stores) back to the µs points.csv carries; None stays 0.0 as the CSV does."""
+    return 0.0 if ms is None else round(float(ms) * 1000.0, 3)
+
+
+def iter_scored(summary: dict):
+    """Every scored leaf point of a summary, with the ancestry a contract row needs (model, gpu,
+    workload from the tree; parallelism/serving/spec/precision from the topology)."""
+    for m in summary.get("matrix", []):
+        for w in m.get("rows", []):
+            for g in w.get("rows", []):
+                for t in g.get("rows", []):
+                    for p in t.get("rows", []):
+                        yield m, w, g, t, p
+
+
+def summary_to_contract(summary: dict, out: Path) -> None:
+    """Write the five contract files that reproduce `summary` -- the inverse of build(), so a
+    published summary.json is the score store an IX-only merge reads (Discussion #15, revised:
+    summary.json IS the store; nothing else is persisted). Lossless: a folded repeat is un-folded
+    into one row per run (each run's own measured value), and every point carries the identity and
+    fidelity the summary kept, so build() over this contract yields the same summary back."""
+    import csv as _csv
+    import io as _io
+    out.mkdir(parents=True, exist_ok=True)
+    tier_str = {v: k for k, v in TIER_BY_STATUS.items()}  # "measured_or_resolved" -> contract tier
+    rows, fids, facets = [], [], {}
+    for m, w, g, t, p in iter_scored(summary):
+        fid = p["fidelity"]
+        status = fid["status"]
+        tier_unbracketed = contract.TIER_BY_STATUS[status]
+        # sweep_id is "{run}|{scenario}|{label}|{hash}": the facet's scenario and label (the sweep's
+        # own workload label, e.g. "1k1k" / "agentx", NOT the topology's deployment label) are its
+        # 2nd and 3rd segments. Both were set wrong before; they come straight out of the sweep_id.
+        _sw = (p.get("sweep_id") or "").split("|")
+        scenario = _sw[1] if len(_sw) > 1 else p.get("sweep_id") or ""
+        sweep_label = _sw[2] if len(_sw) > 2 else w["label"]
+        # Each run of a folded repeat becomes its own contract row, with its own measured value and
+        # id; an unfolded point is just itself. build()'s merge_repeats re-folds them identically.
+        runs = p.get("repeats") or [{"point_id": p["point_id"], "identity": p["identity"],
+                                     "measured": p.get("measured") or {}}]
+        folded = len(runs) > 1
+        for r in runs:
+            ident = r["identity"]
+            pid = r["point_id"]
+            meas = r["measured"]
+            # A folded point's runs shared one concurrency across separate original sweeps (one per
+            # recipe row), which merge_repeats re-joins. The summary keeps only the joined sweep_id,
+            # so give each run a distinct one (suffixed by its id) -- the validator then sees one
+            # point per concurrency per sweep, and merge_repeats re-folds them by the fold key.
+            sweep = f"{p['sweep_id']}#{pid[:12]}" if folded else p["sweep_id"]
+            rows.append({"scenario": scenario, "model": m["model"], "gpu": g["label"], "label": sweep_label,
+                         "concurrency": p["concurrency"],
+                         "meas_tpot_us": _us(meas.get("tpot_ms")), "pred_tpot_us": _us((p.get("predicted") or {}).get("tpot_ms")),
+                         "meas_ttft_us": _us(meas.get("ttft_ms")), "pred_ttft_us": _us((p.get("predicted") or {}).get("ttft_ms")),
+                         "tier_unbracketed": tier_unbracketed, "point_id": pid, "measured_date": p["measured_date"]})
+            fids.append({"point_id": pid, **fid})
+            facets[pid] = {"framework": t["framework"], "gpu": g["label"], "identity": ident,
+                           "model": m["model"], "parallelism": t["parallelism"], "precision": t["precision"],
+                           "scenario": scenario, "serving": t["serving"], "spec_method": t["spec_method"],
+                           "sweep_id": sweep, "workload": w["label"],
+                           "vllm_version": t.get("engine_version"), "label": sweep_label}
+    rows.sort(key=lambda r: contract.points_sort_key({**r, "concurrency": str(r["concurrency"])}))
+    buf = _io.StringIO()
+    wr = _csv.DictWriter(buf, fieldnames=contract.POINTS_HEADER, extrasaction="ignore")
+    wr.writeheader()
+    for r in rows:
+        wr.writerow(r)
+    (out / contract.POINTS_CSV).write_text(buf.getvalue())
+    fids.sort(key=lambda r: r["point_id"])
+    (out / contract.FIDELITY_JSONL).write_text("".join(contract.canonical_dumps(r) + "\n" for r in fids))
+    (out / contract.FACETS_JSON).write_text(contract.canonical_dumps(facets) + "\n")
+    ns = sorted(summary.get("not_scored", []), key=lambda n: n["point_id"])
+    (out / contract.NOT_SCORED_JSONL).write_text("".join(contract.canonical_dumps(n) + "\n" for n in ns))
+    (out / contract.PROVENANCE_JSON).write_text(contract.canonical_dumps(_prov_out_to_in(summary["provenance"])) + "\n")
+
+
+def _prov_out_to_in(prov: dict) -> dict:
+    """The summary's provenance back to the contract's provenance.json shape build() expects."""
+    gt = prov.get("ground_truth", {})
+    return {"ingest": "api", "blis": prov["blis"], "vllm_ref": prov["vllm_ref"],
+            "vllm_max_distance": prov["vllm_max_distance"], "policy_sha256": prov["policy_sha256"],
+            "pulled_at": prov["pulled_at"], "corpus": prov["corpus"],
+            "pull_manifest_sha256": gt.get("measurement_sha256", ""),
+            "source": {"name": gt.get("source", ""), "url": gt.get("source_url", "")}}
+
+
+def build_merged(prior_summary: dict, delta_dir: Path, window_ids: set, *, generated_at: str,
+                 evaluator_commit: str, work: Path) -> dict:
+    """An IX-only night's summary (Discussion #15, revised: summary.json IS the store). Start from
+    last night's published summary, drop points that aged out of the window, overlay the newly
+    scored delta (new points win), and rebuild. Only the delta was fetched and scored; every
+    carried-over point comes from the prior summary, never re-fetched or re-scored.
+
+      prior_summary  last night's published summary.json (the score store).
+      delta_dir      a contract directory holding ONLY this night's new points.
+      window_ids     every point id in the current 180-day window; anything else is pruned.
+
+    Reconstructs a full contract (prior inverted + delta overlaid − aged-out) in `work`, then runs
+    the same build() as a fresh night, so the merged summary is produced by one code path."""
+    merged = work / "merged-contract"
+    summary_to_contract(prior_summary, merged)
+    _overlay_delta(merged, delta_dir, window_ids)
+    return build(merged, generated_at=generated_at, evaluator_commit=evaluator_commit)
+
+
+def _overlay_delta(base: Path, delta_dir: Path, window_ids: set) -> None:
+    """In `base` (a reconstructed contract), drop every point not in window_ids, then add/replace
+    with the delta's points. A point id present in both is the delta's (a re-score of the same id
+    never happens -- a re-measurement is a NEW id -- but if it did, newest wins)."""
+    import csv as _csv
+    keep = set(map(str, window_ids))
+    dpoints = {r["point_id"]: r for r in _csv.DictReader(open(delta_dir / contract.POINTS_CSV))}
+    dfid = {r["point_id"]: r for r in _lines(delta_dir / contract.FIDELITY_JSONL)}
+    dfacets = json.loads((delta_dir / contract.FACETS_JSON).read_text())
+    dns = {n["point_id"]: n for n in _lines(delta_dir / contract.NOT_SCORED_JSONL)}
+    delta_ids = set(dpoints) | set(dns)
+
+    # points.csv: keep base rows in-window and not superseded by the delta, then append delta rows.
+    base_rows = [r for r in _csv.DictReader(open(base / contract.POINTS_CSV))
+                 if r["point_id"] in keep and r["point_id"] not in delta_ids]
+    rows = base_rows + [r for pid, r in dpoints.items() if pid in keep]
+    rows.sort(key=contract.points_sort_key)
+    buf = io.StringIO()
+    wr = _csv.DictWriter(buf, fieldnames=contract.POINTS_HEADER, extrasaction="ignore")
+    wr.writeheader()
+    wr.writerows(rows)
+    (base / contract.POINTS_CSV).write_text(buf.getvalue())
+
+    # fidelity.jsonl / facets.json / not_scored.jsonl: same keep-and-overlay, re-sorted.
+    bfid = {r["point_id"]: r for r in _lines(base / contract.FIDELITY_JSONL)
+            if r["point_id"] in keep and r["point_id"] not in delta_ids}
+    bfid.update({pid: f for pid, f in dfid.items() if pid in keep})
+    (base / contract.FIDELITY_JSONL).write_text(
+        "".join(contract.canonical_dumps(bfid[k]) + "\n" for k in sorted(bfid)))
+
+    bfac = {pid: f for pid, f in json.loads((base / contract.FACETS_JSON).read_text()).items()
+            if pid in keep and pid not in delta_ids}
+    bfac.update({pid: f for pid, f in dfacets.items() if pid in keep})
+    (base / contract.FACETS_JSON).write_text(contract.canonical_dumps(bfac) + "\n")
+
+    bns = {n["point_id"]: n for n in _lines(base / contract.NOT_SCORED_JSONL)
+           if n["point_id"] in keep and n["point_id"] not in delta_ids}
+    bns.update({pid: n for pid, n in dns.items() if pid in keep})
+    (base / contract.NOT_SCORED_JSONL).write_text(
+        "".join(contract.canonical_dumps(bns[k]) + "\n" for k in sorted(bns)))
+    # provenance stays the prior summary's (same BLIS release on an IX-only night).
 
 
 def dumps(summary: dict) -> str:

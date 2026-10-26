@@ -20,8 +20,11 @@ interface Props {
 // precision, and a uniform precision keeps every cell (and both columns) directly comparable.
 const MS_DIGITS = 2
 
+/** One run in a ×N fold, as this tooltip renders it (identity is a storage concern, not shown). */
+type RunRow = { point_id: string; measured: { ttft_ms: number | null; tpot_ms: number | null } }
+
 /** "×N" beside a measured value that averages N InferenceX runs; its tooltip lists each run. */
-export function RunsBody({ runs }: { runs: NonNullable<FlatPoint['repeats']> }) {
+export function RunsBody({ runs }: { runs: RunRow[] }) {
   return (
     <span className="prov-body">
       <span className="prov-row">

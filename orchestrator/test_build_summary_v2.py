@@ -367,6 +367,95 @@ def test_v1_documents_are_not_v2():
     assert vs2.problems(v1) != []
 
 
+# ---------------------------------------------------------------- no-storage merge (#15, revised)
+
+def test_summary_inverts_to_a_valid_contract_and_rebuilds():
+    # summary.json IS the store: it must invert back to a valid contract that build() re-accepts.
+    import contract as c
+    summary = _build()
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        b2.summary_to_contract(summary, tmp)
+        assert c.validate_dir(tmp) == []
+        rebuilt = b2.build(tmp, generated_at=STAMP, evaluator_commit="test")
+        # Same points, same coverage -- the inversion is lossless for identity/fidelity/counts.
+        assert rebuilt["coverage"]["scored"] == summary["coverage"]["scored"]
+        assert rebuilt["coverage"]["not_scored"] == summary["coverage"]["not_scored"]
+        assert {p["point_id"] for p in _points(rebuilt)} == {p["point_id"] for p in _points(summary)}
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_ix_only_merge_of_delta_reproduces_the_full_summary():
+    # The heart of the no-storage design: merge(prior without X, delta=X) == the full summary's
+    # point set and totals, having scored only X.
+    import csv
+    import io
+    import contract as c
+    full = _build()
+    all_ids = [p["point_id"] for p in _points(full)]
+    delta_ids = set(all_ids[:2])
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        # prior = full minus the 2 delta points (invert, strip them, rebuild)
+        prior_c = tmp / "prior"
+        b2.summary_to_contract(full, prior_c)
+        _strip_points(prior_c, delta_ids)
+        prior = b2.build(prior_c, generated_at="2026-10-22T00:00:00Z", evaluator_commit="test")
+        assert prior["coverage"]["scored"] == full["coverage"]["scored"] - 2
+
+        # delta contract = only the 2 new points, taken from the full fixture contract
+        delta_c = tmp / "delta"
+        _subset_contract(FIXTURE / "run-a", delta_c, delta_ids)
+
+        window = set(all_ids) | {n["point_id"] for n in full["not_scored"]}
+        merged = b2.build_merged(prior, delta_c, window, generated_at=STAMP, evaluator_commit="test",
+                                 work=tmp / "wk")
+        assert merged["coverage"]["scored"] == full["coverage"]["scored"]
+        assert merged["totals"] == full["totals"]
+        assert c.validate_dir(delta_c) == []
+    finally:
+        shutil.rmtree(tmp)
+
+
+def _strip_points(contract_dir: Path, drop: set):
+    """Remove `drop` point ids from a contract directory (points.csv, fidelity, facets)."""
+    import csv
+    import io
+    import contract as c
+    rows = [r for r in csv.DictReader(open(contract_dir / c.POINTS_CSV)) if r["point_id"] not in drop]
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=c.POINTS_HEADER, extrasaction="ignore")
+    w.writeheader()
+    w.writerows(rows)
+    (contract_dir / c.POINTS_CSV).write_text(buf.getvalue())
+    fid = [json.loads(l) for l in open(contract_dir / c.FIDELITY_JSONL) if l.strip()
+           and json.loads(l)["point_id"] not in drop]
+    (contract_dir / c.FIDELITY_JSONL).write_text("".join(c.canonical_dumps(r) + "\n" for r in sorted(fid, key=lambda r: r["point_id"])))
+    fac = {k: v for k, v in json.loads((contract_dir / c.FACETS_JSON).read_text()).items() if k not in drop}
+    (contract_dir / c.FACETS_JSON).write_text(c.canonical_dumps(fac) + "\n")
+
+
+def _subset_contract(src: Path, dst: Path, keep: set):
+    """A new contract holding only `keep` scored point ids from `src`."""
+    import csv
+    import io
+    import contract as c
+    dst.mkdir(parents=True, exist_ok=True)
+    rows = [r for r in csv.DictReader(open(src / c.POINTS_CSV)) if r["point_id"] in keep]
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=c.POINTS_HEADER, extrasaction="ignore")
+    w.writeheader()
+    w.writerows(rows)
+    (dst / c.POINTS_CSV).write_text(buf.getvalue())
+    fid = [json.loads(l) for l in open(src / c.FIDELITY_JSONL) if l.strip() and json.loads(l)["point_id"] in keep]
+    (dst / c.FIDELITY_JSONL).write_text("".join(c.canonical_dumps(r) + "\n" for r in sorted(fid, key=lambda r: r["point_id"])))
+    fac = {k: v for k, v in json.loads((src / c.FACETS_JSON).read_text()).items() if k in keep}
+    (dst / c.FACETS_JSON).write_text(c.canonical_dumps(fac) + "\n")
+    (dst / c.NOT_SCORED_JSONL).write_text("")
+    shutil.copy(src / c.PROVENANCE_JSON, dst / c.PROVENANCE_JSON)
+
+
 if __name__ == "__main__":
     import traceback
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]

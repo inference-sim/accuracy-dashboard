@@ -23,6 +23,10 @@ export interface RunRef {
   generated_at: string | null
   blis_release: string | null
   ix_release: string | null
+  /** Which ingest produced the run: 'api' (the live InferenceX API) or 'db-dump' (the legacy
+   *  weekly dump). The picker labels a run · API / · dump from this, and Compare refuses to diff
+   *  across ingests. Absent on an index published before the field existed → treated as 'db-dump'. */
+  ingest?: 'api' | 'db-dump'
   /** path relative to data/ for this run's summary.json */
   path: string
 }
@@ -30,7 +34,11 @@ export interface RunRef {
 export interface RunIndex {
   schema_version: 1
   latest: string | null
-  retention_days: number
+  /** How many API-release snapshots the index keeps (#15's count-based last-5 rule). */
+  keep_api?: number
+  /** Legacy: the old dump pipeline's single day-based retention. Kept optional so an old index
+   *  still loads; the new index is count-based (keep_api). */
+  retention_days?: number
   runs: RunRef[]
 }
 
@@ -77,7 +85,7 @@ export function validateSummary(raw: unknown): Summary {
     type Rows = { rows?: Rows[] } & Record<string, unknown>
     for (const m of doc.matrix as Rows[]) {
       for (const w of m.rows ?? []) for (const g of w.rows ?? []) for (const t of g.rows ?? []) for (const p of t.rows ?? []) {
-        for (const k of ['point_id', 'measured_date', 'fidelity']) {
+        for (const k of ['point_id', 'identity', 'measured_date', 'fidelity']) {
           if (!(k in p)) throw new SummaryLoadError(`summary.json v2 point is missing "${k}"`)
         }
       }

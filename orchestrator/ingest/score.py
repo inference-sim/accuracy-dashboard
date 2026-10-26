@@ -72,6 +72,12 @@ class Env:
     # (isl, osl, concurrency)).
     signedprobe: str = ""
     single_turn_workloads: set = field(default_factory=set)   # {(isl, osl, conc)}
+    # A per-replay resident-memory ceiling in MB (0 = none). An agentic replay whose RSS exceeds
+    # it is killed individually and the point is not-scored with an insufficient_memory reason, so
+    # one memory-heavy trace can't OOM the whole CI job. Peak RAM is trace-content-driven and
+    # unpredictable per point (profiled: a c64 point used 11.5GB where a c128 used 6.9GB), so a
+    # reactive RSS cap is the only reliable bound on a fixed-RAM runner; 0 locally scores everything.
+    max_rss_mb: int = 0
 
 
 def _read(point_dir: Path, files: dict, role: str) -> bytes | None:
@@ -113,6 +119,89 @@ def _blis_refusal(stderr: str, work: Path) -> str:
     text = re.sub(r"\bp-[0-9a-f]{16}\b", "<scenario>", text)
     slug = re.sub(r"[^A-Za-z0-9_.:=-]+", "_", text)[:80].strip("_")
     return f"blis_refused:{slug}" if slug else "blis_refused"
+
+
+class MemoryExceeded(Exception):
+    """A capped subprocess's RSS exceeded the ceiling and it was killed."""
+
+
+def _rss_mb(pid: int) -> float:
+    """Resident memory (MB) of a process and its children. Go reserves huge VIRTUAL address space,
+    so only RSS is meaningful -- an RLIMIT_AS cap would kill blis on startup. Reads /proc on Linux
+    (the CI runner); falls back to `ps` elsewhere (local macOS). Best-effort: returns 0 if unknown."""
+    import os
+    total = 0.0
+    try:
+        # Linux: sum this pid + descendants from /proc/*/statm (field 2 = resident pages).
+        pagesize = os.sysconf("SC_PAGE_SIZE")
+        pids = _proc_tree(pid)
+        for p in pids:
+            try:
+                with open(f"/proc/{p}/statm") as fh:
+                    total += int(fh.read().split()[1]) * pagesize
+            except (OSError, ValueError, IndexError):
+                pass
+        if total:
+            return total / 1024 / 1024
+    except (OSError, ValueError, AttributeError):
+        pass
+    # Fallback (macOS/local): ps rss is in KB, for the single pid.
+    try:
+        out = subprocess.run(["ps", "-o", "rss=", "-p", str(pid)], capture_output=True, text=True, timeout=5)
+        return int(out.stdout.strip() or 0) / 1024
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return 0.0
+
+
+def _proc_tree(root: int) -> list:
+    """`root` and all its descendant pids (Linux /proc). Just [root] if the tree can't be read."""
+    import os
+    children: dict = {}
+    try:
+        for p in os.listdir("/proc"):
+            if not p.isdigit():
+                continue
+            try:
+                with open(f"/proc/{p}/stat") as fh:
+                    ppid = int(fh.read().split()[3])
+                children.setdefault(ppid, []).append(int(p))
+            except (OSError, ValueError, IndexError):
+                pass
+    except OSError:
+        return [root]
+    out, stack = [], [root]
+    while stack:
+        cur = stack.pop()
+        out.append(cur)
+        stack.extend(children.get(cur, []))
+    return out
+
+
+def run_capped(argv, *, timeout, max_rss_mb=0, poll_s=2):
+    """subprocess.run(capture_output, text) with an optional RSS ceiling. If max_rss_mb > 0 and the
+    process tree's resident memory exceeds it, the process is killed and MemoryExceeded is raised --
+    so one memory-heavy replay is killed alone, never taking down the whole job. With max_rss_mb==0
+    this is a plain subprocess.run (local / big-runner scores everything)."""
+    if not max_rss_mb:
+        return subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+    import time
+    proc = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    start = 0.0
+    while True:
+        try:
+            out, err = proc.communicate(timeout=poll_s)
+            return subprocess.CompletedProcess(argv, proc.returncode, out, err)
+        except subprocess.TimeoutExpired:
+            pass
+        if _rss_mb(proc.pid) > max_rss_mb:
+            proc.kill()
+            proc.communicate()
+            raise MemoryExceeded(f"replay RSS exceeded {max_rss_mb} MB")
+        start += poll_s
+        if start >= timeout:
+            proc.kill()
+            proc.communicate()
+            raise subprocess.TimeoutExpired(argv, timeout)
 
 
 def resolved_kv(log: str, metrics: dict | None) -> list[dict]:
@@ -211,6 +300,92 @@ class Outcome:
     fidelity: dict | None = None
     facets: dict | None = None
     csv_row: list | None = None
+
+
+def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
+    """score_point with the uniform error capture the driver used to do inline, so both the serial
+    and the parallel path record a point that raises as not-scored (never drop it)."""
+    try:
+        return score_point(entry, pull_dir, work, env)
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+        return Outcome(point_id=entry["point_id"], identity=entry["identity"], row=entry["row"],
+                       reasons=sorted(set(entry["reasons"] + ["blis_refused:extractor_error"])))
+
+
+# A process-pool worker scores into its OWN work subdir, because score_point writes
+# work/scenarios/<scenario>.yaml keyed by scenario name, not point id -- two points that share a
+# scenario name would race that file across processes. Per-worker dirs isolate it; the per-point
+# metrics/<pid>.json cache stays correct either way (pid is unique). The worker's env and pull_dir
+# are set once per process in the initializer, so each task ships only the small `entry`.
+_W: dict = {}
+
+
+def _worker_init(pull_dir: str, env: Env, work: str):
+    _W["pull_dir"] = Path(pull_dir)
+    _W["env"] = env
+    # os.getpid() is stable for the life of a pool worker -> a fixed per-worker dir it reuses, so
+    # the scenario cache within one worker still helps across its tasks.
+    import os
+    _W["work"] = Path(work) / f"w{os.getpid()}"
+    _W["work"].mkdir(parents=True, exist_ok=True)
+
+
+def _worker_score(entry: dict) -> Outcome:
+    return _score_one(entry, _W["pull_dir"], _W["work"], _W["env"])
+
+
+def _is_agentic(entry: dict) -> bool:
+    return entry["row"].get("benchmark_type") == "agentic_traces"
+
+
+def score_points(points: list, pull_dir: Path, work: Path, env: Env, *, workers: int = 1,
+                 agentic_workers: int = 1, log=lambda m: None) -> list:
+    """Score every point. The result is collected in input order regardless of completion order,
+    and write_contract re-sorts by point_id, so the contract is identical whatever the worker
+    count -- concurrency is a speed knob, never a correctness or determinism lever.
+
+    Split by benchmark type, because the two kinds have opposite resource profiles:
+      * single-turn (signedprobe, no corpus): light RAM, safe to run `workers`-wide.
+      * agentic (blis replay + the 1.8GB corpus): each replay holds the parsed corpus in RAM, so
+        two at once OOM a 16GB runner -- capped at `agentic_workers` (default 1, serial).
+    So the light majority runs parallel while the heavy minority serializes, which keeps a
+    BLIS-release night (full-window rescore) inside the runner's memory without serializing the
+    whole window. On a big box pass agentic_workers > 1 if the RAM is there."""
+    agentic = [(i, e) for i, e in enumerate(points) if _is_agentic(e)]
+    single = [(i, e) for i, e in enumerate(points) if not _is_agentic(e)]
+    n = len(points)
+    results: dict = {}
+    done = [0]
+
+    def record(idx, o):
+        results[idx] = o
+        done[0] += 1
+        e = points[idx]
+        log(f"  [{done[0]}/{n}] {e['row']['model']} {e['row']['hardware']} c{e['row']['conc']} "
+            f"{e['point_id'][:12]} -> {o.fidelity['status'] if o.fidelity else o.reasons}")
+
+    if single:
+        log(f"score: {len(single)} single-turn on {max(workers, 1)} worker(s)")
+        _run_pool(single, pull_dir, work, env, max(workers, 1), record)
+    if agentic:
+        log(f"score: {len(agentic)} agentic on {max(agentic_workers, 1)} worker(s) (corpus-heavy)")
+        _run_pool(agentic, pull_dir, work, env, max(agentic_workers, 1), record)
+    return [results[i] for i in range(n)]   # input order; write_contract re-sorts anyway
+
+
+def _run_pool(indexed: list, pull_dir: Path, work: Path, env: Env, workers: int, record) -> None:
+    """Score a list of (index, entry) at the given concurrency, calling record(index, outcome) as
+    each finishes. workers<=1 runs in-process (no pool), else a ProcessPoolExecutor."""
+    if workers <= 1:
+        for idx, e in indexed:
+            record(idx, _score_one(e, pull_dir, work, env))
+        return
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+    with ProcessPoolExecutor(max_workers=workers, initializer=_worker_init,
+                             initargs=(str(pull_dir), env, str(work))) as ex:
+        futs = {ex.submit(_worker_score, e): idx for idx, e in indexed}
+        for fut in as_completed(futs):
+            record(futs[fut], fut.result())
 
 
 def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
@@ -360,9 +535,16 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         metrics_path.unlink()
     if not metrics_path.exists():
         try:
-            proc = subprocess.run(argv, capture_output=True, text=True, timeout=env.timeout_s)
+            proc = run_capped(argv, timeout=env.timeout_s, max_rss_mb=env.max_rss_mb)
         except subprocess.TimeoutExpired:
             o.reasons = ["blis_refused:timeout"]
+            return o
+        except MemoryExceeded:
+            # This agentic replay's resident memory exceeded the runner's ceiling; it's killed
+            # alone and the point is not scored, so one heavy trace can't OOM the whole job. The
+            # score is unchanged for every other point -- this is a runner-capacity limit, not a
+            # fidelity choice, so a larger-RAM run can score it later.
+            o.reasons = ["blis_refused:insufficient_memory"]
             return o
         (work / "logs").mkdir(exist_ok=True)
         (work / "logs" / f"{pid}.err").write_text(proc.stderr[-20000:])

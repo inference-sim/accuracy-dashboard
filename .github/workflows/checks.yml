@@ -1,9 +1,9 @@
 name: checks
 
 # Fast, hosted-only guards: the orchestrator's arithmetic + fail-loud contract, the web unit/render
-# tests, and the C1 grep (no third-party baseline name in shipped code). These never need the dump
-# or a release build — this is the ONLY suite that runs per-PR (the ~90-min real pipeline is
-# nightly / manual ci-verify, never on arbitrary PRs).
+# tests, and the C1 grep (no third-party baseline name in shipped code). These never need a release
+# build — this is the ONLY suite that runs per-PR (the real API-ingest pipeline is api-nightly.yml,
+# on a schedule or workflow_dispatch, never on arbitrary PRs).
 #
 # Triggers scoped so a PR commit runs this exactly ONCE: `pull_request` covers PR branches (incl.
 # forks); `push` is limited to the default branch so direct pushes to main are still checked
@@ -64,6 +64,18 @@ jobs:
           python3 orchestrator/ingest/test_extract.py
           # a point through score_point and write_contract, fake BLIS binaries (CI has no BLIS build)
           python3 orchestrator/ingest/test_score_e2e.py
+      - name: API nightly pipeline - window, trigger table, no-storage merge, two-retention index, parallel pools, fabricated-release combos (#15)
+        run: |
+          # These use pytest fixtures (tmp_path, monkeypatch), unlike the older standalone scripts.
+          pip install --quiet pytest pyyaml
+          python3 -m pytest -q \
+            orchestrator/ingest/test_nightly.py \
+            orchestrator/ingest/test_incremental.py \
+            orchestrator/ingest/test_nightly_run.py \
+            orchestrator/ingest/test_cli_nightly.py \
+            orchestrator/ingest/test_parallel.py \
+            orchestrator/ingest/test_score_pool.py \
+            orchestrator/test_update_index.py
 
   blisdefaults:
     # The Go helper the extractor calls for BLIS's own batch defaults, built against the pinned
@@ -100,7 +112,7 @@ jobs:
           rm -rf public/data dist
           mkdir -p public/data/latest
           cp testdata/render-fixture.v2.summary.json public/data/latest/summary.json
-          node -e "const s=require('./testdata/render-fixture.v2.summary.json');require('fs').writeFileSync('public/data/index.json',JSON.stringify({schema_version:1,latest:s.snapshot_id,retention_days:90,runs:[{snapshot_id:s.snapshot_id,generated_at:s.generated_at,blis_release:s.provenance.blis.release,ix_release:s.provenance.ground_truth.release_tag,path:'latest/summary.json'}]}))"
+          node -e "const s=require('./testdata/render-fixture.v2.summary.json');require('fs').writeFileSync('public/data/index.json',JSON.stringify({schema_version:1,latest:s.snapshot_id,keep_api:5,runs:[{snapshot_id:s.snapshot_id,generated_at:s.generated_at,blis_release:s.provenance.blis.release,ix_release:s.provenance.ground_truth.release_tag,ingest:'api',path:'latest/summary.json'}]}))"
           npm run build
           npm install --no-save playwright@1.56.0
           npx playwright install --with-deps chromium

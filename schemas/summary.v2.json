@@ -555,6 +555,7 @@
         "concurrency",
         "tier",
         "point_id",
+        "identity",
         "measured_date",
         "sweep_id",
         "fidelity"
@@ -657,6 +658,9 @@
         "point_id": {
           "$ref": "#/definitions/pointId"
         },
+        "identity": {
+          "$ref": "#/definitions/pointIdentity"
+        },
         "measured_date": {
           "$ref": "#/definitions/isoDate"
         },
@@ -672,9 +676,10 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["point_id", "measured"],
+            "required": ["point_id", "identity", "measured"],
             "properties": {
               "point_id": {"$ref": "#/definitions/pointId"},
+              "identity": {"$ref": "#/definitions/pointIdentity"},
               "measured": {
                 "type": "object",
                 "additionalProperties": false,

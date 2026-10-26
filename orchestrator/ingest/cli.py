@@ -44,6 +44,7 @@ PULL_ERROR = "artifact_unmatched:pull_error"
 
 
 def cmd_pull(a) -> int:
+    import shutil
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     today = date.fromisoformat(a.today) if a.today else date.today()
@@ -55,24 +56,79 @@ def cmd_pull(a) -> int:
         # rather than publish a pull that silently lacks a model.
         _log("FATAL: the site names no display name for " + ", ".join(p.unnamed_slugs))
         return 3
+    # --only <point_id ...>: freeze just these window rows (the nightly's delta fetch). The manifest
+    # then holds only the fetched subset; the whole window is listed by the caller, not here. `None`
+    # means "the whole window"; an EMPTY list means "none" (a night whose delta is empty -- an
+    # age-out or a true no-op) -- never conflate the two, or such a night re-freezes the whole window.
+    if getattr(a, "only", None) is not None:
+        want = set(a.only)
+        p.rows = [r for r in p.rows if contract.point_id(pl.identity(r)) in want]
+        _log(f"pull: --only -> {len(p.rows)} of the window's rows")
+    # Incremental: extend a prior frozen pull. A point's measurement is immutable, so one already
+    # frozen is reused verbatim (files + manifest entry), only fresh rows are fetched, and aged-out
+    # points leave the store. A cold pull (no --prior, or --prior == --out) freezes every row.
+    prior_manifest = pl.load_prior_manifest(Path(a.prior)) if a.prior else None
+    prior_points = prior_manifest["points"] if prior_manifest else []
+    if any(PULL_ERROR in (e.get("reasons") or []) for e in prior_points):
+        # A prior manifest that still carries a pull error was never a clean window; reusing its
+        # entries would re-raise the error (and wedge) every night. Start cold instead.
+        _log("pull: prior manifest holds a pull error -- ignoring it and pulling cold")
+        prior_manifest, prior_points = None, []
+    inc = pl.plan_incremental(p.rows, prior_points)
+    prior_dir = Path(a.prior) if a.prior else out
+    _log(f"pull: reuse {len(inc.reuse)} frozen, freeze {len(inc.fresh)} fresh, drop {len(inc.dropped)} aged-out")
     token = clients.require_github_token()
     resolver = build.Resolver(registry=clients.DockerHubRegistry(), github=clients.GitHubREST(token))
     gh = art.GitHubArtifacts(pl.IX_REPO, token, Path(a.cache or out / "_artifacts"))
     recipes = rcp.GitHubRecipes(clients.GitHubREST(token)._get, pl.IX_REPO)
-    run_artifacts: dict = {}
     points = []
-    for i, row in enumerate(p.rows, 1):
-        try:
-            e = pl.freeze_point(row, resolver=resolver, gh=gh, fetch=api.http_fetch, out=out,
-                                run_artifacts=run_artifacts, recipes=recipes)
-        except Exception as ex:  # noqa: BLE001 -- one row's failure is recorded with why, never kills the pull
-            if isinstance(ex, (clients.RateLimited, clients.FetchFailed)):
-                raise   # the whole pull is invalid, not this row: stop rather than record noise
-            ident = pl.identity(row)
-            e = {"point_id": contract.point_id(ident), "identity": ident, "row": row, "files": {},
-                 "build": None, "reasons": [PULL_ERROR], "problems": [repr(ex)[:500]]}
+    # Reused points: carry over the manifest entry and copy the frozen files (unless out IS prior).
+    for pid, e in sorted(inc.reuse.items()):
+        if prior_dir != out:
+            src = prior_dir / "points" / pid
+            if src.exists():
+                shutil.copytree(src, out / "points" / pid, dirs_exist_ok=True)
         points.append(e)
-        _log(f"  [{i}/{len(p.rows)}] {row['model']} {row['hardware']} c{row['conc']} -> {e['reasons'] or 'ok'}")
+    # Freeze fresh rows across a thread pool: downloads are I/O-bound (network wait), so workers
+    # mostly block on sockets -- the pool can exceed the core count, but is bounded so it doesn't
+    # trip GitHub's rate limits (the existing 5xx/429 backoff still applies per request). A fatal
+    # RateLimited/FetchFailed from any worker aborts the whole pull; a per-row error is recorded.
+    import os
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    dl_workers = a.download_workers if getattr(a, "download_workers", 0) else min((os.cpu_count() or 4) * 2, 8)
+
+    def _freeze(row):
+        try:
+            return row, pl.freeze_point(row, resolver=resolver, gh=gh, fetch=api.http_fetch, out=out,
+                                        recipes=recipes), None
+        except (clients.RateLimited, clients.FetchFailed):
+            raise   # the whole pull is invalid, not this row
+        except Exception as ex:  # noqa: BLE001 -- one row's failure is recorded with why, never kills the pull
+            ident = pl.identity(row)
+            return row, {"point_id": contract.point_id(ident), "identity": ident, "row": row, "files": {},
+                         "build": None, "reasons": [PULL_ERROR], "problems": [repr(ex)[:500]]}, ex
+
+    fresh_results = {}
+    if dl_workers <= 1 or len(inc.fresh) <= 1:
+        for row in inc.fresh:
+            r, e, _ = _freeze(row)
+            fresh_results[contract.point_id(pl.identity(r))] = e
+    else:
+        _log(f"pull: freezing {len(inc.fresh)} rows on {dl_workers} download workers")
+        with ThreadPoolExecutor(max_workers=dl_workers) as ex:
+            futs = {ex.submit(_freeze, row): row for row in inc.fresh}
+            done = 0
+            for fut in as_completed(futs):
+                r, e, _ = fut.result()   # a fatal RateLimited/FetchFailed propagates here, aborting
+                fresh_results[contract.point_id(pl.identity(r))] = e
+                done += 1
+                _log(f"  [{done}/{len(inc.fresh)}] {r['model']} {r['hardware']} c{r['conc']} -> {e['reasons'] or 'ok'}")
+    # Append in the pull's stable order (by the fresh list), so the manifest is order-stable.
+    for row in inc.fresh:
+        points.append(fresh_results[contract.point_id(pl.identity(row))])
+    # Aged-out points: drop their files so the store holds only the current window.
+    for pid in sorted(inc.dropped):
+        pl.prune_point_files(out, pid)
     # The served checkpoints' HF base_model, frozen here so scoring needs no network.
     base = {}
     for e in points:
@@ -94,7 +150,14 @@ def cmd_pull(a) -> int:
                         r = sp.hf_repo(x)
                         if r:
                             base.setdefault(r, None)
+    # Reuse a prior pull's base_model lookups for repos it already resolved: a base_model is a
+    # fact about the checkpoint, not about when it was pulled, so an incremental night needn't
+    # re-fetch HuggingFace for a repo it saw last night. Only genuinely new repos are looked up.
+    prior_base = (prior_manifest or {}).get("base_models") or {}
     for repo in sorted(base):
+        if repo in prior_base:
+            base[repo] = prior_base[repo]
+            continue
         try:
             doc = api.decode(api.http_fetch(f"https://huggingface.co/api/models/{repo}"))
             bm = (doc.get("cardData") or {}).get("base_model")
@@ -194,7 +257,8 @@ def cmd_score(a) -> int:
         corpus_cache=Path(a.corpus_cache) if a.corpus_cache else None,
         vllm_ref=manifest["vllm_ref"], policy=policy, policy_sha256=policy_sha,
         base_models=manifest.get("base_models") or {}, timeout_s=a.timeout,
-        vllm_defaults=vdefaults, vllm_defaults_sha256=vdefaults_sha)
+        vllm_defaults=vdefaults, vllm_defaults_sha256=vdefaults_sha,
+        max_rss_mb=getattr(a, "max_rss_mb", 0) or 0)
     env.signedprobe = str(sim / "signedprobe")
     wl = json.loads((sim / "testdata" / "inferencex-workloads" / "seed0.json").read_text())
     env.single_turn_workloads = {(p["isl"], p["osl"], p["concurrency"]) for p in wl["points"]}
@@ -203,20 +267,19 @@ def cmd_score(a) -> int:
     work = Path(a.work or Path(a.out).parent / (Path(a.out).name + "-work"))
     work.mkdir(parents=True, exist_ok=True)
     points = manifest["points"]
-    if a.only:
+    if a.only is not None:  # None = score the whole manifest; [] = score nothing (never "all")
         points = [p for p in points if any(p["point_id"].startswith(x) for x in a.only)]
-    outcomes = []
-    for i, e in enumerate(points, 1):
-        try:
-            o = sc.score_point(e, pull_dir, work, env)
-        except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as ex:
-            # One point that can't be scored is recorded with why, never dropped.
-            o = sc.Outcome(point_id=e["point_id"], identity=e["identity"], row=e["row"],
-                           reasons=sorted(set(e["reasons"] + ["blis_refused:extractor_error"])))
-            _log(f"    extractor error on {e['point_id'][:12]}: {ex!r}"[:400])
-        outcomes.append(o)
-        _log(f"  [{i}/{len(points)}] {e['row']['model']} {e['row']['hardware']} c{e['row']['conc']} "
-             f"{e['point_id'][:12]} -> {o.fidelity['status'] if o.fidelity else o.reasons}")
+    # Score serially or across a process pool. BLIS replays are CPU-bound subprocesses, so the
+    # worker count is clamped to the machine's cores (4 on an ubuntu-latest runner) -- more would
+    # just thrash. The contract is re-sorted by point_id in write_contract, so the output is
+    # identical whatever the worker count; parallelism is only a speed knob.
+    import os
+    workers = a.workers if a.workers and a.workers > 0 else min(os.cpu_count() or 1, 4)
+    # Agentic replays hold the 1.8GB corpus in RAM, so they serialize (default 1) even while
+    # single-turn runs `workers`-wide; override only on a box with the RAM for concurrent corpora.
+    agentic_workers = a.agentic_workers if getattr(a, "agentic_workers", 0) else 1
+    outcomes = sc.score_points(points, pull_dir, work, env, workers=workers,
+                               agentic_workers=agentic_workers, log=_log)
     prov = {"ingest": "api",
             "blis": {"release": env.blis_release, "commit_sha": env.blis_commit, "catalog": env.catalog_release,
                      "registry": env.registry_release, "extractor_version": f"blis-latency-kernel@{env.kernel}"},
@@ -234,6 +297,73 @@ def cmd_score(a) -> int:
     return 1 if problems else 0
 
 
+def cmd_nightly(a) -> int:
+    """One night of the no-storage API-ingest pipeline (Discussion #15, revised 2026-10-25):
+    list the 180-day window, fetch+score only the delta (or the whole window on a BLIS release),
+    merge into last night's published summary, and publish. Nothing raw is persisted -- the work
+    dir is ephemeral and summary.json IS the score store. Wires the real pull/score/build as the
+    closures nightly_run.run_night orchestrates (and unit-tests with fakes). Resolve the BLIS tag
+    outside and pass it in."""
+    import types
+    import nightly_run as nr
+    sys.path.insert(0, str(HERE.parent))
+    import build_summary_v2 as bsv2  # noqa: E402
+
+    today = date.fromisoformat(a.today) if a.today else date.today()
+    work_dir, data_dir, state_path = Path(a.work_dir), Path(a.data_dir), Path(a.state)
+    contract_dir = Path(a.work or data_dir.parent / "_contract")
+    latest_path = data_dir / "latest" / "summary.json"
+
+    def pull_fn(work: Path, today_: date, last_ids: set, blis_changed: bool):
+        # List the whole window (cheap -- api.pull hits only the REST API, no artifacts), then fetch
+        # inputs for the points to score. The whole window is fetched on a BLIS release AND on the
+        # seed (no prior ids); otherwise only the new points. A row the pull itself can't read fails
+        # the run (cmd_pull returns non-zero).
+        p = api.pull(api.http_fetch, today=today_, window_days=a.window_days)
+        window_ids = {contract.point_id(pl.identity(r)) for r in p.rows}
+        whole = blis_changed or not last_ids
+        to_fetch = window_ids if whole else (window_ids - set(last_ids))
+        only = None if whole else sorted(to_fetch)
+        _log(f"nightly: window {len(window_ids)} points; fetch {'whole window' if whole else f'{len(to_fetch)} new'}")
+        rc = cmd_pull(types.SimpleNamespace(out=str(work), today=today_.isoformat(),
+                                            window_days=a.window_days, cache=a.cache, prior=None,
+                                            only=only, download_workers=a.download_workers))
+        if rc != 0:
+            raise RuntimeError(f"pull failed (rc={rc}); the run stops rather than publish a partial pull")
+        return json.loads((work / "manifest.json").read_text())["pulled_at"][:10], window_ids
+
+    def score_build_fn(work: Path, blis_tag: str, score_ids, pull_date: str, window_ids: set):
+        rc = cmd_score(types.SimpleNamespace(
+            pull=str(work), out=str(contract_dir), blis_dir=a.blis_dir, catalog=a.catalog,
+            registry=a.registry, defaults_helper=a.defaults_helper, corpus=a.corpus,
+            corpus_sha256=a.corpus_sha256, corpus_dataset=a.corpus_dataset,
+            corpus_revision=a.corpus_revision, corpus_cache=a.corpus_cache, work=a.score_work,
+            timeout=a.timeout, only=None, workers=a.workers, agentic_workers=a.agentic_workers,
+            max_rss_mb=a.max_rss_mb))
+        if rc != 0:
+            raise RuntimeError(f"score failed (rc={rc})")
+        prov = json.loads((contract_dir / contract.PROVENANCE_JSON).read_text())
+        gen_at = prov["pulled_at"]
+        prior = json.loads(latest_path.read_text()) if latest_path.is_file() else None
+        # IX-only night: merge the delta contract into last night's published summary (summary.json
+        # IS the store). A BLIS release (or the seed) rebuilds the whole window from the contract.
+        if prior and prior.get("provenance", {}).get("blis", {}).get("release") == blis_tag:
+            summary = bsv2.build_merged(prior, contract_dir, window_ids, generated_at=gen_at,
+                                        evaluator_commit=a.evaluator_commit or "local",
+                                        work=Path(a.score_work or contract_dir.parent) / "merge")
+        else:
+            summary = bsv2.build(contract_dir, generated_at=gen_at, evaluator_commit=a.evaluator_commit or "local")
+        return summary, summary["coverage"]["scored"]
+
+    res = nr.run_night(today, a.blis_tag, work_dir=work_dir, data_dir=data_dir, state_path=state_path,
+                       pull_fn=pull_fn, score_build_fn=score_build_fn,
+                       snapshot_date=a.today or today.isoformat(), keep_api=a.keep_api)
+    _log(f"nightly: {res.action} -- {res.decision.reason}")
+    if res.snapshot_id:
+        _log(f"nightly: froze snapshot {res.snapshot_id}")
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -242,6 +372,11 @@ def main(argv=None) -> int:
     p.add_argument("--out", required=True)
     p.add_argument("--today")
     p.add_argument("--cache")
+    p.add_argument("--prior", help="a prior frozen pull to extend: reuse its frozen points, freeze "
+                                   "only new rows, drop aged-out ones. Omit for a cold pull.")
+    p.add_argument("--only", nargs="*", help="freeze only these point_ids of the window (the nightly's delta fetch)")
+    p.add_argument("--download-workers", type=int, default=0,
+                   help="parallel artifact-download workers (default: min(2*cores, 8); I/O-bound)")
     s = sub.add_parser("score")
     s.add_argument("--pull", required=True)
     s.add_argument("--out", required=True)
@@ -258,8 +393,42 @@ def main(argv=None) -> int:
     s.add_argument("--work")
     s.add_argument("--timeout", type=int, default=7200)
     s.add_argument("--only", nargs="*")
+    s.add_argument("--workers", type=int, default=0,
+                   help="single-turn scoring parallelism (default: min(cores, 4))")
+    s.add_argument("--agentic-workers", type=int, default=0,
+                   help="agentic scoring parallelism (default 1: each replay holds the 1.8GB corpus; raise only with RAM)")
+    s.add_argument("--max-rss-mb", type=int, default=0,
+                   help="per-replay resident-memory ceiling MB (0=none); over-limit agentic replays -> not_scored:insufficient_memory")
+
+    n = sub.add_parser("nightly", help="one night: list window -> fetch+score delta -> merge -> publish")
+    n.add_argument("--blis-tag", required=True, help="the stable inference-sim tag resolve_blis.sh resolved")
+    n.add_argument("--work-dir", required=True, help="ephemeral dir for this night's pull (never persisted)")
+    n.add_argument("--data-dir", required=True, help="the published data tree (latest/, snapshots/, index.json)")
+    n.add_argument("--state", required=True, help="state/last-run.json for the API pipeline")
+    n.add_argument("--window-days", type=int, default=180)
+    n.add_argument("--keep-api", type=int, default=5)
+    n.add_argument("--today")
+    n.add_argument("--cache")
+    n.add_argument("--work", help="the contract directory the scored window is written to")
+    n.add_argument("--score-work")
+    n.add_argument("--evaluator-commit")
+    n.add_argument("--blis-dir", required=True)
+    n.add_argument("--catalog", required=True)
+    n.add_argument("--registry", required=True)
+    n.add_argument("--defaults-helper", required=True)
+    n.add_argument("--corpus", required=True)
+    n.add_argument("--corpus-sha256")
+    n.add_argument("--corpus-dataset", default="semianalysisai/cc-traces-weka-062126")
+    n.add_argument("--corpus-revision", required=True)
+    n.add_argument("--corpus-cache")
+    n.add_argument("--timeout", type=int, default=7200)
+    n.add_argument("--workers", type=int, default=0, help="single-turn scoring parallelism (default: min(cores, 4))")
+    n.add_argument("--agentic-workers", type=int, default=0, help="agentic scoring parallelism (default 1, corpus-heavy)")
+    n.add_argument("--download-workers", type=int, default=0, help="parallel artifact-download workers (default: min(2*cores, 8))")
+    n.add_argument("--max-rss-mb", type=int, default=0, help="per-replay RSS ceiling MB (0=none); over-limit agentic -> not_scored:insufficient_memory")
+
     a = ap.parse_args(argv)
-    return cmd_pull(a) if a.cmd == "pull" else cmd_score(a)
+    return {"pull": cmd_pull, "score": cmd_score, "nightly": cmd_nightly}[a.cmd](a)
 
 
 if __name__ == "__main__":

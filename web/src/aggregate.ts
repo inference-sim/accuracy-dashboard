@@ -103,6 +103,41 @@ export function flattenPoints(summary: Summary): FlatPoint[] {
   return out
 }
 
+/**
+ * The live view's points: for each config, only its newest measurement (Discussion #15, Decided:
+ * "the live view shows the latest result per config"). A config is one deployment (sweepKey:
+ * model|workload|gpu|topoLabel) at one concurrency — the same identity the orchestrator keys on,
+ * minus the measurement date. Older measurements stay in each snapshot and in Compare (which
+ * flattens independently and never calls this), so release-over-release diffs still see every
+ * measurement; only the single-run Overview is deduped.
+ *
+ * Newest is by measuredDate, ties broken by pointId, matching the orchestrator's latest_per_config
+ * so the UI and the store never disagree. A point with no measuredDate (a v1 dump snapshot) has no
+ * date to dedupe on, so v1 points pass through untouched.
+ */
+export function latestPerConfig(points: FlatPoint[]): FlatPoint[] {
+  const newest = new Map<string, FlatPoint>()
+  const passthrough: FlatPoint[] = []
+  for (const p of points) {
+    if (p.measuredDate == null) {
+      passthrough.push(p) // v1: no date to dedupe on
+      continue
+    }
+    const key = `${p.sweepKey}|${p.concurrency}`
+    const cur = newest.get(key)
+    if (cur == null || supersedes(p, cur)) newest.set(key, p)
+  }
+  return [...passthrough, ...newest.values()]
+}
+
+/** `a` is a later (or tie-break-higher) measurement of the same config than `b`. */
+function supersedes(a: FlatPoint, b: FlatPoint): boolean {
+  const ad = a.measuredDate ?? ''
+  const bd = b.measuredDate ?? ''
+  if (ad !== bd) return ad > bd
+  return (a.pointId ?? '') > (b.pointId ?? '')
+}
+
 function meanAbs(values: (number | null)[]): { mean: number | null; n: number } {
   let acc = 0
   let n = 0
