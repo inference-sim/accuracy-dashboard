@@ -104,7 +104,7 @@
             },
             "measurement_sha256": {
               "type": "string",
-              "description": "sha256 of the frozen pull manifest (every point's frozen inputs and their sha256s)"
+              "description": "sha256 of the frozen pull manifest (every point's frozen inputs and their sha256s). On an IX-only merge this is the newest (delta) pull's manifest, which does not cover the carried-over prior points; a whole-window manifest exists only on a seed or BLIS-release rebuild."
             }
           }
         },
