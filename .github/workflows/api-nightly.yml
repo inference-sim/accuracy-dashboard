@@ -177,10 +177,33 @@ jobs:
         with:
           name: night
           path: incoming
-      - name: Unpack
+      - name: Unpack and validate the incoming data (never swap in a partial artifact)
         run: |
+          set -euo pipefail
           mkdir -p newdata
-          tar -xzf incoming/data.tgz -C newdata 2>/dev/null || true
+          # A corrupt/truncated artifact must fail here, not be silently half-unpacked and then
+          # swapped over data/. If tar fails, the night is lost but data/ on main is untouched.
+          tar -xzf incoming/data.tgz -C newdata
+          if [ ! -f newdata/index.json ]; then
+            echo "no data produced (a no-op night) — nothing to validate or publish"; exit 0
+          fi
+          # Structural validation before the swap: the two files the dashboard loads must be present
+          # and well-formed JSON (catches a truncated upload), and every db-dump snapshot currently
+          # on main must survive byte-for-byte in the incoming tree (this pipeline never touches a
+          # dump snapshot; its absence or mutation means a bad artifact, so refuse the swap).
+          python3 -c "import json,sys; json.load(open('newdata/index.json')); json.load(open('newdata/latest/summary.json'))"
+          if [ -d data/snapshots ]; then
+            for d in data/snapshots/*/; do
+              name="$(basename "$d")"
+              case "$name" in
+                *_ix-api-*) continue ;;  # an API snapshot: this run may legitimately add/prune it
+              esac
+              if ! diff -rq "$d" "newdata/snapshots/$name" >/dev/null 2>&1; then
+                echo "FATAL: dump snapshot $name is missing or changed in the incoming data — refusing to publish"
+                exit 1
+              fi
+            done
+          fi
 
       # KNOWN CEILING (accepted, documented): committing data/ to main grows main's GIT HISTORY,
       # which neither the 180-day window nor the last-5 retention bounds -- those cap the summary's
@@ -199,12 +222,31 @@ jobs:
             echo "pushed=false" >> "$GITHUB_OUTPUT"; exit 0
           fi
           rm -rf data; mv newdata data
-          mkdir -p state; cp incoming/last-run-api.json state/last-run-api.json 2>/dev/null || true
+          # The state file is this run's trigger-detection input for the NEXT night. Committing data
+          # without it would make the next night re-score the same delta (wasted, not wrong), so a
+          # missing one is a hard error rather than a silent skip.
+          if [ ! -f incoming/last-run-api.json ]; then
+            echo "FATAL: run-night produced data but no state/last-run-api.json — refusing to publish data without its state"
+            exit 1
+          fi
+          mkdir -p state; cp incoming/last-run-api.json state/last-run-api.json
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A data state/last-run-api.json
           if git commit -m "api-nightly: ${{ needs.resolve.outputs.blis_tag }} $(date -u +%F) [skip ci]"; then
-            git push
+            # A long rescore can finish after another commit landed on main; rebase onto it so the
+            # push doesn't fail and lose the night. Our commit only touches data/ + state/, which no
+            # other workflow writes, so a rebase can't conflict. A few retries absorb a tight race;
+            # if all fail the step errors (never report pushed=true for data that didn't land).
+            pushed=false
+            for attempt in 1 2 3; do
+              git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
+              if git push; then pushed=true; break; fi
+              echo "push rejected (main advanced); retry $attempt"; sleep 5
+            done
+            if [ "$pushed" != true ]; then
+              echo "FATAL: could not push after 3 rebase+retry attempts"; exit 1
+            fi
             echo "pushed=true" >> "$GITHUB_OUTPUT"
           else
             echo "nothing to commit (index unchanged)"
