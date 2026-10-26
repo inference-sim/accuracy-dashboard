@@ -17,6 +17,12 @@ const reactRoot = createRoot(root)
 let index: RunIndex | null = null
 let loader = new RunLoader(null) // caches per run so a revisited run keeps one object identity
 let currentKey: string | null = null // the (A|B) pair currently loaded, to avoid redundant reloads
+// The index resolves a named run's path, so a hashchange that fires BEFORE it lands would hit the
+// null-index loader and wrongly report a valid ?run=<id> as "not in the published index". Gate on
+// the index load having SETTLED (not on index being non-null — a null index is the valid
+// latest-only mode): until then, hold at the loading state and let the index's own .then() drive
+// the first render.
+let indexReady = false
 
 function render(summary: Summary | null, summaryB: Summary | null, loadError: string | null) {
   reactRoot.render(
@@ -27,6 +33,7 @@ function render(summary: Summary | null, summaryB: Summary | null, loadError: st
 }
 
 async function loadForHash() {
+  if (!indexReady) return // a hashchange before the index settled: the index's .then() renders first
   const route = parseRoute(window.location.hash)
   // The pair key covers both A and B so the dedup guard reloads when EITHER slot changes (incl.
   // entering/leaving compare mode). The newest snapshot id and "latest" share a key, so toggling
@@ -50,6 +57,7 @@ render(null, null, null) // loading state
 loadIndex().then((idx) => {
   index = idx
   loader = new RunLoader(idx)
+  indexReady = true
   loadForHash()
 })
 window.addEventListener('hashchange', () => {

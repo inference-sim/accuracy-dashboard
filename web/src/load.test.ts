@@ -151,4 +151,16 @@ describe('RunLoader caches so a revisited run keeps one object identity (flicker
     await loader.load(null)
     expect(calls.latest).toBe(1)
   })
+
+  it('a null-index loader cannot resolve a named id — it is "missing" (why main.tsx gates on index readiness)', () => {
+    // main.tsx starts with new RunLoader(null) and swaps in RunLoader(idx) once the index lands.
+    // Against the null loader a VALID newest id resolves to missing:<id>, so a hashchange that
+    // fired before the index settled would wrongly render "not in the published index". main.tsx's
+    // indexReady gate holds loadForHash() until the index's .then() installs the real loader.
+    const nullLoader = new RunLoader(null)
+    expect(nullLoader.keyFor('2026-10-23_blis-v0.12.0_ix-api')).toBe('missing:2026-10-23_blis-v0.12.0_ix-api')
+    // ...and the same id against the real index collapses to 'latest' (it's the newest run).
+    const real = new RunLoader(idx(['2026-10-23_blis-v0.12.0_ix-api', 'old']))
+    expect(real.keyFor('2026-10-23_blis-v0.12.0_ix-api')).toBe('latest')
+  })
 })
