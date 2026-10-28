@@ -5,6 +5,7 @@ Both are stdlib-only. The GitHub client takes a token from GH_TOKEN / GITHUB_TOK
 """
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import re
@@ -36,10 +37,15 @@ class FetchFailed(RuntimeError):
 
 def _get_bytes(url: str, headers: dict, timeout: int = 60, *, retries: int = 4, sleep=None, opener=None,
                max_total_wait: int = 900) -> bytes:
-    """GET a body, retrying 5xx, connection errors and rate limits (429, or 403 with no quota
-    left) with backoff, honouring Retry-After / x-ratelimit-reset. Other HTTP errors (4xx, and
-    a redirect the opener refuses to follow) raise at once as HTTPError; retries that run out
-    raise RateLimited or FetchFailed.
+    """GET a body, retrying 5xx, connection errors, truncated reads and rate limits (429, or 403
+    with no quota left) with backoff, honouring Retry-After / x-ratelimit-reset. Other HTTP errors
+    (4xx, and a redirect the opener refuses to follow) raise at once as HTTPError; retries that run
+    out raise RateLimited or FetchFailed.
+
+    A truncated body (http.client.IncompleteRead: the host closed the connection mid-stream) is as
+    transient as a dropped connection, so it is retried too -- it is NOT a urllib/OSError subclass,
+    so without this it slipped the net and a single flaky artifact download aborted the whole night
+    (run 40705288624: one IncompleteRead on a 1 MB artifact -> fatal pull_error).
 
     Back-off across all retries of one request is bounded by max_total_wait: a primary rate limit's
     reset can be most of an hour away, but the whole run shares that hourly quota, so waiting it out
@@ -76,7 +82,7 @@ def _get_bytes(url: str, headers: dict, timeout: int = 60, *, retries: int = 4, 
             delay = min(delay, 900)   # re-check cadence: never sleep more than 15 min in one go
             sleep(delay)
             spent += delay
-        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead) as e:
             delay = 2 ** attempt
             if attempt == retries or spent + delay > max_total_wait:
                 raise FetchFailed(f"{url.split('?')[0]}: {e!r} after {attempt + 1} tries") from e

@@ -399,6 +399,43 @@ def test_a_far_off_rate_limit_reset_fails_fast_instead_of_idling():
         cl.urllib.request.urlopen = orig
 
 
+def test_a_truncated_read_is_retried_not_a_fatal_pull_error():
+    # Run 40705288624: a GitHub artifact download was truncated (http.client.IncompleteRead), which
+    # is not a urllib/OSError subclass, so it slipped the retry net -> one flaky download aborted the
+    # whole night. A truncation is transient like a dropped connection: retry it, and only a lasting
+    # one raises FetchFailed.
+    import http.client
+    import io
+    import clients as cl
+    slept, script = [], []
+
+    class Resp(io.BytesIO):
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def fake_open(req, timeout):
+        e = script.pop(0)
+        if isinstance(e, Exception):
+            raise e
+        return Resp(e)
+
+    orig = cl.urllib.request.urlopen
+    try:
+        cl.urllib.request.urlopen = fake_open
+        script[:] = [http.client.IncompleteRead(b"partial"), http.client.IncompleteRead(b"partial"),
+                     b"whole"]
+        assert cl._get_bytes("https://h/x", {}, sleep=slept.append) == b"whole"
+        assert slept == [1, 2]                                   # backed off and recovered
+        script[:] = [http.client.IncompleteRead(b"partial")] * 5
+        try:
+            cl._get_bytes("https://h/x", {}, retries=4, sleep=slept.append)
+            raise AssertionError("a lasting truncation was swallowed")
+        except cl.FetchFailed:
+            pass
+    finally:
+        cl.urllib.request.urlopen = orig
+
+
 def test_github_compare_is_cached_and_thread_safe():
     # GitHub #15: is_on_release_tag walks compare() over every release tag, and one client is shared
     # across the download-worker pool -- so the same (base, head) comparison must hit the API once,
