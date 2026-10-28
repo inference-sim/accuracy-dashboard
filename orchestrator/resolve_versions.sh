@@ -35,11 +35,13 @@ PY
 KERNEL=$(grep -E 'blis-latency-kernel ' "$gomod" | awk '{print $2}')
 
 # The vLLM release this BLIS build models: read from blis-vllm's own Upstream provenance var, NOT
-# the blis-vllm MODULE tag (the two are not guaranteed to match). `go doc` prints the composite
-# literal without compiling anything; the Tag field is the v-prefixed ref the resolver/manifest
-# want. Run from inside the checkout so the blis-vllm version is the one this release's go.mod pins.
+# the blis-vllm MODULE tag (the two are not guaranteed to match -- Upstream.Tag is the upstream
+# vLLM tag, the module tag is blis-vllm's own release). `go doc` prints the composite literal
+# without compiling anything, as written in source -- so isolate the Tag: field specifically
+# (grep, not a positional field split) to stay correct whether the literal is one line or many.
+# Run from inside the checkout so the blis-vllm version is the one this release's go.mod pins.
 VLLM=$( cd "$checkout" && GOFLAGS=-mod=mod go doc github.com/inference-sim/blis-vllm Upstream 2>/dev/null \
-          | awk -F'"' '/[[:space:]]Tag:/{print $2; exit}' )
+          | grep -oE 'Tag:[[:space:]]*"[^"]+"' | head -1 | sed -E 's/.*"([^"]+)"/\1/' )
 
 if [[ -z "$CATALOG" || -z "$REGISTRY" || -z "$KERNEL" || -z "$VLLM" ]]; then
   echo "FATAL: could not derive catalog/registry/kernel/vllm from $checkout" >&2
