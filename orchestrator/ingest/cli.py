@@ -78,7 +78,14 @@ def cmd_pull(a) -> int:
     prior_dir = Path(a.prior) if a.prior else out
     _log(f"pull: reuse {len(inc.reuse)} frozen, freeze {len(inc.fresh)} fresh, drop {len(inc.dropped)} aged-out")
     token = clients.require_github_token()
-    resolver = build.Resolver(registry=clients.DockerHubRegistry(), github=clients.GitHubREST(token))
+    # The vLLM ref rides the resolved BLIS release: the nightly exports $VLLM_REF from
+    # resolve_versions.sh (blis-vllm's Upstream provenance). It anchors the WHOLE build resolver
+    # (exact-vs-estimated commit distance) and is stamped into the manifest, so a local run with
+    # nothing resolved falls back to build.VLLM_REF. Resolved once here, used in both places.
+    import os
+    vllm_ref = os.environ.get("VLLM_REF") or build.VLLM_REF
+    resolver = build.Resolver(registry=clients.DockerHubRegistry(), github=clients.GitHubREST(token),
+                              ref=vllm_ref)
     gh = art.GitHubArtifacts(pl.IX_REPO, token, Path(a.cache or out / "_artifacts"))
     recipes = rcp.GitHubRecipes(clients.GitHubREST(token)._get, pl.IX_REPO)
     points = []
@@ -168,7 +175,7 @@ def cmd_pull(a) -> int:
             # outage outlasting the retries raises FetchFailed and stops the pull.
             base[repo] = None if e.code == 404 else {"lookup_failed": f"HTTP {e.code}"}
     meta = {"window": list(p.window), "pulled_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "vllm_ref": build.VLLM_REF, "vllm_max_distance": build.VLLM_MAX_DISTANCE,
+            "vllm_ref": vllm_ref, "vllm_max_distance": build.VLLM_MAX_DISTANCE,
             "unnamed_slugs": p.unnamed_slugs, "base_models": base,
             "undated_row_ids": sorted(str(r["id"]) for r in p.undated)}
     sha = pl.write_manifest(out, meta, points)

@@ -36,9 +36,10 @@
 # refuse/approximate/mapped entry whose value is in `unset` (or equals `default`) is treated as
 # not set: a run that prints a field at its default didn't change it.
 #
-# A rule is on vLLM's behaviour at VLLM_REF (v0.31.0); the BLIS fields are blis-schemas v0.5.0's
-# Deployment (the BLIS v0.12.0 pin). A BLIS release that adds a field moves an entry from
-# refuse to mapped; nothing else changes.
+# A rule is on vLLM's behaviour at the resolved VLLM_REF (the vLLM release the BLIS build models,
+# read from blis-vllm's Upstream provenance; v0.32.0 for the current BLIS release). The BLIS fields
+# are the resolved release's blis-schemas Deployment. A BLIS release that adds a field moves an
+# entry from refuse to mapped; nothing else changes.
 
 version: 1
 

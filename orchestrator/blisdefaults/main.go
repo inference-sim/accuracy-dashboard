@@ -3,7 +3,7 @@
 //
 //	blisdefaults -memory-gib <GiB> -device <catalog hardware name>
 //	    The batch settings BLIS assumes for a vLLM deployment that states neither, for one
-//	    part (sim/kernelmodel.ResolveVLLMBatchDefaults). The extractor uses them only when no
+//	    part (blis-vllm compat/kernelmodel.ResolveVLLMBatchDefaults). The extractor uses them only when no
 //	    source a run left records max_num_seqs or max_num_batched_tokens.
 //	    Prints {"device":…,"max_num_batched_tokens":…,"max_num_seqs":…,"memory_gib":…}.
 //
@@ -48,7 +48,12 @@ import (
 
 	latencykernel "github.com/inference-sim/blis-latency-kernel"
 	schemamodel "github.com/inference-sim/blis-schemas/spec/model"
-	"github.com/inference-sim/inference-sim/sim/kernelmodel"
+	"github.com/inference-sim/blis-vllm/compat/kernelmodel"
+	"github.com/inference-sim/blis-vllm/compat/vllmsettings"
+	vllmrules "github.com/inference-sim/blis-vllm/rules"
+	// Linked so -version reports the inference-sim release this helper was built against, as the
+	// check before scoring requires; its engine resolution is blis-vllm's compat/kernelmodel.
+	_ "github.com/inference-sim/inference-sim/sim/vendored"
 
 	blisschemas "github.com/inference-sim/blis-schemas"
 	"github.com/inference-sim/blis-schemas/spec/acceptance"
@@ -212,7 +217,8 @@ func ResolveScenario(r kernelmodel.Repos, scenario string) (Resolution, error) {
 	// The same documents the kernel was built from (OpenInputs is its loading half), so the
 	// records below are the ones it priced, not a second reading of the catalog.
 	in, err := latencykernel.OpenInputs(scenario, latencykernel.Repos{Scenarios: r.Scenarios,
-		Catalog: r.Catalog, Registry: r.Registry}, 0)
+		Catalog: r.Catalog, Registry: r.Registry, Rules: latencykernel.RulesFrom(vllmrules.Lookup),
+		RulesVersions: vllmrules.Versions, EngineSettings: vllmsettings.OfPool}, 0)
 	if err != nil {
 		return Resolution{}, err
 	}
@@ -233,7 +239,11 @@ func ResolveScenario(r kernelmodel.Repos, scenario string) (Resolution, error) {
 		value, reason, _ := strings.Cut(o.Scope, ": ")
 		out.Assumptions = append(out.Assumptions, Assumption{Name: o.Name, Value: value, Reason: reason})
 	}
-	out.CacheDType = k.Deployment().Engine.CacheDType
+	eng, err := kernelmodel.DecodeEngine(k.Deployment())
+	if err != nil {
+		return Resolution{}, err
+	}
+	out.CacheDType = eng.CacheDType
 	for _, o := range res.Overrides {
 		if o.Field == "cache_dtype" {
 			out.CacheDType = fmt.Sprint(o.Resolved)

@@ -58,7 +58,7 @@ class Env:
     defaults_helper: str
     corpus: dict          # {"dataset", "revision", "sha256", "path", "file"}
     corpus_cache: Path | None = None
-    vllm_ref: str = "v0.31.0"
+    vllm_ref: str = "v0.32.0"
     policy: dict = field(default_factory=dict)
     policy_sha256: str = ""
     base_models: dict = field(default_factory=dict)   # HF repo -> base_model (frozen)

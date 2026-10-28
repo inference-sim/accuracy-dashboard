@@ -62,7 +62,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.27"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -91,7 +91,7 @@ jobs:
           set -euo pipefail
           SIM="$RUNNER_TEMP/sim"
           git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$SIM"
-          ( cd "$SIM" && GOFLAGS=-mod=mod go build -o blis main.go && GOFLAGS=-mod=mod go build -o signedprobe ./cmd/signedprobe )
+          ( cd "$SIM" && GOFLAGS=-mod=mod go build -o blis main.go && GOFLAGS=-mod=mod go build -o signedprobe ./tools/signedprobe )
           eval "$(bash orchestrator/resolve_versions.sh "$SIM")"
           git clone -q --depth 1 --branch "$catalog"  https://github.com/inference-sim/blis-catalog.git  "$RUNNER_TEMP/catalog"
           git clone -q --depth 1 --branch "$registry" https://github.com/inference-sim/blis-registry.git "$RUNNER_TEMP/registry"
@@ -100,6 +100,9 @@ jobs:
           echo "CATALOG=$RUNNER_TEMP/catalog" >> "$GITHUB_ENV"
           echo "REGISTRY=$RUNNER_TEMP/registry" >> "$GITHUB_ENV"
           echo "DEFAULTS_HELPER=$RUNNER_TEMP/blisdefaults" >> "$GITHUB_ENV"
+          # The vLLM ref the resolved BLIS release models (blis-vllm's Upstream), so cmd_pull stamps
+          # it into the manifest and anchors the build resolver on it -- no hardcoded VLLM_REF.
+          echo "VLLM_REF=$vllm" >> "$GITHUB_ENV"
 
       # Fetch the pinned AgentX corpus once, by a RESOLVED HF revision (not a floating ref), so the
       # sha256 recorded in provenance is reproducible and the corpus_changed guard is meaningful.
