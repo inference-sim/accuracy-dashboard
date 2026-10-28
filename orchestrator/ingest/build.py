@@ -32,7 +32,7 @@ import threading
 from dataclasses import dataclass, field
 from typing import Protocol
 
-VLLM_REF = "v0.31.0"
+VLLM_REF = "v0.32.0"
 VLLM_MAX_DISTANCE = 2000
 VLLM_REPO = "vllm-project/vllm"
 OFFICIAL_IMAGES = ("vllm/vllm-openai", "vllm/vllm-openai-rocm")

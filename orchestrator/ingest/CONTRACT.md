@@ -87,7 +87,7 @@ One line per point, sorted by `point_id`. `reasons` is sorted and de-duplicated,
 ```json
 {"ingest": "api",
  "blis": {"release": "v0.12.0", "commit_sha": "…", "catalog": "…", "registry": "…", "extractor_version": "…"},
- "vllm_ref": "v0.31.0", "vllm_max_distance": 2000,
+ "vllm_ref": "v0.32.0", "vllm_max_distance": 2000,
  "policy_sha256": "…", "pulled_at": "<UTC ISO-8601>",
  "corpus": {"dataset": "…", "revision": "…", "sha256": "…"} | null,
  "pull_manifest_sha256": "…",

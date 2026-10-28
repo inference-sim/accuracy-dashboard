@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build as b  # noqa: E402
 import clients  # noqa: E402
 
-MAIN_BASE = "3d5f4d4c" + "0" * 32          # v0.31.0's branch point on main
+MAIN_BASE = "3d5f4d4c" + "0" * 32          # VLLM_REF's branch point on main
 ON_MAIN = "ac9126e58aa7bbab1856ba6593ba4d5003fea516"
 OLDER = "cd10ed6f9f6b37a8ace9cf380007e66fe12ec0c3"
 FAR = "aaaa" * 10
@@ -270,7 +270,7 @@ def test_lookups_are_cached_per_image_and_per_commit():
     assert sorted(set(r.github.resolved)) == sorted(r.github.resolved)       # each SHA expanded once
     assert r.github.tag_checks == [FORK]                                     # off-main check once
     assert len(r.github.compares) == 3      # OLDER: on-main + distance; FORK: on-main only
-    assert r.github.merge_bases == ["v0.31.0"]                               # branch point once
+    assert r.github.merge_bases == ["v0.32.0"]                               # branch point once
 
 
 def test_a_release_tag_resolves_once_across_points():
@@ -307,11 +307,11 @@ def test_resolver_caches_hold_under_concurrency():
 def test_record_matches_the_fidelity_build_shape():
     got = _resolver().resolve("vllm/vllm-openai:nightly-" + OLDER)
     assert got.record() == {"image": "vllm/vllm-openai:nightly-" + OLDER, "commit": OLDER,
-                            "source": "image_tag", "ref": "v0.31.0", "distance": -738, "match": "exact"}
+                            "source": "image_tag", "ref": "v0.32.0", "distance": -738, "match": "exact"}
     far = _resolver().resolve("vllm/vllm-openai:nightly-" + FAR).record()
     assert (far["match"], far["why"], far["distance"]) == ("estimated", "outside_distance", 2001)
     custom = _resolver().resolve("lmsysorg/sglang:v0.5.9").record()
-    assert custom == {"image": "lmsysorg/sglang:v0.5.9", "commit": None, "source": None, "ref": "v0.31.0",
+    assert custom == {"image": "lmsysorg/sglang:v0.5.9", "commit": None, "source": None, "ref": "v0.32.0",
                       "distance": None, "match": "estimated", "why": "custom_build"}
 
 
