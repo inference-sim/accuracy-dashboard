@@ -28,6 +28,7 @@ nightly pipeline.
 from __future__ import annotations
 
 import re
+import threading
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -171,48 +172,76 @@ class Resolver:
     _absent: set = field(default_factory=set)          # shas vllm-project/vllm doesn't have
     _labels: dict = field(default_factory=dict)        # (repository, reference) -> label | None
     _placement: dict = field(default_factory=dict)     # full sha -> (distance | None, why | None)
+    _tags: dict = field(default_factory=dict)          # release tag -> commit sha | None
     _ref_base: str | None = None
+    # One Resolver is shared across the pull's download-worker pool, so every cache here is read and
+    # written concurrently. `_guard` serialises the dict/set bookkeeping; `_locks` hands out one lock
+    # per cache key so the first worker to miss does the (network) fetch and the rest wait for and
+    # reuse its result, instead of all firing the same API call and racing the write (GitHub #15).
+    _guard: threading.Lock = field(default_factory=threading.Lock, repr=False)
+    _locks: dict = field(default_factory=dict, repr=False)
+
+    def _keylock(self, kind: str, key) -> threading.Lock:
+        with self._guard:
+            return self._locks.setdefault((kind, key), threading.Lock())
 
     def _full(self, sha: str) -> str | None:
         """Expand a SHA through the GitHub API, cached."""
-        if sha not in self._commits:
-            full = sha if _FULL_SHA.fullmatch(sha) else None
-            got = self.github.resolve_commit(self.repo, sha)
-            self._commits[sha] = got if got and (full is None or got == full) else None
-            if got is None:
-                self._absent.add(sha)
-        return self._commits[sha]
+        with self._keylock("commit", sha):
+            if sha not in self._commits:
+                full = sha if _FULL_SHA.fullmatch(sha) else None
+                got = self.github.resolve_commit(self.repo, sha)
+                self._commits[sha] = got if got and (full is None or got == full) else None
+                if got is None:
+                    with self._guard:
+                        self._absent.add(sha)
+            return self._commits[sha]
+
+    def _is_absent(self, sha: str) -> bool:
+        with self._guard:
+            return sha in self._absent
+
+    def _tag_commit(self, tag: str) -> str | None:
+        """The commit a release tag names, cached: many points share one release image, so the tag
+        resolves once per run rather than once per point (the call that exhausted the quota)."""
+        with self._keylock("tag", tag):
+            if tag not in self._tags:
+                self._tags[tag] = self.github.tag_commit(self.repo, tag)
+            return self._tags[tag]
 
     def _label(self, repository: str, reference: str) -> str | None:
         key = (repository, reference)
-        if key not in self._labels:
-            self._labels[key] = self.registry.revision_label(repository, reference)
-        return self._labels[key]
+        with self._keylock("label", key):
+            if key not in self._labels:
+                self._labels[key] = self.registry.revision_label(repository, reference)
+            return self._labels[key]
 
     def ref_branch_point(self) -> str:
         """Where VLLM_REF's release branch left main."""
-        if self._ref_base is None:
-            self._ref_base = self.github.merge_base(self.repo, self.ref, "main")
-        return self._ref_base
+        with self._keylock("ref_base", None):
+            if self._ref_base is None:
+                self._ref_base = self.github.merge_base(self.repo, self.ref, "main")
+            return self._ref_base
 
     def _place(self, commit: str) -> tuple[int | None, str | None]:
         """(distance, why) for a resolved commit, cached per commit; why is None within distance."""
-        if commit not in self._placement:
-            # On main iff main contains the commit. (Comparing against the branch point instead
-            # would call a release-branch commit, or a fork cut after that point, "ahead".)
-            status, _, _ = self.github.compare(self.repo, commit, "main")
-            if status in ("ahead", "identical"):
-                point = commit
-            elif self.github.is_on_release_tag(self.repo, commit):
-                # A release-branch commit: measured from where its branch left main.
-                point = self.github.merge_base(self.repo, commit, "main")
-            else:
-                self._placement[commit] = (None, CUSTOM_BUILD)
-                return self._placement[commit]
-            _, ahead, behind = self.github.compare(self.repo, self.ref_branch_point(), point)
-            distance = ahead - behind
-            self._placement[commit] = (distance, OUTSIDE_DISTANCE if abs(distance) > self.max_distance else None)
-        return self._placement[commit]
+        with self._keylock("place", commit):
+            if commit not in self._placement:
+                # On main iff main contains the commit. (Comparing against the branch point instead
+                # would call a release-branch commit, or a fork cut after that point, "ahead".)
+                status, _, _ = self.github.compare(self.repo, commit, "main")
+                if status in ("ahead", "identical"):
+                    point = commit
+                elif self.github.is_on_release_tag(self.repo, commit):
+                    # A release-branch commit: measured from where its branch left main.
+                    point = self.github.merge_base(self.repo, commit, "main")
+                else:
+                    self._placement[commit] = (None, CUSTOM_BUILD)
+                    return self._placement[commit]
+                _, ahead, behind = self.github.compare(self.repo, self.ref_branch_point(), point)
+                distance = ahead - behind
+                self._placement[commit] = (distance, OUTSIDE_DISTANCE if abs(distance) > self.max_distance else None)
+            return self._placement[commit]
 
     def resolve(self, image: str, server_log: str | None = None) -> Build:
         build = Build(image=image or "", ref=self.ref)
@@ -255,12 +284,12 @@ class Resolver:
             if printed and printed != {img.tag}:
                 build.why = COMMIT_CONFLICT
                 return build
-            release_commit = self.github.tag_commit(self.repo, img.tag)
+            release_commit = self._tag_commit(img.tag)
 
         # The image label or the log's banner named a commit vllm-project/vllm doesn't have
         # (GitHub answers 422): the build is off vLLM's mainline, i.e. a custom build, not an
         # unknown one. (An image tag's trailing hex is no such statement: it can be a date.)
-        named_unknown = (label and label != "unknown" and label in self._absent) or (banner and banner in self._absent)
+        named_unknown = (label and label != "unknown" and self._is_absent(label)) or (banner and self._is_absent(banner))
         candidates = [(src, sha) for src, sha in ((label_source, label_commit),
                                                   ("server_log_banner", banner_commit),
                                                   ("image_tag", tag_commit),

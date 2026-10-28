@@ -42,6 +42,7 @@ class FakeGitHub:
 
     def __init__(self):
         self.resolved, self.compares, self.merge_bases, self.tag_checks = [], [], [], []
+        self.tag_commits = []
 
     def resolve_commit(self, repo, sha):
         self.resolved.append(sha)
@@ -70,6 +71,7 @@ class FakeGitHub:
         return sha == RELEASE_BRANCH
 
     def tag_commit(self, repo, tag):
+        self.tag_commits.append(tag)
         return {"v0.31.0": RELEASE_BRANCH}.get(tag)
 
 
@@ -271,6 +273,37 @@ def test_lookups_are_cached_per_image_and_per_commit():
     assert r.github.merge_bases == ["v0.31.0"]                               # branch point once
 
 
+def test_a_release_tag_resolves_once_across_points():
+    # GitHub #15: a release image's tag -> commit was fetched once per point, and many points share
+    # one release image (v0.31.0), so the identical API call fired dozens of times and exhausted the
+    # quota. The tag now resolves once per run.
+    r = _resolver()
+    for _ in range(8):
+        got = r.resolve("vllm/vllm-openai:v0.31.0")
+        assert got.commit == RELEASE_BRANCH and got.source == "release_tag"
+    assert r.github.tag_commits == ["v0.31.0"]                               # one tag lookup, not eight
+
+
+def test_resolver_caches_hold_under_concurrency():
+    # The Resolver is shared across the pull's download-worker pool. Resolving the same release image
+    # from many threads must still hit each API exactly once -- a check-then-fetch across a network
+    # call would otherwise let several threads miss the cache together and duplicate the request.
+    import threading
+    r = _resolver()
+    barrier = threading.Barrier(12)
+
+    def one():
+        barrier.wait()                   # release all threads together to widen the race window
+        r.resolve("vllm/vllm-openai:v0.31.0")
+
+    threads = [threading.Thread(target=one) for _ in range(12)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert r.github.tag_commits == ["v0.31.0"]                               # one lookup despite 12 threads
+
+
 def test_record_matches_the_fidelity_build_shape():
     got = _resolver().resolve("vllm/vllm-openai:nightly-" + OLDER)
     assert got.record() == {"image": "vllm/vllm-openai:nightly-" + OLDER, "commit": OLDER,
@@ -331,6 +364,77 @@ def test_get_json_retries_rate_limits_and_server_errors_then_gives_up_loudly():
             pass
         script[:] = [urllib.error.URLError("reset")] * 2 + [b"body"]
         assert cl._get_bytes("https://h/x", {}, sleep=slept.append) == b"body"
+    finally:
+        cl.urllib.request.urlopen = orig
+
+
+def test_a_far_off_rate_limit_reset_fails_fast_instead_of_idling():
+    # GitHub #15: a primary rate limit's x-ratelimit-reset can be ~an hour away. The whole run shares
+    # that hourly quota, so sitting through the reset inside one request only idles the runner before
+    # the same failure (the failed night waited ~47 min on one request). The total-wait budget gives
+    # up once the next back-off would exceed it, rather than honouring a reset the run can't afford.
+    import io
+    import urllib.error
+    import clients as cl
+    slept = []
+    reset = str(int(cl.time.time()) + 3600)                      # an hour out
+
+    class Resp(io.BytesIO):
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def fake_open(req, timeout):
+        raise urllib.error.HTTPError("u", 403, "x", {"x-ratelimit-remaining": "0",
+                                                     "x-ratelimit-reset": reset}, io.BytesIO(b""))
+    orig = cl.urllib.request.urlopen
+    try:
+        cl.urllib.request.urlopen = fake_open
+        try:
+            cl._get_bytes("https://h/x", {}, retries=4, sleep=slept.append, max_total_wait=900)
+            raise AssertionError("a far-off reset was waited out")
+        except cl.RateLimited:
+            pass
+        assert slept == []                                       # never slept an hour; gave up at once
+    finally:
+        cl.urllib.request.urlopen = orig
+
+
+def test_github_compare_is_cached_and_thread_safe():
+    # GitHub #15: is_on_release_tag walks compare() over every release tag, and one client is shared
+    # across the download-worker pool -- so the same (base, head) comparison must hit the API once,
+    # even when many threads ask for it together.
+    import io
+    import threading
+    import clients as cl
+
+    class Resp(io.BytesIO):
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    calls, g = [], cl.GitHubREST(token="t")
+    barrier = threading.Barrier(12)
+
+    def fake_open(req, timeout):
+        calls.append(req.full_url)
+        cl.time.sleep(0.01)                                      # widen the race window
+        return Resp(b'{"status": "ahead", "ahead_by": 3, "behind_by": 1}')
+
+    orig = cl.urllib.request.urlopen
+    try:
+        cl.urllib.request.urlopen = fake_open
+
+        def one():
+            barrier.wait()
+            assert g.compare("vllm-project/vllm", "base", "head") == ("ahead", 3, 1)
+
+        threads = [threading.Thread(target=one) for _ in range(12)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert len(calls) == 1                                   # one HTTP compare despite 12 callers
+        g.compare("vllm-project/vllm", "base", "other")          # a new (base, head) does fetch
+        assert len(calls) == 2
     finally:
         cl.urllib.request.urlopen = orig
 

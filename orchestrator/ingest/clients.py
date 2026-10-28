@@ -9,6 +9,7 @@ import json
 import os
 import re
 import subprocess
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -33,13 +34,20 @@ class FetchFailed(RuntimeError):
     RateLimited, it stops the pull: an outage would otherwise be filed as per-row data gaps."""
 
 
-def _get_bytes(url: str, headers: dict, timeout: int = 60, *, retries: int = 4, sleep=None, opener=None) -> bytes:
+def _get_bytes(url: str, headers: dict, timeout: int = 60, *, retries: int = 4, sleep=None, opener=None,
+               max_total_wait: int = 900) -> bytes:
     """GET a body, retrying 5xx, connection errors and rate limits (429, or 403 with no quota
     left) with backoff, honouring Retry-After / x-ratelimit-reset. Other HTTP errors (4xx, and
     a redirect the opener refuses to follow) raise at once as HTTPError; retries that run out
-    raise RateLimited or FetchFailed."""
+    raise RateLimited or FetchFailed.
+
+    Back-off across all retries of one request is bounded by max_total_wait: a primary rate limit's
+    reset can be most of an hour away, but the whole run shares that hourly quota, so waiting it out
+    inside one request only idles the runner before the same failure (GitHub #15 idled ~47 min on a
+    single request). If the next back-off would exceed the budget, give up now and fail loudly."""
     sleep = sleep or time.sleep
     open_ = opener.open if opener else urllib.request.urlopen
+    spent = 0
     for attempt in range(retries + 1):
         req = urllib.request.Request(url, headers=headers)
         try:
@@ -49,10 +57,6 @@ def _get_bytes(url: str, headers: dict, timeout: int = 60, *, retries: int = 4, 
             limited = e.code == 429 or (e.code == 403 and e.headers.get("x-ratelimit-remaining") == "0")
             if not (limited or e.code >= 500):
                 raise
-            if attempt == retries:
-                if limited:
-                    raise RateLimited(f"{url.split('?')[0]}: HTTP {e.code} after {retries} retries") from e
-                raise FetchFailed(f"{url.split('?')[0]}: HTTP {e.code} after {retries} retries") from e
             wait = e.headers.get("Retry-After")
             reset = e.headers.get("x-ratelimit-reset")
             if wait and wait.isdigit():
@@ -61,11 +65,23 @@ def _get_bytes(url: str, headers: dict, timeout: int = 60, *, retries: int = 4, 
                 delay = max(1, int(reset) - int(time.time()))
             else:
                 delay = 2 ** attempt
-            sleep(min(delay, 900))
+            # Give up when out of attempts, or when the true wait this back-off needs would blow the
+            # budget (a far-off reset the run can't afford to sit through -- sleeping a capped partial
+            # of it only idles the runner, since the quota won't be back when we retry).
+            if attempt == retries or spent + delay > max_total_wait:
+                how = f"after {attempt + 1} tr{'y' if attempt == 0 else 'ies'}"
+                if limited:
+                    raise RateLimited(f"{url.split('?')[0]}: HTTP {e.code} {how}") from e
+                raise FetchFailed(f"{url.split('?')[0]}: HTTP {e.code} {how}") from e
+            delay = min(delay, 900)   # re-check cadence: never sleep more than 15 min in one go
+            sleep(delay)
+            spent += delay
         except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
-            if attempt == retries:
-                raise FetchFailed(f"{url.split('?')[0]}: {e!r} after {retries} retries") from e
-            sleep(2 ** attempt)
+            delay = 2 ** attempt
+            if attempt == retries or spent + delay > max_total_wait:
+                raise FetchFailed(f"{url.split('?')[0]}: {e!r} after {attempt + 1} tries") from e
+            sleep(delay)
+            spent += delay
     raise AssertionError("unreachable")
 
 
@@ -154,6 +170,14 @@ class GitHubREST:
     def __init__(self, token: str | None = None):
         self.token = token if token is not None else _github_token()
         self._release_tags: dict[str, list[str]] = {}
+        # compare() is a pure function of (repo, base, head) within a run, and is_on_release_tag
+        # walks it over every release tag -- so points built from the same release branch all ask
+        # the same (ref branch point -> branch cut) comparison. Memoise it under a lock: one client
+        # is shared across the pull's download-worker pool, and a duplicate compare spends quota the
+        # nightly has little of (GitHub #15: a release tag's compares exhausted it and 403'd).
+        self._compares: dict[tuple[str, str, str], tuple[str, int, int]] = {}
+        self._compare_guard = threading.Lock()
+        self._compare_locks: dict[tuple[str, str, str], threading.Lock] = {}
 
     def _get(self, path: str):
         headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
@@ -183,8 +207,14 @@ class GitHubREST:
             raise
 
     def compare(self, repo: str, base: str, head: str) -> tuple[str, int, int]:
-        d = self._get(f"/repos/{repo}/compare/{base}...{head}?per_page=1")
-        return d["status"], d["ahead_by"], d["behind_by"]
+        key = (repo, base, head)
+        with self._compare_guard:
+            lock = self._compare_locks.setdefault(key, threading.Lock())
+        with lock:   # the first caller of this (base, head) fetches; the rest reuse its result
+            if key not in self._compares:
+                d = self._get(f"/repos/{repo}/compare/{base}...{head}?per_page=1")
+                self._compares[key] = (d["status"], d["ahead_by"], d["behind_by"])
+            return self._compares[key]
 
     def merge_base(self, repo: str, a: str, b: str) -> str:
         return self._get(f"/repos/{repo}/compare/{b}...{a}?per_page=1")["merge_base_commit"]["sha"]
