@@ -62,7 +62,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.27"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -91,7 +91,7 @@ jobs:
           set -euo pipefail
           SIM="$RUNNER_TEMP/sim"
           git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$SIM"
-          ( cd "$SIM" && GOFLAGS=-mod=mod go build -o blis main.go && GOFLAGS=-mod=mod go build -o signedprobe ./cmd/signedprobe )
+          ( cd "$SIM" && GOFLAGS=-mod=mod go build -o blis main.go && GOFLAGS=-mod=mod go build -o signedprobe ./tools/signedprobe )
           eval "$(bash orchestrator/resolve_versions.sh "$SIM")"
           git clone -q --depth 1 --branch "$catalog"  https://github.com/inference-sim/blis-catalog.git  "$RUNNER_TEMP/catalog"
           git clone -q --depth 1 --branch "$registry" https://github.com/inference-sim/blis-registry.git "$RUNNER_TEMP/registry"
