@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Derive catalog/registry/kernel from a resolved BLIS tag (RFC §4.6). These are NOT separate
-# diff axes: each BLIS release states its compatible catalog/registry in installation.md and
-# its kernel in go.mod, so they ride BLIS_TAG. Recorded in provenance for traceability.
+# Derive catalog/registry/kernel/vllm from a resolved BLIS tag (RFC §4.6). These are NOT separate
+# diff axes: each BLIS release states its compatible catalog/registry in installation.md, its
+# kernel in go.mod, and the vLLM release its engine models in blis-vllm's own Upstream provenance,
+# so they ride BLIS_TAG. Recorded in provenance for traceability.
 #
 # IMPORTANT (verified): the compatible catalog/registry come from the release's
 # installation.md, NOT the kernel's testdata/upstream.lock -- using the lock's pair made the
@@ -33,13 +34,21 @@ PY
 )
 KERNEL=$(grep -E 'blis-latency-kernel ' "$gomod" | awk '{print $2}')
 
-if [[ -z "$CATALOG" || -z "$REGISTRY" || -z "$KERNEL" ]]; then
-  echo "FATAL: could not derive catalog/registry/kernel from $checkout" >&2
-  echo "  catalog=$CATALOG registry=$REGISTRY kernel=$KERNEL" >&2
+# The vLLM release this BLIS build models: read from blis-vllm's own Upstream provenance var, NOT
+# the blis-vllm MODULE tag (the two are not guaranteed to match). `go doc` prints the composite
+# literal without compiling anything; the Tag field is the v-prefixed ref the resolver/manifest
+# want. Run from inside the checkout so the blis-vllm version is the one this release's go.mod pins.
+VLLM=$( cd "$checkout" && GOFLAGS=-mod=mod go doc github.com/inference-sim/blis-vllm Upstream 2>/dev/null \
+          | awk -F'"' '/[[:space:]]Tag:/{print $2; exit}' )
+
+if [[ -z "$CATALOG" || -z "$REGISTRY" || -z "$KERNEL" || -z "$VLLM" ]]; then
+  echo "FATAL: could not derive catalog/registry/kernel/vllm from $checkout" >&2
+  echo "  catalog=$CATALOG registry=$REGISTRY kernel=$KERNEL vllm=$VLLM" >&2
   exit 1
 fi
 
 echo "catalog=${CATALOG}" | tee -a "$out"
 echo "registry=${REGISTRY}" | tee -a "$out"
 echo "kernel=${KERNEL}" | tee -a "$out"
-echo "derived catalog=${CATALOG} registry=${REGISTRY} kernel=${KERNEL} from ${checkout}" >&2
+echo "vllm=${VLLM}" | tee -a "$out"
+echo "derived catalog=${CATALOG} registry=${REGISTRY} kernel=${KERNEL} vllm=${VLLM} from ${checkout}" >&2

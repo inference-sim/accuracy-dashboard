@@ -32,6 +32,12 @@ import threading
 from dataclasses import dataclass, field
 from typing import Protocol
 
+# Fallback vLLM ref for un-resolved local/manual runs. CI overrides it from the resolved BLIS
+# release: resolve_versions.sh reads blis-vllm's Upstream provenance (the vLLM release the engine
+# models), the nightly exports it as $VLLM_REF, and cmd_pull threads that value into the Resolver
+# and the manifest stamp. So the whole "exact vs estimated" resolution rides the resolved release,
+# never this constant, whenever a ref is resolved. Keep it current with the latest release as a
+# sensible default for local runs.
 VLLM_REF = "v0.32.0"
 VLLM_MAX_DISTANCE = 2000
 VLLM_REPO = "vllm-project/vllm"
