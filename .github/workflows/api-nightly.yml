@@ -140,12 +140,19 @@ jobs:
           # job survives and scores the rest. Scoring is also split by type: single-turn (light,
           # no corpus) runs --workers-wide, agentic runs --agentic-workers=1. --corpus-cache stays
           # for agentic parse-speed (blis: output identical with or without it).
+          # PULL-phase memory is a SEPARATE concern --max-rss-mb does NOT bound: that guard wraps
+          # each blis replay subprocess, but the pull holds artifact zips whole in the parent's RAM
+          # (download() -> bytes, decompressed in iter_files), one per download worker. On the cold
+          # full-rescore a BLIS bump forces (reuse 0 frozen, freeze 2030 fresh), 8 workers all held
+          # large agentic blobs from the b300/gb300/mi355x region at once and the 16GB runner was
+          # reclaimed mid-pull (run 40709558993: SIGTERM/exit 143 at point ~1759). 4 workers halves
+          # that peak; the pull is slower but far inside timeout-minutes. See PR notes.
           python3 orchestrator/ingest/cli.py nightly \
             --blis-tag "$BLIS_TAG" \
             --work-dir "$RUNNER_TEMP/pull" --data-dir data --state state/last-run-api.json \
             --window-days "$WINDOW_DAYS" --keep-api "$KEEP_API" \
             --today "$TODAY" \
-            --workers 4 --agentic-workers 1 --download-workers 8 --max-rss-mb 13000 \
+            --workers 4 --agentic-workers 1 --download-workers 4 --max-rss-mb 13000 \
             --cache "$RUNNER_TEMP/artifacts" --corpus-cache "$RUNNER_TEMP/corpus-cache" \
             --work "$RUNNER_TEMP/contract" --score-work "$RUNNER_TEMP/scorework" \
             --evaluator-commit "$GITHUB_SHA" \
