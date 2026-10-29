@@ -81,8 +81,10 @@ jobs:
           restore-keys: |
             ix-artifacts-
 
-      # Build blis + signedprobe FROM SOURCE at the resolved tag, and the blisdefaults helper against
-      # that release's own kernel/schemas (so a per-release score is sound; #15's seed rule).
+      # Build blis FROM SOURCE at the resolved tag, and this repo's signedprobe and blisdefaults
+      # helper against that release's own inference-sim/kernel/schemas/blis-vllm (so a per-release
+      # score is sound; #15's seed rule). signedprobe lives here (orchestrator/signedprobe) since
+      # inference-sim v0.14.0, so a BLIS refactor no longer breaks the dashboard's scorer.
       - name: Build BLIS, signedprobe and the per-release defaults helper
         env:
           BLIS_TAG: ${{ needs.resolve.outputs.blis_tag }}
@@ -91,7 +93,8 @@ jobs:
           set -euo pipefail
           SIM="$RUNNER_TEMP/sim"
           git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$SIM"
-          ( cd "$SIM" && GOFLAGS=-mod=mod go build -o blis main.go && GOFLAGS=-mod=mod go build -o signedprobe ./tools/signedprobe )
+          ( cd "$SIM" && GOFLAGS=-mod=mod go build -o blis main.go )
+          bash orchestrator/build_signedprobe.sh "$SIM" "$RUNNER_TEMP/signedprobe"
           eval "$(bash orchestrator/resolve_versions.sh "$SIM")"
           git clone -q --depth 1 --branch "$catalog"  https://github.com/inference-sim/blis-catalog.git  "$RUNNER_TEMP/catalog"
           git clone -q --depth 1 --branch "$registry" https://github.com/inference-sim/blis-registry.git "$RUNNER_TEMP/registry"
@@ -100,6 +103,7 @@ jobs:
           echo "CATALOG=$RUNNER_TEMP/catalog" >> "$GITHUB_ENV"
           echo "REGISTRY=$RUNNER_TEMP/registry" >> "$GITHUB_ENV"
           echo "DEFAULTS_HELPER=$RUNNER_TEMP/blisdefaults" >> "$GITHUB_ENV"
+          echo "SIGNEDPROBE=$RUNNER_TEMP/signedprobe" >> "$GITHUB_ENV"
           # The vLLM ref the resolved BLIS release models (blis-vllm's Upstream), so cmd_pull stamps
           # it into the manifest and anchors the build resolver on it -- no hardcoded VLLM_REF.
           echo "VLLM_REF=$vllm" >> "$GITHUB_ENV"
@@ -160,7 +164,7 @@ jobs:
             --work "$RUNNER_TEMP/contract" --score-work "$RUNNER_TEMP/scorework" \
             --evaluator-commit "$GITHUB_SHA" \
             --blis-dir "$SIM" --catalog "$CATALOG" --registry "$REGISTRY" \
-            --defaults-helper "$DEFAULTS_HELPER" \
+            --defaults-helper "$DEFAULTS_HELPER" --signedprobe "$SIGNEDPROBE" \
             --corpus "$RUNNER_TEMP/corpus.json" --corpus-revision "$CORPUS_REVISION"
 
       - name: Package the published data for the publish job
