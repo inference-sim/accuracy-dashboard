@@ -1,9 +1,17 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-28T16:02:51Z",
+  "generated_at": "2026-10-29T11:52:35Z",
   "keep_api": 5,
-  "latest": "2026-10-28_blis-v0.13.0_ix-api-2026-10-28",
+  "latest": "2026-10-29_blis-v0.14.0_ix-api-2026-10-29",
   "runs": [
+    {
+      "snapshot_id": "2026-10-29_blis-v0.14.0_ix-api-2026-10-29",
+      "generated_at": "2026-10-29T11:25:44Z",
+      "blis_release": "v0.14.0",
+      "ix_release": "api-2026-10-29",
+      "ingest": "api",
+      "path": "snapshots/2026-10-29_blis-v0.14.0_ix-api-2026-10-29/summary.json"
+    },
     {
       "snapshot_id": "2026-10-28_blis-v0.13.0_ix-api-2026-10-28",
       "generated_at": "2026-10-28T15:36:32Z",
