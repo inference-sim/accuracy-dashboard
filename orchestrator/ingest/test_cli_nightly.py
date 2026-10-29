@@ -24,7 +24,8 @@ def _args(tmp, **over):
              state=str(tmp / "state.json"), window_days=180, keep_api=5, today="2026-10-23",
              cache=None, work=str(tmp / "contract"), score_work=str(tmp / "sw"), evaluator_commit="abc",
              blis_dir=str(tmp / "sim"), catalog=str(tmp / "cat"), registry=str(tmp / "reg"),
-             defaults_helper=str(tmp / "helper"), corpus=str(tmp / "corpus.json"),
+             defaults_helper=str(tmp / "helper"), signedprobe=str(tmp / "signedprobe"),
+             corpus=str(tmp / "corpus.json"),
              corpus_sha256=None, corpus_dataset="d", corpus_revision="main", corpus_cache=None,
              timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0)
     a.update(over)

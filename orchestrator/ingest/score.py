@@ -5,8 +5,8 @@ Per point: settings (settings.py) -> support (support.py) -> replay inputs (repl
 -> the scenario file -> `blis replay --agentic-scenario` -> the diff of what BLIS was given
 against what the run recorded -> one fidelity record, or a not-scored record with reasons.
 
-Single-turn points go through the same extraction and are scored with inference-sim's
-signedprobe at the same BLIS tag (score_single_turn).
+Single-turn points go through the same extraction and are scored with this repo's signedprobe
+(orchestrator/signedprobe), built against the same BLIS tag (score_single_turn).
 """
 from __future__ import annotations
 
@@ -67,10 +67,11 @@ class Env:
     vllm_defaults_sha256: str = ""
     catalog_obj: sp.Catalog | None = None
     parts: set = field(default_factory=set)
-    # Single-turn: inference-sim's signedprobe at the same tag, and the benchmark workloads it
-    # replays (its testdata/inferencex-workloads/seed0.json: InferenceX's request lengths per
-    # (isl, osl, concurrency)).
+    # Single-turn: this repo's signedprobe built against the same tag, and the benchmark
+    # workloads it replays (orchestrator/signedprobe/testdata/inferencex-workloads/seed0.json:
+    # InferenceX's request lengths per (isl, osl, concurrency)).
     signedprobe: str = ""
+    blis_dir: str = ""            # the inference-sim checkout blis runs in (signedprobe -blis-dir)
     single_turn_workloads: set = field(default_factory=set)   # {(isl, osl, conc)}
     # A per-replay resident-memory ceiling in MB (0 = none). An agentic replay whose RSS exceeds
     # it is killed individually and the point is not-scored with an insufficient_memory reason, so
@@ -761,7 +762,7 @@ def single_turn_inputs(row: dict, dep: dict, scenario_file: str) -> tuple[dict, 
 
 def score_single_turn(o, entry, env, work: Path, sdir: Path, name: str, text: str, dep: dict,
                       args: list, log: str, approximated: bool):
-    """One single-turn point through signedprobe (inference-sim cmd/signedprobe at the BLIS tag)."""
+    """One single-turn point through signedprobe (orchestrator/signedprobe, built at the BLIS tag)."""
     row, pid, ident = entry["row"], entry["point_id"], entry["identity"]
     scen_doc = next((d for d in __import__("yaml").safe_load_all(text) if d.get("kind") == "Scenario"), {})
     dep = {**dep, "_model": scen_doc.get("model", ""), "_scenario": scen_doc}
@@ -779,6 +780,8 @@ def score_single_turn(o, entry, env, work: Path, sdir: Path, name: str, text: st
     argv = [env.signedprobe, "-blis", env.blis, "-corpus", str(files["corpus"]), "-scenarios", str(sdir),
             "-absolutes", str(files["absolutes"]), "-engine-settings", str(files["settings"]),
             "-catalog", str(env.catalog), "-registry", str(env.registry)]
+    if env.blis_dir:
+        argv += ["-blis-dir", env.blis_dir]
     out_path = pdir / "signedprobe.csv"
     key = hashlib.sha256((text + "".join(files[r].read_text() for r in sorted(files)) + "\0".join(argv[1:])).encode()).hexdigest()
     key_path = pdir / "signedprobe.key"

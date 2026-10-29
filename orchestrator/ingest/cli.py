@@ -204,18 +204,29 @@ def _go_require(gomod: Path, module: str) -> str | None:
     return None
 
 
-def check_blis_inputs(sim: Path, helper: str, catalog: Path, registry: Path) -> list[str]:
-    """Everything `score` needs to be one BLIS release, or what's wrong. The defaults helper is
-    built against an inference-sim tag; it must be --blis-dir's, with the same kernel and
-    schemas, or its defaults / resolutions / acceptance would come from another release. The
-    releases recorded in provenance must be real tags, never "unknown"."""
+# The dashboard's own copy of signedprobe and the benchmark's request lengths it replays
+# (orchestrator/signedprobe, moved from inference-sim's tools/ at v0.14.0).
+SIGNEDPROBE_DIR = Path(__file__).resolve().parent.parent / "signedprobe"
+SINGLE_TURN_WORKLOADS = SIGNEDPROBE_DIR / "testdata" / "inferencex-workloads" / "seed0.json"
+
+
+def check_blis_inputs(sim: Path, helper: str, catalog: Path, registry: Path,
+                      signedprobe: str) -> list[str]:
+    """Everything `score` needs to be one BLIS release, or what's wrong. The defaults helper and
+    signedprobe are built against an inference-sim tag; it must be --blis-dir's, with the same
+    kernel and schemas, or its defaults / resolutions / acceptance would come from another
+    release. The releases recorded in provenance must be real tags, never "unknown"."""
     out = []
     tag = _git(sim, "describe", "--tags", "--exact-match")
     if not tag:
         out.append(f"--blis-dir {sim} is not at a release tag (fetch tags, or check out the tag)")
-    for f in ("blis", "signedprobe", "testdata/inferencex-workloads/seed0.json"):
-        if not (sim / f).exists():
-            out.append(f"--blis-dir {sim} has no {f} (build blis and signedprobe in it)")
+    if not (sim / "blis").exists():
+        out.append(f"--blis-dir {sim} has no blis (build it there: go build -o blis main.go)")
+    if not Path(signedprobe).exists():
+        out.append(f"--signedprobe {signedprobe} does not exist "
+                   "(build it: orchestrator/build_signedprobe.sh <inference-sim checkout> <out>)")
+    if not SINGLE_TURN_WORKLOADS.exists():
+        out.append(f"{SINGLE_TURN_WORKLOADS} is missing")
     for repo, flag in ((catalog, "--catalog"), (registry, "--registry")):
         if not _git(repo, "describe", "--tags", "--exact-match"):
             out.append(f"{flag} {repo} is not at a release tag")
@@ -235,7 +246,8 @@ def check_blis_inputs(sim: Path, helper: str, catalog: Path, registry: Path) -> 
 
 def cmd_score(a) -> int:
     pull_dir = Path(a.pull)
-    bad = check_blis_inputs(Path(a.blis_dir), a.defaults_helper, Path(a.catalog), Path(a.registry))
+    bad = check_blis_inputs(Path(a.blis_dir), a.defaults_helper, Path(a.catalog), Path(a.registry),
+                            a.signedprobe)
     if bad:
         for b in bad:
             _log(f"FATAL: {b}")
@@ -266,8 +278,9 @@ def cmd_score(a) -> int:
         base_models=manifest.get("base_models") or {}, timeout_s=a.timeout,
         vllm_defaults=vdefaults, vllm_defaults_sha256=vdefaults_sha,
         max_rss_mb=getattr(a, "max_rss_mb", 0) or 0)
-    env.signedprobe = str(sim / "signedprobe")
-    wl = json.loads((sim / "testdata" / "inferencex-workloads" / "seed0.json").read_text())
+    env.signedprobe = str(Path(a.signedprobe).resolve())
+    env.blis_dir = str(sim.resolve())
+    wl = json.loads(SINGLE_TURN_WORKLOADS.read_text())
     env.single_turn_workloads = {(p["isl"], p["osl"], p["concurrency"]) for p in wl["points"]}
     env.catalog_obj = sp.Catalog.load(env.catalog)
     env.parts = sp.registry_parts(env.registry)
@@ -342,7 +355,8 @@ def cmd_nightly(a) -> int:
     def score_build_fn(work: Path, blis_tag: str, score_ids, pull_date: str, window_ids: set):
         rc = cmd_score(types.SimpleNamespace(
             pull=str(work), out=str(contract_dir), blis_dir=a.blis_dir, catalog=a.catalog,
-            registry=a.registry, defaults_helper=a.defaults_helper, corpus=a.corpus,
+            registry=a.registry, defaults_helper=a.defaults_helper, signedprobe=a.signedprobe,
+            corpus=a.corpus,
             corpus_sha256=a.corpus_sha256, corpus_dataset=a.corpus_dataset,
             corpus_revision=a.corpus_revision, corpus_cache=a.corpus_cache, work=a.score_work,
             timeout=a.timeout, only=None, workers=a.workers, agentic_workers=a.agentic_workers,
@@ -392,6 +406,8 @@ def main(argv=None) -> int:
     s.add_argument("--catalog", required=True)
     s.add_argument("--registry", required=True)
     s.add_argument("--defaults-helper", required=True, help="orchestrator/blisdefaults built against --blis-dir's tag")
+    s.add_argument("--signedprobe", required=True,
+                   help="orchestrator/signedprobe built against --blis-dir's tag (build_signedprobe.sh)")
     s.add_argument("--corpus", required=True)
     s.add_argument("--corpus-sha256")
     s.add_argument("--corpus-dataset", default="semianalysisai/cc-traces-weka-062126")
@@ -423,6 +439,8 @@ def main(argv=None) -> int:
     n.add_argument("--catalog", required=True)
     n.add_argument("--registry", required=True)
     n.add_argument("--defaults-helper", required=True)
+    n.add_argument("--signedprobe", required=True,
+                   help="orchestrator/signedprobe built against --blis-dir's tag (build_signedprobe.sh)")
     n.add_argument("--corpus", required=True)
     n.add_argument("--corpus-sha256")
     n.add_argument("--corpus-dataset", default="semianalysisai/cc-traces-weka-062126")
