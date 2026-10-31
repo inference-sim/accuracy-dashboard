@@ -1,7 +1,7 @@
 {
   "ingest": "api",
-  "blis_tag": "v0.14.0",
-  "snapshot_id": "2026-10-30_blis-v0.14.0_ix-api-2026-10-30",
+  "blis_tag": "v0.15.0",
+  "snapshot_id": "2026-10-31_blis-v0.15.0_ix-api-2026-10-31",
   "point_count": 2031,
   "point_ids": [
     "0004425a4c559ee3032f69005c19dcf3173427e360283c2473df31a1bbca6576",
