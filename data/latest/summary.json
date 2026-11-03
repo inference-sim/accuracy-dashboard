@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "snapshot_id": "2026-11-02_blis-v0.15.0_ix-api-2026-11-02",
-  "generated_at": "2026-11-02T12:57:05Z",
+  "snapshot_id": "2026-11-03_blis-v0.15.0_ix-api-2026-11-03",
+  "generated_at": "2026-11-03T12:28:23Z",
   "provenance": {
     "blis": {
       "catalog": "0.3.0",
@@ -13,17 +13,17 @@
     "ground_truth": {
       "source": "SemiAnalysis InferenceX API",
       "source_url": "https://inferencex.semianalysis.com/api/v1/",
-      "release_tag": "api-2026-11-02",
-      "measurement_date_through": "2026-11-02",
-      "measurement_sha256": "4952296d12bade5c60f13b7c716cb2ad822ed63e7e7620443ab530f565a76801"
+      "release_tag": "api-2026-11-03",
+      "measurement_date_through": "2026-11-03",
+      "measurement_sha256": "150fbc984d7cd967663ae5054ea7a271c0a8aecf5fc73fc7e8a77a2716a06dfb"
     },
-    "evaluator_commit": "6b1749f9ab48dcf3961083beb0df041b0d863038",
+    "evaluator_commit": "545b3d3c89341d8cbb03166ddba0ff632de37cc7",
     "scorer": "signedprobe",
     "ingest": "api",
     "vllm_ref": "v0.32.0",
     "vllm_max_distance": 2000,
     "policy_sha256": "602b03250d7bca865bbe29813c316c00dad0f3e387ef00a4855e2290f54b00a8",
-    "pulled_at": "2026-11-02T12:57:05Z",
+    "pulled_at": "2026-11-03T12:28:23Z",
     "corpus": {
       "dataset": "semianalysisai/cc-traces-weka-062126",
       "revision": "23f152f6f0f9399a85901b89a6458def0ef16729",
@@ -32,7 +32,7 @@
   },
   "coverage": {
     "scored": 757,
-    "not_scored": 1273,
+    "not_scored": 1274,
     "multinode_hidden": 0,
     "failed": 0,
     "repeat_runs_folded": 1,
@@ -42,11 +42,11 @@
       "client_scenario_not_replayable": 11,
       "conflict": 17,
       "drafter_not_in_catalog": 488,
-      "hardware_no_coefficients": 649,
+      "hardware_no_coefficients": 650,
       "model_not_in_catalog": 117,
       "required_setting_missing": 13,
       "server_log_missing": 57,
-      "setting_not_modelled": 500,
+      "setting_not_modelled": 501,
       "unclassified_arg": 169
     }
   },
@@ -148206,7 +148206,7 @@
                         "precision": "fp8",
                         "recipe": "row:411032"
                       },
-                      "sweep_id": "1883|minimax-m2.5-b300-fp8-vllm-tp2-dp1-ep2|1k1k|0bbc1a68e232#3dcd808d7fd1",
+                      "sweep_id": "1883|minimax-m2.5-b300-fp8-vllm-tp2-dp1-ep2|1k1k|0bbc1a68e232#3dcd808d7fd1#3dcd808d7fd1",
                       "repeats": [
                         {
                           "point_id": "3dcd808d7fd1180f1c3176ea7dffe0f9d4e0f84438e5c06a8428b5cf75cb428f",
@@ -260330,6 +260330,66 @@
     },
     {
       "benchmark_type": "agentic_traces",
+      "conc": 64,
+      "framework": "vllm",
+      "hardware": "mi355x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 64,
+        "framework": "vllm",
+        "hardware": "mi355x",
+        "measured_date": "2026-11-03",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "99ee81a3df9f1860913519718986b424abf7afe4766ed8bdfd5758772c154652"
+      },
+      "image": "vllm/vllm-openai-rocm:nightly-e68efc685ab1e6f1eda004ced7157e3ca411da2f@sha256:520e098f54ec96837228aaddea0a833cbf6374dbdffd480c1d65f26ffab7701b",
+      "measured": {
+        "tpot_ms": 12.79,
+        "ttft_ms": 500.09
+      },
+      "measured_date": "2026-11-03",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:monokernel",
+          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
+        }
+      ],
+      "point_id": "060ae3f5c0312ad88ac7329d48ba204f901c755f8ea2ef029fc93c79c15c14d4",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+        "setting_not_modelled:monokernel"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
       "conc": 70,
       "framework": "vllm",
       "hardware": "b300",
@@ -262495,66 +262555,6 @@
         "setting_not_modelled:disable_hybrid_kv_cache_manager",
         "setting_not_modelled:env.VLLM_MARLIN_USE_ATOMIC_ADD",
         "setting_not_modelled:speculative_config.kv_cache_dtype"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 4,
-      "framework": "vllm",
-      "hardware": "mi355x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 4,
-        "framework": "vllm",
-        "hardware": "mi355x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "8c554a53ad71d9b9a5f831b6a7ac8dfd5e3611a3048dc2d097b8537ec5d28c17"
-      },
-      "image": "vllm/vllm-openai-rocm:nightly-e68efc685ab1e6f1eda004ced7157e3ca411da2f@sha256:520e098f54ec96837228aaddea0a833cbf6374dbdffd480c1d65f26ffab7701b",
-      "measured": {
-        "tpot_ms": 2.04,
-        "ttft_ms": 1467.19
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:monokernel",
-          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
-        }
-      ],
-      "point_id": "13339bb29adf6e253398adc6f2375234cc15e65b86742bbf5330586c8ae829ec",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-        "setting_not_modelled:monokernel"
       ]
     },
     {
@@ -265620,6 +265620,66 @@
     },
     {
       "benchmark_type": "agentic_traces",
+      "conc": 2,
+      "framework": "vllm",
+      "hardware": "mi355x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 2,
+        "framework": "vllm",
+        "hardware": "mi355x",
+        "measured_date": "2026-11-03",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "07bb1acdc480ce19815c47d09b0059a9d1df8a6fa29eb65a5701aa66fa038f87"
+      },
+      "image": "vllm/vllm-openai-rocm:nightly-e68efc685ab1e6f1eda004ced7157e3ca411da2f@sha256:520e098f54ec96837228aaddea0a833cbf6374dbdffd480c1d65f26ffab7701b",
+      "measured": {
+        "tpot_ms": 1.69,
+        "ttft_ms": 636.54
+      },
+      "measured_date": "2026-11-03",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:monokernel",
+          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
+        }
+      ],
+      "point_id": "247a5208694c0d1d732b27ed674723c977e4ccbf750361aecb58ff5d15283031",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+        "setting_not_modelled:monokernel"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
       "conc": 10,
       "framework": "vllm",
       "hardware": "h200",
@@ -267852,6 +267912,66 @@
       "precision": "fp8",
       "reasons": [
         "hardware_no_coefficients"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 1,
+      "framework": "vllm",
+      "hardware": "mi355x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 1,
+        "framework": "vllm",
+        "hardware": "mi355x",
+        "measured_date": "2026-11-03",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "b65a58c206c8e4b1def2989e0840025eba6c0e2991899611c05c792135348b61"
+      },
+      "image": "vllm/vllm-openai-rocm:nightly-335dd77b09161c5d63139b4e7ae51bb9928305b1@sha256:3c634cc2c51eda7eb840a236b1f09a5ecf6a4b0cb92c4b8486e2158770507291",
+      "measured": {
+        "tpot_ms": 1.44,
+        "ttft_ms": 331.89
+      },
+      "measured_date": "2026-11-03",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:monokernel",
+          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
+        }
+      ],
+      "point_id": "31422cfb0005d02b330baf477829272100adb86b7888ac2e0e5dfba07198bf7d",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+        "setting_not_modelled:monokernel"
       ]
     },
     {
@@ -275167,6 +275287,66 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 2,
+      "framework": "vllm",
+      "hardware": "mi355x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 2,
+        "framework": "vllm",
+        "hardware": "mi355x",
+        "measured_date": "2026-11-03",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "927d6dc80dd6992d51b427185da40ff352f126b68bd248dd1cb5d6b094a1a384"
+      },
+      "image": "vllm/vllm-openai-rocm:nightly-e68efc685ab1e6f1eda004ced7157e3ca411da2f@sha256:520e098f54ec96837228aaddea0a833cbf6374dbdffd480c1d65f26ffab7701b",
+      "measured": {
+        "tpot_ms": 2.02,
+        "ttft_ms": 917.39
+      },
+      "measured_date": "2026-11-03",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:monokernel",
+          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
+        }
+      ],
+      "point_id": "5c95d164b2511fa190766a18677a7b05925a8801fb860cec455172be2c6e1b29",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+        "setting_not_modelled:monokernel"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 256,
       "framework": "vllm",
@@ -277885,6 +278065,66 @@
     },
     {
       "benchmark_type": "agentic_traces",
+      "conc": 4,
+      "framework": "vllm",
+      "hardware": "mi355x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 4,
+        "framework": "vllm",
+        "hardware": "mi355x",
+        "measured_date": "2026-11-03",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "927d6dc80dd6992d51b427185da40ff352f126b68bd248dd1cb5d6b094a1a384"
+      },
+      "image": "vllm/vllm-openai-rocm:nightly-e68efc685ab1e6f1eda004ced7157e3ca411da2f@sha256:520e098f54ec96837228aaddea0a833cbf6374dbdffd480c1d65f26ffab7701b",
+      "measured": {
+        "tpot_ms": 2.04,
+        "ttft_ms": 1531.75
+      },
+      "measured_date": "2026-11-03",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:monokernel",
+          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
+        }
+      ],
+      "point_id": "6c60842e1be7e79a6bd9d13ae2227e6e321e14f5b8f919fd96ffee15fe345fbf",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+        "setting_not_modelled:monokernel"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
       "conc": 16,
       "framework": "vllm",
       "hardware": "b200",
@@ -279410,6 +279650,66 @@
         "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
         "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MHA",
         "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 16,
+      "framework": "vllm",
+      "hardware": "mi355x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 16,
+        "framework": "vllm",
+        "hardware": "mi355x",
+        "measured_date": "2026-11-03",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "29d92dc02799e0554dad8dbf9cafce19c8c55600dbf0c0e863aacb477d174b1d"
+      },
+      "image": "vllm/vllm-openai-rocm:nightly-e68efc685ab1e6f1eda004ced7157e3ca411da2f@sha256:520e098f54ec96837228aaddea0a833cbf6374dbdffd480c1d65f26ffab7701b",
+      "measured": {
+        "tpot_ms": 3.09,
+        "ttft_ms": 982.3
+      },
+      "measured_date": "2026-11-03",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:monokernel",
+          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
+        }
+      ],
+      "point_id": "73836f2b88981a5e0c1d4ab2595f59184d6332cef8509609cfe0cc147c492eab",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+        "setting_not_modelled:monokernel"
       ]
     },
     {
@@ -281841,66 +282141,6 @@
       "precision": "fp4",
       "reasons": [
         "hardware_no_coefficients"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 1,
-      "framework": "vllm",
-      "hardware": "mi355x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 1,
-        "framework": "vllm",
-        "hardware": "mi355x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "8c554a53ad71d9b9a5f831b6a7ac8dfd5e3611a3048dc2d097b8537ec5d28c17"
-      },
-      "image": "vllm/vllm-openai-rocm:nightly-e68efc685ab1e6f1eda004ced7157e3ca411da2f@sha256:520e098f54ec96837228aaddea0a833cbf6374dbdffd480c1d65f26ffab7701b",
-      "measured": {
-        "tpot_ms": 2.01,
-        "ttft_ms": 571.2
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:monokernel",
-          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
-        }
-      ],
-      "point_id": "838eb039200e606f53dce58422d6e92e0658eaa948639481f369d5e649ee8823",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-        "setting_not_modelled:monokernel"
       ]
     },
     {
@@ -287670,6 +287910,66 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 8,
+      "framework": "vllm",
+      "hardware": "mi355x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 8,
+        "framework": "vllm",
+        "hardware": "mi355x",
+        "measured_date": "2026-11-03",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "b317051a1494e017494e1c3b8bb6fd89eb925e1f7a59f399a53317de9cdc78cb"
+      },
+      "image": "vllm/vllm-openai-rocm:nightly-e68efc685ab1e6f1eda004ced7157e3ca411da2f@sha256:520e098f54ec96837228aaddea0a833cbf6374dbdffd480c1d65f26ffab7701b",
+      "measured": {
+        "tpot_ms": 2.28,
+        "ttft_ms": 905.98
+      },
+      "measured_date": "2026-11-03",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:monokernel",
+          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
+        }
+      ],
+      "point_id": "a541038e0a76196c417e40738f84b5142340e191ea1b11e0bbe5b1bf9aae97e7",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+        "setting_not_modelled:monokernel"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 8,
       "framework": "vllm",
@@ -290305,6 +290605,66 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 1,
+      "framework": "vllm",
+      "hardware": "mi355x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 1,
+        "framework": "vllm",
+        "hardware": "mi355x",
+        "measured_date": "2026-11-03",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "07bb1acdc480ce19815c47d09b0059a9d1df8a6fa29eb65a5701aa66fa038f87"
+      },
+      "image": "vllm/vllm-openai-rocm:nightly-e68efc685ab1e6f1eda004ced7157e3ca411da2f@sha256:520e098f54ec96837228aaddea0a833cbf6374dbdffd480c1d65f26ffab7701b",
+      "measured": {
+        "tpot_ms": 1.68,
+        "ttft_ms": 421.89
+      },
+      "measured_date": "2026-11-03",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:monokernel",
+          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
+        }
+      ],
+      "point_id": "b1c2de3f11d52ff77308095d0bd9ad1bf2b315bc8833bb970de7a481e917d229",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+        "setting_not_modelled:monokernel"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 2,
       "framework": "vllm",
@@ -291237,66 +291597,6 @@
       ]
     },
     {
-      "benchmark_type": "agentic_traces",
-      "conc": 64,
-      "framework": "vllm",
-      "hardware": "mi355x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 64,
-        "framework": "vllm",
-        "hardware": "mi355x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "f943ad994c76ba7129e71c9849e0ede34eedd8efb69fdbb7f7e5764e2ce3a5e6"
-      },
-      "image": "vllm/vllm-openai-rocm:nightly-e68efc685ab1e6f1eda004ced7157e3ca411da2f@sha256:520e098f54ec96837228aaddea0a833cbf6374dbdffd480c1d65f26ffab7701b",
-      "measured": {
-        "tpot_ms": 11.13,
-        "ttft_ms": 384.06
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:monokernel",
-          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
-        }
-      ],
-      "point_id": "b7a0e2358ade5d53b59a6df4a879052049362ca248c82248e09adbe04f77a5aa",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-        "setting_not_modelled:monokernel"
-      ]
-    },
-    {
       "benchmark_type": "single_turn",
       "conc": 8,
       "framework": "vllm",
@@ -291928,66 +292228,6 @@
       ]
     },
     {
-      "benchmark_type": "agentic_traces",
-      "conc": 32,
-      "framework": "vllm",
-      "hardware": "mi355x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 32,
-        "framework": "vllm",
-        "hardware": "mi355x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "b42613d9c401b7861945b5f5c26da0e8151931f280a0127adb5e4887b1567150"
-      },
-      "image": "vllm/vllm-openai-rocm:nightly-e68efc685ab1e6f1eda004ced7157e3ca411da2f@sha256:520e098f54ec96837228aaddea0a833cbf6374dbdffd480c1d65f26ffab7701b",
-      "measured": {
-        "tpot_ms": 4.72,
-        "ttft_ms": 2884.76
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:monokernel",
-          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
-        }
-      ],
-      "point_id": "bb1d7ebcabe413868bedd4941b206de92c0f90b52f0e5305615de3d52370721e",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-        "setting_not_modelled:monokernel"
-      ]
-    },
-    {
       "benchmark_type": "single_turn",
       "conc": 16,
       "framework": "vllm",
@@ -292592,66 +292832,6 @@
       ]
     },
     {
-      "benchmark_type": "agentic_traces",
-      "conc": 8,
-      "framework": "vllm",
-      "hardware": "mi355x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 8,
-        "framework": "vllm",
-        "hardware": "mi355x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "6cc0974b979b30c7209f77a4766ceaad3d96f2474b7f1ed09211fb5ab9067ab5"
-      },
-      "image": "vllm/vllm-openai-rocm:nightly-e68efc685ab1e6f1eda004ced7157e3ca411da2f@sha256:520e098f54ec96837228aaddea0a833cbf6374dbdffd480c1d65f26ffab7701b",
-      "measured": {
-        "tpot_ms": 2.26,
-        "ttft_ms": 962.7
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:monokernel",
-          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
-        }
-      ],
-      "point_id": "c000918e9e8407b5b0d4fce298fa07b5ee3f768391a8b10adc183d2fb2d568ac",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-        "setting_not_modelled:monokernel"
-      ]
-    },
-    {
       "benchmark_type": "single_turn",
       "conc": 1,
       "framework": "vllm",
@@ -292684,66 +292864,6 @@
       "reasons": [
         "setting_not_modelled:enable_chunked_prefill",
         "unclassified_arg:attention_config.minimax_m3_msa_decode_backend"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 2,
-      "framework": "vllm",
-      "hardware": "mi355x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 2,
-        "framework": "vllm",
-        "hardware": "mi355x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "8c554a53ad71d9b9a5f831b6a7ac8dfd5e3611a3048dc2d097b8537ec5d28c17"
-      },
-      "image": "vllm/vllm-openai-rocm:nightly-e68efc685ab1e6f1eda004ced7157e3ca411da2f@sha256:520e098f54ec96837228aaddea0a833cbf6374dbdffd480c1d65f26ffab7701b",
-      "measured": {
-        "tpot_ms": 2.02,
-        "ttft_ms": 900.39
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:monokernel",
-          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
-        }
-      ],
-      "point_id": "c08055f8ca24300ca080776e34f96743cd13599f051e7de64c084aa4ce338a84",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-        "setting_not_modelled:monokernel"
       ]
     },
     {
@@ -292993,6 +293113,66 @@
       "precision": "fp8",
       "reasons": [
         "hardware_no_coefficients"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 32,
+      "framework": "vllm",
+      "hardware": "mi355x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 32,
+        "framework": "vllm",
+        "hardware": "mi355x",
+        "measured_date": "2026-11-03",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "1b94624e45989efdc10e394b29e278794e76a89cd7da1faaa35fefc58b342fe5"
+      },
+      "image": "vllm/vllm-openai-rocm:nightly-e68efc685ab1e6f1eda004ced7157e3ca411da2f@sha256:520e098f54ec96837228aaddea0a833cbf6374dbdffd480c1d65f26ffab7701b",
+      "measured": {
+        "tpot_ms": 4.91,
+        "ttft_ms": 3286.21
+      },
+      "measured_date": "2026-11-03",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:monokernel",
+          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
+        }
+      ],
+      "point_id": "c290ce194576de1f240751cb6e3537c521a4c3f5ac64e57318cf6cc478316b3a",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+        "setting_not_modelled:monokernel"
       ]
     },
     {
@@ -296302,66 +296482,6 @@
     },
     {
       "benchmark_type": "agentic_traces",
-      "conc": 2,
-      "framework": "vllm",
-      "hardware": "mi355x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 2,
-        "framework": "vllm",
-        "hardware": "mi355x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "7c6599715c242ef5ea987d7d8c3ce332da21869df8dd70f2d58a620302c9c317"
-      },
-      "image": "vllm/vllm-openai-rocm:nightly-e68efc685ab1e6f1eda004ced7157e3ca411da2f@sha256:520e098f54ec96837228aaddea0a833cbf6374dbdffd480c1d65f26ffab7701b",
-      "measured": {
-        "tpot_ms": 1.69,
-        "ttft_ms": 604.26
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:monokernel",
-          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
-        }
-      ],
-      "point_id": "d5857babeae495d20c78b11e00e53d5975aa926027932ee9bff4af851be10f83",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-        "setting_not_modelled:monokernel"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
       "conc": 8,
       "framework": "vllm",
       "hardware": "tpuv7",
@@ -298103,6 +298223,66 @@
       "reasons": [
         "blis_refused:disaggregated_or_multinode",
         "server_log_missing"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 1,
+      "framework": "vllm",
+      "hardware": "mi355x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 1,
+        "framework": "vllm",
+        "hardware": "mi355x",
+        "measured_date": "2026-11-03",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "927d6dc80dd6992d51b427185da40ff352f126b68bd248dd1cb5d6b094a1a384"
+      },
+      "image": "vllm/vllm-openai-rocm:nightly-e68efc685ab1e6f1eda004ced7157e3ca411da2f@sha256:520e098f54ec96837228aaddea0a833cbf6374dbdffd480c1d65f26ffab7701b",
+      "measured": {
+        "tpot_ms": 2.02,
+        "ttft_ms": 531.26
+      },
+      "measured_date": "2026-11-03",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:monokernel",
+          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
+        }
+      ],
+      "point_id": "e29454817d5060f1b414c717ca6faa5c4899d0130958dea7b137321f335ebfbd",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+        "setting_not_modelled:monokernel"
       ]
     },
     {
@@ -302061,66 +302241,6 @@
       ]
     },
     {
-      "benchmark_type": "agentic_traces",
-      "conc": 16,
-      "framework": "vllm",
-      "hardware": "mi355x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 16,
-        "framework": "vllm",
-        "hardware": "mi355x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "dabccf221e78914a886c8c1b1cc76263b877008d5c0083e3c0f7f30b79420d6d"
-      },
-      "image": "vllm/vllm-openai-rocm:nightly-e68efc685ab1e6f1eda004ced7157e3ca411da2f@sha256:520e098f54ec96837228aaddea0a833cbf6374dbdffd480c1d65f26ffab7701b",
-      "measured": {
-        "tpot_ms": 3.05,
-        "ttft_ms": 899.79
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:monokernel",
-          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
-        }
-      ],
-      "point_id": "f92e2662a7186f8faca888727583d97fee71996337786a6162921c1c50f37e9a",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-        "setting_not_modelled:monokernel"
-      ]
-    },
-    {
       "benchmark_type": "single_turn",
       "conc": 256,
       "framework": "vllm",
@@ -302481,66 +302601,6 @@
       "precision": "fp8",
       "reasons": [
         "hardware_no_coefficients"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 1,
-      "framework": "vllm",
-      "hardware": "mi355x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 1,
-        "framework": "vllm",
-        "hardware": "mi355x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "7c6599715c242ef5ea987d7d8c3ce332da21869df8dd70f2d58a620302c9c317"
-      },
-      "image": "vllm/vllm-openai-rocm:nightly-e68efc685ab1e6f1eda004ced7157e3ca411da2f@sha256:520e098f54ec96837228aaddea0a833cbf6374dbdffd480c1d65f26ffab7701b",
-      "measured": {
-        "tpot_ms": 1.68,
-        "ttft_ms": 504.19
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:monokernel",
-          "text": "A single fused decode kernel (monokernel) the Deployment can't state."
-        }
-      ],
-      "point_id": "faa4526ee9329c8c6e9a43ff972545ce832f6708c39f89367f918b410410b098",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-        "setting_not_modelled:monokernel"
       ]
     },
     {
