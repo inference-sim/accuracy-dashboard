@@ -28,12 +28,13 @@ tokenizer revisions and verified: for every verified point the residual is zero,
 equals the target this script emits. See orchestrator/ingest/inferencex_client.py and
 docs/kernel-exclusive/APPLES-TO-APPLES.md "The sent prompt lengths".
 
-Usage (numpy required; any version -- legacy RandomState streams are frozen by NEP 19):
+Usage (numpy required; any version -- legacy RandomState streams are frozen by NEP 19). CORPUS is
+the single-turn end-to-end corpus JSON in blis-measurements:
 
-    python -I orchestrator/scripts/gen_inferencex_workloads.py --corpus $BLIS_MEASUREMENTS/aisimulate_e2e.json
+    python -I orchestrator/scripts/gen_inferencex_workloads.py --corpus "$CORPUS"
     python -I orchestrator/scripts/gen_inferencex_workloads.py --check            # regenerate and diff
     python -I orchestrator/scripts/gen_inferencex_workloads.py --seed 1 --out /tmp/seed1.json \
-        --corpus $BLIS_MEASUREMENTS/aisimulate_e2e.json            # a sensitivity draw
+        --corpus "$CORPUS"            # a sensitivity draw
 
 --check regenerates every point already in the fixture and fails on any difference. With
 --corpus it also fails if the fixture's point set differs from the corpus's.
@@ -119,7 +120,7 @@ def render(doc):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--corpus", help="aisimulate_e2e.json; enumerates the points")
+    ap.add_argument("--corpus", help="the single-turn end-to-end corpus JSON; enumerates the points")
     ap.add_argument("--out", default=DEFAULT_OUT)
     ap.add_argument("--seed", type=int, default=0, help="numpy seed (the benchmark's is 0)")
     ap.add_argument("--check", action="store_true", help="regenerate --out and fail on any difference")

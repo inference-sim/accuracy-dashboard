@@ -5,7 +5,7 @@
       Pull the API, resolve builds, join and freeze artifacts. Network: InferenceX API,
       GitHub (artifacts + vllm-project/vllm), Docker Hub, HuggingFace (base_model only).
 
-  cli.py score --pull PULL --out CONTRACT --blis-dir SIM --catalog CAT --registry REG
+  cli.py score --pull PULL --out CONTRACT --blis BLIS --catalog CAT --registry REG
                --corpus FILE [--work DIR] [--only PID ...]
       Score a frozen pull with one BLIS release. No network.
 
@@ -217,29 +217,19 @@ def _go_require(gomod: Path, module: str) -> str | None:
     return None
 
 
-# The dashboard's own copy of signedprobe and the benchmark's request lengths it replays
-# (orchestrator/signedprobe, moved from inference-sim's tools/ at v0.14.0).
-SIGNEDPROBE_DIR = Path(__file__).resolve().parent.parent / "signedprobe"
-SINGLE_TURN_WORKLOADS = SIGNEDPROBE_DIR / "testdata" / "inferencex-workloads" / "seed0.json"
-
-
-def check_blis_inputs(sim: Path, helper: str, catalog: Path, registry: Path,
-                      signedprobe: str) -> list[str]:
-    """Everything `score` needs to be one BLIS release, or what's wrong. The defaults helper and
-    signedprobe are built against an inference-sim tag; it must be --blis-dir's, with the same
+def check_blis_inputs(blis: Path, helper: str, catalog: Path, registry: Path) -> list[str]:
+    """Everything `score` needs to be one BLIS release, or what's wrong. The blis binary sits in
+    the inference-sim checkout it was built from, which must be at a release tag. The defaults
+    helper is built against an inference-sim tag; it must be that checkout's, with the same
     kernel and schemas, or its defaults / resolutions / acceptance would come from another
     release. The releases recorded in provenance must be real tags, never "unknown"."""
     out = []
+    sim = blis.parent
+    if not blis.is_file():
+        out.append(f"--blis {blis} is not a file (build it: go build -o blis main.go in an inference-sim checkout)")
     tag = _git(sim, "describe", "--tags", "--exact-match")
     if not tag:
-        out.append(f"--blis-dir {sim} is not at a release tag (fetch tags, or check out the tag)")
-    if not (sim / "blis").exists():
-        out.append(f"--blis-dir {sim} has no blis (build it there: go build -o blis main.go)")
-    if not Path(signedprobe).exists():
-        out.append(f"--signedprobe {signedprobe} does not exist "
-                   "(build it: orchestrator/build_signedprobe.sh <inference-sim checkout> <out>)")
-    if not SINGLE_TURN_WORKLOADS.exists():
-        out.append(f"{SINGLE_TURN_WORKLOADS} is missing")
+        out.append(f"--blis {blis}: its checkout {sim} is not at a release tag (fetch tags, or check out the tag)")
     for repo, flag in ((catalog, "--catalog"), (registry, "--registry")):
         if not _git(repo, "describe", "--tags", "--exact-match"):
             out.append(f"{flag} {repo} is not at a release tag")
@@ -253,14 +243,14 @@ def check_blis_inputs(sim: Path, helper: str, catalog: Path, registry: Path,
             "blis-schemas": _go_require(sim / "go.mod", "github.com/inference-sim/blis-schemas")}
     for mod, v in want.items():
         if v and got.get(mod) not in (v, "(devel)"):
-            out.append(f"--defaults-helper is built against {mod} {got.get(mod)}, --blis-dir is {v}")
+            out.append(f"--defaults-helper is built against {mod} {got.get(mod)}, --blis's checkout is {v}")
     return out
 
 
 def cmd_score(a) -> int:
     pull_dir = Path(a.pull)
-    bad = check_blis_inputs(Path(a.blis_dir), a.defaults_helper, Path(a.catalog), Path(a.registry),
-                            a.signedprobe)
+    blis = Path(a.blis).resolve()
+    bad = check_blis_inputs(blis, a.defaults_helper, Path(a.catalog), Path(a.registry))
     if bad:
         for b in bad:
             _log(f"FATAL: {b}")
@@ -271,30 +261,27 @@ def cmd_score(a) -> int:
     if failed:
         _log(f"FATAL: the pull has {len(failed)} row(s) it failed to read ({', '.join(failed[:5])}); re-run the pull")
         return 2
-    sim = Path(a.blis_dir)
+    sim = blis.parent
     policy, policy_sha = st.load_policy()
     vdefaults, vdefaults_sha = st.load_vllm_defaults()
-    corpus_path = Path(a.corpus)
+    # blis runs in its binary's directory, so every path it is given is absolute.
+    corpus_path = Path(a.corpus).resolve()
     corpus_sha = a.corpus_sha256 or art.sha256(corpus_path.read_bytes())
     env = sc.Env(
-        blis=str(sim / "blis"), blis_release=_git(sim, "describe", "--tags", "--exact-match") or "unknown",
-        blis_commit=_git(sim, "rev-parse", "HEAD"), catalog=Path(a.catalog),
-        catalog_release=_git(a.catalog, "describe", "--tags") or "unknown", registry=Path(a.registry),
+        blis=str(blis), blis_release=_git(sim, "describe", "--tags", "--exact-match") or "unknown",
+        blis_commit=_git(sim, "rev-parse", "HEAD"), catalog=Path(a.catalog).resolve(),
+        catalog_release=_git(a.catalog, "describe", "--tags") or "unknown", registry=Path(a.registry).resolve(),
         registry_release=_git(a.registry, "describe", "--tags") or "unknown",
         kernel=next((l.split()[1] for l in (sim / "go.mod").read_text().splitlines()
                      if "blis-latency-kernel " in l), "unknown"),
         defaults_helper=a.defaults_helper,
         corpus={"dataset": a.corpus_dataset, "revision": a.corpus_revision, "sha256": corpus_sha,
                 "path": str(corpus_path), "file": corpus_path.name},
-        corpus_cache=Path(a.corpus_cache) if a.corpus_cache else None,
+        corpus_cache=Path(a.corpus_cache).resolve() if a.corpus_cache else None,
         vllm_ref=manifest["vllm_ref"], policy=policy, policy_sha256=policy_sha,
         base_models=manifest.get("base_models") or {}, timeout_s=a.timeout,
         vllm_defaults=vdefaults, vllm_defaults_sha256=vdefaults_sha,
         max_rss_mb=getattr(a, "max_rss_mb", 0) or 0)
-    env.signedprobe = str(Path(a.signedprobe).resolve())
-    env.blis_dir = str(sim.resolve())
-    wl = json.loads(SINGLE_TURN_WORKLOADS.read_text())
-    env.single_turn_workloads = {(p["isl"], p["osl"], p["concurrency"]) for p in wl["points"]}
     env.catalog_obj = sp.Catalog.load(env.catalog)
     env.parts = sp.registry_parts(env.registry)
     work = Path(a.work or Path(a.out).parent / (Path(a.out).name + "-work"))
@@ -374,8 +361,8 @@ def cmd_nightly(a) -> int:
 
     def score_build_fn(work: Path, blis_tag: str, score_ids, pull_date: str, window_ids: set):
         rc = cmd_score(types.SimpleNamespace(
-            pull=str(work), out=str(contract_dir), blis_dir=a.blis_dir, catalog=a.catalog,
-            registry=a.registry, defaults_helper=a.defaults_helper, signedprobe=a.signedprobe,
+            pull=str(work), out=str(contract_dir), blis=a.blis, catalog=a.catalog,
+            registry=a.registry, defaults_helper=a.defaults_helper,
             corpus=a.corpus,
             corpus_sha256=a.corpus_sha256, corpus_dataset=a.corpus_dataset,
             corpus_revision=a.corpus_revision, corpus_cache=a.corpus_cache, work=a.score_work,
@@ -427,13 +414,11 @@ def main(argv=None) -> int:
     s = sub.add_parser("score")
     s.add_argument("--pull", required=True)
     s.add_argument("--out", required=True)
-    s.add_argument("--blis-dir", required=True,
-                   help="an inference-sim checkout with blis and signedprobe built in it")
+    s.add_argument("--blis", required=True,
+                   help="the blis binary, built in an inference-sim checkout at a release tag; it runs in that directory")
     s.add_argument("--catalog", required=True)
     s.add_argument("--registry", required=True)
-    s.add_argument("--defaults-helper", required=True, help="orchestrator/blisdefaults built against --blis-dir's tag")
-    s.add_argument("--signedprobe", required=True,
-                   help="orchestrator/signedprobe built against --blis-dir's tag (build_signedprobe.sh)")
+    s.add_argument("--defaults-helper", required=True, help="orchestrator/blisdefaults built against --blis's tag")
     s.add_argument("--corpus", required=True)
     s.add_argument("--corpus-sha256")
     s.add_argument("--corpus-dataset", default="semianalysisai/cc-traces-weka-062126")
@@ -462,12 +447,10 @@ def main(argv=None) -> int:
     n.add_argument("--score-work")
     n.add_argument("--evaluator-commit")
     n.add_argument("--ledger", required=True, help="blis-substrate's catalog/ledger (see pull --ledger)")
-    n.add_argument("--blis-dir", required=True)
+    n.add_argument("--blis", required=True, help="the blis binary (see score --blis)")
     n.add_argument("--catalog", required=True)
     n.add_argument("--registry", required=True)
     n.add_argument("--defaults-helper", required=True)
-    n.add_argument("--signedprobe", required=True,
-                   help="orchestrator/signedprobe built against --blis-dir's tag (build_signedprobe.sh)")
     n.add_argument("--corpus", required=True)
     n.add_argument("--corpus-sha256")
     n.add_argument("--corpus-dataset", default="semianalysisai/cc-traces-weka-062126")

@@ -30,7 +30,7 @@ NOT_SCORED_JSONL = "not_scored.jsonl"
 PROVENANCE_JSON = "provenance.json"
 CONTRACT_FILES = (POINTS_CSV, FIDELITY_JSONL, FACETS_JSON, NOT_SCORED_JSONL, PROVENANCE_JSON)
 
-# The signedprobe per-point CSV columns, then the two the contract adds.
+# The per-point CSV columns build_summary.py reads, then the two the contract adds.
 POINTS_HEADER = EXPECTED_HEADER + ["point_id", "measured_date"]
 
 # A point's identity is its ledger unit's identity (design §10.2; blis-substrate

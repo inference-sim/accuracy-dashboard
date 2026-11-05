@@ -5,12 +5,14 @@ Per point: settings (settings.py) -> support (support.py) -> replay inputs (repl
 -> the scenario file -> `blis replay --agentic-scenario` -> the diff of what BLIS was given
 against what the run recorded -> one fidelity record, or a not-scored record with reasons.
 
-Single-turn points go through the same extraction and are scored with this repo's signedprobe
-(orchestrator/signedprobe), built against the same BLIS tag (score_single_turn).
+Single-turn points go through the same extraction and are replayed as the run's client sent
+them (inferencex_client, COV-12) by `blis replay` (score_single_turn). Every run's Result is read
+from blis's standard output and validated (result.py).
 """
 from __future__ import annotations
 
 import csv
+import dataclasses
 import gzip
 import hashlib
 import io
@@ -24,7 +26,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import contract  # noqa: E402
+import inferencex_client as ix  # noqa: E402
 import replay as rp  # noqa: E402
+import result  # noqa: E402
 import settings as st  # noqa: E402
 import support as sp  # noqa: E402
 
@@ -46,7 +50,8 @@ def sweep_id(row: dict, scenario: str, label: str) -> str:
 
 @dataclass
 class Env:
-    """What scoring runs against: one BLIS release and its pinned repos."""
+    """What scoring runs against: one BLIS release and its pinned repos. blis is the path of
+    the blis binary; it runs with its working directory set to the binary's directory."""
     blis: str
     blis_release: str
     blis_commit: str
@@ -67,12 +72,6 @@ class Env:
     vllm_defaults_sha256: str = ""
     catalog_obj: sp.Catalog | None = None
     parts: set = field(default_factory=set)
-    # Single-turn: this repo's signedprobe built against the same tag, and the benchmark
-    # workloads it replays (orchestrator/signedprobe/testdata/inferencex-workloads/seed0.json:
-    # InferenceX's request lengths per (isl, osl, concurrency)).
-    signedprobe: str = ""
-    blis_dir: str = ""            # the inference-sim checkout blis runs in (signedprobe -blis-dir)
-    single_turn_workloads: set = field(default_factory=set)   # {(isl, osl, conc)}
     # A per-replay resident-memory ceiling in MB (0 = none). An agentic replay whose RSS exceeds
     # it is killed individually and the point is not-scored with an insufficient_memory reason, so
     # one memory-heavy trace can't OOM the whole CI job. Peak RAM is trace-content-driven and
@@ -118,11 +117,6 @@ def measured(entry: dict) -> dict:
         if vals:
             out[key] = sum(vals) / len(vals)
     return out
-
-
-def _metrics_us(m: dict) -> tuple[float, float]:
-    # TPOT is the per-token figure aiperf reports (request_itl_mean_ms), not the step interval.
-    return float(m["ttft_mean_ms"]) * 1e3, float(m["request_itl_mean_ms"]) * 1e3
 
 
 def _blis_refusal(stderr: str, work: Path) -> str:
@@ -193,15 +187,14 @@ def _proc_tree(root: int) -> list:
     return out
 
 
-def run_capped(argv, *, timeout, max_rss_mb=0, poll_s=2):
+def run_capped(argv, *, timeout, max_rss_mb=0, poll_s=2, cwd=None):
     """subprocess.run(capture_output, text) with an optional RSS ceiling. If max_rss_mb > 0 and the
     process tree's resident memory exceeds it, the process is killed and MemoryExceeded is raised --
     so one memory-heavy replay is killed alone, never taking down the whole job. With max_rss_mb==0
     this is a plain subprocess.run (local / big-runner scores everything)."""
     if not max_rss_mb:
-        return subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
-    import time
-    proc = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        return subprocess.run(argv, capture_output=True, text=True, timeout=timeout, cwd=cwd)
+    proc = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=cwd)
     start = 0.0
     while True:
         try:
@@ -220,8 +213,9 @@ def run_capped(argv, *, timeout, max_rss_mb=0, poll_s=2):
             raise subprocess.TimeoutExpired(argv, timeout)
 
 
-def resolved_kv(log: str, metrics: dict | None) -> list[dict]:
-    """The KV pool vLLM allocated vs BLIS's, per engine core. Never passed to BLIS."""
+def resolved_kv(log: str, doc: dict | None) -> list[dict]:
+    """The KV pool vLLM allocated vs BLIS's, per engine core, BLIS's from the engine's report in
+    the Result (kv_capacity_tokens_per_replica). Never passed to BLIS."""
     found = [int(x.replace(",", "")) for x in re.findall(r"GPU KV cache size: ([0-9,]+) tokens", log)]
     if not found:
         return []
@@ -231,7 +225,7 @@ def resolved_kv(log: str, metrics: dict | None) -> list[dict]:
     rec["measured"] = found[0]
     if len(found) > 1:
         rec["occurrences"] = len(found)
-    blis = (metrics or {}).get("kv_capacity_tokens_per_replica")
+    blis = result.engine_report(doc or {}, "kv_capacity_tokens_per_replica")
     # (No KV line at all returns [] above: the record then has no KV comparison, which the
     # fidelity record states by its absence; the line is printed by every v1 engine.)
     if not blis:
@@ -333,7 +327,7 @@ def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
 # A process-pool worker scores into its OWN work subdir, because score_point writes
 # work/scenarios/<scenario>.yaml keyed by scenario name, not point id -- two points that share a
 # scenario name would race that file across processes. Per-worker dirs isolate it; the per-point
-# metrics/<pid>.json cache stays correct either way (pid is unique). The worker's env and pull_dir
+# results/<pid>.json cache stays correct either way (pid is unique). The worker's env and pull_dir
 # are set once per process in the initializer, so each task ships only the small `entry`.
 _W: dict = {}
 
@@ -363,7 +357,7 @@ def score_points(points: list, pull_dir: Path, work: Path, env: Env, *, workers:
     count -- concurrency is a speed knob, never a correctness or determinism lever.
 
     Split by benchmark type, because the two kinds have opposite resource profiles:
-      * single-turn (signedprobe, no corpus): light RAM, safe to run `workers`-wide.
+      * single-turn (no corpus): light RAM, safe to run `workers`-wide.
       * agentic (blis replay + the 1.8GB corpus): each replay holds the parsed corpus in RAM, so
         two at once OOM a 16GB runner -- capped at `agentic_workers` (default 1, serial).
     So the light majority runs parallel while the heavy minority serializes, which keeps a
@@ -408,6 +402,8 @@ def _run_pool(indexed: list, pull_dir: Path, work: Path, env: Env, workers: int,
 
 def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     row, ident, pid = entry["row"], entry["identity"], entry["point_id"]
+    # blis runs in its binary's directory, so every path it is given is absolute.
+    work = work.resolve()
     o = Outcome(point_id=pid, identity=ident, row=row, reasons=list(entry["reasons"]),
                 measurements=entry.get("measurements") or [])
     pdir = pull_dir / "points" / pid
@@ -462,7 +458,10 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
             elif r.corpus_repo != env.corpus["dataset"]:
                 o.reasons.append(f"corpus_changed:{r.corpus_repo}")
     else:
-        o.reasons += single_turn_replayable(row, env)
+        for k in ("isl", "osl", "conc"):
+            v = row.get(k)
+            if not isinstance(v, int) or isinstance(v, bool) or v < 1:
+                o.reasons.append(f"required_setting_missing:replay.{k}")
 
     if sup.model is None or part_name not in cat.hardware:
         o.reasons = sorted(set(o.reasons))
@@ -498,8 +497,8 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
             o.reasons = sorted(set(o.reasons))
             return o
     if b.kernel_resolves or b.acceptance_needed or b.acceptance_length is not None:
-        # State what the kernel resolved, so every consumer (signedprobe's harness requires a
-        # stated block_size) runs the same value the kernel would have assumed.
+        # State what the kernel resolved, so every run of the scenario uses the value the kernel
+        # would have assumed.
         eng = b.deployment["pools"][0]["engine"]
         for a in args:
             if a["arg"] in b.kernel_resolves and a["match"] == "blis_default":
@@ -512,8 +511,8 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         else:
             al = None
         if al is not None and spec.get("num_spec_tokens"):
-            # Pinned in the scenario, so every consumer runs it: blis replay (which also takes
-            # --speculative-acceptance-length) and signedprobe (which passes no acceptance flag).
+            # Pinned in the scenario, so every replay runs it: the agentic one (which also takes
+            # --speculative-acceptance-length) and the single-turn one (which passes no flag).
             b.scenario["acceptance"] = {"value": {"num_spec_tokens": int(spec["num_spec_tokens"]),
                                                   "acceptance_length": al}}
         text = st.to_yaml(b, header)
@@ -527,11 +526,9 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         return o
 
     if not agentic:
-        return score_single_turn(o, entry, env, work, sdir, name, text, dep, args, log, _estimated(args))
+        return score_single_turn(o, entry, env, work, b, header, name, dep, args, log, sup)
 
     # ---- the replay
-    metrics_path = work / "metrics" / f"{pid}.json"
-    metrics_path.parent.mkdir(parents=True, exist_ok=True)
     spec_doc = rp.workload_spec(r, env.corpus["sha256"], env.corpus["revision"], env.corpus["file"])
     spec_path = work / "workloads" / f"{pid}.yaml"
     spec_path.parent.mkdir(parents=True, exist_ok=True)
@@ -541,48 +538,29 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
             "--workload-spec", str(spec_path), "--concurrency", str(r.concurrency),
             "--seed", str(r.seed), "--corpus", env.corpus["path"], "--corpus-sha256", env.corpus["sha256"],
             "--scenario", f"{name}.yaml", "--scenarios", str(sdir),
-            "--catalog", str(env.catalog), "--registry", str(env.registry),
-            "--metrics-path", str(metrics_path)]
+            "--catalog", str(env.catalog), "--registry", str(env.registry), "--format", "json"]
     if b.acceptance_length is not None:
         argv += ["--speculative-acceptance-length", b.acceptance_length]
     if env.corpus_cache:
         argv += ["--corpus-cache", str(env.corpus_cache)]
-    # The cached result is reused only for the exact same inputs: scenario, workload, argv.
+    # The cached Result is reused only for the exact same inputs: scenario, workload, argv.
     key = hashlib.sha256((text + spec_path.read_text() + "\0".join(argv[1:])).encode()).hexdigest()
-    key_path = metrics_path.with_suffix(".key")
-    if metrics_path.exists() and (not key_path.exists() or key_path.read_text() != key):
-        metrics_path.unlink()
-    if not metrics_path.exists():
-        try:
-            proc = run_capped(argv, timeout=env.timeout_s, max_rss_mb=env.max_rss_mb)
-        except subprocess.TimeoutExpired:
-            o.reasons = ["blis_refused:timeout"]
-            return o
-        except MemoryExceeded:
-            # This agentic replay's resident memory exceeded the runner's ceiling; it's killed
-            # alone and the point is not scored, so one heavy trace can't OOM the whole job. The
-            # score is unchanged for every other point -- this is a runner-capacity limit, not a
-            # fidelity choice, so a larger-RAM run can score it later.
-            o.reasons = ["blis_refused:insufficient_memory"]
-            return o
-        (work / "logs").mkdir(exist_ok=True)
-        (work / "logs" / f"{pid}.err").write_text(proc.stderr[-20000:])
-        if proc.returncode != 0 or not metrics_path.exists():
-            o.reasons = [_blis_refusal(proc.stderr, work)]
-            return o
-        key_path.write_text(key)
-    metrics = json.loads(metrics_path.read_text())
+    doc = _run_result(o, argv, key, work / "results" / f"{pid}.json", env, work,
+                      runner=lambda a, timeout, cwd: run_capped(a, timeout=timeout, max_rss_mb=env.max_rss_mb,
+                                                                cwd=cwd))
+    if doc is None:
+        return o
     try:
-        pttft, ptpot = _metrics_us(metrics)
-    except (KeyError, TypeError, ValueError):
-        o.reasons = ["blis_refused:metrics_incomplete"]
+        pttft, ptpot = (result.figure(doc, result.TTFT_MEAN_MS) * 1e3, result.figure(doc, result.TPOT_MEAN_MS) * 1e3)
+    except result.ResultError as e:
+        o.reasons = [f"blis_refused:{e.slug}"]
         return o
 
     m = measured(entry)
-    status = point_status(_estimated(args), entry["build"])
+    status = point_status(_estimated(args), entry["build"], [])
     o.fidelity = {"status": status, "build": entry["build"], "args": args,
-                  "resolved": resolved_kv(log, metrics), "replay": r.record(env.corpus["sha256"]),
-                  "blis_kernel_provenance": metrics.get("kernel_provenance")}
+                  "resolved": resolved_kv(log, doc), "replay": r.record(env.corpus["sha256"]),
+                  "blis_kernel_provenance": result.kernel_report(doc)}
     par = dep["pools"][0]["parallel"]
     ep = (par["tp"] * par["dp"]) if par.get("enable_expert_parallel") else 1
     scen = f"{sup.model}-{row['hardware']}-{row['precision']}-vllm-tp{par['tp']}-dp{par['dp']}-ep{ep}-agentx"
@@ -714,143 +692,168 @@ def fill_blis_side(args: list, env, scenarios: Path, scenario: str, model: str) 
     return reasons
 
 
-def single_turn_replayable(row: dict, env) -> list[str]:
-    """signedprobe replays InferenceX's single-turn benchmark from its own request-length
-    fixture; a (isl, osl, concurrency) the fixture doesn't hold can't be replayed."""
-    try:
-        key = (int(row["isl"]), int(row["osl"]), int(row["conc"]))
-    except (KeyError, TypeError, ValueError):
-        return ["required_setting_missing:replay.isl_osl"]
-    if key not in env.single_turn_workloads:
-        return [f"client_scenario_not_replayable:single_turn_{key[0]}:{key[1]}_c{key[2]}"]
-    return []
-
-
 def _single_turn_label(isl: int, osl: int) -> str:
     k = lambda n: f"{n // 1024}k" if n % 1024 == 0 else str(n)
     return f"{k(isl)}{k(osl)}"
 
 
-# The engine fields signedprobe sets on the scenario it runs (harness.applyPointConfig): each is
-# passed as the scenario we wrote states it, so signedprobe runs exactly that scenario and never
-# substitutes its own vLLM resolution for one of them.
-_PROBE_FIELDS = (("max_num_seqs", "max_num_seqs"), ("max_num_batched_tokens", "max_num_batched_tokens"),
-                 ("max_model_len", "max_model_len"), ("block_size", "block_size"),
-                 ("enable_prefix_caching", "enable_prefix_caching"),
-                 ("gpu_memory_utilization", "gpu_memory_utilization"),
-                 ("max_cudagraph_capture_size", "max_cudagraph_capture_size"))
+# The scenario seed every single-turn replay runs with (the old harness's Config.Seed). The
+# requests are the client's own (inferencex_client), so the seed draws only what they leave
+# open, such as a router's tie-breaks (COV-10).
+SINGLE_TURN_SEED = 42
 
 
-def single_turn_inputs(row: dict, dep: dict, scenario_file: str, m: dict) -> tuple[dict, dict, dict] | list[str]:
-    """signedprobe's three inputs for one point: a one-sweep corpus, the measured means
-    (absolutes) and the engine settings, all keyed by the scenario file and workload label."""
+def _run_result(o: Outcome, argv: list[str], key: str, cache: Path, env: Env, work: Path,
+                runner=None) -> dict | None:
+    """The Result of one `blis replay`, read from its standard output and validated
+    (result.run), or None with the point's refusal set on `o`. blis runs in its binary's
+    directory. The validated document is cached at `cache` and reused only for the same `key`,
+    a hash of every input the run reads."""
+    key_path = cache.with_suffix(".key")
+    if cache.exists() and key_path.exists() and key_path.read_text() == key:
+        return json.loads(cache.read_text())
+    cache.unlink(missing_ok=True)
+    logs = work / "logs"
+    logs.mkdir(parents=True, exist_ok=True)
+    try:
+        doc, raw, stderr = result.run(argv, blis=env.blis, cwd=str(Path(env.blis).parent), timeout=env.timeout_s,
+                                      runner=runner)
+    except subprocess.TimeoutExpired:
+        o.reasons = ["blis_refused:timeout"]
+        return None
+    except MemoryExceeded:
+        # This replay's resident memory exceeded the runner's ceiling; it is killed alone and
+        # the point is not scored, so one heavy trace cannot OOM the whole job. This is a
+        # runner-capacity limit, not a fidelity choice, so a larger-RAM run can score it later.
+        o.reasons = ["blis_refused:insufficient_memory"]
+        return None
+    except result.RunFailed as e:
+        (logs / f"{o.point_id}.err").write_text(e.stderr[-20000:])
+        o.reasons = [_blis_refusal(e.stderr, work)]
+        return None
+    except result.ResultError as e:
+        (logs / f"{o.point_id}.err").write_text(str(e)[-20000:])
+        o.reasons = [f"blis_refused:{e.slug}"]
+        return None
+    (logs / f"{o.point_id}.err").write_text(stderr[-20000:])
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_bytes(raw)
+    key_path.write_text(key)
+    return doc
+
+
+def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built, header: list[str],
+                      name: str, dep: dict, args: list, log: str, sup: sp.Support) -> Outcome:
+    """One single-turn point, replayed as the run's client sent it (COV-12).
+
+    The requests are the client's seed-0 draws for the row's (isl, osl, conc)
+    (inferencex_client.target_lengths). Where the scenario's engine states
+    enable_prefix_caching false, the warm-up leaves nothing the main phase reads, so the main
+    phase runs from an empty engine. Otherwise it runs primed: request 0's prompt cached on each
+    of the deployment's dp replicas by dp warm-up copies, as the client's drained warm-up leaves
+    it. The scenario gains the router block of every single-turn point (vLLM's data-parallel
+    balancer, which places by requests in flight), written beside it. The predicted means are
+    the client's own, computed from the Result's request rows (inferencex_client.summarize);
+    the fidelity record's `requests` names how the requests were replayed and every difference
+    from the run's client."""
+    row, pid, ident = entry["row"], entry["point_id"], entry["identity"]
+    model = b.scenario["model"]
     pool = dep["pools"][0]
     eng, par = pool["engine"], pool["parallel"]
-    if "speculative" in eng and "acceptance" not in (dep.get("_scenario") or {}):
-        # signedprobe passes no acceptance flag to blis replay: a drafter is priced only when
-        # the scenario pins its acceptance.
-        return ["client_scenario_not_replayable:single_turn_speculative"]
-    try:
-        ttft_us, tpot_us = float(m["mean_ttft"]) * 1e6, float(m["mean_tpot"]) * 1e6
-    except (KeyError, TypeError, ValueError):
-        return ["required_setting_missing:measured.mean_ttft_or_tpot"]
-    isl, osl, conc = int(row["isl"]), int(row["osl"]), int(row["conc"])
-    label = _single_turn_label(isl, osl)
-    ep = par["tp"] * par["dp"] if par.get("enable_expert_parallel") else 1
-    sweep = {"scenario": scenario_file, "model": dep.get("_model", ""), "gpu": row["hardware"],
-             "workload": f"{isl}:{osl}", "label": label, "framework": "vllm", "precision": row["precision"],
-             "serving": "aggregated", "spec_method": "none",
-             "parallelism": {"tp": par["tp"], "pp": par["pp"], "dp": par["dp"], "ep": ep},
-             "points": [{"concurrency": conc}]}
-    corpus = {"source": "orchestrator/ingest (one InferenceX API row)", "measurement_source": "InferenceX API",
-              "sweeps": [sweep]}
-    absolutes = {"source": "InferenceX API", "anchors": [
-        {"scenario": scenario_file, "label": label, "framework": "vllm", "gpu": row["hardware"],
-         "absolute_tpot_us": {str(conc): round(tpot_us, 3)}, "absolute_ttft_us": {str(conc): round(ttft_us, 3)}}]}
-    passed = {k: eng[f] for k, f in _PROBE_FIELDS if f in eng}
-    # vLLM v0.31.0 caches prefixes unless told not to; stated so signedprobe never decides it.
-    passed.setdefault("enable_prefix_caching", True)
-    passed["enable_expert_parallel"] = bool(par.get("enable_expert_parallel"))
-    settings = {"source": "orchestrator/ingest (the run's server log)", "settings": [
-        {"scenario": scenario_file, "label": label, "framework": "vllm", "gpu": row["hardware"],
-         "by_concurrency": {str(conc): {"passed": passed, "resolved": {}}}}]}
-    return corpus, absolutes, settings
-
-
-def score_single_turn(o, entry, env, work: Path, sdir: Path, name: str, text: str, dep: dict,
-                      args: list, log: str, approximated: bool):
-    """One single-turn point through signedprobe (orchestrator/signedprobe, built at the BLIS tag)."""
-    row, pid, ident = entry["row"], entry["point_id"], entry["identity"]
-    scen_doc = next((d for d in __import__("yaml").safe_load_all(text) if d.get("kind") == "Scenario"), {})
-    dep = {**dep, "_model": scen_doc.get("model", ""), "_scenario": scen_doc}
-    got = single_turn_inputs(row, dep, f"{name}.yaml", measured(entry))
-    if isinstance(got, list):
-        o.reasons = sorted(set(got))
+    if "speculative" in eng and "acceptance" not in b.scenario:
+        # The replay passes no acceptance flag: a drafter is priced only when the scenario pins
+        # its acceptance.
+        o.reasons = ["client_scenario_not_replayable:single_turn_speculative"]
         return o
-    corpus, absolutes, settings = got
-    pdir = work / "single_turn" / pid
+    m = measured(entry)
+    try:
+        meas_ttft_us, meas_tpot_us = float(m["mean_ttft"]) * 1e6, float(m["mean_tpot"]) * 1e6
+    except (KeyError, TypeError, ValueError):
+        o.reasons = ["required_setting_missing:measured.mean_ttft_or_tpot"]
+        return o
+    isl, osl, conc = int(row["isl"]), int(row["osl"]), int(row["conc"])
+    ins, outs = ix.target_lengths(isl, osl, conc)
+    primed = eng.get("enable_prefix_caching") is not False
+    copies = max(int(par.get("dp") or 1), 1) if primed else 0
+    replay = ix.primed_phase(ins, outs, conc, copies) if primed else ix.main_phase(ins, outs, conc)
+
+    pdir = (work / "single_turn" / pid).resolve()
     pdir.mkdir(parents=True, exist_ok=True)
-    files = {}
-    for role, doc in (("corpus", corpus), ("absolutes", absolutes), ("settings", settings)):
-        files[role] = pdir / f"{role}.json"
-        files[role].write_text(contract.canonical_dumps(doc) + "\n")
-    argv = [env.signedprobe, "-blis", env.blis, "-corpus", str(files["corpus"]), "-scenarios", str(sdir),
-            "-absolutes", str(files["absolutes"]), "-engine-settings", str(files["settings"]),
-            "-catalog", str(env.catalog), "-registry", str(env.registry)]
-    if env.blis_dir:
-        argv += ["-blis-dir", env.blis_dir]
-    out_path = pdir / "signedprobe.csv"
-    key = hashlib.sha256((text + "".join(files[r].read_text() for r in sorted(files)) + "\0".join(argv[1:])).encode()).hexdigest()
-    key_path = pdir / "signedprobe.key"
-    if not (out_path.exists() and key_path.exists() and key_path.read_text() == key):
-        try:
-            proc = subprocess.run(argv, capture_output=True, text=True, timeout=env.timeout_s)
-        except subprocess.TimeoutExpired:
-            o.reasons = ["blis_refused:timeout"]
-            return o
-        (pdir / "signedprobe.err").write_text(proc.stderr[-20000:])
-        if proc.returncode != 0:
-            o.reasons = [_blis_refusal(_probe_error(proc.stderr), work)]
-            return o
-        out_path.write_text(proc.stdout)
-        key_path.write_text(key)
-    import csv as _csv
-    rows = list(_csv.DictReader(out_path.read_text().splitlines()))
-    if len(rows) != 1:
+    routed = dataclasses.replace(b, deployment={**b.deployment,
+                                                "router": {"endpoint_picker_config": ix.ROUTER_CONFIG_NAME}})
+    text = st.to_yaml(routed, header)
+    (pdir / f"{name}.yaml").write_text(text)
+    router = ix.router_config_bytes()
+    (pdir / ix.ROUTER_CONFIG_NAME).write_bytes(router)
+    header_path, data_path = ix.write_trace(replay, pdir)
+    argv = ix.replay_argv(env.blis, f"{name}.yaml", pdir, header_path, data_path, replay.sessions, replay.pool,
+                          SINGLE_TURN_SEED)
+    if env.catalog:
+        argv += ["--catalog", str(env.catalog)]
+    if env.registry:
+        argv += ["--registry", str(env.registry)]
+    key = hashlib.sha256(b"\0".join([text.encode(), router, header_path.read_bytes(), data_path.read_bytes(),
+                                      "\0".join(argv[1:]).encode()])).hexdigest()
+    doc = _run_result(o, argv, key, pdir / "result.json", env, work)
+    if doc is None:
+        return o
+    try:
+        result.requests_complete(doc, len(replay.records))
+        rows = result.rows(doc)
+    except result.ResultError as e:
+        o.reasons = [f"blis_refused:{e.slug}"]
+        return o
+    try:
+        if primed:
+            ix.check_primed(rows, len(ins))
+    except ValueError:
+        o.reasons = ["blis_refused:warmup_not_drained"]
+        return o
+    try:
+        s = ix.summarize(rows, ins, outs, ignore=ix.main_phase_only(len(ins)) if primed else None)
+    except ValueError:
+        o.reasons = ["blis_refused:requests_not_the_points"]
+        return o
+    if s["mean_tpot_us"] is None:
         o.reasons = ["blis_refused:metrics_incomplete"]
         return o
-    pr = rows[0]
-    status = point_status(approximated, entry["build"])
+
+    verified, why = _prompt_lengths().verified(sup.checkpoint, row.get("date"), isl, osl, conc)
+    differences = ix.client_differences(verified, why)
+    status = point_status(_estimated(args), entry["build"], differences)
     o.fidelity = {"status": status, "build": entry["build"], "args": args, "resolved": [],
-                  "blis_kernel_provenance": None}
-    pool = dep["pools"][0]
-    par = pool["parallel"]
+                  "blis_kernel_provenance": result.kernel_report(doc),
+                  "requests": {"client": ix.CLIENT_SUBJECT, "start": "primed" if primed else "cold",
+                               "copies": copies, "count": len(ins), "differences": differences}}
     ep = (par["tp"] * par["dp"]) if par.get("enable_expert_parallel") else 1
-    label = corpus["sweeps"][0]["label"]
-    scen = f"{dep['_model']}-{row['hardware']}-{row['precision']}-vllm-tp{par['tp']}-dp{par['dp']}-ep{ep}"
+    label = _single_turn_label(isl, osl)
+    scen = f"{model}-{row['hardware']}-{row['precision']}-vllm-tp{par['tp']}-dp{par['dp']}-ep{ep}"
     o.facets = {"identity": ident, "sweep_id": sweep_id(row, scen, label),
-                "scenario": scen, "label": label, "workload": corpus["sweeps"][0]["workload"],
-                "model": dep["_model"], "gpu": row["hardware"], "precision": row["precision"], "framework": "vllm",
+                "scenario": scen, "label": label, "workload": f"{isl}:{osl}",
+                "model": model, "gpu": row["hardware"], "precision": row["precision"], "framework": "vllm",
                 "serving": "aggregated", "spec_method": row.get("spec_method") or "none",
                 "parallelism": {"tp": par["tp"], "pp": par["pp"], "dp": par["dp"], "ep": ep},
                 "image": row.get("image"), "vllm_version": _banner_version(log)}
-    o.csv_row = [scen, dep["_model"], row["hardware"], label, ident["conc"],
-                 float(pr["meas_tpot_us"]), float(pr["pred_tpot_us"]),
-                 float(pr["meas_ttft_us"]), float(pr["pred_ttft_us"]),
+    o.csv_row = [scen, model, row["hardware"], label, ident["conc"],
+                 round(meas_tpot_us, 3), round(s["mean_tpot_us"], 3),
+                 round(meas_ttft_us, 3), round(s["mean_ttft_us"], 3),
                  contract.TIER_BY_STATUS[status], pid, ident["measured_date"]]
     return o
 
 
+_EVIDENCE: list = []
+
+
+def _prompt_lengths() -> ix.PromptLengthEvidence:
+    """The sent-prompt-length evidence (inferencex_client.PROMPT_LENGTHS), loaded once per
+    process."""
+    if not _EVIDENCE:
+        _EVIDENCE.append(ix.PromptLengthEvidence.load(ix.PROMPT_LENGTHS))
+    return _EVIDENCE[0]
+
+
 def _helper_failure(ex: Exception) -> str:
     return "blis_refused:timeout" if isinstance(ex, subprocess.TimeoutExpired) else "blis_refused:defaults_helper_failed"
-
-
-def _probe_error(stderr: str) -> str:
-    """signedprobe's own failure line (first run error / no latency), else its last line."""
-    for line in stderr.splitlines():
-        if line.startswith("first run error") or line.startswith("no latency observed"):
-            return line.split(": ", 1)[-1]
-    return stderr
 
 
 def _estimated(args: list) -> bool:
@@ -859,10 +862,12 @@ def _estimated(args: list) -> bool:
     return any(a.get("match") == "approximated" for a in args)
 
 
-def point_status(approximated: bool, build: dict) -> str:
-    """exact only when BLIS was given every setting as the run recorded it AND the run's build is
-    the one BLIS models; otherwise approximate (shown as "estimated"). A build never refuses."""
-    return "approximate" if approximated or build.get("match") != "exact" else "exact"
+def point_status(approximated: bool, build: dict, client_differences: list) -> str:
+    """exact only when BLIS was given every setting as the run recorded it, the run's build is
+    the one BLIS models, and the simulated requests are the ones the run's client sent (no
+    client difference, COV-12); otherwise approximate (shown as "estimated"). A build never
+    refuses."""
+    return "approximate" if approximated or build.get("match") != "exact" or client_differences else "exact"
 
 
 def row_vs_run(row: dict, c: st.Classified) -> list[str]:

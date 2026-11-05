@@ -1,8 +1,8 @@
 """The requests an InferenceX single-turn run sent, reproduced for `blis replay` (COV-12).
 
-Ported from the dashboard's copy of inference-sim's tools/harness (orchestrator/signedprobe/
-harness: workload.go, promptlengths.go, blisrun.go, and harness.go's Run, checkPrimed and
-summarize). inference-sim docs/kernel-exclusive/APPLES-TO-APPLES.md cites every line of the
+Ported from inference-sim's tools/harness (workload.go, promptlengths.go, blisrun.go, and
+harness.go's Run, checkPrimed and summarize), which the dashboard ran as the Go command
+signedprobe until score.py used this module instead. inference-sim docs/kernel-exclusive/APPLES-TO-APPLES.md cites every line of the
 client this depends on. Nothing here imports or runs Go code.
 
 What the client does. InferenceX's benchmark_serving.py, launched by benchmark_lib.sh with

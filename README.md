@@ -6,8 +6,16 @@ How accurately BLIS predicts real inference latency, scored nightly against
 
 **BLIS only. End-to-end only. Tables only, no plots.** Every number is a full `blis replay`
 through the whole stack (router/admission → scheduler → batch → kernel), scored against the
-pinned weekly InferenceX dump. v0.1.0 reports **mean TTFT and TPOT, each MAPE + shape** — exactly
-what `cmd/signedprobe` emits. E2E, tail p99 and throughput are out of scope for v0.1.0.
+pinned weekly InferenceX dump. v0.1.0 reports **mean TTFT and TPOT, each MAPE + shape**. E2E,
+tail p99 and throughput are out of scope for v0.1.0.
+
+Points are scored by `orchestrator/ingest/score.py`. For a single-turn point it writes the
+requests the InferenceX client sent (`orchestrator/ingest/inferencex_client.py`), runs
+`blis replay` on them, and computes the client's mean TTFT and TPOT from the per-request rows of
+the Result document blis prints. For an agentic point it runs `blis replay --agentic-scenario`
+and reads `ttft_mean_ms` and `tpot_mean_ms` from the Result. The Go command `signedprobe`, which
+scored single-turn points before, has been removed; the pipeline sketch below predates the API
+ingest.
 
 ## How it fits together
 
@@ -39,7 +47,7 @@ extractors are all built/run from source at the CI-resolved release tag.
 | `docs/RFC-0001.md` | The complete v0.1.0 design (the spec). |
 | `docs/mockups/` | The approved Overview mockup (`.png` + `.html`). |
 | `schemas/summary.v1.json` | Local JSON schema `summary.json` is validated against (RFC §4.4). |
-| `orchestrator/` | The glue: resolve inputs, build from source, run `signedprobe`, shape the CSV into `summary.json`, validate. No scoring logic. |
+| `orchestrator/` | The glue: resolve inputs, build from source, run `blis replay` per point (`ingest/score.py`), shape the CSV into `summary.json`, validate. |
 | `web/` | The static Overview SPA (two tables, no plots). |
 | `data/latest/summary.json` | The current snapshot (CI-produced; the site fetches it). |
 | `data/snapshots/<id>/` | Immutable history, one per run. |

@@ -20,8 +20,9 @@ CSV, so `build_summary.py` scores it with no new scoring code:
   the scenario       gen_scenarios.emit() over the row's topology -> the Scenario +
                      Deployment YAML `blis replay` prices the server from (the SAME writer
                      the single-turn path uses, so the deployment is described identically).
-  the prediction     `blis replay … --metrics-path out.json` -> ttft_mean_ms / itl_mean_ms
-                     (the PREDICTED side).
+  the prediction     `blis replay … --format json` -> the Result document on standard
+                     output, validated (orchestrator/ingest/result.py); its metrics
+                     ttft_mean_ms / tpot_mean_ms (the PREDICTED side, DEV-8).
 
 A row with a refusal (unsupported model/hardware, or a speculative run with no stated
 synthetic acceptance) is emitted as NOT scored, never run with a guessed value.
@@ -51,11 +52,13 @@ Usage:
 
 import argparse
 import json
-import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent / "ingest"))
+
+import result  # noqa: E402
 
 from extract_agentic_replay_args import (AGENTX_SCENARIO, parse_job_log,  # noqa: E402
                                          parse_server_log)
@@ -293,33 +296,19 @@ def measured_us(row: dict) -> tuple[float, float]:
     return float(ttft_s) * 1e6, float(tpot_s) * 1e6
 
 
-def predicted_us(metrics_json: dict) -> tuple[float, float]:
-    """(pred_ttft_us, pred_tpot_us) from a blis --metrics-path MetricsOutput, in microseconds.
+def predicted_us(doc: dict) -> tuple[float, float]:
+    """(pred_ttft_us, pred_tpot_us) from a blis Result document, in microseconds.
 
-    TPOT comes from `request_itl_mean_ms`, NOT `itl_mean_ms`. The two differ under
-    speculative decoding, which every agentic row here uses (DSpark):
-
-      itl_mean_ms          the per-DECODE-STEP interval. A step accepts AL tokens (AL ~ 3.8
-                           for DSpark), so this is ~AL times the per-token value.
-      request_itl_mean_ms  aiperf's ITL, (latency - TTFT) / (OSL - 1), per TOKEN
-                           (sim/metrics_measured.go:64-67, pinned by
-                           TestMetricsPath_DSparkRequestITLIsTheStepIntervalOverTheAccepted-
-                           Length). This is what InferenceX/aiperf reports as mean_tpot.
-
-    Reading itl_mean_ms would make predicted TPOT ~AL times too high and read as a BLIS
-    accuracy failure that is really a metric mismatch (PR #21 review, point 1). TTFT is
-    ttft_mean_ms, which the file already restates over the measured window.
+    Both are read by their metric-registry identifiers (DEV-8): ttft_mean_ms, and tpot_mean_ms,
+    the per-token (latency - TTFT) / (OSL - 1) averaged per request, which is what
+    InferenceX/aiperf reports as mean_tpot. It is not the per-decode-step interval, which under
+    speculative decoding is about the acceptance length times larger. A Result without either
+    figure fails loud.
     """
-    ttft_ms = metrics_json.get("ttft_mean_ms")
-    # request_itl_mean_ms is the per-token metric; fall back to itl_mean_ms only if a
-    # (non-speculative) build did not emit it, so a missing key fails loud rather than
-    # silently reverting to the step interval.
-    tpot_ms = metrics_json.get("request_itl_mean_ms")
-    if ttft_ms is None or tpot_ms is None:
-        raise SystemExit("blis metrics JSON missing ttft_mean_ms/request_itl_mean_ms "
-                         "(need a --metrics-path file from a build that emits the "
-                         "aiperf-defined measured metrics)")
-    return float(ttft_ms) * 1e3, float(tpot_ms) * 1e3
+    try:
+        return result.figure(doc, result.TTFT_MEAN_MS) * 1e3, result.figure(doc, result.TPOT_MEAN_MS) * 1e3
+    except result.ResultError as e:
+        raise SystemExit(f"blis Result: {e}")
 
 
 def csv_row(row: dict, sweep: dict, pred_ttft_us: float, pred_tpot_us: float) -> dict:
@@ -374,10 +363,11 @@ def facets_corpus(sweep: dict, row: dict) -> dict:
 
 def build_blis_argv(blis: str, scenario_name: str, scenarios_dir: str, catalog: str,
                     registry: str, corpus: str, corpus_sha256: str,
-                    replay: list[str], metrics_path: str) -> list[str]:
+                    replay: list[str]) -> list[str]:
     """The full `blis replay --agentic-scenario` command. `replay` is PR #19's arg list,
     which already carries --agentic-scenario + --seed/--concurrency/--benchmark-duration
-    and (for a synthetic-acceptance run) --speculative-acceptance-length."""
+    and (for a synthetic-acceptance run) --speculative-acceptance-length. The Result is written
+    to standard output as JSON."""
     return [
         blis, "replay",
         *replay,
@@ -387,7 +377,7 @@ def build_blis_argv(blis: str, scenario_name: str, scenarios_dir: str, catalog: 
         "--scenarios", scenarios_dir,
         "--catalog", catalog,
         "--registry", registry,
-        "--metrics-path", metrics_path,
+        "--format", "json",
     ]
 
 
@@ -411,13 +401,14 @@ def main() -> int:
                          "seed/duration are left to blis's defaults regardless.")
     ap.add_argument("--corpus", required=True, help="traces.jsonl")
     ap.add_argument("--corpus-sha256", required=True)
-    ap.add_argument("--blis", required=True, help="the blis binary evaluate.sh built")
+    ap.add_argument("--blis", required=True, help="the blis binary; it runs in its own directory")
     ap.add_argument("--catalog", required=True)
     ap.add_argument("--registry", required=True)
     ap.add_argument("--out-dir", required=True)
     args = ap.parse_args()
 
-    out = Path(args.out_dir)
+    # blis runs in its binary's directory, so every path it is given is absolute.
+    out = Path(args.out_dir).resolve()
     out.mkdir(parents=True, exist_ok=True)
 
     row = json.loads(Path(args.row).read_text())
@@ -461,22 +452,25 @@ def main() -> int:
     (scen_dir / sweep["scenario"]).write_text(
         emit(sweep, {sweep["workload"]}, {AGENTIC_LABEL}))
 
-    metrics_path = out / f"blis-metrics-{row.get('id')}.json"
+    blis = str(Path(args.blis).resolve())
     argv = build_blis_argv(
-        args.blis, sweep["scenario"], str(scen_dir), args.catalog, args.registry,
-        args.corpus, args.corpus_sha256, replay, str(metrics_path))
+        blis, sweep["scenario"], str(scen_dir), str(Path(args.catalog).resolve()),
+        str(Path(args.registry).resolve()), str(Path(args.corpus).resolve()), args.corpus_sha256, replay)
     print("running:", " ".join(argv), file=sys.stderr)
-    proc = subprocess.run(argv, capture_output=True, text=True)
-    if proc.returncode != 0:
-        sys.stderr.write(proc.stderr[-4000:])
-        raise SystemExit(f"blis replay failed (exit {proc.returncode}) for row {row.get('id')}")
+    try:
+        doc, raw, _ = result.run(argv, blis=blis, cwd=str(Path(blis).parent))
+    except result.RunFailed as e:
+        sys.stderr.write(e.stderr[-4000:])
+        raise SystemExit(f"blis replay failed for row {row.get('id')}")
+    except result.ResultError as e:
+        raise SystemExit(f"blis replay for row {row.get('id')}: {e}")
+    (out / f"blis-result-{row.get('id')}.json").write_bytes(raw)
 
-    metrics = json.loads(metrics_path.read_text())
-    pred_ttft_us, pred_tpot_us = predicted_us(metrics)
+    pred_ttft_us, pred_tpot_us = predicted_us(doc)
     r = csv_row(row, sweep, pred_ttft_us, pred_tpot_us)
-    write_csv([r], out / "signedprobe.csv")  # same name/shape build_summary.py reads
+    write_csv([r], out / "points.csv")  # the shape build_summary.py --csv reads
 
-    print(f"row {row.get('id')} scored -> {out/'signedprobe.csv'}")
+    print(f"row {row.get('id')} scored -> {out/'points.csv'}")
     print(f"  measured ttft={r['meas_ttft_us']/1e3:.1f}ms tpot={r['meas_tpot_us']/1e3:.3f}ms "
           f"| predicted ttft={r['pred_ttft_us']/1e3:.1f}ms tpot={r['pred_tpot_us']/1e3:.3f}ms")
     return 0

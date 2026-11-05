@@ -84,6 +84,15 @@ export interface Fidelity {
     seed: number
     trajectory_start?: { min_ratio?: number; max_ratio?: number }
   }
+  /** Single-turn: how the client's requests were replayed, and each difference from the run's
+   *  client (COV-12). A point naming a difference is approximate. */
+  requests?: {
+    client: string
+    start: 'cold' | 'primed'
+    copies: number
+    count: number
+    differences: { kind: 'client_difference'; subject: 'send_gap' | 'sent_prompt_lengths'; detail: string }[]
+  }
   blis_kernel_provenance?: unknown
 }
 

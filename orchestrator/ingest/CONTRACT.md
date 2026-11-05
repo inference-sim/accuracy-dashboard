@@ -20,7 +20,7 @@ Every scored `point_id` appears exactly once in each of `points.csv`, `fidelity.
 
 ### `points.csv`
 
-The signedprobe per-point columns `build_summary.py` already reads (`EXPECTED_HEADER`), then two more:
+The per-point columns `build_summary.py` already reads (`EXPECTED_HEADER`), then two more:
 
 ```
 scenario,model,gpu,label,concurrency,meas_tpot_us,pred_tpot_us,meas_ttft_us,pred_ttft_us,tier_unbracketed,point_id,measured_date
@@ -65,7 +65,7 @@ Snapshots published before this identity carry `point_id`s of an eight-field ide
 
 ### `fidelity.jsonl`
 
-`{"point_id": …, <record>}`, one line per scored point, sorted by `point_id`. The record is described by `fidelity.schema.json`, and its shape is explained in Discussion #28 ("Per-point fidelity record"). For a scored point, `status` is `exact` or `approximate`, and there is no `reasons` field (the schema enforces both ways: `not_scored` requires `reasons`, a scored status forbids it). A point is `approximate` exactly when one of its `args` has `match: approximated` (a quantization setting BLIS can't state, scored with what BLIS uses instead), or its `build.match` is `estimated` (the run's vLLM build isn't the one BLIS models: a custom image, a commit off vLLM's mainline or unresolvable, or more than `vllm_max_distance` commits from `vllm_ref`; `build.why` says which). A build never stops a point from being scored. That arg's `blis` is the value BLIS used, and its `note` says why (fixed text from the policy table). A `mapped` arg must name its `blis_field`, a `blis_default` arg its `rule`, an `approximated` arg its `note`, and a `conflict` arg its `values`.
+`{"point_id": …, <record>}`, one line per scored point, sorted by `point_id`. The record is described by `fidelity.schema.json`, and its shape is explained in Discussion #28 ("Per-point fidelity record"). For a scored point, `status` is `exact` or `approximate`, and there is no `reasons` field (the schema enforces both ways: `not_scored` requires `reasons`, a scored status forbids it). A point is `approximate` exactly when one of its `args` has `match: approximated` (a quantization setting BLIS can't state, scored with what BLIS uses instead), or its `build.match` is `estimated` (the run's vLLM build isn't the one BLIS models: a custom image, a commit off vLLM's mainline or unresolvable, or more than `vllm_max_distance` commits from `vllm_ref`; `build.why` says which), or its `requests.differences` names a difference between the run's client and the simulated one (COV-12). A build never stops a point from being scored. A single-turn point's `requests` says how its client's requests were replayed: `cold` from an empty engine when the run disabled prefix caching, `primed` after `copies` warm-up copies of request 0 otherwise. Its differences always include `send_gap` (the client's interval between a response ending and its next request, which the simulator does not model), so every single-turn point is `approximate`, and `sent_prompt_lengths` where the sent prompt lengths are not verified equal to the replayed targets. That arg's `blis` is the value BLIS used, and its `note` says why (fixed text from the policy table). A `mapped` arg must name its `blis_field`, a `blis_default` arg its `rule`, an `approximated` arg its `note`, and a `conflict` arg its `values`.
 
 ### `facets.json`
 
@@ -126,7 +126,7 @@ Defined once in `fidelity.schema.json` (`definitions/reason`). An optional `:<qu
 | `setting_not_modelled` | A timing-relevant setting BLIS can't represent. |
 | `setting_differs` | A timing-relevant setting BLIS was given differs from what the run recorded (`differs` / `absent_in_blis` in the args diff). |
 | `required_setting_missing` | A setting BLIS requires that no source records and BLIS has no default for. |
-| `client_scenario_not_replayable` | The AgentX client scenario has no BLIS replay counterpart. |
+| `client_scenario_not_replayable` | The client scenario has no BLIS replay counterpart: an AgentX scenario BLIS does not replay, or a single-turn drafter whose acceptance the scenario does not pin. |
 | `model_not_in_catalog` | The served checkpoint (or its HF `base_model`) maps to no catalog model. |
 | `hardware_no_coefficients` | The registry has no coefficients for the part. |
 | `drafter_not_in_catalog` | The catalog graph doesn't describe the run's drafter. |

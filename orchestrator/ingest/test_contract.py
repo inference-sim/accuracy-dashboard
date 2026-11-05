@@ -58,7 +58,7 @@ def test_point_id_changes_with_the_measurement_date_and_the_benchmark_run():
 def test_point_id_takes_a_null_fingerprint_and_a_null_run():
     assert c.point_id({**IDENT, "recipe_fingerprint": None, "benchmark_run": None})
     for bad in ({**IDENT, "recipe_fingerprint": ""}, {**IDENT, "benchmark_run": "123"},
-                {**IDENT, "source": "aisimulate"}):
+                {**IDENT, "source": "another-source"}):
         try:
             c.point_id(bad)
         except ValueError:

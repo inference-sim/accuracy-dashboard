@@ -33,10 +33,10 @@ with `python -I`. Kimi-K2.5's tokenizer is custom code (tokenization_kimi.py) an
 trust_remote_code; read it before running. Points with no engine log (Llama-3.1-70B, whose
 tokenizer is also gated) have no run date or known client version and are not recorded.
 
-Usage:
+Usage (CORPUS is the single-turn end-to-end corpus JSON in blis-measurements):
     export HF_HOME=~/.cache/blis-check/tokenizers/hf
     python -I orchestrator/scripts/inferencex_prompt_lengths.py \\
-        --corpus "$BLIS_MEASUREMENTS"/aisimulate_e2e.json \\
+        --corpus "$CORPUS" \\
         --engine-settings "$BLIS_MEASUREMENTS"/inferencex_engine_settings.json \\
         --out orchestrator/ingest/testdata/inferencex-workloads/prompt-lengths.json
 """

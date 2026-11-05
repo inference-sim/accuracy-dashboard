@@ -24,8 +24,8 @@ def _args(tmp, **over):
     a = dict(blis_tag="v0.12.0", work_dir=str(tmp / "work"), data_dir=str(tmp / "data"),
              state=str(tmp / "state.json"), window_days=180, keep_api=5, today="2026-10-23",
              cache=None, work=str(tmp / "contract"), score_work=str(tmp / "sw"), evaluator_commit="abc",
-             blis_dir=str(tmp / "sim"), catalog=str(tmp / "cat"), registry=str(tmp / "reg"),
-             defaults_helper=str(tmp / "helper"), signedprobe=str(tmp / "signedprobe"),
+             blis=str(tmp / "sim" / "blis"), catalog=str(tmp / "cat"), registry=str(tmp / "reg"),
+             defaults_helper=str(tmp / "helper"),
              corpus=str(tmp / "corpus.json"),
              corpus_sha256=None, corpus_dataset="d", corpus_revision="main", corpus_cache=None,
              timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0,
@@ -152,3 +152,63 @@ def test_nightly_stops_when_the_pull_fails(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "cmd_pull", lambda a: 4)      # a pull error
     with pytest.raises(RuntimeError, match="pull failed"):
         cli.cmd_nightly(_args(tmp_path))
+
+
+def test_the_nightly_passes_the_blis_binary_to_score(tmp_path, monkeypatch):
+    rows = [_row("m", 1, "2026-10-01")]
+    fakes = Fakes(rows)
+    _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
+    seen = {}
+    real = fakes.cmd_score
+    monkeypatch.setattr(cli, "cmd_score", lambda a: (seen.setdefault("a", a), real(a))[1])
+    fakes.ledger(tmp_path)
+    cli.cmd_nightly(_args(tmp_path))
+    assert seen["a"].blis == str(tmp_path / "sim" / "blis")
+    assert not hasattr(seen["a"], "blis_dir") and not hasattr(seen["a"], "signedprobe")
+
+
+def _git(*a):
+    import subprocess
+    subprocess.run(["git", *a], check=True, capture_output=True)
+
+
+def _helper(tmp, versions):
+    p = tmp / "helper"
+    p.write_text(f"#!/bin/sh\necho '{json.dumps(versions)}'\n")
+    p.chmod(0o755)
+    return str(p)
+
+
+def _tagged_repo(path, tag):
+    path.mkdir(parents=True)
+    _git("-C", str(path), "init", "-q")
+    _git("-C", str(path), "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "x")
+    if tag:
+        _git("-C", str(path), "tag", tag)
+
+
+def test_check_blis_inputs_reads_the_release_from_the_binarys_checkout(tmp_path):
+    sim = tmp_path / "sim"
+    _tagged_repo(sim, "v0.16.0")
+    (sim / "go.mod").write_text("module m\nrequire github.com/inference-sim/blis-schemas v0.4.0\n")
+    (sim / "blis").write_text("")
+    for r in ("cat", "reg"):
+        _tagged_repo(tmp_path / r, "v1.0.0")
+    ok = _helper(tmp_path, {"inference-sim": "v0.16.0", "blis-schemas": "v0.4.0"})
+    assert cli.check_blis_inputs(sim / "blis", ok, tmp_path / "cat", tmp_path / "reg") == []
+    bad = cli.check_blis_inputs(sim / "nope", ok, tmp_path / "cat", tmp_path / "reg")
+    assert len(bad) == 1 and bad[0].startswith(f"--blis {sim / 'nope'} is not a file")
+    other = _helper(tmp_path, {"inference-sim": "v0.15.0", "blis-schemas": "v0.4.0"})
+    bad = cli.check_blis_inputs(sim / "blis", other, tmp_path / "cat", tmp_path / "reg")
+    assert bad == ["--defaults-helper is built against inference-sim v0.15.0, --blis's checkout is v0.16.0"]
+
+
+def test_check_blis_inputs_refuses_a_checkout_not_at_a_tag(tmp_path):
+    sim = tmp_path / "sim"
+    _tagged_repo(sim, None)
+    (sim / "go.mod").write_text("module m\n")
+    (sim / "blis").write_text("")
+    for r in ("cat", "reg"):
+        _tagged_repo(tmp_path / r, "v1.0.0")
+    bad = cli.check_blis_inputs(sim / "blis", _helper(tmp_path, {}), tmp_path / "cat", tmp_path / "reg")
+    assert any("is not at a release tag" in b for b in bad)

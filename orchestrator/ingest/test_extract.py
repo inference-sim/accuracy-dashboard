@@ -715,11 +715,14 @@ def test_the_rows_gpu_count_is_read_in_inferencex_terms():
 def test_a_point_is_exact_only_on_the_build_blis_models_with_nothing_approximated():
     import score as sc
     near = {"match": "exact", "distance": -738}
-    assert sc.point_status(False, near) == "exact"
-    assert sc.point_status(True, near) == "approximate"
+    assert sc.point_status(False, near, []) == "exact"
+    assert sc.point_status(True, near, []) == "approximate"
     for why in ("custom_build", "outside_distance", "commit_unresolvable", "commit_conflict"):
-        assert sc.point_status(False, {"match": "estimated", "why": why}) == "approximate", why
-    assert sc.point_status(False, {}) == "approximate"          # no build record: never exact
+        assert sc.point_status(False, {"match": "estimated", "why": why}, []) == "approximate", why
+    assert sc.point_status(False, {}, []) == "approximate"          # no build record: never exact
+    # A difference between the run's client and the simulated one is never exact (COV-12).
+    gap = [{"kind": "client_difference", "subject": "send_gap", "detail": "x"}]
+    assert sc.point_status(False, near, gap) == "approximate"
 
 
 def test_a_build_never_refuses_a_point_at_pull_time():

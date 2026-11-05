@@ -13,7 +13,7 @@
   ],
   "properties": {
     "status": {
-      "description": "exact: every timing-relevant setting is matched (recorded by the run, or BLIS's own default). approximate: scored, but at least one setting BLIS can't state was approximated (an args entry with match approximated, which says what BLIS used instead and why). not_scored: the point carries at least one reason code; approximate also when build.match is estimated (the run's vLLM build isn't the one BLIS models).",
+      "description": "exact: every timing-relevant setting is matched (recorded by the run, or BLIS's own default), the run's build is the one BLIS models, and the simulated requests are the ones the run's client sent. approximate: scored, but at least one setting BLIS can't state was approximated (an args entry with match approximated, which says what BLIS used instead and why), or build.match is estimated (the run's vLLM build isn't the one BLIS models), or requests names a difference between the run's client and the simulated one (COV-12). not_scored: the point carries at least one reason code.",
       "enum": [
         "exact",
         "approximate",
@@ -49,8 +49,11 @@
     "replay": {
       "$ref": "#/definitions/replay"
     },
+    "requests": {
+      "$ref": "#/definitions/requests"
+    },
     "blis_kernel_provenance": {
-      "description": "BLIS's own --metrics-path kernel_provenance, verbatim. Informational only.",
+      "description": "The kernel's own report from BLIS's Result (reports.kernel), verbatim, or null when the Result has none. Informational only.",
       "type": [
         "object",
         "null"
@@ -466,6 +469,105 @@
           "minLength": 1
         }
       }
+    },
+    "requests": {
+      "description": "Single-turn only: how the requests the run's client sent were replayed (COV-12). The requests are the client's own draws for the point's isl, osl and concurrency, in its order. Every remaining difference between the run's client and the simulated one is named in differences; a point naming one is approximate.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "client",
+        "start",
+        "copies",
+        "count",
+        "differences"
+      ],
+      "properties": {
+        "client": {
+          "description": "The client whose requests were replayed.",
+          "type": "string",
+          "minLength": 1
+        },
+        "start": {
+          "description": "cold: the main phase ran from an empty engine, because the run disabled prefix caching and the warm-up leaves nothing the main phase reads. primed: the main phase ran after copies of request 0 had cached its prompt, as the client's drained warm-up leaves the engine.",
+          "enum": [
+            "cold",
+            "primed"
+          ]
+        },
+        "copies": {
+          "description": "The warm-up copies of request 0 replayed before the main phase: the deployment's dp width when primed, 0 when cold.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "count": {
+          "description": "The main-phase requests replayed, 10 per unit of concurrency; the predicted means are taken over them.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "differences": {
+          "description": "Each difference between the run's client and the simulated one, sorted by kind, then subject.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "subject",
+              "detail"
+            ],
+            "properties": {
+              "kind": {
+                "const": "client_difference"
+              },
+              "subject": {
+                "description": "send_gap: the client's interval between one response ending and the next request, which the simulator does not model. sent_prompt_lengths: the sent prompt lengths are not verified equal to the replayed targets.",
+                "enum": [
+                  "send_gap",
+                  "sent_prompt_lengths"
+                ]
+              },
+              "detail": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "start": {
+                "const": "cold"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "copies": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "start": {
+                "const": "primed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "copies": {
+                "minimum": 1
+              }
+            }
+          }
+        }
+      ]
     }
   },
   "allOf": [
@@ -534,6 +636,24 @@
             "required": [
               "build"
             ]
+          },
+          {
+            "properties": {
+              "requests": {
+                "properties": {
+                  "differences": {
+                    "type": "array",
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "differences"
+                ]
+              }
+            },
+            "required": [
+              "requests"
+            ]
           }
         ]
       },
@@ -584,6 +704,24 @@
                 },
                 "required": [
                   "build"
+                ]
+              },
+              {
+                "properties": {
+                  "requests": {
+                    "properties": {
+                      "differences": {
+                        "type": "array",
+                        "minItems": 1
+                      }
+                    },
+                    "required": [
+                      "differences"
+                    ]
+                  }
+                },
+                "required": [
+                  "requests"
                 ]
               }
             ]

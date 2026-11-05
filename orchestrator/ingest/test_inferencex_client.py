@@ -1,5 +1,6 @@
 """Tests for inferencex_client.py: the client's draws, the sent-length evidence, the traces, and
-reading the simulator's request rows back (COV-12). No network, no simulator, no numpy needed."""
+reading the simulator's request rows back (COV-12). No network and no simulator; one test
+compares the generator with numpy itself."""
 from __future__ import annotations
 
 import csv
@@ -38,8 +39,8 @@ def test_the_generator_reproduces_numpys_legacy_randint(name, seed, calls, want)
         assert g.randint(low, high, n) == w
 
 
-def test_the_generator_agrees_with_numpy_when_numpy_is_installed():
-    np = pytest.importorskip("numpy")  # an extra check; the vectors above are the required one
+def test_the_generator_agrees_with_numpy():
+    import numpy as np  # CI installs it: a skipped test is not a passing one (X16)
     for seed in (0, 1, 7, 20261016):
         for isl, osl, conc in ((1024, 1024, 4), (8192, 1024, 64), (1000, 1, 3)):
             np.random.seed(seed)

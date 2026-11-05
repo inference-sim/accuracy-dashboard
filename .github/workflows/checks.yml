@@ -62,12 +62,12 @@ jobs:
         run: |
           pip install --quiet pyyaml
           python3 orchestrator/ingest/test_extract.py
-          # a point through score_point and write_contract, fake BLIS binaries (CI has no BLIS build)
+          # points through score_point and write_contract, fake BLIS binaries (CI has no BLIS build)
           python3 orchestrator/ingest/test_score_e2e.py
       - name: API nightly pipeline - window, trigger table, no-storage merge, two-retention index, parallel pools, fabricated-release combos (#15)
         run: |
           # These use pytest fixtures (tmp_path, monkeypatch), unlike the older standalone scripts.
-          pip install --quiet pytest pyyaml
+          pip install --quiet pytest pyyaml numpy
           python3 -m pytest -q \
             orchestrator/ingest/test_nightly.py \
             orchestrator/ingest/test_incremental.py \
@@ -76,6 +76,8 @@ jobs:
             orchestrator/ingest/test_parallel.py \
             orchestrator/ingest/test_score_pool.py \
             orchestrator/ingest/test_ledger.py \
+            orchestrator/ingest/test_inferencex_client.py \
+            orchestrator/ingest/test_result.py \
             orchestrator/test_update_index.py
       - name: Every point id of every published snapshot maps to a ledger unit (COV-8)
         run: python3 orchestrator/ingest/legacy_ids.py check --map data/legacy/point-ids.json --data data
@@ -95,30 +97,6 @@ jobs:
           cache-dependency-path: orchestrator/blisdefaults/go.sum
       - run: go test ./...
       - run: go build -o /tmp/blisdefaults .
-
-  signedprobe:
-    # The dashboard's single-turn scorer and its harness, moved here from inference-sim's tools/
-    # at v0.14.0, built against the pinned inference-sim tag in its go.mod. The tests that run a
-    # real `blis replay` need an inference-sim checkout (BLIS_SIM_DIR), so it's cloned at the
-    # same tag the go.mod pins.
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: orchestrator/signedprobe
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: orchestrator/signedprobe/go.mod
-          cache-dependency-path: orchestrator/signedprobe/go.sum
-      - name: Clone inference-sim at the pinned tag (for the tests that run blis)
-        run: |
-          tag=$(awk '$1=="github.com/inference-sim/inference-sim" {print $2; exit}' go.mod)
-          git clone -q --depth 1 --branch "$tag" https://github.com/inference-sim/inference-sim.git "$RUNNER_TEMP/sim"
-          echo "BLIS_SIM_DIR=$RUNNER_TEMP/sim" >> "$GITHUB_ENV"
-      - run: go vet ./...
-      - run: go test ./...
-      - run: go build -o /tmp/signedprobe .
 
   web:
     runs-on: ubuntu-latest
