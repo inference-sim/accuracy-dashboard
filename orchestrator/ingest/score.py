@@ -571,6 +571,11 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         o.reasons = [f"blis_refused:{e.slug}"]
         return o
 
+    try:
+        o.subs += result.coefficient_substitutions(doc)
+    except result.ResultError as e:
+        o.reasons = [f"blis_refused:{e.slug}"]
+        return o
     m = measured(entry)
     o.fidelity = {"build": entry["build"], "args": args,
                   "resolved": resolved_kv(log, doc), "replay": r.record(env.corpus["sha256"]),
@@ -728,6 +733,11 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
         o.reasons = ["blis_refused:metrics_incomplete"]
         return o
 
+    try:
+        o.subs += result.coefficient_substitutions(doc)
+    except result.ResultError as e:
+        o.reasons = [f"blis_refused:{e.slug}"]
+        return o
     verified, why = _prompt_lengths().verified(sup.checkpoint, row.get("date"), isl, osl, conc)
     differences = ix.client_differences(verified, why)
     o.fidelity = {"build": entry["build"], "args": args, "resolved": [],

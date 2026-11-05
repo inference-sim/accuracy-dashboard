@@ -134,3 +134,38 @@ def kernel_report(doc: dict) -> dict | None:
     """The kernel's own report (reports.kernel), verbatim, or None when the run has none."""
     k = (doc.get("reports") or {}).get("kernel")
     return k if k else None
+
+
+# Coefficient methods (design section 9.2). measured and calibrated keep a point at G1;
+# not_charged is deliberately zero. The rest are G2 substitutions (design 11.3):
+# transferred, literature, vendor_spec, roofline and assumed by the design's list, and
+# copied (carried over from another scope, a transfer by another name).
+TRUSTED_METHODS = ("measured", "calibrated", "not_charged")
+SUBSTITUTED_METHODS = ("transferred", "literature", "vendor_spec", "roofline", "assumed", "copied")
+REPORT_SUBJECT = "selected-entry report"
+
+
+def coefficient_substitutions(doc: dict) -> list[dict]:
+    """The G2 substitutions the Result's selected-entry report names (design 11.3).
+
+    Each coefficient the run priced with is in doc["selected_entries"]["coefficients"] with its
+    set, name and method. A method other than measured or calibrated is a `coefficient_method`
+    substitution (subject set/name, detail the method). A Result with no selected-entry report
+    (an older build) names the single substitution `coefficient_method` on the report itself, so
+    no G1 is published for coefficients nobody read.
+
+    The design's `coefficient_range` (an extrapolated or unidentified lookup) cannot be named
+    yet: the Result carries no range field. When it does, it is read here."""
+    report = doc.get("selected_entries")
+    if not isinstance(report, dict):
+        return [{"kind": "coefficient_method", "subject": REPORT_SUBJECT, "detail": "not read"}]
+    out = []
+    for c in report.get("coefficients") or []:
+        method = c.get("method")
+        if method in TRUSTED_METHODS:
+            continue
+        if method not in SUBSTITUTED_METHODS:
+            raise ResultError(f"selected_entries: coefficient {c.get('set')}/{c.get('name')} has method "
+                              f"{method!r}, not one of design 9.2's", "coefficient_method_unknown")
+        out.append({"kind": "coefficient_method", "subject": f"{c['set']}/{c['name']}", "detail": method})
+    return sorted(out, key=lambda s: (s["subject"], s["detail"]))

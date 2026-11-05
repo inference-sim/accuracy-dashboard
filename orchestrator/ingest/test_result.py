@@ -160,3 +160,31 @@ def test_run_raises_run_failed_with_the_simulators_stderr(tmp_path):
     with pytest.raises(result.RunFailed) as e:
         result.run(["blis", "replay"], blis=_validator(tmp_path, 0), runner=_runner(1, "", 'level=fatal msg="no"'))
     assert e.value.stderr == 'level=fatal msg="no"'
+
+
+def _report(*methods):
+    return {"selected_entries": {"coefficients": [
+        {"set": "cost-model-attention", "name": f"c{i}", "method": m, "scope": {}, "file": "f.yaml"}
+        for i, m in enumerate(methods)]}}
+
+
+def test_measured_and_calibrated_coefficients_name_no_substitution():
+    assert result.coefficient_substitutions(_report("measured", "calibrated", "not_charged")) == []
+    assert result.coefficient_substitutions({"selected_entries": {}}) == []
+
+
+@pytest.mark.parametrize("method", ["transferred", "literature", "vendor_spec", "roofline", "assumed"])
+def test_each_weaker_coefficient_method_is_a_named_g2_substitution(method):
+    assert result.coefficient_substitutions(_report("measured", method)) == [
+        {"kind": "coefficient_method", "subject": "cost-model-attention/c1", "detail": method}]
+
+
+def test_a_result_without_the_selected_entry_report_is_never_g1():
+    assert result.coefficient_substitutions({}) == [
+        {"kind": "coefficient_method", "subject": "selected-entry report", "detail": "not read"}]
+
+
+def test_an_unknown_coefficient_method_is_refused():
+    with pytest.raises(result.ResultError) as e:
+        result.coefficient_substitutions(_report("divined"))
+    assert e.value.slug == "coefficient_method_unknown"

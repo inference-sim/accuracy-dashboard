@@ -61,6 +61,7 @@ LOG = (
 FAKE_BLIS = """#!/usr/bin/env python3
 import csv, json, os, sys
 VALIDATE, DROP, EARLY_HOLDER, SHORT, TTFT_US, TPOT_US = {validate}, {drop}, {early_holder}, {short}, 180000, 9000.0
+METHODS = {methods}
 a = sys.argv[1:]
 here = os.path.dirname(os.path.abspath(__file__))
 if a[:3] == ["schema", "validate", "result"]:
@@ -76,6 +77,10 @@ doc = {{"kind": "Result", "schema_version": 2, "name": "fake", "requests": count
        "metrics": {{"ttft_mean_ms": {{"value": 1500.0, "samples": 10}}, "tpot_mean_ms": {{"value": 4.5, "samples": 10}},
                    "itl_mean_ms": {{"value": 17.0, "samples": 10}}}},
        "reports": {{"engine": {{"cluster": {{"kv_capacity_tokens_per_replica": 100000}}}}, "kernel": {{"pool": "fake"}}}}}}
+if METHODS is not None:
+    doc["selected_entries"] = {{"coefficients": [
+        {{"set": "cost-model-attention", "name": "n%d" % i, "method": m, "scope": {{}}, "file": "f.yaml"}}
+        for i, m in enumerate(METHODS)]}}
 if "--trace-data" in a:
     recs = list(csv.DictReader(open(arg("--trace-data"))))
     main = [r for r in recs if r["session_id"].startswith("main-")]
@@ -112,12 +117,12 @@ def _exe(path: Path, body: str) -> str:
 
 
 def _fake_blis(tmp: Path, *, validate: int = 0, drop: bool = False, early_holder: bool = False,
-               short: bool = False) -> str:
+               short: bool = False, methods=("measured",)) -> str:
     d = tmp / "sim"
     d.mkdir(exist_ok=True)
     (d / "blis_saw.json").unlink(missing_ok=True)
     return _exe(d / "blis", FAKE_BLIS.format(validate=validate, drop=drop, early_holder=early_holder,
-                                                     short=short))
+                                                     short=short, methods=repr(methods)))
 
 
 def _saw(env) -> list[dict]:
@@ -580,6 +585,24 @@ def test_a_point_refused_before_blis_never_calls_it():
         assert c.validate_dir(tmp / "c1") == []
     finally:
         shutil.rmtree(tmp)
+
+
+def test_a_coefficient_not_measured_or_a_missing_report_makes_the_point_g2_and_never_g1():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        env.blis = _fake_blis(tmp, methods=("measured", "roofline"))
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert {"kind": "coefficient_method", "subject": "cost-model-attention/n1", "detail": "roofline"} \
+            in o.fidelity["substitutions"]
+        env.blis = _fake_blis(tmp, methods=None)
+        o, _ = _score(tmp, entry, env, tmp / "c2")
+        assert {"kind": "coefficient_method", "subject": "selected-entry report", "detail": "not read"} \
+            in o.fidelity["substitutions"]
+        assert c.validate_dir(tmp / "c2") == []
+    finally:
+        shutil.rmtree(tmp)
+
 
 
 if __name__ == "__main__":
