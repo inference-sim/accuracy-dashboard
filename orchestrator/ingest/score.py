@@ -499,7 +499,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
             if not isinstance(v, int) or isinstance(v, bool) or v < 1:
                 o.reasons.append(f"required_setting_missing:replay.{k}")
 
-    if sup.model is None or part_name not in cat.hardware:
+    if sup.model is None or sup.chip is None:
         o.reasons = sorted(set(o.reasons))
         return o
     part = st.Part(name=part_name)

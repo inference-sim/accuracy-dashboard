@@ -395,3 +395,40 @@ def test_units_select_the_points_of_the_pull_and_name_those_it_does_not_hold(tmp
     assert chosen == [{"point_id": a}]
     assert rec["count"] == 2 and rec["not_in_pull"] == [c_] and len(rec["sha256"]) == 64
     assert cli.select_units(pts, None) == (pts, None)
+
+
+def _score_inputs(tmp_path, commands: dict):
+    """What cmd_score needs, with a fake blis answering `commands` beside a stack.json for vLLM
+    0.32.0, in a checkout at v0.16.0; the catalog and registry at release tags; and a pull of no
+    points."""
+    sim = tmp_path / "sim"
+    _tagged_repo(sim, "v0.16.0")
+    (sim / "go.mod").write_text("module x\n")
+    (sim / "stack.json").write_text(json.dumps({"kind": "Stack", "engines": [{"kind": "vllm", "version": "0.32.0"}]}))
+    blis = fake_blis(sim / "blis", {"fields --engine vllm --json": [0, json.dumps(FIELD_LIST), ""], **commands})
+    for r in ("cat", "reg"):
+        _tagged_repo(tmp_path / r, "v1.0.0")
+    (tmp_path / "pull").mkdir()
+    pl.write_manifest(tmp_path / "pull", {"window": ["", ""], "pulled_at": "2026-10-23T00:00:00Z",
+                                          "vllm_ref": "v0.32.0", "vllm_max_distance": 0}, [])
+    (tmp_path / "corpus.json").write_text("{}")
+    return types.SimpleNamespace(
+        pull=str(tmp_path / "pull"), out=str(tmp_path / "contract"), blis=str(blis), catalog=str(tmp_path / "cat"),
+        registry=str(tmp_path / "reg"), stack=None, sim_build=None, harness_digest="unreleased", units=None,
+        corpus=str(tmp_path / "corpus.json"), corpus_sha256=None, corpus_dataset="d", corpus_revision="main",
+        corpus_cache=None, work=str(tmp_path / "work"), timeout=60, only=None, workers=1, agentic_workers=1,
+        max_rss_mb=0)
+
+
+def test_a_failed_catalog_resolve_stops_the_score_run(tmp_path, monkeypatch):
+    # The scorer reads catalog identities through `blis catalog resolve`, with the catalog it
+    # was given. A build without the command, or a name it refuses, fails the run rather than
+    # grade a point not_in_catalog.
+    a = _score_inputs(tmp_path, {})
+    import score
+    monkeypatch.setattr(score, "score_points", lambda points, pull, work, env, **k: [env.catalog_obj.model("org/m")])
+    msgs = []
+    monkeypatch.setattr(cli, "_log", msgs.append)
+    assert cli.cmd_score(a) == 2
+    want = f"blis catalog resolve --catalog {Path(a.catalog).resolve()} --model org/m --json exited 2"
+    assert any(want in m for m in msgs), msgs

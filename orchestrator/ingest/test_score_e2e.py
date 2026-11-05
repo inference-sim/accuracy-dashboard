@@ -120,6 +120,34 @@ def _fake_blis(tmp: Path, *, validate: int = 0, drop: bool = False, early_holder
                                                      short=short))
 
 
+# A blis that answers only `catalog resolve --catalog DIR --model|--chip NAME --json`: a model
+# is the entry MODELS gives its source repository (compared without regard to case), a chip is
+# itself when CHIPS holds it, and anything else is null. The scorer asks the blis it scores
+# with; the tests give the catalog its own fake so a replay fake can be swapped alone.
+CATALOG_BLIS = """#!/usr/bin/env python3
+import json, sys
+MODELS, CHIPS = {models!r}, {chips!r}
+a = sys.argv[1:]
+assert a[:3] == ["catalog", "resolve", "--catalog"] and a[-1] == "--json", a
+kind, q = a[4], a[5]
+ident = MODELS.get(q.lower()) if kind == "--model" else (q if q in CHIPS else None)
+print(json.dumps({{"query": q, "identity": ident, "reason": "fake"}}))
+"""
+
+
+def _catalog(tmp: Path, models: dict, chips: list, speculators: dict) -> sp.Catalog:
+    """A catalog at tmp/catalog: identities from a fake `blis catalog resolve`, and each model's
+    graph.yaml naming its speculator."""
+    root = tmp / "catalog"
+    for name, method in speculators.items():
+        (root / "models" / name).mkdir(parents=True, exist_ok=True)
+        (root / "models" / name / "graph.yaml").write_text(f"speculator:\n  method: {method}\n")
+    root.mkdir(parents=True, exist_ok=True)
+    blis = _exe(tmp / "catalog-blis", CATALOG_BLIS.format(models={k.lower(): v for k, v in models.items()},
+                                                          chips=list(chips)))
+    return sp.Catalog(blis=blis, root=root)
+
+
 def _saw(env) -> list[dict]:
     p = Path(env.blis).parent / "blis_saw.json"
     return [json.loads(x) for x in p.read_text().splitlines()] if p.exists() else []
@@ -147,8 +175,7 @@ def _setup(tmp: Path, *, log: str = LOG, repo: str = "org/m", conc: int = 4, isl
                  catalog_release="0.3.0", registry=tmp, registry_release="v0.2.0", kernel="v0.3.0",
                  corpus={"sha256": "c" * 64}, field_list=FIELDS, vllm_defaults=st.load_vllm_defaults()[0],
                  engine_release="0.31.0", sim_build="v0.12.0")
-    env.catalog_obj = sp.Catalog(root=tmp, models={"m": repo}, speculators={"m": "mtp"},
-                                 hardware={"h200": 139.8})
+    env.catalog_obj = _catalog(tmp, {repo: "m"}, ["h200"], {"m": "mtp"})
     env.parts = {"h200"}
     return entry, env
 

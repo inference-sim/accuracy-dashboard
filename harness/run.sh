@@ -5,9 +5,10 @@
 #                       pre-release suffix) or a full 40-hex commit of inference-sim, from
 #                       --sim-repo. A branch name is refused: a branch moves, so the figures it
 #                       gave could not be regenerated (X8).
-#   the data            --catalog DIR and --registry DIR. Both are required until the simulator can
-#                       report the data it embeds: the scorer reads the catalog and registry itself
-#                       to grade not_in_catalog before the simulator runs.
+#   the data            --catalog DIR and --registry DIR. Both are required: the scorer passes them
+#                       to blis, and reads two facts from them that no blis command prints yet,
+#                       the graph's speculator method and the registry's coefficient scopes
+#                       (orchestrator/ingest/support.py, TEMPORARY).
 #   a set of units      --units FILE, the ledger units to score, and --pull DIR, their frozen
 #                       recorded runs.
 #

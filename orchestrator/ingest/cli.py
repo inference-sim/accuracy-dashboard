@@ -363,7 +363,7 @@ def cmd_score(a) -> int:
     # (check_blis_inputs required one), with the engine release its stack.json names (COV-6).
     env.sim_build = sim_build or env.blis_release
     env.harness_digest = a.harness_digest
-    env.catalog_obj = sp.Catalog.load(env.catalog)
+    env.catalog_obj = sp.Catalog(blis=str(blis), root=env.catalog)
     env.parts = sp.registry_parts(env.registry)
     work = Path(a.work or Path(a.out).parent / (Path(a.out).name + "-work"))
     work.mkdir(parents=True, exist_ok=True)
@@ -381,8 +381,14 @@ def cmd_score(a) -> int:
     # Agentic replays hold the 1.8GB corpus in RAM, so they serialize (default 1) even while
     # single-turn runs `workers`-wide; override only on a box with the RAM for concurrent corpora.
     agentic_workers = a.agentic_workers if getattr(a, "agentic_workers", 0) else 1
-    outcomes = sc.score_points(points, pull_dir, work, env, workers=workers,
-                               agentic_workers=agentic_workers, log=_log)
+    try:
+        outcomes = sc.score_points(points, pull_dir, work, env, workers=workers,
+                                   agentic_workers=agentic_workers, log=_log)
+    except bc.CommandError as e:
+        # A blis command the scorer reads catalog identities through failed (an ambiguous
+        # name, or a build without the command): no point of the run is graded on a guess.
+        _log(f"FATAL: {e}")
+        return 2
     prov = {"ingest": "api",
             "blis": {"release": env.blis_release, "commit_sha": env.blis_commit, "catalog": env.catalog_release,
                      "registry": env.registry_release, "extractor_version": f"blis-latency-kernel@{env.kernel}"},
