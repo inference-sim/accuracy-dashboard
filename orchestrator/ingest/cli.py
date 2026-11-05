@@ -330,9 +330,25 @@ def cmd_score(a) -> int:
         return 2
     sim = blis.parent
     vdefaults, _ = st.load_vllm_defaults()
-    # blis runs in its binary's directory, so every path it is given is absolute.
-    corpus_path = Path(a.corpus).resolve()
-    corpus_sha = a.corpus_sha256 or art.sha256(corpus_path.read_bytes())
+    work = Path(a.work or Path(a.out).parent / (Path(a.out).name + "-work"))
+    work.mkdir(parents=True, exist_ok=True)
+    points, units = select_units(manifest["points"], getattr(a, "units", None))
+    if units and units["not_in_pull"]:
+        _log(f"score: {len(units['not_in_pull'])} of the {units['count']} units named are not in the pull")
+    if a.only is not None:  # None = score the whole manifest; [] = score nothing (never "all")
+        points = [p for p in points if any(p["point_id"].startswith(x) for x in a.only)]
+    # The corpus is read only by an agentic replay, so it is required only when a point to score
+    # is agentic. Superseded by --corpus-dir on the corpus branch.
+    corpus = None
+    if any(p["row"].get("benchmark_type") == "agentic_traces" for p in points):
+        if not a.corpus or not a.corpus_revision:
+            _log("FATAL: the points to score include an agentic one, so --corpus and --corpus-revision are required")
+            return 2
+        # blis runs in its binary's directory, so every path it is given is absolute.
+        path = Path(a.corpus).resolve()
+        sha = a.corpus_sha256 or art.sha256(path.read_bytes())
+        corpus = {"dataset": a.corpus_dataset, "revision": a.corpus_revision, "sha256": sha,
+                  "path": str(path), "file": path.name}
     env = sc.Env(
         blis=str(blis), blis_release=_git(sim, "describe", "--tags", "--exact-match") or "unknown",
         blis_commit=_git(sim, "rev-parse", "HEAD"), catalog=Path(a.catalog).resolve(),
@@ -340,8 +356,7 @@ def cmd_score(a) -> int:
         registry_release=_git(a.registry, "describe", "--tags") or "unknown",
         kernel=next((l.split()[1] for l in (sim / "go.mod").read_text().splitlines()
                      if "blis-latency-kernel " in l), "unknown"),
-        corpus={"dataset": a.corpus_dataset, "revision": a.corpus_revision, "sha256": corpus_sha,
-                "path": str(corpus_path), "file": corpus_path.name},
+        corpus=corpus,
         corpus_cache=Path(a.corpus_cache).resolve() if a.corpus_cache else None,
         vllm_ref=manifest["vllm_ref"], field_list=field_list, fields_sha256=fields_sha,
         base_models=manifest.get("base_models") or {}, timeout_s=a.timeout, vllm_defaults=vdefaults,
@@ -352,13 +367,6 @@ def cmd_score(a) -> int:
     env.harness_digest = a.harness_digest
     env.catalog_obj = sp.Catalog.load(env.catalog)
     env.parts = sp.registry_parts(env.registry)
-    work = Path(a.work or Path(a.out).parent / (Path(a.out).name + "-work"))
-    work.mkdir(parents=True, exist_ok=True)
-    points, units = select_units(manifest["points"], getattr(a, "units", None))
-    if units and units["not_in_pull"]:
-        _log(f"score: {len(units['not_in_pull'])} of the {units['count']} units named are not in the pull")
-    if a.only is not None:  # None = score the whole manifest; [] = score nothing (never "all")
-        points = [p for p in points if any(p["point_id"].startswith(x) for x in a.only)]
     # Score serially or across a process pool. BLIS replays are CPU-bound subprocesses, so the
     # worker count is clamped to the machine's cores (4 on an ubuntu-latest runner) -- more would
     # just thrash. The contract is re-sorted by point_id in write_contract, so the output is
@@ -382,7 +390,7 @@ def cmd_score(a) -> int:
             "left_out_records": len((manifest.get("ledger") or {}).get("unlisted") or []),
             "vllm_ref": manifest["vllm_ref"], "vllm_max_distance": manifest["vllm_max_distance"],
             "fields_sha256": fields_sha, "pulled_at": manifest["pulled_at"],
-            "corpus": {"dataset": env.corpus["dataset"], "revision": env.corpus["revision"], "sha256": corpus_sha},
+            "corpus": corpus and {k: corpus[k] for k in ("dataset", "revision", "sha256")},
             "pull_manifest_sha256": art.sha256(manifest_text.encode()),
             "source": {"name": "SemiAnalysis InferenceX API", "url": api.API + "/"}}
     sc.write_contract(Path(a.out), outcomes, prov)
@@ -516,10 +524,10 @@ def main(argv=None) -> int:
     s.add_argument("--harness-digest", required=True, help="sha256:<64 hex> of the harness image, or unreleased (X8)")
     s.add_argument("--units", help="the ledger units to score: a PublishedUnits list or a file of unit ids "
                                     "(default: every point of the pull)")
-    s.add_argument("--corpus", required=True)
+    s.add_argument("--corpus", help="the agentic corpus file; required only when a point to score is agentic")
     s.add_argument("--corpus-sha256")
     s.add_argument("--corpus-dataset", default="semianalysisai/cc-traces-weka-062126")
-    s.add_argument("--corpus-revision", required=True)
+    s.add_argument("--corpus-revision", help="the corpus's resolved revision; required with --corpus")
     s.add_argument("--corpus-cache")
     s.add_argument("--work")
     s.add_argument("--timeout", type=int, default=7200)

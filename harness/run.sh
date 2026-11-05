@@ -108,7 +108,9 @@ fi
 got="$(git -C "$src" rev-parse HEAD)"
 echo "run.sh: inference-sim $sim at $got" >&2
 
-( cd "$src" && go mod download && go build -o "$work/blis" main.go )
+# The binary is built inside the checkout: cli.py reads the build's release, commit, stack.json
+# and go.mod from the directory the binary sits in.
+( cd "$src" && go mod download && go build -o "$src/blis" main.go )
 
 if [ -z "$fields" ]; then
   vllm_dir="$(cd "$src" && go list -m -f '{{.Dir}}' github.com/inference-sim/blis-vllm)"
@@ -116,6 +118,6 @@ if [ -z "$fields" ]; then
   [ -f "$fields" ] || refuse "the blis-vllm module this build selects ($vllm_dir) publishes no fields.json; pass --fields"
 fi
 
-args=(score --pull "$pull" --out "$out" --blis "$work/blis" --fields "$fields" --units "$units"
+args=(score --pull "$pull" --out "$out" --blis "$src/blis" --fields "$fields" --units "$units"
       --sim-build "$sim" --harness-digest "$digest" --catalog "$catalog" --registry "$registry")
 python3 "$root/orchestrator/ingest/cli.py" "${args[@]}"

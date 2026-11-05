@@ -1,13 +1,16 @@
 """Tests for the scoring harness's entrypoint (run.sh) and its release workflow.
 
 run.sh's flags are checked with --check-args, which validates and exits without cloning or
-building, so these tests need no network. The workflow is checked as YAML.
+building. The real path is run against a local bare git repository standing in for inference-sim,
+with a fake `go`, so these tests need no network. The workflow is checked as YAML.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 import yaml
@@ -108,3 +111,127 @@ def test_only_the_release_job_may_request_an_oidc_token():
     assert "id-token" not in (doc.get("permissions") or {})
     holders = [n for n, j in doc["jobs"].items() if (j.get("permissions") or {}).get("id-token") == "write"]
     assert holders == ["release"]
+
+
+# ------------------------------------------------------------------ the real path
+
+def git(*args, cwd=None):
+    env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+    return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True, env=env).stdout.strip()
+
+
+def tagged_dir(path: Path, tag: str) -> Path:
+    path.mkdir(parents=True)
+    git("init", "-q", cwd=path)
+    git("commit", "-q", "--allow-empty", "-m", "x", cwd=path)
+    git("tag", tag, cwd=path)
+    return path
+
+
+STACK = {"kind": "Stack", "engines": [{"kind": "vllm", "version": "0.32.0"}]}
+FIELDS = {"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": []}
+MANIFEST = {"window": ["2026-05-01", "2026-10-28"], "pulled_at": "2026-10-28T00:00:00Z", "vllm_ref": "v0.32.0",
+            "vllm_max_distance": 2000, "unnamed_slugs": [], "base_models": {}, "undated_row_ids": [],
+            "ledger": {"revision": "r", "unlisted": []}, "points": []}
+
+
+def real_setup(tmp: Path):
+    """A bare git repository standing in for inference-sim (the tag v0.16.0 and its commit), a fake
+    `go` and a python3 that records its arguments, and the smallest pull, units, catalog and registry."""
+    work = tmp / "upstream"
+    work.mkdir()
+    git("init", "-q", cwd=work)
+    (work / "main.go").write_text("package main\n")
+    (work / "go.mod").write_text("module x\n\nrequire (\n\tgithub.com/inference-sim/blis-latency-kernel v0.3.0\n)\n")
+    (work / "stack.json").write_text(json.dumps(STACK))
+    git("add", ".", cwd=work)
+    git("commit", "-q", "-m", "release", cwd=work)
+    git("tag", "v0.16.0", cwd=work)
+    commit = git("rev-parse", "HEAD", cwd=work)
+    bare = tmp / "inference-sim.git"
+    git("clone", "-q", "--bare", str(work), str(bare))
+    bin_ = tmp / "bin"
+    bin_.mkdir()
+    # `go mod download` does nothing; `go build -o OUT main.go` writes a fake blis script at OUT.
+    go = bin_ / "go"
+    go.write_text('#!/bin/sh\n'
+                  'if [ "$1 $2" = "mod download" ]; then exit 0; fi\n'
+                  'if [ "$1 $2" = "build -o" ]; then printf "#!/bin/sh\\nexit 0\\n" > "$3"; chmod +x "$3"; exit 0; fi\n'
+                  'echo "fake go: unexpected $*" >&2; exit 9\n')
+    py = bin_ / "python3"
+    log = tmp / "python-args.txt"
+    # The checkout is removed when run.sh exits, so the wrapper also lists the binary's directory.
+    py.write_text(f'#!/bin/sh\nprintf "%s\\n" "$@" > "{log}"\n'
+                  'prev=""\nfor a in "$@"; do\n'
+                  f'  if [ "$prev" = --blis ]; then ls "$(dirname "$a")" > "{log}.ls"; fi\n'
+                  '  prev="$a"\ndone\n'
+                  f'exec "{sys.executable}" "$@"\n')
+    for f in (go, py):
+        f.chmod(0o755)
+    pull = tmp / "pull"
+    pull.mkdir()
+    (pull / "manifest.json").write_text(json.dumps(MANIFEST))
+    units = tmp / "units.txt"
+    units.write_text("")
+    fields = tmp / "fields.json"
+    fields.write_text(json.dumps(FIELDS))
+    cat = tagged_dir(tmp / "cat", "v1.0.0")
+    (cat / "models").mkdir()
+    (cat / "hardware").mkdir()
+    reg = tagged_dir(tmp / "reg", "v1.0.0")
+    (reg / "coefficients").mkdir()
+    return bare, commit, bin_, log, pull, units, fields, cat, reg
+
+
+def run_real(tmp: Path, sim_of, extra=()):
+    bare, commit, bin_, log, pull, units, fields, cat, reg = real_setup(tmp)
+    out = tmp / "out"
+    env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "HARNESS_DIGEST": "sha256:" + "b" * 64}
+    p = subprocess.run(["bash", str(RUN), "--sim", sim_of(commit), "--sim-repo", str(bare), "--units", str(units),
+                        "--pull", str(pull), "--out", str(out), "--catalog", str(cat), "--registry", str(reg),
+                        "--fields", str(fields), *extra], capture_output=True, text=True, env=env)
+    return p, out, log, commit
+
+
+def test_the_real_path_builds_into_the_checkout_and_scores_with_it(tmp_path):
+    p, out, log, commit = run_real(tmp_path, lambda c: "v0.16.0")
+    assert p.returncode == 0, p.stderr
+    argv = log.read_text().splitlines()
+    assert "score" in argv, argv
+    blis = Path(argv[argv.index("--blis") + 1])
+    # The binary sits in the inference-sim checkout, beside its go.mod and stack.json.
+    assert blis.name == "blis" and blis.parent.name == "inference-sim"
+    assert set(Path(str(log) + ".ls").read_text().split()) == {"blis", "go.mod", "main.go", "stack.json"}
+    assert argv[argv.index("--sim-build") + 1] == "v0.16.0"
+    assert argv[argv.index("--harness-digest") + 1] == "sha256:" + "b" * 64
+    prov = json.loads((out / "provenance.json").read_text())
+    # The stack.json of the checkout gave the engine release; the checkout gave the build.
+    assert prov["engine"] == {"kind": "vllm", "version": "0.32.0"}
+    assert prov["simulator"] == {"build": "v0.16.0", "engine": {"kind": "vllm", "version": "0.32.0"},
+                                 "harness_digest": "sha256:" + "b" * 64}
+    assert prov["harness_digest"] == "sha256:" + "b" * 64
+    assert prov["blis"]["release"] == "v0.16.0" and prov["blis"]["commit_sha"] == commit
+    assert prov["blis"]["extractor_version"] == "blis-latency-kernel@v0.3.0"
+    assert prov["fields_sha256"] and prov["experimental"] is False and prov["corpus"] is None
+
+
+def test_the_real_path_scores_a_full_commit(tmp_path):
+    p, out, log, commit = run_real(tmp_path, lambda c: c)
+    assert p.returncode == 0, p.stderr
+    prov = json.loads((out / "provenance.json").read_text())
+    assert prov["simulator"]["build"] == commit and prov["experimental"] is True
+
+
+def test_the_corpus_flags_are_required_only_for_an_agentic_point(tmp_path):
+    pid = "a" * 64
+    bare, commit, bin_, log, pull, units, fields, cat, reg = real_setup(tmp_path)
+    (pull / "manifest.json").write_text(json.dumps(
+        {**MANIFEST, "points": [{"point_id": pid, "reasons": [], "row": {"benchmark_type": "agentic_traces"}}]}))
+    units.write_text(pid + "\n")
+    env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}"}
+    p = subprocess.run(["bash", str(RUN), "--sim", "v0.16.0", "--sim-repo", str(bare), "--units", str(units),
+                        "--pull", str(pull), "--out", str(tmp_path / "out"), "--catalog", str(cat),
+                        "--registry", str(reg), "--fields", str(fields)], capture_output=True, text=True, env=env)
+    assert p.returncode == 2
+    assert "--corpus and --corpus-revision are required" in p.stderr
