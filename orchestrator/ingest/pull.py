@@ -192,12 +192,22 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
                 elif role == "client_export":
                     entry["reasons"].append("artifact_unmatched:client_export")
     if not agentic and server_log is None:
-        text = api.server_log(fetch, row["id"])
-        if text and art.is_server_log(text.encode()):
-            frozen.put("server_log", text.encode(), "api:/server-log")
-            server_log = text
+        try:
+            text = api.server_log(fetch, row["id"])
+        except urllib.error.HTTPError as e:
+            # The API answers 413 for a row whose log it will not serve: a fact about the source's
+            # data, reported to it and listed in the backlog. Any other HTTP error is a fault of
+            # the run and stays an exception (cmd_pull records it as a pull error).
+            if e.code != 413:
+                raise
+            text = None
+            entry["reasons"].append("server_log_missing:api_413")
         else:
-            entry["reasons"].append("server_log_missing")
+            if text and art.is_server_log(text.encode()):
+                frozen.put("server_log", text.encode(), "api:/server-log")
+                server_log = text
+            else:
+                entry["reasons"].append("server_log_missing")
     b = resolver.resolve(row.get("image") or "", server_log)
     # The build never refuses a point; it makes it estimated unless it's the build BLIS models.
     entry["build"] = b.record()

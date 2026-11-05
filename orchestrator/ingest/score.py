@@ -441,7 +441,9 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     pdir = pull_dir / "points" / pid
     log_b = _read(pdir, entry["files"], "server_log")
     if log_b is None:
-        o.reasons = sorted(set(o.reasons + ["server_log_missing"] + asx.router_reason(row, None)))
+        # The pull may already have said why (the API answered 413): that reason stands alone.
+        bare = [] if "server_log_missing:api_413" in o.reasons else ["server_log_missing"]
+        o.reasons = sorted(set(o.reasons + bare + asx.router_reason(row, None)))
         return o
     log = log_b.decode("utf-8", "replace")
     o.banner = _banner_version(log)
