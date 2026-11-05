@@ -31,6 +31,7 @@ G5_FOR_REASON = {
     "corpus_changed": "value_not_recorded",
     "client_scenario_not_replayable": "value_not_recorded",
     "router_unsupported": "router_unsupported",
+    "topology_unsupported": "topology_unsupported",
     "engine_unsupported": "engine_unsupported",
     "code_not_visible": "code_not_visible",
     "build_unparseable": "build_unparseable",

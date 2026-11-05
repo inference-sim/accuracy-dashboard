@@ -517,10 +517,9 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         topo = st.topology_reasons(launch, st.read_args(log), env.field_list)
         o.reasons = sorted(set(o.reasons + topo))
         if not o.reasons:
-            # Every recorded topology field is modelled, and no closed-list reason is true: the
-            # harness cannot write this run, and says so as a run fault, never as a G5 reason it
-            # cannot justify. CONTRACT.md lists this as a ruling needed.
-            o.reasons = ["setting_differs:disaggregated_topology"]
+            # Every recorded topology field is modelled, but the harness builds one colocated
+            # pool and cannot write several engines as a scenario (design §11.4).
+            o.reasons = ["topology_unsupported"]
         return o
 
     readings, problems = st.read_all(log, launch)

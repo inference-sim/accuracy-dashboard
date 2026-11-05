@@ -32,9 +32,9 @@ from dataclasses import dataclass
 VLLM = "vllm"
 SGLANG = "sglang"
 
-# The one place the SGLang family's reason is written. Design §11.4 has no reason for "a
-# BLIS engine repository exists and is empty", and this is the closest true one: needs the
-# design owner's ruling. It goes when blis-sglang publishes a field list (M3).
+# The one place the SGLang family's reason is written: design §11.4's field_unclassified also
+# covers "the engine's repository publishes no field list yet". It goes when blis-sglang
+# publishes a field list (M3).
 SGLANG_FIELD_LIST_UNPUBLISHED = "field_unclassified:sglang: no field list published"
 
 AGGREGATED, DISAGGREGATED, EITHER = "aggregated", "disaggregated", "either"

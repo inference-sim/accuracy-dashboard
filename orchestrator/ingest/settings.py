@@ -794,8 +794,8 @@ def topology_reasons(launch_config: dict | None, args: "Reading", field_list) ->
     classifies not_modelled (with no rule) is `field_not_modelled:<field>`, one the release lacks
     `field_not_in_release`. A run that records no kv_transfer_config field is
     `value_not_recorded` for kv_transfer_config.kv_role. A run whose topology fields are all modelled cannot be written as
-    the colocated pool this harness builds, and no reason on design §11.4's list is true of it:
-    the list is returned empty and the caller decides (score.py)."""
+    the colocated pool this harness builds: the list is returned empty and the caller names
+    `topology_unsupported` (score.py)."""
     import fields as fl
     paths = topology_paths(launch_config, args)
     out = []

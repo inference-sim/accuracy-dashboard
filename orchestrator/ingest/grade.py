@@ -33,6 +33,7 @@ GRADED = (G1, G2, G3, G4)
 G5_CODES = (
     "code_not_visible",
     "router_unsupported",
+    "topology_unsupported",
     "value_not_recorded",
     "field_not_modelled",
     "field_unclassified",

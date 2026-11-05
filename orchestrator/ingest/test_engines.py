@@ -167,14 +167,15 @@ def test_a_disaggregated_runs_recorded_topology_fields_go_through_the_field_list
     assert asx.g5_of(o.reasons[0]) == {"code": "value_not_recorded", "subject": "kv_transfer_config.kv_role"}
 
 
-def test_a_disaggregated_run_whose_topology_is_all_modelled_is_a_run_fault_not_an_invented_reason(tmp_path):
+def test_a_disaggregated_run_whose_topology_is_all_modelled_is_g5_topology_unsupported(tmp_path):
     kv = "'kv_transfer_config': KVTransferConfig(kv_connector='NixlConnector', kv_role='kv_producer')"
     env = sc.Env(blis="/nonexistent", blis_release="v0.16.0", blis_commit="a" * 40, catalog=tmp_path,
                  catalog_release="c", registry=tmp_path, registry_release="r", kernel="k", corpus=None,
                  field_list=_fields(("kv_transfer_config.kv_role", "modelled"),
                                     ("kv_transfer_config.kv_connector", "modelled")))
     o = sc.score_point(_disagg_entry(tmp_path / "c", kv), tmp_path / "c" / "pull", tmp_path / "w", env)
-    assert o.reasons == ["setting_differs:disaggregated_topology"]
+    assert o.reasons == ["topology_unsupported"]
+    assert asx.g5_of(o.reasons[0]) == {"code": "topology_unsupported"}
 
 
 def test_the_fabric_reason_is_gone():

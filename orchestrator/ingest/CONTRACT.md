@@ -182,7 +182,7 @@ The pull lists every framework InferenceX reports in the window. `engines.FRAMEW
 
 The fabric between a run's engines is a catalog property, not a run value, so no fields.json rule can clear it, and the backlog would have pointed at InferenceX instead of BLIS. A vLLM-engine row with `disagg` or `is_multinode` instead goes through the same Decide step as every other point, on the topology fields its own record states: every `kv_transfer_config.*` field and the parallel sizes, read from its launch config and its logged arguments (`settings.topology_reasons`). Whatever the engine's fields.json classifies `not_modelled` with no rule is `field_not_modelled` on that field; a field the release lacks is `field_not_in_release`. A run that records no `kv_transfer_config` field at all is `value_not_recorded` with the subject `kv_transfer_config.kv_role`, which is a run value. Nothing is simulated for such a point.
 
-Ruling needed: a disaggregated run whose recorded topology fields are all modelled has no true reason on design §11.4's list, because the harness builds one colocated pool and cannot write the run. It is listed as failed (`setting_differs:disaggregated_topology`), which stops a publish until the design owner rules or the harness writes a disaggregated deployment. Which rows fall in this class depends on the fields.json in use; count them with the nightly's `failed.jsonl`.
+A run whose recorded topology fields are all modelled is G5 `topology_unsupported`: the harness builds one colocated pool and cannot write several engines as a scenario. It is a blocker-backlog entry, cleared when the harness can write that topology.
 
 ## Tests that need a simulator
 
@@ -192,6 +192,10 @@ Ruling needed: a disaggregated run whose recorded topology fields are all modell
 
 A single-turn point with `parallel.dp` above 1 is simulated behind the llm-d endpoint picker profile `vllm-dp-lb`, which stands in for vLLM's internal load balancer. The point names it: `execution_mode` on `data-parallel balancer`.
 
+## No required-field list
+
+The dashboard holds no list of required fields. The engine refuses a scenario it cannot resolve, and the dashboard maps that refusal to `value_not_recorded` (`score.value_refusal`).
+
 ## G5 reasons
 
 The closed list of design §11.4 (`grade.G5_CODES`; COV-5). A reason the scorer finds is mapped onto it by `assess.g5_of`; a reason with no place on the list raises, and is never published.
@@ -200,9 +204,10 @@ The closed list of design §11.4 (`grade.G5_CODES`; COV-5). A reason the scorer 
 |---|---|
 | `code_not_visible` | An out-of-tree connector or a patched private build. |
 | `router_unsupported` | The run was measured behind a router BLIS does not host: the API row's `router_name`, or the launch configuration's frontend, names one other than llm-d's. BLIS is not asked about such a point. |
+| `topology_unsupported` | The run was measured on a deployment the scoring harness cannot write as a scenario: several engines, as in a prefill and decode split or a run across nodes, where it builds one colocated pool. A blocker-backlog entry, cleared when the harness can write that topology. |
 | `value_not_recorded` | A value the simulation needs is not recorded: the server log or the client export is missing, the row has no artifact, a required setting no source states, or a client scenario BLIS does not replay. |
 | `field_not_modelled` | The run sets a field the engine classifies as not modelled, with no estimation rule. |
-| `field_unclassified` | The engine has not classified a field the run sets. For the SGLang family (`sglang`, `dynamo-sglang`, `mori-sglang`) the subject is `sglang: no field list published`: blis-sglang exists and is empty until M3, so `engine_unsupported` would be false. This needs the design owner's ruling (`engines.SGLANG_FIELD_LIST_UNPUBLISHED`). |
+| `field_unclassified` | The engine has not classified a field the run sets, or the engine's repository publishes no field list yet. For the SGLang family (`sglang`, `dynamo-sglang`, `mori-sglang`) the subject is `sglang: no field list published` (`engines.SGLANG_FIELD_LIST_UNPUBLISHED`): blis-sglang is empty until M3. |
 | `engine_unsupported` | No BLIS engine repository exists for the run's engine (TensorRT-LLM, ATOM, TileRT). |
 | `not_in_catalog` | The run's model, chip or drafter has no catalog entry. |
 | `field_not_in_release` | The run sets a field the engine release BLIS runs does not have. |
