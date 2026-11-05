@@ -764,3 +764,46 @@ def to_yaml(b: Built, header: list[str]) -> str:
     body = yaml.safe_dump(b.scenario, sort_keys=False, default_flow_style=None, width=1000)
     body += "---\n" + yaml.safe_dump(b.deployment, sort_keys=False, default_flow_style=None, width=1000)
     return "\n".join(lines) + ("\n" if lines else "") + body
+
+
+# The fields a disaggregated or multi-node run's recorded settings state its topology by (design
+# §11.4): the KV transfer config (role, connector) and the parallel sizes. They go through the
+# same Decide step as every other field; the dashboard does not classify them.
+TOPOLOGY_PREFIXES = ("kv_transfer_config.",)
+TOPOLOGY_FIELDS = tuple(f for f, loc in LOCATIONS.items() if loc.startswith("parallel."))
+KV_ROLE = "kv_transfer_config.kv_role"
+
+
+def topology_paths(launch_config: dict | None, args: "Reading") -> list[str]:
+    """The topology fields the run records, in any role of the launch config or in the logged
+    arguments."""
+    paths = set()
+    for role in ((launch_config or {}).get("roles") or {}).values():
+        for flag, v in ((role or {}).get("args") or {}).items():
+            key = str(flag).replace("-", "_")
+            for k in flatten(_arg_value(v), key):
+                paths.add(k)
+    paths |= set(args.values)
+    return sorted(p for p in paths if p.startswith(TOPOLOGY_PREFIXES) or p in TOPOLOGY_FIELDS)
+
+
+def topology_reasons(launch_config: dict | None, args: "Reading", field_list) -> list[str]:
+    """Why a disaggregated or multi-node run is not scored as one colocated engine.
+
+    Its recorded topology fields are decided by the engine's fields.json: a field the engine
+    classifies not_modelled (with no rule) is `field_not_modelled:<field>`, one the release lacks
+    `field_not_in_release`. A run that records no kv_transfer_config field is
+    `value_not_recorded` for kv_transfer_config.kv_role. A run whose topology fields are all modelled cannot be written as
+    the colocated pool this harness builds, and no reason on design §11.4's list is true of it:
+    the list is returned empty and the caller decides (score.py)."""
+    import fields as fl
+    paths = topology_paths(launch_config, args)
+    out = []
+    if not any(p.startswith(TOPOLOGY_PREFIXES) for p in paths):
+        # Parallel sizes alone do not say how the engines are split: the role is still needed.
+        out.append(f"required_setting_missing:{KV_ROLE}")
+    for p in paths:
+        dec = fl.decide(field_list, p, set_by_run=True)
+        if dec.g5:
+            out.append(f"{dec.g5['code']}:{p}")
+    return sorted(out)

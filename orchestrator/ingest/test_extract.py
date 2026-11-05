@@ -692,17 +692,6 @@ def test_a_build_never_refuses_a_point_at_pull_time():
     assert not hasattr(__import__("build").Build(image="x"), "reasons")
 
 
-def test_a_multi_node_or_disaggregated_run_records_no_fabric_so_its_value_is_not_recorded():
-    # Design §11.4: a value the simulation needs (the fabric between engines) is not recorded.
-    import assess as asx
-    import pull as pl
-    for row in ({"disagg": True}, {"is_multinode": True}):
-        reasons = pl._row_reasons(row)
-        assert reasons == ["required_setting_missing:multi_node_fabric"]
-        assert asx.g5_of(reasons[0]) == {"code": "value_not_recorded", "subject": "multi_node_fabric"}
-    assert pl._row_reasons({"disagg": False, "is_multinode": False}) == []
-
-
 def _A(i, name, t, expired=False):
     return art.Artifact(id=i, name=name, created_at=t, expired=expired, size=1)
 

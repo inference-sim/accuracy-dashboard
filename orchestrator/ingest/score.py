@@ -509,6 +509,18 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     # it (design §11.4, X4; inference-sim #2028), so BLIS is not asked about it.
     o.reasons += asx.router_reason(row, _launch_router(launch) or fw.router)
 
+    if row.get("disagg") or row.get("is_multinode"):
+        # One colocated engine is not this run (design §11.4): decide its recorded topology
+        # fields by the engine's field list and stop; nothing is simulated.
+        topo = st.topology_reasons(launch, st.read_args(log), env.field_list)
+        o.reasons = sorted(set(o.reasons + topo))
+        if not o.reasons:
+            # Every recorded topology field is modelled, and no closed-list reason is true: the
+            # harness cannot write this run, and says so as a run fault, never as a G5 reason it
+            # cannot justify. CONTRACT.md lists this as a ruling needed.
+            o.reasons = ["setting_differs:disaggregated_topology"]
+        return o
+
     readings, problems = st.read_all(log, launch)
     # The API row's router is its own source: it states the frontend, nothing about the engine.
     rm = row.get("metrics") or {}

@@ -47,19 +47,6 @@ class Frozen:
         self.files[role] = {"path": name, "sha256": art.sha256(data), "from": origin}
 
 
-MULTI_NODE_FABRIC = "multi_node_fabric"
-
-
-def _row_reasons(row: dict) -> list[str]:
-    """Rows this extractor doesn't handle at all, by the row's own shape. A disaggregated or
-    multi-node run records no fabric between its engines, so a value the simulation needs is
-    not recorded (design §11.4, value_not_recorded)."""
-    out = []
-    if row.get("disagg") or row.get("is_multinode"):
-        out.append(f"required_setting_missing:{MULTI_NODE_FABRIC}")
-    return out
-
-
 # What a point takes from its agentic upload, by file name -> role.
 AGENTIC_FILES = {"profile_export_aiperf.json": "client_export", "benchmark_command.txt": "client_command"}
 
@@ -117,7 +104,7 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
     ident = dict(point.unit.identity)
     pid = contract.point_id(ident)
     entry = {"point_id": pid, "identity": ident, "row": row, "records": point.records,
-             "measurements": point.measurements, "reasons": _row_reasons(row), "files": {}}
+             "measurements": point.measurements, "reasons": [], "files": {}}
     fw = engines.lookup(row["framework"])
     if not engines.scored(fw):
         # No BLIS engine scores this framework, so nothing is fetched: the point is G5 for the

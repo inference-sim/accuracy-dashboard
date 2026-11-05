@@ -114,3 +114,68 @@ def test_every_unit_ends_scored_g5_or_failed():
     o.g5 = {"code": "engine_unsupported"}
     assert sc.check_all_scored([{"point_id": "a" * 64}], [o]) == []
     assert "outcomes for 2 points" in sc.check_all_scored([{"point_id": "a" * 64}, {"point_id": "b" * 64}], [o])[0]
+
+
+def _disagg_entry(tmp, args, framework="vllm-disagg", router=None, with_launch=True):
+    import gzip
+    import json
+    row = _row(framework, router)
+    entry = _freeze_with_log(tmp, row)
+    pdir = tmp / "pull" / "points" / entry["point_id"]
+    log = ("INFO non-default args: {'model': 'm', %s}\nINFO Initializing a V1 LLM engine (v0.32.0) with config: model='m'\n"
+           % args)
+    (pdir / "server_log.gz").write_bytes(gzip.compress(log.encode(), mtime=0))
+    entry["files"] = {"server_log": {"path": "server_log.gz", "sha256": "0" * 64, "from": "api"}}
+    return entry
+
+
+def _freeze_with_log(tmp, row):
+    lg = ldg.load(ledger_fake.write(tmp / "ledger", [row]))
+    (point,) = pl.place([row], lg).points
+    from contract import point_id
+    pid = point.point_id
+    (tmp / "pull" / "points" / pid).mkdir(parents=True)
+    return {"point_id": pid, "identity": dict(point.unit.identity), "row": row, "reasons": [], "files": {},
+            "records": ["1"], "measurements": [], "build": {"image": "x/y:1"}}
+
+
+def _fields(*specs):
+    import fields as fl
+    import json
+    rows = sorted(({"name": n, "source": "config", "status": st_, "evidence":
+                    {"traces": ["t"]} if st_ == "modelled" else {"issue": "o/r#1"}, "estimation": {"rule": "none"}}
+                   for n, st_ in specs), key=lambda f: f["name"])
+    return fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": rows}))
+
+
+def test_a_disaggregated_runs_recorded_topology_fields_go_through_the_field_list(tmp_path):
+    kv = "'kv_transfer_config': KVTransferConfig(kv_connector='NixlConnector', kv_role='kv_producer')"
+    env = sc.Env(blis="/nonexistent", blis_release="v0.16.0", blis_commit="a" * 40, catalog=tmp_path,
+                 catalog_release="c", registry=tmp_path, registry_release="r", kernel="k", corpus=None,
+                 field_list=_fields(("kv_transfer_config.kv_role", "not_modelled"),
+                                    ("kv_transfer_config.kv_connector", "modelled")))
+    o = sc.score_point(_disagg_entry(tmp_path / "a", kv), tmp_path / "a" / "pull", tmp_path / "w", env)
+    assert o.reasons == ["field_not_modelled:kv_transfer_config.kv_role"]
+    # No topology field recorded at all: value_not_recorded for the field that would be needed.
+    o = sc.score_point(_disagg_entry(tmp_path / "b", "'tensor_parallel_size': 8"), tmp_path / "b" / "pull",
+                       tmp_path / "w", env)
+    assert o.reasons == ["field_not_in_release:tensor_parallel_size",
+                         "required_setting_missing:kv_transfer_config.kv_role"]
+    o = sc.score_point(_disagg_entry(tmp_path / "d", "'max_num_seqs': 8"), tmp_path / "d" / "pull",
+                       tmp_path / "w", env)
+    assert o.reasons == ["required_setting_missing:kv_transfer_config.kv_role"]
+    assert asx.g5_of(o.reasons[0]) == {"code": "value_not_recorded", "subject": "kv_transfer_config.kv_role"}
+
+
+def test_a_disaggregated_run_whose_topology_is_all_modelled_is_a_run_fault_not_an_invented_reason(tmp_path):
+    kv = "'kv_transfer_config': KVTransferConfig(kv_connector='NixlConnector', kv_role='kv_producer')"
+    env = sc.Env(blis="/nonexistent", blis_release="v0.16.0", blis_commit="a" * 40, catalog=tmp_path,
+                 catalog_release="c", registry=tmp_path, registry_release="r", kernel="k", corpus=None,
+                 field_list=_fields(("kv_transfer_config.kv_role", "modelled"),
+                                    ("kv_transfer_config.kv_connector", "modelled")))
+    o = sc.score_point(_disagg_entry(tmp_path / "c", kv), tmp_path / "c" / "pull", tmp_path / "w", env)
+    assert o.reasons == ["setting_differs:disaggregated_topology"]
+
+
+def test_the_fabric_reason_is_gone():
+    assert not hasattr(pl, "_row_reasons") and not hasattr(pl, "MULTI_NODE_FABRIC")
