@@ -188,6 +188,10 @@ Ruling needed: a disaggregated run whose recorded topology fields are all modell
 
 `test_inferencex_client_sim.py` holds the two COV-12 warm-up tests that run a real `blis replay`. They need a simulator build whose Result has `request_rows` (trace version 4), and none is released yet, so no CI job runs them: a job that always failed would be useless, and a skipped gate is forbidden (X16). They run when such a build exists (`BLIS_BIN`, `BLIS_SCENARIO_DIR`). This is an open item; the job is added with the first such build.
 
+## Single-turn data-parallel balancer
+
+A single-turn point with `parallel.dp` above 1 is simulated behind the llm-d endpoint picker profile `vllm-dp-lb`, which stands in for vLLM's internal load balancer. The point names it: `execution_mode` on `data-parallel balancer`.
+
 ## G5 reasons
 
 The closed list of design §11.4 (`grade.G5_CODES`; COV-5). A reason the scorer finds is mapped onto it by `assess.g5_of`; a reason with no place on the list raises, and is never published.

@@ -645,6 +645,26 @@ def test_a_coefficient_not_measured_or_a_missing_report_makes_the_point_g2_and_n
 
 
 
+def test_a_single_turn_point_with_data_parallel_ranks_names_the_balancer_substitution():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert not [s for s in o.fidelity["substitutions"] if s["subject"] == "data-parallel balancer"]
+        log = LOG.replace("'tensor_parallel_size': 1,", "'tensor_parallel_size': 1, 'data_parallel_size': 2,") \
+            .replace("data_parallel_size=1", "data_parallel_size=2")
+        _with_log(tmp, entry, log)
+        entry["row"].update(num_decode_gpu=2)
+        o, _ = _score(tmp, entry, env, tmp / "c2")
+        assert o.fidelity is not None, o.reasons
+        assert {"kind": "execution_mode", "subject": "data-parallel balancer", "detail":
+                "llm-d endpoint picker profile vllm-dp-lb stands in for vLLM's internal load balancer"} \
+            in o.fidelity["substitutions"]
+        assert c.validate_dir(tmp / "c2") == []
+    finally:
+        shutil.rmtree(tmp)
+
+
 if __name__ == "__main__":
     import traceback
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]

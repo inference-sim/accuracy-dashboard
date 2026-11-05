@@ -720,6 +720,13 @@ def _run_result(o: Outcome, argv: list[str], key: str, cache: Path, env: Env, wo
     return doc
 
 
+# A single-turn point with data-parallel ranks is simulated behind the llm-d endpoint picker
+# profile vllm-dp-lb (inferencex/vllm-dp-lb.epp.yaml), which stands in for vLLM's internal load
+# balancer; the point names it (design 11.3, an execution mode substituted).
+DP_BALANCER = {"kind": "execution_mode", "subject": "data-parallel balancer",
+               "detail": "llm-d endpoint picker profile vllm-dp-lb stands in for vLLM's internal load balancer"}
+
+
 def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built, header: list[str],
                       name: str, dep: dict, args: list, log: str, sup: sp.Support) -> Outcome:
     """One single-turn point, replayed as the run's client sent it (COV-12).
@@ -799,6 +806,8 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
         return o
     verified, why = _prompt_lengths().verified(sup.checkpoint, row.get("date"), isl, osl, conc)
     differences = ix.client_differences(verified, why)
+    if int(par.get("dp") or 1) > 1:
+        o.subs.append(DP_BALANCER)
     o.fidelity = {"build": entry["build"], "args": args, "resolved": [],
                   "blis_kernel_provenance": result.kernel_report(doc),
                   "requests": {"client": ix.CLIENT_SUBJECT, "start": "primed" if primed else "cold",
