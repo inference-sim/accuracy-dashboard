@@ -26,3 +26,13 @@ def fields(blis: str, engine: str) -> bytes:
     """`blis fields --engine <engine> --json`: the engine's fields.json at the release this build
     runs (COV-3), byte for byte."""
     return _run(blis, ["fields", "--engine", engine, "--json"]).encode("utf-8")
+
+
+def ledger_list(blis: str, role: str) -> bytes:
+    """`blis ledger --list <role> --json`: the published unit list of that role (fit, anchor or
+    report) embedded in the substrate release this build pins, byte for byte. The dashboard reads
+    it as blis-substrate's ledger.Published: {"kind": "PublishedUnits", "role", "partition_version",
+    "seed_sha256", "units": [unit_id, ...]} (ledger.read_unit_set)."""
+    if role not in ("fit", "anchor", "report"):
+        raise CommandError(f"ledger --list {role!r}: the published lists are fit, anchor and report")
+    return _run(blis, ["ledger", "--list", role, "--json"]).encode("utf-8")

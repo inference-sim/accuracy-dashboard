@@ -2,8 +2,8 @@ name: api-nightly
 
 # The API-ingest nightly pipeline (Discussion #15, revised 2026-10-25: the no-storage design).
 # Replaces the db-dump nightly (nightly.yml): instead of restoring a ~323 GB Postgres dump, it
-# pulls the live InferenceX API, scores the 180-day window with the resolved BLIS release, and
-# publishes summary v3 `api` snapshots. NOTHING RAW IS PERSISTED -- no ix-store branch, no committed logs;
+# pulls the live InferenceX API, scores the anchor units of the 180-day window (COV-2) with the
+# resolved BLIS release, and publishes summary v3 `api` snapshots. NOTHING RAW IS PERSISTED -- no ix-store branch, no committed logs;
 # the work dir is ephemeral and summary.json IS the score store (an IX-only night merges the delta
 # into the published summary). Only the agentic artifact downloads are cached, via actions/cache
 # (ephemeral, not committed), to keep a BLIS-release night fast.
@@ -124,9 +124,11 @@ jobs:
             git -C "$RUNNER_TEMP/substrate" checkout -q "$substrate_commit"
             CATALOG="$RUNNER_TEMP/substrate/catalog"
             REGISTRY="$RUNNER_TEMP/substrate/registry"
-            # The ledger at the same commit: every point is one of its units (design §10.2).
-            # TEMPORARY until `blis ledger --list` (inference-sim m1/substrate) prints the unit
-            # list; the job then reads it from the simulator.
+            # The ledger at the same commit: every row of the window is placed in one of its
+            # units (design §10.2). The units scored are the anchor units `blis ledger --list
+            # anchor` prints (cli.py nightly). TEMPORARY until an inference-sim command prints
+            # the full unit list with identities (catalog/ledger/units) and the ingest report:
+            # `blis ledger --list` prints only the published unit ids.
             LEDGER="$RUNNER_TEMP/substrate/catalog/ledger"
             # The vLLM tag of the engine release the simulator runs (stack.json engines), so
             # cmd_pull stamps it into the manifest and anchors the build resolver on it.
