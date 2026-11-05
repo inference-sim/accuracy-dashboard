@@ -288,6 +288,22 @@ def read_fields(blis: Path, engine_release: str) -> tuple["fl.FieldList", str]:
     return field_list, art.sha256(raw)
 
 
+def read_anchor_units(blis: Path, out: Path) -> set[str]:
+    """The anchor units of the substrate release the scoring build pins (COV-2): the list
+    `blis ledger --list anchor --json` prints, written to `out` so the score step can name it as
+    --units. An empty list is refused: until the ledger's seed exists the release publishes no
+    anchor unit, and a night that scored anything else would publish figures on units that may
+    fit or select values (X8)."""
+    raw = bc.ledger_list(str(blis), "anchor")
+    out.write_bytes(raw)
+    units = ldg.read_unit_set(out, role="anchor")
+    if not units:
+        raise ldg.LedgerError("blis ledger --list anchor printed no unit: the substrate release this build pins "
+                              "publishes no anchor list yet (the ledger seed is not created), so there is no unit "
+                              "the nightly may score (COV-2)")
+    return units
+
+
 def read_stack(blis: Path, given: str | None) -> sk.Stack:
     """The scoring build's stack.json: the engine release it runs (LIF-6) and the modules it pins.
 
@@ -422,22 +438,34 @@ def cmd_nightly(a) -> int:
     work_dir, data_dir, state_path = Path(a.work_dir), Path(a.data_dir), Path(a.state)
     contract_dir = Path(a.work or data_dir.parent / "_contract")
     latest_path = data_dir / "latest" / "summary.json"
+    # The night scores only the anchor units of the substrate release the build pins (COV-2).
+    # The list is read before anything is pulled, so a release without one fails the night
+    # at once.
+    work_dir.mkdir(parents=True, exist_ok=True)
+    anchor_path = work_dir / "anchor-units.json"
+    try:
+        anchors = read_anchor_units(Path(a.blis), anchor_path)
+    except (bc.CommandError, ldg.LedgerError, OSError, ValueError) as e:
+        _log(f"FATAL: {e}")
+        return 2
 
     def pull_fn(work: Path, today_: date, last_ids: set, blis_changed: bool):
-        # List the whole window (cheap -- api.pull hits only the REST API, no artifacts), then fetch
-        # inputs for the points to score. The whole window is fetched on a BLIS release AND on the
-        # seed (no prior ids); otherwise only the new points. A row the pull itself can't read fails
-        # the run (cmd_pull returns non-zero).
+        # List the whole window (cheap -- api.pull hits only the REST API, no artifacts); its points
+        # are the anchor units among the ledger units of its rows. Then fetch inputs for the points
+        # to score: every point on a BLIS release AND on the seed (no prior ids), otherwise only
+        # the new points. A row the pull itself can't read fails the run (cmd_pull returns
+        # non-zero).
         p = api.pull(api.http_fetch, today=today_, window_days=a.window_days)
-        window_ids = {x.point_id for x in pl.place(p.rows, ldg.load(Path(a.ledger))).points}
+        listed = {x.point_id for x in pl.place(p.rows, ldg.load(Path(a.ledger))).points}
+        window_ids = listed & anchors
         prior = json.loads(latest_path.read_text()) if latest_path.is_file() else None
         whole = blis_changed or not last_ids or not mergeable(prior, bsv2.SCHEMA_VERSION)
         to_fetch = window_ids if whole else (window_ids - set(last_ids))
-        only = None if whole else sorted(to_fetch)
-        _log(f"nightly: window {len(window_ids)} points; fetch {'whole window' if whole else f'{len(to_fetch)} new'}")
+        _log(f"nightly: window {len(listed)} units, {len(window_ids)} of them anchor units; "
+             f"fetch {'every one' if whole else f'{len(to_fetch)} new'}")
         rc = cmd_pull(types.SimpleNamespace(out=str(work), today=today_.isoformat(),
                                             window_days=a.window_days, cache=a.cache, prior=None,
-                                            only=only, download_workers=a.download_workers,
+                                            only=sorted(to_fetch), download_workers=a.download_workers,
                                             ledger=a.ledger))
         if rc != 0:
             raise RuntimeError(f"pull failed (rc={rc}); the run stops rather than publish a partial pull")
@@ -446,10 +474,7 @@ def cmd_nightly(a) -> int:
     def score_build_fn(work: Path, blis_tag: str, score_ids, pull_date: str, window_ids: set):
         rc = cmd_score(types.SimpleNamespace(
             pull=str(work), out=str(contract_dir), blis=a.blis, catalog=a.catalog, stack=a.stack,
-            registry=a.registry, sim_build=None, harness_digest="unreleased",
-            # TEMPORARY until blis-substrate publishes the anchor list (COV-2): the nightly scores
-            # every point of the window; it then passes that list as --units.
-            units=None,
+            registry=a.registry, sim_build=None, harness_digest="unreleased", units=str(anchor_path),
             corpus=a.corpus,
             corpus_sha256=a.corpus_sha256, corpus_dataset=a.corpus_dataset,
             corpus_revision=a.corpus_revision, corpus_cache=a.corpus_cache, work=a.score_work,
@@ -494,7 +519,10 @@ def main(argv=None) -> int:
     p.add_argument("--only", nargs="*", help="freeze only these point_ids of the window (the nightly's delta fetch)")
     p.add_argument("--ledger", required=True,
                    help="blis-substrate's catalog/ledger at the commit the scoring simulator pins: "
-                        "every point is a unit of its unit list (design §10.2)")
+                        "every point is a unit of its unit list (design §10.2). TEMPORARY until an "
+                        "inference-sim command prints the full unit list with identities "
+                        "(catalog/ledger/units) and the ingest report; `blis ledger --list` prints "
+                        "only the published unit ids")
     p.add_argument("--download-workers", type=int, default=0,
                    help="parallel artifact-download workers (default: min(2*cores, 8); I/O-bound)")
     s = sub.add_parser("score")

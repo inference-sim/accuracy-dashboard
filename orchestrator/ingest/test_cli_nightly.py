@@ -20,6 +20,20 @@ import api  # noqa: E402
 import ledger_fake  # noqa: E402
 
 
+def fake_blis(path: Path, commands: dict) -> Path:
+    """A blis executable that answers each command in `commands` (its argv joined by spaces) with
+    (exit status, standard output, standard error), records every argv it was given in
+    path.saw, and exits 2 for any other command."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("#!/usr/bin/env python3\nimport json, sys\n"
+                    f"answers = {json.dumps(commands)}\n"
+                    f"open({str(path) + '.saw'!r}, 'a').write(json.dumps(sys.argv[1:]) + '\\n')\n"
+                    "code, out, err = answers.get(' '.join(sys.argv[1:]), [2, '', 'unknown command'])\n"
+                    "sys.stdout.write(out); sys.stderr.write(err); sys.exit(code)\n")
+    path.chmod(0o755)
+    return path
+
+
 def _args(tmp, **over):
     a = dict(blis_tag="v0.12.0", work_dir=str(tmp / "work"), data_dir=str(tmp / "data"),
              state=str(tmp / "state.json"), window_days=180, keep_api=5, today="2026-10-23",
@@ -40,18 +54,33 @@ def _row(model, conc, md):
             "run_url": f"https://github.com/o/r/actions/runs/{conc}{md.replace('-', '')}/attempts/1"}
 
 
+def published(role, units):
+    return json.dumps({"kind": "PublishedUnits", "role": role, "partition_version": 1,
+                       "seed_sha256": "0" * 64, "units": sorted(units)})
+
+
 class Fakes:
     """Stand-ins for the network+BLIS steps, recording what cmd_nightly drove."""
     def __init__(self, rows):
         self.rows = rows
-        self.pulled_only = None   # the --only list cmd_pull got (None = whole window)
+        self.pulled_only = None   # the --only list cmd_pull got
+        self.anchors = None       # the anchor list blis prints; None = every row's unit
 
     def api_pull(self, fetch, *, today, window_days, framework="vllm"):
         return types.SimpleNamespace(rows=self.rows)
 
     def ledger(self, tmp):
-        # The ledger the night reads: one unit per row, written before each night.
+        # The ledger the night reads: one unit per row, written before each night, and the blis
+        # that prints the anchor list of the substrate release it pins.
         ledger_fake.write(tmp / "ledger", self.rows)
+        anchors = [ledger_fake.point_id(r) for r in self.rows] if self.anchors is None else self.anchors
+        fake_blis(tmp / "sim" / "blis", {"ledger --list anchor --json": [0, published("anchor", anchors), ""]})
+
+    def cmd_score(self, a):
+        self.scored_units = a.units
+        Path(a.out).mkdir(parents=True, exist_ok=True)
+        (Path(a.out) / "provenance.json").write_text(json.dumps({"pulled_at": "2026-10-23T00:00:00Z"}))
+        return 0
 
     def cmd_pull(self, a):
         self.pulled_only = a.only
@@ -67,10 +96,6 @@ class Fakes:
         pl.write_manifest(out, {"window": ["", a.today], "pulled_at": a.today + "T00:00:00Z"}, points)
         return 0
 
-    def cmd_score(self, a):
-        Path(a.out).mkdir(parents=True, exist_ok=True)
-        (Path(a.out) / "provenance.json").write_text(json.dumps({"pulled_at": "2026-10-23T00:00:00Z"}))
-        return 0
 
 
 def _install(monkeypatch, fakes, scored_ids):
@@ -97,8 +122,9 @@ def test_nightly_seed_lists_window_fetches_all_and_publishes(tmp_path, monkeypat
     fakes.ledger(tmp_path)
     rc = cli.cmd_nightly(_args(tmp_path))
     assert rc == 0
-    # Seed (no prior summary) -> whole window fetched, snapshot frozen, live view + state written.
-    assert fakes.pulled_only is None                      # whole window, not a delta
+    # Seed (no prior summary) -> every anchor unit of the window fetched, snapshot frozen, live
+    # view + state written.
+    assert fakes.pulled_only == sorted(ledger_fake.point_id(r) for r in rows)
     idx = json.loads((tmp_path / "data" / "index.json").read_text())
     assert idx["latest"] == "2026-10-23_blis-v0.12.0_ix-api-2026-10-23"
     assert (tmp_path / "data" / "latest" / "summary.json").is_file()
@@ -142,7 +168,7 @@ def test_a_night_after_a_v2_summary_fetches_and_scores_the_whole_window(tmp_path
     import build_summary_v2
     monkeypatch.setattr(build_summary_v2, "build_merged", lambda *a, **k: (_ for _ in ()).throw(AssertionError("merged")))
     cli.cmd_nightly(_args(tmp_path, today="2026-10-24"))
-    assert fakes.pulled_only is None                      # the whole window
+    assert fakes.pulled_only == sorted(ledger_fake.point_id(r) for r in fakes.rows)   # the whole window
 
 
 def test_nightly_noop_fetches_nothing_not_the_whole_window(tmp_path, monkeypatch):
@@ -155,13 +181,62 @@ def test_nightly_noop_fetches_nothing_not_the_whole_window(tmp_path, monkeypatch
     _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
     fakes.ledger(tmp_path)
     cli.cmd_nightly(_args(tmp_path))                       # seed: whole window
-    assert fakes.pulled_only is None
+    assert fakes.pulled_only == sorted(ledger_fake.point_id(r) for r in rows)
 
     # Night 2: identical window, same BLIS -> no new points. The delta is empty.
     cli.cmd_nightly(_args(tmp_path, today="2026-10-24"))
-    assert fakes.pulled_only == []                         # the empty delta, NOT None (whole window)
+    assert fakes.pulled_only == []                         # the empty delta, not the whole window
     # and cmd_pull froze zero rows for that empty delta
     assert json.loads((tmp_path / "work" / "manifest.json").read_text())["points"] == []
+
+
+def test_the_night_scores_only_the_anchor_units_the_build_publishes(tmp_path, monkeypatch):
+    # COV-2: a window row whose unit is not on the release's anchor list is neither fetched nor
+    # scored, and the score step is given the anchor list as --units.
+    rows = [_row("m", 1, "2026-10-01"), _row("m", 2, "2026-10-01")]
+    fakes = Fakes(rows)
+    anchor = ledger_fake.point_id(rows[0])
+    fakes.anchors = [anchor, "f" * 64]                     # an anchor unit outside the window too
+    _install(monkeypatch, fakes, [anchor])
+    fakes.ledger(tmp_path)
+    assert cli.cmd_nightly(_args(tmp_path)) == 0
+    assert fakes.pulled_only == [anchor]
+    import ledger as ldg
+    assert ldg.read_unit_set(Path(fakes.scored_units), role="anchor") == {anchor, "f" * 64}
+    assert json.loads((tmp_path / "state.json").read_text())["point_ids"] == [anchor]
+
+
+def test_a_night_whose_build_publishes_no_anchor_unit_fails_and_scores_nothing(tmp_path, monkeypatch):
+    # Until the ledger seed exists the anchor list is empty. The night fails naming why; it does
+    # not fall back to scoring the whole window (X16).
+    fakes = Fakes([_row("m", 1, "2026-10-01")])
+    fakes.anchors = []
+    _install(monkeypatch, fakes, [])
+    fakes.ledger(tmp_path)
+    monkeypatch.setattr(cli, "cmd_pull", lambda a: (_ for _ in ()).throw(AssertionError("pulled")))
+    msgs = []
+    monkeypatch.setattr(cli, "_log", msgs.append)
+    assert cli.cmd_nightly(_args(tmp_path)) == 2
+    assert any("printed no unit" in m and "anchor list" in m for m in msgs), msgs
+    assert not (tmp_path / "data" / "latest").exists()
+
+
+def test_a_night_whose_blis_has_no_ledger_command_fails(tmp_path, monkeypatch):
+    fakes = Fakes([_row("m", 1, "2026-10-01")])
+    _install(monkeypatch, fakes, [])
+    fakes.ledger(tmp_path)
+    fake_blis(tmp_path / "sim" / "blis", {})
+    msgs = []
+    monkeypatch.setattr(cli, "_log", msgs.append)
+    assert cli.cmd_nightly(_args(tmp_path)) == 2
+    assert any("blis ledger --list anchor --json exited 2" in m for m in msgs), msgs
+
+
+def test_a_list_of_another_role_is_not_the_anchor_list(tmp_path):
+    import ledger as ldg
+    blis = fake_blis(tmp_path / "sim" / "blis", {"ledger --list anchor --json": [0, published("fit", ["a" * 64]), ""]})
+    with pytest.raises(ldg.LedgerError, match="role 'fit', want 'anchor'"):
+        cli.read_anchor_units(blis, tmp_path / "anchor.json")
 
 
 def test_nightly_stops_when_the_pull_fails(tmp_path, monkeypatch):
@@ -221,20 +296,6 @@ def test_check_blis_inputs_refuses_a_checkout_not_at_a_tag(tmp_path):
 
 
 FIELD_LIST = {"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": []}
-
-
-def fake_blis(path: Path, commands: dict) -> Path:
-    """A blis executable that answers each command in `commands` (its argv joined by spaces) with
-    (exit status, standard output, standard error), records every argv it was given in
-    path.saw, and exits 2 for any other command."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("#!/usr/bin/env python3\nimport json, sys\n"
-                    f"answers = {json.dumps(commands)}\n"
-                    f"open({str(path) + '.saw'!r}, 'a').write(json.dumps(sys.argv[1:]) + '\\n')\n"
-                    "code, out, err = answers.get(' '.join(sys.argv[1:]), [2, '', 'unknown command'])\n"
-                    "sys.stdout.write(out); sys.stderr.write(err); sys.exit(code)\n")
-    path.chmod(0o755)
-    return path
 
 
 def test_the_field_list_is_what_blis_fields_prints_for_the_release_the_simulator_runs(tmp_path):

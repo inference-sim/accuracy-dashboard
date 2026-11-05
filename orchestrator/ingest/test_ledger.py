@@ -131,3 +131,17 @@ def test_a_unit_set_is_a_published_list_or_a_list_of_ids(tmp_path):
     plain.write_text("row:1\n")
     with pytest.raises(ldg.LedgerError, match="not a unit_id"):
         ldg.read_unit_set(plain)
+
+
+def test_a_unit_set_of_a_role_must_be_that_roles_published_list(tmp_path):
+    ids = sorted(u["unit_id"] for u in _units())[:2]
+    pub = tmp_path / "anchor.json"
+    pub.write_text(json.dumps({"kind": "PublishedUnits", "role": "anchor", "partition_version": 1,
+                               "seed_sha256": "", "units": ids}))
+    assert ldg.read_unit_set(pub, role="anchor") == set(ids)
+    with pytest.raises(ldg.LedgerError, match="role 'anchor', want 'fit'"):
+        ldg.read_unit_set(pub, role="fit")
+    plain = tmp_path / "units.txt"
+    plain.write_text("\n".join(ids) + "\n")
+    with pytest.raises(ldg.LedgerError, match="not a published list"):
+        ldg.read_unit_set(plain, role="anchor")
