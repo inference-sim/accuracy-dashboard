@@ -181,6 +181,20 @@ def _group(points, keyfn):
     return g
 
 
+def metric_pair(points: list[dict]) -> dict:
+    """v1's metric blocks over `points`, with every error figure under hl.MIN_POINTS points shown as
+    "too few points" (COV-11). A figure's own count is the points that have its value; `n` stays
+    the larger of the two metrics' counts, as v1 states it."""
+    pair = v1.metric_block_pair(points)
+    for tier, block in pair.items():
+        pts = [p for p in points if tier == "all" or p["tier"] == "measured_or_resolved"]
+        for kind in ("mape", "shape"):
+            for m in ("ttft", "tpot"):
+                if sum(1 for p in pts if p[f"{kind}_{m}"] is not None) < hl.MIN_POINTS:
+                    block[kind][m] = hl.TOO_FEW
+    return pair
+
+
 def build_matrix(flat: list[dict], facets: dict, fidelity: dict) -> list[dict]:
     """model -> workload -> gpu -> topology -> point, as v1, with v2's point fields."""
     for p in flat:
@@ -191,20 +205,20 @@ def build_matrix(flat: list[dict], facets: dict, fidelity: dict) -> list[dict]:
         mnode = {"level": "model", "model": model, "source": "inferencex",
                  "vllm_version": versions[0] if len(versions) == 1 else None,
                  "coverage": {"scored": len(mpts), "total": len(mpts)},
-                 "metrics": v1.metric_block_pair(mpts), "rows": []}
+                 "metrics": metric_pair(mpts), "rows": []}
         for wl, wpts in sorted(_group(mpts, lambda p: p["_f"]["workload"]).items()):
             isl = osl = None
             if ":" in str(wl):
                 isl, osl = (int(x) for x in str(wl).split(":"))
             wnode = {"level": "workload", "label": str(wl), "isl": isl, "osl": osl,
                      "coverage": {"scored": len(wpts), "total": len(wpts)},
-                     "metrics": v1.metric_block_pair(wpts), "rows": []}
+                     "metrics": metric_pair(wpts), "rows": []}
             for gpu, gpts in sorted(_group(wpts, lambda p: p["_f"]["gpu"]).items()):
                 # A GPU's precision only when its rows agree; one GPU can serve fp4 and int4 runs.
                 precs = {p["_f"]["precision"] for p in gpts}
                 gnode = {"level": "gpu", "label": gpu, "precision": precs.pop() if len(precs) == 1 else None,
                          "coverage": {"scored": len(gpts), "total": len(gpts)},
-                         "metrics": v1.metric_block_pair(gpts), "rows": []}
+                         "metrics": metric_pair(gpts), "rows": []}
                 for _, tpts in sorted(_group(gpts, _deployment).items()):
                     gnode["rows"].append(topology_node(tpts, fidelity))
                 _unique_labels(gnode["rows"])
@@ -242,7 +256,7 @@ def topology_node(tpts: list[dict], fidelity: dict) -> dict:
             "serving": f0["serving"], "spec_method": f0["spec_method"],
             "label": f"{base} · {f0['precision']}" + (f" · {spec}" if spec else ""),
             "coverage": {"scored": len(tpts), "total": len(tpts)},
-            "metrics": v1.metric_block_pair(tpts),
+            "metrics": metric_pair(tpts),
             "rows": [point_node(p, fidelity[p["point_id"]])
                      for p in sorted(tpts, key=lambda p: (p["concurrency"], p["measured_date"], p["sweep_id"]))]}
 
@@ -324,6 +338,7 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     matrix = build_matrix(flat, facets, fidelity)
     totals = v1.metric_block_pair(flat)
     v1.assert_self_consistent(flat, totals)
+    totals = metric_pair(flat)
 
     folded = sum(len(r) - 1 for r in runs.values())
     coverage = {"points": cov["points"] + len(failed), "graded": cov["graded"], "not_scored": len(not_scored),

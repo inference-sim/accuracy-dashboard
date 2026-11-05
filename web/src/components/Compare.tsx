@@ -13,7 +13,7 @@
  * not for a visitor asking "how accurate is BLIS?".
  */
 import { useMemo, useState } from 'react'
-import { aggregate, flattenPoints, intersectByKey } from '../aggregate'
+import { aggregate, figureValue, flattenPoints, intersectByKey } from '../aggregate'
 import { buildRows, type RenderRow } from '../tree'
 import { formatSignedDelta, formatCount } from '../format'
 import { Term } from './Term'
@@ -80,10 +80,10 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
     const oa = aggregate(aIn, effectiveTier)
     const ob = aggregate(bIn, effectiveTier)
     return {
-      mapeTtft: delta(oa.mape.ttft, ob.mape.ttft),
-      shapeTtft: delta(oa.shape.ttft, ob.shape.ttft),
-      mapeTpot: delta(oa.mape.tpot, ob.mape.tpot),
-      shapeTpot: delta(oa.shape.tpot, ob.shape.tpot),
+      mapeTtft: delta(figureValue(oa.mape.ttft), figureValue(ob.mape.ttft)),
+      shapeTtft: delta(figureValue(oa.shape.ttft), figureValue(ob.shape.ttft)),
+      mapeTpot: delta(figureValue(oa.mape.tpot), figureValue(ob.mape.tpot)),
+      shapeTpot: delta(figureValue(oa.shape.tpot), figureValue(ob.shape.tpot)),
     }
   }, [aIn, bIn, effectiveTier])
 
@@ -97,14 +97,14 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
     else next.add(id)
     setExpanded(next)
   }
-  const aRows = useMemo(() => buildRows(aIn, expanded), [aIn, expanded])
-  const bRows = useMemo(() => buildRows(bIn, expanded), [bIn, expanded])
+  const aRows = useMemo(() => buildRows(aIn, expanded, a.min_points ?? 0), [aIn, expanded, a.min_points])
+  const bRows = useMemo(() => buildRows(bIn, expanded, b.min_points ?? 0), [bIn, expanded, b.min_points])
   const bById = useMemo(() => new Map(bRows.map((r) => [r.id, r])), [bRows])
 
   const metricVal = (row: RenderRow | undefined, kind: 'mape' | 'shape', m: Metric): number | null => {
     if (!row) return null
     const blk = row.metrics[effectiveTier]
-    return blk[kind][m]
+    return figureValue(blk[kind][m])   // a figure under the minimum is missing from the Δ
   }
 
   const idA = a.snapshot_id

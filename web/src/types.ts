@@ -9,9 +9,14 @@
 export type Metric = 'ttft' | 'tpot'
 export type TierKey = 'measured_or_resolved' | 'all'
 
+/** The text a figure over fewer than min_points points is published and shown as (COV-11). */
+export const TOO_FEW = 'too few points'
+export type TooFew = typeof TOO_FEW
+
 export interface MapeShape {
-  ttft: number | null
-  tpot: number | null
+  /** v3: 'too few points' where the points holding the value are fewer than min_points. */
+  ttft: number | null | TooFew
+  tpot: number | null | TooFew
   n: number
 }
 
@@ -280,7 +285,7 @@ export interface NotScoredPoint {
 
 /** v3: one published figure and the number of points it covers (COV-11). */
 export interface Figure {
-  mape: number | 'too few points'
+  mape: number | TooFew
   n: number
 }
 
@@ -290,7 +295,7 @@ export interface HeadlineBlock {
   graded: number
   not_scored: number
   headline: { ttft: Figure; tpot: Figure }
-  grades: Record<GradedGrade, { points: number; share: number | null; ttft: Figure; tpot: Figure }>
+  grades: Record<GradedGrade, { points: number; share: number | TooFew; ttft: Figure; tpot: Figure }>
 }
 
 export interface Summary {

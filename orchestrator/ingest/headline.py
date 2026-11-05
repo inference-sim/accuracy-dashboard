@@ -34,6 +34,14 @@ def figure(points: list[dict], metric: str) -> dict:
     return {"mape": sum(errs) / n, "n": n}
 
 
+def share(count: int, graded: int):
+    """A grade's share of the graded points: "too few points" when the grade holds fewer than
+    MIN_POINTS points (its count stays beside it)."""
+    if count < MIN_POINTS:
+        return TOO_FEW
+    return count / graded
+
+
 def headline(points: list[dict]) -> dict:
     """points: every point, scored or not, each with its "grade" and, when graded, its measured
     and predicted microseconds (meas_ttft_us, pred_ttft_us, meas_tpot_us, pred_tpot_us)."""
@@ -47,7 +55,7 @@ def headline(points: list[dict]) -> dict:
            "headline": {m: figure(graded, m) for m in ("ttft", "tpot")}, "grades": {}}
     for g in gr.GRADED:
         pts = [p for p in graded if p["grade"] == g]
-        out["grades"][g] = {"points": len(pts), "share": (len(pts) / n) if n else None,
+        out["grades"][g] = {"points": len(pts), "share": share(len(pts), n),
                             **{m: figure(pts, m) for m in ("ttft", "tpot")}}
     if sum(v["points"] for v in out["grades"].values()) + out["not_scored"] != len(points):
         raise ValueError("the grade counts do not sum to the total (COV-1)")
@@ -75,8 +83,8 @@ def coverage(points: list[dict], left_out_records: int) -> dict:
 
 
 def check(summary_headline: dict) -> list[str]:
-    """The publish check of COV-11: every figure carries its count, and one under MIN_POINTS is
-    "too few points"."""
+    """The publish check of COV-11 for the headline block: every figure carries its count, and one
+    under MIN_POINTS is "too few points". check_document walks the whole summary."""
     out = []
 
     def fig(where, f):
@@ -89,4 +97,31 @@ def check(summary_headline: dict) -> list[str]:
     for g, row in summary_headline["grades"].items():
         for m in ("ttft", "tpot"):
             fig(f"grades.{g}.{m}", row[m])
+    return out
+
+
+def check_document(doc) -> list[str]:
+    """COV-11 over a whole summary, at every depth: a dict that states a count `n` (a headline
+    figure, or the mape and shape of a metric block at any level of the matrix and its totals)
+    holds a number only when n >= MIN_POINTS, and a grade row (`points` and `share`) shows a
+    share only when it holds MIN_POINTS points."""
+    out = []
+
+    def walk(x, path):
+        if isinstance(x, dict):
+            n = x.get("n")
+            if isinstance(n, int) and not isinstance(n, bool) and n < MIN_POINTS:
+                for k in ("mape", "ttft", "tpot"):
+                    v = x.get(k)
+                    if isinstance(v, (int, float)) and not isinstance(v, bool):
+                        out.append(f"{path}.{k}: a figure over {n} points, under the minimum {MIN_POINTS}")
+            c = x.get("points")
+            if isinstance(c, int) and "share" in x and c < MIN_POINTS and x["share"] != TOO_FEW:
+                out.append(f"{path}.share: the share of a grade of {c} points, under the minimum {MIN_POINTS}")
+            for k, v in x.items():
+                walk(v, f"{path}.{k}" if path else k)
+        elif isinstance(x, list):
+            for i, v in enumerate(x):
+                walk(v, f"{path}[{i}]")
+    walk(doc, "")
     return out

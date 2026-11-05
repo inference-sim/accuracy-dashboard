@@ -4,7 +4,7 @@
  * over every graded point, G1 to G4, and beside it each grade's share and own accuracy, every
  * figure with its point count, and "too few points" for a figure under the summary's minimum.
  */
-import { formatCount, formatPct } from '../format'
+import { formatCount, formatFigure, formatPct } from '../format'
 import type { Figure, HeadlineBlock, MetricBlockPair, TierKey } from '../types'
 
 interface Props {
@@ -34,7 +34,7 @@ const GRADE_LABEL: Record<string, string> = {
 
 /** A published figure: a percentage, or "too few points" under the summary's minimum. */
 function figureText(f: Figure): string {
-  return f.mape === 'too few points' ? 'too few points' : formatPct(f.mape)
+  return formatFigure(f.mape)
 }
 
 function FigureStat({ figure, label }: { figure: Figure; label: string }) {
@@ -71,7 +71,7 @@ function GradeSplit({ h }: { h: HeadlineBlock }) {
                 {g} <span className="facet">{GRADE_LABEL[g]}</span>
               </th>
               <td>{formatCount(r.points)}</td>
-              <td>{r.share == null ? '—' : formatPct(r.share * 100)}</td>
+              <td>{r.share === 'too few points' ? r.share : formatPct(r.share * 100)}</td>
               <td>{figureText(r.ttft)}</td>
               <td>{figureText(r.tpot)}</td>
             </tr>
@@ -82,10 +82,10 @@ function GradeSplit({ h }: { h: HeadlineBlock }) {
   )
 }
 
-function Stat({ value, label, hint }: { value: number | null; label: string; hint: string }) {
+function Stat({ value, label, hint }: { value: number | null | 'too few points'; label: string; hint: string }) {
   return (
     <div className="stat">
-      <div className="stat-value">{formatPct(value)}</div>
+      <div className="stat-value">{formatFigure(value)}</div>
       <div className="stat-label">{label}</div>
       <div className="stat-hint">{hint}</div>
     </div>

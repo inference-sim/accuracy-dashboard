@@ -38,6 +38,16 @@ def test_a_figure_under_the_minimum_is_too_few_points_not_a_number():
     assert hl.check(h) == ["grades.G1.ttft: a figure over 3 points, under the minimum 10"]
 
 
+def test_a_grade_under_the_minimum_shows_its_count_but_no_share():
+    h = hl.headline([_pt("G1")] * 3 + [_pt("G2")] * 12)
+    assert (h["grades"]["G1"]["points"], h["grades"]["G1"]["share"]) == (3, hl.TOO_FEW)
+    assert h["grades"]["G2"]["share"] == 0.8
+    assert (h["grades"]["G3"]["points"], h["grades"]["G3"]["share"]) == (0, hl.TOO_FEW)
+    assert hl.check_document(h) == []
+    h["grades"]["G1"]["share"] = 0.2
+    assert hl.check_document(h) == ["grades.G1.share: the share of a grade of 3 points, under the minimum 10"]
+
+
 def test_coverage_splits_by_engine_release_chip_and_grade():
     pts = [_pt("G2")] * 3 + [_pt("G5", framework="sglang", release=None, hardware="b200")] * 2
     c = hl.coverage(pts, left_out_records=7)

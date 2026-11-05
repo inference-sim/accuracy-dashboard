@@ -51,7 +51,7 @@ function distinctVersions(pts: FlatPoint[]): string[] {
 }
 
 /** Build the ordered, flattened render rows honoring which node ids are expanded. */
-export function buildRows(points: FlatPoint[], expanded: Set<string>): RenderRow[] {
+export function buildRows(points: FlatPoint[], expanded: Set<string>, minPoints = 0): RenderRow[] {
   const rows: RenderRow[] = []
   const byModel = group(points, (p) => p.model)
   for (const [model, mpts] of [...byModel.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
@@ -59,7 +59,7 @@ export function buildRows(points: FlatPoint[], expanded: Set<string>): RenderRow
     rows.push({
       level: 'model', label: model,
       facet: '', // the expanded rows already show the GPUs and workloads (#23)
-      metrics: aggregatePair(mpts), versions: distinctVersions(mpts),
+      metrics: aggregatePair(mpts, minPoints), versions: distinctVersions(mpts),
       pointCount: mpts.length, depth: 0, id: modelId,
     })
     if (!expanded.has(modelId)) continue
@@ -71,7 +71,7 @@ export function buildRows(points: FlatPoint[], expanded: Set<string>): RenderRow
       rows.push({
         level: 'workload', label: shortWorkload(wl),
         facet: w0.isl != null && w0.osl != null ? `isl ${w0.isl} · osl ${w0.osl}` : wl,
-        metrics: aggregatePair(wpts), versions: distinctVersions(wpts),
+        metrics: aggregatePair(wpts, minPoints), versions: distinctVersions(wpts),
         pointCount: wpts.length, depth: 1, id: wlId,
       })
       if (!expanded.has(wlId)) continue
@@ -84,7 +84,7 @@ export function buildRows(points: FlatPoint[], expanded: Set<string>): RenderRow
           level: 'gpu', label: gpu,
           // A precision only when every deployment under the GPU shares it.
           facet: new Set(gpts.map((p) => p.precision)).size === 1 && g0.precision ? g0.precision : '',
-          metrics: aggregatePair(gpts), versions: distinctVersions(gpts),
+          metrics: aggregatePair(gpts, minPoints), versions: distinctVersions(gpts),
           pointCount: gpts.length, depth: 2, id: gpuId,
         })
         if (!expanded.has(gpuId)) continue
@@ -100,7 +100,7 @@ export function buildRows(points: FlatPoint[], expanded: Set<string>): RenderRow
           rows.push({
             level: 'topology', label: topo,
             facet: facetBits,
-            metrics: aggregatePair(tpts), versions: distinctVersions(tpts),
+            metrics: aggregatePair(tpts, minPoints), versions: distinctVersions(tpts),
             pointCount: tpts.length, depth: 3, id: topoId,
             sweepKey: t0.sweepKey,
             ...(withFid.length > 0

@@ -163,6 +163,7 @@ def _v3_problems(doc: dict, pts: list[dict]) -> list[str]:
         out.append("coverage.g5_reasons does not count the not_scored reasons")
     head = doc["headline"]
     out += [f"headline: {x}" for x in hl.check(head)]
+    out += [f"COV-11: {x}" for x in hl.check_document(doc)]
     again = hl.headline(runs + g5)
     for m in ("ttft", "tpot"):
         a, b = head["headline"][m], again["headline"][m]
@@ -222,7 +223,15 @@ def recompute(pts: list[dict], tier: str) -> dict:
     return out
 
 
-def _metric_problems(where: str, node: dict, pts: list[dict]) -> list[str]:
+def _tier_pts(pts: list[dict], tier: str) -> list[dict]:
+    return [p for p in pts if tier == "all" or p["tier"] == "measured_or_resolved"]
+
+
+def _get(p: dict, kind: str, m: str):
+    return (p.get("error_pct" if kind == "mape" else "shape") or {}).get(m)
+
+
+def _metric_problems(where: str, node: dict, pts: list[dict], doc_version: int = 2) -> list[str]:
     out = []
     if node["coverage"]["scored"] != len(pts):
         out.append(f"{where}: coverage.scored {node['coverage']['scored']} != its {len(pts)} points")
@@ -233,6 +242,15 @@ def _metric_problems(where: str, node: dict, pts: list[dict]) -> list[str]:
                 out.append(f"{where}: {tier} {kind} n {got[kind]['n']} != {want[kind]['n']} from its points")
             for m in ("ttft", "tpot"):
                 a, b = got[kind][m], want[kind][m]
+                if doc_version == 3 and a == hl.TOO_FEW:
+                    # Published as too few points: the points under it must be fewer than the minimum.
+                    if sum(1 for p in _tier_pts(pts, tier) if _get(p, kind, m) is not None) >= hl.MIN_POINTS:
+                        out.append(f"{where}: {tier} {kind}.{m} is 'too few points' over enough points")
+                    continue
+                if doc_version == 3 and b is not None and \
+                        sum(1 for p in _tier_pts(pts, tier) if _get(p, kind, m) is not None) < hl.MIN_POINTS:
+                    out.append(f"{where}: {tier} {kind}.{m} is a number over fewer than {hl.MIN_POINTS} points (COV-11)")
+                    continue
                 if (a is None) != (b is None) or (a is not None and abs(a - b) > METRIC_TOLERANCE):
                     out.append(f"{where}: {tier} {kind}.{m} {a} != {b} from its points")
     return out
@@ -254,15 +272,16 @@ def tree_problems(doc: dict) -> list[str]:
     # v2 counts the matrix's points as coverage.scored; v3 counts graded anchor units, so the
     # matrix's own count (repeats folded) is what its totals cover.
     shown = doc["coverage"]["scored"] if doc["schema_version"] == 2 else len(points(doc))
-    out += _metric_problems("totals", {"coverage": {"scored": shown}, "metrics": doc["totals"]}, points(doc))
+    v = doc["schema_version"]
+    out += _metric_problems("totals", {"coverage": {"scored": shown}, "metrics": doc["totals"]}, points(doc), v)
     row_of_sweep: dict = {}
     for m in doc["matrix"]:
-        out += _metric_problems(f"{m['model']}", m, pts_of(m))
+        out += _metric_problems(f"{m['model']}", m, pts_of(m), v)
         for w in m["rows"]:
-            out += _metric_problems(f"{m['model']} › {w['label']}", w, pts_of(w))
+            out += _metric_problems(f"{m['model']} › {w['label']}", w, pts_of(w), v)
             for g in w["rows"]:
                 gw = f"{m['model']} › {w['label']} › {g['label']}"
-                out += _metric_problems(gw, g, pts_of(g))
+                out += _metric_problems(gw, g, pts_of(g), v)
                 labels = [t["label"] for t in g["rows"]]
                 if len(labels) != len(set(labels)):
                     out.append(f"{gw}: two deployment rows share a label")
@@ -270,7 +289,7 @@ def tree_problems(doc: dict) -> list[str]:
                     out.append(f"{gw}: GPU precision {g['precision']} but a row has another")
                 for t in g["rows"]:
                     tw = f"{gw} › {t['label']}"
-                    out += _metric_problems(tw, t, t["rows"])
+                    out += _metric_problems(tw, t, t["rows"], v)
                     # "<parallelism> · <precision>[ · <drafter>][ · vLLM <version>]"
                     label = t["label"].split(" · vLLM ", 1)[0]
                     spec = _spec(t.get("spec_method"))

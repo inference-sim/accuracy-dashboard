@@ -10,7 +10,10 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { App } from './App'
 import { validateSummary } from './load'
-import { flattenPoints } from './aggregate'
+import { aggregatePair, flattenPoints } from './aggregate'
+import { formatFigure } from './format'
+import { sortModelKeys } from './sort'
+import { buildRows } from './tree'
 import { ProvenanceBody } from './components/Provenance'
 import { Headline } from './components/Headline'
 import { isEstimated, type Summary } from './types'
@@ -51,8 +54,10 @@ describe('a v3 snapshot renders', () => {
   it('shows every graded grade with its count, share and accuracy', () => {
     const h = headline(render(<App summary={v3a()} loadError={null} initialHash="#/" />).html)
     for (const g of ['G1', 'G2', 'G3', 'G4']) expect(h).toContain(`<th scope="row">${g} `)
-    expect(h).toContain('<td>3</td><td>33.3%</td>')       // G1, G2 and G4: 3 points each
-    expect(h).toContain('<td>0</td><td>0.0%</td>')        // G3: none
+    // Under the minimum a grade shows its count and no share (COV-11): G1, G2 and G4 hold 3 points, G3 none.
+    expect(h).toContain('<td>3</td><td>too few points</td>')
+    expect(h).toContain('<td>0</td><td>too few points</td>')
+    expect(h).not.toContain('33.3%')
   })
 
   it('shows a figure over enough points as a number with its count', () => {
@@ -88,5 +93,34 @@ describe('a v3 snapshot renders', () => {
     expect(a).toMatch(/points graded<\/span><\/span> <b>9<\/b> of 14|points graded.*?<b>9<\/b> of 14/)
     const b = render(<App summary={v3b()} loadError={null} initialHash="#/" />).html
     expect(b).toMatch(/failed <b>1<\/b>/)
+  })
+})
+
+
+describe('a v3 node over fewer than the minimum points (COV-11)', () => {
+  it('shows "too few points" in the table at every level, never a number', () => {
+    const s = v3a()
+    const html = render(<App summary={s} loadError={null} initialHash="#/?tier=all" />).html
+    const table = html.slice(html.indexOf('<table class="readout"'), html.indexOf('</table>', html.indexOf('<table class="readout"')))
+    expect(table).toContain('<span class="num">too few points</span>')
+    expect(table).not.toMatch(/<span class="num">\d/)
+  })
+
+  it('aggregates a count under the minimum as too few points, and sorts it as missing', () => {
+    const pts = flattenPoints(v3a()).slice(0, 3)
+    const under = aggregatePair(pts, 10)
+    expect(under.all.mape.ttft).toBe('too few points')
+    expect(under.all.mape.n).toBe(3)
+    expect(aggregatePair(pts).all.mape.ttft).toEqual(expect.any(Number))
+    const rows = buildRows(pts, new Set(), 10)
+    expect(sortModelKeys(rows, { key: 'ttft_mape', dir: 1 }, 'all')).toEqual(rows.map((r) => r.label))
+    const num = { ...rows[0]!, label: 'zz', metrics: aggregatePair(pts, 0) }
+    expect(sortModelKeys([rows[0]!, num], { key: 'ttft_mape', dir: 1 }, 'all')).toEqual(['zz', rows[0]!.label])
+  })
+
+  it('formats such a figure as the text, not a percent', () => {
+    expect(formatFigure('too few points')).toBe('too few points')
+    expect(formatFigure(12.34)).toBe('12.3%')
+    expect(formatFigure(null)).toBe('—')
   })
 })

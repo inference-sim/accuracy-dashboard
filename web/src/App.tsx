@@ -218,7 +218,7 @@ function Overview({
   // Only the per-model table and the points below respond to the filters.
   const headlinePoints = useMemo(() => applyFilters(allPoints, DEFAULT_ROUTE), [allPoints])
   const headlineTier: TierKey = 'all'
-  const totals = useMemo(() => aggregatePair(headlinePoints), [headlinePoints])
+  const totals = useMemo(() => aggregatePair(headlinePoints, summary.min_points ?? 0), [headlinePoints, summary.min_points])
   const headlineSplit = useMemo(() => {
     const estimated = headlinePoints.filter((p) => isEstimated(p.fidelity)).length
     return { exact: headlinePoints.length - estimated, estimated }
@@ -227,7 +227,7 @@ function Overview({
   // A row is listed only if it has points in the tier being shown, so the exact tier never shows
   // deployments that are entirely estimated as rows of dashes.
   const tierPoints = useMemo(() => visible.filter(inTier), [visible, effectiveTier, showEstimated])
-  const rows = useMemo(() => buildRows(tierPoints, expanded), [tierPoints, expanded])
+  const rows = useMemo(() => buildRows(tierPoints, expanded, summary.min_points ?? 0), [tierPoints, expanded, summary.min_points])
 
   // Sort reorders only the model-level rows; children follow their parent.
   const orderedRows = useMemo(() => {

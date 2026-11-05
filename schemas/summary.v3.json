@@ -454,18 +454,47 @@
                   "minimum": 0
                 },
                 "share": {
-                  "type": [
-                    "number",
-                    "null"
-                  ],
-                  "minimum": 0,
-                  "maximum": 1
+                  "description": "The grade's share of the graded points, or 'too few points' for a grade holding fewer than min_points points (its count stays in points).",
+                  "oneOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "const": "too few points"
+                    }
+                  ]
                 },
                 "ttft": {
                   "$ref": "#/definitions/figure"
                 },
                 "tpot": {
                   "$ref": "#/definitions/figure"
+                }
+              },
+              "if": {
+                "properties": {
+                  "share": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "share"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "points": {
+                    "minimum": 10
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "points": {
+                    "maximum": 9
+                  }
                 }
               }
             },
@@ -484,18 +513,47 @@
                   "minimum": 0
                 },
                 "share": {
-                  "type": [
-                    "number",
-                    "null"
-                  ],
-                  "minimum": 0,
-                  "maximum": 1
+                  "description": "The grade's share of the graded points, or 'too few points' for a grade holding fewer than min_points points (its count stays in points).",
+                  "oneOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "const": "too few points"
+                    }
+                  ]
                 },
                 "ttft": {
                   "$ref": "#/definitions/figure"
                 },
                 "tpot": {
                   "$ref": "#/definitions/figure"
+                }
+              },
+              "if": {
+                "properties": {
+                  "share": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "share"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "points": {
+                    "minimum": 10
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "points": {
+                    "maximum": 9
+                  }
                 }
               }
             },
@@ -514,18 +572,47 @@
                   "minimum": 0
                 },
                 "share": {
-                  "type": [
-                    "number",
-                    "null"
-                  ],
-                  "minimum": 0,
-                  "maximum": 1
+                  "description": "The grade's share of the graded points, or 'too few points' for a grade holding fewer than min_points points (its count stays in points).",
+                  "oneOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "const": "too few points"
+                    }
+                  ]
                 },
                 "ttft": {
                   "$ref": "#/definitions/figure"
                 },
                 "tpot": {
                   "$ref": "#/definitions/figure"
+                }
+              },
+              "if": {
+                "properties": {
+                  "share": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "share"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "points": {
+                    "minimum": 10
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "points": {
+                    "maximum": 9
+                  }
                 }
               }
             },
@@ -544,18 +631,47 @@
                   "minimum": 0
                 },
                 "share": {
-                  "type": [
-                    "number",
-                    "null"
-                  ],
-                  "minimum": 0,
-                  "maximum": 1
+                  "description": "The grade's share of the graded points, or 'too few points' for a grade holding fewer than min_points points (its count stays in points).",
+                  "oneOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "const": "too few points"
+                    }
+                  ]
                 },
                 "ttft": {
                   "$ref": "#/definitions/figure"
                 },
                 "tpot": {
                   "$ref": "#/definitions/figure"
+                }
+              },
+              "if": {
+                "properties": {
+                  "share": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "share"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "points": {
+                    "minimum": 10
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "points": {
+                    "maximum": 9
+                  }
                 }
               }
             }
@@ -605,24 +721,70 @@
   },
   "definitions": {
     "mapeShape": {
+      "description": "A metric block's error: the mean absolute error of each metric over the points that have it, or 'too few points' where those are fewer than min_points (COV-11). n is the larger of the two counts, so a number requires n >= min_points.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "ttft": {
-          "type": [
-            "number",
-            "null"
+          "oneOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            },
+            {
+              "const": "too few points"
+            }
           ]
         },
         "tpot": {
-          "type": [
-            "number",
-            "null"
+          "oneOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            },
+            {
+              "const": "too few points"
+            }
           ]
         },
         "n": {
           "type": "integer",
           "minimum": 0
+        }
+      },
+      "if": {
+        "anyOf": [
+          {
+            "properties": {
+              "ttft": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "ttft"
+            ]
+          },
+          {
+            "properties": {
+              "tpot": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "tpot"
+            ]
+          }
+        ]
+      },
+      "then": {
+        "properties": {
+          "n": {
+            "minimum": 10
+          }
         }
       }
     },

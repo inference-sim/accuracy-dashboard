@@ -63,7 +63,7 @@
     "grades": {
       "G1": {
         "points": 2,
-        "share": 0.25,
+        "share": "too few points",
         "ttft": {
           "mape": "too few points",
           "n": 2
@@ -75,7 +75,7 @@
       },
       "G2": {
         "points": 3,
-        "share": 0.375,
+        "share": "too few points",
         "ttft": {
           "mape": "too few points",
           "n": 3
@@ -87,7 +87,7 @@
       },
       "G3": {
         "points": 0,
-        "share": 0.0,
+        "share": "too few points",
         "ttft": {
           "mape": "too few points",
           "n": 0
@@ -99,7 +99,7 @@
       },
       "G4": {
         "points": 3,
-        "share": 0.375,
+        "share": "too few points",
         "ttft": {
           "mape": "too few points",
           "n": 3
@@ -279,26 +279,26 @@
   "totals": {
     "measured_or_resolved": {
       "mape": {
-        "ttft": 14.167650531286892,
-        "tpot": 12.839862984371658,
+        "ttft": "too few points",
+        "tpot": "too few points",
         "n": 2
       },
       "shape": {
-        "ttft": null,
-        "tpot": null,
+        "ttft": "too few points",
+        "tpot": "too few points",
         "n": 0
       },
       "noise_floor_pct": 1.6
     },
     "all": {
       "mape": {
-        "ttft": 9.784630384487885,
-        "tpot": 10.994294917166492,
+        "ttft": "too few points",
+        "tpot": "too few points",
         "n": 8
       },
       "shape": {
-        "ttft": 11.106414663367337,
-        "tpot": 4.624987707537731,
+        "ttft": "too few points",
+        "tpot": "too few points",
         "n": 2
       },
       "noise_floor_pct": 1.6
@@ -317,26 +317,26 @@
       "metrics": {
         "measured_or_resolved": {
           "mape": {
-            "ttft": null,
-            "tpot": null,
+            "ttft": "too few points",
+            "tpot": "too few points",
             "n": 0
           },
           "shape": {
-            "ttft": null,
-            "tpot": null,
+            "ttft": "too few points",
+            "tpot": "too few points",
             "n": 0
           },
           "noise_floor_pct": 1.6
         },
         "all": {
           "mape": {
-            "ttft": 12.643509439427573,
-            "tpot": 6.985278712364899,
+            "ttft": "too few points",
+            "tpot": "too few points",
             "n": 3
           },
           "shape": {
-            "ttft": 11.106414663367337,
-            "tpot": 4.624987707537731,
+            "ttft": "too few points",
+            "tpot": "too few points",
             "n": 2
           },
           "noise_floor_pct": 1.6
@@ -355,26 +355,26 @@
           "metrics": {
             "measured_or_resolved": {
               "mape": {
-                "ttft": null,
-                "tpot": null,
+                "ttft": "too few points",
+                "tpot": "too few points",
                 "n": 0
               },
               "shape": {
-                "ttft": null,
-                "tpot": null,
+                "ttft": "too few points",
+                "tpot": "too few points",
                 "n": 0
               },
               "noise_floor_pct": 1.6
             },
             "all": {
               "mape": {
-                "ttft": 12.643509439427573,
-                "tpot": 6.985278712364899,
+                "ttft": "too few points",
+                "tpot": "too few points",
                 "n": 3
               },
               "shape": {
-                "ttft": 11.106414663367337,
-                "tpot": 4.624987707537731,
+                "ttft": "too few points",
+                "tpot": "too few points",
                 "n": 2
               },
               "noise_floor_pct": 1.6
@@ -392,26 +392,26 @@
               "metrics": {
                 "measured_or_resolved": {
                   "mape": {
-                    "ttft": null,
-                    "tpot": null,
+                    "ttft": "too few points",
+                    "tpot": "too few points",
                     "n": 0
                   },
                   "shape": {
-                    "ttft": null,
-                    "tpot": null,
+                    "ttft": "too few points",
+                    "tpot": "too few points",
                     "n": 0
                   },
                   "noise_floor_pct": 1.6
                 },
                 "all": {
                   "mape": {
-                    "ttft": 12.643509439427573,
-                    "tpot": 6.985278712364899,
+                    "ttft": "too few points",
+                    "tpot": "too few points",
                     "n": 3
                   },
                   "shape": {
-                    "ttft": 11.106414663367337,
-                    "tpot": 4.624987707537731,
+                    "ttft": "too few points",
+                    "tpot": "too few points",
                     "n": 2
                   },
                   "noise_floor_pct": 1.6
@@ -440,26 +440,26 @@
                   "metrics": {
                     "measured_or_resolved": {
                       "mape": {
-                        "ttft": null,
-                        "tpot": null,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 0
                       },
                       "shape": {
-                        "ttft": null,
-                        "tpot": null,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 0
                       },
                       "noise_floor_pct": 1.6
                     },
                     "all": {
                       "mape": {
-                        "ttft": 12.643509439427573,
-                        "tpot": 6.985278712364899,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 3
                       },
                       "shape": {
-                        "ttft": 11.106414663367337,
-                        "tpot": 4.624987707537731,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 2
                       },
                       "noise_floor_pct": 1.6
@@ -813,26 +813,26 @@
       "metrics": {
         "measured_or_resolved": {
           "mape": {
-            "ttft": 14.167650531286892,
-            "tpot": 12.839862984371658,
+            "ttft": "too few points",
+            "tpot": "too few points",
             "n": 2
           },
           "shape": {
-            "ttft": null,
-            "tpot": null,
+            "ttft": "too few points",
+            "tpot": "too few points",
             "n": 0
           },
           "noise_floor_pct": 1.6
         },
         "all": {
           "mape": {
-            "ttft": 8.706260591245584,
-            "tpot": 13.783529105144055,
+            "ttft": "too few points",
+            "tpot": "too few points",
             "n": 4
           },
           "shape": {
-            "ttft": null,
-            "tpot": null,
+            "ttft": "too few points",
+            "tpot": "too few points",
             "n": 0
           },
           "noise_floor_pct": 1.6
@@ -851,26 +851,26 @@
           "metrics": {
             "measured_or_resolved": {
               "mape": {
-                "ttft": 14.167650531286892,
-                "tpot": 12.839862984371658,
+                "ttft": "too few points",
+                "tpot": "too few points",
                 "n": 2
               },
               "shape": {
-                "ttft": null,
-                "tpot": null,
+                "ttft": "too few points",
+                "tpot": "too few points",
                 "n": 0
               },
               "noise_floor_pct": 1.6
             },
             "all": {
               "mape": {
-                "ttft": 8.706260591245584,
-                "tpot": 13.783529105144055,
+                "ttft": "too few points",
+                "tpot": "too few points",
                 "n": 4
               },
               "shape": {
-                "ttft": null,
-                "tpot": null,
+                "ttft": "too few points",
+                "tpot": "too few points",
                 "n": 0
               },
               "noise_floor_pct": 1.6
@@ -888,26 +888,26 @@
               "metrics": {
                 "measured_or_resolved": {
                   "mape": {
-                    "ttft": null,
-                    "tpot": null,
+                    "ttft": "too few points",
+                    "tpot": "too few points",
                     "n": 0
                   },
                   "shape": {
-                    "ttft": null,
-                    "tpot": null,
+                    "ttft": "too few points",
+                    "tpot": "too few points",
                     "n": 0
                   },
                   "noise_floor_pct": 1.6
                 },
                 "all": {
                   "mape": {
-                    "ttft": 2.5423728813559254,
-                    "tpot": 15.686274509803921,
+                    "ttft": "too few points",
+                    "tpot": "too few points",
                     "n": 1
                   },
                   "shape": {
-                    "ttft": null,
-                    "tpot": null,
+                    "ttft": "too few points",
+                    "tpot": "too few points",
                     "n": 0
                   },
                   "noise_floor_pct": 1.6
@@ -936,26 +936,26 @@
                   "metrics": {
                     "measured_or_resolved": {
                       "mape": {
-                        "ttft": null,
-                        "tpot": null,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 0
                       },
                       "shape": {
-                        "ttft": null,
-                        "tpot": null,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 0
                       },
                       "noise_floor_pct": 1.6
                     },
                     "all": {
                       "mape": {
-                        "ttft": 2.5423728813559254,
-                        "tpot": 15.686274509803921,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 1
                       },
                       "shape": {
-                        "ttft": null,
-                        "tpot": null,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 0
                       },
                       "noise_floor_pct": 1.6
@@ -1142,26 +1142,26 @@
               "metrics": {
                 "measured_or_resolved": {
                   "mape": {
-                    "ttft": 14.167650531286892,
-                    "tpot": 12.839862984371658,
+                    "ttft": "too few points",
+                    "tpot": "too few points",
                     "n": 2
                   },
                   "shape": {
-                    "ttft": null,
-                    "tpot": null,
+                    "ttft": "too few points",
+                    "tpot": "too few points",
                     "n": 0
                   },
                   "noise_floor_pct": 1.6
                 },
                 "all": {
                   "mape": {
-                    "ttft": 10.760889827875472,
-                    "tpot": 13.149280636924098,
+                    "ttft": "too few points",
+                    "tpot": "too few points",
                     "n": 3
                   },
                   "shape": {
-                    "ttft": null,
-                    "tpot": null,
+                    "ttft": "too few points",
+                    "tpot": "too few points",
                     "n": 0
                   },
                   "noise_floor_pct": 1.6
@@ -1190,26 +1190,26 @@
                   "metrics": {
                     "measured_or_resolved": {
                       "mape": {
-                        "ttft": 14.167650531286892,
-                        "tpot": 12.839862984371658,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 2
                       },
                       "shape": {
-                        "ttft": null,
-                        "tpot": null,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 0
                       },
                       "noise_floor_pct": 1.6
                     },
                     "all": {
                       "mape": {
-                        "ttft": 14.167650531286892,
-                        "tpot": 12.839862984371658,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 2
                       },
                       "shape": {
-                        "ttft": null,
-                        "tpot": null,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 0
                       },
                       "noise_floor_pct": 1.6
@@ -1450,26 +1450,26 @@
                   "metrics": {
                     "measured_or_resolved": {
                       "mape": {
-                        "ttft": null,
-                        "tpot": null,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 0
                       },
                       "shape": {
-                        "ttft": null,
-                        "tpot": null,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 0
                       },
                       "noise_floor_pct": 1.6
                     },
                     "all": {
                       "mape": {
-                        "ttft": 3.9473684210526327,
-                        "tpot": 13.768115942028981,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 1
                       },
                       "shape": {
-                        "ttft": null,
-                        "tpot": null,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 0
                       },
                       "noise_floor_pct": 1.6
@@ -1609,26 +1609,26 @@
       "metrics": {
         "measured_or_resolved": {
           "mape": {
-            "ttft": null,
-            "tpot": null,
+            "ttft": "too few points",
+            "tpot": "too few points",
             "n": 0
           },
           "shape": {
-            "ttft": null,
-            "tpot": null,
+            "ttft": "too few points",
+            "tpot": "too few points",
             "n": 0
           },
           "noise_floor_pct": 1.6
         },
         "all": {
           "mape": {
-            "ttft": 5.521472392638027,
-            "tpot": 11.864406779661019,
+            "ttft": "too few points",
+            "tpot": "too few points",
             "n": 1
           },
           "shape": {
-            "ttft": null,
-            "tpot": null,
+            "ttft": "too few points",
+            "tpot": "too few points",
             "n": 0
           },
           "noise_floor_pct": 1.6
@@ -1647,26 +1647,26 @@
           "metrics": {
             "measured_or_resolved": {
               "mape": {
-                "ttft": null,
-                "tpot": null,
+                "ttft": "too few points",
+                "tpot": "too few points",
                 "n": 0
               },
               "shape": {
-                "ttft": null,
-                "tpot": null,
+                "ttft": "too few points",
+                "tpot": "too few points",
                 "n": 0
               },
               "noise_floor_pct": 1.6
             },
             "all": {
               "mape": {
-                "ttft": 5.521472392638027,
-                "tpot": 11.864406779661019,
+                "ttft": "too few points",
+                "tpot": "too few points",
                 "n": 1
               },
               "shape": {
-                "ttft": null,
-                "tpot": null,
+                "ttft": "too few points",
+                "tpot": "too few points",
                 "n": 0
               },
               "noise_floor_pct": 1.6
@@ -1684,26 +1684,26 @@
               "metrics": {
                 "measured_or_resolved": {
                   "mape": {
-                    "ttft": null,
-                    "tpot": null,
+                    "ttft": "too few points",
+                    "tpot": "too few points",
                     "n": 0
                   },
                   "shape": {
-                    "ttft": null,
-                    "tpot": null,
+                    "ttft": "too few points",
+                    "tpot": "too few points",
                     "n": 0
                   },
                   "noise_floor_pct": 1.6
                 },
                 "all": {
                   "mape": {
-                    "ttft": 5.521472392638027,
-                    "tpot": 11.864406779661019,
+                    "ttft": "too few points",
+                    "tpot": "too few points",
                     "n": 1
                   },
                   "shape": {
-                    "ttft": null,
-                    "tpot": null,
+                    "ttft": "too few points",
+                    "tpot": "too few points",
                     "n": 0
                   },
                   "noise_floor_pct": 1.6
@@ -1732,26 +1732,26 @@
                   "metrics": {
                     "measured_or_resolved": {
                       "mape": {
-                        "ttft": null,
-                        "tpot": null,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 0
                       },
                       "shape": {
-                        "ttft": null,
-                        "tpot": null,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 0
                       },
                       "noise_floor_pct": 1.6
                     },
                     "all": {
                       "mape": {
-                        "ttft": 5.521472392638027,
-                        "tpot": 11.864406779661019,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 1
                       },
                       "shape": {
-                        "ttft": null,
-                        "tpot": null,
+                        "ttft": "too few points",
+                        "tpot": "too few points",
                         "n": 0
                       },
                       "noise_floor_pct": 1.6

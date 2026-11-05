@@ -101,7 +101,7 @@ def test_the_headline_covers_g1_to_g4_with_each_grades_share_and_count():
     assert (h["points"], h["graded"], h["not_scored"]) == (14, 9, 5)
     assert h["headline"]["ttft"] == {"mape": "too few points", "n": 9}
     assert {g: (r["points"], r["share"]) for g, r in h["grades"].items()} == \
-        {"G1": (3, 1 / 3), "G2": (3, 1 / 3), "G3": (0, 0.0), "G4": (3, 1 / 3)}
+        {g: (n, "too few points") for g, n in (("G1", 3), ("G2", 3), ("G3", 0), ("G4", 3))}
     assert all(r["ttft"]["mape"] == "too few points" for r in h["grades"].values())
 
 
@@ -344,6 +344,64 @@ def test_a_sweep_with_two_points_at_one_concurrency_is_refused_not_built():
     raise AssertionError("built a summary whose sweep repeats a concurrency")
 
 
+def _pt(err, shape=None):
+    return {"tier": "measured_or_resolved", "error_pct": {"ttft": err, "tpot": err}, "shape": {"ttft": shape, "tpot": shape}}
+
+
+def test_every_metric_block_of_a_v3_summary_is_too_few_points_under_the_minimum():
+    # COV-11 at every level: run-a has 9 points, so no block at any level holds a number, and its
+    # smaller nodes (3 points) say "too few points" with their count.
+    doc = _build()
+    seen = []
+
+    def walk(node):
+        for tier in ("measured_or_resolved", "all"):
+            for kind in ("mape", "shape"):
+                b = node["metrics"][tier][kind]
+                seen.append((node["level"], b["n"]))
+                for m in ("ttft", "tpot"):
+                    assert b[m] in (None, "too few points") or b["n"] >= 10, (node["level"], tier, kind, b)
+        for r in node.get("rows", []):
+            if r["level"] != "point":
+                walk(r)
+    assert doc["totals"]["all"]["mape"] == {"ttft": "too few points", "tpot": "too few points", "n": 9}
+    for m in doc["matrix"]:
+        walk(m)
+    assert {lvl for lvl, _ in seen} == {"model", "workload", "gpu", "topology"}
+    assert any(n == 3 for _, n in seen)
+    assert vs2.problems(doc) == []
+
+
+def test_the_validator_refuses_a_number_over_fewer_than_the_minimum_at_any_depth():
+    import copy
+    base = _build()
+    topo = lambda d: d["matrix"][0]["rows"][0]["rows"][0]["rows"][0]
+    for name, mutate in (
+        ("totals", lambda d: d["totals"]["all"]["mape"].update(ttft=4.0)),
+        ("model", lambda d: d["matrix"][0]["metrics"]["all"]["shape"].update(tpot=4.0)),
+        ("workload", lambda d: d["matrix"][0]["rows"][0]["metrics"]["all"]["mape"].update(tpot=4.0)),
+        ("topology", lambda d: topo(d)["metrics"]["all"]["mape"].update(ttft=4.0)),
+        ("a grade share", lambda d: d["headline"]["grades"]["G1"].update(share=0.3)),
+    ):
+        doc = copy.deepcopy(base)
+        mutate(doc)
+        found = vs2.problems(doc)
+        assert found, name
+    import headline as hl
+    doc = copy.deepcopy(base)
+    topo(doc)["metrics"]["all"]["mape"].update(ttft=4.0)
+    assert any("under the minimum" in x for x in hl.check_document(doc)), "the document walk names the figure"
+    assert hl.check_document(base) == []
+    # Enough points: a number is right and the block recomputes.
+    pts = [_pt(5.0, 1.0)] * 10
+    node = {"coverage": {"scored": 10}, "metrics": {t: {"mape": {"ttft": 5.0, "tpot": 5.0, "n": 10},
+                                                      "shape": {"ttft": 1.0, "tpot": 1.0, "n": 10}}
+                                                  for t in ("measured_or_resolved", "all")}}
+    assert vs2._metric_problems("x", node, pts, 3) == []
+    node["metrics"]["all"]["mape"]["ttft"] = "too few points"
+    assert any("over enough points" in x for x in vs2._metric_problems("x", node, pts, 3))
+
+
 def test_the_validator_checks_the_tree_against_its_points():
     import copy
     base = _build()
@@ -353,7 +411,6 @@ def test_the_validator_checks_the_tree_against_its_points():
         mutate(doc)
         return any(text in p for p in vs2.problems(doc))
     topo = lambda d: d["matrix"][0]["rows"][0]["rows"][0]["rows"][0]
-    assert found(lambda d: d["totals"]["all"]["mape"].update(ttft=99.0), "totals: all mape.ttft")
     assert found(lambda d: topo(d)["metrics"]["all"]["shape"].update(n=99), "shape n 99")
     assert found(lambda d: topo(d).update(spec_method="eagle3"), "label doesn't state")
     assert found(lambda d: topo(d).update(precision="int4"), "label doesn't state")
