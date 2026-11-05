@@ -475,6 +475,9 @@ POOL_ROLE = {"kv_transfer_config.kv_role": {"kv_both": "colocated"}}
 # block_size, max_num_seqs, max_num_batched_tokens). One the run did not record takes the
 # field's estimation rule (design §11.2, Estimate).
 REQUIRED = ("block_size", "max_num_batched_tokens", "max_num_seqs")
+# An agentic replay filters its corpus against the deployment's max_model_len (the workload's
+# max_context_length: max_model_len), so it decides which requests are sent (COV-12).
+REQUIRED_AGENTIC = ("max_model_len",)
 
 
 def _yaml_value(v):
@@ -633,7 +636,7 @@ FRONTEND = {True: "rust", False: "python"}   # VLLM_USE_RUST_FRONTEND, parsed as
 
 
 def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str, field_list,
-          multinode: bool = False) -> Built:
+          multinode: bool = False, agentic: bool = False) -> Built:
     """The Scenario + Deployment for one point, from the decided settings.
 
     Only what the run recorded is written, under the engine's own names (LOCATIONS), and the
@@ -675,7 +678,7 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
     spec = eng.get("speculative")
     if spec is not None and set(spec) >= {"method"} and "num_spec_tokens" not in spec:
         b.reasons.append("required_setting_missing:speculative_config.num_speculative_tokens")
-    needed = [p for p in REQUIRED if p not in eng]
+    needed = [p for p in REQUIRED + (REQUIRED_AGENTIC if agentic else ()) if p not in eng]
     if spec is not None and b.acceptance_length is None:
         needed.append("speculative_config.synthetic_acceptance_length")
     for path in needed:

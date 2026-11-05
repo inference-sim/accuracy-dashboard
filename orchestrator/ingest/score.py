@@ -532,7 +532,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     part = st.Part(name=part_name)
     name = f"p-{pid[:16]}"
     b = st.build(c, name=name, model=sup.model, part=part, engine_version=env.engine_release,
-                 field_list=env.field_list)
+                 field_list=env.field_list, agentic=agentic)
     o.reasons += b.reasons
     o.subs += b.substitutions
     header = [f"point {pid}", f"InferenceX row {row['id']} ({row['run_url']})",
