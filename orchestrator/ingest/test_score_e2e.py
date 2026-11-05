@@ -27,6 +27,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import assess as asx  # noqa: E402
 import contract as c  # noqa: E402
 import inferencex_client as ix  # noqa: E402
 import score as sc  # noqa: E402
@@ -134,7 +135,15 @@ def _saw(env) -> list[dict]:
     return [json.loads(x) for x in p.read_text().splitlines()] if p.exists() else []
 
 
-def _setup(tmp: Path, *, log: str = LOG, repo: str = "org/m", conc: int = 4, isl: int = 1024, osl: int = 1024,
+def job_log_text(isl: int, osl: int, conc: int, extra: str = "") -> str:
+    """The CI job log line of a run whose client was given the launcher's defaults."""
+    return (f"2026-10-01T02:42:03.2Z + python3 /workspace/utils/bench_serving/benchmark_serving.py --model m "
+            f"--backend vllm --dataset-name random --random-input-len {isl} --random-output-len {osl} "
+            f"--random-range-ratio 0.8 --num-prompts {10 * conc} --max-concurrency {conc} --request-rate inf "
+            f"--ignore-eos --save-result --num-warmups {2 * conc} --result-filename x.json{extra}\n")
+
+
+def _setup(tmp: Path, *, log: str = LOG, job_log: str | None = "default", client_commit: bool = True, repo: str = "org/m", conc: int = 4, isl: int = 1024, osl: int = 1024,
            date: str = "2026-10-01", spec: str = "mtp", benchmark_type: str = "single_turn"):
     row = {"id": "1", "model": "m", "hardware": "h200", "precision": "fp8", "framework": "vllm",
            "benchmark_type": benchmark_type, "conc": conc, "isl": isl, "osl": osl, "spec_method": spec,
@@ -148,10 +157,20 @@ def _setup(tmp: Path, *, log: str = LOG, repo: str = "org/m", conc: int = 4, isl
     log = log.replace("org/m", repo)
     (pdir / "server_log.gz").write_bytes(gzip.compress(log.encode(), mtime=0))
     entry = {"point_id": pid, "identity": ident, "row": row, "reasons": [], "records": ["1"],
+             "client_commit": {"repo": "SemiAnalysisAI/InferenceX", "sha": "f" * 40, "date": "2026-10-01T00:00:00Z"}
+             if client_commit else None,
              "measurements": [{"record": "1", "metrics": row["metrics"]}],
              "files": {"server_log": {"path": "server_log.gz", "sha256": "0" * 64, "from": "api:/server-log"}},
              "build": {"image": row["image"], "commit": "a" * 40, "source": "image_label", "ref": "v0.31.0",
                        "distance": 0, "match": "exact"}}
+    if job_log == "default":
+        job_log = job_log_text(isl, osl, conc)
+    if job_log is not None:
+        (pdir / "job_log.gz").write_bytes(gzip.compress(job_log.encode(), mtime=0))
+        entry["files"]["job_log"] = {"path": "job_log.gz", "sha256": "0" * 64, "from": "t"}
+        entry["client_args"] = {"job_id": 5, "job_name": "j"}
+    else:
+        entry["client_args"] = None
     env = sc.Env(blis=_fake_blis(tmp), blis_release="v0.12.0", blis_commit="b" * 40, catalog=tmp,
                  catalog_release="0.3.0", registry=tmp, registry_release="v0.2.0", kernel="v0.3.0",
                  corpus={"sha256": "c" * 64}, field_list=FIELDS, vllm_defaults=st.load_vllm_defaults()[0],
@@ -679,3 +698,54 @@ if __name__ == "__main__":
             traceback.print_exc()
     print(f"\n{len(fns) - failed}/{len(fns)} passed")
     sys.exit(1 if failed else 0)
+
+
+def test_a_client_flag_the_harness_does_not_reproduce_makes_the_point_g5_value_not_recorded():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        for extra, flag in ((" --use-chat-template", "--use-chat-template"), (" --seed 7", "--seed")):
+            tmp = Path(tempfile.mkdtemp())
+            entry, env = _setup(tmp, job_log=job_log_text(1024, 1024, 4, extra))
+            o, _ = _score(tmp, entry, env, tmp / "c1")
+            assert o.fidelity is None and o.reasons == [f"value_not_recorded:client:{flag}"]
+            assert asx.g5_of(o.reasons[0]) == {"code": "value_not_recorded", "subject": f"client:{flag}"}
+            assert _saw(env) == []
+        tmp = Path(tempfile.mkdtemp())
+        entry, env = _setup(tmp, job_log=job_log_text(1024, 1024, 4).replace("ratio 0.8", "ratio 1.0"))
+        o, _ = _score(tmp, entry, env, tmp / "c2")
+        assert o.reasons == ["value_not_recorded:client:--random-range-ratio"]
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_an_expired_job_log_keeps_the_point_scored_and_names_client_flags_assumed():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp, job_log=None)
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        diffs = o.fidelity["requests"]["differences"]
+        assert "client_flags" in [d["subject"] for d in diffs] and o.fidelity["grade"] == "G2"
+        d = next(d for d in diffs if d["subject"] == "client_flags")
+        assert d["kind"] == "client_difference" and \
+            d["detail"] == "job log expired; the client's flags are assumed to be the launcher's defaults"
+        tmp = Path(tempfile.mkdtemp())
+        entry, env = _setup(tmp)
+        o, _ = _score(tmp, entry, env, tmp / "c2")
+        assert "client_flags" not in [d["subject"] for d in o.fidelity["requests"]["differences"]]
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_run_with_no_recorded_inferencex_commit_names_client_release_unrecorded():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp, client_commit=False)
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        diffs = o.fidelity["requests"]["differences"]
+        assert "client_release" in [d["subject"] for d in diffs] and o.fidelity["grade"] == "G2"
+        tmp = Path(tempfile.mkdtemp())
+        entry, env = _setup(tmp)
+        o, _ = _score(tmp, entry, env, tmp / "c2")
+        assert "client_release" not in [d["subject"] for d in o.fidelity["requests"]["differences"]]
+    finally:
+        shutil.rmtree(tmp)

@@ -12,6 +12,7 @@ import pytest
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parent))
 import inferencex_client as ix  # noqa: E402
 
 
@@ -269,3 +270,121 @@ def test_every_point_names_the_send_gap_and_an_unverified_length():
     d = ix.client_differences(False, "no evidence")
     assert [x["subject"] for x in d] == ["send_gap", "sent_prompt_lengths"]
     assert "no evidence" in d[1]["detail"]
+
+
+# ------------------------------------------------------------------ client release and flags (COV-12)
+
+def _job_log(extra="", env=""):
+    return (env + "2026-10-01T02:42:03Z + python3 /w/utils/bench_serving/benchmark_serving.py --model m "
+            "--backend vllm --dataset-name random --random-input-len 1024 --random-output-len 1024 "
+            "--random-range-ratio 0.8 --num-prompts 40 --max-concurrency 4 --request-rate inf --ignore-eos "
+            "--save-result --num-warmups 8 --result-filename x.json" + extra + "\n")
+
+
+@pytest.mark.parametrize("name,log,want", [
+    ("the launcher's defaults", _job_log(), []),
+    ("another range ratio", _job_log().replace("ratio 0.8", "ratio 1.0"), ["--random-range-ratio"]),
+    ("another prompt count", _job_log().replace("prompts 40", "prompts 80"), ["--num-prompts"]),
+    ("another warm-up count", _job_log().replace("warmups 8", "warmups 2"), ["--num-warmups"]),
+    ("a seed", _job_log(" --seed 7"), ["--seed"]),
+    ("a chat template flag", _job_log(" --use-chat-template"), ["--use-chat-template"]),
+    ("USE_CHAT_TEMPLATE=1 in the environment", _job_log(env="USE_CHAT_TEMPLATE=1\n"), ["--use-chat-template"]),
+    ("USE_CHAT_TEMPLATE=true in the environment", _job_log(env="  USE_CHAT_TEMPLATE=true\n"), ["--use-chat-template"]),
+    ("USE_CHAT_TEMPLATE=0 is off", _job_log(env="USE_CHAT_TEMPLATE=0\n"), []),
+    ("a random prefix", _job_log(" --random-prefix-len 128"), ["--random-prefix-len"]),
+])
+def test_client_flags_the_harness_does_not_reproduce_are_named(name, log, want):
+    import extract_single_turn_bench_args as sx
+    assert sx.client_flag_differences(log, 1024, 1024, 4) == want
+
+
+class _GH:
+    """A GitHubArtifacts stand-in: the run's commit, and the log of the one job that ran the client."""
+    repo = "SemiAnalysisAI/InferenceX"
+
+    def __init__(self, log=None, run=None, expired=0):
+        self.log, self._run, self.expired = log, run, expired
+
+    def run(self, run_id):
+        if self._run is None:
+            import io
+            import urllib.error
+            raise urllib.error.HTTPError("u", 404, "x", {}, io.BytesIO(b""))
+        return self._run
+
+    def job_logs_cached(self, run_id, attempt):
+        return ({"x": (77, "bench / c4", self.log)} if self.log else {}), self.expired
+
+
+def _freeze_client(tmp_path, gh, filename="x.json"):
+    import pull as pl
+    entry = {}
+    frozen = pl.Frozen(tmp_path)
+    pl.client_release(entry, frozen, gh, "9001", 1, filename)
+    return entry, frozen
+
+
+def test_the_job_log_and_the_runs_commit_are_frozen_with_the_point(tmp_path):
+    import gzip
+    entry, frozen = _freeze_client(tmp_path, _GH(_job_log(), {"sha": "a" * 40, "date": "2026-04-22T00:00:00Z"}))
+    assert entry["client_commit"] == {"repo": "SemiAnalysisAI/InferenceX", "sha": "a" * 40,
+                                      "date": "2026-04-22T00:00:00Z"}
+    assert entry["client_args"] == {"job_id": 77, "job_name": "bench / c4"}
+    assert gzip.decompress((tmp_path / frozen.files["job_log"]["path"]).read_bytes()).decode() == _job_log()
+
+
+def test_an_expired_job_log_records_null_client_args_and_the_reason_without_failing(tmp_path):
+    entry, frozen = _freeze_client(tmp_path, _GH(None, {"sha": "a" * 40, "date": "d"}, expired=1))
+    assert entry["client_args"] is None and entry["client_args_reason"] == "job_log_expired"
+    assert "job_log" not in frozen.files
+
+
+def test_an_unavailable_run_records_no_client_commit_and_the_reason(tmp_path):
+    entry, _ = _freeze_client(tmp_path, _GH(_job_log(), None))
+    assert entry["client_commit"] is None and entry["client_commit_reason"] == "run_unavailable:HTTP_404"
+
+
+def test_job_logs_are_found_by_result_file_and_a_410_is_expired(monkeypatch, tmp_path):
+    import io
+    import urllib.error
+    import artifacts as art
+    import clients
+    jobs = {"total_count": 2, "jobs": [{"id": 1, "name": "a"}, {"id": 2, "name": "b"}]}
+
+    def get_json(url, headers, timeout=60, **k):
+        assert url.endswith("/actions/runs/9001/attempts/1/jobs?per_page=100&page=1")
+        return jobs
+
+    def get_bytes(url, headers, timeout=60, **k):
+        if url.endswith("/jobs/1/logs"):
+            raise urllib.error.HTTPError(url, 410, "gone", {}, io.BytesIO(b""))
+        return _job_log().encode()
+    monkeypatch.setattr(clients, "_get_json", get_json)
+    monkeypatch.setattr(clients, "_get_bytes", get_bytes)
+    gh = art.GitHubArtifacts("SemiAnalysisAI/InferenceX", None, tmp_path)
+    index, expired = gh.job_logs_cached("9001", 1)
+    assert expired == 1 and list(index) == ["x"] and index["x"][:2] == (2, "b")
+
+
+def _regime_of(commit_date):
+    """The client regime the port selects from the InferenceX commit's date (APPLES-TO-APPLES.md:
+    the parallel client begins at 1780296b, 2026-04-21)."""
+    return "parallel" if commit_date >= "2026-04-21" else "serial-global"
+
+
+def test_each_client_regime_draws_the_committed_seed0_requests_and_matches_the_evidence_dates():
+    ev = json.loads(ix.PROMPT_LENGTHS.read_text())
+    assert ev["client"]["serial-global"].startswith("before 1780296b (2026-04-21)")
+    assert ev["client"]["parallel"] == "from 1780296b"
+    seen = {}
+    for p in ev["points"]:
+        seen.setdefault(p["client_path"], set()).add(p["run_date"])
+    assert set(seen) == {"serial-global", "parallel"}
+    # Both regimes draw lengths from numpy's global generator seeded with 0 before any request is
+    # sent, so the committed seed0.json holds for each; the regimes differ in prompt text only.
+    doc = json.loads(ix.WORKLOADS_SEED0.read_text())
+    p = doc["points"][0]
+    for regime in seen:
+        assert ix.target_lengths(p["isl"], p["osl"], p["concurrency"]) == (p["input_lens"], p["output_lens"]), regime
+    for regime, dates in seen.items():
+        assert {_regime_of(d) for d in dates} == {regime}, (regime, sorted(dates))

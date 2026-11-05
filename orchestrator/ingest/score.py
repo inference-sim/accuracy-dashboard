@@ -26,6 +26,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parent))
+import extract_single_turn_bench_args as sx  # noqa: E402
 import assess as asx  # noqa: E402
 import contract  # noqa: E402
 import engines  # noqa: E402
@@ -607,7 +609,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         return o
 
     if not agentic:
-        return score_single_turn(o, entry, env, work, b, header, name, dep, args, log, sup)
+        return score_single_turn(o, entry, env, work, b, header, name, dep, args, log, sup, pdir)
 
     # ---- the replay
     spec_doc = rp.workload_spec(r, env.corpus["sha256"], env.corpus["revision"], env.corpus["file"])
@@ -727,8 +729,25 @@ DP_BALANCER = {"kind": "execution_mode", "subject": "data-parallel balancer",
                "detail": "llm-d endpoint picker profile vllm-dp-lb stands in for vLLM's internal load balancer"}
 
 
+def client_reasons(entry: dict, pdir: Path, client: dict) -> list[str]:
+    """What the run's job log says about the client it ran (COV-12). A flag the harness does not
+    reproduce makes the point G5 value_not_recorded, subject `client:<flag>`: the client drew other
+    requests. A job log that is gone (client_args null) leaves the flags assumed; a run whose
+    InferenceX commit is unknown leaves the release unrecorded. Both set `client` for the point's
+    named client differences."""
+    row = entry["row"]
+    log_b = _read(pdir, entry["files"], "job_log")
+    client["flags_assumed"] = log_b is None
+    client["release_unrecorded"] = not entry.get("client_commit")
+    if log_b is None:
+        return []
+    flags = sx.client_flag_differences(log_b.decode("utf-8", "replace"), int(row["isl"]), int(row["osl"]),
+                                       int(row["conc"]))
+    return [f"value_not_recorded:client:{f}" for f in flags]
+
+
 def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built, header: list[str],
-                      name: str, dep: dict, args: list, log: str, sup: sp.Support) -> Outcome:
+                      name: str, dep: dict, args: list, log: str, sup: sp.Support, pdir_in: Path) -> Outcome:
     """One single-turn point, replayed as the run's client sent it (COV-12).
 
     The requests are the client's seed-0 draws for the row's (isl, osl, conc)
@@ -752,6 +771,11 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
         o.reasons = ["required_setting_missing:measured.mean_ttft_or_tpot"]
         return o
     isl, osl, conc = int(row["isl"]), int(row["osl"]), int(row["conc"])
+    client: dict = {}
+    refused = client_reasons(entry, pdir_in, client)
+    if refused:
+        o.reasons = sorted(set(o.reasons + refused))
+        return o
     ins, outs = ix.target_lengths(isl, osl, conc)
     primed = eng.get("enable_prefix_caching") is not False
     copies = max(int(par.get("dp") or 1), 1) if primed else 0
@@ -805,7 +829,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
         o.reasons = [f"blis_refused:{e.slug}"]
         return o
     verified, why = _prompt_lengths().verified(sup.checkpoint, row.get("date"), isl, osl, conc)
-    differences = ix.client_differences(verified, why)
+    differences = ix.client_differences(verified, why, **client)
     if int(par.get("dp") or 1) > 1:
         o.subs.append(DP_BALANCER)
     o.fidelity = {"build": entry["build"], "args": args, "resolved": [],

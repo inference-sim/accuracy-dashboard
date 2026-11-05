@@ -22,6 +22,8 @@ ASSUMED from the constants, never as read, so a reader can tell the two apart.
 Nothing here is fetched: callers pass the log text.
 """
 
+import re
+
 from _argv import command_after, flag as flag_value
 
 # The harness's constants (inference-sim sim/kernelmodel/harness/workload.go). A row whose
@@ -119,3 +121,26 @@ def settings_record(job_log: str | None, isl: int, osl: int, conc: int) -> dict:
     job = parse_job_log(job_log)
     return {"source": "read", "settings": job,
             "mismatches": check_against_harness(job, isl, osl, conc)}
+
+
+# The flags check_against_harness's keys come from.
+_FLAG_OF = {"dataset": "--dataset-name", "input_len": "--random-input-len", "output_len": "--random-output-len",
+            "range_ratio": "--random-range-ratio", "num_prompts": "--num-prompts",
+            "concurrency": "--max-concurrency", "num_warmups": "--num-warmups", "seed": "--seed",
+            "request_rate": "--request-rate", "ignore_eos": "--ignore-eos"}
+_CHAT_ENV = re.compile(r"\bUSE_CHAT_TEMPLATE=(?:1|true|True|TRUE)\b")
+
+
+def client_flag_differences(job_log: str, isl: int, osl: int, conc: int) -> list[str]:
+    """The flags the run's client was given that the harness does not reproduce, sorted: any
+    setting check_against_harness reports, a chat template (--use-chat-template in the logged
+    command, or USE_CHAT_TEMPLATE=1 or true in the log's environment lines; InferenceX's
+    launcher shortens the input length before the draw when it is on) and --random-prefix-len."""
+    out = {_FLAG_OF[d.split()[0]] for d in check_against_harness(parse_job_log(job_log), isl, osl, conc)
+           if d.split()[0] in _FLAG_OF}
+    argv = bench_command(job_log) or []
+    if "--use-chat-template" in argv or _CHAT_ENV.search(job_log):
+        out.add("--use-chat-template")
+    if flag_value(argv, "--random-prefix-len") not in (None, "0"):
+        out.add("--random-prefix-len")
+    return sorted(out)

@@ -448,7 +448,8 @@ def main_phase_only(n: int):
 CLIENT_SUBJECT = "inferencex benchmark_serving.py"
 
 
-def client_differences(verified: bool, why: str) -> list[dict]:
+def client_differences(verified: bool, why: str, *, flags_assumed: bool = False,
+                       release_unrecorded: bool = False) -> list[dict]:
     """Every remaining difference between the run's client and the simulated one, each named on
     the point; any of them makes the point G2 (COV-12). Kind "client_difference" is the
     dashboard's name for design §11.3's G2 condition "the simulated requests differ from the
@@ -458,7 +459,9 @@ def client_differences(verified: bool, why: str) -> list[dict]:
     that emitted the previous request's last token; the client sends it after the response
     stream closes and its asyncio semaphore wakes the next task (APPLES-TO-APPLES.md "What else
     is not reproduced"). When `verified` is false: the sent prompt lengths are not verified
-    equal to the replayed targets, for the reason `why`."""
+    equal to the replayed targets, for the reason `why`. When `flags_assumed`, the run's job log
+    is gone and its client flags are taken to be the launcher's defaults. When `release_unrecorded`,
+    the InferenceX commit of the run is not known."""
     out = [{"kind": "client_difference", "subject": "send_gap",
             "detail": "the simulator admits the next request at the step that emitted the previous "
                       "request's last token; the client sends it after the response stream closes and "
@@ -466,4 +469,10 @@ def client_differences(verified: bool, why: str) -> list[dict]:
     if not verified:
         out.append({"kind": "client_difference", "subject": "sent_prompt_lengths",
                     "detail": f"sent prompt lengths not verified equal to the replayed targets: {why}"})
+    if flags_assumed:
+        out.append({"kind": "client_difference", "subject": "client_flags",
+                    "detail": "job log expired; the client's flags are assumed to be the launcher's defaults"})
+    if release_unrecorded:
+        out.append({"kind": "client_difference", "subject": "client_release",
+                    "detail": "the InferenceX commit of the run is not recorded"})
     return sorted(out, key=lambda d: (d["kind"], d["subject"]))

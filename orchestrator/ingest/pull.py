@@ -93,6 +93,31 @@ def recipe_checkpoint(row: dict, server_log: str | None, recipes) -> dict | None
     return {"repo": repo, "source": "inferencex_recipe", "commit": sha, "served_path": paths[0]} if repo else None
 
 
+def client_release(entry: dict, frozen: "Frozen", gh, run_id: str, attempt: int, result_filename: str | None) -> None:
+    """Record the InferenceX commit of a single-turn run (`client_commit`: sha and date, or None with
+    `client_commit_reason`) and freeze the log of the job that ran the client (role job_log), whose
+    benchmark_serving.py command names the point's result file. GitHub expires logs (404 or 410):
+    `client_args` is then None with the reason, and the point is still scored, its flags assumed
+    (COV-12). A log that is not found among the run's jobs is recorded the same way."""
+    try:
+        run = gh.run(run_id)
+        entry["client_commit"] = {"repo": gh.repo, "sha": run["sha"], "date": run["date"]}
+    except urllib.error.HTTPError as e:
+        if e.code not in (404, 410):
+            raise
+        entry["client_commit"] = None
+        entry["client_commit_reason"] = f"run_unavailable:HTTP_{e.code}"
+    index, expired = gh.job_logs_cached(run_id, attempt)
+    hit = index.get(art.normal_result_name(result_filename or ""))
+    if hit is None:
+        entry["client_args"] = None
+        entry["client_args_reason"] = "job_log_expired" if expired else "job_not_found"
+        return
+    job_id, job_name, text = hit
+    frozen.put("job_log", text.encode(), f"{gh.repo}/actions/jobs/{job_id}")
+    entry["client_args"] = {"job_id": job_id, "job_name": job_name}
+
+
 def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArtifacts, fetch, out: Path,
                  recipes=None) -> dict:
     """Freeze one point's inputs. The point is one ledger unit; its inputs are the kept
@@ -169,6 +194,8 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
             if cfg is not None:
                 frozen.put("launch_config", json.dumps(cfg, sort_keys=True, default=str).encode(),
                            f"{j.server_logs.name}:{p}")
+        if not agentic:
+            client_release(entry, frozen, gh, run_id, attempt, j.result_filename)
         if agentic and j.agentic is not None:
             try:
                 files = read_needed(gh.download(j.agentic), entry,
