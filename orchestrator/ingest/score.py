@@ -28,6 +28,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import assess as asx  # noqa: E402
 import contract  # noqa: E402
+import fields as fl  # noqa: E402
 import grade as gr  # noqa: E402
 import inferencex_client as ix  # noqa: E402
 import replay as rp  # noqa: E402
@@ -146,6 +147,31 @@ def _blis_refusal(stderr: str, work: Path) -> str:
     text = re.sub(r"\bp-[0-9a-f]{16}\b", "<scenario>", text)
     slug = re.sub(r"[^A-Za-z0-9_.:=-]+", "_", text)[:80].strip("_")
     return f"blis_refused:{slug}" if slug else "blis_refused"
+
+
+_STATES_NO = re.compile(r"\bstates no ([A-Za-z_][A-Za-z0-9_.]*)")
+
+
+def value_refusal(stderr: str, work: Path, field_list) -> str | None:
+    """The G5 reason for an engine refusal that says the scenario lacks a value ("states no
+    <field>"), else None. The field is parsed from the refusal's text. The field's estimation rule
+    (fields.estimate_missing) is applied to it: the engine has already refused to resolve it, so
+    a rule that would leave it unset or substitute another setting cannot help here, and the
+    reason is value_not_recorded in every case (design 11.4). A refusal that says "states no"
+    but names no parseable field takes the refusal's slug as the subject."""
+    slug = _blis_refusal(stderr, work)
+    text = slug.partition(":")[2]
+    if "states_no" not in text and "states no" not in stderr:
+        return None
+    m = _STATES_NO.search(re.sub(r"\s+", " ", stderr))
+    name = m.group(1) if m else None
+    if name is None:
+        return f"required_setting_missing:{text}"
+    if field_list is not None:
+        dec = fl.estimate_missing(field_list, name)
+        if dec.g5 and dec.g5["code"] != "value_not_recorded":
+            return f"{dec.g5['code']}:{name}"
+    return f"required_setting_missing:{name}"
 
 
 class MemoryExceeded(Exception):
@@ -644,7 +670,7 @@ def _run_result(o: Outcome, argv: list[str], key: str, cache: Path, env: Env, wo
         return None
     except result.RunFailed as e:
         (logs / f"{o.point_id}.err").write_text(e.stderr[-20000:])
-        o.reasons = [_blis_refusal(e.stderr, work)]
+        o.reasons = [value_refusal(e.stderr, work, env.field_list) or _blis_refusal(e.stderr, work)]
         return None
     except result.ResultError as e:
         (logs / f"{o.point_id}.err").write_text(str(e)[-20000:])

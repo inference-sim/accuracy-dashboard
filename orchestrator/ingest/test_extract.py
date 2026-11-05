@@ -383,8 +383,6 @@ def test_a_drafter_without_a_recorded_acceptance_takes_its_estimation_rule():
                        "'gpu_memory_utilization': 0.9, 'speculative_config': {'method': 'dspark', 'num_speculative_tokens': 5}"))
     b = _build(c)
     assert b.reasons == [] and b.acceptance_length is None
-    assert [(x["kind"], x["subject"]) for x in b.substitutions] == \
-        [("estimated", "speculative_config.synthetic_acceptance_length")]
 
 
 def test_the_flat_and_nested_spellings_of_one_setting_agree_or_conflict():
@@ -444,15 +442,15 @@ def test_the_vllm_defaults_table_is_read_from_vllm_and_covers_printed_configs():
 PART_H200 = st.Part(name="h200")
 
 
-def test_a_required_value_nothing_recorded_takes_its_estimation_rule_or_is_not_recorded():
-    # max_num_seqs and block_size are leave_unset in the fixture: left to the engine, named.
-    # max_num_batched_tokens has no rule: the point is not scored (value_not_recorded).
+def test_a_setting_nothing_recorded_is_left_unset_and_no_list_of_required_settings_exists():
+    # X19, design 11.1: the dashboard holds no list of the settings an engine needs. The engine
+    # resolves what is unset; if it refuses, score.value_refusal names the field.
     c = _classify(_log("'tensor_parallel_size': 1"))
     b = _build(c)
     eng = b.deployment["pools"][0]["engine"]
-    assert "max_num_seqs" not in eng and "block_size" not in eng
-    assert {x["subject"] for x in b.substitutions} == {"block_size", "max_num_seqs"}
-    assert b.reasons == ["required_setting_missing:max_num_batched_tokens"]
+    assert "max_num_seqs" not in eng and "block_size" not in eng and "max_num_batched_tokens" not in eng
+    assert b.reasons == [] and b.substitutions == []
+    assert not hasattr(st, "REQUIRED")
 
 
 def test_a_built_scenario_holds_only_recorded_values_and_states_engine_version_from_stack_json():

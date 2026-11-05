@@ -497,12 +497,6 @@ ROLES = {"model": "model", "model_tag": "model", "served_model_name": "served_mo
 # colocated pool both stores and loads KV, which is kv_role kv_both (vllm/config/kv_transfer.py).
 POOL_ROLE = {"kv_transfer_config.kv_role": {"kv_both": "colocated"}}
 
-# The values blis-vllm's engine needs and resolves no default for (compat/kernelmodel Engine:
-# block_size, max_num_seqs, max_num_batched_tokens). One the run did not record takes the
-# field's estimation rule (design §11.2, Estimate).
-REQUIRED = ("block_size", "max_num_batched_tokens", "max_num_seqs")
-
-
 def _yaml_value(v):
     """A recorded value as the scenario states it: a printed float as a float, a bare token as
     its text, everything else as recorded."""
@@ -658,16 +652,16 @@ class Built:
 FRONTEND = {True: "rust", False: "python"}   # VLLM_USE_RUST_FRONTEND, parsed as a bool
 
 
-def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str, field_list,
-          multinode: bool = False) -> Built:
+def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str, field_list) -> Built:
     """The Scenario + Deployment for one point, from the decided settings.
 
     Only what the run recorded is written, under the engine's own names (LOCATIONS), and the
     substitute an estimation rule states. engine_version is the release the scoring simulator
-    runs (stack.json), not the run's own (design §11.2). A value the engine needs that no source
-    recorded takes its field's estimation rule (fields.estimate_missing): left unset, so the
-    engine resolves it (X19), and named on the point; or the point is not scored
-    (value_not_recorded). The cluster is sized to the run's own GPUs (one engine replica)."""
+    runs (stack.json), not the run's own (design §11.2). A setting no source recorded is left
+    unset, so the engine resolves it (X19); the dashboard holds no list of the settings an
+    engine needs (design §11.1). If the engine refuses the scenario for want of one, score.py
+    maps its refusal to value_not_recorded, naming the field. The cluster is sized to the
+    run's own GPUs (one engine replica)."""
     import fields as fl
     b = Built()
     acc = d.mapped.get("replay.acceptance_length")
@@ -701,30 +695,10 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
     spec = eng.get("speculative")
     if spec is not None and set(spec) >= {"method"} and "num_spec_tokens" not in spec:
         b.reasons.append("required_setting_missing:speculative_config.num_speculative_tokens")
-    needed = [p for p in REQUIRED if p not in eng]
-    if spec is not None and b.acceptance_length is None:
-        needed.append("speculative_config.synthetic_acceptance_length")
-    for path in needed:
-        dec = fl.estimate_missing(field_list, path)
-        if dec.g5:
-            b.reasons.append(f"{dec.g5['code']}:{path}" if dec.g5["code"] != "value_not_recorded"
-                             else f"required_setting_missing:{path}")
-            continue
-        b.substitutions.append(dec.substitution)
-        f = field_list.lookup(path)
-        if f.estimation["rule"] == fl.SUBSTITUTE:
-            for k, v in sorted(f.estimation["setting"].items()):
-                loc = location(k)
-                if loc is None:
-                    b.reasons.append(f"setting_differs:{k}")
-                else:
-                    _set(pool, loc, v)
     if offload:
         b.reasons += _write_offload(dep, offload, d, par)
     ranks = par["tp"] * par["pp"] * par["dp"] * par.get("pcp", 1)
     b.gpus = ranks
-    if multinode:
-        b.reasons.append("required_setting_missing:multi_node_fabric")
     pool["nodes"] = 1
     b.scenario = {"kind": "Scenario", "name": name, "engine_version": engine_version.lstrip("v"),
                   "model": model, "coefficients": COEFFICIENTS,

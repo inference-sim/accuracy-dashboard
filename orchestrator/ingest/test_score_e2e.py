@@ -503,22 +503,37 @@ def test_the_scenario_engine_block_holds_the_runs_values_under_the_engines_own_n
         shutil.rmtree(tmp)
 
 
-def test_a_value_the_run_did_not_record_takes_its_estimation_rule_or_is_not_scored():
-    # max_num_seqs: leave_unset in the fixture, so the scenario leaves it to the engine (X19)
-    # and the point names it. max_num_batched_tokens: no rule, so value_not_recorded.
+REFUSAL = ('time=t level=fatal msg="kernelmodel: deployment states no max_num_seqs"\n')
+
+
+def _refusing_blis(tmp, stderr):
+    body = ("#!/usr/bin/env python3\nimport sys\nif sys.argv[1:4] == ['schema', 'validate', 'result']:\n"
+            "    sys.exit(0)\nsys.stderr.write(%r)\nsys.exit(1)\n" % stderr)
+    return _exe(Path(_fake_blis(tmp)), body)
+
+
+def test_an_unrecorded_setting_is_left_unset_and_the_engines_refusal_is_value_not_recorded():
+    # The dashboard states no required-settings list: max_num_seqs is left out of the scenario
+    # (X19). If blis refuses for want of it, the point is G5 value_not_recorded naming the field
+    # parsed from the refusal; one blis resolves is scored.
     tmp = Path(tempfile.mkdtemp())
     try:
         entry, env = _setup(tmp)
         _with_log(tmp, entry, LOG.replace("'max_num_seqs': 16, ", ""))
         o, work = _score(tmp, entry, env, tmp / "c1")
-        assert o.fidelity["grade"] == "G2"
-        est = [s for s in o.fidelity["substitutions"] if s["kind"] == "estimated"]
-        assert [s["subject"] for s in est] == ["max_num_seqs"] and "not recorded" in est[0]["detail"]
+        assert o.fidelity["grade"] == "G2" and o.fidelity["substitutions"] == [
+            s for s in o.fidelity["substitutions"] if s["kind"] != "estimated"]
         scen_text = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
         assert "max_num_seqs" not in scen_text
-        _with_log(tmp, entry, LOG.replace("'max_num_batched_tokens': 8192, ", ""))
+        env.blis = _refusing_blis(tmp, REFUSAL)
         o, _ = _score(tmp, entry, env, tmp / "c2")
-        assert o.g5 == {"code": "value_not_recorded", "subject": "max_num_batched_tokens"}
+        assert o.g5 == {"code": "value_not_recorded", "subject": "max_num_seqs"}
+        env.blis = _refusing_blis(tmp, 'level=fatal msg="deployment states no  "\n')
+        o, _ = _score(tmp, entry, env, tmp / "c3")
+        assert o.g5["code"] == "value_not_recorded"
+        env.blis = _refusing_blis(tmp, 'level=fatal msg="something else broke"\n')
+        o, _ = _score(tmp, entry, env, tmp / "c4")
+        assert o.fidelity is None and o.faults[0].startswith("blis_refused:")
     finally:
         shutil.rmtree(tmp)
 
