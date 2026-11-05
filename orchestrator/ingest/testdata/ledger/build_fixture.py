@@ -2,10 +2,11 @@
 """Write the ledger fixture: InferenceX records shaped like export.sql's rows and the API's
 rows, and the unit list and ingest report blis-substrate's own ingest tool generates from them.
 
-TEMPORARY until inference-sim's `blis ledger` command exists (inference-sim m1/substrate, task
-H): the unit list is generated here by running the ledger's ingest tool from a blis-substrate
-checkout at the pinned commit. This script runs only by hand, to regenerate the fixture; no test
-and no scorer runs or imports blis-substrate code (X7).
+TEMPORARY until an inference-sim command prints the unit list and ingest report the ledger's
+ingest gives a set of records (`blis ledger --list` prints only the published unit ids): the
+unit list is generated here by running the ledger's ingest tool from a blis-substrate checkout at
+the pinned commit. This script runs only by hand, to regenerate the fixture; no test and no
+scorer runs or imports blis-substrate code (X7). orchestrator/lint_blis_boundary.py lists it.
 
 The records cover each rule of design §10.2 the harness depends on:
   r101, r102  two attempts of one benchmark run, the same measured values, the image digest on

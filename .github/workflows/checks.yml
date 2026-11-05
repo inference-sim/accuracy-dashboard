@@ -92,6 +92,10 @@ jobs:
             orchestrator/test_update_index.py
       - name: Every point id of every published snapshot maps to a ledger unit (COV-8)
         run: python3 orchestrator/ingest/legacy_ids.py check --map data/legacy/point-ids.json --data data
+      - name: BLIS is read only through the inference-sim commands, except the listed TEMPORARY sites (X7)
+        run: |
+          python3 -m pytest -q orchestrator/test_lint_blis_boundary.py
+          python3 orchestrator/lint_blis_boundary.py
 
   web:
     runs-on: ubuntu-latest
