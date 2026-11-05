@@ -540,7 +540,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
 
     # ---- the replay
     spec_doc = rp.workload_spec(r, env.corpus["sha256"], env.corpus["revision"], env.corpus["file"])
-    spec_path = work / "workloads" / f"{pid}.yaml"
+    spec_path = work / "replay-specs" / f"{pid}.yaml"
     spec_path.parent.mkdir(parents=True, exist_ok=True)
     import yaml
     spec_path.write_text(yaml.safe_dump({"replay": spec_doc}, sort_keys=False))

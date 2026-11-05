@@ -28,12 +28,10 @@ from pathlib import Path
 BLIS_MODULE = re.compile(r"github\.com/inference-sim/blis-[A-Za-z0-9._-]+")
 GO_IMPORT = re.compile(r'^\s*(?:import\s+)?(?:[A-Za-z_.][A-Za-z0-9_]*\s+)?"github\.com/inference-sim/blis-[^"]*"\s*\)?\s*$')
 
-# The names a path inside a catalog, registry or ledger checkout starts with. `workloads` (the
-# catalog's workload presets) is left out: the scorer's own work directory has a workloads/
-# subdirectory (score.py), and the dashboard has never read the catalog's.
+# The names a path inside a catalog, registry or ledger checkout starts with.
 LAYOUT = {
     "catalog", "registry", "ledger",
-    "models", "hardware", "networks", "devices", "model.yaml", "graph.yaml",
+    "models", "hardware", "networks", "devices", "workloads", "model.yaml", "graph.yaml",
     "coefficients",
     "units", "reports", "published", "ledger.yaml", "sources.yaml", "legacy-map.yaml",
 }
@@ -59,6 +57,9 @@ DATA_READS = {
         "TEMPORARY until a command prints a catalog model graph's speculator method",
     ("orchestrator/ingest/support.py", "registry_parts"):
         "TEMPORARY until a command prints the parts the registry scopes coefficients to",
+    ("orchestrator/resolve_agentic_corpus.py", "workload_path"):
+        "TEMPORARY until a command prints a catalog replay workload entry: `blis catalog resolve` "
+        "takes only --model and --chip",
     ("orchestrator/ingest/testdata/ledger/build_fixture.py", "main"):
         "TEMPORARY with GO_IMPORTS' entry for this file: runs blis-substrate's ingest in a checkout",
 }
