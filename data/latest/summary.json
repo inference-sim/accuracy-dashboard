@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "snapshot_id": "2026-11-04_blis-v0.15.0_ix-api-2026-11-04",
-  "generated_at": "2026-11-04T12:39:14Z",
+  "snapshot_id": "2026-11-05_blis-v0.15.0_ix-api-2026-11-05",
+  "generated_at": "2026-11-05T12:50:21Z",
   "provenance": {
     "blis": {
       "catalog": "0.3.0",
@@ -13,17 +13,17 @@
     "ground_truth": {
       "source": "SemiAnalysis InferenceX API",
       "source_url": "https://inferencex.semianalysis.com/api/v1/",
-      "release_tag": "api-2026-11-04",
-      "measurement_date_through": "2026-11-03",
-      "measurement_sha256": "5b79a16904467a07d38ac1d80de4a07c5867665690ecea0b567c96d865d4ca7d"
+      "release_tag": "api-2026-11-05",
+      "measurement_date_through": "2026-11-05",
+      "measurement_sha256": "10a57650a0fbe6c3fbf7939cdd59477f65230947501e19df58a23a403b760811"
     },
-    "evaluator_commit": "f6c16dc206940f9fe04ea9baab0a2c65375fe4ef",
+    "evaluator_commit": "f87f98dcaaf245ca3faec9825b2483b0361ddf68",
     "scorer": "signedprobe",
     "ingest": "api",
     "vllm_ref": "v0.32.0",
     "vllm_max_distance": 2000,
     "policy_sha256": "602b03250d7bca865bbe29813c316c00dad0f3e387ef00a4855e2290f54b00a8",
-    "pulled_at": "2026-11-04T12:39:14Z",
+    "pulled_at": "2026-11-05T12:50:21Z",
     "corpus": {
       "dataset": "semianalysisai/cc-traces-weka-062126",
       "revision": "23f152f6f0f9399a85901b89a6458def0ef16729",
@@ -32,7 +32,7 @@
   },
   "coverage": {
     "scored": 757,
-    "not_scored": 1277,
+    "not_scored": 1288,
     "multinode_hidden": 0,
     "failed": 0,
     "repeat_runs_folded": 1,
@@ -43,10 +43,10 @@
       "conflict": 17,
       "drafter_not_in_catalog": 488,
       "hardware_no_coefficients": 650,
-      "model_not_in_catalog": 120,
+      "model_not_in_catalog": 131,
       "required_setting_missing": 13,
       "server_log_missing": 57,
-      "setting_not_modelled": 504,
+      "setting_not_modelled": 515,
       "unclassified_arg": 171
     }
   },
@@ -148206,7 +148206,7 @@
                         "precision": "fp8",
                         "recipe": "row:411032"
                       },
-                      "sweep_id": "1883|minimax-m2.5-b300-fp8-vllm-tp2-dp1-ep2|1k1k|0bbc1a68e232#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1",
+                      "sweep_id": "1883|minimax-m2.5-b300-fp8-vllm-tp2-dp1-ep2|1k1k|0bbc1a68e232#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1",
                       "repeats": [
                         {
                           "point_id": "3dcd808d7fd1180f1c3176ea7dffe0f9d4e0f84438e5c06a8428b5cf75cb428f",
@@ -262816,6 +262816,41 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 48,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 48,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-11-05",
+        "model": "kimik3.1",
+        "precision": "fp4",
+        "recipe": "7977b1127be17dd7759a4c7f2f92cb96c793ca3ec9e583428a61d74df67e7ba7"
+      },
+      "image": "vllm/vllm-openai:kimi-k31@sha256:904520f3fefc32414abcedf6ba8dadc9c5978db1bcdaf40f58d6b9036ef30a99",
+      "measured": {
+        "tpot_ms": 20.77,
+        "ttft_ms": 1113.39
+      },
+      "measured_date": "2026-11-05",
+      "model": "kimik3.1",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "1551e27d087899e1db62d145aa1005f9eff549963ccfbc0a894e3591f0165ee5",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 8,
       "framework": "vllm",
@@ -263689,6 +263724,41 @@
       "precision": "fp4",
       "reasons": [
         "drafter_not_in_catalog:eagle3"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 1,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 1,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-11-05",
+        "model": "kimik3.1",
+        "precision": "fp4",
+        "recipe": "3d1684e032a42fd7397949ef6d601708b1eebf587561995498d0f7a6a48fe491"
+      },
+      "image": "vllm/vllm-openai:kimi-k31@sha256:904520f3fefc32414abcedf6ba8dadc9c5978db1bcdaf40f58d6b9036ef30a99",
+      "measured": {
+        "tpot_ms": 16.28,
+        "ttft_ms": 8580.87
+      },
+      "measured_date": "2026-11-05",
+      "model": "kimik3.1",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "19df6d6372c2d7dbbbfe326c61ff2867f3c4b1e4564e6a761d45004a1f82c4da",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE"
       ]
     },
     {
@@ -265025,6 +265095,41 @@
       "precision": "fp4",
       "reasons": [
         "hardware_no_coefficients"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 4,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 4,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-11-05",
+        "model": "kimik3.1",
+        "precision": "fp4",
+        "recipe": "58aaa47e33b85bedeb035448b126b46feef91feb876f0bd132a25e7141da119e"
+      },
+      "image": "vllm/vllm-openai:kimi-k31@sha256:904520f3fefc32414abcedf6ba8dadc9c5978db1bcdaf40f58d6b9036ef30a99",
+      "measured": {
+        "tpot_ms": 5.12,
+        "ttft_ms": 555.04
+      },
+      "measured_date": "2026-11-05",
+      "model": "kimik3.1",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "20969674e10b365af1fa388f3d220bb2128a2b248874f23046cf9d8e9b3ffeab",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE"
       ]
     },
     {
@@ -268190,6 +268295,41 @@
         "unclassified_arg:dbo_decode_token_threshold",
         "unclassified_arg:dbo_prefill_token_threshold",
         "unclassified_arg:enable_dbo"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 32,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 32,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-11-05",
+        "model": "kimik3.1",
+        "precision": "fp4",
+        "recipe": "6074a8b46acc8f0c1b6c3a68a27b6a048d83aa26ccdb4127a8735c79b018d293"
+      },
+      "image": "vllm/vllm-openai:kimi-k31@sha256:904520f3fefc32414abcedf6ba8dadc9c5978db1bcdaf40f58d6b9036ef30a99",
+      "measured": {
+        "tpot_ms": 15.44,
+        "ttft_ms": 855.32
+      },
+      "measured_date": "2026-11-05",
+      "model": "kimik3.1",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "32902fddf1fcf649fd9eafdfa0225e5ec3f72db1d44e2d86293440b99a02fc51",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE"
       ]
     },
     {
@@ -273252,6 +273392,41 @@
       "precision": "fp4",
       "reasons": [
         "drafter_not_in_catalog:eagle3"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 2,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 2,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-11-05",
+        "model": "kimik3.1",
+        "precision": "fp4",
+        "recipe": "d2640f074dad9bb22e17febc4d3b7ddfbf140a52d91efcdfbfa0c00b7550cba6"
+      },
+      "image": "vllm/vllm-openai:kimi-k31@sha256:904520f3fefc32414abcedf6ba8dadc9c5978db1bcdaf40f58d6b9036ef30a99",
+      "measured": {
+        "tpot_ms": 4.94,
+        "ttft_ms": 572.93
+      },
+      "measured_date": "2026-11-05",
+      "model": "kimik3.1",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "5033a9d473a179d9a877dff816d5a76ffbde2268c46e4f5ab92d5840534b7ebe",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE"
       ]
     },
     {
@@ -285634,6 +285809,41 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 8,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 8,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-11-05",
+        "model": "kimik3.1",
+        "precision": "fp4",
+        "recipe": "01351f7164c7cc432da32b1db8da7e37874e4e77347ad112e3f4eae7dbf75159"
+      },
+      "image": "vllm/vllm-openai:kimi-k31@sha256:904520f3fefc32414abcedf6ba8dadc9c5978db1bcdaf40f58d6b9036ef30a99",
+      "measured": {
+        "tpot_ms": 6.86,
+        "ttft_ms": 591.13
+      },
+      "measured_date": "2026-11-05",
+      "model": "kimik3.1",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "94e0649e4a265f0ec9ec9e6ca4221d36e980146a4b7757f44d46493f71eb2be3",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 64,
       "framework": "vllm",
@@ -287472,6 +287682,41 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 16,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 16,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-11-05",
+        "model": "kimik3.1",
+        "precision": "fp4",
+        "recipe": "c61e6b85298b55e2f1db5ab26345a45ca625f2769d6a966dd08b60c85b50098f"
+      },
+      "image": "vllm/vllm-openai:kimi-k31@sha256:904520f3fefc32414abcedf6ba8dadc9c5978db1bcdaf40f58d6b9036ef30a99",
+      "measured": {
+        "tpot_ms": 10.43,
+        "ttft_ms": 731.2
+      },
+      "measured_date": "2026-11-05",
+      "model": "kimik3.1",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "a09395ea33986b4b7c3f38b0204c74c0b0c5cef50bb8855352220e3a9f9ce4f9",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 256,
       "framework": "vllm",
@@ -288982,6 +289227,41 @@
         "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FUSION_SHARED_EXPERTS",
         "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
         "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 40,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 40,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-11-05",
+        "model": "kimik3.1",
+        "precision": "fp4",
+        "recipe": "5bc1c0d14702d2640643e8315e609d307019866a360cfc1c17533e9dbc4e1408"
+      },
+      "image": "vllm/vllm-openai:kimi-k31@sha256:904520f3fefc32414abcedf6ba8dadc9c5978db1bcdaf40f58d6b9036ef30a99",
+      "measured": {
+        "tpot_ms": 17.45,
+        "ttft_ms": 930.15
+      },
+      "measured_date": "2026-11-05",
+      "model": "kimik3.1",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "a9b0a279a253452c66aaebf0a1efe0fc2799a21c28a3df7dcb5e15680220f1aa",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE"
       ]
     },
     {
@@ -294774,6 +295054,41 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 70,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 70,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-11-05",
+        "model": "kimik3.1",
+        "precision": "fp4",
+        "recipe": "1afca5b4b2dafb555306c73fafb24ff4e6c8a7f14eaddd3b6819d1b66d36b3d5"
+      },
+      "image": "vllm/vllm-openai:kimi-k31@sha256:904520f3fefc32414abcedf6ba8dadc9c5978db1bcdaf40f58d6b9036ef30a99",
+      "measured": {
+        "tpot_ms": 30.03,
+        "ttft_ms": 16085.5
+      },
+      "measured_date": "2026-11-05",
+      "model": "kimik3.1",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "ca47caebc94ee424405c74088323c1393cf6515ca27404a3335f276740ac3f15",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 32,
       "framework": "vllm",
@@ -294799,6 +295114,41 @@
       "precision": "fp8",
       "reasons": [
         "drafter_not_in_catalog:eagle3"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 24,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 24,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-11-05",
+        "model": "kimik3.1",
+        "precision": "fp4",
+        "recipe": "33da06a3c9cfd3db019a82d90d77be9157b661ad7bf18179149193470d73183a"
+      },
+      "image": "vllm/vllm-openai:kimi-k31@sha256:904520f3fefc32414abcedf6ba8dadc9c5978db1bcdaf40f58d6b9036ef30a99",
+      "measured": {
+        "tpot_ms": 13.29,
+        "ttft_ms": 807.69
+      },
+      "measured_date": "2026-11-05",
+      "model": "kimik3.1",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "cb0f071645feded7738bb615d85cd52d7c3090cd4defdd0b390db635e7137c01",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE"
       ]
     },
     {
@@ -303031,6 +303381,41 @@
       "reasons": [
         "drafter_not_in_catalog:eagle3",
         "hardware_no_coefficients"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 56,
+      "framework": "vllm",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 56,
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-11-05",
+        "model": "kimik3.1",
+        "precision": "fp4",
+        "recipe": "dbf5e1ef806a52926fe505a9f011cd13c143d3f2cf0cb545aba97e3936f23f5d"
+      },
+      "image": "vllm/vllm-openai:kimi-k31@sha256:904520f3fefc32414abcedf6ba8dadc9c5978db1bcdaf40f58d6b9036ef30a99",
+      "measured": {
+        "tpot_ms": 26.56,
+        "ttft_ms": 1678.01
+      },
+      "measured_date": "2026-11-05",
+      "model": "kimik3.1",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "fd41889d9420035e245baa160fadaf1f93a038e422a6685546858473a979757d",
+      "precision": "fp4",
+      "reasons": [
+        "model_not_in_catalog",
+        "setting_not_modelled:env.VLLM_HTTP_TIMEOUT_KEEP_ALIVE"
       ]
     },
     {
