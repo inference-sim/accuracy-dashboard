@@ -133,3 +133,29 @@ def test_a_rolling_alias_and_a_missing_entry_are_refused(tmp_path):
         rc.catalog_entry(both(tmp_path), "semianalysis_cc_traces_weka_with_subagents")
     with pytest.raises(rc.CorpusError, match="no workload 'agentx-mvp'"):
         rc.catalog_entry(catalog(tmp_path / "only", {"agentx-mvp-uncapped": entry_yaml(UNCAPPED, DIGEST)}), CAPPED)
+
+
+def test_all_resolves_every_pinned_alias_into_its_workloads_directory_and_the_scorer_checks_them(tmp_path):
+    capped_body = b'{"trace": "capped"}\n'
+    cat = catalog(tmp_path / "cat", {"agentx-mvp-uncapped": entry_yaml(UNCAPPED, DIGEST),
+                                     "agentx-mvp": entry_yaml(CAPPED, hashlib.sha256(capped_body).hexdigest())})
+    bodies = {"cc-traces-weka-062126/": BODY, "cc-traces-weka-062126-256k/": capped_body}
+    seen = []
+
+    def dl(url, dest):
+        seen.append(url)
+        dest.write_bytes(next(b for k, b in bodies.items() if f"/{k}" in url))
+    got = rc.resolve_all(cat, tmp_path / "corpora", download=dl)
+    assert sorted(got) == [UNCAPPED, CAPPED]
+    assert sorted(seen) == sorted(f"https://huggingface.co/datasets/{ex.PINNED_CORPORA[a]}/resolve/{REV[a]}/traces.jsonl"
+                                  for a in (UNCAPPED, CAPPED))
+    assert (tmp_path / "corpora" / "agentx-mvp-uncapped" / "traces.jsonl").read_bytes() == BODY
+    assert (tmp_path / "corpora" / "agentx-mvp" / "traces.jsonl").read_bytes() == capped_body
+    # A second run keeps files that check and downloads nothing.
+    rc.resolve_all(cat, tmp_path / "corpora", download=lambda u, d: pytest.fail(f"downloaded {u}"))
+    checked = rc.checked_corpora(cat, tmp_path / "corpora")
+    assert checked[UNCAPPED]["workload"] == "agentx-mvp-uncapped" and checked[CAPPED]["revision"] == REV[CAPPED]
+    # The scorer refuses a file that no longer has its entry's hash; nothing is downloaded.
+    (tmp_path / "corpora" / "agentx-mvp" / "traces.jsonl").write_bytes(b"changed\n")
+    with pytest.raises(rc.CorpusError, match="mismatch"):
+        rc.checked_corpora(cat, tmp_path / "corpora")

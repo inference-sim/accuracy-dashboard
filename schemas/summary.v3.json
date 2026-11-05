@@ -149,27 +149,37 @@
           "format": "date-time",
           "description": "When the API pull was frozen"
         },
-        "corpus": {
-          "type": [
-            "object",
-            "null"
-          ],
-          "additionalProperties": false,
-          "required": [
-            "dataset",
-            "revision",
-            "sha256"
-          ],
-          "properties": {
-            "dataset": {
-              "type": "string"
-            },
-            "revision": {
-              "type": "string"
-            },
-            "sha256": {
-              "type": "string",
-              "pattern": "^[0-9a-f]{64}$"
+        "corpora": {
+          "description": "Each AgentX corpus the run could replay, by the date-pinned alias a run's client records, with the catalog replay workload that pins it by revision and full sha256 (X12, D3). Each agentic point is replayed with its own alias's entry (COV-12).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "alias",
+              "workload",
+              "dataset",
+              "revision",
+              "sha256"
+            ],
+            "properties": {
+              "alias": {
+                "type": "string"
+              },
+              "workload": {
+                "type": "string"
+              },
+              "dataset": {
+                "type": "string"
+              },
+              "revision": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
             }
           }
         },

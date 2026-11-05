@@ -173,7 +173,7 @@ def _setup(tmp: Path, *, log: str = LOG, repo: str = "org/m", conc: int = 4, isl
                        "distance": 0, "match": "exact"}}
     env = sc.Env(blis=_fake_blis(tmp), blis_release="v0.12.0", blis_commit="b" * 40, catalog=tmp,
                  catalog_release="0.3.0", registry=tmp, registry_release="v0.2.0", kernel="v0.3.0",
-                 corpus={"sha256": "c" * 64}, field_list=FIELDS, vllm_defaults=st.load_vllm_defaults()[0],
+                 corpora={}, field_list=FIELDS, vllm_defaults=st.load_vllm_defaults()[0],
                  engine_release="0.31.0", sim_build="v0.12.0")
     env.catalog_obj = _catalog(tmp, {repo: "m"}, ["h200"], {"m": "mtp"})
     env.parts = {"h200"}
@@ -188,7 +188,7 @@ def _score(tmp: Path, entry, env, out: Path):
             "simulator": env.simulator(), "harness_digest": env.harness_digest, "experimental": False, "units": None,
             "engine": {"kind": "vllm", "version": "0.31.0"}, "left_out_records": 0,
             "vllm_ref": "v0.31.0", "vllm_max_distance": 2000, "fields_sha256": "d" * 64,
-            "pulled_at": "2026-10-23T00:00:00Z", "corpus": None, "pull_manifest_sha256": "e" * 64,
+            "pulled_at": "2026-10-23T00:00:00Z", "corpora": [], "pull_manifest_sha256": "e" * 64,
             "source": {"name": "test", "url": "https://example.invalid/"}}
     sc.write_contract(out, [o], prov)
     return o, work
@@ -442,9 +442,93 @@ def _agentic(tmp: Path):
     pdir = tmp / "pull" / "points" / entry["point_id"]
     (pdir / "export.gz").write_bytes(gzip.compress(json.dumps(_export()).encode(), mtime=0))
     entry["files"]["client_export"] = {"path": "export.gz", "sha256": "0" * 64, "from": "artifact"}
-    env.corpus = {"dataset": "semianalysisai/cc-traces-weka-062126", "revision": "rev", "sha256": "c" * 64,
-                  "path": str(tmp / "traces.jsonl"), "file": "traces.jsonl"}
+    env.corpora = {
+        UNCAPPED: {"workload": "agentx-mvp-uncapped", "repo": "semianalysisai/cc-traces-weka-062126",
+                   "revision": "23f152f6f0f9399a85901b89a6458def0ef16729", "file": "traces.jsonl",
+                   "split": "train", "sha256": "c" * 64, "path": str(tmp / "uncapped" / "traces.jsonl")},
+        CAPPED: {"workload": "agentx-mvp", "repo": "semianalysisai/cc-traces-weka-062126-256k",
+                 "revision": "8fecd2fc56694469f758f0afbbb6335ad3043740", "file": "traces.jsonl",
+                 "split": "train", "sha256": "d" * 64, "path": str(tmp / "capped" / "traces.jsonl")}}
     return entry, env
+
+
+UNCAPPED = "semianalysis_cc_traces_weka_062126"
+CAPPED = "semianalysis_cc_traces_weka_062126_256k"
+
+
+def _set_alias(tmp: Path, entry, alias: str, repo: str | None):
+    """Rewrite the point's client export so its run loaded `alias` (and recorded `repo`)."""
+    from test_extract import _export
+    doc = _export()
+    doc["input_config"]["datasets"][0]["dataset"] = alias
+    doc["metadata"]["dataset"]["loader"] = alias
+    if repo is None:
+        del doc["metadata"]["dataset"]["hf_dataset_name"]
+    else:
+        doc["metadata"]["dataset"]["hf_dataset_name"] = repo
+    pdir = tmp / "pull" / "points" / entry["point_id"]
+    (pdir / "export.gz").write_bytes(gzip.compress(json.dumps(doc).encode(), mtime=0))
+
+
+def test_each_agentic_point_replays_the_corpus_its_own_run_loaded():
+    # COV-12, D3: the alias the run's client recorded picks the catalog entry, and blis is given
+    # that entry's revision, full sha256 and file, never one corpus for the whole night.
+    import yaml
+    for alias, repo, rev, sha, sub in (
+            (UNCAPPED, "semianalysisai/cc-traces-weka-062126", "23f152f6f0f9399a85901b89a6458def0ef16729",
+             "c" * 64, "uncapped"),
+            (CAPPED, "semianalysisai/cc-traces-weka-062126-256k", "8fecd2fc56694469f758f0afbbb6335ad3043740",
+             "d" * 64, "capped")):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            entry, env = _agentic(tmp)
+            _set_alias(tmp, entry, alias, repo)
+            o, _ = _score(tmp, entry, env, tmp / "c1")
+            assert o.fidelity is not None, o.reasons
+            argv = _saw(env)[0]["argv"]
+            assert argv[argv.index("--corpus-sha256") + 1] == sha
+            assert argv[argv.index("--corpus") + 1] == str(tmp / sub / "traces.jsonl")
+            spec = yaml.safe_load(Path(argv[argv.index("--workload-spec") + 1]).read_text())["replay"]["corpus"]
+            assert spec["loader"] == alias and spec["sha256"] == sha
+            assert spec["source"] == {"huggingface": repo, "revision": rev, "file": "traces.jsonl", "split": "train"}
+            assert o.fidelity["replay"]["corpus"] == alias and o.fidelity["replay"]["corpus_sha256"] == sha
+        finally:
+            shutil.rmtree(tmp)
+
+
+def test_an_agentic_point_whose_corpus_is_not_date_pinned_is_g5_value_not_recorded():
+    for alias, repo, want in (
+            ("semianalysis_cc_traces_weka_with_subagents", "semianalysisai/cc-traces-weka-062126",
+             "value_not_recorded:replay.corpus=semianalysis_cc_traces_weka_with_subagents"),
+            # The recorded repository is not the one the alias loads: two records of the run disagree.
+            (UNCAPPED, "semianalysisai/cc-traces-weka-062126-256k", "conflict:replay.corpus_repo")):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            entry, env = _agentic(tmp)
+            _set_alias(tmp, entry, alias, repo)
+            o, _ = _score(tmp, entry, env, tmp / "c1")
+            assert o.fidelity is None and want in o.reasons, o.reasons
+            assert _saw(env) == []
+            assert c.validate_dir(tmp / "c1") == []
+            ns = [json.loads(x) for x in (tmp / "c1" / c.NOT_SCORED_JSONL).read_text().splitlines()]
+            code = want.partition(":")[0].replace("conflict", "value_conflict")
+            assert ns[0]["grade"] == "G5" and {"code": code, "subject": want.partition(":")[2]} in ns[0]["g5_reasons"], ns[0]
+        finally:
+            shutil.rmtree(tmp)
+    # No alias at all: from_export names it, and it is value_not_recorded too.
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _agentic(tmp)
+        from test_extract import _export
+        doc = _export()
+        del doc["input_config"]["datasets"][0]["dataset"]
+        del doc["metadata"]["dataset"]["loader"]
+        (tmp / "pull" / "points" / entry["point_id"] / "export.gz").write_bytes(
+            gzip.compress(json.dumps(doc).encode(), mtime=0))
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert "required_setting_missing:replay.corpus" in o.reasons and _saw(env) == []
+    finally:
+        shutil.rmtree(tmp)
 
 
 def test_the_agentic_path_reads_the_registry_means_and_the_engine_report():

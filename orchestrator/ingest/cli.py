@@ -6,9 +6,10 @@
       GitHub (artifacts + vllm-project/vllm), Docker Hub, HuggingFace (base_model only).
 
   cli.py score --pull PULL --out CONTRACT --blis BLIS --catalog CAT --registry REG
-               [--stack STACK] --corpus FILE [--work DIR] [--only PID ...]
+               [--stack STACK] --corpus-dir DIR [--work DIR] [--only PID ...]
       Score a frozen pull with one BLIS release. No network. The engine's field list is what
-      `blis fields --engine vllm --json` prints.
+      `blis fields --engine vllm --json` prints. --corpus-dir holds each AgentX corpus as
+      resolve_agentic_corpus.py --all fetched it from the catalog's replay workloads.
 
 Nothing in the nightly pipeline calls this. Run by path, like the other orchestrator scripts.
 """
@@ -25,6 +26,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(1, str(HERE.parent))
 import api  # noqa: E402
 import artifacts as art  # noqa: E402
 import blis_commands as bc  # noqa: E402
@@ -34,6 +36,7 @@ import contract  # noqa: E402
 import fields as fl  # noqa: E402
 import ledger as ldg  # noqa: E402
 import pull as pl  # noqa: E402
+import resolve_agentic_corpus as rac  # noqa: E402
 import recipes as rcp  # noqa: E402
 import result  # noqa: E402
 import score as sc  # noqa: E402
@@ -334,6 +337,12 @@ def cmd_score(a) -> int:
         bad += result.check_definitions(bc.metrics(str(blis)))
     except (sk.StackError, fl.FieldsError, bc.CommandError, OSError, ValueError) as e:
         bad.append(str(e))
+    # Every date-pinned AgentX corpus, by the catalog replay workload of its alias, checked against
+    # the entry's full sha256 (X12, D3). A point is replayed with its own run's alias (score.py).
+    try:
+        corpora = rac.checked_corpora(Path(a.catalog), Path(a.corpus_dir))
+    except rac.CorpusError as e:
+        bad.append(str(e))
     if bad:
         for b in bad:
             _log(f"FATAL: {b}")
@@ -346,9 +355,6 @@ def cmd_score(a) -> int:
         return 2
     sim = blis.parent
     vdefaults, _ = st.load_vllm_defaults()
-    # blis runs in its binary's directory, so every path it is given is absolute.
-    corpus_path = Path(a.corpus).resolve()
-    corpus_sha = a.corpus_sha256 or art.sha256(corpus_path.read_bytes())
     env = sc.Env(
         blis=str(blis), blis_release=_git(sim, "describe", "--tags", "--exact-match") or "unknown",
         blis_commit=_git(sim, "rev-parse", "HEAD"), catalog=Path(a.catalog).resolve(),
@@ -356,8 +362,7 @@ def cmd_score(a) -> int:
         registry_release=_git(a.registry, "describe", "--tags") or "unknown",
         kernel=next((l.split()[1] for l in (sim / "go.mod").read_text().splitlines()
                      if "blis-latency-kernel " in l), "unknown"),
-        corpus={"dataset": a.corpus_dataset, "revision": a.corpus_revision, "sha256": corpus_sha,
-                "path": str(corpus_path), "file": corpus_path.name},
+        corpora=corpora,
         corpus_cache=Path(a.corpus_cache).resolve() if a.corpus_cache else None,
         vllm_ref=manifest["vllm_ref"], field_list=field_list, fields_sha256=fields_sha,
         base_models=manifest.get("base_models") or {}, timeout_s=a.timeout, vllm_defaults=vdefaults,
@@ -404,7 +409,7 @@ def cmd_score(a) -> int:
             "left_out_records": len((manifest.get("ledger") or {}).get("unlisted") or []),
             "vllm_ref": manifest["vllm_ref"], "vllm_max_distance": manifest["vllm_max_distance"],
             "fields_sha256": fields_sha, "pulled_at": manifest["pulled_at"],
-            "corpus": {"dataset": env.corpus["dataset"], "revision": env.corpus["revision"], "sha256": corpus_sha},
+            "corpora": sc.corpora_provenance(env.corpora),
             "pull_manifest_sha256": art.sha256(manifest_text.encode()),
             "source": {"name": "SemiAnalysis InferenceX API", "url": api.API + "/"}}
     sc.write_contract(Path(a.out), outcomes, prov)
@@ -484,9 +489,7 @@ def cmd_nightly(a) -> int:
         rc = cmd_score(types.SimpleNamespace(
             pull=str(work), out=str(contract_dir), blis=a.blis, catalog=a.catalog, stack=a.stack,
             registry=a.registry, sim_build=None, harness_digest="unreleased", units=str(anchor_path),
-            corpus=a.corpus,
-            corpus_sha256=a.corpus_sha256, corpus_dataset=a.corpus_dataset,
-            corpus_revision=a.corpus_revision, corpus_cache=a.corpus_cache, work=a.score_work,
+            corpus_dir=a.corpus_dir, corpus_cache=a.corpus_cache, work=a.score_work,
             timeout=a.timeout, only=None, workers=a.workers, agentic_workers=a.agentic_workers,
             max_rss_mb=a.max_rss_mb))
         if rc != 0:
@@ -548,10 +551,9 @@ def main(argv=None) -> int:
     s.add_argument("--harness-digest", required=True, help="sha256:<64 hex> of the harness image, or unreleased (X8)")
     s.add_argument("--units", help="the ledger units to score: a PublishedUnits list or a file of unit ids "
                                     "(default: every point of the pull)")
-    s.add_argument("--corpus", required=True)
-    s.add_argument("--corpus-sha256")
-    s.add_argument("--corpus-dataset", default="semianalysisai/cc-traces-weka-062126")
-    s.add_argument("--corpus-revision", required=True)
+    s.add_argument("--corpus-dir", required=True,
+                   help="each AgentX corpus at <dir>/<workload>/<file>, as resolve_agentic_corpus.py --all "
+                        "fetched it at the revision its catalog replay workload pins")
     s.add_argument("--corpus-cache")
     s.add_argument("--work")
     s.add_argument("--timeout", type=int, default=7200)
@@ -580,10 +582,7 @@ def main(argv=None) -> int:
     n.add_argument("--catalog", required=True)
     n.add_argument("--registry", required=True)
     n.add_argument("--stack", help="TEMPORARY until inference-sim v0.16.0 (see score --stack)")
-    n.add_argument("--corpus", required=True)
-    n.add_argument("--corpus-sha256")
-    n.add_argument("--corpus-dataset", default="semianalysisai/cc-traces-weka-062126")
-    n.add_argument("--corpus-revision", required=True)
+    n.add_argument("--corpus-dir", required=True, help="see score --corpus-dir")
     n.add_argument("--corpus-cache")
     n.add_argument("--timeout", type=int, default=7200)
     n.add_argument("--workers", type=int, default=0, help="single-turn scoring parallelism (default: min(cores, 4))")

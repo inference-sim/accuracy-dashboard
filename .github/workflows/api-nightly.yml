@@ -84,18 +84,6 @@ jobs:
           restore-keys: |
             ix-artifacts-
 
-      # Fetch the pinned AgentX corpus once, by a RESOLVED HF revision (not a floating ref), so the
-      # sha256 recorded in provenance is reproducible and the corpus_changed guard is meaningful.
-      - name: Resolve the AgentX corpus (pinned HF revision + sha256)
-        run: |
-          set -euo pipefail
-          repo="semianalysisai/cc-traces-weka-062126"
-          file="traces.jsonl"
-          rev=$(curl -fsSL "https://huggingface.co/api/datasets/${repo}/revision/main" | python3 -c "import sys,json;print(json.load(sys.stdin)['sha'])")
-          curl -fsSL "https://huggingface.co/datasets/${repo}/resolve/${rev}/${file}" -o "$RUNNER_TEMP/corpus.json"
-          echo "CORPUS_REVISION=${rev}" >> "$GITHUB_ENV"
-          echo "fetched corpus ${repo}@${rev} ($(wc -c < "$RUNNER_TEMP/corpus.json") bytes)"
-
       # Score every release resolve_blis.sh named, oldest first, one after another, each once
       # (COV-9). For each: build blis FROM SOURCE at the tag (so a per-release score is sound; #15's
       # seed rule), fetch what it pins, and run one night with it. Every point is scored by
@@ -135,6 +123,12 @@ jobs:
             fi
             CATALOG="$RUNNER_TEMP/catalog"
             REGISTRY="$RUNNER_TEMP/registry"
+            # Every AgentX corpus, at the revision and full sha256 its replay workload in this
+            # release's catalog pins (agentx-mvp-uncapped, agentx-mvp; X12, D3). Each point is
+            # replayed with the corpus its own run's client loaded (COV-12). Nothing resolves a
+            # moving ref such as main. A file kept from an earlier release is reused only if it has
+            # the entry's hash.
+            python3 orchestrator/resolve_agentic_corpus.py --catalog "$CATALOG" --all -o "$RUNNER_TEMP/corpora"
             # The vLLM ref the resolved BLIS release models (blis-vllm's Upstream), so cmd_pull stamps
             # it into the manifest and anchors the build resolver on it -- no hardcoded VLLM_REF.
             export VLLM_REF="$vllm"
@@ -173,7 +167,7 @@ jobs:
               --evaluator-commit "$GITHUB_SHA" \
               --ledger "$LEDGER" \
               --blis "$SIM/blis" --catalog "$CATALOG" --registry "$REGISTRY" \
-              --corpus "$RUNNER_TEMP/corpus.json" --corpus-revision "$CORPUS_REVISION"
+              --corpus-dir "$RUNNER_TEMP/corpora"
             echo "::endgroup::"
           done
 

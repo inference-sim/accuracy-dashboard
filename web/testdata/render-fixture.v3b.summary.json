@@ -39,11 +39,22 @@
     "vllm_max_distance": 2000,
     "fields_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
     "pulled_at": "2026-10-23T00:00:00Z",
-    "corpus": {
-      "dataset": "semianalysisai/cc-traces-weka-062126",
-      "revision": "23f152f6f0f9399a85901b89a6458def0ef16729",
-      "sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276"
-    }
+    "corpora": [
+      {
+        "alias": "semianalysis_cc_traces_weka_062126",
+        "dataset": "semianalysisai/cc-traces-weka-062126",
+        "revision": "23f152f6f0f9399a85901b89a6458def0ef16729",
+        "sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
+        "workload": "agentx-mvp-uncapped"
+      },
+      {
+        "alias": "semianalysis_cc_traces_weka_062126_256k",
+        "dataset": "semianalysisai/cc-traces-weka-062126-256k",
+        "revision": "8fecd2fc56694469f758f0afbbb6335ad3043740",
+        "sha256": "e39cd2ff3eba21d4a3664be51da743ac3d2149a1933898cafc7bfeac8147eeef",
+        "workload": "agentx-mvp"
+      }
+    ]
   },
   "min_points": 10,
   "headline": {

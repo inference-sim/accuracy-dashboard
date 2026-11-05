@@ -39,8 +39,7 @@ def _args(tmp, **over):
              state=str(tmp / "state.json"), window_days=180, keep_api=5, today="2026-10-23",
              cache=None, work=str(tmp / "contract"), score_work=str(tmp / "sw"), evaluator_commit="abc",
              blis=str(tmp / "sim" / "blis"), catalog=str(tmp / "cat"), registry=str(tmp / "reg"),
-             corpus=str(tmp / "corpus.json"),
-             corpus_sha256=None, corpus_dataset="d", corpus_revision="main", corpus_cache=None,
+             corpus_dir=str(tmp / "corpora"), corpus_cache=None,
              timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0, stack=None,
              ledger=str(tmp / "ledger"))
     a.update(over)
@@ -401,6 +400,26 @@ def test_units_select_the_points_of_the_pull_and_name_those_it_does_not_hold(tmp
 from test_result import REGISTRY  # noqa: E402
 
 
+AGENTX = {"semianalysis_cc_traces_weka_062126": ("agentx-mvp-uncapped", "semianalysisai/cc-traces-weka-062126",
+                                                  "23f152f6f0f9399a85901b89a6458def0ef16729", b"uncapped\n"),
+          "semianalysis_cc_traces_weka_062126_256k": ("agentx-mvp", "semianalysisai/cc-traces-weka-062126-256k",
+                                                      "8fecd2fc56694469f758f0afbbb6335ad3043740", b"capped\n")}
+
+
+def _agentx_corpora(catalog, corpus_dir):
+    """The two AgentX replay workloads in the catalog, and their corpus files where
+    resolve_agentic_corpus.py --all puts them, each with the sha256 its entry pins."""
+    import hashlib
+    (catalog / "workloads").mkdir(parents=True, exist_ok=True)
+    for alias, (name, repo, rev, body) in AGENTX.items():
+        (catalog / "workloads" / f"{name}.yaml").write_text(
+            f"replay:\n  corpus:\n    loader: {alias}\n    source:\n      huggingface: {repo}\n"
+            f"      revision: {rev}\n      file: traces.jsonl\n      split: train\n"
+            f"    sha256: {hashlib.sha256(body).hexdigest()}\n")
+        (corpus_dir / name).mkdir(parents=True, exist_ok=True)
+        (corpus_dir / name / "traces.jsonl").write_bytes(body)
+
+
 def _score_inputs(tmp_path, commands: dict):
     """What cmd_score needs, with a fake blis answering `commands` beside a stack.json for vLLM
     0.32.0, in a checkout at v0.16.0; the catalog and registry at release tags; and a pull of no
@@ -414,14 +433,14 @@ def _score_inputs(tmp_path, commands: dict):
                                     **commands})
     for r in ("cat", "reg"):
         _tagged_repo(tmp_path / r, "v1.0.0")
+    _agentx_corpora(tmp_path / "cat", tmp_path / "corpora")
     (tmp_path / "pull").mkdir()
     pl.write_manifest(tmp_path / "pull", {"window": ["", ""], "pulled_at": "2026-10-23T00:00:00Z",
                                           "vllm_ref": "v0.32.0", "vllm_max_distance": 0}, [])
-    (tmp_path / "corpus.json").write_text("{}")
     return types.SimpleNamespace(
         pull=str(tmp_path / "pull"), out=str(tmp_path / "contract"), blis=str(blis), catalog=str(tmp_path / "cat"),
         registry=str(tmp_path / "reg"), stack=None, sim_build=None, harness_digest="unreleased", units=None,
-        corpus=str(tmp_path / "corpus.json"), corpus_sha256=None, corpus_dataset="d", corpus_revision="main",
+        corpus_dir=str(tmp_path / "corpora"),
         corpus_cache=None, work=str(tmp_path / "work"), timeout=60, only=None, workers=1, agentic_workers=1,
         max_rss_mb=0)
 
@@ -452,6 +471,49 @@ def test_a_score_run_whose_blis_defines_tpot_otherwise_is_refused_before_scoring
     assert cli.cmd_score(a) == 2
     assert "FATAL: the simulator's tpot_mean_ms has population 'tokens'; the InferenceX client's has " \
            "'requests_min_2_output_tokens'" in msgs, msgs
+
+
+def test_a_score_run_replays_every_agentx_corpus_by_its_catalog_entry(tmp_path, monkeypatch):
+    # D3, COV-12: the scorer takes each date-pinned alias's revision and full sha256 from its
+    # catalog replay workload, and records both corpora in provenance. No --corpus-dataset, no
+    # --corpus-revision: nothing defaults the corpus, and nothing resolves a moving ref.
+    a = _score_inputs(tmp_path, {})
+    import score
+    seen = {}
+    monkeypatch.setattr(score, "score_points", lambda points, pull, work, env, **k: seen.setdefault("env", env) and [])
+    monkeypatch.setattr(score, "write_contract", lambda out, outcomes, prov: seen.setdefault("prov", prov))
+    import contract
+    monkeypatch.setattr(contract, "validate_dir", lambda d: [])
+    assert cli.cmd_score(a) == 0
+    corpora = seen["env"].corpora
+    assert sorted(corpora) == sorted(AGENTX)
+    for alias, (name, repo, rev, body) in AGENTX.items():
+        e = corpora[alias]
+        assert (e["workload"], e["repo"], e["revision"]) == (name, repo, rev)
+        assert e["path"] == str((tmp_path / "corpora" / name / "traces.jsonl").resolve())
+    assert [c["alias"] for c in seen["prov"]["corpora"]] == sorted(AGENTX)
+    assert all(len(c["revision"]) == 40 and len(c["sha256"]) == 64 for c in seen["prov"]["corpora"])
+    for flag in ("--corpus-dataset", "--corpus-revision", "--corpus-sha256"):
+        with pytest.raises(SystemExit):
+            cli.main(["score", "--pull", "p", "--out", "o", "--blis", "b", "--catalog", "c", "--registry", "r",
+                      "--harness-digest", "unreleased", "--corpus-dir", "d", flag, "x"])
+
+
+@pytest.mark.parametrize("damage,match", [
+    (lambda cat, cd: (cd / "agentx-mvp" / "traces.jsonl").write_bytes(b"other\n"), "mismatch"),
+    (lambda cat, cd: (cd / "agentx-mvp" / "traces.jsonl").unlink(), "does not exist"),
+    (lambda cat, cd: (cat / "workloads" / "agentx-mvp-uncapped.yaml").unlink(), "no workload"),
+    (lambda cat, cd: (cat / "workloads" / "agentx-mvp.yaml").write_text(
+        (cat / "workloads" / "agentx-mvp.yaml").read_text().replace("8fecd2fc56694469f758f0afbbb6335ad3043740", "main")),
+     "40-hex"),
+])
+def test_a_score_run_without_every_pinned_corpus_is_refused(tmp_path, monkeypatch, damage, match):
+    a = _score_inputs(tmp_path, {})
+    damage(Path(a.catalog), Path(a.corpus_dir))
+    msgs = []
+    monkeypatch.setattr(cli, "_log", msgs.append)
+    assert cli.cmd_score(a) == 2
+    assert any(match in m for m in msgs), msgs
 
 
 def test_a_score_run_whose_blis_has_no_metrics_command_is_refused(tmp_path, monkeypatch):
