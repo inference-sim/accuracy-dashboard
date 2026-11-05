@@ -1,5 +1,6 @@
-"""End-to-end: frozen points through score_point and write_contract, with fake `blisdefaults`
-and `blis` executables standing in for BLIS (CI has no catalog or BLIS build). The fake blis
+"""End-to-end: frozen points through score_point and write_contract, with a fake `blis`
+executable standing in for BLIS (CI has no catalog or BLIS build), and a small fields.json
+fixture (testdata/fields) standing in for the engine's field list. The fake blis
 reads the trace it is given and prints a schema-version-2 Result on standard output, as
 `blis replay --format json` does; `blis schema validate result` accepts it, or refuses it in
 the invalid variant.
@@ -29,8 +30,11 @@ sys.path.insert(0, str(HERE))
 import contract as c  # noqa: E402
 import inferencex_client as ix  # noqa: E402
 import score as sc  # noqa: E402
+import fields as fl  # noqa: E402
 import settings as st  # noqa: E402
 import support as sp  # noqa: E402
+
+FIELDS = fl.load(HERE / "testdata" / "fields" / "fields.json")
 
 LOG = (
     "INFO [api_utils.py:286] non-default args: {'model': 'org/m', 'served_model_name': ['org/m'], "
@@ -44,15 +48,6 @@ LOG = (
     "compilation_config={'mode': <CompilationMode.NONE: 0>, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>}\n"
     "INFO [kv_cache_utils.py:1] GPU KV cache size: 100,000 tokens\n"
     '"POST /v1/completions HTTP/1.1" 200\n')
-
-FAKE_DEFAULTS = """#!/usr/bin/env python3
-import json, sys
-a = sys.argv[1:]
-if "-resolve" in a:
-    print(json.dumps({"assumptions": [], "cache_dtype": "auto", "caches": [], "dp": 1, "ep": 1, "overrides": [], "tp": 1}))
-else:
-    print(json.dumps({"device": "h200", "max_num_batched_tokens": 8192, "max_num_seqs": 1024, "memory_gib": 139.8}))
-"""
 
 # The fake blis. `schema validate result FILE` exits VALIDATE. `replay` records its argv and
 # working directory beside itself, then prints a Result. For a single-turn trace (--trace-data)
@@ -150,10 +145,10 @@ def _setup(tmp: Path, *, log: str = LOG, repo: str = "org/m", conc: int = 4, isl
                        "distance": 0, "match": "exact"}}
     env = sc.Env(blis=_fake_blis(tmp), blis_release="v0.12.0", blis_commit="b" * 40, catalog=tmp,
                  catalog_release="0.3.0", registry=tmp, registry_release="v0.2.0", kernel="v0.3.0",
-                 defaults_helper=_exe(tmp / "blisdefaults", FAKE_DEFAULTS), corpus={"sha256": "c" * 64},
-                 policy=st.load_policy()[0], vllm_defaults=st.load_vllm_defaults()[0], engine_release="0.31.0")
+                 corpus={"sha256": "c" * 64}, field_list=FIELDS, vllm_defaults=st.load_vllm_defaults()[0],
+                 engine_release="0.31.0")
     env.catalog_obj = sp.Catalog(root=tmp, models={"m": repo}, speculators={"m": "mtp"},
-                                 hardware={"h200": 139.8}, capability={"h200": 9})
+                                 hardware={"h200": 139.8})
     env.parts = {"h200"}
     return entry, env
 
@@ -164,7 +159,7 @@ def _score(tmp: Path, entry, env, out: Path):
     prov = {"ingest": "api", "blis": {"release": "v0.12.0", "commit_sha": "b" * 40, "catalog": "0.3.0",
                                       "registry": "v0.2.0", "extractor_version": "blis-latency-kernel@v0.3.0"},
             "engine": {"kind": "vllm", "version": "0.31.0"}, "left_out_records": 0,
-            "vllm_ref": "v0.31.0", "vllm_max_distance": 2000, "policy_sha256": "d" * 64,
+            "vllm_ref": "v0.31.0", "vllm_max_distance": 2000, "fields_sha256": "d" * 64,
             "pulled_at": "2026-10-23T00:00:00Z", "corpus": None, "pull_manifest_sha256": "e" * 64,
             "source": {"name": "test", "url": "https://example.invalid/"}}
     sc.write_contract(out, [o], prov)
@@ -345,7 +340,10 @@ def test_every_single_turn_point_names_the_send_gap_and_is_g2():
         assert o.fidelity is not None, o.reasons
         assert [d["subject"] for d in o.fidelity["requests"]["differences"]] == ["send_gap"]
         assert o.fidelity["grade"] == "G2"
-        assert [s["subject"] for s in o.fidelity["substitutions"]] == ["send_gap"]
+        assert [s["subject"] for s in o.fidelity["substitutions"] if s["kind"] == "client_difference"] == ["send_gap"]
+        # model and served_model_name are inert, unproven in the field list: named, as interim.
+        assert {s["subject"] for s in o.fidelity["substitutions"] if s["kind"] == "interim_status"} == \
+            {"model", "served_model_name"}
         assert c.validate_dir(tmp / "c1") == []
     finally:
         shutil.rmtree(tmp)
@@ -467,6 +465,99 @@ def test_crosscheck_matches_the_contract_to_the_api_rows_and_catches_a_change():
         shutil.rmtree(tmp)
 
 
+def _with_log(tmp, entry, log):
+    pdir = tmp / "pull" / "points" / entry["point_id"]
+    (pdir / "server_log.gz").write_bytes(gzip.compress(log.encode(), mtime=0))
+
+
+def test_the_scenario_engine_block_holds_the_runs_values_under_the_engines_own_names():
+    # COV-3: every recorded value is copied verbatim; engine.version is stack.json's release.
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        o, work = _score(tmp, entry, env, tmp / "c1")
+        scen_text = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
+        import yaml
+        docs = list(yaml.safe_load_all(scen_text))
+        scen, dep = docs[0], docs[1]
+        assert scen["engine_version"] == "0.31.0"
+        eng = dep["pools"][0]["engine"]
+        assert {k: eng[k] for k in ("max_num_seqs", "max_num_batched_tokens", "block_size", "max_model_len",
+                                    "enable_prefix_caching", "quantization", "cache_dtype")} == \
+            {"max_num_seqs": 16, "max_num_batched_tokens": 8192, "block_size": 16, "max_model_len": 2304,
+             "enable_prefix_caching": False, "quantization": "fp8", "cache_dtype": "auto"}
+        assert eng["gpu_memory_utilization"] == 0.9 and eng["speculative"] == {
+            "method": "mtp", "num_spec_tokens": 2, "rejection_sample_method": "synthetic"}
+        assert dep["pools"][0]["parallel"] == {"tp": 1, "pp": 1, "dp": 1, "enable_expert_parallel": False}
+        assert o.fidelity["run_release"] == "0.31.0"
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_value_the_run_did_not_record_takes_its_estimation_rule_or_is_not_scored():
+    # max_num_seqs: leave_unset in the fixture, so the scenario leaves it to the engine (X19)
+    # and the point names it. max_num_batched_tokens: no rule, so value_not_recorded.
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        _with_log(tmp, entry, LOG.replace("'max_num_seqs': 16, ", ""))
+        o, work = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity["grade"] == "G2"
+        est = [s for s in o.fidelity["substitutions"] if s["kind"] == "estimated"]
+        assert [s["subject"] for s in est] == ["max_num_seqs"] and "not recorded" in est[0]["detail"]
+        scen_text = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
+        assert "max_num_seqs" not in scen_text
+        _with_log(tmp, entry, LOG.replace("'max_num_batched_tokens': 8192, ", ""))
+        o, _ = _score(tmp, entry, env, tmp / "c2")
+        assert o.g5 == {"code": "value_not_recorded", "subject": "max_num_batched_tokens"}
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_field_the_release_lacks_or_the_engine_does_not_model_is_g5():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        _with_log(tmp, entry, LOG.replace("'block_size': 16,", "'block_size': 16, 'monokernel': True,"))
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.g5 == {"code": "field_not_in_release", "subject": "monokernel"}
+        _with_log(tmp, entry, LOG.replace("'block_size': 16,", "'block_size': 16, 'compilation_config': "
+                                          "{'custom_ops': ['+rms_norm']},"))
+        o, _ = _score(tmp, entry, env, tmp / "c2")
+        assert o.g5 == {"code": "field_not_modelled", "subject": "compilation_config.custom_ops"}
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_not_modelled_field_with_a_substitute_rule_states_the_substitute_and_names_it():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        _with_log(tmp, entry, LOG.replace("'max_model_len': 2304, ", "'language_model_only': True, "))
+        o, work = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        sub = next(s for s in o.fidelity["substitutions"] if s["subject"] == "language_model_only")
+        assert sub["kind"] == "estimated" and '"max_model_len": 8192' in sub["detail"]
+        scen_text = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
+        assert "max_model_len: 8192" in scen_text and "language_model_only" not in scen_text
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_launch_config_and_logged_args_that_disagree_are_g5_value_conflict():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        pdir = tmp / "pull" / "points" / entry["point_id"]
+        lc = {"roles": {"agg": {"args": {"max-num-seqs": 32}}}}
+        (pdir / "launch_config.gz").write_bytes(gzip.compress(json.dumps(lc).encode(), mtime=0))
+        entry["files"]["launch_config"] = {"path": "launch_config.gz", "sha256": "0" * 64, "from": "artifact"}
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.g5 == {"code": "value_conflict", "subject": "max_num_seqs"}
+    finally:
+        shutil.rmtree(tmp)
+
+
 def test_a_point_refused_before_blis_never_calls_it():
     tmp = Path(tempfile.mkdtemp())
     try:
@@ -476,7 +567,7 @@ def test_a_point_refused_before_blis_never_calls_it():
         (pdir / "server_log.gz").write_bytes(gzip.compress(log.encode(), mtime=0))
         env.blis = _exe(Path(env.blis), "#!/bin/sh\nexit 99\n")   # must not run
         o, _ = _score(tmp, entry, env, tmp / "c1")
-        assert o.fidelity is None and o.reasons == ["setting_not_modelled:prefill_schedule_interval"]
+        assert o.fidelity is None and o.reasons == ["field_not_modelled:prefill_schedule_interval"]
         assert o.g5 == {"code": "field_not_modelled", "subject": "prefill_schedule_interval"}
         assert c.validate_dir(tmp / "c1") == []
     finally:

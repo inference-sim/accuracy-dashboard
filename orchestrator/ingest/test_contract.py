@@ -353,9 +353,9 @@ def test_fidelity_schema_ties_match_to_its_fields():
     mapped = {"arg": "kernel_config.moe_backend", "measured": "x", "blis": "x", "match": "mapped"}
     assert not v.is_valid({**rec, "args": [mapped]})                          # mapped needs blis_field
     assert v.is_valid({**rec, "args": [{**mapped, "blis_field": "engine.moe_backend"}]})
-    dflt = {"arg": "max_num_seqs", "measured": None, "blis": 1024, "match": "blis_default", "source": "blis_default"}
-    assert not v.is_valid({**rec, "args": [dflt]})                            # blis_default needs rule
-    assert v.is_valid({**rec, "args": [{**dflt, "rule": "r"}]})
+    # The scorer never writes a value of its own: no arg is a BLIS default (X19).
+    dflt = {"arg": "max_num_seqs", "measured": None, "blis": 1024, "match": "blis_default", "rule": "r"}
+    assert not v.is_valid({**rec, "args": [dflt]})
 
 
 def test_validator_rejects_a_facets_record_missing_a_key_the_builder_reads():

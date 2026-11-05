@@ -7,10 +7,11 @@ module turns what it found into the grade's inputs:
 
   State     a value any source records is copied. Two sources of the same stage that disagree
             (launch configuration against logged arguments) make the point G5 value_conflict.
-  Decide    each setting the run set is classified. TEMPORARY until the scorer reads the
-            engine's fields.json: by the dashboard's settings table (settings.classify).
-  Estimate  a value the simulation needs that no source recorded is estimated, named on the
-            point, or makes the point G5 value_not_recorded.
+  Decide    each setting the run set is looked up in the engine's fields.json (settings.decide,
+            fields.decide).
+  Estimate  a value the simulation needs that no source recorded takes the field's estimation
+            rule (fields.estimate_missing), named on the point, or makes the point G5
+            value_not_recorded.
 
 The scorer's own refusal reasons are mapped onto design §11.4's closed list. A reason with no
 place on that list is an error in the scorer, raised here, never published (COV-5).
@@ -38,15 +39,13 @@ G5_FOR_REASON = {
     "field_unclassified": "field_unclassified",
     "value_not_recorded": "value_not_recorded",
     "value_conflict": "value_conflict",
-    # TEMPORARY until the scorer reads fields.json (the next commit): the policy table's own codes.
-    "setting_not_modelled": "field_not_modelled",
-    "unclassified_arg": "field_unclassified",
 }
 
 # Reasons that are faults of the harness's run, not facts about the point: a run that holds
 # one has not finished scoring and publishes nothing (COV-8). blis_refused is the simulator
 # refusing a scenario the harness wrote from recorded values; it names an engine or substrate
 # gap, and stays a run fault until the engine's fields.json classifies what it refused.
+# setting_differs is the written scenario losing a value the run recorded (COV-3).
 RUN_FAULTS = ("blis_refused", "setting_differs")
 
 # Run faults that are limits of the runner, not of the harness or the data: a larger runner or a

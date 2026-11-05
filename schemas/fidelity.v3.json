@@ -204,8 +204,7 @@
             "args",
             "resolved_config",
             "engine_line",
-            "api_row",
-            "blis_default"
+            "api_row"
           ]
         },
         "blis": {
@@ -218,7 +217,7 @@
           ]
         },
         "blis_field": {
-          "description": "The BLIS Deployment field a mapped arg was written to.",
+          "description": "The scenario field a recorded value was copied to, where the engine block names it differently (settings.LOCATIONS).",
           "type": "string"
         },
         "match": {
@@ -226,17 +225,12 @@
             "exact",
             "mapped",
             "inert",
-            "blis_default",
             "approximated",
             "differs",
             "absent_in_blis",
             "unreadable",
             "conflict"
           ]
-        },
-        "rule": {
-          "description": "For blis_default: the BLIS resolver rule used.",
-          "type": "string"
         },
         "occurrences": {
           "type": "integer",
@@ -257,7 +251,7 @@
           "type": "string"
         },
         "note": {
-          "description": "For approximated: why, and what BLIS used instead. Fixed text from the policy table, never composed per point.",
+          "description": "For approximated: the field list's estimation rule that decided the value (fields.json), never composed per point.",
           "type": "string",
           "minLength": 1
         }
@@ -278,29 +272,6 @@
             "required": [
               "blis_field"
             ]
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "match": {
-                "const": "blis_default"
-              }
-            },
-            "required": [
-              "match"
-            ]
-          },
-          "then": {
-            "required": [
-              "rule",
-              "source"
-            ],
-            "properties": {
-              "source": {
-                "const": "blis_default"
-              }
-            }
           }
         },
         {

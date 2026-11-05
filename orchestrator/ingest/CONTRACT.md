@@ -33,9 +33,19 @@ Every point gets exactly one closeness grade, computed from data alone by `grade
 
 The run's release (`run_release`) is read by `grade.run_release` from the recorded build: an official `vllm/vllm-openai` or `vllm/vllm-openai-rocm` image tagged `vX.Y.Z` whose server-log banner, when there is one, prints that version; any other build is nightly or custom, and `run_release` is null. The build's `match` (the commit distance from `vllm_ref`) is not a grade input.
 
-A substitution is `{kind, subject, detail}`; the record's `substitutions` are sorted by kind, then subject. The G2 kinds are `estimated` (an `args` entry with `match: approximated`, its detail the entry's note; or with `match: blis_default`, its detail the entry's rule), `client_difference` (each of `requests.differences`, COV-12), and the kinds blis-substrate `contracts/spec/pointrecord` names (`coefficient_method`, `coefficient_range`, `execution_mode`, `kernel_hash`, `value_class`, `interim_status`, `resolved_differs`). The G3 and G4 kinds are `other_release`, `changed_functions`, `nightly_or_custom` and `ported_functions_unpublished`.
+A substitution is `{kind, subject, detail}`; the record's `substitutions` are sorted by kind, then subject. The G2 kinds are `estimated` (a field the engine's fields.json classifies as not modelled, set by the run, whose estimation rule decided the scenario's value; or a value the engine needs that the run did not record, taken by that field's rule; the detail is the rule), `interim_status` (a field the run set whose status is `inert_unproven`, allowed only until M2), `client_difference` (each of `requests.differences`, COV-12), and the kinds blis-substrate `contracts/spec/pointrecord` names (`coefficient_method`, `coefficient_range`, `execution_mode`, `kernel_hash`, `value_class`, `interim_status`, `resolved_differs`). The G3 and G4 kinds are `other_release`, `changed_functions`, `nightly_or_custom` and `ported_functions_unpublished`.
 
 `grade.check` holds every point of a contract to these rules (COV-4, COV-5, COV-6), and the validator runs it.
+
+## The scenario a point is scored on (design §11.2; COV-3)
+
+The scorer copies the run's recorded configuration, unchanged, into the scenario's engine block (`settings.decide`, `settings.build`). It reads every source a run records: the launch configuration and the arguments the server log prints as passed, the configuration it prints as resolved, and the lines vLLM prints about values it chose. A value any of them records is copied; the passed value where the run passed one, the resolved one otherwise. Two passed sources that disagree, read as vLLM's argument parser reads them, are G5 `value_conflict`. A resolved value that differs from a passed one is not a conflict.
+
+Each value goes under the engine's own name for it (`settings.LOCATIONS`): the upstream's name, as blis-vllm's engine block takes it (blis-vllm `rules/engineconfig/fieldnames_test.go`), except the renames that block and blis-substrate's Deployment require (`kv_cache_dtype` is `cache_dtype`; the compilation, attention and kernel config fields are top-level; `speculative_config` is `speculative`; the parallel sizes are the Deployment's `parallel`; the KV connector and its CPU bytes are its `offload` block). Every other environment variable goes into the block's `env` as the launch gave it. `engine_version` is the release stack.json names, and the run's own release is the point's `run_release`.
+
+Which fields are modelled, and each field's estimation rule, come only from the engine's fields.json (`fields.py`, VLM-3); the dashboard holds no settings table. For each field the run set: a field the release does not list is G5 `field_not_in_release`; `not_modelled` with rule `none` is G5 `field_not_modelled`; `not_modelled` with `leave_unset` is left out of the scenario so the engine resolves it (X19), and with `substitute` the rule's stated setting is written instead, each named on the point as `estimated`; `inert_unproven` is named as `interim_status`; `modelled` and `proven_inert` change no grade. A value blis-vllm needs that no source recorded (`block_size`, `max_num_batched_tokens`, `max_num_seqs`, a drafter's acceptance) takes its field's estimation rule the same way, or the point is G5 `value_not_recorded`. A field inside a config object that vLLM prints whole is set by the run only when it differs from vLLM's own default, read from vLLM's dataclasses at the release (`orchestrator/vllm_defaults.json`, written by `gen_vllm_defaults.py`).
+
+TEMPORARY until `blis fields --engine vllm --json` exists (inference-sim m1/substrate, task H): `cli.py score --fields FILE` names the field list, blis-vllm's `fields.json` at the release the simulator runs. A list for another release is refused.
 
 ## Failed points
 
@@ -90,7 +100,7 @@ Snapshots published before this identity carry `point_id`s of an eight-field ide
 
 ### `fidelity.jsonl`
 
-`{"point_id": …, <record>}`, one line per scored point, sorted by `point_id`. The record is described by `schemas/fidelity.v3.json`. It carries the point's `grade` (`G1` to `G4`), its `substitutions` (empty exactly for G1), its `run_release`, the recorded `build`, every classified setting in `args`, the engine outcomes compared in `resolved`, and for an agentic point `replay`, for a single-turn point `requests`. A build never stops a point from being scored. A single-turn point's `requests` says how its client's requests were replayed: `cold` from an empty engine when the run disabled prefix caching, `primed` after `copies` warm-up copies of request 0 otherwise. Its differences always include `send_gap` (the client's interval between a response ending and its next request, which the simulator does not model), so every single-turn point is at least G2, and `sent_prompt_lengths` where the sent prompt lengths are not verified equal to the replayed targets. An `approximated` arg's `blis` is the value BLIS used, and its `note` says why. A `mapped` arg must name its `blis_field`, a `blis_default` arg its `rule`, an `approximated` arg its `note`, and a `conflict` arg its `values`.
+`{"point_id": …, <record>}`, one line per scored point, sorted by `point_id`. The record is described by `schemas/fidelity.v3.json`. It carries the point's `grade` (`G1` to `G4`), its `substitutions` (empty exactly for G1), its `run_release`, the recorded `build`, every classified setting in `args`, the engine outcomes compared in `resolved`, and for an agentic point `replay`, for a single-turn point `requests`. A build never stops a point from being scored. A single-turn point's `requests` says how its client's requests were replayed: `cold` from an empty engine when the run disabled prefix caching, `primed` after `copies` warm-up copies of request 0 otherwise. Its differences always include `send_gap` (the client's interval between a response ending and its next request, which the simulator does not model), so every single-turn point is at least G2, and `sent_prompt_lengths` where the sent prompt lengths are not verified equal to the replayed targets. An arg is one recorded setting: `exact` when the scenario carries the recorded value under the upstream's own name, `mapped` when under the engine block's renamed field (`blis_field`), `inert` when the run set it and the scenario has no place for it (a proven-inert or unproven-inert field), `approximated` when the field's estimation rule decided the value (`note` is the rule), `conflict` when two same-stage sources disagree (`values`).
 
 ### `facets.json`
 
@@ -128,7 +138,7 @@ One line per G5 point, sorted by `point_id` (`schemas/fidelity.v3.json#/definiti
  "blis": {"release": "v0.12.0", "commit_sha": "…", "catalog": "…", "registry": "…", "extractor_version": "…"},
  "engine": {"kind": "vllm", "version": "0.32.0"}, "points": 2035, "left_out_records": 0,
  "vllm_ref": "v0.32.0", "vllm_max_distance": 2000,
- "policy_sha256": "…", "pulled_at": "<UTC ISO-8601>",
+ "fields_sha256": "…", "pulled_at": "<UTC ISO-8601>",
  "corpus": {"dataset": "…", "revision": "…", "sha256": "…"} | null,
  "pull_manifest_sha256": "…",
  "source": {"name": "SemiAnalysis InferenceX API", "url": "https://inferencex.semianalysis.com/api/v1/"}}
@@ -137,6 +147,8 @@ One line per G5 point, sorted by `point_id` (`schemas/fidelity.v3.json#/definiti
 `source` names what was pulled: `{"name", "url"}` (the API the pull read), copied into summary.json's `ground_truth`.
 
 `engine` is the engine release the scoring simulator runs, read from its stack.json (LIF-6); every point is scored on it, and graded against it. TEMPORARY until inference-sim v0.16.0 ships stack.json at its root: `cli.py score --stack FILE` names the file. A simulator checkout with no stack.json and no `--stack` is refused, because the build predates stack.json; the release is never read from installation.md.
+
+`fields_sha256` is the sha256 of the fields.json the scorer read.
 
 `points` is the number of points the run holds (scored, G5 and failed), and `left_out_records` the number of source records the ledger holds no unit for (the pull manifest's `ledger.unlisted`), published in coverage (COV-7).
 
@@ -167,8 +179,6 @@ The closed list of design §11.4 (`grade.G5_CODES`; COV-5). A reason the scorer 
 | `field_not_in_release` | The run sets a field the engine release BLIS runs does not have. |
 | `value_conflict` | Two sources that record the same stage of one field disagree. |
 | `build_unparseable` | The run's recorded engine build cannot be read. |
-
-TEMPORARY until the scorer reads the engine's fields.json: the dashboard's settings table names a setting it cannot represent `setting_not_modelled` and one it does not list `unclassified_arg`, which map to `field_not_modelled` and `field_unclassified`.
 
 ## Determinism
 

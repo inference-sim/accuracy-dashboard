@@ -7,7 +7,7 @@ included (`'attention_config': AttentionConfig(backend=None, …, indexer_kv_dty
 A field printed at its default isn't something the run asked for, so the extractor must know
 each default. They come from vLLM's dataclasses, never from this repo:
 
-    python3 orchestrator/ingest/gen_vllm_defaults.py --ref v0.31.0
+    python3 orchestrator/ingest/gen_vllm_defaults.py --ref v0.32.0
 
 reads vllm/config/*.py at that tag (GitHub API, or --src DIR for a local checkout) and writes,
 per dotted path (`attention_config.indexer_kv_dtype`), the literal default. A default that

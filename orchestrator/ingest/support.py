@@ -36,7 +36,6 @@ class Catalog:
     models: dict = field(default_factory=dict)        # catalog name -> source.repo
     speculators: dict = field(default_factory=dict)   # catalog name -> speculator method | None
     hardware: dict = field(default_factory=dict)      # part -> MemoryGiB
-    capability: dict = field(default_factory=dict)    # part -> CUDA compute-capability major (catalog)
 
     @staticmethod
     def load(root) -> "Catalog":
@@ -60,9 +59,6 @@ class Catalog:
             doc = yaml.safe_load(h.read_text()) or {}
             if "MemoryGiB" in doc:
                 c.hardware[h.stem] = float(doc["MemoryGiB"])
-            cc = str(doc.get("ComputeCapability") or "")
-            if cc.split(".")[0].isdigit():
-                c.capability[h.stem] = int(cc.split(".")[0])
         return c
 
 
@@ -74,19 +70,6 @@ def catalog_part(cat: Catalog, parts: set[str], label: str) -> str | None:
     if label in cat.hardware:
         return label
     hits = [p for p in cat.hardware if p.startswith(label + "-") and p in parts]
-    return hits[0] if len(hits) == 1 else None
-
-
-def index_record_format(bytes_per_entry: int, head_dim: int) -> str | None:
-    """The format an indexer K record of this width holds, by vLLM v0.31.0's own layouts for a
-    head of head_dim values: fp8 is one byte per value plus a 4-byte fp32 scale; mxfp4 packs two
-    values per byte plus a 1-byte ue8m0 scale per 32 (model_executor/layers/sparse_attn_indexer.py
-    MXFP4_BLOCK_SIZE, kv_cache_as_quant_view); bf16 is two bytes per value. None when the width
-    is none of these, so a record nobody can name is never given a name."""
-    if head_dim <= 0:
-        return None
-    layouts = {"fp8": head_dim + 4, "mxfp4": head_dim // 2 + head_dim // 32, "bf16": 2 * head_dim}
-    hits = [name for name, width in layouts.items() if width == bytes_per_entry]
     return hits[0] if len(hits) == 1 else None
 
 

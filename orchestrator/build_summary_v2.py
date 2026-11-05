@@ -351,7 +351,7 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
                          "measurement_sha256": prov_in["pull_manifest_sha256"]},
         "evaluator_commit": evaluator_commit, "scorer": "orchestrator/ingest/score.py", "ingest": "api",
         "vllm_ref": prov_in["vllm_ref"], "vllm_max_distance": prov_in["vllm_max_distance"],
-        "policy_sha256": prov_in["policy_sha256"], "pulled_at": prov_in["pulled_at"], "corpus": prov_in["corpus"],
+        "fields_sha256": prov_in["fields_sha256"], "pulled_at": prov_in["pulled_at"], "corpus": prov_in["corpus"],
     }
     return {
         "schema_version": SCHEMA_VERSION,
@@ -454,7 +454,7 @@ def _prov_out_to_in(prov: dict, coverage: dict) -> dict:
     gt = prov.get("ground_truth", {})
     return {"ingest": "api", "blis": prov["blis"], "engine": prov["engine"], "points": coverage["points"],
             "left_out_records": coverage["left_out_records"], "vllm_ref": prov["vllm_ref"],
-            "vllm_max_distance": prov["vllm_max_distance"], "policy_sha256": prov["policy_sha256"],
+            "vllm_max_distance": prov["vllm_max_distance"], "fields_sha256": prov["fields_sha256"],
             "pulled_at": prov["pulled_at"], "corpus": prov["corpus"],
             "pull_manifest_sha256": gt.get("measurement_sha256", ""),
             "source": {"name": gt.get("source", ""), "url": gt.get("source_url", "")}}
@@ -473,7 +473,7 @@ def build_merged(prior_summary: dict, delta_dir: Path, window_ids: set, *, gener
 
     Reconstructs a full contract (prior inverted + delta overlaid − aged-out) in `work`, then runs
     the same build() as a fresh night, so the merged summary is produced by one code path. The
-    merged provenance keeps the prior run's BLIS/policy/corpus (nothing was re-scored) but takes the
+    merged provenance keeps the prior run's BLIS release, field list and corpus (nothing was re-scored) but takes the
     delta pull's `pulled_at` / `pull_manifest_sha256`, so the API pull date tracks the newest data
     (issue #35)."""
     merged = work / "merged-contract"
@@ -526,7 +526,7 @@ def _overlay_delta(base: Path, delta_dir: Path, window_ids: set) -> None:
         counts += len(kept)
 
     # Provenance stays the prior run's for everything that genuinely didn't change on an IX-only
-    # night -- BLIS release, policy, corpus, vllm_ref, source -- since nothing was re-scored. But a
+    # night -- BLIS release, field list, corpus, vllm_ref, source -- since nothing was re-scored. But a
     # NEW pull DID fetch the delta, so the two fields that describe the pull event itself must come
     # from the delta: `pulled_at` (the "API pull date" the UI shows, and what build() derives the
     # release_tag / snapshot_id from) and `pull_manifest_sha256` (the "pull sha256", which must

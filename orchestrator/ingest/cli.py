@@ -6,7 +6,7 @@
       GitHub (artifacts + vllm-project/vllm), Docker Hub, HuggingFace (base_model only).
 
   cli.py score --pull PULL --out CONTRACT --blis BLIS --catalog CAT --registry REG
-               --corpus FILE [--work DIR] [--only PID ...]
+               --fields FIELDS [--stack STACK] --corpus FILE [--work DIR] [--only PID ...]
       Score a frozen pull with one BLIS release. No network.
 
 Nothing in the nightly pipeline calls this. Run by path, like the other orchestrator scripts.
@@ -28,6 +28,7 @@ import artifacts as art  # noqa: E402
 import build  # noqa: E402
 import clients  # noqa: E402
 import contract  # noqa: E402
+import fields as fl  # noqa: E402
 import ledger as ldg  # noqa: E402
 import pull as pl  # noqa: E402
 import recipes as rcp  # noqa: E402
@@ -218,34 +219,38 @@ def _go_require(gomod: Path, module: str) -> str | None:
     return None
 
 
-def check_blis_inputs(blis: Path, helper: str, catalog: Path, registry: Path) -> list[str]:
+def check_blis_inputs(blis: Path, catalog: Path, registry: Path) -> list[str]:
     """Everything `score` needs to be one BLIS release, or what's wrong. The blis binary sits in
-    the inference-sim checkout it was built from, which must be at a release tag. The defaults
-    helper is built against an inference-sim tag; it must be that checkout's, with the same
-    kernel and schemas, or its defaults / resolutions / acceptance would come from another
-    release. The releases recorded in provenance must be real tags, never "unknown"."""
+    the inference-sim checkout it was built from, which must be at a release tag, as must the
+    catalog and registry. The releases recorded in provenance must be real tags, never
+    "unknown"."""
     out = []
     sim = blis.parent
     if not blis.is_file():
         out.append(f"--blis {blis} is not a file (build it: go build -o blis main.go in an inference-sim checkout)")
-    tag = _git(sim, "describe", "--tags", "--exact-match")
-    if not tag:
+    if not _git(sim, "describe", "--tags", "--exact-match"):
         out.append(f"--blis {blis}: its checkout {sim} is not at a release tag (fetch tags, or check out the tag)")
     for repo, flag in ((catalog, "--catalog"), (registry, "--registry")):
         if not _git(repo, "describe", "--tags", "--exact-match"):
             out.append(f"{flag} {repo} is not at a release tag")
-    try:
-        got = json.loads(subprocess.run([helper, "-version"], capture_output=True, text=True,
-                                        check=True, timeout=60).stdout)
-    except (OSError, subprocess.SubprocessError, ValueError) as e:
-        return out + [f"--defaults-helper {helper} doesn't report its versions ({e})"]
-    want = {"inference-sim": tag,
-            "blis-latency-kernel": _go_require(sim / "go.mod", "github.com/inference-sim/blis-latency-kernel"),
-            "blis-schemas": _go_require(sim / "go.mod", "github.com/inference-sim/blis-schemas")}
-    for mod, v in want.items():
-        if v and got.get(mod) not in (v, "(devel)"):
-            out.append(f"--defaults-helper is built against {mod} {got.get(mod)}, --blis's checkout is {v}")
     return out
+
+
+def read_fields(path: str | None, engine_release: str) -> tuple["fl.FieldList", str]:
+    """The engine's field list at the release the scoring build runs, and its sha256.
+
+    TEMPORARY until `blis fields --engine vllm --json` exists (inference-sim m1/substrate, task
+    H): --fields names the file blis-vllm publishes at its root. The list must be for the engine
+    release stack.json names; one for another release is refused (LIF-6)."""
+    if not path:
+        raise fl.FieldsError("--fields is required: the engine's fields.json at the release the simulator runs "
+                             "(until `blis fields --engine vllm --json` exists)")
+    raw = Path(path).read_bytes()
+    field_list = fl.parse(raw)
+    if field_list.engine != {"kind": "vllm", "version": engine_release}:
+        raise fl.FieldsError(f"--fields {path} is the field list of {field_list.engine}, but the simulator runs "
+                             f"vllm {engine_release} (stack.json)")
+    return field_list, art.sha256(raw)
 
 
 def read_stack(blis: Path, given: str | None) -> sk.Stack:
@@ -266,11 +271,12 @@ def read_stack(blis: Path, given: str | None) -> sk.Stack:
 def cmd_score(a) -> int:
     pull_dir = Path(a.pull)
     blis = Path(a.blis).resolve()
-    bad = check_blis_inputs(blis, a.defaults_helper, Path(a.catalog), Path(a.registry))
+    bad = check_blis_inputs(blis, Path(a.catalog), Path(a.registry))
     try:
         stack = read_stack(blis, getattr(a, "stack", None))
         engine_release = stack.engine("vllm")
-    except (sk.StackError, OSError, ValueError) as e:
+        field_list, fields_sha = read_fields(getattr(a, "fields", None), engine_release)
+    except (sk.StackError, fl.FieldsError, OSError, ValueError) as e:
         bad.append(str(e))
     if bad:
         for b in bad:
@@ -283,8 +289,7 @@ def cmd_score(a) -> int:
         _log(f"FATAL: the pull has {len(failed)} row(s) it failed to read ({', '.join(failed[:5])}); re-run the pull")
         return 2
     sim = blis.parent
-    policy, policy_sha = st.load_policy()
-    vdefaults, vdefaults_sha = st.load_vllm_defaults()
+    vdefaults, _ = st.load_vllm_defaults()
     # blis runs in its binary's directory, so every path it is given is absolute.
     corpus_path = Path(a.corpus).resolve()
     corpus_sha = a.corpus_sha256 or art.sha256(corpus_path.read_bytes())
@@ -295,13 +300,11 @@ def cmd_score(a) -> int:
         registry_release=_git(a.registry, "describe", "--tags") or "unknown",
         kernel=next((l.split()[1] for l in (sim / "go.mod").read_text().splitlines()
                      if "blis-latency-kernel " in l), "unknown"),
-        defaults_helper=a.defaults_helper,
         corpus={"dataset": a.corpus_dataset, "revision": a.corpus_revision, "sha256": corpus_sha,
                 "path": str(corpus_path), "file": corpus_path.name},
         corpus_cache=Path(a.corpus_cache).resolve() if a.corpus_cache else None,
-        vllm_ref=manifest["vllm_ref"], policy=policy, policy_sha256=policy_sha,
-        base_models=manifest.get("base_models") or {}, timeout_s=a.timeout,
-        vllm_defaults=vdefaults, vllm_defaults_sha256=vdefaults_sha,
+        vllm_ref=manifest["vllm_ref"], field_list=field_list, fields_sha256=fields_sha,
+        base_models=manifest.get("base_models") or {}, timeout_s=a.timeout, vllm_defaults=vdefaults,
         max_rss_mb=getattr(a, "max_rss_mb", 0) or 0, engine_release=engine_release)
     env.catalog_obj = sp.Catalog.load(env.catalog)
     env.parts = sp.registry_parts(env.registry)
@@ -327,7 +330,7 @@ def cmd_score(a) -> int:
             "engine": {"kind": "vllm", "version": engine_release},
             "left_out_records": len((manifest.get("ledger") or {}).get("unlisted") or []),
             "vllm_ref": manifest["vllm_ref"], "vllm_max_distance": manifest["vllm_max_distance"],
-            "policy_sha256": art.sha256((policy_sha + vdefaults_sha).encode()), "pulled_at": manifest["pulled_at"],
+            "fields_sha256": fields_sha, "pulled_at": manifest["pulled_at"],
             "corpus": {"dataset": env.corpus["dataset"], "revision": env.corpus["revision"], "sha256": corpus_sha},
             "pull_manifest_sha256": art.sha256(manifest_text.encode()),
             "source": {"name": "SemiAnalysis InferenceX API", "url": api.API + "/"}}
@@ -395,7 +398,7 @@ def cmd_nightly(a) -> int:
     def score_build_fn(work: Path, blis_tag: str, score_ids, pull_date: str, window_ids: set):
         rc = cmd_score(types.SimpleNamespace(
             pull=str(work), out=str(contract_dir), blis=a.blis, catalog=a.catalog, stack=a.stack,
-            registry=a.registry, defaults_helper=a.defaults_helper,
+            fields=a.fields, registry=a.registry,
             corpus=a.corpus,
             corpus_sha256=a.corpus_sha256, corpus_dataset=a.corpus_dataset,
             corpus_revision=a.corpus_revision, corpus_cache=a.corpus_cache, work=a.score_work,
@@ -449,7 +452,8 @@ def main(argv=None) -> int:
                    help="the blis binary, built in an inference-sim checkout at a release tag; it runs in that directory")
     s.add_argument("--catalog", required=True)
     s.add_argument("--registry", required=True)
-    s.add_argument("--defaults-helper", required=True, help="orchestrator/blisdefaults built against --blis's tag")
+    s.add_argument("--fields", help="TEMPORARY until `blis fields --engine vllm --json` exists (inference-sim "
+                                     "m1/substrate): blis-vllm's fields.json at the release the simulator runs")
     s.add_argument("--stack", help="TEMPORARY until inference-sim v0.16.0 ships stack.json: the scoring build's "
                                     "stack.json, when its checkout has none")
     s.add_argument("--corpus", required=True)
@@ -483,7 +487,7 @@ def main(argv=None) -> int:
     n.add_argument("--blis", required=True, help="the blis binary (see score --blis)")
     n.add_argument("--catalog", required=True)
     n.add_argument("--registry", required=True)
-    n.add_argument("--defaults-helper", required=True)
+    n.add_argument("--fields", help="TEMPORARY until `blis fields --engine vllm --json` exists (see score --fields)")
     n.add_argument("--stack", help="TEMPORARY until inference-sim v0.16.0 (see score --stack)")
     n.add_argument("--corpus", required=True)
     n.add_argument("--corpus-sha256")

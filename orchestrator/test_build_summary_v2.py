@@ -495,7 +495,7 @@ def test_ix_only_merge_of_delta_reproduces_the_full_summary():
 
 
 def test_merge_takes_the_pull_date_from_the_delta_not_the_prior():
-    # Issue #35: an IX-only merge keeps the prior run's BLIS/policy/corpus (nothing was re-scored)
+    # Issue #35: an IX-only merge keeps the prior run's BLIS release, field list and corpus (nothing was re-scored)
     # but a NEW pull fetched the delta, so `pulled_at`/`pull_manifest_sha256` -- the "API pull date"
     # and "pull sha256" the UI shows, and what build() derives release_tag/snapshot_id from -- must
     # come from the delta. Otherwise the pull date freezes to the base and chains backwards while
@@ -528,7 +528,7 @@ def test_merge_takes_the_pull_date_from_the_delta_not_the_prior():
         assert p["ground_truth"]["release_tag"] == "api-2026-10-24"  # derived from the delta pull date
         # ...and the release-identity fields stay the prior's (nothing was re-scored).
         assert p["blis"] == prior["provenance"]["blis"]
-        assert p["policy_sha256"] == prior["provenance"]["policy_sha256"]
+        assert p["fields_sha256"] == prior["provenance"]["fields_sha256"]
         assert p["corpus"] == prior["provenance"]["corpus"]
         assert c.validate_dir(delta_c) == []
     finally:

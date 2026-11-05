@@ -45,7 +45,7 @@
         "ingest",
         "vllm_ref",
         "vllm_max_distance",
-        "policy_sha256",
+        "fields_sha256",
         "pulled_at",
         "engine"
       ],
@@ -140,11 +140,6 @@
           "minimum": 0,
           "description": "VLLM_MAX_DISTANCE: symmetric limit in commits"
         },
-        "policy_sha256": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$",
-          "description": "sha256 of the dashboard's settings table as used. TEMPORARY: removed when the scorer reads the engine's fields.json."
-        },
         "pulled_at": {
           "type": "string",
           "format": "date-time",
@@ -191,6 +186,11 @@
               "minLength": 1
             }
           }
+        },
+        "fields_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "sha256 of the engine's fields.json the scorer read (design §11.1): the field statuses and estimation rules every grade rests on."
         }
       }
     },

@@ -25,7 +25,7 @@ def _args(tmp, **over):
              state=str(tmp / "state.json"), window_days=180, keep_api=5, today="2026-10-23",
              cache=None, work=str(tmp / "contract"), score_work=str(tmp / "sw"), evaluator_commit="abc",
              blis=str(tmp / "sim" / "blis"), catalog=str(tmp / "cat"), registry=str(tmp / "reg"),
-             defaults_helper=str(tmp / "helper"),
+             fields=str(tmp / "fields.json"),
              corpus=str(tmp / "corpus.json"),
              corpus_sha256=None, corpus_dataset="d", corpus_revision="main", corpus_cache=None,
              timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0, stack=None,
@@ -191,13 +191,6 @@ def _git(*a):
     subprocess.run(["git", *a], check=True, capture_output=True)
 
 
-def _helper(tmp, versions):
-    p = tmp / "helper"
-    p.write_text(f"#!/bin/sh\necho '{json.dumps(versions)}'\n")
-    p.chmod(0o755)
-    return str(p)
-
-
 def _tagged_repo(path, tag):
     path.mkdir(parents=True)
     _git("-C", str(path), "init", "-q")
@@ -209,25 +202,44 @@ def _tagged_repo(path, tag):
 def test_check_blis_inputs_reads_the_release_from_the_binarys_checkout(tmp_path):
     sim = tmp_path / "sim"
     _tagged_repo(sim, "v0.16.0")
-    (sim / "go.mod").write_text("module m\nrequire github.com/inference-sim/blis-schemas v0.4.0\n")
     (sim / "blis").write_text("")
     for r in ("cat", "reg"):
         _tagged_repo(tmp_path / r, "v1.0.0")
-    ok = _helper(tmp_path, {"inference-sim": "v0.16.0", "blis-schemas": "v0.4.0"})
-    assert cli.check_blis_inputs(sim / "blis", ok, tmp_path / "cat", tmp_path / "reg") == []
-    bad = cli.check_blis_inputs(sim / "nope", ok, tmp_path / "cat", tmp_path / "reg")
+    assert cli.check_blis_inputs(sim / "blis", tmp_path / "cat", tmp_path / "reg") == []
+    bad = cli.check_blis_inputs(sim / "nope", tmp_path / "cat", tmp_path / "reg")
     assert len(bad) == 1 and bad[0].startswith(f"--blis {sim / 'nope'} is not a file")
-    other = _helper(tmp_path, {"inference-sim": "v0.15.0", "blis-schemas": "v0.4.0"})
-    bad = cli.check_blis_inputs(sim / "blis", other, tmp_path / "cat", tmp_path / "reg")
-    assert bad == ["--defaults-helper is built against inference-sim v0.15.0, --blis's checkout is v0.16.0"]
 
 
 def test_check_blis_inputs_refuses_a_checkout_not_at_a_tag(tmp_path):
     sim = tmp_path / "sim"
     _tagged_repo(sim, None)
-    (sim / "go.mod").write_text("module m\n")
     (sim / "blis").write_text("")
     for r in ("cat", "reg"):
         _tagged_repo(tmp_path / r, "v1.0.0")
-    bad = cli.check_blis_inputs(sim / "blis", _helper(tmp_path, {}), tmp_path / "cat", tmp_path / "reg")
+    bad = cli.check_blis_inputs(sim / "blis", tmp_path / "cat", tmp_path / "reg")
     assert any("is not at a release tag" in b for b in bad)
+
+
+FIELD_LIST = {"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": []}
+
+
+def test_the_field_list_must_be_the_release_the_simulator_runs(tmp_path):
+    p = tmp_path / "fields.json"
+    p.write_text(json.dumps(FIELD_LIST))
+    fl_, sha = cli.read_fields(str(p), "0.32.0")
+    assert fl_.engine == {"kind": "vllm", "version": "0.32.0"} and len(sha) == 64
+    import fields
+    with pytest.raises(fields.FieldsError, match="the simulator runs vllm 0.31.0"):
+        cli.read_fields(str(p), "0.31.0")
+    with pytest.raises(fields.FieldsError, match="--fields is required"):
+        cli.read_fields(None, "0.32.0")
+
+
+def test_a_build_with_no_stack_json_is_refused_with_why(tmp_path):
+    import stack
+    (tmp_path / "sim").mkdir()
+    with pytest.raises(stack.StackError, match="predates stack.json"):
+        cli.read_stack(tmp_path / "sim" / "blis", None)
+    s = tmp_path / "stack.json"
+    s.write_text(json.dumps({"kind": "Stack", "engines": [{"kind": "vllm", "version": "0.32.0"}]}))
+    assert cli.read_stack(tmp_path / "sim" / "blis", str(s)).engine("vllm") == "0.32.0"

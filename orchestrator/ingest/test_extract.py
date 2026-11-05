@@ -1,4 +1,5 @@
-"""Tests for the extractor stages: repr parsing, settings, policy, replay inputs, support,
+"""Tests for the extractor stages: repr parsing, settings and their decision by the field list,
+replay inputs, support,
 artifacts and the API pull (orchestrator/ingest/). Network clients are faked.
 
 Run: python3 orchestrator/ingest/test_extract.py
@@ -20,13 +21,14 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import api  # noqa: E402
 import artifacts as art  # noqa: E402
+import fields as fl  # noqa: E402
 import pyrepr  # noqa: E402
 import replay as rp  # noqa: E402
 import settings as st  # noqa: E402
 import support as sp  # noqa: E402
 
-POLICY, POLICY_SHA = st.load_policy()
 DEFAULTS, _ = st.load_vllm_defaults()
+FIELDS = fl.load(HERE / "testdata" / "fields" / "fields.json")
 
 # A resolved engine-config line as vLLM v0.31.0 prints it (every engine log has one).
 RESOLVED = ("model='m', tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, "
@@ -51,7 +53,11 @@ def _classify(log: str, launch=None, extra_readings=None):
     readings, problems = st.read_all(log, launch)
     assert problems == [], problems
     readings.update(extra_readings or {})
-    return st.classify(st.merge(readings, POLICY, DEFAULTS), POLICY, DEFAULTS)
+    return st.decide(st.merge(readings, DEFAULTS), FIELDS)
+
+
+def _build(c, **kw):
+    return st.build(c, name="p", model="m", part=PART_H200, engine_version="0.31.0", field_list=FIELDS, **kw)
 
 
 # ------------------------------------------------------------------ pyrepr
@@ -80,46 +86,13 @@ def test_resolved_line_keeps_bare_words_as_text():
                    "speculative_config": {"method": "dspark", "num_spec_tokens": 5}}
 
 
-# ------------------------------------------------------------------ the policy table
-
-def test_most_specific_policy_entry_wins():
-    assert st.lookup(POLICY, "attention_config.indexer_kv_dtype")[0] == "attention_config.indexer_kv_dtype"
-    assert st.lookup(POLICY, "attention_config.flex_attn_block_m")[0] == "attention_config.*"
-    assert st.lookup(POLICY, "some_new_flag") is None
-
-
-def test_an_unknown_arg_refuses_the_point():
-    c = _classify(_log("'max_num_seqs': 8, 'brand_new_knob': 3"))
-    assert "unclassified_arg:brand_new_knob" in c.reasons
-
-
-def test_every_policy_entry_is_well_formed():
-    classes = {"mapped", "inert", "approximate", "refuse"}
-    for path, e in POLICY["entries"].items():
-        assert e["class"] in classes, path
-        if e["class"] == "mapped":
-            assert e.get("blis_field"), path
-        if e["class"] == "approximate":
-            assert e.get("note") and "upstream" not in e, path
-            # What BLIS used must come from BLIS (a source score.py reads) or be a fixed
-            # switch value; never left for a placeholder.
-            src = e.get("blis_from")
-            assert (src is None) != ("approximate_as" not in e), path
-            assert src is None or src == "priced.index_cache" or src.startswith("resolved."), path
-        if e["class"] == "refuse":
-            assert e.get("note"), path
-
-
 # ------------------------------------------------------------------ settings sources
 
-def test_a_request_the_engine_overrode_is_a_conflict():
-    # PR #32 review: vLLM can override a requested value (e.g. block size for a backend); BLIS
-    # was given the request. Now the engine's own report of a different value refuses the point.
+def test_a_resolved_value_that_differs_from_the_passed_one_is_not_a_conflict():
+    # Design §11.2: the engine resolves its settings; the block holds the value the run passed.
     log = _log("'block_size': 16", extra="INFO Setting kv cache block size to 64 for FLASHMLA backend(s).\n")
-    assert "conflict:block_size" in _classify(log).reasons
-    # the same value as the request, or the same once typed ('1' is True), is no conflict
-    log = _log("'block_size': 64", extra="INFO Setting kv cache block size to 64 for FLASHMLA backend(s).\n")
-    assert _classify(log).reasons == []
+    c = _classify(log)
+    assert c.reasons == [] and c.mapped["engine.block_size"] == ("block_size", 16)
 
 
 def test_args_win_and_engine_lines_fill_what_args_omit():
@@ -150,57 +123,92 @@ def test_launch_config_and_args_that_disagree_conflict():
     assert "conflict:max_num_seqs" in c.reasons
 
 
-def test_the_resolved_line_is_the_engines_resolution_not_a_conflict():
-    # Asked VLLM_COMPILE; the engine ran NONE (vLLM runs DeepSeek-V4.1 uncompiled). Not a conflict,
-    # and the compile mode is judged on what ran.
-    c = _classify(_log("'compilation_config': {'mode': <CompilationMode.VLLM_COMPILE: 3>}"))
+def test_two_spellings_of_compilation_mode_the_engine_parses_alike_are_one_value():
+    # vLLM parses CompilationConfig.mode from 3 or "VLLM_COMPILE" alike (config/compilation.py:852-870).
+    launch = {"roles": {"agg": {"args": {"compilation-config": '{"mode": 3}'}}}}
+    c = _classify(_log("'compilation_config': {'mode': <CompilationMode.VLLM_COMPILE: 3>}"), launch)
     assert c.reasons == []
-    # VLLM_COMPILE (vLLM's default) and NONE are both what BLIS prices; another mode isn't.
-    c = _classify(_log("'max_num_seqs': 1", RESOLVED.replace("CompilationMode.NONE: 0", "CompilationMode.VLLM_COMPILE: 3")))
-    assert c.reasons == []
-    c = _classify(_log("'max_num_seqs': 1", RESOLVED.replace("CompilationMode.NONE: 0", "CompilationMode.STOCK_TORCH_COMPILE: 1")))
-    assert c.reasons == ["setting_not_modelled:compilation_config.mode"]
+    launch = {"roles": {"agg": {"args": {"compilation-config": '{"mode": 0}'}}}}
+    c = _classify(_log("'compilation_config': {'mode': <CompilationMode.VLLM_COMPILE: 3>}"), launch)
+    assert c.reasons == ["conflict:compilation_config.mode"]
 
 
-def test_a_setting_the_run_asked_for_and_blis_cannot_state_is_not_modelled():
+def test_a_not_modelled_field_the_run_set_with_no_rule_is_field_not_modelled():
     c = _classify(_log("'prefill_schedule_interval': 32"))
-    assert c.reasons == ["setting_not_modelled:prefill_schedule_interval"]
-    assert next(a for a in c.args if a["arg"] == "prefill_schedule_interval")["match"] == "absent_in_blis"
+    assert c.reasons == ["field_not_modelled:prefill_schedule_interval"]
 
 
-def test_a_field_printed_at_its_default_is_not_a_request():
-    # vLLM prints a config object whole: its defaults are not settings the run chose.
-    c = _classify(_log("'attention_config': AttentionConfig(backend=None, use_trtllm_attention=None, "
-                       "indexer_kv_dtype='auto', indexer_sparse_logits=False)"))
-    assert c.reasons == [] and not c.approximated
+def test_a_field_the_release_lacks_is_field_not_in_release():
+    c = _classify(_log("'brand_new_knob': 3"))
+    assert c.reasons == ["field_not_in_release:brand_new_knob"]
 
 
-def test_the_indexer_cache_dtype_is_approximated_with_its_note():
+def test_a_field_printed_at_its_default_is_not_set_by_the_run():
+    # vLLM prints a config object whole: its defaults are not settings the run chose, so even a
+    # not-modelled field there decides nothing.
+    c = _classify(_log("'compilation_config': {'custom_ops': []}, 'attention_config': AttentionConfig("
+                       "backend=None, indexer_kv_dtype='auto', indexer_sparse_logits=False)"))
+    assert c.reasons == [] and c.substitutions == []
+
+
+def test_a_not_modelled_field_with_a_leave_unset_rule_is_left_unset_and_named():
     c = _classify(_log("'attention_config': AttentionConfig(indexer_kv_dtype='mxfp4', indexer_sparse_logits=True)"))
-    assert c.reasons == [] and c.approximated
+    assert c.reasons == []
+    assert [(x["kind"], x["subject"]) for x in c.substitutions] == [
+        ("estimated", "attention_config.indexer_kv_dtype"), ("estimated", "attention_config.indexer_sparse_logits")]
     rec = {a["arg"]: a for a in c.args}
     assert rec["attention_config.indexer_kv_dtype"]["match"] == "approximated"
-    assert rec["attention_config.indexer_kv_dtype"]["note"] and "upstream" not in rec["attention_config.indexer_kv_dtype"]
-    assert rec["attention_config.indexer_sparse_logits"]["measured"] is True
+    assert "engine.indexer_kv_dtype" not in c.mapped                 # left to the engine (X19)
 
 
-def test_a_weight_format_blis_cannot_state_is_estimated_as_the_nearest_it_prices():
-    import score as sc
-    for run, blis in (("mxfp8", "fp8"), ("gpt_oss_mxfp4", "mxfp4"), ("modelopt_mixed", "modelopt_fp4")):
-        c = _classify(_log("'max_num_seqs': 1", RESOLVED.replace("quantization=fp8", f"quantization={run}")))
-        assert c.approximated and c.reasons == [], run
-        assert c.mapped["engine.quantization"][1] == blis, run
-        a = next(x for x in c.args if x["arg"] == "quantization")
-        assert a["measured"] == run and a["note"], run
-        # the diff reads the scenario back: written as the estimate, it's "approximated"
-        args = [dict(a)]
-        assert sc._diff_args(args, {"pools": [{"engine": {"quantization": blis}}]}, None) == []
-        assert args[0]["match"] == "approximated" and args[0]["blis"] == blis and "_approximated" not in args[0]
-        # a scenario that lost it is still a refusal
-        assert sc._diff_args([dict(a)], {"pools": [{"engine": {}}]}, None) == ["setting_differs:quantization"]
-    # a format BLIS prices is passed as it is
-    c = _classify(_log("'max_num_seqs': 1", RESOLVED))
-    assert not c.approximated and c.mapped["engine.quantization"][1] == "fp8"
+def test_an_inert_unproven_field_the_run_set_is_named_as_an_interim_status():
+    c = _classify(_log("'attention_config': AttentionConfig(backend='FLASHINFER')"))
+    assert c.reasons == [] and [(x["kind"], x["subject"]) for x in c.substitutions] == \
+        [("interim_status", "attention_config.backend")]
+
+
+def test_every_recorded_value_is_copied_verbatim_under_the_engines_own_names():
+    # COV-3: no value is translated; only the names the engine block renames are renamed.
+    c = _classify(_log("'max_num_seqs': 16, 'tensor_parallel_size': 1, 'kv_cache_dtype': 'fp8', "
+                       "'compilation_config': {'max_cudagraph_capture_size': 512}, "
+                       "'speculative_config': {'method': 'mtp', 'num_speculative_tokens': 2}"))
+    assert {k: v[1] for k, v in c.mapped.items() if k.startswith("engine.")} == {
+        "engine.max_num_seqs": 16, "engine.cache_dtype": "fp8", "engine.quantization": "fp8",
+        "engine.enable_prefix_caching": True, "engine.cudagraph_mode": "FULL_AND_PIECEWISE",
+        "engine.max_cudagraph_capture_size": 512,
+        "engine.speculative.method": "mtp", "engine.speculative.num_spec_tokens": 2}
+
+
+def test_every_location_is_a_field_blis_vllm_engine_block_or_the_deployment_names():
+    # The names blis-vllm rules/engineconfig/fieldnames_test.go (origin/m1/vllm) pins, and the
+    # Deployment's parallel and offload fields (blis-substrate contracts/spec/deployment).
+    engine = {"all2all_backend", "disable_custom_all_reduce", "cudagraph_mode", "max_cudagraph_capture_size",
+              "cudagraph_capture_sizes", "async_scheduling", "frontend", "disable_cascade_attn",
+              "enable_prefix_caching", "swa_bounded_replay", "block_size", "max_num_batched_tokens", "max_num_seqs",
+              "long_prefill_token_threshold", "max_model_len", "quantization", "cache_dtype", "mamba_cache_dtype",
+              "mamba_ssm_cache_dtype", "mamba_cache_mode", "gpu_memory_utilization", "scheduling_policy", "dbo",
+              "eplb", "speculative", "engram_config", "moe_backend", "dcp_comm_backend", "dcp_q_replicate",
+              "cp_kv_cache_interleave_size", "long_prefill_token_threshold_adaptive", "max_num_scheduled_tokens",
+              "max_num_active_seqs", "watermark", "prefill_schedule_interval", "stream_interval",
+              "disable_hybrid_kv_cache_manager", "kv_cache_memory_bytes", "prefix_match_unit",
+              "prefix_cache_retention_interval", "kv_events", "max_loras", "max_cpu_loras",
+              "decoder_replay_cudagraph_capture_sizes", "custom_ops", "use_trtllm_attention", "mla_prefill_backend",
+              "indexer_kv_dtype", "linear_backend", "env"}
+    parallel = {"tp", "pp", "dp", "dp_local", "enable_expert_parallel", "pcp", "dcp"}
+    for path, loc in st.LOCATIONS.items():
+        top, _, rest = loc.partition(".")
+        if top == "engine":
+            assert rest.split(".")[0] in engine, (path, loc)
+        elif top == "parallel":
+            assert rest in parallel, (path, loc)
+        elif rest.startswith("connector_options."):
+            assert rest.split(".", 1)[1] in {"load_async", "lookup_async", "enable_offload",
+                                             "enable_cross_layers_blocks", "lazy_offload", "blocks_per_chunk",
+                                             "kv_load_failure_policy"}, (path, loc)
+        else:
+            assert top in ("offload", "replay") and rest in ("connector", "spec", "tiers.cpu_dram",
+                                                             "acceptance_length"), (path, loc)
+    assert st.location("env.VLLM_FLASHINFER_ALLREDUCE_BACKEND") == "engine.env.VLLM_FLASHINFER_ALLREDUCE_BACKEND"
 
 
 def test_a_local_model_path_is_named_by_the_runs_own_recipe():
@@ -283,65 +291,32 @@ def test_gpu_memory_utilization_is_read_from_the_profiling_note_when_no_desired_
     assert [str(v) for v in r.values["gpu_memory_utilization"]] == ["0.9200"] * 2
 
 
-def test_a_fusion_pass_at_vllms_own_default_for_the_part_is_inert():
-    log = lambda tp, v: _log(f"'tensor_parallel_size': {tp}, 'compilation_config': {{'pass_config': {{'fuse_allreduce_rms': {v}}}}}")
-    k = "compilation_config.pass_config.fuse_allreduce_rms"
-
-    def cls(tp, v, family):
-        c = st.classify(st.merge(st.read_all(log(tp, v), None)[0], POLICY, DEFAULTS), POLICY, DEFAULTS, family=family)
-        return c.reasons, next(a["match"] for a in c.args if a["arg"] == k)
-    # on at tp > 1 on Blackwell / Hopper: vLLM's own default, so nothing differs
-    assert cls(4, True, 10) == ([], "inert") and cls(8, True, 9) == ([], "inert")
-    # off where vLLM would turn it on, or on where it wouldn't (tp 1, an Ampere part): a choice
-    assert cls(4, False, 10) == ([f"setting_not_modelled:{k}"], "absent_in_blis")
-    # tp 1: the pass can't run (vLLM: "AllReduce fusion pass is disabled for tp_size <= 1"),
-    # so any value is the engine vLLM ran (gpt-oss-120b b200 v0.22.0, point 033685898e93569f)
-    assert cls(1, True, 10) == ([], "inert") and cls(1, False, 10) == ([], "inert")
-    assert cls(4, True, 8) == ([f"setting_not_modelled:{k}"], "absent_in_blis")
-    # the part's architecture unknown (an AMD part has no ComputeCapability): never assumed
-    assert cls(4, True, None) == ([f"setting_not_modelled:{k}"], "absent_in_blis")
-
-
-def test_chunked_prefill_off_is_refused_whatever_the_budget():
-    # vLLM holds a prompt that doesn't fit the budget LEFT after decodes; BLIS splits it. A run
-    # with chunking off always has max_num_batched_tokens >= max_model_len (vLLM refuses to start
-    # otherwise), so that condition can't make it inert.
-    for mbt, mml in ((16384, 9472), (9472, 9472)):
-        c = _classify(_log(f"'enable_chunked_prefill': False, 'max_num_batched_tokens': {mbt}, 'max_model_len': {mml}"))
-        assert c.reasons == ["setting_not_modelled:enable_chunked_prefill"], (mbt, mml)
-
-
 def test_an_env_var_vllm_warns_is_deprecated_is_read_as_set():
     # gpt-oss-120b h200 v0.22.0 (point 0004425a4c559ee3): no launch config, but vLLM printed
     log = ("(EngineCore pid=1) /usr/lib/python3/vllm/envs.py:358: FutureWarning: VLLM_MXFP4_USE_MARLIN is "
            "deprecated and will be removed in v0.23. Use --moe-backend instead.\n")
     r = st.read_engine_lines(log + log)
     assert r.values["env.VLLM_MXFP4_USE_MARLIN"] == [True]           # once, however often it's printed
-    # an MoE-kernel selector: estimated as BLIS's default MoE kernel, not refused (the user's call)
+    # set by the run, and not modelled with no rule in the field list
     c = _classify(_log("'tensor_parallel_size': 1") + "\n" + log)
-    assert c.reasons == [] and c.approximated
-    a = next(x for x in c.args if x["arg"] == "env.VLLM_MXFP4_USE_MARLIN")
-    assert (a["measured"], a["blis"], a["match"]) == (True, False, "approximated") and a["note"]
-    # an unknown deprecated variable is unclassified, never silently passed
+    assert c.reasons == ["field_not_modelled:env.VLLM_MXFP4_USE_MARLIN"]
+    # a variable the release does not read is not in its field list
     c = _classify(_log("'tensor_parallel_size': 1") + "\n" + log.replace("VLLM_MXFP4_USE_MARLIN", "VLLM_SOMETHING_NEW"))
-    assert "setting_not_modelled:env.VLLM_SOMETHING_NEW" in c.reasons
+    assert c.reasons == ["field_not_in_release:env.VLLM_SOMETHING_NEW"]
 
 
-def test_custom_ops_all_is_vllms_own_resolution_when_the_engine_runs_uncompiled():
-    def cls(ops, mode):
-        c = _classify(_log(f"'compilation_config': {{'custom_ops': {ops}}}", RESOLVED.replace(
-            "CompilationMode.NONE: 0", mode)))
-        return c.reasons
-    k = "setting_not_modelled:compilation_config.custom_ops"
-    # mode NONE: vLLM appends "all" itself (config/vllm.py:1788-1795), so ['all'] changes nothing
-    # (DeepSeek-V4-Pro b200/b300 v0.25, e.g. point 00870be2cd0c6428)
-    assert cls("['all']", "CompilationMode.NONE: 0") == []
-    # compiled with inductor, vLLM appends "none": ['all'] is a choice
-    assert k in cls("['all']", "CompilationMode.VLLM_COMPILE: 3")
-    # any other list picks kernels at any mode
-    assert k in cls("['+rotary_embedding']", "CompilationMode.NONE: 0")
+def test_an_environment_variable_is_copied_into_the_engine_env_as_the_launch_gave_it():
+    launch = {"roles": {"agg": {"args": {"max-num-seqs": 16}, "env": {"VLLM_FLASHINFER_ALLREDUCE_BACKEND": "trtllm"}}}}
+    c = _classify(_log("'max_num_seqs': 16"), launch)
+    b = _build(c)
+    assert b.deployment["pools"][0]["engine"]["env"] == {"VLLM_FLASHINFER_ALLREDUCE_BACKEND": "trtllm"}
+    # a variable whose value the run did not record (only a deprecation warning) is not copied
+    log = "FutureWarning: VLLM_FLASHINFER_ALLREDUCE_BACKEND is deprecated and will be removed\n"
+    c = _classify(_log("'max_num_seqs': 16") + log)
+    assert c.reasons == ["required_setting_missing:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND"]
 
-def test_moe_backend_is_mapped_to_its_blis_field():
+
+def test_moe_backend_is_copied_to_the_engine_blocks_field():
     c = _classify(_log("'kernel_config': KernelConfig(moe_backend='deep_gemm_mega_moe')"))
     assert c.mapped["engine.moe_backend"][1] == "deep_gemm_mega_moe"
 
@@ -349,7 +324,7 @@ def test_moe_backend_is_mapped_to_its_blis_field():
 def test_the_rust_frontend_line_maps_to_engine_frontend():
     c = _classify(_log("'max_num_seqs': 1", extra="INFO Launching Rust frontend: /usr/bin/vllm\n"))
     assert c.mapped["engine.frontend"][1] is True
-    launch = {"roles": {"agg": {"args": {"max-num-seqs": 1}, "env": {"VLLM_USE_RUST_FRONTEND": "true"}}}}
+    launch = {"roles": {"agg": {"args": {"max-num-seqs": 1}, "env": {"VLLM_USE_RUST_FRONTEND": "1"}}}}
     assert _classify(_log("'max_num_seqs': 1"), launch).mapped["engine.frontend"][1] is True
     launch["roles"]["agg"]["env"]["VLLM_USE_RUST_FRONTEND"] = "maybe"
     assert "conflict:env.VLLM_USE_RUST_FRONTEND" in _classify(_log("'max_num_seqs': 1"), launch).reasons
@@ -367,13 +342,13 @@ def test_a_router_from_the_api_row_does_not_hide_what_the_args_line_asked_for():
     router = st.Reading()
     router.add("frontend.router", "vllm-router/consistent_hash")
     c = _classify(_log("'prefill_schedule_interval': 32"), extra_readings={"api_row": router})
-    assert c.reasons == ["setting_not_modelled:prefill_schedule_interval"]
+    assert c.reasons == ["field_not_modelled:prefill_schedule_interval"]
 
 
 def test_with_a_launch_config_an_args_only_request_still_counts():
     launch = {"roles": {"agg": {"args": {"max-num-seqs": 8}}}}
-    c = _classify(_log("'max_num_seqs': 8, 'enforce_eager': True"), launch)
-    assert "setting_not_modelled:enforce_eager" in c.reasons
+    c = _classify(_log("'max_num_seqs': 8, 'prefill_schedule_interval': 4"), launch)
+    assert "field_not_modelled:prefill_schedule_interval" in c.reasons
 
 
 def test_a_log_missing_its_args_or_resolved_line_is_unreadable():
@@ -383,14 +358,11 @@ def test_a_log_missing_its_args_or_resolved_line_is_unreadable():
     assert problems == ["server log has no `non-default args` line"]
 
 
-def test_a_new_field_under_a_wildcard_entry_refuses_when_set():
+def test_a_field_inside_a_config_object_is_decided_when_set_and_ignored_at_its_default():
     c = _classify(_log("'attention_config': AttentionConfig(backend=None, flex_attn_block_m=64)"))
-    assert c.reasons == ["unclassified_arg:attention_config.flex_attn_block_m"]
-    c = _classify(_log("'attention_config': AttentionConfig(backend=None, mla_prefill_backend='TRTLLM_RAGGED')"))
-    assert c.reasons == ["setting_not_modelled:attention_config.mla_prefill_backend"]
+    assert c.reasons == []                                       # proven inert in the fixture
     c = _classify(_log("'compilation_config': {'brand_new_knob': 7}"))
-    assert c.reasons == ["unclassified_arg:compilation_config.brand_new_knob"]
-    # The same fields at vLLM's default are not requests.
+    assert c.reasons == ["field_not_in_release:compilation_config.brand_new_knob"]
     c = _classify(_log("'attention_config': AttentionConfig(backend=None, flex_attn_block_m=None)"))
     assert c.reasons == []
 
@@ -401,50 +373,21 @@ def test_a_none_in_an_earlier_source_does_not_hide_a_later_value():
     assert c.mapped["engine.max_num_batched_tokens"][1] == 8192
 
 
-def test_a_drafter_without_a_recorded_acceptance_takes_blis_registry_default():
-    import score as sc
-    c = _classify(_log("'speculative_config': {'method': 'dspark', 'num_speculative_tokens': 5, "
-                       "'rejection_sample_method': 'standard'}"))
-    assert "setting_not_modelled:speculative_config.rejection_sample_method" in c.reasons
+def test_a_drafter_without_a_recorded_acceptance_takes_its_estimation_rule():
+    # leave_unset in the fixture: the acceptance is left to the simulator's own registry, named.
     c = _classify(_log("'tensor_parallel_size': 1, 'max_num_seqs': 8, 'max_num_batched_tokens': 4096, 'block_size': 128, "
                        "'gpu_memory_utilization': 0.9, 'speculative_config': {'method': 'dspark', 'num_speculative_tokens': 5}"))
-    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="v0.31.0", defaults=H200_DEFAULTS)
-    assert b.reasons == [] and b.acceptance_needed == ("dspark", 5) and b.acceptance_length is None
-
-    class Env:
-        defaults_helper, registry = "blisdefaults", "reg"
-    calls = []
-
-    def fake_run(argv, **kw):
-        calls.append(argv)
-        return type("P", (), {"returncode": 0, "stdout": json.dumps(
-            {"acceptance_length": 4.07, "fallback_from": "(none)", "measured_on": "b200",
-             "profile": "m/dspark/k5/thinking-off/coding", "set": "s"})})()
-    orig = sc.subprocess.run
-    try:
-        sc.subprocess.run = fake_run
-        completions = '"POST /v1/completions HTTP/1.1" 200'
-        args = []
-        assert sc.acceptance_default(args, b, Env(), completions, "h200", "m") == []
-        assert args[0]["blis"] == "4.07" and args[0]["match"] == "approximated" and args[0]["measured"] is None
-        assert "registry default m/dspark/k5/thinking-off/coding (measured on b200)" in args[0]["note"]
-        assert calls[0][calls[0].index("-thinking") + 1] == "off"
-        # chat requests: the thinking mode depends on template arguments the log doesn't state
-        assert sc.acceptance_default([], b, Env(), '"POST /v1/chat/completions HTTP/1.1"', "h200", "m") == \
-            ["required_setting_missing:speculative_config.synthetic_acceptance_length"]
-        # BLIS has no profile for the drafter: refused, never guessed
-        sc.subprocess.run = lambda argv, **kw: type("P", (), {"returncode": 1, "stdout": ""})()
-        assert sc.acceptance_default([], b, Env(), completions, "h200", "m") == \
-            ["required_setting_missing:speculative_config.synthetic_acceptance_length"]
-    finally:
-        sc.subprocess.run = orig
+    b = _build(c)
+    assert b.reasons == [] and b.acceptance_length is None
+    assert [(x["kind"], x["subject"]) for x in b.substitutions] == \
+        [("estimated", "speculative_config.synthetic_acceptance_length")]
 
 
 def test_the_flat_and_nested_spellings_of_one_setting_agree_or_conflict():
-    c = _classify(_log("'moe_backend': 'deep_gemm_mega_moe'"))
-    assert c.mapped["engine.moe_backend"][1] == "deep_gemm_mega_moe" and c.reasons == []
-    c = _classify(_log("'moe_backend': 'aiter', 'kernel_config': KernelConfig(moe_backend='deep_gemm_mega_moe')"))
-    assert c.reasons == ["conflict:moe_backend"]
+    c = _classify(_log("'max_cudagraph_capture_size': 512, 'compilation_config': {'max_cudagraph_capture_size': 512}"))
+    assert c.mapped["engine.max_cudagraph_capture_size"][1] == 512 and c.reasons == []
+    c = _classify(_log("'max_cudagraph_capture_size': 256, 'compilation_config': {'max_cudagraph_capture_size': 512}"))
+    assert len(c.reasons) == 1 and c.reasons[0].startswith("conflict:")
 
 
 def test_offload_bytes_printed_as_floats_and_ranks_that_disagree():
@@ -452,27 +395,37 @@ def test_offload_bytes_printed_as_floats_and_ranks_that_disagree():
             "'gpu_memory_utilization': 0.9, 'kv_transfer_config': KVTransferConfig(kv_connector='SimpleCPUOffloadConnector', "
             "kv_connector_extra_config={'cpu_bytes_to_use': 53687091200.0})")
     c = _classify(_log(base))
-    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="v0.31.0", defaults=H200_DEFAULTS)
+    b = _build(c)
     assert b.reasons == [] and b.deployment["offload"]["tiers"][0]["bytes"] == 53687091200
     lines = "SimpleCPUOffloadConnector: role=WORKER, per_rank=50.00 GB, world_size=1\n" \
             "SimpleCPUOffloadConnector: role=WORKER, per_rank=40.00 GB, world_size=1\n"
-    b = st.build(_classify(_log(base, extra=lines)), name="p", model="m", part=PART_H200,
-                 engine_version="v0.31.0", defaults=H200_DEFAULTS)
+    b = _build(_classify(_log(base, extra=lines)))
     assert b.reasons == ["conflict:offload.per_rank_gib"]
 
 
 def test_parallelism_must_come_from_the_run():
     c = _classify(_log("'max_num_seqs': 8", "model='m', quantization=fp8"))
-    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="v0.31.0", defaults=H200_DEFAULTS)
+    b = _build(c)
     assert {"required_setting_missing:parallel.tp", "required_setting_missing:parallel.dp"} <= set(b.reasons)
 
 
 def test_an_unknown_client_input_refuses():
     r = rp.from_export(_export(phase={"brand_new_pacing": 2}))
-    assert "unclassified_arg:replay.phase.brand_new_pacing" in r.reasons
+    assert "client_scenario_not_replayable:phase.brand_new_pacing" in r.reasons
     r = rp.from_export(_export())
     rp.cross_check(r, "aiperf profile --benchmark-grace-period 30 'unterminated", 8)
     assert r.reasons == ["conflict:replay.command_unreadable"]
+
+
+def test_the_dashboard_holds_no_settings_table():
+    # COV-3, design §11.1: field status and estimation rules come only from the engine's
+    # fields.json. No file in the orchestrator classifies a setting.
+    root = HERE.parent
+    assert not (root / "vllm_arg_policy.yaml").exists()
+    for f in sorted(root.rglob("*.py")) + sorted(root.rglob("*.yaml")):
+        text = f.read_text()
+        for word in ("class: mapped", "class: inert", "class: refuse", "class: approximate", "load_policy"):
+            assert word not in text or f.name == "test_extract.py", (f, word)
 
 
 def test_the_vllm_defaults_table_is_read_from_vllm_and_covers_printed_configs():
@@ -484,37 +437,34 @@ def test_the_vllm_defaults_table_is_read_from_vllm_and_covers_printed_configs():
 
 # ------------------------------------------------------------------ the deployment written
 
-PART_H200 = st.Part(name="h200", memory_gib=139.80072021)
-H200_DEFAULTS = {"device": "h200", "max_num_batched_tokens": 8192, "max_num_seqs": 1024, "memory_gib": 139.80072021}
+PART_H200 = st.Part(name="h200")
 
 
-def test_a_required_setting_nothing_recorded_takes_the_blis_default():
-    c = _classify(_log("'tensor_parallel_size': 8, 'max_num_batched_tokens': 8192",
-                       RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=8"),
-                       extra="Setting kv cache block size to 64 for X\nDesired GPU memory utilization is (0.92, 128 GiB).\n"))
-    b = st.build(c, name="p", model="deepseek-v4.1-flash", part=PART_H200, engine_version="v0.31.0",
-                 defaults=H200_DEFAULTS)
-    eng = b.deployment["pools"][0]["engine"]
-    assert eng["max_num_seqs"] == 1024 and eng["max_num_batched_tokens"] == 8192
-    used = b.defaults_used
-    assert [u["arg"] for u in used] == ["max_num_seqs"] and used[0]["source"] == "blis_default"
-    assert b.reasons == []
-
-
-def test_a_required_setting_with_no_source_and_no_default_refuses():
+def test_a_required_value_nothing_recorded_takes_its_estimation_rule_or_is_not_recorded():
+    # max_num_seqs and block_size are leave_unset in the fixture: left to the engine, named.
+    # max_num_batched_tokens has no rule: the point is not scored (value_not_recorded).
     c = _classify(_log("'tensor_parallel_size': 1"))
-    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="v0.31.0", defaults=None)
-    assert sorted(b.reasons) == ["required_setting_missing:gpu_memory_utilization",
-                                 "required_setting_missing:max_num_batched_tokens", "required_setting_missing:max_num_seqs"]
-    # block_size is left to BLIS's kernel, which resolves it as vLLM would; score.py records it.
-    assert b.kernel_resolves == ["block_size"] and "block_size" not in b.deployment["pools"][0]["engine"]
+    b = _build(c)
+    eng = b.deployment["pools"][0]["engine"]
+    assert "max_num_seqs" not in eng and "block_size" not in eng
+    assert {x["subject"] for x in b.substitutions} == {"block_size", "max_num_seqs"}
+    assert b.reasons == ["required_setting_missing:max_num_batched_tokens"]
+
+
+def test_a_built_scenario_holds_only_recorded_values_and_states_engine_version_from_stack_json():
+    # X19: nothing the run did not record is written; engine_version is the release passed in.
+    c = _classify(_log("'tensor_parallel_size': 1, 'max_num_batched_tokens': 4096"))
+    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="0.32.0", field_list=FIELDS)
+    assert b.scenario["engine_version"] == "0.32.0"
+    recorded = {loc.split(".", 1)[1] for loc in c.mapped if loc.startswith("engine.")}
+    assert set(b.deployment["pools"][0]["engine"]) == recorded
 
 
 def test_the_cluster_is_sized_to_the_runs_own_gpus():
     c = _classify(_log("'tensor_parallel_size': 1, 'data_parallel_size': 2, 'enable_expert_parallel': True, "
                        "'max_num_seqs': 16, 'max_num_batched_tokens': 4096, 'block_size': 128, 'gpu_memory_utilization': 0.9",
                        RESOLVED.replace("data_parallel_size=1", "data_parallel_size=2")))
-    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="v0.31.0", defaults=H200_DEFAULTS)
+    b = _build(c)
     assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 1, "gpus_per_node": 2}
     assert b.scenario["engine_version"] == "0.31.0"
     par = b.deployment["pools"][0]["parallel"]
@@ -530,10 +480,21 @@ def test_offload_bytes_are_the_engines_from_the_server_wide_total():
             "kv_connector_extra_config={'cpu_bytes_to_use': 1000000000003, 'lazy_offload': True})")
     c = _classify(_log(args, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=4"),
                        extra="SimpleCPUOffloadConnector: role=WORKER, per_rank=232.83 GB, world_size=4\n"))
-    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="v0.31.0", defaults=H200_DEFAULTS)
+    b = _build(c)
     assert b.reasons == [], b.reasons
     assert b.deployment["offload"] == {"connector": "SimpleCPUOffloadConnector", "spec": "lazy",
                                        "tiers": [{"tier": "cpu_dram", "bytes": (1000000000003 // 4) * 4}]}
+
+
+def test_a_connectors_own_options_are_copied_to_the_offload_blocks_connector_options():
+    args = ("'tensor_parallel_size': 1, 'max_num_seqs': 8, 'max_num_batched_tokens': 4096, 'block_size': 128, "
+            "'kv_transfer_config': KVTransferConfig(kv_connector='MooncakeStoreConnector', kv_role='kv_both', "
+            "kv_load_failure_policy='recompute', kv_connector_extra_config={'cpu_bytes_to_use': 1073741824, "
+            "'load_async': False, 'enable_cross_layers_blocks': True})")
+    b = _build(_classify(_log(args)))
+    assert b.reasons == [], b.reasons
+    assert b.deployment["offload"]["connector_options"] == {
+        "enable_cross_layers_blocks": True, "kv_load_failure_policy": "recompute", "load_async": False}
 
 
 def test_offload_bytes_that_disagree_with_the_logged_per_rank_figure_conflict():
@@ -543,7 +504,7 @@ def test_offload_bytes_that_disagree_with_the_logged_per_rank_figure_conflict():
             "kv_connector_extra_config={'cpu_bytes_to_use': 1000000000000})")
     c = _classify(_log(args, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=4"),
                        extra="SimpleCPUOffloadConnector: role=WORKER, per_rank=50.00 GB, world_size=4\n"))
-    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="v0.31.0", defaults=H200_DEFAULTS)
+    b = _build(c)
     assert b.reasons == ["conflict:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use"]
 
 
@@ -590,7 +551,7 @@ def test_another_client_scenario_is_not_replayable():
 
 def test_a_system_idle_cap_other_than_the_locked_one_is_not_modelled():
     r = rp.from_export(_export(phase={"system_idle_gap_cap_seconds": 30.0}))
-    assert "setting_not_modelled:replay.system_idle_gap_cap_seconds" in r.reasons
+    assert "client_scenario_not_replayable:system_idle_gap_cap_seconds" in r.reasons
 
 
 # ------------------------------------------------------------------ support checks
@@ -629,49 +590,6 @@ def test_support_refuses_an_unknown_model_part_or_drafter():
     assert s.reasons == ["drafter_not_in_catalog:eagle3"]
 
 
-def test_what_blis_used_for_an_estimated_setting_is_read_from_blis():
-    import score as sc
-    res = {"cache_dtype": "nvfp4_ds_mla", "assumptions": [],
-           "overrides": [{"field": "cache_dtype", "requested": "fp8", "resolved": "nvfp4_ds_mla", "reason": "r"}],
-           "caches": [{"name": "index", "kind": "index", "bytes_per_entry": 132, "head_dim": 128},
-                      {"name": "swa", "kind": "window", "bytes_per_entry": 528, "head_dim": 512}]}
-
-    def args():
-        return [{"arg": "attention_config.backend", "measured": "FLASHINFER_MLA_SPARSE_DSV41", "blis": None,
-                 "match": "approximated", "_blis_from": "resolved.cache_dtype"},
-                {"arg": "attention_config.indexer_kv_dtype", "measured": "mxfp4", "blis": None,
-                 "match": "approximated", "_blis_from": "priced.index_cache"}]
-    orig = sc.blis_resolution
-    try:
-        sc.blis_resolution = lambda env, d, f: res
-        a = args()
-        assert sc.fill_blis_side(a, None, Path("."), "s.yaml", "m") == []
-        assert [x["blis"] for x in a] == ["nvfp4_ds_mla", "fp8"]
-        assert all("_blis_from" not in x for x in a)
-        # No override (the run's cache dtype is what BLIS runs): still read, from cache_dtype.
-        sc.blis_resolution = lambda env, d, f: {**res, "overrides": [], "cache_dtype": "fp8_ds_mla"}
-        a = args()
-        assert sc.fill_blis_side(a, None, Path("."), "s.yaml", "m") == [] and a[0]["blis"] == "fp8_ds_mla"
-        # An indexer record no vLLM layout names, or two that differ: refused, never named.
-        for caches in ([{"kind": "index", "bytes_per_entry": 100, "head_dim": 128}],
-                       [{"kind": "index", "bytes_per_entry": 132, "head_dim": 128},
-                        {"kind": "index", "bytes_per_entry": 68, "head_dim": 128}]):
-            sc.blis_resolution = lambda env, d, f, c=caches: {**res, "caches": c}
-            assert sc.fill_blis_side(args(), None, Path("."), "s.yaml", "m") == \
-                ["setting_differs:attention_config.indexer_kv_dtype"], caches
-        # A model with no sparse indexer (Kimi): the setting changes nothing; inert, not estimated.
-        sc.blis_resolution = lambda env, d, f: {**res, "caches": [{"kind": "kv", "bytes_per_entry": 576, "head_dim": 576}]}
-        a = args()[1:]
-        assert sc.fill_blis_side(a, None, Path("."), "s.yaml", "m") == [] and a[0]["match"] == "inert"
-        assert sc.substitutions({"args": a}) == []
-        # BLIS refuses the scenario: its refusal is the reason, never a crash.
-        sc.blis_resolution = lambda env, d, f: "blis_refused:quantization_mxfp8_is_not_one_this_kernel_prices"
-        assert "blis_refused:quantization_mxfp8_is_not_one_this_kernel_prices" in sc.fill_blis_side(
-            args(), None, Path("."), "s.yaml", "m")
-    finally:
-        sc.blis_resolution = orig
-
-
 def test_an_inferencex_hardware_label_names_one_catalog_part():
     cat = sp.Catalog(root=Path("."), hardware={"b200": 178.0, "gb200-nvl72": 184.0, "a100-80": 79.2, "a100-sxm": 39.4})
     parts = {"b200", "gb200-nvl72", "a100-80", "a100-sxm"}
@@ -680,14 +598,6 @@ def test_an_inferencex_hardware_label_names_one_catalog_part():
     assert sp.catalog_part(cat, parts, "a100") is None                   # two variants: not guessed
     assert sp.catalog_part(cat, parts, "mi355x") is None                 # none
     assert sp.catalog_part(cat, parts - {"gb200-nvl72"}, "gb200") is None   # no coefficients for it
-
-
-def test_an_indexer_record_is_named_by_vllms_layout_for_its_head_width():
-    # vLLM v0.31.0: fp8 = d_h + 4-byte scale; mxfp4 = d_h/2 + d_h/32 ue8m0 scales; bf16 = 2*d_h.
-    assert [sp.index_record_format(w, 128) for w in (132, 68, 256)] == ["fp8", "mxfp4", "bf16"]
-    assert [sp.index_record_format(w, 64) for w in (68, 34, 128)] == ["fp8", "mxfp4", "bf16"]
-    assert sp.index_record_format(100, 128) is None          # no layout gives 100 B
-    assert sp.index_record_format(132, 0) is None            # no head width stated: not guessed
 
 
 def test_the_rows_gpu_count_is_read_in_inferencex_terms():
@@ -714,21 +624,21 @@ def test_the_rows_gpu_count_is_read_in_inferencex_terms():
     assert t(row(decode_tp=8, decode_ep=1, num_decode_gpu=8), C(tp=1, dp=8)) == ["conflict:tp"]
 
 
-def _graded(*, image="vllm/vllm-openai:v0.32.0", banner="0.32.0", args=(), requests=None, reasons=(),
+def _graded(*, image="vllm/vllm-openai:v0.32.0", banner="0.32.0", subs=(), requests=None, reasons=(),
             scored=True, build_match="exact"):
     import score as sc
     o = sc.Outcome(point_id="p" * 64, identity={}, row={"image": image}, reasons=list(reasons),
-                   build={"image": image, "match": build_match}, banner=banner)
+                   build={"image": image, "match": build_match}, banner=banner, subs=list(subs))
     if scored:
-        o.fidelity = {"build": o.build, "args": list(args), "resolved": [],
+        o.fidelity = {"build": o.build, "args": [], "resolved": [],
                       **({"requests": requests} if requests else {})}
         o.csv_row = [None] * 12
     sc.grade_outcome(o, "0.32.0")
     return o
 
 
-APPROX = {"arg": "quantization", "match": "approximated", "note": "fp8 for mxfp8"}
-DEFAULTED = {"arg": "max_num_seqs", "match": "blis_default", "rule": "ResolveVLLMBatchDefaults"}
+APPROX = {"kind": "estimated", "subject": "quantization", "detail": "left unset"}
+DEFAULTED = {"kind": "estimated", "subject": "max_num_seqs", "detail": "not recorded; left unset"}
 
 
 def test_a_point_is_g1_only_on_the_release_the_simulator_runs_with_nothing_substituted():
@@ -741,11 +651,11 @@ def test_a_point_is_g1_only_on_the_release_the_simulator_runs_with_nothing_subst
 
 def test_every_estimate_and_client_difference_is_named_and_makes_the_point_g2():
     gap = {"kind": "client_difference", "subject": "send_gap", "detail": "x"}
-    o = _graded(args=[APPROX, DEFAULTED], requests={"differences": [gap]})
+    o = _graded(subs=[APPROX, DEFAULTED], requests={"differences": [gap]})
     assert o.fidelity["grade"] == "G2"
     assert [(s["kind"], s["subject"]) for s in o.fidelity["substitutions"]] == [
         ("client_difference", "send_gap"), ("estimated", "max_num_seqs"), ("estimated", "quantization")]
-    assert o.fidelity["substitutions"][2]["detail"] == "fp8 for mxfp8"
+    assert o.fidelity["substitutions"][2]["detail"] == "left unset"
 
 
 def test_another_release_or_a_nightly_build_is_g4_and_says_so():
@@ -789,25 +699,6 @@ def test_a_multi_node_or_disaggregated_run_records_no_fabric_so_its_value_is_not
         assert reasons == ["required_setting_missing:multi_node_fabric"]
         assert asx.g5_of(reasons[0]) == {"code": "value_not_recorded", "subject": "multi_node_fabric"}
     assert pl._row_reasons({"disagg": False, "is_multinode": False}) == []
-
-
-def test_a_block_size_no_source_recorded_is_the_one_blis_resolves():
-    import score as sc
-    orig = sc.blis_resolution
-    try:
-        sc.blis_resolution = lambda env, d, f: {"overrides": [], "assumptions": [
-            {"name": "block_size", "value": "16", "reason": "CacheConfig.DEFAULT_BLOCK_SIZE"}]}
-        args = []
-        assert sc.kernel_defaults(args, ["block_size"], None, Path("."), "s.yaml") == []
-        assert args == [{"arg": "block_size", "measured": None, "source": "blis_default", "blis": 16,
-                         "match": "blis_default", "rule": "BLIS kernel: CacheConfig.DEFAULT_BLOCK_SIZE"}]
-        sc.blis_resolution = lambda env, d, f: {"overrides": [], "assumptions": []}
-        assert sc.kernel_defaults([], ["block_size"], None, Path("."), "s.yaml") == ["required_setting_missing:block_size"]
-        sc.blis_resolution = lambda env, d, f: "blis_refused:x"
-        assert sc.kernel_defaults([], ["block_size"], None, Path("."), "s.yaml") == ["blis_refused:x"]
-        assert sc.kernel_defaults([], [], None, Path("."), "s.yaml") == []       # nothing left to BLIS
-    finally:
-        sc.blis_resolution = orig
 
 
 def _A(i, name, t, expired=False):
@@ -896,16 +787,6 @@ def test_an_escaped_quote_inside_a_string_does_not_end_it():
     text = "non-default args: {'a': 'it\\'s {not} a brace', 'b': 1} tail }"
     got = st._balanced(text, text.index("{"))
     assert got == "{'a': 'it\\'s {not} a brace', 'b': 1}", got
-
-
-def test_a_list_setting_given_a_non_list_refuses_instead_of_writing_null():
-    entry = {"type": "list"}
-    assert st._typed(entry, [1, 2]) == [1, 2]
-    try:
-        st._typed(entry, 8)
-    except ValueError:
-        return
-    raise AssertionError("a non-list list value was accepted")
 
 
 def test_a_sweep_is_one_curve_of_inferencex_rows():
@@ -1070,32 +951,36 @@ def test_run_and_attempt_from_run_url():
     assert api.run_of({"run_url": None}) is None
 
 
-# ------------------------------------------------------------------ policy coverage on real logs
+# ------------------------------------------------------------------ real logs
 
 LOGS = HERE / "testdata" / "logs"
 
 
-# The parts' CUDA compute-capability majors, as the pinned catalog states them (catalog
-# hardware/*.yaml ComputeCapability); AMD and TPU parts state none.
-CATALOG_FAMILY = {"h100": 9, "h200": 9, "b200": 10, "b300": 10, "gb200": 10, "gb300": 10}
-
-
-def test_every_arg_in_the_committed_real_logs_classifies_as_recorded():
+def test_every_value_a_real_log_records_is_read_and_copied_verbatim():
     """One excerpt per InferenceX deployment shape seen in the 2026-09-20..10-23 window (the
-    lines the extractor reads, verbatim). Every path classifies (no unclassified_arg), the
-    logs read whole, and each deployment's outcome is the one expected.json records. A policy
-    edit that changes any of them shows up here and has to be re-recorded on purpose."""
-    expected = json.loads((LOGS / "expected.json").read_text())
-    assert len(expected) >= 40
-    for name, want in sorted(expected.items()):
+    lines the extractor reads, verbatim). Each reads whole, and every value it records that the
+    scenario has a place for is copied there unchanged, under the engine block's name (COV-3).
+    The field list here is every recorded path, modelled, so nothing is estimated or refused."""
+    names = sorted(p.name[:-len(".server-log.txt")] for p in LOGS.glob("*.server-log.txt"))
+    assert len(names) >= 40
+    for name in names:
         launch_path = LOGS / f"{name}.launch.json"
         launch = json.loads(launch_path.read_text()) if launch_path.exists() else None
         readings, problems = st.read_all((LOGS / f"{name}.server-log.txt").read_text(), launch)
-        part = name.split("-")[1]
-        c = st.classify(st.merge(readings, POLICY, DEFAULTS), POLICY, DEFAULTS, family=CATALOG_FAMILY.get(part))
-        got = {"problems": problems, "reasons": c.reasons, "approximate": c.approximated}
-        assert got == want, (name, got, want)
-        assert not [r for r in c.reasons if r.startswith("unclassified_arg")], name
+        assert problems == [], (name, problems)
+        merged = st.merge(readings, DEFAULTS)
+        everything = fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.31.0"},
+            "fields": sorted(({"name": p[4:] if p.startswith("env.") else p,
+                               "source": "env" if p.startswith("env.") else "config", "status": "modelled",
+                               "evidence": {"traces": ["t"]}, "estimation": {"rule": "none"}} for p in merged),
+                             key=lambda f: (f["name"], f["source"]))}))
+        d = st.decide(merged, everything)
+        for loc, (path, value) in d.mapped.items():
+            s_ = merged[path]
+            assert st._canon(value) == st._canon(st._yaml_value(s_.value)) or loc == "engine.frontend", (name, path)
+            # The passed value where the run passed one; the resolved one only where it passed none.
+            passed = [v for x in st.PASSED for v in readings[x].values.get(path, []) if v is not None]
+            assert s_.source in st.PASSED or not passed, (name, path)
 
 
 if __name__ == "__main__":

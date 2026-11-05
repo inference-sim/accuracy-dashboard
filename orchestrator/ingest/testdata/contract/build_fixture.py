@@ -6,10 +6,10 @@ The values are illustrative, shaped like real InferenceX rows from Discussion #2
 pull scored by an older BLIS release, with different predictions, and one point that BLIS
 refused, listed as failed, so Compare sees a shrunk intersection.
 
-Each point is graded by grade.grade from its build and substitutions (design §11.3), with the
-engine release both runs score on, ENGINE: a nightly or custom build is G4; an official image
-of ENGINE with a substitution is G2, with none G1; another release is G4, since no engine
-publishes its ported-function list yet.
+Each point is graded by grade.grade from its build and the substitutions its settings named
+(design §11.3), with the engine release both runs score on, ENGINE: a nightly or custom build is
+G4; an official image of ENGINE with a substitution is G2, with none G1; another release is G4,
+since no engine publishes its ported-function list yet.
 
 Usage: build_fixture.py [OUT_DIR]   (default: this directory, i.e. regenerate the committed fixture)
 test_contract.py generates into a temporary directory and checks the committed files match it.
@@ -33,7 +33,7 @@ import score as sc  # noqa: E402
 ENGINE = "0.31.0"
 
 VLLM_REF = "v0.31.0"
-POLICY_SHA = "1" * 64
+FIELDS_SHA = "1" * 64
 CORPUS = {"dataset": "semianalysisai/cc-traces-weka-062126",
           "revision": "23f152f6f0f9399a85901b89a6458def0ef16729",
           "sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276"}
@@ -74,15 +74,13 @@ def common_args(seqs, seqs_src, block, gmu, gmu_src):
     ]
 
 
-# Approximations are fixed text per arg (the policy table's).
+# An estimate is the field list's estimation rule, named on the point (fields.decide).
+LEFT_UNSET = "left unset; the engine resolves the upstream default"
 APPROX = {
-    "attention_config.indexer_kv_dtype": {
-        "note": "No Deployment key states the indexer cache dtype, so BLIS prices the default FP8 "
-                "indexer record (132 B/entry) where the run used MXFP4 (68 B)."},
-    "attention_config.indexer_sparse_logits": {
-        "note": "vLLM's sparse-logits indexer needs the MXFP4 indexer cache; with the FP8 record BLIS "
-                "prices, it's the dense-logits indexer."},
+    "attention_config.indexer_kv_dtype": {"note": LEFT_UNSET},
+    "attention_config.indexer_sparse_logits": {"note": LEFT_UNSET},
 }
+NOT_RECORDED = "not recorded; left unset, so the engine resolves the upstream default"
 SEND_GAP = {"kind": "client_difference", "subject": "send_gap",
             "detail": "the simulator admits the next request at the step that emitted the previous request's last "
                       "token; the client sends it after the response stream closes, an interval not modelled"}
@@ -126,14 +124,13 @@ POINTS = [
      "meas": (760.0, 6.90), "pred": {"a": (720.0, 6.10), "b": (790.0, 5.95)},
      "fidelity": {"build": B_OLD,
                   "args": [arg("block_size", 64, 64, "exact", "engine_line"),
-                           arg("gpu_memory_utilization", "0.92", "0.92", "exact", "engine_line"),
-                           arg("max_num_seqs", None, 1024, "blis_default", "blis_default",
-                               rule="ResolveVLLMBatchDefaults: >=70 GiB, not A100 (vLLM v0.31.0 OpenAI-server tier)")],
+                           arg("gpu_memory_utilization", "0.92", "0.92", "exact", "engine_line")],
+                  "_subs": [{"kind": "estimated", "subject": "max_num_seqs", "detail": NOT_RECORDED}],
                   "resolved": [{"quantity": "kv_cache_tokens_per_replica", "measured": 31006342,
                                 "blis": None, "match": "unreadable"}],
                   "replay": {**REPLAY, "concurrency": 1}, "blis_kernel_provenance": None}},
-    # DeepSeek-V4.1-Flash b200 DEP2 c8: MegaMoE mapped, router inert, and the MXFP4 indexer
-    # cache approximated (BLIS prices the default FP8 record), so the point is approximate.
+    # DeepSeek-V4.1-Flash b200 DEP2 c8 on a nightly build: MegaMoE copied into the engine block's
+    # moe_backend, and the MXFP4 indexer cache left unset by the field list's estimation rule.
     {"row": {"model": "dsv41flash", "hardware": "b200", "precision": "fp4", "framework": "vllm",
              "benchmark_type": "agentic_traces", "recipe_fingerprint": "c8" * 32, "conc": 8,
              "date": "2026-10-03", "curve_workflow_run_id": "2560"},
@@ -143,14 +140,14 @@ POINTS = [
                 "image": B_AC91["image"], "vllm_version": "0.30.1rc1.dev493+gac9126e58"},
      "meas": (1180.0, 5.10), "pred": {"a": (1043.9, 4.447), "b": (1210.0, 4.30)},
      "fidelity": {"build": B_AC91,
-                  "args": [arg("attention_config.indexer_kv_dtype", "mxfp4", "fp8", "approximated", "args",
+                  "_subs": [{"kind": "estimated", "subject": k, "detail": v["note"]} for k, v in APPROX.items()],
+                  "args": [arg("attention_config.indexer_kv_dtype", "mxfp4", None, "approximated", "args",
                                **APPROX["attention_config.indexer_kv_dtype"]),
-                           arg("attention_config.indexer_sparse_logits", True, False, "approximated", "args",
+                           arg("attention_config.indexer_sparse_logits", True, None, "approximated", "args",
                                **APPROX["attention_config.indexer_sparse_logits"]),
                            arg("block_size", 128, 128, "exact", "engine_line"),
                            arg("data_parallel_size", 2, 2, "exact", "args"),
                            arg("enable_expert_parallel", True, True, "exact", "args"),
-                           arg("frontend.router", "vllm-router/consistent_hash", None, "inert", "api_row"),
                            arg("gpu_memory_utilization", "0.97", "0.97", "exact", "args"),
                            arg("kernel_config.moe_backend", "deep_gemm_mega_moe", "deep_gemm_mega_moe",
                                "mapped", "args", blis_field="engine.moe_backend"),
@@ -278,10 +275,12 @@ def write_run(name: str, run: dict, base: Path) -> Path:
                        "precision": ident["precision"], "framework": "vllm", "serving": "aggregated",
                        "spec_method": f["spec_method"], "parallelism": f["parallelism"],
                        "image": f["image"], "vllm_version": f["vllm_version"]}
-        fid = {k: v for k, v in p["fidelity"].items() if v is not None or k == "blis_kernel_provenance"}
+        fid = {k: v for k, v in p["fidelity"].items()
+               if (v is not None or k == "blis_kernel_provenance") and k != "_subs"}
         fid["args"] = sorted(fid["args"], key=lambda a: a["arg"])
         fid["resolved"] = sorted(fid["resolved"], key=lambda r: r["quantity"])
-        g = gr.grade(engine_version=ENGINE, release=rel, substitutions=sc.substitutions(fid))
+        g = gr.grade(engine_version=ENGINE, release=rel,
+                     substitutions=sc.substitutions(p["fidelity"].get("_subs", []), fid))
         fid.update(grade=g.grade, substitutions=g.substitutions, run_release=rel.version)
         pttft, ptpot = p["pred"][name]
         rows.append([f["scenario"], f["model"], f["gpu"], f["label"], ident["conc"],
@@ -311,7 +310,7 @@ def write_run(name: str, run: dict, base: Path) -> Path:
     prov = {"ingest": "api", "blis": run["blis"], "engine": {"kind": "vllm", "version": ENGINE},
             "points": len(POINTS) + len(NOT_SCORED), "left_out_records": 3,
             "vllm_ref": VLLM_REF, "vllm_max_distance": 2000,
-            "policy_sha256": POLICY_SHA, "pulled_at": "2026-10-23T00:00:00Z", "corpus": CORPUS,
+            "fields_sha256": FIELDS_SHA, "pulled_at": "2026-10-23T00:00:00Z", "corpus": CORPUS,
             "pull_manifest_sha256": "2" * 64,
             "source": {"name": "SemiAnalysis InferenceX API", "url": "https://inferencex.semianalysis.com/api/v1/"}}
     (out / PROVENANCE_JSON).write_text(canonical_dumps(prov) + "\n")

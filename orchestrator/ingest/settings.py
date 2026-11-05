@@ -1,26 +1,24 @@
-"""Read every setting a run recorded, classify it, and build the deployment BLIS is handed
-(Discussion #28, "Engine settings").
+"""Read every setting a run recorded, decide each by the engine's field list, and build the
+deployment BLIS is handed (design §11.2; COV-3).
 
-Sources, in order; for each setting the first that states it wins, and two that state
-different values are a conflict:
+Sources, in order; for each setting the first that states it wins:
 
   1. launch_config    the srt launch config's role args + env (artifact), when the run has one;
   2. args             the server log's `non-default args: {...}`;
   3. resolved_config  the server log's `Initializing a V1 LLM engine (v…) with config: …`;
   4. engine_line      lines vLLM prints even for a setting it wasn't passed (ENGINE_LINES);
-  5. blis_default     BLIS's own resolver (orchestrator/blisdefaults), only for a setting
-                      BLIS requires that nothing above recorded.
+  5. api_row          the InferenceX row (the router a run was measured behind).
 
-A policy entry may restrict where its value is read (`source_only`) or prefer one source
-(`source_prefer`): the compile mode is what the engine resolved, not what was asked.
+The first two record the values passed, the next two the values resolved. Two sources of the
+same stage that disagree are a conflict (G5 value_conflict). A resolved value that differs from
+a passed one is not a conflict: the engine resolves its settings, and blis-vllm reproduces that.
 
-Every path the run recorded is classified by orchestrator/vllm_arg_policy.yaml; an unknown
-path refuses the point (unclassified_arg). Engine outcomes (the KV pool) are compared after
-the replay and never written here.
+Which fields are modelled, and each field's estimation rule, come only from the engine's field
+list (fields.py, VLM-3). The dashboard holds no settings table of its own (§11.1). Engine
+outcomes (the KV pool) are compared after the replay and never written here.
 """
 from __future__ import annotations
 
-import fnmatch
 import hashlib
 import json
 import re
@@ -29,14 +27,13 @@ from pathlib import Path
 
 import pyrepr
 
-POLICY_PATH = Path(__file__).resolve().parent.parent / "vllm_arg_policy.yaml"
 VLLM_DEFAULTS_PATH = Path(__file__).resolve().parent.parent / "vllm_defaults.json"
 
 
 def load_vllm_defaults(path: Path = VLLM_DEFAULTS_PATH) -> tuple[dict, str]:
     raw = path.read_bytes()
     return json.loads(raw)["defaults"], hashlib.sha256(raw).hexdigest()
-SOURCES = ("launch_config", "args", "resolved_config", "engine_line", "api_row", "blis_default")
+SOURCES = ("launch_config", "args", "resolved_config", "engine_line", "api_row")
 
 # Lines vLLM prints with what it resolved, whether or not the flag was passed. Each pattern's
 # groups become (path, value). A line printed once per rank must agree across ranks.
@@ -56,26 +53,6 @@ _DEPRECATED_ENV = re.compile(r"FutureWarning: ([A-Z][A-Z0-9_]+) is deprecated")
 _SIMPLE_OFFLOAD = re.compile(r"SimpleCPUOffloadConnector: role=\w+, per_rank=([0-9.]+) GB, world_size=(\d+)")
 _ARGS = "non-default args: {"
 _RESOLVED = re.compile(r"Initializing a V1 LLM engine \(v[^)]*\) with config: (.*)")
-
-
-def load_policy(path: Path = POLICY_PATH) -> tuple[dict, str]:
-    import yaml
-    raw = path.read_bytes()
-    return yaml.safe_load(raw), hashlib.sha256(raw).hexdigest()
-
-
-def lookup(policy: dict, path: str) -> tuple[str, dict] | None:
-    """The most specific entry for a path: an exact key, else the longest `prefix.*` that
-    covers it."""
-    entries = policy["entries"]
-    if path in entries:
-        return path, entries[path]
-    best = None
-    for key in entries:
-        if key.endswith(".*") and fnmatch.fnmatchcase(path, key):
-            if best is None or len(key) > len(best):
-                best = key
-    return (best, entries[best]) if best else None
 
 
 # ------------------------------------------------------------------ reading each source
@@ -170,7 +147,7 @@ def read_engine_lines(log: str) -> Reading:
     if _RUST_FRONTEND.search(log):
         r.add("env.VLLM_USE_RUST_FRONTEND", True)
     for name in sorted(set(_DEPRECATED_ENV.findall(log))):
-        # The value isn't printed, only that it was set; the policy decides what that means.
+        # The value isn't printed, only that it was set (decide refuses to copy it).
         r.add(f"env.{name}", True)
     for m in _SIMPLE_OFFLOAD.finditer(log):
         # vLLM prints GiB under the "GB" label (bytes / 1024**3); kept as the per-rank figure.
@@ -276,91 +253,59 @@ def _one(values: list):
     return values[0], len(values), None
 
 
-def merge(readings: dict[str, Reading], policy: dict, vllm_defaults: dict | None = None) -> dict[str, Setting]:
-    """One Setting per path, by the source order and each entry's source rules.
+def merge(readings: dict[str, Reading], vllm_defaults: dict) -> dict[str, Setting]:
+    """One Setting per path: the first source in SOURCES order that states a value.
 
     A source that states a path as None ("let the engine decide") doesn't hide a later
-    source's value for it: the first non-None value wins."""
-    defaults = vllm_defaults or {}
+    source's value for it: the first non-None value wins. Repeats within one source that
+    disagree, and the two passed sources (launch_config, args) disagreeing, are conflicts
+    (design §11.2, value_conflict). A resolved value that differs from a passed one is the
+    engine's resolution, never a conflict."""
     paths = set()
     for r in readings.values():
         paths |= set(r.values)
     out = {}
     for path in sorted(paths):
-        hit = lookup(policy, path)
-        entry = hit[1] if hit else {}
-        order = list(SOURCES[:-1])
-        if entry.get("source_only"):
-            order = [entry["source_only"]]
-        elif entry.get("source_prefer"):
-            order = [entry["source_prefer"]] + [s for s in order if s != entry["source_prefer"]]
-        found = [(s, readings[s].values[path]) for s in order if s in readings and path in readings[s].values]
-        if not found:
-            continue
+        found = [(s, readings[s].values[path]) for s in SOURCES if s in readings and path in readings[s].values]
         stated = [(s, v) for s, v in found if any(x is not None for x in v)]
         s, vals = (stated or found)[0]
         value, occ, conflict = _one([x for x in vals if x is not None] or vals)
         st = Setting(path=path, value=value, source=s, occurrences=occ, conflict=conflict,
-                     requested=_requested(path, readings, entry, defaults))
-        # The launch config and the args line both state the request, so a difference
-        # between them is a conflict.
-        if conflict is None and s in REQUESTED:
+                     requested=_requested(path, readings, vllm_defaults))
+        if conflict is None and s in PASSED:
             for s2, vals2 in stated[1:]:
-                if s2 not in REQUESTED:
+                if s2 not in PASSED:
                     continue
                 v2, _, c2 = _one([x for x in vals2 if x is not None])
-                if c2 is not None or not _same(v2, value):
+                if c2 is not None or not _same(v2, value, path):
                     st.conflict = sorted({_canon(value): value, **{_canon(x): x for x in (c2 or [v2])}}.values(), key=_canon)
-                    break
-        # A mapped setting is written to BLIS from the request. If the engine then reports
-        # running a different value (and the entry doesn't already take the engine's), BLIS
-        # would simulate something the run didn't do, so that's a conflict too. Compared as
-        # the entry's type, so '1' and True are one value.
-        if st.conflict is None and s in REQUESTED and entry.get("class") == "mapped" \
-                and not (entry.get("source_prefer") or entry.get("source_only")):
-            for s2, vals2 in stated:
-                if s2 not in ENGINE_SOURCES:
-                    continue
-                v2, _, c2 = _one([x for x in vals2 if x is not None])
-                if c2 is None and not _same_typed(entry, value, v2):
-                    st.conflict = sorted({_canon(value): value, _canon(v2): v2}.values(), key=_canon)
                     break
         out[path] = st
     return out
 
 
-REQUESTED = ("launch_config", "args")
-ENGINE_SOURCES = ("resolved_config", "engine_line")
+# The sources that record the values passed, and those that record the values resolved.
+PASSED = ("launch_config", "args")
+RESOLVED_SOURCES = ("resolved_config", "engine_line")
 
 
-def _same_typed(entry: dict, a, b) -> bool:
-    try:
-        return _canon(_typed(entry, a)) == _canon(_typed(entry, b))
-    except ValueError:
-        return _same(a, b)
+def _at_default(path: str, value, vllm_defaults: dict) -> bool:
+    """Whether a value inside a config object is vLLM's own default for that field."""
+    d = vllm_defaults.get(path)
+    return path in vllm_defaults and not (isinstance(d, dict) and "unliteral" in d) and _canon(value) == _canon(d)
 
 
-def _at_default(path: str, value, entry: dict, vllm_defaults: dict) -> bool:
-    """Whether a value is vLLM's own default for the path (at VLLM_REF), or one the policy
-    names as meaning "not set"."""
-    if _is_unset(entry, value):
-        return True
-    if path in vllm_defaults:
-        d = vllm_defaults[path]
-        return not (isinstance(d, dict) and "unliteral" in d) and _canon(value) == _canon(d)
-    return False
+def _requested(path: str, readings: dict, vllm_defaults: dict) -> bool:
+    """Whether the run set this setting, rather than the build resolving it.
 
-
-def _requested(path: str, readings: dict, entry: dict, vllm_defaults: dict) -> bool:
-    """Whether the run asked for this setting, rather than the build resolving it.
-
-    Asked: the launch config states it, or the args line states it at a value other than
-    vLLM's default. (vLLM prints only the arguments that differ from their defaults, but a
-    config object passed as an argument is printed whole, defaults included, so a field
-    inside one counts only when it isn't at its default.) A resolved-line or engine-line
-    value alone is the engine's resolution, never a request; an entry about what the engine
-    ran (source_only: resolved_config) is judged on it."""
-    if entry.get("source_only") == "resolved_config":
+    Set: the launch config states it, or the args line states it. vLLM prints only the
+    arguments that differ from their defaults, but a config object passed as an argument is
+    printed whole, defaults included, so a field inside one counts only when it isn't at its
+    default (vllm_defaults, read from vLLM's dataclasses by gen_vllm_defaults.py). With a launch
+    config, which states exactly the fields the run passed, the args line's config-object
+    fields are not requests. An environment variable the engine prints as set is set. A
+    resolved-line or engine-line value alone is the engine's resolution, never a request."""
+    if path.startswith("env."):
         return True
     lc = readings.get("launch_config")
     has_lc = lc is not None and bool(lc.values)
@@ -373,26 +318,38 @@ def _requested(path: str, readings: dict, entry: dict, vllm_defaults: dict) -> b
     if value is None:
         return False
     if "." not in path:
-        # A top-level arg in the args line differs from vLLM's default (that's what vLLM
-        # prints), whether the launch config or the launcher around it set it.
         return True
-    # A field inside a config object: vLLM prints the object whole, with values it resolved
-    # itself. The launch config, when the run ships one, says exactly which fields were set.
     if has_lc:
         return False
     if path not in vllm_defaults:
-        return True     # a field VLLM_REF doesn't have: no default to say it wasn't set
-    return not _at_default(path, value, entry, vllm_defaults)
+        return True     # a field the release's defaults don't name: nothing says it wasn't set
+    return not _at_default(path, value, vllm_defaults)
 
 
-def _same(a, b) -> bool:
-    """Equal as settings. A CLI flag that takes several values (served_model_name) is a
-    scalar in the launch config and a one-element list in the args line."""
+# vLLM v0.32.0 parses CompilationConfig.mode from the IntEnum's value or its member name
+# (vllm/config/compilation.py:37-50 CompilationMode, :852-870 validate_mode_before), and the
+# server log prints the member name. The two passed sources may each use either spelling.
+COMPILATION_MODES = {0: "NONE", 1: "STOCK_TORCH_COMPILE", 2: "DYNAMO_TRACE_ONCE", 3: "VLLM_COMPILE"}
+
+
+def _parsed(path: str, v):
+    """A passed value as the engine's argument parser reads it, for comparing two sources."""
+    if path == "compilation_config.mode" and isinstance(v, int) and not isinstance(v, bool):
+        return COMPILATION_MODES.get(v, v)
+    if path == "compilation_config.mode" and isinstance(v, str):
+        return v.upper()
+    return v
+
+
+def _same(a, b, path: str = "") -> bool:
+    """Equal as settings, each read as the engine's parser reads it. A CLI flag that takes
+    several values (served_model_name) is a scalar in the launch config and a one-element list
+    in the args line."""
     if isinstance(a, list) and len(a) == 1 and not isinstance(b, list):
         a = a[0]
     if isinstance(b, list) and len(b) == 1 and not isinstance(a, list):
         b = b[0]
-    return _canon(a) == _canon(b)
+    return _canon(_parsed(path, a)) == _canon(_parsed(path, b))
 
 
 def read_all(server_log: str, launch_config: dict | None) -> tuple[dict[str, Reading], list[str]]:
@@ -412,214 +369,235 @@ def read_all(server_log: str, launch_config: dict | None) -> tuple[dict[str, Rea
     return readings, problems
 
 
-# ------------------------------------------------------------------ classifying + the deployment
+# ------------------------------------------------------------------ the engine's argument mapping
 
-def _is_unset(entry: dict, value) -> bool:
-    unset = entry.get("unset", [])
-    if "default" in entry:
-        unset = list(unset) + [entry["default"]]
-    return any(_canon(value) == _canon(u) for u in unset)
+# Where each recorded field goes in the scenario, by its upstream name. This is the engine's own
+# argument mapping, not a classification: every name is the upstream's, as blis-vllm's engine
+# block takes it (blis-vllm rules/engineconfig/fieldnames_test.go at origin/m1/vllm), except the
+# renames that file and blis-substrate's Deployment (contracts/spec/deployment/deployment.go)
+# require: kv_cache_dtype is the block's cache_dtype; the compilation, attention and kernel
+# config fields are the block's top-level ones; speculative_config is its speculative block
+# (num_speculative_tokens is num_spec_tokens); VLLM_USE_RUST_FRONTEND is its frontend; the
+# parallel sizes are the Deployment's parallel layout. kv_transfer_config's connector and CPU
+# bytes are the Deployment's offload block (_write_offload). Every other environment variable is
+# copied into the block's env as the launch gave it. The connector's own options go under the
+# Deployment's offload.connector_options, as blis-vllm rules/engineconfig/connector.go names them.
+_SAME_NAME = (
+    "all2all_backend", "async_scheduling", "block_size", "cp_kv_cache_interleave_size", "dcp_comm_backend",
+    "dcp_q_replicate", "disable_cascade_attn", "disable_custom_all_reduce", "disable_hybrid_kv_cache_manager",
+    "enable_prefix_caching", "gpu_memory_utilization", "kv_cache_memory_bytes", "long_prefill_token_threshold",
+    "long_prefill_token_threshold_adaptive", "mamba_cache_dtype", "mamba_cache_mode", "mamba_ssm_cache_dtype",
+    "max_cpu_loras", "max_cudagraph_capture_size", "max_loras", "max_model_len", "max_num_active_seqs",
+    "max_num_batched_tokens", "max_num_scheduled_tokens", "max_num_seqs", "moe_backend",
+    "prefill_schedule_interval", "prefix_cache_retention_interval", "prefix_match_unit", "quantization",
+    "scheduling_policy", "stream_interval", "swa_bounded_replay", "watermark",
+)
+LOCATIONS = {
+    **{f: f"engine.{f}" for f in _SAME_NAME},
+    "kv_cache_dtype": "engine.cache_dtype",
+    "compilation_config.cudagraph_mode": "engine.cudagraph_mode",
+    "compilation_config.max_cudagraph_capture_size": "engine.max_cudagraph_capture_size",
+    "compilation_config.cudagraph_capture_sizes": "engine.cudagraph_capture_sizes",
+    "compilation_config.decoder_replay_cudagraph_capture_sizes": "engine.decoder_replay_cudagraph_capture_sizes",
+    "compilation_config.custom_ops": "engine.custom_ops",
+    "attention_config.use_trtllm_attention": "engine.use_trtllm_attention",
+    "attention_config.mla_prefill_backend": "engine.mla_prefill_backend",
+    "attention_config.indexer_kv_dtype": "engine.indexer_kv_dtype",
+    "kernel_config.linear_backend": "engine.linear_backend",
+    "kernel_config.moe_backend": "engine.moe_backend",
+    "enable_dbo": "engine.dbo.enable_dbo",
+    "dbo_decode_token_threshold": "engine.dbo.dbo_decode_token_threshold",
+    "dbo_prefill_token_threshold": "engine.dbo.dbo_prefill_token_threshold",
+    "enable_eplb": "engine.eplb.enable_eplb",
+    "eplb_config.num_redundant_experts": "engine.eplb.num_redundant_experts",
+    "eplb_config.window_size": "engine.eplb.window_size",
+    "eplb_config.step_interval": "engine.eplb.step_interval",
+    "kv_events_config.enable_kv_cache_events": "engine.kv_events.enable_kv_cache_events",
+    "kv_events_config.publisher": "engine.kv_events.publisher",
+    "kv_events_config.topic": "engine.kv_events.topic",
+    "speculative_config.method": "engine.speculative.method",
+    "speculative_config.num_speculative_tokens": "engine.speculative.num_spec_tokens",
+    "speculative_config.kv_cache_dtype": "engine.speculative.kv_cache_dtype",
+    "speculative_config.draft_sample_method": "engine.speculative.draft_sample_method",
+    "speculative_config.rejection_sample_method": "engine.speculative.rejection_sample_method",
+    "speculative_config.enable_adaptive_verification": "engine.speculative.enable_adaptive_verification",
+    "engram_config.cpu_offload": "engine.engram_config.cpu_offload",
+    "engram_config.dp_shared_memory": "engine.engram_config.dp_shared_memory",
+    "engram_config.use_thp": "engine.engram_config.use_thp",
+    "env.VLLM_USE_RUST_FRONTEND": "engine.frontend",
+    "tensor_parallel_size": "parallel.tp",
+    "pipeline_parallel_size": "parallel.pp",
+    "data_parallel_size": "parallel.dp",
+    "data_parallel_size_local": "parallel.dp_local",
+    "enable_expert_parallel": "parallel.enable_expert_parallel",
+    "prefill_context_parallel_size": "parallel.pcp",
+    "decode_context_parallel_size": "parallel.dcp",
+    "kv_transfer_config.kv_connector": "offload.connector",
+    "kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use": "offload.tiers.cpu_dram",
+    "kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use_per_rank": "offload.tiers.cpu_dram",
+    "kv_transfer_config.kv_connector_extra_config.lazy_offload": "offload.spec",
+    # The connector's own options, as blis-vllm reads them (rules/engineconfig/connector.go
+    # ConnectorOptions), under the Deployment's offload.connector_options.
+    "kv_transfer_config.kv_connector_extra_config.load_async": "offload.connector_options.load_async",
+    "kv_transfer_config.kv_connector_extra_config.lookup_async": "offload.connector_options.lookup_async",
+    "kv_transfer_config.kv_connector_extra_config.enable_offload": "offload.connector_options.enable_offload",
+    "kv_transfer_config.kv_connector_extra_config.enable_cross_layers_blocks":
+        "offload.connector_options.enable_cross_layers_blocks",
+    "kv_transfer_config.kv_connector_extra_config.blocks_per_chunk": "offload.connector_options.blocks_per_chunk",
+    "kv_transfer_config.kv_load_failure_policy": "offload.connector_options.kv_load_failure_policy",
+    "speculative_config.synthetic_acceptance_length": "replay.acceptance_length",
+}
 
 
-def _typed(entry: dict, value):
-    t = entry.get("type")
-    v = value[0] if isinstance(value, list) and len(value) == 1 and t != "list" else value
-    try:
-        if t == "int":
-            if isinstance(v, bool):
-                raise ValueError
-            return int(str(v)) if not isinstance(v, int) else v
-        if t == "float":
-            return float(v)
-        if t == "bool":
-            if isinstance(v, bool):
-                return v
-            if str(v).lower() in ("true", "1"):
-                return True
-            if str(v).lower() in ("false", "0"):
-                return False
-            raise ValueError
-        if t == "str":
-            return None if v is None else str(v)
-        if t == "list":
-            if not isinstance(v, list):
-                raise ValueError     # never written as null: the point refuses (conflict)
-            return [int(x) for x in v]
-    except (TypeError, ValueError):
-        raise ValueError(f"{value!r} is not a {t}")
+def location(path: str) -> str | None:
+    """Where a recorded field goes in the scenario; None when the scenario has no place for it."""
+    if path in LOCATIONS:
+        return LOCATIONS[path]
+    if path.startswith("env."):
+        return f"engine.env.{path[4:]}"
+    return None
+
+
+# Readings the harness derives that are not engine fields: the router a run was measured behind
+# (assess.router_reason grades it) and the per-rank offload figure vLLM prints (_write_offload
+# checks the written bytes against it).
+DERIVED = ("frontend.router", "offload.per_rank_gib", "offload.world_size")
+
+# The settings the support checks read to find the served checkpoint (support.check), by role.
+ROLES = {"model": "model", "model_tag": "model", "served_model_name": "served_model",
+         "speculative_config.model": "drafter"}
+
+# A recorded field the Deployment states by the pool's shape rather than by a field: a
+# colocated pool both stores and loads KV, which is kv_role kv_both (vllm/config/kv_transfer.py).
+POOL_ROLE = {"kv_transfer_config.kv_role": {"kv_both": "colocated"}}
+
+# The values blis-vllm's engine needs and resolves no default for (compat/kernelmodel Engine:
+# block_size, max_num_seqs, max_num_batched_tokens). One the run did not record takes the
+# field's estimation rule (design §11.2, Estimate).
+REQUIRED = ("block_size", "max_num_batched_tokens", "max_num_seqs")
+
+
+def _yaml_value(v):
+    """A recorded value as the scenario states it: a printed float as a float, a bare token as
+    its text, everything else as recorded."""
+    if isinstance(v, pyrepr.Float):
+        return float(v)
+    if isinstance(v, pyrepr.Opaque):
+        return str(v)
+    if isinstance(v, list):
+        return [_yaml_value(x) for x in v]
+    if isinstance(v, dict):
+        return {k: _yaml_value(x) for k, x in v.items()}
     return v
 
 
+def _flag(v) -> bool:
+    """An environment variable's value as vLLM's envs.py reads a boolean one."""
+    if isinstance(v, bool):
+        return v
+    t = str(v).strip().lower()
+    if t in ("1", "true"):
+        return True
+    if t in ("0", "false"):
+        return False
+    raise ValueError(f"{v!r} is not a boolean")
+
+
 @dataclass
-class Classified:
-    """The per-point outcome of settings extraction."""
+class Decided:
+    """One point's recorded settings, decided by the engine's field list."""
     settings: dict = field(default_factory=dict)       # path -> Setting
     args: list = field(default_factory=list)           # fidelity args entries (blis filled later)
     reasons: list = field(default_factory=list)
-    mapped: dict = field(default_factory=dict)         # blis_field -> value
-    approximated: bool = False
-    roles: dict = field(default_factory=dict)          # role -> value (model, drafter, ...)
+    substitutions: list = field(default_factory=list)  # G2 substitutions named on the point
+    mapped: dict = field(default_factory=dict)         # location -> (path, value)
+    roles: dict = field(default_factory=dict)          # role -> value (model, served_model)
 
 
-def _inert_when(rule, value, settings: dict) -> bool:
-    """A refuse entry's condition under which the setting is the engine's own resolution, from
-    the run's recorded settings: {"value": v, "eq": [path, x]} holds when the setting's value
-    is v and the recorded `path` is x. Unrecorded values never satisfy it, so a setting is
-    never assumed harmless."""
-    if not rule:
-        return False
-    if "value" in rule and _canon(value) != _canon(rule["value"]):
-        return False
-    path, want = rule["eq"]
-    other = settings.get(path)
-    return other is not None and other.value is not None and _canon(other.value) == _canon(want)
+def decide(settings: dict[str, Setting], field_list) -> Decided:
+    """Decide every recorded setting by the engine's fields.json (design §11.2, State and Decide).
 
-
-def part_default(entry: dict, settings: dict, family: int | None):
-    """vLLM's own value for a setting whose default depends on the part (default_by_part), or
-    None when the policy doesn't say or the part's architecture isn't known."""
-    rule = entry.get("default_by_part")
-    if not rule or family is None:
-        return None
-    tp = settings.get("tensor_parallel_size")
-    tp = int(tp.value) if tp is not None and tp.value is not None else 1
-    if "any_at_or_below_tp" in rule and tp <= rule["any_at_or_below_tp"]:
-        return ANY
-    on = family in rule.get("families", []) and tp > rule.get("when_tp_gt", 0)
-    return rule["value"] if on else rule["else"]
-
-
-ANY = object()   # part_default: every value is the engine vLLM runs
-
-
-def classify(settings: dict[str, Setting], policy: dict, vllm_defaults: dict | None = None,
-             family: int | None = None) -> Classified:
-    """family: the part's CUDA compute-capability major, for defaults that depend on it."""
-    defaults = vllm_defaults or {}
-    c = Classified(settings=settings)
-    aliases = {}
-    for path, st in settings.items():
-        hit = lookup(policy, path)
-        if hit is None:
-            c.reasons.append(f"unclassified_arg:{path}")
+    A setting two same-stage sources disagree on is a conflict (value_conflict). Every recorded
+    value the scenario has a place for is copied there unchanged: the passed value where the run
+    passed one, else the resolved one. Each field the run set is decided by fields.decide: a field
+    the release lacks is field_not_in_release, a not-modelled field with no estimation rule is
+    field_not_modelled, one with a rule takes it (left unset, or the stated substitute) and is
+    named on the point, and an inert-unproven one is named as an interim status. A field the run
+    set that the field list calls modelled, but the scenario has no place for, is a setting the
+    written scenario lost (setting_differs): the harness cannot state what the run did."""
+    import fields as fl
+    d = Decided(settings=settings)
+    for path, st in sorted(settings.items()):
+        if path in DERIVED:
             continue
-        key, entry = hit
-        if entry.get("default_by_part") and st.requested:
-            want = part_default(entry, settings, family)
-            if want is not ANY and (want is None or _canon(st.value) != _canon(want)):
-                # Not vLLM's own value on this part (or the part isn't known): a choice the
-                # Deployment can't state.
-                if st.value is not None:
-                    c.reasons.append(f"setting_not_modelled:{path}")
-                    c.args.append({"arg": path, "measured": _record_value(st.value), "source": st.source,
-                                   "blis": None, "match": "absent_in_blis"})
-                continue
-            c.args.append({"arg": path, "measured": _record_value(st.value), "source": st.source,
-                           "blis": None, "match": "inert"})
+        if path in ROLES:
+            d.roles[ROLES[path]] = st.value
+        if path in POOL_ROLE:
+            if st.value is not None and POOL_ROLE[path].get(st.value) != "colocated":
+                d.reasons.append(f"setting_differs:{path}")
             continue
-        if key.endswith(".*") and entry["class"] == "inert" and st.requested and not entry.get("any_value"):
-            # A wildcard inert entry covers a config object's fields at vLLM's defaults. A field
-            # the run asked for at another value (or one vLLM didn't have at VLLM_REF) may pick a
-            # kernel, so it is unknown until the table names it.
-            c.reasons.append(f"unclassified_arg:{path}")
-            continue
-        if entry.get("alias_of"):
-            aliases[path] = (entry["alias_of"], st)
-            continue
-        if entry.get("role"):
-            c.roles[entry["role"]] = st.value
-        if st.conflict is not None:
-            vals = [_record_value(v) for v in st.conflict]
-            if entry["class"] == "inert":
-                # Disagreeing values of a setting with no timing effect (e.g. a per-host id).
-                c.args.append({"arg": path, "measured": None, "source": st.source, "blis": None,
-                               "match": "inert", "values": vals})
-                continue
-            c.reasons.append(f"conflict:{path}")
-            c.args.append({"arg": path, "measured": None, "source": st.source, "blis": None,
-                           "match": "conflict", "values": vals})
-            continue
-        cls = entry["class"]
         rec = {"arg": path, "measured": _record_value(st.value), "source": st.source}
-        if cls in ("refuse", "approximate") and not st.requested and not entry.get("always"):
-            # The build's own resolution of a setting the run didn't ask for. The commit
-            # distance gate admitted this build; its defaults are part of it. Recorded, so the
-            # record shows what the engine resolved.
-            if not _is_unset(entry, st.value):
-                c.args.append({**rec, "blis": None, "match": "inert"})
-            continue
         if st.occurrences > 1:
             rec["occurrences"] = st.occurrences
-        if cls == "inert":
-            # Recorded when the run set it: a named entry, or a field under a config object that
-            # isn't at vLLM's default. A field vLLM printed at its default is not something the
-            # run did, and isn't recorded.
-            if (not key.endswith(".*") or st.requested) and (entry.get("note") or path == "frontend.router" or st.requested):
-                c.args.append({**rec, "blis": None, "match": "inert"})
+        if st.conflict is not None:
+            d.reasons.append(f"conflict:{path}")
+            d.args.append({"arg": path, "measured": None, "source": st.source, "blis": None, "match": "conflict",
+                           "values": [_record_value(v) for v in st.conflict]})
             continue
-        if cls == "refuse":
-            if _is_unset(entry, st.value):
+        estimated = None
+        if st.requested:
+            dec = fl.decide(field_list, path, set_by_run=True)
+            if dec.g5:
+                d.reasons.append(f"{dec.g5['code']}:{path}")
                 continue
-            if _inert_when(entry.get("inert_when"), st.value, settings):
-                # The setting can't change anything under the run's other settings.
-                c.args.append({**rec, "blis": None, "match": "inert"})
-                continue
-            c.reasons.append(f"setting_not_modelled:{path}")
-            c.args.append({**rec, "blis": None, "match": "absent_in_blis"})
+            if dec.substitution:
+                d.substitutions.append(dec.substitution)
+                if dec.substitution["kind"] == "estimated":
+                    estimated = field_list.lookup(path).estimation
+        loc = location(path)
+        if estimated is not None:
+            # The field's estimation rule decides what the scenario states for it, not the run.
+            d.args.append({**rec, "blis": None, "match": "approximated",
+                           "note": d.substitutions[-1]["detail"]})
+            if estimated["rule"] == fl.SUBSTITUTE:
+                for f, v in sorted(estimated["setting"].items()):
+                    sub = location(f)
+                    if sub is None:
+                        d.reasons.append(f"setting_differs:{f}")
+                    else:
+                        d.mapped[sub] = (f, v)
             continue
-        if cls == "approximate":
-            if _is_unset(entry, st.value):
-                continue
-            c.approximated = True
-            # What BLIS used is filled in after the scenario is written (score.fill_blis_side),
-            # from BLIS itself; `approximate_as` is only for a switch BLIS has no setting for.
-            rec.update(blis=_record_value(entry.get("approximate_as")), match="approximated",
-                       note=entry["note"])
-            if entry.get("blis_from"):
-                rec["_blis_from"] = entry["blis_from"]
-            c.args.append(rec)
-            continue
-        # mapped
         if st.value is None:
-            continue    # None is "let the engine decide": not a setting
-        try:
-            value = _typed(entry, st.value)
-        except ValueError:
-            c.reasons.append(f"conflict:{path}")
-            c.args.append({**rec, "blis": None, "match": "unreadable"})
+            continue    # None is "let the engine decide": nothing to copy
+        if loc is None:
+            f = field_list.lookup(path)
+            if st.requested and f is not None and f.status == fl.MODELLED and path not in ROLES:
+                d.reasons.append(f"setting_differs:{path}")
+            elif st.requested:
+                d.args.append({**rec, "blis": None, "match": "inert"})
             continue
-        approx = (entry.get("approximate_values") or {}).get(value) if isinstance(value, str) else None
-        if approx is not None:
-            # A value BLIS can't state, written as the nearest one it prices: the point is
-            # estimated, and the diff checks the scenario carries the value written.
-            c.approximated = True
-            value = approx["as"]
-            rec.update(note=approx["note"], _approximated=True)
-        c.mapped[entry["blis_field"]] = (path, value, entry)
-        c.args.append({**rec, "blis_field": entry["blis_field"], "_value": value})
-    # An alias (max_cudagraph_capture_size beside compilation_config's) must agree with its
-    # canonical path when both are recorded; alone, it stands in for it.
-    for path, (canonical, st) in sorted(aliases.items()):
-        entry = policy["entries"][canonical]
-        try:
-            value = _typed(entry, st.value)
-        except ValueError:
-            c.reasons.append(f"conflict:{path}")
+        if loc.startswith("engine.env.") and isinstance(st.value, bool):
+            # vLLM's deprecation warning shows the variable was set, not its value.
+            d.reasons.append(f"required_setting_missing:{path}")
             continue
-        canon = settings.get(canonical)
-        if canon is not None and canon.requested and st.requested and \
-                _canon(_typed(entry, canon.value) if canon.value is not None else None) != _canon(value):
-            c.reasons.append(f"conflict:{path}")
+        value = _yaml_value(st.value)
+        if loc == "engine.frontend":
+            try:
+                value = _flag(value)
+            except ValueError:
+                d.reasons.append(f"conflict:{path}")
+                continue
+        prior = d.mapped.get(loc)
+        if prior is not None and _canon(prior[1]) != _canon(value):
+            # Two spellings of one setting (max_cudagraph_capture_size and compilation_config's)
+            # that record different values.
+            d.reasons.append(f"conflict:{path}")
             continue
-        if canon is None or not canon.requested:
-            # The alias is what the run asked for (or the only statement of it).
-            c.args = [a for a in c.args if a["arg"] != canonical]
-            c.mapped[entry["blis_field"]] = (path, value, entry)
-            c.args.append({"arg": path, "measured": _record_value(st.value), "source": st.source,
-                           "blis_field": entry["blis_field"], "_value": value})
-    c.args.sort(key=lambda a: a["arg"])
-    c.reasons = sorted(set(c.reasons))
-    return c
+        d.mapped[loc] = (path, value)
+        d.args.append({**rec, "blis_field": loc, "_value": value})
+    d.args.sort(key=lambda a: a["arg"])
+    d.reasons = sorted(set(d.reasons))
+    return d
 
 
 # ------------------------------------------------------------------ the scenario BLIS is handed
@@ -632,15 +610,6 @@ COEFFICIENTS = ["cost-model-primitives", "cost-model-collectives", "cost-model-h
 class Part:
     """A catalog hardware part (catalog/hardware/<name>.yaml)."""
     name: str
-    memory_gib: float
-
-
-def blis_defaults(helper: str, part: Part) -> dict:
-    """BLIS's own batch defaults for a part, from orchestrator/blisdefaults."""
-    import subprocess
-    out = subprocess.run([helper, "-memory-gib", repr(part.memory_gib), "-device", part.name],
-                         capture_output=True, text=True, check=True, timeout=120)
-    return json.loads(out.stdout)
 
 
 def _set(d: dict, dotted: str, value):
@@ -655,43 +624,45 @@ class Built:
     scenario: dict = field(default_factory=dict)      # the Scenario document
     deployment: dict = field(default_factory=dict)    # the Deployment document
     acceptance_length: str | None = None              # --speculative-acceptance-length
-    # A drafter whose acceptance the run didn't record: (method, num_spec_tokens), for score.py
-    # to take BLIS's own registry default (blisdefaults -acceptance) and pin it in the scenario.
-    acceptance_needed: tuple | None = None
     gpus: int = 0
     reasons: list = field(default_factory=list)
-    defaults_used: list = field(default_factory=list)  # fidelity args entries
-    kernel_resolves: list = field(default_factory=list)  # settings left to the kernel's own resolution
+    substitutions: list = field(default_factory=list)  # estimates of values the run did not record
 
 
 FRONTEND = {True: "rust", False: "python"}   # VLLM_USE_RUST_FRONTEND, parsed as a bool
 
 
-def build(c: Classified, *, name: str, model: str, part: Part, engine_version: str,
-          defaults: dict | None, multinode: bool = False) -> Built:
-    """The Scenario + Deployment for one point, from the classified settings.
+def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str, field_list,
+          multinode: bool = False) -> Built:
+    """The Scenario + Deployment for one point, from the decided settings.
 
-    Only what the run recorded is written, plus BLIS's default for a setting BLIS requires
-    that nothing recorded. The cluster is sized to the run's own GPUs (one engine replica),
-    so BLIS never multiplies the deployment beyond what was measured.
-    """
+    Only what the run recorded is written, under the engine's own names (LOCATIONS), and the
+    substitute an estimation rule states. engine_version is the release the scoring simulator
+    runs (stack.json), not the run's own (design §11.2). A value the engine needs that no source
+    recorded takes its field's estimation rule (fields.estimate_missing): left unset, so the
+    engine resolves it (X19), and named on the point; or the point is not scored
+    (value_not_recorded). The cluster is sized to the run's own GPUs (one engine replica)."""
+    import fields as fl
     b = Built()
-    acc = c.mapped.get("replay.acceptance_length")
+    acc = d.mapped.get("replay.acceptance_length")
     if acc is not None:
-        b.acceptance_length = str(c.settings[acc[0]].value)
+        b.acceptance_length = str(d.settings[acc[0]].value)
     pool = {"role": "colocated", "nodes": 1, "parallel": {}, "engine": {}}
     dep = {"kind": "Deployment", "name": name, "pools": [pool]}
     offload = {}
-    for blis_field, (path, value, entry) in sorted(c.mapped.items()):
-        top = blis_field.split(".")[0]
-        if blis_field == "replay.acceptance_length":
+    for loc, (path, value) in sorted(d.mapped.items()):
+        top = loc.split(".")[0]
+        if loc == "replay.acceptance_length":
             continue
         if top == "offload":
-            offload[blis_field] = (path, value)
+            offload[loc] = (path, value)
             continue
-        if blis_field == "engine.frontend":
+        if loc == "engine.frontend":
             value = FRONTEND[value]
-        _set(pool, blis_field, value)
+        if loc.startswith("engine.env."):
+            pool["engine"].setdefault("env", {})[loc[len("engine.env."):]] = str(value)
+            continue
+        _set(pool, loc, value)
     par = pool["parallel"]
     # Parallelism from the run: the resolved engine config always states tp/pp/dp, so a
     # missing one means the log couldn't be read, not a default.
@@ -701,42 +672,31 @@ def build(c: Classified, *, name: str, model: str, part: Part, engine_version: s
             par[k] = 1
     par.setdefault("enable_expert_parallel", False)
     eng = pool["engine"]
-    # A speculative block needs both halves; one alone isn't a drafter BLIS can price. And the
-    # acceptance the run had must be stated: only synthetic rejection records it.
-    if "speculative" in eng:
-        if set(eng["speculative"]) != {"method", "num_spec_tokens"}:
-            b.reasons.append("required_setting_missing:speculative_config.num_speculative_tokens")
-        if b.acceptance_length is None and set(eng["speculative"]) == {"method", "num_spec_tokens"}:
-            b.acceptance_needed = (eng["speculative"]["method"], int(eng["speculative"]["num_spec_tokens"]))
-    # Required settings no source recorded: BLIS's own default, else refuse.
-    if "gpu_memory_utilization" not in eng:
-        # vLLM prints it (the "Desired GPU memory utilization" line) whether or not it was
-        # passed, and BLIS has no resolver for it: missing means the log changed shape.
-        b.reasons.append("required_setting_missing:gpu_memory_utilization")
-    for path, field_ in (("max_num_seqs", "max_num_seqs"), ("max_num_batched_tokens", "max_num_batched_tokens"),
-                         ("block_size", "block_size")):
-        if field_ in eng:
+    spec = eng.get("speculative")
+    if spec is not None and set(spec) >= {"method"} and "num_spec_tokens" not in spec:
+        b.reasons.append("required_setting_missing:speculative_config.num_speculative_tokens")
+    needed = [p for p in REQUIRED if p not in eng]
+    if spec is not None and b.acceptance_length is None:
+        needed.append("speculative_config.synthetic_acceptance_length")
+    for path in needed:
+        dec = fl.estimate_missing(field_list, path)
+        if dec.g5:
+            b.reasons.append(f"{dec.g5['code']}:{path}" if dec.g5["code"] != "value_not_recorded"
+                             else f"required_setting_missing:{path}")
             continue
-        if field_ == "block_size":
-            # Left unstated: the kernel resolves it itself, as vLLM v0.31.0 would for the model
-            # and part, and score.py records the value it reports (blisdefaults -resolve).
-            b.kernel_resolves.append(path)
-            continue
-        if defaults and field_ in defaults:
-            eng[field_] = defaults[field_]
-            b.defaults_used.append({
-                "arg": path, "measured": None, "source": "blis_default", "blis": defaults[field_],
-                "match": "blis_default",
-                "rule": f"ResolveVLLMBatchDefaults({defaults['memory_gib']} GiB, {defaults['device']}) "
-                        f"at the BLIS release (vLLM {engine_version}'s served-deployment tier)"})
-        else:
-            b.reasons.append(f"required_setting_missing:{path}")
+        b.substitutions.append(dec.substitution)
+        f = field_list.lookup(path)
+        if f.estimation["rule"] == fl.SUBSTITUTE:
+            for k, v in sorted(f.estimation["setting"].items()):
+                loc = location(k)
+                if loc is None:
+                    b.reasons.append(f"setting_differs:{k}")
+                else:
+                    _set(pool, loc, v)
     if offload:
-        b.reasons += _write_offload(dep, offload, c, par)
+        b.reasons += _write_offload(dep, offload, d, par)
     ranks = par["tp"] * par["pp"] * par["dp"] * par.get("pcp", 1)
     b.gpus = ranks
-    # The run's own GPUs, on one node: the API row says whether it spanned nodes, and a
-    # multi-node run needs a fabric the run doesn't record.
     if multinode:
         b.reasons.append("required_setting_missing:multi_node_fabric")
     pool["nodes"] = 1
@@ -747,7 +707,7 @@ def build(c: Classified, *, name: str, model: str, part: Part, engine_version: s
     return b
 
 
-def _write_offload(dep: dict, offload: dict, c: Classified, par: dict) -> list[str]:
+def _write_offload(dep: dict, offload: dict, c: Decided, par: dict) -> list[str]:
     """The Deployment offload block from the run's kv_transfer_config. BLIS's tier bytes are
     per engine (one data-parallel rank's engine); vLLM's cpu_bytes_to_use is server-wide and
     divided by the engine's world size, unless cpu_bytes_to_use_per_rank states it per rank.
@@ -781,6 +741,10 @@ def _write_offload(dep: dict, offload: dict, c: Classified, par: dict) -> list[s
     lazy = offload.get("offload.spec", (None, None))[1]
     if lazy is not None and conn == "SimpleCPUOffloadConnector":
         block["spec"] = "lazy" if lazy else "eager"
+    opts = {loc.rsplit(".", 1)[1]: v for loc, (_, v) in sorted(offload.items())
+            if loc.startswith("offload.connector_options.")}
+    if opts:
+        block["connector_options"] = opts
     dep["offload"] = block
     return []
 

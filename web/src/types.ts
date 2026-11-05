@@ -35,6 +35,7 @@ export interface CoverageCount {
 export interface FidelityArg {
   arg: string
   measured: string | number | boolean | null
+  /** blis_default appears in v2 records only. */
   source?: 'launch_config' | 'args' | 'resolved_config' | 'engine_line' | 'api_row' | 'blis_default'
   blis: string | number | boolean | null
   blis_field?: string
@@ -237,7 +238,10 @@ export interface Provenance {
   ingest?: 'api'
   vllm_ref?: string
   vllm_max_distance?: number
+  /** v2 only. */
   policy_sha256?: string
+  /** v3 only: the sha256 of the engine's fields.json the scorer read. */
+  fields_sha256?: string
   pulled_at?: string
   corpus?: { dataset: string; revision: string; sha256: string } | null
 }
