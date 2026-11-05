@@ -62,6 +62,7 @@ scenario,model,gpu,label,concurrency,meas_tpot_us,pred_tpot_us,meas_ttft_us,pred
 ```
 
 - Latencies are **microseconds**. Measured values come from the InferenceX row; predicted values from BLIS.
+- A measured and a predicted value are compared only under one definition (DEV-8). Before it scores, `cli.py score` reads the simulator's metric registry (`blis metrics --json`) and refuses the run unless `ttft_mean_ms` is the mean over requests of each request's TTFT, and `tpot_mean_ms` the mean, over requests with two or more output tokens, of each request's (E2E - TTFT) / (output tokens - 1), both over the measured window in milliseconds, unfinished requests excluded: the InferenceX client's definitions (`result.CLIENT_DEFINITIONS`).
 - `scenario` is the **deployment** name, shared by every concurrency of one sweep. (The agentic driver may write one scenario file per point; their names are an implementation detail and aren't carried here.)
 - `label` is the workload label: `8k1k`-style for single-turn, `agentx` for agentic.
 - `grade` is the point's grade, `G1` to `G4`, and equals its fidelity record's. In the summary's tree a G1 point is in the strict tier (`measured_or_resolved`), every other one in `all` only.

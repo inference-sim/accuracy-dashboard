@@ -60,3 +60,33 @@ def catalog_resolve(blis: str, catalog: str, *, model: str | None = None, chip: 
         raise CommandError(f"blis {' '.join(args)} printed query {doc['query']!r} and identity "
                            f"{doc['identity']!r}; want query {query!r} and a name or null")
     return doc["identity"]
+
+
+def metrics(blis: str) -> dict:
+    """`blis metrics --json`: the metric registry (blis-substrate contracts/metrics; DEV-8), as a
+    map from identifier to definition. The dashboard reads it as {"metrics": [definition, ...]},
+    each definition carrying the registry's fields under their JSON names: id, formula, statistic,
+    population, window, unit, percentile_method (percentiles only), unfinished, description and
+    follows (when set). A definition with any other key, or an identifier listed twice, is
+    refused."""
+    args = ["metrics", "--json"]
+    text = _run(blis, args)
+    try:
+        doc = json.loads(text)
+    except json.JSONDecodeError as e:
+        raise CommandError(f"blis {' '.join(args)} printed no JSON: {e}") from None
+    if not isinstance(doc, dict) or set(doc) != {"metrics"} or not isinstance(doc["metrics"], list):
+        raise CommandError(f"blis {' '.join(args)} printed {text.strip()[:200]!r}, not {{\"metrics\": [...]}}")
+    out = {}
+    for i, d in enumerate(doc["metrics"]):
+        if not isinstance(d, dict) or not _DEFINITION_REQUIRED <= set(d) or set(d) - _DEFINITION_KEYS:
+            raise CommandError(f"blis {' '.join(args)}: metrics[{i}] is {d!r}, not a definition with the keys "
+                               f"{sorted(_DEFINITION_REQUIRED)} and optionally {sorted(_DEFINITION_KEYS - _DEFINITION_REQUIRED)}")
+        if d["id"] in out:
+            raise CommandError(f"blis {' '.join(args)}: metric {d['id']!r} is defined twice")
+        out[d["id"]] = d
+    return out
+
+
+_DEFINITION_REQUIRED = {"id", "formula", "statistic", "population", "window", "unit", "unfinished", "description"}
+_DEFINITION_KEYS = _DEFINITION_REQUIRED | {"percentile_method", "follows"}

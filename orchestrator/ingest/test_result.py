@@ -160,3 +160,45 @@ def test_run_raises_run_failed_with_the_simulators_stderr(tmp_path):
     with pytest.raises(result.RunFailed) as e:
         result.run(["blis", "replay"], blis=_validator(tmp_path, 0), runner=_runner(1, "", 'level=fatal msg="no"'))
     assert e.value.stderr == 'level=fatal msg="no"'
+
+
+# ttft_mean_ms and tpot_mean_ms as blis-substrate contracts/metrics (800ae263) defines them,
+# under the JSON names of its Definition.
+REGISTRY = {
+    "ttft_mean_ms": {"id": "ttft_mean_ms", "formula": "ttft", "statistic": "mean", "population": "requests",
+                     "window": "measured", "unit": "ms", "unfinished": "excluded",
+                     "description": "Time to first token, mean, over the measured window.",
+                     "follows": "vllm v0.32.0 vllm/benchmarks/serve.py:624-634"},
+    "tpot_mean_ms": {"id": "tpot_mean_ms", "formula": "tpot", "statistic": "mean",
+                     "population": "requests_min_2_output_tokens", "window": "measured", "unit": "ms",
+                     "unfinished": "excluded",
+                     "description": "Time per output token, excluding the first, computed per request, mean, "
+                                    "over the measured window.",
+                     "follows": "vllm v0.32.0 vllm/benchmarks/serve.py:624-634"},
+}
+
+
+def test_the_registrys_ttft_and_tpot_means_are_the_clients():
+    assert result.check_definitions(REGISTRY) == []
+
+
+@pytest.mark.parametrize("metric,key,value", [
+    ("ttft_mean_ms", "statistic", "p50"),
+    ("ttft_mean_ms", "window", "run"),
+    ("tpot_mean_ms", "population", "tokens"),     # pooled over tokens: inter-token latency, not TPOT
+    ("tpot_mean_ms", "formula", "itl"),
+    ("tpot_mean_ms", "unit", "s"),
+    ("tpot_mean_ms", "unfinished", "not_applicable"),
+    ("ttft_mean_ms", "percentile_method", "numpy_linear"),
+])
+def test_a_definition_other_than_the_clients_is_refused_naming_the_field(metric, key, value):
+    reg = {k: dict(v) for k, v in REGISTRY.items()}
+    reg[metric][key] = value
+    assert result.check_definitions(reg) == [
+        f"the simulator's {metric} has {key} {value!r}; the InferenceX client's has "
+        f"{result.CLIENT_DEFINITIONS[metric][key]!r}"]
+
+
+def test_a_registry_without_a_metric_the_harness_reads_is_refused():
+    assert result.check_definitions({"ttft_mean_ms": REGISTRY["ttft_mean_ms"]}) == [
+        "the simulator's metric registry has no tpot_mean_ms"]
