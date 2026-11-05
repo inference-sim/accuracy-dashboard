@@ -25,6 +25,36 @@ KIND = "Result"
 TTFT_MEAN_MS = "ttft_mean_ms"
 TPOT_MEAN_MS = "tpot_mean_ms"
 
+# The measured side's definitions (DEV-8): what the InferenceX client reports as mean TTFT and
+# mean TPOT (inferencex_client.summarize). Mean TTFT is the mean over requests of each request's
+# time to first token; mean TPOT is the mean, over requests with two or more output tokens, of
+# each request's (E2E - TTFT) / (output tokens - 1). Both over the measured window, in
+# milliseconds, with requests unfinished at the horizon giving no sample. The keys are the
+# fields blis-substrate contracts/metrics compares (Comparable): two figures are comparable only
+# when all of them are equal.
+CLIENT_DEFINITIONS = {
+    TTFT_MEAN_MS: {"formula": "ttft", "statistic": "mean", "population": "requests", "window": "measured",
+                   "unit": "ms", "percentile_method": None, "unfinished": "excluded"},
+    TPOT_MEAN_MS: {"formula": "tpot", "statistic": "mean", "population": "requests_min_2_output_tokens",
+                   "window": "measured", "unit": "ms", "percentile_method": None, "unfinished": "excluded"},
+}
+
+
+def check_definitions(registry: dict) -> list[str]:
+    """Why the simulator's metric registry (blis_commands.metrics) cannot be compared with the
+    client, or [] when it can: each metric the harness reads must exist and have the client's
+    definition, field for field (DEV-8)."""
+    out = []
+    for metric, want in CLIENT_DEFINITIONS.items():
+        d = registry.get(metric)
+        if d is None:
+            out.append(f"the simulator's metric registry has no {metric}")
+            continue
+        for k, v in want.items():
+            if d.get(k) != v:
+                out.append(f"the simulator's {metric} has {k} {d.get(k)!r}; the InferenceX client's has {v!r}")
+    return out
+
 
 class ResultError(RuntimeError):
     """The simulator refused the run, or wrote a document the harness cannot read."""

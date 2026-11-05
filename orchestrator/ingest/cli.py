@@ -36,6 +36,7 @@ import fields as fl  # noqa: E402
 import ledger as ldg  # noqa: E402
 import pull as pl  # noqa: E402
 import recipes as rcp  # noqa: E402
+import result  # noqa: E402
 import score as sc  # noqa: E402
 import settings as st  # noqa: E402
 import stack as sk  # noqa: E402
@@ -338,6 +339,8 @@ def cmd_score(a) -> int:
         stack = read_stack(blis, getattr(a, "stack", None))
         engine_release = stack.engine("vllm")
         field_list, fields_sha = read_fields(blis, engine_release)
+        # DEV-8: a predicted figure is compared with a measured one only under one definition.
+        bad += result.check_definitions(bc.metrics(str(blis)))
     except (sk.StackError, fl.FieldsError, bc.CommandError, OSError, ValueError) as e:
         bad.append(str(e))
     if bad:

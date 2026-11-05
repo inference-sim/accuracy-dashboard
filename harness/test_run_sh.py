@@ -164,7 +164,7 @@ def real_setup(tmp: Path, tag: str = "v0.16.0"):
     go = bin_ / "go"
     go.write_text('#!/bin/sh\n'
                   'if [ "$1 $2" = "mod download" ]; then exit 0; fi\n'
-                  'if [ "$1 $2" = "build -o" ]; then printf "#!/bin/sh\\nif [ \\"\\$1\\" = fields ]; then cat \\"\\$FAKE_FIELDS\\"; fi\\nexit 0\\n" > "$3"; chmod +x "$3"; exit 0; fi\n'
+                  'if [ "$1 $2" = "build -o" ]; then printf "#!/bin/sh\\ncase \\"\\$1\\" in fields) cat \\"\\$FAKE_FIELDS\\";; metrics) cat \\"\\$FAKE_FIELDS.metrics\\";; esac\\nexit 0\\n" > "$3"; chmod +x "$3"; exit 0; fi\n'
                   'echo "fake go: unexpected $*" >&2; exit 9\n')
     py = bin_ / "python3"
     log = tmp / "python-args.txt"
@@ -183,6 +183,10 @@ def real_setup(tmp: Path, tag: str = "v0.16.0"):
     units.write_text("")
     fields = tmp / "fields.json"
     fields.write_text(json.dumps(FIELDS))
+    # `blis metrics --json`: the client's two definitions (DEV-8).
+    sys.path.insert(0, str(HERE.parent / "orchestrator" / "ingest"))
+    from test_result import REGISTRY
+    (tmp / "fields.json.metrics").write_text(json.dumps({"metrics": list(REGISTRY.values())}))
     cat = tagged_dir(tmp / "cat", "v1.0.0")
     (cat / "models").mkdir()
     (cat / "hardware").mkdir()

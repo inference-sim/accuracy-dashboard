@@ -467,6 +467,10 @@ def test_a_pre_release_tag_is_a_simulator_build_but_not_a_release_tag(tmp_path):
     assert cli._RELEASE_TAG.match("v0.16.0") and not cli._RELEASE_TAG.match("v0.16.0-rc1")
 
 
+# ttft_mean_ms and tpot_mean_ms as blis-substrate contracts/metrics (800ae263) defines them.
+from test_result import REGISTRY  # noqa: E402
+
+
 def _score_inputs(tmp_path, commands: dict):
     """What cmd_score needs, with a fake blis answering `commands` beside a stack.json for vLLM
     0.32.0, in a checkout at v0.16.0; the catalog and registry at release tags; and a pull of no
@@ -475,7 +479,9 @@ def _score_inputs(tmp_path, commands: dict):
     _tagged_repo(sim, "v0.16.0")
     (sim / "go.mod").write_text("module x\n")
     (sim / "stack.json").write_text(json.dumps({"kind": "Stack", "engines": [{"kind": "vllm", "version": "0.32.0"}]}))
-    blis = fake_blis(sim / "blis", {"fields --engine vllm --json": [0, json.dumps(FIELD_LIST), ""], **commands})
+    blis = fake_blis(sim / "blis", {"fields --engine vllm --json": [0, json.dumps(FIELD_LIST), ""],
+                                    "metrics --json": [0, json.dumps({"metrics": list(REGISTRY.values())}), ""],
+                                    **commands})
     for r in ("cat", "reg"):
         _tagged_repo(tmp_path / r, "v1.0.0")
     (tmp_path / "pull").mkdir()
@@ -524,3 +530,49 @@ def test_an_ambiguous_catalog_repository_stops_the_night_before_any_fetch(tmp_pa
     assert cli.cmd_nightly(_args(tmp_path)) == 2
     assert any("FATAL" in m and "a, b" in m and "--model org/m" in m for m in msgs), msgs
     assert not (tmp_path / "data" / "latest").exists()
+
+
+def test_a_score_run_whose_blis_defines_tpot_otherwise_is_refused_before_scoring(tmp_path, monkeypatch):
+    # DEV-8: the measured mean TPOT is over requests; a simulator whose tpot_mean_ms pools over
+    # tokens is not compared with it.
+    pooled = dict(REGISTRY["tpot_mean_ms"], population="tokens")
+    a = _score_inputs(tmp_path, {"metrics --json": [0, json.dumps({"metrics": [REGISTRY["ttft_mean_ms"], pooled]}), ""]})
+    import score
+    monkeypatch.setattr(score, "score_points", lambda *x, **k: (_ for _ in ()).throw(AssertionError("scored")))
+    msgs = []
+    monkeypatch.setattr(cli, "_log", msgs.append)
+    assert cli.cmd_score(a) == 2
+    assert "FATAL: the simulator's tpot_mean_ms has population 'tokens'; the InferenceX client's has " \
+           "'requests_min_2_output_tokens'" in msgs, msgs
+
+
+def test_a_score_run_whose_blis_has_no_metrics_command_is_refused(tmp_path, monkeypatch):
+    a = _score_inputs(tmp_path, {"metrics --json": [2, "", "unknown command \"metrics\""]})
+    msgs = []
+    monkeypatch.setattr(cli, "_log", msgs.append)
+    assert cli.cmd_score(a) == 2
+    assert any("blis metrics --json exited 2" in m for m in msgs), msgs
+
+
+def test_a_score_run_with_the_clients_definitions_scores(tmp_path, monkeypatch):
+    a = _score_inputs(tmp_path, {})
+    import score
+    seen = []
+    monkeypatch.setattr(score, "score_points", lambda points, *x, **k: seen.append(points) or [])
+    monkeypatch.setattr(score, "write_contract", lambda *x: None)
+    import contract
+    monkeypatch.setattr(contract, "validate_dir", lambda d: [])
+    assert cli.cmd_score(a) == 0 and seen == [[]]
+
+
+@pytest.mark.parametrize("printed,match", [
+    ({"metrics": [{"id": "x"}]}, "not a definition"),
+    ({"metrics": [dict(REGISTRY["ttft_mean_ms"], extra=1)]}, "not a definition"),
+    ({"metrics": [REGISTRY["ttft_mean_ms"], REGISTRY["ttft_mean_ms"]]}, "defined twice"),
+    ([REGISTRY["ttft_mean_ms"]], "not {\"metrics\""),
+])
+def test_the_metric_registry_client_refuses_another_shape(tmp_path, printed, match):
+    import blis_commands
+    blis = fake_blis(tmp_path / "blis", {"metrics --json": [0, json.dumps(printed), ""]})
+    with pytest.raises(blis_commands.CommandError, match=match):
+        blis_commands.metrics(str(blis))
