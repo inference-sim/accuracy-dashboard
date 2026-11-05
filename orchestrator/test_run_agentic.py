@@ -9,6 +9,7 @@ unsupported model/hardware or an unreplayable row rather than scoring it with a 
 Run: python3 orchestrator/test_run_agentic.py
 """
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -160,34 +161,138 @@ CATALOG_CASE = (
     "fi\n")
 
 
-def run_driver(td: Path, row: dict, blis_stub: str, launch: dict | None = None) -> subprocess.CompletedProcess:
+UNCAPPED = "semianalysis_cc_traces_weka_062126"
+CAPPED = "semianalysis_cc_traces_weka_062126_256k"
+CORPUS = b"{}\n"
+
+
+def write_catalog(td: Path, uncapped_sha: str | None = None, capped_sha: str | None = None) -> None:
+    """A catalog checkout with the two AgentX replay workloads, pinned to the test corpus's hash
+    unless told otherwise."""
+    want = hashlib.sha256(CORPUS).hexdigest()
+    (td / "workloads").mkdir(exist_ok=True)
+    for name, alias, repo, rev, sha in (
+            ("agentx-mvp-uncapped", UNCAPPED, "semianalysisai/cc-traces-weka-062126",
+             "23f152f6f0f9399a85901b89a6458def0ef16729", uncapped_sha or want),
+            ("agentx-mvp", CAPPED, "semianalysisai/cc-traces-weka-062126-256k",
+             "8fecd2fc56694469f758f0afbbb6335ad3043740", capped_sha or want)):
+        (td / "workloads" / f"{name}.yaml").write_text(
+            f"_comment: \"{name}\"\nreplay:\n  scenario: inferencex-agentx-mvp\n  harness_version: 0.12.0\n"
+            f"  corpus:\n    loader: {alias}\n    format: weka-trace-v7\n    encoding: jsonl\n"
+            f"    source:\n      huggingface: {repo}\n      revision: {rev}\n      file: traces.jsonl\n"
+            f"      split: train\n    sha256: {sha}\n  random_seed: 42\n  category: coding\n")
+
+
+
+NODE8 = {"resources": {"gpus_per_node": 8}}
+
+
+def run_driver(td: Path, row: dict, blis_stub: str, alias: str | None = UNCAPPED,
+               job_log: str | None = None, extra: list | None = None,
+               launch: dict | None = NODE8) -> subprocess.CompletedProcess:
     """Drive run_agentic.main() with a fake blis that prints a fixed Result document.
 
-    Deliberately passes NO --job-log: the external repo's Actions log is usually unreadable,
+    By default passes NO --job-log: the external repo's Actions log is usually unreadable,
     and the driver must score without it (seed/duration default, concurrency from the row).
+    The corpus the run loaded is then stated with --corpus-alias.
     """
     (td / "row.json").write_text(json.dumps(row))
     (td / "server.log").write_text(SERVER_LOG)
+    if not (td / "workloads").exists():
+        write_catalog(td)
     blis = td / "blis_stub.sh"
     blis.write_text(blis_stub)
     blis.chmod(0o755)
-    extra = []
+    argv = [sys.executable, str(HERE / "run_agentic.py"),
+            "--row", str(td / "row.json"), "--server-log", str(td / "server.log"),
+            "--corpus", str(td / "traces.jsonl"), "--blis", str(blis),
+            "--catalog", str(td), "--registry", str(td), "--out-dir", str(td / "out")]
+    if alias is not None:
+        argv += ["--corpus-alias", alias]
+    if job_log is not None:
+        (td / "job.log").write_text(job_log)
+        argv += ["--job-log", str(td / "job.log")]
     if launch is not None:
         (td / "launch.json").write_text(json.dumps(launch))
-        extra = ["--launch-config", str(td / "launch.json")]
-    return subprocess.run(
-        [sys.executable, str(HERE / "run_agentic.py"),
-         "--row", str(td / "row.json"), "--server-log", str(td / "server.log"),
-         "--corpus", str(td / "traces.jsonl"),
-         "--corpus-sha256", "deadbeef", "--blis", str(blis),
-         "--catalog", str(td), "--registry", str(td), "--out-dir", str(td / "out"), *extra],
-        capture_output=True, text=True)
+        argv += ["--launch-config", str(td / "launch.json")]
+    return subprocess.run(argv + (extra or []), capture_output=True, text=True)
+
+
+RECORDING_STUB_HEAD = (
+    "#!/usr/bin/env bash\n" + CATALOG_CASE +
+    "[ \"$1\" = schema ] && exit 0\n"
+    "printf '%s\\n' \"$@\" > \"$(dirname \"$0\")/argv.txt\"\n"
+    "pwd > \"$(dirname \"$0\")/cwd.txt\"\n"
+)
+
+
+def _flag(argv: list, flag: str):
+    return argv[argv.index(flag) + 1] if flag in argv else None
+
+
+def test_driver_scores_each_alias_with_its_own_entry():
+    doc = json.dumps(_result({"ttft_mean_ms": 1500.0, "tpot_mean_ms": 4.5}))
+    for alias, name in ((UNCAPPED, "agentx-mvp-uncapped"), (CAPPED, "agentx-mvp")):
+        with tempfile.TemporaryDirectory() as d:
+            td = Path(d)
+            (td / "traces.jsonl").write_bytes(CORPUS)
+            r = run_driver(td, ROW, RECORDING_STUB_HEAD + f"echo '{doc}'\n", alias=alias)
+            ck(f"{alias}: the driver scores", r.returncode == 0, r.stderr[-300:])
+            argv = (td / "argv.txt").read_text().splitlines() if (td / "argv.txt").exists() else []
+            spec = _flag(argv, "--workload-spec")
+            text = Path(spec).read_text() if spec else ""
+            ck(f"{alias}: blis is given the catalog entry {name} as --workload-spec",
+               f"loader: {alias}\n" in text and "category: coding" in text and "_comment" not in text, text[:200])
+            ck(f"{alias}: --corpus-sha256 is the entry's full hash",
+               _flag(argv, "--corpus-sha256") == hashlib.sha256(CORPUS).hexdigest(), str(argv))
+
+
+def test_driver_refuses_a_corpus_that_is_not_the_entrys():
+    stub = "#!/usr/bin/env bash\n[ \"$1\" = schema ] && exit 0\necho 'blis should not run' >&2\nexit 7\n"
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_bytes(CORPUS)
+        full = hashlib.sha256(CORPUS).hexdigest()
+        # The entry shares the file's 12-hex prefix but not its whole hash.
+        write_catalog(td, uncapped_sha=full[:12] + ("0" if full[12] != "0" else "1") + full[13:])
+        r = run_driver(td, ROW, stub)
+        ck("a corpus matching the entry's hash only in its prefix is refused",
+           r.returncode != 0 and "mismatch" in r.stderr and "should not run" not in r.stderr, r.stderr[-300:])
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_bytes(CORPUS)
+        r = run_driver(td, ROW, stub, extra=["--corpus-sha256", "0" * 64])
+        ck("a --corpus-sha256 that is not the entry's is refused",
+           r.returncode != 0 and "is not the sha256" in r.stderr, r.stderr[-300:])
+
+
+def test_driver_reads_the_alias_from_the_job_log():
+    doc = json.dumps(_result({"ttft_mean_ms": 1500.0, "tpot_mean_ms": 4.5}))
+    log = f"+ aiperf profile --scenario inferencex-agentx-mvp --concurrency 2 --public-dataset {CAPPED}\n"
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_bytes(CORPUS)
+        r = run_driver(td, ROW, RECORDING_STUB_HEAD + f"echo '{doc}'\n", alias=None, job_log=log)
+        argv = (td / "argv.txt").read_text().splitlines() if (td / "argv.txt").exists() else []
+        spec = _flag(argv, "--workload-spec")
+        ck("the job log's --public-dataset picks the capped entry",
+           r.returncode == 0 and spec is not None and f"loader: {CAPPED}\n" in Path(spec).read_text(),
+           r.stderr[-300:])
+    for alias, log_, want in ((UNCAPPED, log, "differ"), (None, None, "not recorded")):
+        with tempfile.TemporaryDirectory() as d:
+            td = Path(d)
+            (td / "traces.jsonl").write_bytes(CORPUS)
+            r = run_driver(td, ROW, "#!/usr/bin/env bash\nexit 7\n", alias=alias, job_log=log_)
+            ref = td / "out" / "refusals.json"
+            ck(f"a corpus that is {want} is not scored",
+               r.returncode == 0 and ref.exists() and any(want in x for x in json.loads(ref.read_text())["refusals"]),
+               r.stderr[-300:])
 
 
 def test_driver_scores_a_supported_row():
     with tempfile.TemporaryDirectory() as d:
         td = Path(d)
-        (td / "traces.jsonl").write_text("{}\n")
+        (td / "traces.jsonl").write_bytes(CORPUS)
         # A fake blis: `schema validate result` accepts; `replay` records its argv and its
         # working directory and prints a fixed Result. The Result carries BOTH itl_mean_ms
         # (step interval) and tpot_mean_ms (per token) so the test confirms the driver reads
@@ -271,7 +376,7 @@ def test_driver_writes_the_recorded_node_size_and_refuses_a_row_that_records_non
     with tempfile.TemporaryDirectory() as d:
         td = Path(d)
         (td / "traces.jsonl").write_text("{}\n")
-        r = run_driver(td, ROW, "#!/usr/bin/env bash\n" + CATALOG_CASE + "echo 'blis should not run' >&2\nexit 7\n")
+        r = run_driver(td, ROW, "#!/usr/bin/env bash\n" + CATALOG_CASE + "echo 'blis should not run' >&2\nexit 7\n", launch=None)
         ref = td / "out" / "refusals.json"
         ck("a row with no recorded node size is not scored (exit 0, no CSV)", r.returncode == 0 and not (td / "out" / "points.csv").exists(), r.stderr[-200:])
         ck("the refusal is value_not_recorded:cluster.gpus_per_node",
@@ -298,6 +403,9 @@ def main() -> int:
     test_driver_refuses_unsupported()
     test_driver_writes_the_recorded_node_size_and_refuses_a_row_that_records_none()
     test_driver_refuses_a_result_that_does_not_validate()
+    test_driver_scores_each_alias_with_its_own_entry()
+    test_driver_refuses_a_corpus_that_is_not_the_entrys()
+    test_driver_reads_the_alias_from_the_job_log()
     print()
     if FAILURES:
         print(f"FAIL: {len(FAILURES)} failure(s): {FAILURES}")

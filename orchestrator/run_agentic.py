@@ -16,7 +16,11 @@ CSV, so `build_summary.py` scores it with no new scoring code:
                      with PR #19's no-guess rule). --seed is left to blis's default of 42,
                      which matches InferenceX's --random-seed 42 -- not READ per row, so
                      still a FIXED workload rather than a bit-exact per-row replay.
-  the corpus         resolve_agentic_corpus.py -> --corpus traces.jsonl + --corpus-sha256.
+  the corpus         the alias the run's aiperf command loaded (--public-dataset, from the
+                     job log, or --corpus-alias) names the catalog replay workload
+                     (agentx-mvp-uncapped or agentx-mvp). resolve_agentic_corpus.py downloads
+                     its traces.jsonl at the entry's revision; here the file must have the
+                     entry's full sha256, and the entry is passed whole as --workload-spec.
   the scenario       gen_scenarios.emit() over the row's topology -> the Scenario +
                      Deployment YAML `blis replay` prices the server from (the SAME writer
                      the single-turn path uses, so the deployment is described identically).
@@ -44,10 +48,12 @@ Usage:
     python orchestrator/run_agentic.py \
         --row .work/agentic/row-439932.json \
         --server-log .work/agentic/server-439932.log \
-        --corpus .work/agentic/corpus/traces.jsonl --corpus-sha256 <hex> \
+        --corpus-alias semianalysis_cc_traces_weka_062126 \
+        --corpus .work/agentic/corpus/traces.jsonl \
         --blis $WORK/inference-sim/blis --catalog $WORK/catalog --registry $WORK/registry \
         --out-dir .work/agentic/scored
-        # --job-log is optional: only pins --max-context-length when readable.
+        # --job-log is optional: it pins --max-context-length, and its --public-dataset
+        # must agree with --corpus-alias when both are given.
 """
 
 import argparse
@@ -65,6 +71,7 @@ from extract_agentic_replay_args import (AGENTX_SCENARIO, parse_job_log,  # noqa
 from gen_scenarios import PackagingError, emit  # noqa: E402
 import blis_commands as bc  # noqa: E402
 import support as sp  # noqa: E402
+from resolve_agentic_corpus import CorpusError, catalog_entry, check  # noqa: E402
 from settings import recorded_node_size  # noqa: E402
 
 # Agentic InferenceX model/GPU slug -> blis-catalog name. SEPARATE from the single-turn
@@ -367,16 +374,41 @@ def facets_corpus(sweep: dict, row: dict) -> dict:
     }
 
 
+def corpus_alias(job: dict, stated: str | None) -> tuple[str | None, list[str]]:
+    """The corpus alias the run loaded, and every reason it is not known. The job log's
+    --public-dataset and --corpus-alias are two records of one fact: either one is enough,
+    and two that differ are a conflict. With neither, the corpus is not recorded, and no
+    alias is assumed."""
+    logged = job.get("corpus_alias")
+    if logged and stated and logged != stated:
+        return None, [f"the job log's --public-dataset {logged!r} and --corpus-alias {stated!r} differ"]
+    alias = logged or stated
+    if not alias:
+        return None, ["the corpus the run loaded is not recorded: give --corpus-alias or a job log "
+                      "with the aiperf command"]
+    return alias, []
+
+
+def workload_spec(entry: dict) -> str:
+    """The catalog entry's replay definition, as the --workload-spec document blis reads."""
+    import yaml
+
+    doc = yaml.safe_load(Path(entry["path"]).read_text())
+    return yaml.safe_dump({"replay": doc["replay"]}, sort_keys=False)
+
+
 def build_blis_argv(blis: str, scenario_name: str, scenarios_dir: str, catalog: str,
                     registry: str, corpus: str, corpus_sha256: str,
-                    replay: list[str]) -> list[str]:
+                    replay: list[str], workload_spec_path: str) -> list[str]:
     """The full `blis replay --agentic-scenario` command. `replay` is PR #19's arg list,
     which already carries --agentic-scenario + --seed/--concurrency/--benchmark-duration
-    and (for a synthetic-acceptance run) --speculative-acceptance-length. The Result is written
-    to standard output as JSON."""
+    and (for a synthetic-acceptance run) --speculative-acceptance-length; the flags override
+    the workload spec, which is the catalog entry of the corpus the run loaded. The Result is
+    written to standard output as JSON."""
     return [
         blis, "replay",
         *replay,
+        "--workload-spec", workload_spec_path,
         "--corpus", corpus,
         "--corpus-sha256", corpus_sha256,
         "--scenario", scenario_name,
@@ -402,11 +434,16 @@ def main() -> int:
     ap.add_argument("--row", required=True, help="row-<id>.json from fetch_agentic_rows.py")
     ap.add_argument("--server-log", required=True)
     ap.add_argument("--job-log", default=None,
-                    help="optional CI job log; only used to pin --max-context-length. "
-                         "Omit when the external repo's Actions logs are unreadable; "
-                         "seed/duration are left to blis's defaults regardless.")
-    ap.add_argument("--corpus", required=True, help="traces.jsonl")
-    ap.add_argument("--corpus-sha256", required=True)
+                    help="optional CI job log; used to pin --max-context-length and to read the "
+                         "corpus alias (--public-dataset). Omit when the external repo's Actions logs "
+                         "are unreadable; seed/duration are left to blis's defaults regardless.")
+    ap.add_argument("--corpus-alias", default=None,
+                    help="the --public-dataset alias the run's aiperf command loaded; required "
+                         "unless --job-log states it")
+    ap.add_argument("--corpus", required=True,
+                    help="traces.jsonl, as resolve_agentic_corpus.py downloaded it for the alias")
+    ap.add_argument("--corpus-sha256", default=None,
+                    help="optional; when given it must equal the catalog entry's sha256")
     ap.add_argument("--blis", required=True, help="the blis binary; it runs in its own directory")
     ap.add_argument("--catalog", required=True)
     ap.add_argument("--registry", required=True)
@@ -435,6 +472,15 @@ def main() -> int:
     # Unsupported model / new hardware (the #15 case) is a refusal too, read from the row
     # itself. Combine both so an unscoreable row is not run at all.
     refusals = support_refusals(row) + refusals
+    # The corpus the run loaded decides the catalog workload it is scored with (COV-12).
+    alias, why = corpus_alias(job, args.corpus_alias)
+    refusals += why
+    entry = None
+    if alias is not None:
+        try:
+            entry = catalog_entry(Path(args.catalog), alias)
+        except CorpusError as e:
+            refusals.append(str(e))
 
     if refusals:
         # Not scored: either the replay args are incomplete (running would require guessing
@@ -459,6 +505,18 @@ def main() -> int:
     # Write the scenario the row's deployment prices from, into a scenarios dir blis reads.
     scen_dir = out / "scenarios"
     scen_dir.mkdir(exist_ok=True)
+    # The file must be the entry's corpus, by its full sha256; a stated --corpus-sha256 that
+    # differs from the entry's is refused as well, never preferred to it.
+    if args.corpus_sha256 is not None and args.corpus_sha256.lower() != entry["sha256"]:
+        raise SystemExit(f"--corpus-sha256 {args.corpus_sha256} is not the sha256 the catalog workload "
+                         f"{entry['workload']} pins ({entry['sha256']})")
+    try:
+        check(Path(args.corpus), entry)
+    except CorpusError as e:
+        raise SystemExit(str(e))
+    spec_path = out / "workload-spec.yaml"
+    spec_path.write_text(workload_spec(entry))
+
     blis = str(Path(args.blis).resolve())
     try:
         packaging = sp.Catalog(blis=blis, root=Path(args.catalog).resolve()).packaging(sweep["gpu"])
@@ -474,9 +532,11 @@ def main() -> int:
         raise SystemExit(f"row {row.get('id')}: {e}")
     (scen_dir / sweep["scenario"]).write_text(text)
 
+
     argv = build_blis_argv(
         blis, sweep["scenario"], str(scen_dir), str(Path(args.catalog).resolve()),
-        str(Path(args.registry).resolve()), str(Path(args.corpus).resolve()), args.corpus_sha256, replay)
+        str(Path(args.registry).resolve()), str(Path(args.corpus).resolve()), entry["sha256"], replay,
+        str(spec_path))
     print("running:", " ".join(argv), file=sys.stderr)
     try:
         doc, raw, _ = result.run(argv, blis=blis, cwd=str(Path(blis).parent))

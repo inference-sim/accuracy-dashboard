@@ -43,11 +43,23 @@ from _argv import command_after, flag as flag_value
 # benchmark `blis replay --agentic-scenario` reproduces.
 AGENTX_SCENARIO = "inferencex-agentx-mvp"
 
-# aiperf's alias for a HuggingFace dataset -> the dataset repo it loads. Only date-pinned
-# aliases appear here: the rolling alias (…_with_subagents) advances when a new corpus
-# drops, so a log naming it does not say which corpus was read.
+# aiperf's alias for a HuggingFace dataset -> the dataset repo it loads (aiperf 0.12.0
+# plugin/plugins.yaml:2409-2447, metadata.hf_dataset_name). Only date-pinned aliases appear
+# here: the rolling alias (…_with_subagents) advances when a new corpus drops, so a log
+# naming it does not say which corpus was read. InferenceX replays both: the uncapped
+# corpus by default and the 256k-capped one for its dsr1, qwen3.5 and qwen3.8next models
+# (InferenceX b9c6fc30, inferencex-e2e/infx/bench/agentic/traces.py:7-21).
 PINNED_CORPORA = {
     "semianalysis_cc_traces_weka_062126": "semianalysisai/cc-traces-weka-062126",
+    "semianalysis_cc_traces_weka_062126_256k": "semianalysisai/cc-traces-weka-062126-256k",
+}
+
+# Each pinned alias -> the catalog replay workload whose corpus it is. The alias a run's
+# aiperf command loaded decides the entry the run is scored with, and the entry pins the
+# corpus's revision and full sha256 (X12, D3).
+CATALOG_WORKLOADS = {
+    "semianalysis_cc_traces_weka_062126": "agentx-mvp-uncapped",
+    "semianalysis_cc_traces_weka_062126_256k": "agentx-mvp",
 }
 
 
@@ -72,7 +84,7 @@ def parse_job_log(job_log: str) -> dict:
     """The AgentX inputs recorded in a CI job log.
 
     Keys present only when the log states them: scenario, corpus_alias, corpus_dataset,
-    seed, concurrency, benchmark_duration_s, num_dataset_entries, max_context_length,
+    catalog_workload, seed, concurrency, benchmark_duration_s, num_dataset_entries, max_context_length,
     aiperf_version. `corpus_pinned` is False when the corpus alias is not a known
     date-pinned one, which a caller must treat as "corpus unknown".
     """
@@ -90,6 +102,7 @@ def parse_job_log(job_log: str) -> dict:
         out["corpus_pinned"] = alias in PINNED_CORPORA
         if alias in PINNED_CORPORA:
             out["corpus_dataset"] = PINNED_CORPORA[alias]
+            out["catalog_workload"] = CATALOG_WORKLOADS[alias]
     for flag, key in (("--random-seed", "seed"), ("--concurrency", "concurrency"),
                       ("--benchmark-duration", "benchmark_duration_s"),
                       ("--num-dataset-entries", "num_dataset_entries"),

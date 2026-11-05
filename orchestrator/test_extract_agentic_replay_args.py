@@ -71,6 +71,19 @@ def main() -> int:
     ck("a wrapped command (run_server_client …) is still found",
        (v41.get("concurrency"), v41.get("seed")) == (1, 42), repr(v41))
 
+    ck("the uncapped alias is scored with agentx-mvp-uncapped",
+       job.get("catalog_workload") == "agentx-mvp-uncapped", repr(job))
+    # InferenceX replays the 256k-capped corpus for its dsr1, qwen3.5 and qwen3.8next models
+    # (b9c6fc30 traces.py:13), and published qwen3.5 agentic rows ran it, so it is a known corpus.
+    capped = parse_job_log(KIMI_JOB.replace("semianalysis_cc_traces_weka_062126",
+                                            "semianalysis_cc_traces_weka_062126_256k"))
+    _, refusals = replay_args(capped, {})
+    ck("the 256k-capped alias is a pinned corpus, scored with agentx-mvp",
+       capped.get("corpus_pinned") is True
+       and capped.get("corpus_dataset") == "semianalysisai/cc-traces-weka-062126-256k"
+       and capped.get("catalog_workload") == "agentx-mvp"
+       and not any("date-pinned" in r for r in refusals), repr(capped))
+
     # The rolling alias names whichever corpus is current, so it identifies none.
     rolling = parse_job_log(KIMI_JOB.replace("semianalysis_cc_traces_weka_062126",
                                              "semianalysis_cc_traces_weka_with_subagents"))
