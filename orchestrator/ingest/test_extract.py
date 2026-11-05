@@ -361,7 +361,11 @@ def test_a_log_missing_its_args_or_resolved_line_is_unreadable():
 def test_a_field_inside_a_config_object_is_decided_when_set_and_ignored_at_its_default():
     c = _classify(_log("'attention_config': AttentionConfig(backend=None, flex_attn_block_m=64)"))
     assert c.reasons == []                                       # proven inert in the fixture
+    # A field the release's defaults have no entry for is unset unless the launch config states it.
     c = _classify(_log("'compilation_config': {'brand_new_knob': 7}"))
+    assert c.reasons == []
+    launch = {"roles": {"agg": {"args": {"compilation-config": '{"brand_new_knob": 7}'}}}}
+    c = _classify(_log("'compilation_config': {'brand_new_knob': 7}"), launch)
     assert c.reasons == ["field_not_in_release:compilation_config.brand_new_knob"]
     c = _classify(_log("'attention_config': AttentionConfig(backend=None, flex_attn_block_m=None)"))
     assert c.reasons == []
@@ -981,6 +985,47 @@ def test_every_value_a_real_log_records_is_read_and_copied_verbatim():
             # The passed value where the run passed one; the resolved one only where it passed none.
             passed = [v for x in st.PASSED for v in readings[x].values.get(path, []) if v is not None]
             assert s_.source in st.PASSED or not passed, (name, path)
+
+
+def test_a_whole_printed_config_field_at_the_default_of_the_runs_release_is_not_set():
+    """Real log excerpt (v0.32.0 banner): AttentionConfig prints use_prefill_decode_attention
+    False and use_fp4_indexer_cache False, inductor_compile_config prints its entries. None is
+    set by the run; none may yield field_not_in_release."""
+    log = _LOG_V32
+    readings, problems = st.read_all(log, None)
+    assert problems == []
+    assert "attention_config.use_prefill_decode_attention" in readings["args"].values
+    defaults = st.defaults_for("0.32.0", DEFAULTS, st.vllm_defaults_release())
+    merged = st.merge(readings, defaults)
+    assert not merged["attention_config.use_prefill_decode_attention"].requested
+    assert not merged["compilation_config.inductor_compile_config.combo_kernels"].requested
+    assert [r for r in st.decide(merged, FIELDS).reasons if r.startswith("field_not_in_release")] == []
+
+
+def test_defaults_of_another_release_judge_nothing_as_set():
+    assert st.defaults_for("0.23.1rc1.dev1403+g4080263bb", DEFAULTS, "0.32.0") == {}
+    assert st.defaults_for(None, DEFAULTS, "0.32.0") == {}
+    assert st.defaults_for("0.32.0", DEFAULTS, "0.32.0") is DEFAULTS
+
+
+def test_a_launch_config_stated_field_absent_from_the_release_is_field_not_in_release():
+    launch = {"roles": {"agg": {"args": {"attention-config": '{"use_prefill_decode_attention": false}'}}}}
+    readings, _ = st.read_all(_LOG_V32, launch)
+    merged = st.merge(readings, st.defaults_for("0.32.0", DEFAULTS, "0.32.0"))
+    assert merged["attention_config.use_prefill_decode_attention"].requested
+    assert "field_not_in_release:attention_config.use_prefill_decode_attention" in st.decide(merged, FIELDS).reasons
+
+
+_LOG_V32 = (
+    "INFO [api_utils.py:273] non-default args: {'model': 'org/m', 'tensor_parallel_size': 1, "
+    "'attention_config': AttentionConfig(backend=None, flash_attn_version=None, "
+    "use_prefill_decode_attention=False, use_fp4_indexer_cache=False, indexer_kv_dtype='fp8'), "
+    "'compilation_config': {'mode': <CompilationMode.NONE: 0>, 'inductor_compile_config': "
+    "{'enable_auto_functionalized_v2': False, 'combo_kernels': True}}}\n"
+    "INFO [core.py:116] Initializing a V1 LLM engine (v0.32.0) with config: model='m', "
+    "tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, quantization=fp8, "
+    "kv_cache_dtype=auto, enable_prefix_caching=True\n")
+
 
 
 if __name__ == "__main__":

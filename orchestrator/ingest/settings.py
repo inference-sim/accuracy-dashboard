@@ -33,6 +33,18 @@ VLLM_DEFAULTS_PATH = Path(__file__).resolve().parent.parent / "vllm_defaults.jso
 def load_vllm_defaults(path: Path = VLLM_DEFAULTS_PATH) -> tuple[dict, str]:
     raw = path.read_bytes()
     return json.loads(raw)["defaults"], hashlib.sha256(raw).hexdigest()
+
+
+def vllm_defaults_release(path: Path = VLLM_DEFAULTS_PATH) -> str:
+    """The vLLM release the defaults table was read at, e.g. "0.32.0"."""
+    return json.loads(path.read_bytes())["vllm_ref"].lstrip("v")
+
+
+def defaults_for(run_release: str | None, table: dict, table_release: str) -> dict:
+    """The defaults of the run's OWN release: the table when the run's banner names exactly the
+    release the table was read at, else none. A table of another release says nothing about what
+    the run's vLLM printed."""
+    return table if run_release is not None and run_release.lstrip("v") == table_release else {}
 SOURCES = ("launch_config", "args", "resolved_config", "engine_line", "api_row")
 
 # Lines vLLM prints with what it resolved, whether or not the flag was passed. Each pattern's
@@ -295,16 +307,32 @@ def _at_default(path: str, value, vllm_defaults: dict) -> bool:
     return path in vllm_defaults and not (isinstance(d, dict) and "unliteral" in d) and _canon(value) == _canon(d)
 
 
-def _requested(path: str, readings: dict, vllm_defaults: dict) -> bool:
-    """Whether the run set this setting, rather than the build resolving it.
+# The config objects vLLM prints WHOLE in `non-default args`, each field with its default
+# (vllm/engine/arg_utils.py: an EngineArgs field typed as the config class). speculative_config
+# and additional_config are plain dicts there and are printed as the run passed them.
+WHOLE_PRINTED = ("aux_output_config", "attention_config", "compilation_config", "engram_config",
+                 "eplb_config", "kernel_config", "kv_transfer_config", "observability_config",
+                 "structured_outputs_config")
 
-    Set: the launch config states it, or the args line states it. vLLM prints only the
-    arguments that differ from their defaults, but a config object passed as an argument is
-    printed whole, defaults included, so a field inside one counts only when it isn't at its
-    default (vllm_defaults, read from vLLM's dataclasses by gen_vllm_defaults.py). With a launch
-    config, which states exactly the fields the run passed, the args line's config-object
-    fields are not requests. An environment variable the engine prints as set is set. A
-    resolved-line or engine-line value alone is the engine's resolution, never a request."""
+
+def _requested(path: str, readings: dict, vllm_defaults: dict) -> bool:
+    """Whether the run set this setting, rather than the build resolving it (design §11.4: "the
+    run sets a field the release does not have"; a field at its default is not set).
+
+    vLLM prints only the top-level arguments that differ from their defaults, so a top-level
+    field in the args line is set. A config object passed as an argument is printed whole, every
+    field with its default (WHOLE_PRINTED), so a field inside one is judged by:
+
+      1. the launch config, where the run has one: it states exactly the fields the run passed,
+         so a field it states is set, and one it does not state is not, whatever the args line
+         prints;
+      2. otherwise the defaults of the run's own release (vllm_defaults, chosen by
+         defaults_for): a field at the table's value is not set, one elsewhere is set;
+      3. a field the release's defaults have no entry for, or any field when no table exists
+         for the run's release, is judged unset: nothing says the run set it.
+
+    An environment variable the engine prints as set is set. A resolved-line or engine-line value
+    alone is the engine's resolution, never a request."""
     if path.startswith("env."):
         return True
     lc = readings.get("launch_config")
@@ -317,13 +345,11 @@ def _requested(path: str, readings: dict, vllm_defaults: dict) -> bool:
     value = _one(a.values[path])[0]
     if value is None:
         return False
-    if "." not in path:
+    if path.split(".")[0] not in WHOLE_PRINTED:
         return True
     if has_lc:
         return False
-    if path not in vllm_defaults:
-        return True     # a field the release's defaults don't name: nothing says it wasn't set
-    return not _at_default(path, value, vllm_defaults)
+    return path in vllm_defaults and not _at_default(path, value, vllm_defaults)
 
 
 # vLLM v0.32.0 parses CompilationConfig.mode from the IntEnum's value or its member name

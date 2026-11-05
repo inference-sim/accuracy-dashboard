@@ -74,6 +74,8 @@ class Env:
     # vLLM's own defaults for the fields of the config objects its log prints whole
     # (vllm_defaults.json), so a field printed at its default is not taken as set by the run.
     vllm_defaults: dict = field(default_factory=dict)
+    # The vLLM release the table was read at; it applies only to a run of that release.
+    vllm_defaults_release: str = ""
     # The engine release the scoring simulator runs (stack.json, LIF-6), e.g. "0.32.0".
     engine_release: str = ""
     # The simulator build that scores the run: a release tag, or a commit (pointrecord Simulator).
@@ -465,7 +467,8 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     # stays what the row is shown and keyed by.
     part_name = (sp.catalog_part(env.catalog_obj, env.parts, row["hardware"]) if env.catalog_obj else None) \
         or row["hardware"]
-    c = st.decide(st.merge(readings, env.vllm_defaults), env.field_list)
+    defaults = st.defaults_for(o.banner, env.vllm_defaults, env.vllm_defaults_release)
+    c = st.decide(st.merge(readings, defaults), env.field_list)
     o.reasons += c.reasons
     o.subs = list(c.substitutions)
     o.reasons += row_vs_run(row, c)

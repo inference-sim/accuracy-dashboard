@@ -525,8 +525,12 @@ def test_a_field_the_release_lacks_or_the_engine_does_not_model_is_g5():
         _with_log(tmp, entry, LOG.replace("'block_size': 16,", "'block_size': 16, 'monokernel': True,"))
         o, _ = _score(tmp, entry, env, tmp / "c1")
         assert o.g5 == {"code": "field_not_in_release", "subject": "monokernel"}
-        _with_log(tmp, entry, LOG.replace("'block_size': 16,", "'block_size': 16, 'compilation_config': "
-                                          "{'custom_ops': ['+rms_norm']},"))
+        # The log's release is not the one the defaults table was read at, so only the launch
+        # config can state a field inside a config object.
+        pdir = tmp / "pull" / "points" / entry["point_id"]
+        lc = {"roles": {"agg": {"args": {"compilation-config": '{"custom_ops": ["+rms_norm"]}'}}}}
+        (pdir / "launch_config.gz").write_bytes(gzip.compress(json.dumps(lc).encode(), mtime=0))
+        entry["files"]["launch_config"] = {"path": "launch_config.gz", "sha256": "0" * 64, "from": "artifact"}
         o, _ = _score(tmp, entry, env, tmp / "c2")
         assert o.g5 == {"code": "field_not_modelled", "subject": "compilation_config.custom_ops"}
     finally:

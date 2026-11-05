@@ -363,6 +363,7 @@ def cmd_score(a) -> int:
         corpus_cache=Path(a.corpus_cache).resolve() if a.corpus_cache else None,
         vllm_ref=manifest["vllm_ref"], field_list=field_list, fields_sha256=fields_sha,
         base_models=manifest.get("base_models") or {}, timeout_s=a.timeout, vllm_defaults=vdefaults,
+        vllm_defaults_release=st.vllm_defaults_release(),
         max_rss_mb=getattr(a, "max_rss_mb", 0) or 0, engine_release=engine_release)
     # The build every point records: --sim-build, else the release tag the checkout is at
     # (check_blis_inputs required one), with the engine release its stack.json names (COV-6).
