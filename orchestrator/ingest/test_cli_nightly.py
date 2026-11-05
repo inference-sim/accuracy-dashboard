@@ -1,6 +1,6 @@
 """cli.py nightly's wiring (no-storage model): it lists the window, fetches+scores the delta, and
 merges into the published summary. BLIS and the network aren't available here, so api.pull,
-cmd_pull, cmd_score and build_summary_v2 are monkeypatched to cheap fakes -- this checks the glue
+cmd_pull, run_image and build_summary_v2 are monkeypatched to cheap fakes -- this checks the glue
 (arg plumbing, work/data/state paths, the pull-failure-stops-the-run rule), not the scoring, which
 test_score_e2e and test_nightly_run cover.
 """
@@ -53,12 +53,15 @@ def resolves(catalog: Path, models: dict) -> dict:
     return out
 
 
+IMAGE = "ghcr.io/inference-sim/accuracy-dashboard-harness@sha256:" + "a" * 64
+
+
 def _args(tmp, **over):
     a = dict(blis_tag="v0.12.0", work_dir=str(tmp / "work"), data_dir=str(tmp / "data"),
              state=str(tmp / "state.json"), scored=str(tmp / "scored-releases.json"), window_days=180, keep_api=5, today="2026-10-23",
              cache=None, work=str(tmp / "contract"), score_work=str(tmp / "sw"), evaluator_commit="abc",
              blis=str(tmp / "sim" / "blis"), catalog=str(tmp / "cat"), registry=str(tmp / "reg"),
-             corpus=str(tmp / "corpus.json"),
+             corpus=str(tmp / "corpus.json"), harness_image=IMAGE,
              corpus_sha256=None, corpus_dataset="d", corpus_revision="main", corpus_cache=None,
              timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0, stack=None,
              ledger=str(tmp / "ledger"))
@@ -99,10 +102,14 @@ class Fakes:
         fake_blis(tmp / "sim" / "blis", {"ledger --list anchor --json": [0, published("anchor", anchors), ""],
                                          **resolves(cat, {"m": "org/m"})})
 
-    def cmd_score(self, a):
-        self.scored_units = a.units
-        Path(a.out).mkdir(parents=True, exist_ok=True)
-        (Path(a.out) / "provenance.json").write_text(json.dumps({"pulled_at": "2026-10-23T00:00:00Z"}))
+    def run_image(self, cmd):
+        # The harness image the night scores through: record its command, and write what the
+        # image would write to the mounted output directory.
+        self.image_cmd = cmd
+        self.scored_units = Path(next(v.split(":")[0] for v in cmd if v.endswith(":/data/units.json:ro")))
+        out = Path(next(v.split(":")[0] for v in cmd if v.endswith(":/data/out")))
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "provenance.json").write_text(json.dumps({"pulled_at": "2026-10-23T00:00:00Z"}))
         return 0
 
     def cmd_pull(self, a):
@@ -124,7 +131,7 @@ class Fakes:
 def _install(monkeypatch, fakes, scored_ids):
     monkeypatch.setattr(api, "pull", fakes.api_pull)
     monkeypatch.setattr(cli, "cmd_pull", fakes.cmd_pull)
-    monkeypatch.setattr(cli, "cmd_score", fakes.cmd_score)
+    monkeypatch.setattr(cli, "run_image", fakes.run_image)
     import build_summary_v2
     def fake_build(contract_dir, *, generated_at, evaluator_commit):
         return {"schema_version": 3, "snapshot_id": "2026-10-23_blis-v0.12.0_ix-api-2026-10-23",
@@ -298,17 +305,18 @@ def test_nightly_stops_when_the_pull_fails(tmp_path, monkeypatch):
         cli.cmd_nightly(_args(tmp_path))
 
 
-def test_the_nightly_passes_the_blis_binary_to_score(tmp_path, monkeypatch):
+def test_the_nightly_scores_through_the_harness_image_by_digest(tmp_path, monkeypatch):
+    # Design §11.7: the night runs the released image, so every figure records its digest. It
+    # does not call cmd_score (the source tree's scorer).
     rows = [_row("m", 1, "2026-10-01")]
     fakes = Fakes(rows)
     _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
-    seen = {}
-    real = fakes.cmd_score
-    monkeypatch.setattr(cli, "cmd_score", lambda a: (seen.setdefault("a", a), real(a))[1])
+    monkeypatch.setattr(cli, "cmd_score", lambda a: (_ for _ in ()).throw(AssertionError("scored from source")))
     fakes.ledger(tmp_path)
-    cli.cmd_nightly(_args(tmp_path))
-    assert seen["a"].blis == str(tmp_path / "sim" / "blis")
-    assert not hasattr(seen["a"], "blis_dir") and not hasattr(seen["a"], "signedprobe")
+    assert cli.cmd_nightly(_args(tmp_path)) == 0
+    cmd = fakes.image_cmd
+    assert cmd[:3] == ["docker", "run", "--rm"] and IMAGE in cmd and "HARNESS_DIGEST=sha256:" + "a" * 64 in cmd
+    assert cmd[cmd.index(IMAGE) + 1:cmd.index(IMAGE) + 3] == ["--sim", "v0.12.0"]
 
 
 def _git(*a):

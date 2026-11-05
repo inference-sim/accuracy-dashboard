@@ -55,6 +55,12 @@ The image takes three inputs, as flags to its entrypoint `harness/run.sh`:
 - the data: `--catalog` and `--registry` (both required until the simulator can report the data it embeds);
 - a set of ledger units: `--units`, with `--pull`, the frozen recorded runs of those units.
 
+The nightly (`.github/workflows/api-nightly.yml`) scores through the image named in `harness/image.pin`: the
+image reference by digest, or the word `unpublished` while no image has been released. The nightly verifies
+the signature with `cosign verify`, then runs the image with `docker run`, `HARNESS_DIGEST` set from the pin
+and the data mounted. With `unpublished` or a malformed line the step fails; the scorer is not run from the
+source tree instead.
+
 A repository whose pull requests run the harness pins one digest in one pin file, as it pins
 any dependency, pulls the image by that digest, and passes it to the run as `HARNESS_DIGEST`.
 The release bot moves the pin. Every figure records the digest of the harness that produced it

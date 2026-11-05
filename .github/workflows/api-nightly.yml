@@ -97,6 +97,22 @@ jobs:
           echo "CORPUS_REVISION=${rev}" >> "$GITHUB_ENV"
           echo "fetched corpus ${repo}@${rev} ($(wc -c < "$RUNNER_TEMP/corpus.json") bytes)"
 
+      # The scoring runs in the harness image named by its digest in harness/image.pin (design
+      # §11.7, X8), so every figure records the digest of the image that produced it. While the pin
+      # says `unpublished` no image exists and this step FAILS: a gate that does not run is a
+      # failure (X16), and the scorer is never run from this source tree instead. A digest is
+      # verified against the signature harness-release.yml signs with before anything runs it.
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+      - name: Pin and verify the harness image
+        run: |
+          set -euo pipefail
+          IMAGE_REF="$(python3 orchestrator/ingest/harness_pin.py check harness/image.pin)"
+          cosign verify "$IMAGE_REF" \
+            --certificate-identity-regexp '^https://github\.com/inference-sim/accuracy-dashboard/\.github/workflows/harness-release\.yml@refs/(tags/v[0-9].*|heads/main)$' \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com > /dev/null
+          docker pull -q "$IMAGE_REF"
+          echo "HARNESS_IMAGE=${IMAGE_REF}" >> "$GITHUB_ENV"
+
       # Score every release resolve_blis.sh named, oldest first, one after another, each once
       # (COV-9). For each: build blis FROM SOURCE at the tag (so a per-release score is sound; #15's
       # seed rule), fetch what it pins, and run one night with it. Every point is scored by
@@ -169,6 +185,7 @@ jobs:
               --evaluator-commit "$GITHUB_SHA" \
               --ledger "$LEDGER" \
               --blis "$SIM/blis" --catalog "$CATALOG" --registry "$REGISTRY" \
+              --harness-image "$HARNESS_IMAGE" \
               --corpus "$RUNNER_TEMP/corpus.json" --corpus-revision "$CORPUS_REVISION"
             echo "::endgroup::"
           done

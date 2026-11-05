@@ -26,7 +26,7 @@
 #
 # Usage:
 #   run.sh --sim <tag|commit> [--sim-repo URL] --units FILE --pull DIR --out DIR
-#          --catalog DIR --registry DIR
+#          --catalog DIR --registry DIR [--corpus FILE --corpus-revision REV] [--max-rss-mb N]
 #   run.sh --check-args <the same flags>     validate the flags, do nothing else
 #
 # Exit status: 0 on success, 2 for a refused flag or value, otherwise the failing step's status.
@@ -41,12 +41,12 @@ refuse() {
 }
 
 sim="" sim_repo="https://github.com/inference-sim/inference-sim.git"
-units="" pull="" out="" catalog="" registry="" check_only=0
+units="" pull="" out="" catalog="" registry="" corpus="" corpus_revision="" max_rss_mb="" check_only=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --check-args) check_only=1; shift; continue ;;
-    --sim|--sim-repo|--units|--pull|--out|--catalog|--registry)
+    --sim|--sim-repo|--units|--pull|--out|--catalog|--registry|--corpus|--corpus-revision|--max-rss-mb)
       [ $# -ge 2 ] || refuse "$1 needs a value"
       case "$1" in
         --sim) sim="$2" ;;
@@ -56,6 +56,9 @@ while [ $# -gt 0 ]; do
         --out) out="$2" ;;
         --catalog) catalog="$2" ;;
         --registry) registry="$2" ;;
+        --corpus) corpus="$2" ;;
+        --corpus-revision) corpus_revision="$2" ;;
+        --max-rss-mb) max_rss_mb="$2" ;;
       esac
       shift 2 ;;
     *) refuse "unknown flag $1" ;;
@@ -88,6 +91,7 @@ fi
 
 [ -f "$units" ] || refuse "--units $units is not a file"
 [ -d "$pull" ] || refuse "--pull $pull is not a directory"
+if [ -n "$corpus" ] && [ ! -f "$corpus" ]; then refuse "--corpus $corpus is not a file"; fi
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -113,4 +117,9 @@ echo "run.sh: inference-sim $sim at $got" >&2
 
 args=(score --pull "$pull" --out "$out" --blis "$src/blis" --units "$units"
       --sim-build "$sim" --harness-digest "$digest" --catalog "$catalog" --registry "$registry")
+# The agentic corpus and the replay memory ceiling are passed on only when given; the scorer
+# requires the corpus when a point to score is agentic.
+[ -z "$corpus" ] || args+=(--corpus "$corpus")
+[ -z "$corpus_revision" ] || args+=(--corpus-revision "$corpus_revision")
+[ -z "$max_rss_mb" ] || args+=(--max-rss-mb "$max_rss_mb")
 python3 "$root/orchestrator/ingest/cli.py" "${args[@]}"

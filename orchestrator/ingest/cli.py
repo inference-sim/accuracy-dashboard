@@ -33,6 +33,7 @@ import clients  # noqa: E402
 import contract  # noqa: E402
 import engines  # noqa: E402
 import fields as fl  # noqa: E402
+import harness_pin as hp  # noqa: E402
 import ledger as ldg  # noqa: E402
 import pull as pl  # noqa: E402
 import recipes as rcp  # noqa: E402
@@ -454,6 +455,11 @@ def mergeable(prior: dict | None, schema_version: int) -> bool:
     return prior is not None and prior.get("schema_version") == schema_version and not _has_legacy_ids(prior)
 
 
+def run_image(cmd: list[str]) -> int:
+    """Run the harness image (harness_pin.docker_command) and return its exit status."""
+    return subprocess.run(cmd).returncode
+
+
 def cmd_nightly(a) -> int:
     """One night of the no-storage API-ingest pipeline (Discussion #15, revised 2026-10-25):
     list the 180-day window, fetch+score only the delta (or the whole window on a BLIS release),
@@ -522,13 +528,12 @@ def cmd_nightly(a) -> int:
         return json.loads((work / "manifest.json").read_text())["pulled_at"][:10], window_ids
 
     def score_build_fn(work: Path, blis_tag: str, score_ids, pull_date: str, window_ids: set):
-        rc = cmd_score(types.SimpleNamespace(
-            pull=str(work), out=str(contract_dir), blis=a.blis, catalog=a.catalog, stack=a.stack,
-            registry=a.registry, sim_build=None, harness_digest="unreleased", units=str(anchor_path),
-            corpus=a.corpus,
-            corpus_sha256=a.corpus_sha256, corpus_dataset=a.corpus_dataset,
-            corpus_revision=a.corpus_revision, corpus_cache=a.corpus_cache, work=a.score_work,
-            timeout=a.timeout, only=None, workers=a.workers, agentic_workers=a.agentic_workers,
+        # The night scores through the released harness image, named by its digest (design
+        # §11.7): the figures record that digest, and no scorer runs from this source tree.
+        contract_dir.mkdir(parents=True, exist_ok=True)
+        rc = run_image(hp.docker_command(
+            a.harness_image, sim=blis_tag, units=anchor_path, pull=work, out=contract_dir,
+            catalog=a.catalog, registry=a.registry, corpus=a.corpus, corpus_revision=a.corpus_revision,
             max_rss_mb=a.max_rss_mb))
         if rc != 0:
             raise RuntimeError(f"score failed (rc={rc})")
@@ -620,6 +625,8 @@ def main(argv=None) -> int:
     n.add_argument("--evaluator-commit")
     n.add_argument("--ledger", required=True, help="blis-substrate's catalog/ledger (see pull --ledger)")
     n.add_argument("--blis", required=True, help="the blis binary (see score --blis)")
+    n.add_argument("--harness-image", required=True,
+                   help="the harness image by digest (harness/image.pin): the night scores through it")
     n.add_argument("--catalog", required=True)
     n.add_argument("--registry", required=True)
     n.add_argument("--stack", help="TEMPORARY until inference-sim v0.16.0 (see score --stack)")
