@@ -37,7 +37,7 @@ import fields as fl  # noqa: E402
 import settings as st  # noqa: E402
 import support as sp  # noqa: E402
 
-FIELDS = fl.load(HERE / "testdata" / "fields" / "fields.json")
+FIELDS = fl.parse((HERE / "testdata" / "fields" / "fields.json").read_bytes())
 
 LOG = (
     "INFO [api_utils.py:286] non-default args: {'model': 'org/m', 'served_model_name': ['org/m'], "

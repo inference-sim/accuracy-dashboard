@@ -29,7 +29,7 @@ import settings as st  # noqa: E402
 import support as sp  # noqa: E402
 
 DEFAULTS, _ = st.load_vllm_defaults()
-FIELDS = fl.load(HERE / "testdata" / "fields" / "fields.json")
+FIELDS = fl.parse((HERE / "testdata" / "fields" / "fields.json").read_bytes())
 
 # A resolved engine-config line as vLLM v0.31.0 prints it (every engine log has one).
 RESOLVED = ("model='m', tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, "

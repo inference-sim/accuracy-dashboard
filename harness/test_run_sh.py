@@ -53,6 +53,13 @@ def test_an_unknown_flag_is_refused():
     assert "unknown flag --metrics-path" in p.stderr
 
 
+def test_the_field_list_is_not_a_flag():
+    # The scorer asks the blis it built for the field list (COV-3); no file stands in for it.
+    p = check("--sim", "v0.16.0", *GOOD, "--fields", "fields.json")
+    assert p.returncode == 2
+    assert "unknown flag --fields" in p.stderr
+
+
 def test_catalog_and_registry_are_required():
     base = ["--units", "units.txt", "--pull", "pull", "--out", "out"]
     p = check("--sim", "v0.16.0", *base, "--catalog", "cat")
@@ -157,7 +164,7 @@ def real_setup(tmp: Path, tag: str = "v0.16.0"):
     go = bin_ / "go"
     go.write_text('#!/bin/sh\n'
                   'if [ "$1 $2" = "mod download" ]; then exit 0; fi\n'
-                  'if [ "$1 $2" = "build -o" ]; then printf "#!/bin/sh\\nexit 0\\n" > "$3"; chmod +x "$3"; exit 0; fi\n'
+                  'if [ "$1 $2" = "build -o" ]; then printf "#!/bin/sh\\nif [ \\"\\$1\\" = fields ]; then cat \\"\\$FAKE_FIELDS\\"; fi\\nexit 0\\n" > "$3"; chmod +x "$3"; exit 0; fi\n'
                   'echo "fake go: unexpected $*" >&2; exit 9\n')
     py = bin_ / "python3"
     log = tmp / "python-args.txt"
@@ -187,10 +194,11 @@ def real_setup(tmp: Path, tag: str = "v0.16.0"):
 def run_real(tmp: Path, sim_of, extra=(), tag="v0.16.0"):
     bare, commit, bin_, log, pull, units, fields, cat, reg = real_setup(tmp, tag)
     out = tmp / "out"
-    env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "HARNESS_DIGEST": "sha256:" + "b" * 64}
+    env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "HARNESS_DIGEST": "sha256:" + "b" * 64,
+           "FAKE_FIELDS": str(fields)}
     p = subprocess.run(["bash", str(RUN), "--sim", sim_of(commit), "--sim-repo", str(bare), "--units", str(units),
                         "--pull", str(pull), "--out", str(out), "--catalog", str(cat), "--registry", str(reg),
-                        "--fields", str(fields), *extra], capture_output=True, text=True, env=env)
+                        *extra], capture_output=True, text=True, env=env)
     return p, out, log, commit
 
 
@@ -229,10 +237,10 @@ def test_the_corpus_flags_are_required_only_for_an_agentic_point(tmp_path):
     (pull / "manifest.json").write_text(json.dumps(
         {**MANIFEST, "points": [{"point_id": pid, "reasons": [], "row": {"benchmark_type": "agentic_traces"}}]}))
     units.write_text(pid + "\n")
-    env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}"}
+    env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "FAKE_FIELDS": str(fields)}
     p = subprocess.run(["bash", str(RUN), "--sim", "v0.16.0", "--sim-repo", str(bare), "--units", str(units),
                         "--pull", str(pull), "--out", str(tmp_path / "out"), "--catalog", str(cat),
-                        "--registry", str(reg), "--fields", str(fields)], capture_output=True, text=True, env=env)
+                        "--registry", str(reg)], capture_output=True, text=True, env=env)
     assert p.returncode == 2
     assert "--corpus and --corpus-revision are required" in p.stderr
 

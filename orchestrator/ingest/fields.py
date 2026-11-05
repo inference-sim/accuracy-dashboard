@@ -4,10 +4,8 @@ The engine repository classifies every configuration field and environment varia
 release reads (VLM-3), and states each field's estimation rule. The dashboard keeps no table of
 its own: Decide and Estimate read this list only.
 
-The list is printed by `blis fields --engine <kind> --json` at the release the scoring build
-runs. TEMPORARY until that command exists (inference-sim m1/substrate): the scorer takes the
-file the engine repository publishes at its root, by path (--fields), and the harness image
-takes it from the blis-vllm module the simulator build selects (harness/run.sh).
+The scorer reads the list from `blis fields --engine <kind> --json`, which prints it at the
+engine release the scoring build runs (cli.read_fields).
 
 The loader is strict (SUB-12): unknown keys are refused at every level, and the rules of
 blis-substrate contracts/spec/fields (Validate) are checked: the evidence a status takes, the
@@ -22,7 +20,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from pathlib import Path
 
 MODELLED, PROVEN_INERT, NOT_MODELLED, INERT_UNPROVEN = "modelled", "proven_inert", "not_modelled", "inert_unproven"
 STATUSES = (MODELLED, PROVEN_INERT, NOT_MODELLED, INERT_UNPROVEN)
@@ -130,13 +127,6 @@ def parse(data: bytes | str) -> FieldList:
         fld = Field(name, source, status, ev, est)
         fl.fields[fld.path] = fld
     return fl
-
-
-def load(path) -> FieldList:
-    try:
-        return parse(Path(path).read_bytes())
-    except FieldsError as e:
-        raise FieldsError(f"{path}: {e}") from None
 
 
 # ------------------------------------------------------------------ Decide and Estimate
