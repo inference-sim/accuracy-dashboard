@@ -50,6 +50,13 @@ def test_an_unknown_flag_is_refused():
     assert "unknown flag --metrics-path" in p.stderr
 
 
+def test_the_field_list_is_not_a_flag():
+    # The scorer asks the blis it built for the field list (COV-3); no file stands in for it.
+    p = check("--sim", "v0.16.0", *GOOD, "--fields", "fields.json")
+    assert p.returncode == 2
+    assert "unknown flag --fields" in p.stderr
+
+
 def test_catalog_and_registry_are_required():
     base = ["--units", "units.txt", "--pull", "pull", "--out", "out"]
     p = check("--sim", "v0.16.0", *base, "--catalog", "cat")

@@ -6,8 +6,9 @@
       GitHub (artifacts + vllm-project/vllm), Docker Hub, HuggingFace (base_model only).
 
   cli.py score --pull PULL --out CONTRACT --blis BLIS --catalog CAT --registry REG
-               --fields FIELDS [--stack STACK] --corpus FILE [--work DIR] [--only PID ...]
-      Score a frozen pull with one BLIS release. No network.
+               [--stack STACK] --corpus FILE [--work DIR] [--only PID ...]
+      Score a frozen pull with one BLIS release. No network. The engine's field list is what
+      `blis fields --engine vllm --json` prints.
 
 Nothing in the nightly pipeline calls this. Run by path, like the other orchestrator scripts.
 """
@@ -26,6 +27,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import api  # noqa: E402
 import artifacts as art  # noqa: E402
+import blis_commands as bc  # noqa: E402
 import build  # noqa: E402
 import clients  # noqa: E402
 import contract  # noqa: E402
@@ -274,20 +276,15 @@ def select_units(points: list[dict], units_path: str | None) -> tuple[list[dict]
              "not_in_pull": sorted(want - held)})
 
 
-def read_fields(path: str | None, engine_release: str) -> tuple["fl.FieldList", str]:
-    """The engine's field list at the release the scoring build runs, and its sha256.
-
-    TEMPORARY until `blis fields --engine vllm --json` exists (inference-sim m1/substrate, task
-    H): --fields names the file blis-vllm publishes at its root. The list must be for the engine
-    release stack.json names; one for another release is refused (LIF-6)."""
-    if not path:
-        raise fl.FieldsError("--fields is required: the engine's fields.json at the release the simulator runs "
-                             "(until `blis fields --engine vllm --json` exists)")
-    raw = Path(path).read_bytes()
+def read_fields(blis: Path, engine_release: str) -> tuple["fl.FieldList", str]:
+    """The engine's field list at the release the scoring build runs, and its sha256: what
+    `blis fields --engine vllm --json` prints (COV-3). The list must be for the engine release
+    stack.json names; one for another release is refused (LIF-6)."""
+    raw = bc.fields(str(blis), "vllm")
     field_list = fl.parse(raw)
     if field_list.engine != {"kind": "vllm", "version": engine_release}:
-        raise fl.FieldsError(f"--fields {path} is the field list of {field_list.engine}, but the simulator runs "
-                             f"vllm {engine_release} (stack.json)")
+        raise fl.FieldsError(f"blis fields --engine vllm printed the field list of {field_list.engine}, but the "
+                             f"simulator runs vllm {engine_release} (stack.json)")
     return field_list, art.sha256(raw)
 
 
@@ -315,8 +312,8 @@ def cmd_score(a) -> int:
     try:
         stack = read_stack(blis, getattr(a, "stack", None))
         engine_release = stack.engine("vllm")
-        field_list, fields_sha = read_fields(getattr(a, "fields", None), engine_release)
-    except (sk.StackError, fl.FieldsError, OSError, ValueError) as e:
+        field_list, fields_sha = read_fields(blis, engine_release)
+    except (sk.StackError, fl.FieldsError, bc.CommandError, OSError, ValueError) as e:
         bad.append(str(e))
     if bad:
         for b in bad:
@@ -449,7 +446,7 @@ def cmd_nightly(a) -> int:
     def score_build_fn(work: Path, blis_tag: str, score_ids, pull_date: str, window_ids: set):
         rc = cmd_score(types.SimpleNamespace(
             pull=str(work), out=str(contract_dir), blis=a.blis, catalog=a.catalog, stack=a.stack,
-            fields=a.fields, registry=a.registry, sim_build=None, harness_digest="unreleased",
+            registry=a.registry, sim_build=None, harness_digest="unreleased",
             # TEMPORARY until blis-substrate publishes the anchor list (COV-2): the nightly scores
             # every point of the window; it then passes that list as --units.
             units=None,
@@ -507,8 +504,6 @@ def main(argv=None) -> int:
                    help="the blis binary, built in an inference-sim checkout at a release tag; it runs in that directory")
     s.add_argument("--catalog", required=True)
     s.add_argument("--registry", required=True)
-    s.add_argument("--fields", help="TEMPORARY until `blis fields --engine vllm --json` exists (inference-sim "
-                                     "m1/substrate): blis-vllm's fields.json at the release the simulator runs")
     s.add_argument("--stack", help="TEMPORARY until inference-sim v0.16.0 ships stack.json: the scoring build's "
                                     "stack.json, when its checkout has none")
     s.add_argument("--sim-build", help="the simulator build: a release tag or a 40-hex commit; the checkout must be at it "
@@ -547,7 +542,6 @@ def main(argv=None) -> int:
     n.add_argument("--blis", required=True, help="the blis binary (see score --blis)")
     n.add_argument("--catalog", required=True)
     n.add_argument("--registry", required=True)
-    n.add_argument("--fields", help="TEMPORARY until `blis fields --engine vllm --json` exists (see score --fields)")
     n.add_argument("--stack", help="TEMPORARY until inference-sim v0.16.0 (see score --stack)")
     n.add_argument("--corpus", required=True)
     n.add_argument("--corpus-sha256")

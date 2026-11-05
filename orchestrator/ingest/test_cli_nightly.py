@@ -25,7 +25,6 @@ def _args(tmp, **over):
              state=str(tmp / "state.json"), window_days=180, keep_api=5, today="2026-10-23",
              cache=None, work=str(tmp / "contract"), score_work=str(tmp / "sw"), evaluator_commit="abc",
              blis=str(tmp / "sim" / "blis"), catalog=str(tmp / "cat"), registry=str(tmp / "reg"),
-             fields=str(tmp / "fields.json"),
              corpus=str(tmp / "corpus.json"),
              corpus_sha256=None, corpus_dataset="d", corpus_revision="main", corpus_cache=None,
              timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0, stack=None,
@@ -224,16 +223,37 @@ def test_check_blis_inputs_refuses_a_checkout_not_at_a_tag(tmp_path):
 FIELD_LIST = {"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": []}
 
 
-def test_the_field_list_must_be_the_release_the_simulator_runs(tmp_path):
-    p = tmp_path / "fields.json"
-    p.write_text(json.dumps(FIELD_LIST))
-    fl_, sha = cli.read_fields(str(p), "0.32.0")
-    assert fl_.engine == {"kind": "vllm", "version": "0.32.0"} and len(sha) == 64
+def fake_blis(path: Path, commands: dict) -> Path:
+    """A blis executable that answers each command in `commands` (its argv joined by spaces) with
+    (exit status, standard output, standard error), records every argv it was given in
+    path.saw, and exits 2 for any other command."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("#!/usr/bin/env python3\nimport json, sys\n"
+                    f"answers = {json.dumps(commands)}\n"
+                    f"open({str(path) + '.saw'!r}, 'a').write(json.dumps(sys.argv[1:]) + '\\n')\n"
+                    "code, out, err = answers.get(' '.join(sys.argv[1:]), [2, '', 'unknown command'])\n"
+                    "sys.stdout.write(out); sys.stderr.write(err); sys.exit(code)\n")
+    path.chmod(0o755)
+    return path
+
+
+def test_the_field_list_is_what_blis_fields_prints_for_the_release_the_simulator_runs(tmp_path):
+    text = json.dumps(FIELD_LIST)
+    blis = fake_blis(tmp_path / "sim" / "blis", {"fields --engine vllm --json": [0, text, ""]})
+    fl_, sha = cli.read_fields(blis, "0.32.0")
+    assert fl_.engine == {"kind": "vllm", "version": "0.32.0"}
+    import hashlib
+    assert sha == hashlib.sha256(text.encode()).hexdigest()
     import fields
     with pytest.raises(fields.FieldsError, match="the simulator runs vllm 0.31.0"):
-        cli.read_fields(str(p), "0.31.0")
-    with pytest.raises(fields.FieldsError, match="--fields is required"):
-        cli.read_fields(None, "0.32.0")
+        cli.read_fields(blis, "0.31.0")
+
+
+def test_a_blis_without_the_fields_command_is_refused_naming_the_command(tmp_path):
+    import blis_commands
+    blis = fake_blis(tmp_path / "sim" / "blis", {})
+    with pytest.raises(blis_commands.CommandError, match="blis fields --engine vllm --json exited 2: unknown command"):
+        cli.read_fields(blis, "0.32.0")
 
 
 def test_a_build_with_no_stack_json_is_refused_with_why(tmp_path):

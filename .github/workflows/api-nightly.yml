@@ -110,7 +110,7 @@ jobs:
           set -euo pipefail
           for BLIS_TAG in $BLIS_TAGS; do
             echo "::group::score $BLIS_TAG"
-            rm -rf "$RUNNER_TEMP/sim" "$RUNNER_TEMP/catalog" "$RUNNER_TEMP/registry" "$RUNNER_TEMP/blis-vllm" \
+            rm -rf "$RUNNER_TEMP/sim" "$RUNNER_TEMP/catalog" "$RUNNER_TEMP/registry" \
               "$RUNNER_TEMP/substrate" "$RUNNER_TEMP/pull" "$RUNNER_TEMP/contract" "$RUNNER_TEMP/scorework"
             SIM="$RUNNER_TEMP/sim"
             git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$SIM"
@@ -118,18 +118,6 @@ jobs:
             eval "$(bash orchestrator/resolve_versions.sh "$SIM")"
             git clone -q --depth 1 --branch "$catalog"  https://github.com/inference-sim/blis-catalog.git  "$RUNNER_TEMP/catalog"
             git clone -q --depth 1 --branch "$registry" https://github.com/inference-sim/blis-registry.git "$RUNNER_TEMP/registry"
-            # The engine's field list (design §11.1): every field's status and estimation rule.
-            # TEMPORARY until `blis fields --engine vllm --json` exists (inference-sim m1/substrate,
-            # task H): read from the blis-vllm module the build pins, at its root. A module that
-            # publishes none fails the night; there is no fallback.
-            vllm_mod=$(awk '$1=="github.com/inference-sim/blis-vllm" {print $2; exit}' "$SIM/go.mod")
-            git clone -q --filter=blob:none https://github.com/inference-sim/blis-vllm.git "$RUNNER_TEMP/blis-vllm"
-            git -C "$RUNNER_TEMP/blis-vllm" checkout -q "${vllm_mod##*-}" 2>/dev/null || git -C "$RUNNER_TEMP/blis-vllm" checkout -q "$vllm_mod"
-            if [ ! -f "$RUNNER_TEMP/blis-vllm/fields.json" ]; then
-              echo "FATAL: blis-vllm $vllm_mod publishes no fields.json, so no point can be graded" >&2
-              exit 1
-            fi
-            FIELDS="$RUNNER_TEMP/blis-vllm/fields.json"
             # The ledger at the blis-substrate commit this release pins: every point is one of its
             # units (design §10.2). TEMPORARY until `blis ledger --list` (inference-sim m1/substrate)
             # prints the unit list; the job then reads it from the simulator.
@@ -183,7 +171,6 @@ jobs:
               --evaluator-commit "$GITHUB_SHA" \
               --ledger "$LEDGER" \
               --blis "$SIM/blis" --catalog "$CATALOG" --registry "$REGISTRY" \
-              --fields "$FIELDS" \
               --corpus "$RUNNER_TEMP/corpus.json" --corpus-revision "$CORPUS_REVISION"
             echo "::endgroup::"
           done

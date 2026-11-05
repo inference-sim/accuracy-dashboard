@@ -13,8 +13,8 @@
 #
 # It clones inference-sim at the ref, builds blis, and runs the scorer
 # (orchestrator/ingest/cli.py score), which writes the per-point records and aggregates to --out.
-# The field list is --fields FILE, or else the fields.json of the blis-vllm module the build
-# selects (COV-3: the dashboard reads field status and estimation rules only from the engine).
+# The scorer asks the blis it built for the engine's field list (`blis fields --engine vllm
+# --json`; COV-3), so the list is always the one of the engine release that build runs.
 #
 # The harness digest. Every figure records the digest of the harness that produced it (X8). An
 # image cannot hold its own digest, since the digest is known only after the image is built.
@@ -25,7 +25,7 @@
 #
 # Usage:
 #   run.sh --sim <tag|commit> [--sim-repo URL] --units FILE --pull DIR --out DIR
-#          --catalog DIR --registry DIR [--fields FILE]
+#          --catalog DIR --registry DIR
 #   run.sh --check-args <the same flags>     validate the flags, do nothing else
 #
 # Exit status: 0 on success, 2 for a refused flag or value, otherwise the failing step's status.
@@ -40,12 +40,12 @@ refuse() {
 }
 
 sim="" sim_repo="https://github.com/inference-sim/inference-sim.git"
-units="" pull="" out="" catalog="" registry="" fields="" check_only=0
+units="" pull="" out="" catalog="" registry="" check_only=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --check-args) check_only=1; shift; continue ;;
-    --sim|--sim-repo|--units|--pull|--out|--catalog|--registry|--fields)
+    --sim|--sim-repo|--units|--pull|--out|--catalog|--registry)
       [ $# -ge 2 ] || refuse "$1 needs a value"
       case "$1" in
         --sim) sim="$2" ;;
@@ -55,7 +55,6 @@ while [ $# -gt 0 ]; do
         --out) out="$2" ;;
         --catalog) catalog="$2" ;;
         --registry) registry="$2" ;;
-        --fields) fields="$2" ;;
       esac
       shift 2 ;;
     *) refuse "unknown flag $1" ;;
@@ -88,7 +87,6 @@ fi
 
 [ -f "$units" ] || refuse "--units $units is not a file"
 [ -d "$pull" ] || refuse "--pull $pull is not a directory"
-if [ -n "$fields" ] && [ ! -f "$fields" ]; then refuse "--fields $fields is not a file"; fi
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -110,12 +108,6 @@ echo "run.sh: inference-sim $sim at $got" >&2
 
 ( cd "$src" && go mod download && go build -o "$work/blis" main.go )
 
-if [ -z "$fields" ]; then
-  vllm_dir="$(cd "$src" && go list -m -f '{{.Dir}}' github.com/inference-sim/blis-vllm)"
-  fields="$vllm_dir/fields.json"
-  [ -f "$fields" ] || refuse "the blis-vllm module this build selects ($vllm_dir) publishes no fields.json; pass --fields"
-fi
-
-args=(score --pull "$pull" --out "$out" --blis "$work/blis" --fields "$fields" --units "$units"
+args=(score --pull "$pull" --out "$out" --blis "$work/blis" --units "$units"
       --sim-build "$sim" --harness-digest "$digest" --catalog "$catalog" --registry "$registry")
 python3 "$root/orchestrator/ingest/cli.py" "${args[@]}"

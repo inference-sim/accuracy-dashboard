@@ -45,7 +45,7 @@ Each value goes under the engine's own name for it (`settings.LOCATIONS`): the u
 
 Which fields are modelled, and each field's estimation rule, come only from the engine's fields.json (`fields.py`, VLM-3); the dashboard holds no settings table. For each field the run set: a field the release does not list is G5 `field_not_in_release`; `not_modelled` with rule `none` is G5 `field_not_modelled`; `not_modelled` with `leave_unset` is left out of the scenario so the engine resolves it (X19), and with `substitute` the rule's stated setting is written instead, each named on the point as `estimated`; `inert_unproven` is named as `interim_status`; `modelled` and `proven_inert` change no grade. A value blis-vllm needs that no source recorded (`block_size`, `max_num_batched_tokens`, `max_num_seqs`, a drafter's acceptance) takes its field's estimation rule the same way, or the point is G5 `value_not_recorded`. A field inside a config object that vLLM prints whole is set by the run only when it differs from vLLM's own default, read from vLLM's dataclasses at the release (`orchestrator/vllm_defaults.json`, written by `gen_vllm_defaults.py`).
 
-TEMPORARY until `blis fields --engine vllm --json` exists (inference-sim m1/substrate, task H): `cli.py score --fields FILE` names the field list, blis-vllm's `fields.json` at the release the simulator runs. A list for another release is refused.
+The scorer reads the field list from the simulator it scores with: `blis fields --engine vllm --json` prints the engine's fields.json at the release that build runs. A list whose `engine` is not the release stack.json names is refused.
 
 ## Failed points
 
@@ -153,7 +153,7 @@ One line per G5 point, sorted by `point_id` (`schemas/fidelity.v3.json#/definiti
 
 `engine` is the engine release the scoring simulator runs, read from its stack.json (LIF-6); every point is scored on it, and graded against it. TEMPORARY until inference-sim v0.16.0 ships stack.json at its root: `cli.py score --stack FILE` names the file. A simulator checkout with no stack.json and no `--stack` is refused, because the build predates stack.json; the release is never read from installation.md.
 
-`fields_sha256` is the sha256 of the fields.json the scorer read.
+`fields_sha256` is the sha256 of the field list `blis fields --engine vllm --json` printed.
 
 `points` is the number of points the run holds (scored, G5 and failed), and `left_out_records` the number of source records the ledger holds no unit for (the pull manifest's `ledger.unlisted`), published in coverage (COV-7).
 
