@@ -169,3 +169,21 @@ def coefficient_substitutions(doc: dict) -> list[dict]:
                               f"{method!r}, not one of design 9.2's", "coefficient_method_unknown")
         out.append({"kind": "coefficient_method", "subject": f"{c['set']}/{c['name']}", "detail": method})
     return sorted(out, key=lambda s: (s["subject"], s["detail"]))
+
+
+ACCEPTANCE_SUBJECT = "speculative_config.acceptance_length"
+
+
+def acceptance_substitution(doc: dict) -> dict:
+    """The G2 substitution for a drafter whose acceptance the run did not record (design D8):
+    blis resolves it from the substrate's profile, and the Result's input.workload_properties
+    says which. Kind estimated; the detail names the profile (set/key), or says the Result does
+    not report it."""
+    for p in (doc.get("input") or {}).get("workload_properties") or []:
+        if p.get("name") == "speculative_acceptance":
+            if p.get("source") == "profile" and p.get("profile"):
+                detail = f"profile {p['profile']} from the registry"
+            else:
+                detail = f"supplied by {p.get('source')}, not a registry profile"
+            return {"kind": "estimated", "subject": ACCEPTANCE_SUBJECT, "detail": detail}
+    return {"kind": "estimated", "subject": ACCEPTANCE_SUBJECT, "detail": "profile not reported"}

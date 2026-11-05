@@ -62,6 +62,7 @@ FAKE_BLIS = """#!/usr/bin/env python3
 import csv, json, os, sys
 VALIDATE, DROP, EARLY_HOLDER, SHORT, TTFT_US, TPOT_US = {validate}, {drop}, {early_holder}, {short}, 180000, 9000.0
 METHODS = {methods}
+WP = {wp}
 a = sys.argv[1:]
 here = os.path.dirname(os.path.abspath(__file__))
 if a[:3] == ["schema", "validate", "result"]:
@@ -77,6 +78,8 @@ doc = {{"kind": "Result", "schema_version": 2, "name": "fake", "requests": count
        "metrics": {{"ttft_mean_ms": {{"value": 1500.0, "samples": 10}}, "tpot_mean_ms": {{"value": 4.5, "samples": 10}},
                    "itl_mean_ms": {{"value": 17.0, "samples": 10}}}},
        "reports": {{"engine": {{"cluster": {{"kv_capacity_tokens_per_replica": 100000}}}}, "kernel": {{"pool": "fake"}}}}}}
+if WP is not None:
+    doc["input"] = {{"workload_properties": WP}}
 if METHODS is not None:
     doc["selected_entries"] = {{"coefficients": [
         {{"set": "cost-model-attention", "name": "n%d" % i, "method": m, "scope": {{}}, "file": "f.yaml"}}
@@ -117,12 +120,13 @@ def _exe(path: Path, body: str) -> str:
 
 
 def _fake_blis(tmp: Path, *, validate: int = 0, drop: bool = False, early_holder: bool = False,
-               short: bool = False, methods=("measured",)) -> str:
+               short: bool = False, methods=("measured",), workload_properties=None) -> str:
     d = tmp / "sim"
     d.mkdir(exist_ok=True)
     (d / "blis_saw.json").unlink(missing_ok=True)
     return _exe(d / "blis", FAKE_BLIS.format(validate=validate, drop=drop, early_holder=early_holder,
-                                                     short=short, methods=repr(methods)))
+                                                     short=short, methods=repr(methods),
+                                                     wp=repr(workload_properties)))
 
 
 def _saw(env) -> list[dict]:
@@ -242,14 +246,35 @@ def test_a_request_that_ran_other_lengths_than_its_target_is_refused():
         shutil.rmtree(tmp)
 
 
-def test_a_drafter_whose_acceptance_the_scenario_does_not_pin_is_not_replayed():
+def test_a_drafter_with_no_recorded_acceptance_is_replayed_with_the_profile_and_names_it():
+    # D8: the dashboard pins no acceptance the run did not record; blis resolves it from the
+    # substrate's profile, and the point names the profile as an estimate.
     tmp = Path(tempfile.mkdtemp())
     try:
-        # Zero draft tokens: the scenario states a drafter but pins no acceptance for it.
-        entry, env = _setup(tmp, log=LOG.replace("'num_speculative_tokens': 2", "'num_speculative_tokens': 0"))
-        o, _ = _score(tmp, entry, env, tmp / "c1")
-        assert o.fidelity is None and o.reasons == ["client_scenario_not_replayable:single_turn_speculative"], o.reasons
-        assert _saw(env) == []
+        log = LOG.replace(", 'synthetic_acceptance_length': 2.4", "")
+        entry, env = _setup(tmp, log=log)
+        env.blis = _fake_blis(tmp, workload_properties=[
+            {"name": "speculative_acceptance", "values": {"acceptance_length": 3.1}, "source": "profile",
+             "profile": "mtp/deepseek"}])
+        o, work = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        scen = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
+        assert "acceptance" not in scen.replace("rejection_sample_method", "")
+        sub = next(s for s in o.fidelity["substitutions"] if s["subject"] == "speculative_config.acceptance_length")
+        assert sub == {"kind": "estimated", "subject": "speculative_config.acceptance_length",
+                       "detail": "profile mtp/deepseek from the registry"}
+        env.blis = _fake_blis(tmp)
+        o, _ = _score(tmp, entry, env, tmp / "c2")
+        assert [s["detail"] for s in o.fidelity["substitutions"]
+                if s["subject"] == "speculative_config.acceptance_length"] == ["profile not reported"]
+        # A recorded acceptance is passed, pinned, and names no substitution.
+        tmp2 = Path(tempfile.mkdtemp())
+        try:
+            entry, env = _setup(tmp2)
+            o, _ = _score(tmp2, entry, env, tmp2 / "c3")
+            assert not [s for s in o.fidelity["substitutions"] if s["subject"].endswith("acceptance_length")]
+        finally:
+            shutil.rmtree(tmp2)
     finally:
         shutil.rmtree(tmp)
 

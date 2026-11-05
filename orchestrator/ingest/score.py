@@ -445,6 +445,15 @@ def score_points(points: list, pull_dir: Path, work: Path, env: Env, *, workers:
     return [results[i] for i in range(n)]   # input order; write_contract re-sorts anyway
 
 
+def _acceptance_subs(b: st.Built, doc: dict) -> list[dict]:
+    """A drafter with no recorded acceptance is simulated with the substrate's profile (D8); the
+    scenario pins nothing and the point names the profile blis resolved."""
+    spec = b.deployment["pools"][0]["engine"].get("speculative")
+    if spec is None or b.acceptance_length is not None:
+        return []
+    return [result.acceptance_substitution(doc)]
+
+
 def check_all_scored(points: list, outcomes: list) -> list[str]:
     """COV-1: every unit the window holds ends scored, G5 with a reason, or failed. The outcomes
     are the points, one each, and each is one of those three."""
@@ -618,6 +627,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
 
     try:
         o.subs += result.coefficient_substitutions(doc)
+        o.subs += _acceptance_subs(b, doc)
     except result.ResultError as e:
         o.reasons = [f"blis_refused:{e.slug}"]
         return o
@@ -716,11 +726,6 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     model = b.scenario["model"]
     pool = dep["pools"][0]
     eng, par = pool["engine"], pool["parallel"]
-    if "speculative" in eng and "acceptance" not in b.scenario:
-        # The replay passes no acceptance flag: a drafter is priced only when the scenario pins
-        # its acceptance.
-        o.reasons = ["client_scenario_not_replayable:single_turn_speculative"]
-        return o
     m = measured(entry)
     try:
         meas_ttft_us, meas_tpot_us = float(m["mean_ttft"]) * 1e6, float(m["mean_tpot"]) * 1e6
@@ -776,6 +781,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
 
     try:
         o.subs += result.coefficient_substitutions(doc)
+        o.subs += _acceptance_subs(b, doc)
     except result.ResultError as e:
         o.reasons = [f"blis_refused:{e.slug}"]
         return o
