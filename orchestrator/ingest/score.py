@@ -574,12 +574,12 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
             if not isinstance(v, int) or isinstance(v, bool) or v < 1:
                 o.reasons.append(f"required_setting_missing:replay.{k}")
 
-    if sup.model is None or part_name not in cat.hardware:
+    if sup.model is None or sup.chip is None:
         o.reasons = sorted(set(o.reasons))
         return o
     part = st.Part(name=part_name)
     name = f"p-{pid[:16]}"
-    catalog_size = cat.node_sizes.get(part_name)
+    catalog_size = cat.node_size(part_name)
     node = ir.resolve(env.runner_table, row["hardware"], run_date=ident["measured_date"],
                       launch_size=st.recorded_node_size(launch), fixes_packaging=catalog_size is not None)
     b = st.build(c, name=name, model=sup.model, part=part, engine_version=env.engine_release,

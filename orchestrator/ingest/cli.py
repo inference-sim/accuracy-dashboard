@@ -388,7 +388,7 @@ def cmd_score(a) -> int:
     # (check_blis_inputs required one), with the engine release its stack.json names (COV-6).
     env.sim_build = sim_build or env.blis_release
     env.harness_digest = a.harness_digest
-    env.catalog_obj = sp.Catalog.load(env.catalog)
+    env.catalog_obj = sp.Catalog(blis=str(blis), root=env.catalog)
     env.parts = sp.registry_parts(env.registry)
     # Score serially or across a process pool. BLIS replays are CPU-bound subprocesses, so the
     # worker count is clamped to the machine's cores (4 on an ubuntu-latest runner) -- more would
@@ -399,8 +399,14 @@ def cmd_score(a) -> int:
     # Agentic replays hold the 1.8GB corpus in RAM, so they serialize (default 1) even while
     # single-turn runs `workers`-wide; override only on a box with the RAM for concurrent corpora.
     agentic_workers = a.agentic_workers if getattr(a, "agentic_workers", 0) else 1
-    outcomes = sc.score_points(points, pull_dir, work, env, workers=workers,
-                               agentic_workers=agentic_workers, log=_log)
+    try:
+        outcomes = sc.score_points(points, pull_dir, work, env, workers=workers,
+                                   agentic_workers=agentic_workers, log=_log)
+    except bc.CommandError as e:
+        # A blis command the scorer reads catalog identities through failed (an ambiguous
+        # name, or a build without the command): no point of the run is graded on a guess.
+        _log(f"FATAL: {e}")
+        return 2
     problems = sc.check_all_scored(points, outcomes)
     if problems:
         for p in problems:
@@ -470,6 +476,15 @@ def cmd_nightly(a) -> int:
         anchors = read_anchor_units(Path(a.blis), anchor_path)
     except (bc.CommandError, ldg.LedgerError, OSError, ValueError) as e:
         _log(f"FATAL: {e}")
+        return 2
+
+    # The catalog is checked once, before any artifact is fetched: a source repository two
+    # entries claim makes `blis catalog resolve` refuse, and the night stops here, not
+    # mid-score.
+    try:
+        sp.Catalog(blis=str(Path(a.blis).resolve()), root=Path(a.catalog)).check_unambiguous()
+    except (bc.CommandError, OSError, ValueError) as e:
+        _log(f"FATAL: the catalog is ambiguous or unreadable: {e}")
         return 2
 
     def pull_fn(work: Path, today_: date, last_ids: set, blis_changed: bool):

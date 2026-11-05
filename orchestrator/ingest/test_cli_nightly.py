@@ -34,6 +34,25 @@ def fake_blis(path: Path, commands: dict) -> Path:
     return path
 
 
+def write_catalog(root: Path, models: dict) -> Path:
+    """A catalog of the given entries (name -> source repository): models/<name>/model.yaml."""
+    for name, repo in models.items():
+        (root / "models" / name).mkdir(parents=True, exist_ok=True)
+        (root / "models" / name / "model.yaml").write_text(f"name: {name}\nsource:\n  repo: {repo}\n")
+    return root
+
+
+def resolves(catalog: Path, models: dict) -> dict:
+    """The answers of `blis catalog resolve --catalog <catalog> --model <q> --json` for every entry
+    name and source repository of `models`, each resolving to its entry."""
+    out = {}
+    for name, repo in models.items():
+        for q in (name, repo):
+            out[f"catalog resolve --catalog {catalog} --model {q} --json"] = [
+                0, json.dumps({"query": q, "identity": name, "reason": "fake"}), ""]
+    return out
+
+
 def _args(tmp, **over):
     a = dict(blis_tag="v0.12.0", work_dir=str(tmp / "work"), data_dir=str(tmp / "data"),
              state=str(tmp / "state.json"), scored=str(tmp / "scored-releases.json"), window_days=180, keep_api=5, today="2026-10-23",
@@ -76,7 +95,9 @@ class Fakes:
         # that prints the anchor list of the substrate release it pins.
         ledger_fake.write(tmp / "ledger", self.rows)
         anchors = [ledger_fake.point_id(r) for r in self.rows] if self.anchors is None else self.anchors
-        fake_blis(tmp / "sim" / "blis", {"ledger --list anchor --json": [0, published("anchor", anchors), ""]})
+        cat = write_catalog(tmp / "cat", {"m": "org/m"})
+        fake_blis(tmp / "sim" / "blis", {"ledger --list anchor --json": [0, published("anchor", anchors), ""],
+                                         **resolves(cat, {"m": "org/m"})})
 
     def cmd_score(self, a):
         self.scored_units = a.units
@@ -444,3 +465,62 @@ def test_a_pre_release_tag_is_a_simulator_build_but_not_a_release_tag(tmp_path):
     assert check("v0.16") == ["--sim-build 'v0.16' is neither a tag vX.Y.Z[-suffix] nor a 40-hex commit"]
     assert cli.check_blis_inputs(sim / "blis", tmp_path / "cat", tmp_path / "reg") == []
     assert cli._RELEASE_TAG.match("v0.16.0") and not cli._RELEASE_TAG.match("v0.16.0-rc1")
+
+
+def _score_inputs(tmp_path, commands: dict):
+    """What cmd_score needs, with a fake blis answering `commands` beside a stack.json for vLLM
+    0.32.0, in a checkout at v0.16.0; the catalog and registry at release tags; and a pull of no
+    points."""
+    sim = tmp_path / "sim"
+    _tagged_repo(sim, "v0.16.0")
+    (sim / "go.mod").write_text("module x\n")
+    (sim / "stack.json").write_text(json.dumps({"kind": "Stack", "engines": [{"kind": "vllm", "version": "0.32.0"}]}))
+    blis = fake_blis(sim / "blis", {"fields --engine vllm --json": [0, json.dumps(FIELD_LIST), ""], **commands})
+    for r in ("cat", "reg"):
+        _tagged_repo(tmp_path / r, "v1.0.0")
+    (tmp_path / "pull").mkdir()
+    pl.write_manifest(tmp_path / "pull", {"window": ["", ""], "pulled_at": "2026-10-23T00:00:00Z",
+                                          "vllm_ref": "v0.32.0", "vllm_max_distance": 0}, [])
+    (tmp_path / "corpus.json").write_text("{}")
+    return types.SimpleNamespace(
+        pull=str(tmp_path / "pull"), out=str(tmp_path / "contract"), blis=str(blis), catalog=str(tmp_path / "cat"),
+        registry=str(tmp_path / "reg"), stack=None, sim_build=None, harness_digest="unreleased", units=None,
+        corpus=str(tmp_path / "corpus.json"), corpus_sha256=None, corpus_dataset="d", corpus_revision="main",
+        corpus_cache=None, work=str(tmp_path / "work"), timeout=60, only=None, workers=1, agentic_workers=1,
+        max_rss_mb=0)
+
+
+def test_a_failed_catalog_resolve_stops_the_score_run(tmp_path, monkeypatch):
+    # The scorer reads catalog identities through `blis catalog resolve`, with the catalog it
+    # was given. A build without the command, or a name it refuses, fails the run rather than
+    # grade a point not_in_catalog.
+    a = _score_inputs(tmp_path, {})
+    import score
+    monkeypatch.setattr(score, "score_points", lambda points, pull, work, env, **k: [env.catalog_obj.model("org/m")])
+    msgs = []
+    monkeypatch.setattr(cli, "_log", msgs.append)
+    assert cli.cmd_score(a) == 2
+    want = f"blis catalog resolve --catalog {Path(a.catalog).resolve()} --model org/m --json exited 2"
+    assert any(want in m for m in msgs), msgs
+
+
+def test_an_ambiguous_catalog_repository_stops_the_night_before_any_fetch(tmp_path, monkeypatch):
+    # Two entries claim org/m. `blis catalog resolve` refuses it; the night checks the catalog
+    # once, before the pull, and exits with the message naming both entries (audit finding 14),
+    # instead of crashing mid-score.
+    fakes = Fakes([_row("m", 1, "2026-10-01")])
+    _install(monkeypatch, fakes, [])
+    fakes.ledger(tmp_path)
+    models = {"a": "org/m", "b": "org/m"}
+    cat = write_catalog(tmp_path / "cat", models)
+    refusal = "model 'org/m' is the source repository of 2 catalog entries: a, b"
+    answers = {"ledger --list anchor --json": [0, published("anchor", [ledger_fake.point_id(fakes.rows[0])]), ""],
+               **resolves(cat, models),
+               f"catalog resolve --catalog {cat} --model org/m --json": [1, "", refusal]}
+    fake_blis(tmp_path / "sim" / "blis", answers)
+    monkeypatch.setattr(cli, "cmd_pull", lambda a: (_ for _ in ()).throw(AssertionError("pulled")))
+    msgs = []
+    monkeypatch.setattr(cli, "_log", msgs.append)
+    assert cli.cmd_nightly(_args(tmp_path)) == 2
+    assert any("FATAL" in m and "a, b" in m and "--model org/m" in m for m in msgs), msgs
+    assert not (tmp_path / "data" / "latest").exists()

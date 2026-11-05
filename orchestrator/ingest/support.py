@@ -1,21 +1,28 @@
 """Whether the pinned BLIS release can price a point at all, decided before calling blis
 (Discussion #28, "Model, hardware and drafter support").
 
-Everything is read from the catalog and registry the BLIS release pins, so a release that
-adds a model, part or drafter changes the outcome with no code change here:
+Catalog identities come from the blis the run scores with (`blis catalog resolve`, design §5),
+so a release that adds a model or part changes the outcome with no code change here:
 
   model     the served checkpoint, or its HuggingFace base_model, is some catalog model's
-            source.repo (exact checkpoint first, then the base) -> else model_not_in_catalog;
+            source repository (exact checkpoint first, then the base) -> else model_not_in_catalog;
   hardware  the catalog has the part and the registry scopes coefficients to it
             -> else hardware_no_coefficients;
   drafter   the run's speculative method is the catalog graph's speculator
             -> else drafter_not_in_catalog:<method>.
+
+TEMPORARY until inference-sim prints them through a command: the graph's speculator method is
+read from <catalog>/models/<model>/graph.yaml (Catalog.speculator), and the parts the registry
+scopes coefficients to from <registry>/coefficients/*.yaml (registry_parts). No command in the
+brief's table prints either.
 """
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+
+import blis_commands as bc
 
 _HF_REPO = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.\-]*/[A-Za-z0-9][A-Za-z0-9_.\-]*$")
 
@@ -32,37 +39,57 @@ def hf_repo(name) -> str | None:
 
 @dataclass
 class Catalog:
+    """The catalog the scoring build reads, asked through `blis catalog resolve`. Each answer is
+    cached, since the scorer asks the same names for many points."""
+    blis: str
     root: Path
-    models: dict = field(default_factory=dict)        # catalog name -> source.repo
-    speculators: dict = field(default_factory=dict)   # catalog name -> speculator method | None
-    hardware: dict = field(default_factory=dict)      # part -> MemoryGiB
-    node_sizes: dict = field(default_factory=dict)    # part -> GPUsPerNode, for a part whose entry states one
+    _models: dict = field(default_factory=dict)       # source repository -> identity | None
+    _chips: dict = field(default_factory=dict)        # chip name -> identity | None
 
-    @staticmethod
-    def load(root) -> "Catalog":
+    def model(self, repo: str) -> str | None:
+        """The catalog model whose source repository is `repo`, or None."""
+        if repo not in self._models:
+            self._models[repo] = bc.catalog_resolve(self.blis, str(self.root), model=repo)
+        return self._models[repo]
+
+    def chip(self, name: str) -> str | None:
+        """The catalog chip of that name, or None."""
+        if name not in self._chips:
+            self._chips[name] = bc.catalog_resolve(self.blis, str(self.root), chip=name)
+        return self._chips[name]
+
+    def node_size(self, chip: str) -> int | None:
+        """The GPUs per node the chip's catalog entry fixes, or None where it fixes none.
+        TEMPORARY until a command prints it: read from <catalog>/hardware/<chip>.yaml GPUsPerNode."""
         import yaml
-        root = Path(root)
-        c = Catalog(root=root)
-        for d in sorted((root / "models").iterdir()):
+        f = Path(self.root) / "hardware" / f"{chip}.yaml"
+        doc = (yaml.safe_load(f.read_text()) or {}) if f.is_file() else {}
+        return int(doc["GPUsPerNode"]) if doc.get("GPUsPerNode") else None
+
+    def check_unambiguous(self) -> None:
+        """Ask `blis catalog resolve` for every model entry name and every source repository the
+        catalog's entries name, so a repository two entries claim is refused by the command before
+        any point is scored. Raises the command's CommandError, which quotes its message naming
+        both entries. TEMPORARY until a command lists the catalog's models: the entry names and
+        their source repositories are read from <catalog>/models/*/model.yaml."""
+        import yaml
+        for d in sorted((Path(self.root) / "models").iterdir()):
             m = d / "model.yaml"
             if not m.is_file():
                 continue
-            doc = yaml.safe_load(m.read_text()) or {}
-            repo = ((doc.get("source") or {}).get("repo"))
+            self.model(d.name)
+            repo = (((yaml.safe_load(m.read_text()) or {}).get("source")) or {}).get("repo")
             if repo:
-                c.models[d.name] = repo
-            g = d / "graph.yaml"
-            if g.is_file():
-                graph = yaml.safe_load(g.read_text()) or {}
-                spec = graph.get("speculator") if isinstance(graph, dict) else None
-                c.speculators[d.name] = spec.get("method") if isinstance(spec, dict) else None
-        for h in sorted((root / "hardware").glob("*.yaml")):
-            doc = yaml.safe_load(h.read_text()) or {}
-            if "MemoryGiB" in doc:
-                c.hardware[h.stem] = float(doc["MemoryGiB"])
-            if doc.get("GPUsPerNode"):
-                c.node_sizes[h.stem] = int(doc["GPUsPerNode"])
-        return c
+                self.model(repo)
+
+    def speculator(self, model: str) -> str | None:
+        """The speculator method of a catalog model's graph, or None when it has none.
+        TEMPORARY until a command prints it: read from the graph file."""
+        import yaml
+        g = Path(self.root) / "models" / model / "graph.yaml"
+        graph = (yaml.safe_load(g.read_text()) or {}) if g.is_file() else {}
+        spec = graph.get("speculator") if isinstance(graph, dict) else None
+        return spec.get("method") if isinstance(spec, dict) else None
 
 
 def catalog_part(cat: Catalog, parts: set[str], label: str) -> str | None:
@@ -70,14 +97,15 @@ def catalog_part(cat: Catalog, parts: set[str], label: str) -> str | None:
     one part named `<label>-<variant>` with registry coefficients (InferenceX's `gb200` is the
     catalog's `gb200-nvl72`). None when there is none, or more than one, so a label is never
     matched to a part by guess."""
-    if label in cat.hardware:
+    if cat.chip(label) is not None:
         return label
-    hits = [p for p in cat.hardware if p.startswith(label + "-") and p in parts]
+    hits = [p for p in sorted(parts) if p.startswith(label + "-") and cat.chip(p) is not None]
     return hits[0] if len(hits) == 1 else None
 
 
 def registry_parts(registry_root) -> set[str]:
-    """Every part some coefficient in the registry is scoped to."""
+    """Every part some coefficient in the registry is scoped to. TEMPORARY until a command prints
+    the registry's coefficient scopes."""
     import yaml
     parts = set()
 
@@ -102,17 +130,16 @@ class Support:
     model: str | None = None
     matched_by: str | None = None       # checkpoint | base_model
     checkpoint: str | None = None
+    chip: str | None = None             # the catalog chip, or None when the catalog has none
     reasons: list = field(default_factory=list)
 
 
 def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models: dict,
           hardware: str, spec_method: str | None) -> Support:
     """checkpoints: candidate HF repos for the served model, most authoritative first.
-    base_models: repo -> its HF base_model (frozen at pull time)."""
+    base_models: repo -> its HF base_model (frozen at pull time). A repository two catalog
+    entries claim is refused by `blis catalog resolve`, and raises its CommandError."""
     s = Support()
-    by_repo = {}
-    for name, repo in cat.models.items():
-        by_repo.setdefault(repo.lower(), []).append(name)
     lookup_failed = False
     for ck in checkpoints:
         bm = base_models.get(ck)
@@ -120,13 +147,10 @@ def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models:
             lookup_failed = True
             bm = None
         for how, repo in (("checkpoint", ck), ("base_model", bm)):
-            hits = sorted(by_repo.get((repo or "").lower(), []))
-            if len(hits) == 1:
-                s.model, s.matched_by, s.checkpoint = hits[0], how, ck
+            hit = cat.model(repo) if repo else None
+            if hit is not None:
+                s.model, s.matched_by, s.checkpoint = hit, how, ck
                 break
-            if len(hits) > 1:
-                s.reasons.append("model_not_in_catalog:ambiguous")
-                return s
         if s.model:
             break
     if not s.model and lookup_failed:
@@ -134,10 +158,11 @@ def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models:
         s.reasons.append("model_not_in_catalog:base_model_lookup_failed")
     if not s.model:
         s.reasons.append("model_not_in_catalog")
-    if hardware not in cat.hardware or hardware not in parts:
+    s.chip = cat.chip(hardware)
+    if s.chip is None or hardware not in parts:
         s.reasons.append("hardware_no_coefficients")
     if s.model and spec_method:
-        have = cat.speculators.get(s.model)
+        have = cat.speculator(s.model)
         if have != spec_method:
             s.reasons.append(f"drafter_not_in_catalog:{spec_method}")
     return s

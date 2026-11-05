@@ -597,26 +597,63 @@ def test_a_system_idle_cap_other_than_the_locked_one_is_not_modelled():
 
 # ------------------------------------------------------------------ support checks
 
-def _catalog(tmp: Path) -> sp.Catalog:
-    for name, repo, spec in (("dsv41", "deepseek-ai/DeepSeek-V4.1-Flash", "dspark"),
-                             ("mm3", "MiniMaxAI/MiniMax-M3", "minimax_m3_mtp")):
+# The scorer reads catalog identities through `blis catalog resolve` (design §5). This fake
+# answers it as inference-sim 2eff3576 does: a model by entry name or by the source repository
+# its model.yaml names (without regard to case), a chip by hardware/<name>.yaml; null otherwise;
+# a repository two entries claim exits 1. Every argv is recorded in <blis>.saw.
+FAKE_RESOLVE = """#!/usr/bin/env python3
+import json, sys
+MODELS, CHIPS = {models!r}, {chips!r}
+a = sys.argv[1:]
+open(sys.argv[0] + ".saw", "a").write(json.dumps(a) + "\\n")
+assert a[:3] == ["catalog", "resolve", "--catalog"] and a[-1] == "--json", a
+kind, q = a[4], a[5]
+if kind == "--model":
+    hits = sorted({{n for n, r in MODELS.items() if n == q or r.lower() == q.lower()}})
+    if len(hits) > 1:
+        sys.stderr.write(f"model {{q!r}} is the source repository of {{len(hits)}} catalog entries\\n")
+        sys.exit(1)
+    ident = hits[0] if hits else None
+else:
+    ident = q if q in CHIPS else None
+print(json.dumps({{"query": q, "identity": ident, "reason": "fake"}}))
+"""
+
+
+def _catalog(tmp: Path, models=None, chips=("h200", "tpuv7")) -> sp.Catalog:
+    models = models or {"dsv41": "deepseek-ai/DeepSeek-V4.1-Flash", "mm3": "MiniMaxAI/MiniMax-M3"}
+    for name, spec in (("dsv41", "dspark"), ("mm3", "minimax_m3_mtp")):
         (tmp / "models" / name).mkdir(parents=True)
-        (tmp / "models" / name / "model.yaml").write_text(f"name: {name}\nsource:\n  repo: {repo}\n")
         (tmp / "models" / name / "graph.yaml").write_text(f"global: {{}}\nspeculator:\n  method: {spec}\n")
-    (tmp / "hardware").mkdir()
-    (tmp / "hardware" / "h200.yaml").write_text("MemoryGiB: 139.8\n")
-    (tmp / "hardware" / "tpuv7.yaml").write_text("MemoryGiB: 192\n")
-    return sp.Catalog.load(tmp)
+    blis = tmp / "blis"
+    blis.write_text(FAKE_RESOLVE.format(models=models, chips=list(chips)))
+    blis.chmod(0o755)
+    return sp.Catalog(blis=str(blis), root=tmp)
+
+
+def _asked(cat: sp.Catalog) -> list[list[str]]:
+    saw = Path(cat.blis + ".saw")
+    return [json.loads(x) for x in saw.read_text().splitlines()] if saw.exists() else []
 
 
 def test_support_matches_the_checkpoint_then_its_base_model():
     cat = _catalog(Path(tempfile.mkdtemp()))
     s = sp.check(cat, {"h200"}, checkpoints=["deepseek-ai/DeepSeek-V4.1-Flash"], base_models={}, hardware="h200",
                  spec_method="dspark")
-    assert (s.model, s.matched_by, s.reasons) == ("dsv41", "checkpoint", [])
+    assert (s.model, s.matched_by, s.chip, s.reasons) == ("dsv41", "checkpoint", "h200", [])
     s = sp.check(cat, {"h200"}, checkpoints=["nvidia/MiniMax-M3-NVFP4"],
                  base_models={"nvidia/MiniMax-M3-NVFP4": "MiniMaxAI/MiniMax-M3"}, hardware="h200", spec_method=None)
     assert (s.model, s.matched_by) == ("mm3", "base_model")
+
+
+def test_support_asks_blis_catalog_resolve_with_the_catalog_and_caches_each_answer():
+    cat = _catalog(Path(tempfile.mkdtemp()))
+    for _ in range(2):
+        sp.check(cat, {"h200"}, checkpoints=["deepseek-ai/DeepSeek-V4.1-Flash"], base_models={}, hardware="h200",
+                 spec_method=None)
+    root = str(cat.root)
+    assert _asked(cat) == [["catalog", "resolve", "--catalog", root, "--model", "deepseek-ai/DeepSeek-V4.1-Flash", "--json"],
+                           ["catalog", "resolve", "--catalog", root, "--chip", "h200", "--json"]]
 
 
 def test_support_refuses_an_unknown_model_part_or_drafter():
@@ -626,13 +663,37 @@ def test_support_refuses_an_unknown_model_part_or_drafter():
     s = sp.check(cat, {"h200"}, checkpoints=["deepseek-ai/DeepSeek-V4.1-Flash"], base_models={}, hardware="tpuv7",
                  spec_method="dspark")
     assert s.reasons == ["hardware_no_coefficients"]
+    # A part the registry has coefficients for but the catalog has no entry of.
+    s = sp.check(cat, {"h200", "mi355x"}, checkpoints=["deepseek-ai/DeepSeek-V4.1-Flash"], base_models={},
+                 hardware="mi355x", spec_method="dspark")
+    assert (s.chip, s.reasons) == (None, ["hardware_no_coefficients"])
     s = sp.check(cat, {"h200"}, checkpoints=["MiniMaxAI/MiniMax-M3"], base_models={}, hardware="h200",
                  spec_method="eagle3")
     assert s.reasons == ["drafter_not_in_catalog:eagle3"]
 
 
+def test_a_repository_two_catalog_entries_claim_stops_the_run():
+    import blis_commands as bc
+    cat = _catalog(Path(tempfile.mkdtemp()), models={"dsv41": "org/m", "mm3": "org/m"})
+    with pytest.raises(bc.CommandError, match="source repository of 2 catalog entries"):
+        sp.check(cat, {"h200"}, checkpoints=["org/m"], base_models={}, hardware="h200", spec_method=None)
+
+
+def test_catalog_resolve_output_of_another_shape_is_refused():
+    import blis_commands as bc
+    tmp = Path(tempfile.mkdtemp())
+    blis = tmp / "blis"
+    for out, match in (('{"query": "h200", "identity": "h200"}', "not an object of query, identity and reason"),
+                       ('{"query": "b200", "identity": "h200", "reason": ""}', "want query 'h200'"),
+                       ("h200", "printed no JSON")):
+        blis.write_text(f"#!/bin/sh\necho '{out}'\n")
+        blis.chmod(0o755)
+        with pytest.raises(bc.CommandError, match=match):
+            bc.catalog_resolve(str(blis), str(tmp), chip="h200")
+
+
 def test_an_inferencex_hardware_label_names_one_catalog_part():
-    cat = sp.Catalog(root=Path("."), hardware={"b200": 178.0, "gb200-nvl72": 184.0, "a100-80": 79.2, "a100-sxm": 39.4})
+    cat = _catalog(Path(tempfile.mkdtemp()), chips=("b200", "gb200-nvl72", "a100-80", "a100-sxm"))
     parts = {"b200", "gb200-nvl72", "a100-80", "a100-sxm"}
     assert sp.catalog_part(cat, parts, "b200") == "b200"                 # the part of that name
     assert sp.catalog_part(cat, parts, "gb200") == "gb200-nvl72"         # its one <label>-variant
