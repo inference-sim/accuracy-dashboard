@@ -38,9 +38,12 @@ ROW = {
 SERVER_LOG = (
     "(APIServer pid=1) INFO  version 0.17.2rc1.dev4996+g5894fdf98\n"
     "non-default args: {'model': '/scratch/models/Kimi-K3', 'tensor_parallel_size': 8, "
+    "'max_model_len': 262144, "
     "'speculative_config': {'method': 'dspark', 'num_speculative_tokens': 7, "
     "'rejection_sample_method': 'synthetic', 'synthetic_acceptance_length': 3.84}}\n"
 )
+# The same run with no max_model_len recorded anywhere in its server log.
+SERVER_LOG_NO_LEN = SERVER_LOG.replace("'max_model_len': 262144, ", "")
 def _result(metrics: dict) -> dict:
     """A schema-version-2 Result document with these figures (metric id -> value)."""
     return {"kind": "Result", "schema_version": 2, "name": "x",
@@ -180,7 +183,8 @@ def write_catalog(td: Path, uncapped_sha: str | None = None, capped_sha: str | N
             f"_comment: \"{name}\"\nreplay:\n  scenario: inferencex-agentx-mvp\n  harness_version: 0.12.0\n"
             f"  corpus:\n    loader: {alias}\n    format: weka-trace-v7\n    encoding: jsonl\n"
             f"    source:\n      huggingface: {repo}\n      revision: {rev}\n      file: traces.jsonl\n"
-            f"      split: train\n    sha256: {sha}\n  random_seed: 42\n  category: coding\n")
+            f"      split: train\n    sha256: {sha}\n  random_seed: 42\n  max_context_length: max_model_len\n"
+            f"  category: coding\n")
 
 
 
@@ -189,7 +193,7 @@ NODE8 = {"resources": {"gpus_per_node": 8}}
 
 def run_driver(td: Path, row: dict, blis_stub: str, alias: str | None = UNCAPPED,
                job_log: str | None = None, extra: list | None = None,
-               launch: dict | None = NODE8) -> subprocess.CompletedProcess:
+               launch: dict | None = NODE8, server_log: str = SERVER_LOG) -> subprocess.CompletedProcess:
     """Drive run_agentic.main() with a fake blis that prints a fixed Result document.
 
     By default passes NO --job-log: the external repo's Actions log is usually unreadable,
@@ -197,7 +201,7 @@ def run_driver(td: Path, row: dict, blis_stub: str, alias: str | None = UNCAPPED
     The corpus the run loaded is then stated with --corpus-alias.
     """
     (td / "row.json").write_text(json.dumps(row))
-    (td / "server.log").write_text(SERVER_LOG)
+    (td / "server.log").write_text(server_log)
     if not (td / "workloads").exists():
         write_catalog(td)
     blis = td / "blis_stub.sh"
@@ -264,6 +268,70 @@ def test_driver_refuses_a_corpus_that_is_not_the_entrys():
         r = run_driver(td, ROW, stub, extra=["--corpus-sha256", "0" * 64])
         ck("a --corpus-sha256 that is not the entry's is refused",
            r.returncode != 0 and "is not the sha256" in r.stderr, r.stderr[-300:])
+
+
+def _scenario_engine(td: Path) -> dict:
+    import yaml
+    scen = list((td / "out" / "scenarios").glob("*.yaml"))
+    return list(yaml.safe_load_all(scen[0].read_text()))[1]["pools"][0]["engine"] if scen else {}
+
+
+def test_max_model_len_is_the_runs_own_and_never_a_default():
+    doc = json.dumps(_result({"ttft_mean_ms": 1500.0, "tpot_mean_ms": 4.5}))
+    ck("no AGENTIC_CONTEXT_DEFAULT constant remains", not hasattr(ra, "AGENTIC_CONTEXT_DEFAULT"))
+    # An uncapped row with a recorded 1048576, and no job log: the scenario serves 1M tokens, so
+    # the replay's max_context_length: max_model_len keeps the traces over 256k.
+    long_log = SERVER_LOG.replace("'max_model_len': 262144", "'max_model_len': 1048576")
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_bytes(CORPUS)
+        r = run_driver(td, ROW, RECORDING_STUB_HEAD + f"echo '{doc}'\n", server_log=long_log)
+        eng = _scenario_engine(td)
+        argv = (td / "argv.txt").read_text().splitlines() if (td / "argv.txt").exists() else []
+        spec = _flag(argv, "--workload-spec")
+        ck("a recorded max_model_len 1048576 is copied, not replaced by 262144",
+           r.returncode == 0 and eng.get("max_model_len") == 1048576, f"{eng} {r.stderr[-300:]}")
+        ck("the uncapped replay filters by the deployment's max_model_len, so traces over 256k are kept",
+           spec is not None and "max_context_length: max_model_len" in Path(spec).read_text()
+           and "--max-context-length" not in argv, str(argv))
+    # The resolved engine-config line alone (max_seq_len) is a record of the run as well.
+    resolved = ("(EngineCore pid=7) INFO Initializing a V1 LLM engine (v0.32.0) with config: model='x', "
+                "max_seq_len=524288, tensor_parallel_size=8\n")
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_bytes(CORPUS)
+        r = run_driver(td, ROW, RECORDING_STUB_HEAD + f"echo '{doc}'\n", server_log=SERVER_LOG_NO_LEN + resolved)
+        ck("a max_model_len recorded only as resolved (max_seq_len) is copied",
+           _scenario_engine(td).get("max_model_len") == 524288, r.stderr[-300:])
+    # Not recorded: nothing is written. The scenario leaves max_model_len unset, and blis
+    # resolves it or refuses the scenario; the driver assumes no value and asks for no field list.
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_bytes(CORPUS)
+        r = run_driver(td, ROW, RECORDING_STUB_HEAD + f"echo '{doc}'\n", server_log=SERVER_LOG_NO_LEN)
+        ck("an unrecorded max_model_len is left unset in the scenario",
+           r.returncode == 0 and "max_model_len" not in _scenario_engine(td) and bool(_scenario_engine(td)),
+           r.stderr[-300:])
+    # The launch configuration and the passed args are two records of the run; if they disagree
+    # the point is not scored (value_conflict).
+    launch = {"resources": {"gpus_per_node": 8},
+              "roles": {"decode": {"args": {"max-model-len": 786432}}}}
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_bytes(CORPUS)
+        r = run_driver(td, ROW, "#!/usr/bin/env bash\nexit 7\n", launch=launch)
+        ref = td / "out" / "refusals.json"
+        ck("a run whose launch configuration and args give different max_model_len is not scored (value_conflict)",
+           r.returncode == 0 and ref.exists()
+           and any(x.startswith("value_conflict") for x in json.loads(ref.read_text())["refusals"]),
+           r.stderr[-300:])
+    # A launch configuration that states it is a record of the run as well.
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_bytes(CORPUS)
+        r = run_driver(td, ROW, RECORDING_STUB_HEAD + f"echo '{doc}'\n", server_log=SERVER_LOG_NO_LEN, launch=launch)
+        ck("a max_model_len the launch configuration states is copied",
+           _scenario_engine(td).get("max_model_len") == 786432, r.stderr[-300:])
 
 
 def test_driver_reads_the_alias_from_the_job_log():
@@ -406,6 +474,7 @@ def main() -> int:
     test_driver_scores_each_alias_with_its_own_entry()
     test_driver_refuses_a_corpus_that_is_not_the_entrys()
     test_driver_reads_the_alias_from_the_job_log()
+    test_max_model_len_is_the_runs_own_and_never_a_default()
     print()
     if FAILURES:
         print(f"FAIL: {len(FAILURES)} failure(s): {FAILURES}")

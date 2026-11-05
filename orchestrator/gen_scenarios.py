@@ -167,12 +167,14 @@ def emit(dep: dict, workloads: set[str], labels: set[str], packaging: dict) -> s
     per_node = node_size(dep, packaging)
     nodes = max(1, -(-ranks // per_node))
     quant = QUANT[dep["precision"]]
-    max_len = context_length(workloads)
+    stated = dep.get("stated_config", {})
+    # A stated max_model_len is the run's own (None: left unset, so the engine resolves it, X19);
+    # otherwise it is sized to the longest isl+osl the deployment's workloads run.
+    max_len = stated["max_model_len"] if "max_model_len" in stated else context_length(workloads)
     name = dep["scenario"][: -len(".yaml")]
     block_size = 64 if dep["model"] in DSA_MODELS else 16
     if dep["model"] in V4_MODELS:
         block_size = v4_block_size(dep["gpu"])
-    stated = dep.get("stated_config", {})
     block_size = stated.get("block_size", block_size)
     gmu = stated.get("gpu_memory_utilization", GPU_MEMORY_UTILIZATION_DEFAULT)
     spec = stated.get("speculative_method")
@@ -197,6 +199,9 @@ def emit(dep: dict, workloads: set[str], labels: set[str], packaging: dict) -> s
     ]
     if "enable_prefix_caching" in stated:
         lines.append("# enable_prefix_caching: stated by the run.")
+    if "max_model_len" in stated:
+        lines.append("# max_model_len: " + ("recorded by the run." if max_len is not None else
+                                            "not recorded; left unset, so the engine resolves it."))
     if spec and unpriced_spec:
         lines += [f"# speculative: the run drafts with {spec} x"
                   f"{stated['num_speculative_tokens']}, NOT written: the catalog graph",
@@ -277,7 +282,10 @@ def emit(dep: dict, workloads: set[str], labels: set[str], packaging: dict) -> s
         f"      block_size: {block_size}",
         "      max_num_batched_tokens: 8192",
         "      max_num_seqs: 256",
-        f"      max_model_len: {max_len}",
+    ]
+    if max_len is not None:
+        lines.append(f"      max_model_len: {max_len}")
+    lines += [
         "      cudagraph_mode: PIECEWISE",
         f"      gpu_memory_utilization: {gmu}",
     ]

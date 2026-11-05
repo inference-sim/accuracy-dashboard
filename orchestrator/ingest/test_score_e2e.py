@@ -901,6 +901,58 @@ def test_a_single_turn_point_with_data_parallel_ranks_names_the_balancer_substit
         shutil.rmtree(tmp)
 
 
+def test_an_agentic_points_max_model_len_is_the_runs_own_and_never_a_default():
+    # X19, design §11.2: the replay filters its corpus against the deployment's max_model_len,
+    # so a recorded 1048576 is copied, and an unrecorded one is left unset, never a context length
+    # the run did not state. blis refuses what it cannot resolve (value_not_recorded, score.value_refusal).
+    import yaml
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _agentic(tmp)
+        _with_log(tmp, entry, LOG.replace("'max_model_len': 2304", "'max_model_len': 1048576"))
+        o, work = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        argv = _saw(env)[0]["argv"]
+        scen = Path(argv[argv.index("--scenarios") + 1]) / argv[argv.index("--scenario") + 1]
+        eng = list(yaml.safe_load_all(scen.read_text()))[1]["pools"][0]["engine"]
+        assert eng["max_model_len"] == 1048576
+        spec = yaml.safe_load(Path(argv[argv.index("--workload-spec") + 1]).read_text())["replay"]
+        assert "max_context_length" not in spec          # the client filtered nothing
+    finally:
+        shutil.rmtree(tmp)
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _agentic(tmp)
+        _with_log(tmp, entry, LOG.replace("'max_model_len': 2304, ", ""))
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        argv = _saw(env)[0]["argv"]
+        scen = Path(argv[argv.index("--scenarios") + 1]) / argv[argv.index("--scenario") + 1]
+        eng = list(yaml.safe_load_all(scen.read_text()))[1]["pools"][0]["engine"]
+        assert "max_model_len" not in eng             # left unset: blis resolves it or refuses
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_an_agentic_clients_max_context_length_reaches_the_replay_as_recorded():
+    import yaml
+    from test_extract import _export
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _agentic(tmp)
+        doc = _export()
+        doc["input_config"]["datasets"][0]["max_context_length"] = 1048576
+        (tmp / "pull" / "points" / entry["point_id"] / "export.gz").write_bytes(
+            gzip.compress(json.dumps(doc).encode(), mtime=0))
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        argv = _saw(env)[0]["argv"]
+        spec = yaml.safe_load(Path(argv[argv.index("--workload-spec") + 1]).read_text())["replay"]
+        assert spec["max_context_length"] == 1048576
+    finally:
+        shutil.rmtree(tmp)
+
+
 if __name__ == "__main__":
     import traceback
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]

@@ -95,6 +95,12 @@ def main() -> int:
                                            "num_speculative_tokens": 2})
     ck("a stated speculative config is written as stated",
        (engine(mtp, "method"), engine(mtp, "num_spec_tokens")) == ("mtp", "2"))
+    ck("a stated max_model_len is written as stated, not sized from the workload",
+       engine(sweep(stated={"max_model_len": 1048576}), "max_model_len") == "1048576")
+    ck("a max_model_len stated as None is left unset, so the engine resolves it",
+       engine(sweep(stated={"max_model_len": None}), "max_model_len") is None)
+    ck("an unstated max_model_len is still sized from the workload (32768 for 1k/1k)",
+       engine(sweep(stated={}), "max_model_len") == "32768")
     ck("an unstated speculative config is left out",
        engine(sweep("deepseek-v4-pro", stated={}), "method") is None)
 

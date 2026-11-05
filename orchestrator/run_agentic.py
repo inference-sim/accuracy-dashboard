@@ -126,12 +126,29 @@ AGENTIC_DURATION_S = 3600
 # Agentic rows carry no isl/osl workload; label them by the scenario the harness replays.
 AGENTIC_LABEL = "agentx"
 
-# The context window the scenario's max_model_len must admit. The AgentX corpus is the
-# cc-traces-weka 256k set, so the deployment must serve up to 256k-token sequences; a run
-# that pinned --max-context-length lower is read from the job log and used instead. Passed
-# to gen_scenarios.emit() as a parseable "<ctx>:0" workload so context_length() sizes
-# max_model_len from it (emit expects an isl:osl pair; agentic has none, so osl is 0).
-AGENTIC_CONTEXT_DEFAULT = 262144
+# The deployment's max_model_len is the run's own, never chosen here (X19, design §11.2): it is
+# copied from the run's recorded engine configuration (the launch configuration or the passed
+# args, else the resolved config's max_seq_len), as the API scorer reads it (ingest/settings.py). One the run did not
+# record is left unset in the scenario, and blis refuses what it cannot resolve. The replay
+# filters traces against it (the workload's max_context_length: max_model_len), so a context the
+# run never stated would drop or keep the wrong traces.
+MAX_MODEL_LEN = "max_model_len"
+
+
+def recorded_max_model_len(server_log: str, launch: dict | None) -> tuple[dict, list[str]]:
+    """The stated_config entry for the max_model_len the run's server log records (None when it
+    records none: gen_scenarios.emit then leaves it unset, so the engine resolves it, or blis
+    refuses), and the refusals: two sources of the same stage that disagree are value_conflict
+    (design §11.2, §11.4)."""
+    import settings as st
+
+    readings, _ = st.read_all(server_log, launch)
+    setting = st.merge(readings, st.load_vllm_defaults()[0]).get(MAX_MODEL_LEN)
+    if setting is None or setting.value is None:
+        return {MAX_MODEL_LEN: None}, []
+    if setting.conflict:
+        return {}, [f"value_conflict: the run records max_model_len as {setting.conflict}"]
+    return {MAX_MODEL_LEN: int(setting.value)}, []
 
 
 def support_refusals(row: dict) -> list[str]:
@@ -168,7 +185,8 @@ def agentic_replay_args(row: dict, server: dict) -> tuple[list[str], list[str]]:
       --speculative-acceptance-length  from the SERVER log (restored in the dump / API),
                                     with PR #19's rule: a speculative run is refused unless
                                     its acceptance is a stated synthetic value, never guessed
-      --corpus / --corpus-sha256    supplied by the caller (the scenario pins the 256k corpus)
+      --corpus / --corpus-sha256    supplied by the caller, checked against the catalog entry of
+                                    the corpus alias the run loaded
 
     What it does NOT pass, and why that is a documented tradeoff rather than a refusal:
 
@@ -234,7 +252,7 @@ def _attention_dp_size(row: dict) -> int:
 
 
 def sweep_from_row(row: dict, server: dict | None = None, node_size: int | None = None,
-                   max_context: int | None = None) -> dict:
+                   engine: dict | None = None) -> dict:
     """A gen_scenarios.emit()-shaped deployment dict from an agentic API row.
 
     Maps the row's slugs to catalog names and its parallelism the same way the direct
@@ -247,11 +265,10 @@ def sweep_from_row(row: dict, server: dict | None = None, node_size: int | None 
     (cmd/speculative_acceptance.go:87). So the method + num_speculative_tokens are written
     into stated_config, and gen_scenarios.emit() renders the block.
 
-    `max_context` (from the job log's --max-context-length, if the run pinned one) sizes
-    the scenario's max_model_len; absent, the 256k corpus default is used.
+    `engine` holds the engine settings taken from the run (recorded_max_model_len), copied into
+    stated_config.
     """
     server = server or {}
-    ctx = int(max_context) if max_context else AGENTIC_CONTEXT_DEFAULT
     slug, gpu_raw = row.get("model"), row.get("hardware")
     model = AGENTIC_MODELS[slug]
     chip = AGENTIC_CHIPS[gpu_raw]
@@ -272,7 +289,7 @@ def sweep_from_row(row: dict, server: dict | None = None, node_size: int | None 
     # server log's speculative_config (its vLLM name, e.g. dspark/mtp/eagle3 -- all priced by
     # blis, sim/config.go:317); K from num_speculative_tokens. gpu_memory_utilization etc.
     # are left to emit()'s defaults, as on the single-turn path.
-    stated: dict = {}
+    stated: dict = dict(engine or {})
     if spec != "none" and server.get("num_speculative_tokens"):
         stated["speculative_method"] = server.get("speculative_method") or spec
         stated["num_speculative_tokens"] = int(server["num_speculative_tokens"])
@@ -289,9 +306,9 @@ def sweep_from_row(row: dict, server: dict | None = None, node_size: int | None 
                         "moe_ep_size": ep,
                         "moe_tp_size": 1 if ep > 1 else tp},
         "stated_config": stated,
-        # A parseable "<ctx>:0" pair so gen_scenarios.emit() sizes max_model_len to the
-        # agentic context window (emit expects isl:osl; agentic has no fixed osl).
-        "workload": f"{ctx}:0",
+        # emit() takes an isl:osl pair; an agentic run has none. Its max_model_len is the run's
+        # own (stated_config), so this pair sizes nothing.
+        "workload": "0:0",
         # The GPUs in one node as the run recorded them (settings.recorded_node_size), or None:
         # gen_scenarios.emit() writes it only for a chip whose catalog entry fixes none.
         "gpus_per_node": node_size,
@@ -434,9 +451,9 @@ def main() -> int:
     ap.add_argument("--row", required=True, help="row-<id>.json from fetch_agentic_rows.py")
     ap.add_argument("--server-log", required=True)
     ap.add_argument("--job-log", default=None,
-                    help="optional CI job log; used to pin --max-context-length and to read the "
-                         "corpus alias (--public-dataset). Omit when the external repo's Actions logs "
-                         "are unreadable; seed/duration are left to blis's defaults regardless.")
+                    help="optional CI job log; its aiperf --max-context-length is passed to the replay, "
+                         "and its --public-dataset names the corpus. Omit when the external repo's "
+                         "Actions logs are unreadable; seed/duration are left to blis's defaults regardless.")
     ap.add_argument("--corpus-alias", default=None,
                     help="the --public-dataset alias the run's aiperf command loaded; required "
                          "unless --job-log states it")
@@ -459,16 +476,22 @@ def main() -> int:
 
     row = json.loads(Path(args.row).read_text())
     server = parse_server_log(Path(args.server_log).read_text())
-    # The job log is OPTIONAL and used only as a hint for --max-context-length: the external
-    # repo's Actions logs are usually unreadable, and seed/duration are deliberately left to
-    # blis's defaults (see agentic_replay_args). When present, its --max-context-length pins
-    # max_model_len to exactly what the run used.
+    # The job log is OPTIONAL: the external repo's Actions logs are usually unreadable, and
+    # seed/duration are deliberately left to blis's defaults (see agentic_replay_args). When
+    # present, its --public-dataset names the corpus and its --max-context-length (the client's
+    # trace filter, not the engine's max_model_len) is passed to the replay as recorded.
     job = {}
     if args.job_log:
         jt = Path(args.job_log).read_text()
         job = parse_job_log(jt) if jt.strip() else {}
 
     replay, refusals = agentic_replay_args(row, server)
+    if "max_context_length" in job:
+        replay += ["--max-context-length", str(job["max_context_length"])]
+    # The deployment's max_model_len, from the run (design §11.2; X19).
+    launch = json.loads(Path(args.launch_config).read_text()) if args.launch_config else None
+    engine, why = recorded_max_model_len(Path(args.server_log).read_text(), launch)
+    refusals += why
     # Unsupported model / new hardware (the #15 case) is a refusal too, read from the row
     # itself. Combine both so an unscoreable row is not run at all.
     refusals = support_refusals(row) + refusals
@@ -494,11 +517,9 @@ def main() -> int:
         return 0
 
     # Supported and replayable: build the deployment sweep + its facets corpus. `server`
-    # supplies the speculative method/K the scenario must draft with; if the run pinned
-    # --max-context-length (job log), size max_model_len to it, else the 256k default.
-    launch = json.loads(Path(args.launch_config).read_text()) if args.launch_config else None
-    sweep = sweep_from_row(row, server=server, node_size=recorded_node_size(launch),
-                           max_context=job.get("max_context_length"))
+    # supplies the speculative method/K the scenario must draft with, `engine` the run's
+    # max_model_len (copied, or left unset when the run records none).
+    sweep = sweep_from_row(row, server=server, node_size=recorded_node_size(launch), engine=engine)
     corpus_doc = facets_corpus(sweep, row)
     (out / "agentic_corpus.json").write_text(json.dumps(corpus_doc, indent=2) + "\n")
 
@@ -531,7 +552,6 @@ def main() -> int:
     except bc.CommandError as e:
         raise SystemExit(f"row {row.get('id')}: {e}")
     (scen_dir / sweep["scenario"]).write_text(text)
-
 
     argv = build_blis_argv(
         blis, sweep["scenario"], str(scen_dir), str(Path(args.catalog).resolve()),
