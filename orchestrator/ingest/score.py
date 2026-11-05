@@ -76,6 +76,8 @@ class Env:
     vllm_defaults: dict = field(default_factory=dict)
     # The engine release the scoring simulator runs (stack.json, LIF-6), e.g. "0.32.0".
     engine_release: str = ""
+    # The simulator build that scores the run: a release tag, or a commit (pointrecord Simulator).
+    sim_build: str = ""
     catalog_obj: sp.Catalog | None = None
     parts: set = field(default_factory=set)
     # A per-replay resident-memory ceiling in MB (0 = none). An agentic replay whose RSS exceeds
@@ -84,6 +86,10 @@ class Env:
     # unpredictable per point (profiled: a c64 point used 11.5GB where a c128 used 6.9GB), so a
     # reactive RSS cap is the only reliable bound on a fixed-RAM runner; 0 locally scores everything.
     max_rss_mb: int = 0
+
+    def simulator(self) -> dict:
+        """The simulator block every point of this run records: its build and engine release."""
+        return {"build": self.sim_build, "engine": {"kind": "vllm", "version": self.engine_release}}
 
 
 def _read(point_dir: Path, files: dict, role: str) -> bytes | None:
@@ -327,6 +333,7 @@ class Outcome:
     # Set by grade_outcome: the run's own engine release (None for a nightly or custom build);
     # for a G5 point its reason and every reason found; for a failed point its run faults.
     run_release: str | None = None
+    simulator: dict | None = None   # {"build", "engine": {"kind", "version"}}
     g5: dict | None = None
     g5_reasons: list = field(default_factory=list)
     faults: list = field(default_factory=list)
@@ -341,7 +348,7 @@ def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         o = Outcome(point_id=entry["point_id"], identity=entry["identity"], row=entry["row"],
                     reasons=sorted(set(entry["reasons"] + ["blis_refused:extractor_error"])),
                     measurements=entry.get("measurements") or [], build=entry.get("build"))
-    grade_outcome(o, env.engine_release)
+    grade_outcome(o, env.engine_release, env.simulator())
     return o
 
 
@@ -753,7 +760,7 @@ def substitutions(o_subs: list[dict], fidelity: dict) -> list[dict]:
     return list(o_subs) + list((fidelity.get("requests") or {}).get("differences") or [])
 
 
-def grade_outcome(o: Outcome, engine_release: str) -> None:
+def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None) -> None:
     """Give one outcome its grade (design §11.3, §11.4; COV-4, COV-5), from data alone.
 
     A scored point is G1 to G4, its record naming every substitution, and its points.csv row
@@ -761,9 +768,11 @@ def grade_outcome(o: Outcome, engine_release: str) -> None:
     §11.4's list (assess.g5_of; any other reason raises). A point carrying a run fault (the
     simulator refused the scenario, or the scenario lost a recorded value) is neither: it is
     listed as failed (o.faults), never graded. The run's own release is recorded on every point
-    (§11.2), read from its recorded build and the server log's banner."""
+    (§11.2), read from its recorded build and the server log's banner, and the simulator build and
+    engine release that scored it (pointrecord's Simulator), on every point."""
     rel = gr.run_release(o.build or {"image": o.row.get("image")}, o.banner)
     o.run_release = rel.version
+    o.simulator = simulator
     faults = sorted({r for r in o.reasons if asx.is_fault(r)})
     if faults:
         o.fidelity, o.facets, o.csv_row, o.faults = None, None, None, faults
@@ -777,7 +786,8 @@ def grade_outcome(o: Outcome, engine_release: str) -> None:
         o.g5_reasons = sorted((dict(x) for x in g5), key=lambda r: (r["code"], r.get("subject", "")))
         return
     g = gr.grade(engine_version=engine_release, release=rel, substitutions=substitutions(o.subs, o.fidelity))
-    o.fidelity = {**o.fidelity, "grade": g.grade, "substitutions": g.substitutions, "run_release": rel.version}
+    o.fidelity = {**o.fidelity, "grade": g.grade, "substitutions": g.substitutions, "run_release": rel.version,
+                  "simulator": simulator}
     o.csv_row[contract.POINTS_HEADER.index(contract.GRADE_COLUMN)] = g.grade
 
 
@@ -868,6 +878,7 @@ def write_contract(out: Path, outcomes: list[Outcome], provenance: dict) -> None
                "model": o.row["model"], "hardware": o.row["hardware"], "precision": o.row["precision"],
                "framework": o.row["framework"], "benchmark_type": o.row["benchmark_type"],
                "conc": o.identity["conc"], "image": o.row.get("image"), "run_release": o.run_release,
+               "simulator": o.simulator,
                "measured": {"ttft_ms": _ms(m.get("mean_ttft")), "tpot_ms": _ms(m.get("mean_tpot"))}}
         if o.faults:
             failed.append({**rec, "faults": o.faults})

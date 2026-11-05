@@ -1,24 +1,33 @@
 #!/usr/bin/env bash
-# Resolve the one input the API-ingest pipeline keys on: the latest STABLE inference-sim release
-# (Discussion #15, "How the triggers are detected": a BLIS release is a new stable inference-sim
-# tag). Unlike the old dump pipeline (resolve_inputs.sh), there is no IX_TAG to resolve -- the
-# InferenceX data is pulled live from the API, and an IX release is detected from the pulled point
-# ids, not from a GitHub release. The catalog/registry/kernel are derived from BLIS_TAG
-# (resolve_versions.sh), never resolved here.
+# Resolve the simulator releases a night scores (COV-9; Discussion #15, "How the triggers are
+# detected"). Every stable inference-sim release, in the order they were tagged, from the first
+# one scored on graded points (stack.py FIRST_GRADED_RELEASE) on, that has no published snapshot
+# under data/snapshots/*_blis-<tag>_*, is scored once, oldest first. When every such release has
+# its scores, the night scores the newest stable release's IX-only delta (a new point id), as
+# before. There is no IX_TAG to resolve: the InferenceX data is pulled live from the API.
 #
 # Emits key=value to $GITHUB_OUTPUT (or stdout when run locally):
-#   blis_tag   latest stable inference-sim release (never main, never a pre-release)
+#   blis_tags  the releases to score tonight, oldest first, space-separated (never empty)
+#   blis_tag   the newest stable inference-sim release (never main, never a pre-release)
 set -euo pipefail
 
 out="${GITHUB_OUTPUT:-/dev/stdout}"
+here="$(cd "$(dirname "$0")" && pwd)"
+tags="$(mktemp)"
+trap 'rm -f "$tags"' EXIT
 
-BLIS_TAG=$(gh release list --repo inference-sim/inference-sim \
-             --exclude-drafts --exclude-pre-releases -L1 \
-             --json tagName -q '.[0].tagName')
-if [[ -z "${BLIS_TAG}" ]]; then
+# Stable releases in the order they were tagged: gh lists newest first, so reverse it.
+gh release list --repo inference-sim/inference-sim --exclude-drafts --exclude-pre-releases \
+  -L 1000 --json tagName,createdAt -q 'sort_by(.createdAt) | .[].tagName' > "$tags"
+NEWEST=$(tail -n 1 "$tags")
+if [[ -z "${NEWEST}" ]]; then
   echo "FATAL: could not resolve a stable BLIS release tag" >&2
   exit 1
 fi
 
-echo "blis_tag=${BLIS_TAG}" | tee -a "$out"
-echo "resolved BLIS=${BLIS_TAG}" >&2
+UNSCORED=$(python3 "$here/ingest/stack.py" --tags "$tags" --data-dir "$here/../data" | tr '\n' ' ' | sed 's/ *$//')
+TONIGHT="${UNSCORED:-$NEWEST}"
+
+echo "blis_tags=${TONIGHT}" | tee -a "$out"
+echo "blis_tag=${NEWEST}" | tee -a "$out"
+echo "resolved BLIS: score ${TONIGHT} (newest stable ${NEWEST})" >&2

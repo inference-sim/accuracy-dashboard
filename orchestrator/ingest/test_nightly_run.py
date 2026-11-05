@@ -95,6 +95,7 @@ def _run(world, tmp, today, blis_tag, keep_api=5):
                         work_dir=tmp / "work", data_dir=tmp / "data",
                         state_path=tmp / "state.json",
                         pull_fn=world.pull, score_build_fn=world.score,
+                        backlog_fn=lambda s: {"kind": "Backlog", "snapshot_id": s["snapshot_id"], "engines": {}},
                         snapshot_date=today, keep_api=keep_api)
 
 
@@ -248,3 +249,14 @@ def test_seed_rescore_is_byte_identical(tmp_path):
     assert r.decision.is_noop
     assert (tmp_path / "data" / "latest" / "summary.json").read_text() == first
     assert len(w.scored_log) == scored_before     # a no-op didn't even call the scorer
+
+
+def test_every_published_summary_has_its_backlog_beside_it(tmp_path):
+    # COV-7: the backlog is published with the live view every night the live view changes.
+    w = World()
+    w.rows = [("m", 1, "2026-10-01")]
+    _run(w, tmp_path, "2026-10-23", "v0.12.0")
+    latest = tmp_path / "data" / "latest"
+    backlog = json.loads((latest / "backlog.json").read_text())
+    assert backlog["kind"] == "Backlog"
+    assert backlog["snapshot_id"] == json.loads((latest / "summary.json").read_text())["snapshot_id"]

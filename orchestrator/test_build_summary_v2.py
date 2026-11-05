@@ -227,6 +227,36 @@ def test_the_validator_refuses_a_figure_under_the_minimum_or_one_that_does_not_r
     assert any("COV-8" in p for p in vs2.problems(doc))
 
 
+def test_the_backlog_published_beside_the_summary_ranks_every_blocker_per_engine():
+    # COV-7, design §11.6: from run-a's points, by hand. Each entry counts the points it blocks
+    # (G5) or demotes (graded below G1); "alone" counts the G5 points whose only reason it is.
+    b = b2.backlog_of(_build())
+    assert b["kind"] == "Backlog" and b["simulator"]["build"] == "v0.12.0"
+    v = {e["entry"]: e for e in b["engines"]["vllm"]}
+    assert v["client_difference:send_gap"] == {"entry": "client_difference:send_gap", "blocks": 0, "alone": 0,
+                                               "demotes": 3}
+    assert v["not_in_catalog:eagle3"] == {"entry": "not_in_catalog:eagle3", "blocks": 2, "alone": 1, "demotes": 0}
+    assert v["router_unsupported:vllm-router"]["alone"] == 1
+    assert b["engines"]["vllm"][0]["alone"] >= b["engines"]["vllm"][-1]["alone"]
+
+
+def test_a_pull_date_earlier_than_its_newest_measurement_is_refused():
+    # COV-9: each published pull date is no earlier than the newest measurement it covers.
+    doc = _build()
+    doc["provenance"]["pulled_at"] = "2026-09-01T00:00:00Z"
+    assert any("COV-9" in p for p in vs2.problems(doc))
+
+
+def test_the_validator_requires_one_simulator_for_every_point_of_a_summary():
+    doc = _build()
+    _points(doc)[0]["fidelity"]["simulator"] = {"build": "v0.99.0", "engine": {"kind": "vllm", "version": "0.31.0"}}
+    assert any("COV-6" in p for p in vs2.problems(doc))
+    # Every point names one build, but not the provenance's.
+    doc = _build()
+    doc["provenance"]["simulator"] = {**doc["provenance"]["simulator"], "build": "v0.99.0"}
+    assert any("other than the provenance's" in p for p in vs2.problems(doc))
+
+
 def test_the_validator_refuses_states_the_contract_forbids():
     import copy
     base = _build()

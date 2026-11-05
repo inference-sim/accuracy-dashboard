@@ -83,6 +83,7 @@ def _install(monkeypatch, fakes, scored_ids):
         return {"schema_version": 3, "snapshot_id": "2026-10-23_blis-v0.12.0_ix-api-2026-10-23",
                 "generated_at": generated_at,
                 "provenance": {"ingest": "api", "blis": {"release": "v0.12.0"},
+                               "simulator": {"build": "v0.12.0", "engine": {"kind": "vllm", "version": "0.32.0"}},
                                "ground_truth": {"release_tag": "api-2026-10-23"}},
                 "coverage": {"graded": len(scored_ids), "not_scored": 0}, "matrix": [], "not_scored": []}
     monkeypatch.setattr(build_summary_v2, "build", fake_build)
@@ -243,3 +244,41 @@ def test_a_build_with_no_stack_json_is_refused_with_why(tmp_path):
     s = tmp_path / "stack.json"
     s.write_text(json.dumps({"kind": "Stack", "engines": [{"kind": "vllm", "version": "0.32.0"}]}))
     assert cli.read_stack(tmp_path / "sim" / "blis", str(s)).engine("vllm") == "0.32.0"
+
+
+def test_resolve_blis_names_every_unscored_release_oldest_first_else_the_newest(tmp_path):
+    # COV-9: resolve_blis.sh lists every stable release from v0.16.0 on with no published
+    # snapshot, in tag order; with none left, it scores the newest release's delta.
+    import subprocess
+    root = Path(__file__).resolve().parent.parent
+    bin_ = tmp_path / "bin"
+    bin_.mkdir()
+    releases = [{"tagName": t, "createdAt": d} for t, d in
+                (("v0.17.0", "2026-12-01"), ("v0.15.0", "2026-10-30"), ("v0.16.0", "2026-11-10"))]
+    gh = bin_ / "gh"
+    # The fake gh applies the jq query the script passes, as gh does.
+    gh.write_text("#!/usr/bin/env python3\nimport json, sys\nrel = " + json.dumps(releases) + "\n"
+                  "q = sys.argv[sys.argv.index('-q') + 1]\n"
+                  "assert q == 'sort_by(.createdAt) | .[].tagName', q\n"
+                  "print('\\n'.join(r['tagName'] for r in sorted(rel, key=lambda r: r['createdAt'])))\n")
+    gh.chmod(0o755)
+
+    def run():
+        out = tmp_path / "out"
+        out.unlink(missing_ok=True)
+        env = {"PATH": f"{bin_}:/usr/bin:/bin", "GITHUB_OUTPUT": str(out)}
+        work = tmp_path / "repo"
+        r = subprocess.run(["bash", str(work / "orchestrator" / "resolve_blis.sh")], env=env,
+                           capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr
+        return dict(line.split("=", 1) for line in out.read_text().splitlines())
+    import shutil
+    shutil.copytree(root, tmp_path / "repo" / "orchestrator", ignore=shutil.ignore_patterns("testdata", "__pycache__"))
+    snaps = tmp_path / "repo" / "data" / "snapshots"
+    (snaps / "2026-10-31_blis-v0.15.0_ix-api-2026-10-31").mkdir(parents=True)
+    import sys as _sys
+    (bin_ / "python3").symlink_to(_sys.executable)
+    assert run() == {"blis_tags": "v0.16.0 v0.17.0", "blis_tag": "v0.17.0"}
+    (snaps / "2026-11-11_blis-v0.16.0_ix-api-2026-11-11").mkdir()
+    (snaps / "2026-12-02_blis-v0.17.0_ix-api-2026-12-02").mkdir()
+    assert run() == {"blis_tags": "v0.17.0", "blis_tag": "v0.17.0"}

@@ -306,6 +306,9 @@ def cmd_score(a) -> int:
         vllm_ref=manifest["vllm_ref"], field_list=field_list, fields_sha256=fields_sha,
         base_models=manifest.get("base_models") or {}, timeout_s=a.timeout, vllm_defaults=vdefaults,
         max_rss_mb=getattr(a, "max_rss_mb", 0) or 0, engine_release=engine_release)
+    # The build every point records: the release tag the checkout is at (check_blis_inputs
+    # required one), with the engine release its stack.json names (COV-6).
+    env.sim_build = env.blis_release
     env.catalog_obj = sp.Catalog.load(env.catalog)
     env.parts = sp.registry_parts(env.registry)
     work = Path(a.work or Path(a.out).parent / (Path(a.out).name + "-work"))
@@ -327,7 +330,7 @@ def cmd_score(a) -> int:
     prov = {"ingest": "api",
             "blis": {"release": env.blis_release, "commit_sha": env.blis_commit, "catalog": env.catalog_release,
                      "registry": env.registry_release, "extractor_version": f"blis-latency-kernel@{env.kernel}"},
-            "engine": {"kind": "vllm", "version": engine_release},
+            "simulator": env.simulator(), "engine": {"kind": "vllm", "version": engine_release},
             "left_out_records": len((manifest.get("ledger") or {}).get("unlisted") or []),
             "vllm_ref": manifest["vllm_ref"], "vllm_max_distance": manifest["vllm_max_distance"],
             "fields_sha256": fields_sha, "pulled_at": manifest["pulled_at"],
@@ -422,7 +425,8 @@ def cmd_nightly(a) -> int:
 
     res = nr.run_night(today, a.blis_tag, work_dir=work_dir, data_dir=data_dir, state_path=state_path,
                        pull_fn=pull_fn, score_build_fn=score_build_fn,
-                       snapshot_date=a.today or today.isoformat(), keep_api=a.keep_api)
+                       snapshot_date=a.today or today.isoformat(), keep_api=a.keep_api,
+                       backlog_fn=bsv2.backlog_of)
     _log(f"nightly: {res.action} -- {res.decision.reason}")
     if res.snapshot_id:
         _log(f"nightly: froze snapshot {res.snapshot_id}")

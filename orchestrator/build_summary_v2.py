@@ -343,6 +343,7 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     dates = sorted({p["measured_date"] for p in flat} | {ns["measured_date"] for ns in not_scored})
     provenance = {
         "blis": prov_in["blis"],
+        "simulator": prov_in["simulator"],
         "engine": prov_in["engine"],
         # What the extractor pulled, as it recorded it (provenance.json's source).
         "ground_truth": {"source": prov_in["source"]["name"], "source_url": prov_in["source"]["url"],
@@ -452,7 +453,8 @@ def summary_to_contract(summary: dict, out: Path) -> None:
 def _prov_out_to_in(prov: dict, coverage: dict) -> dict:
     """The summary's provenance back to the contract's provenance.json shape build() expects."""
     gt = prov.get("ground_truth", {})
-    return {"ingest": "api", "blis": prov["blis"], "engine": prov["engine"], "points": coverage["points"],
+    return {"ingest": "api", "blis": prov["blis"], "simulator": prov["simulator"], "engine": prov["engine"],
+            "points": coverage["points"],
             "left_out_records": coverage["left_out_records"], "vllm_ref": prov["vllm_ref"],
             "vllm_max_distance": prov["vllm_max_distance"], "fields_sha256": prov["fields_sha256"],
             "pulled_at": prov["pulled_at"], "corpus": prov["corpus"],
@@ -541,6 +543,25 @@ def _overlay_delta(base: Path, delta_dir: Path, window_ids: set) -> None:
     bprov["points"] = counts
     bprov["left_out_records"] = dprov["left_out_records"]
     (base / contract.PROVENANCE_JSON).write_text(contract.canonical_dumps(bprov) + "\n")
+
+
+BACKLOG_KIND = "Backlog"
+
+
+def backlog_of(summary: dict) -> dict:
+    """The blocker backlog published beside a v3 summary (design §11.6, COV-7): per engine, every
+    G5 reason and every substitution that holds a point below G1, ranked by the points it blocks
+    or demotes (backlog.build). Built from the summary's own points, repeats unfolded, so it is
+    the same whether the night scored the window or merged a delta into it."""
+    points = []
+    for m, w, g, t, p in iter_scored(summary):
+        for _ in p.get("repeats") or [p]:
+            points.append({"framework": t["framework"], "grade": p["fidelity"]["grade"],
+                           "substitutions": p["fidelity"]["substitutions"]})
+    points += [{"framework": n["framework"], "grade": "G5", "g5_reasons": n["g5_reasons"]}
+               for n in summary["not_scored"]]
+    return {"kind": BACKLOG_KIND, "snapshot_id": summary["snapshot_id"],
+            "simulator": summary["provenance"]["simulator"], "engines": bl.build(points)}
 
 
 def dumps(summary: dict) -> str:

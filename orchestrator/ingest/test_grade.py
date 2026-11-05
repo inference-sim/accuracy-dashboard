@@ -91,3 +91,15 @@ def test_check_holds_every_point_to_one_grade_and_its_build():
            {"point_id": "i", "grade": "G5", "g5_reason": {"code": "blis_refused"}},
            {"point_id": "j", "grade": "G6"}]
     assert len(g.check(bad, V)) == 5
+
+
+def test_check_requires_one_simulator_build_and_engine_release_for_every_point():
+    # COV-6: every point of one run is scored by one simulator release.
+    sim = {"build": "v0.16.0", "engine": {"kind": "vllm", "version": V}}
+    pts = [{"point_id": "a", "grade": "G1", "build": {"release": V}, "simulator": sim},
+           {"point_id": "b", "grade": "G5", "g5_reason": {"code": "not_in_catalog"}, "simulator": sim}]
+    assert g.check(pts, V) == []
+    other = {**sim, "build": "v0.17.0"}
+    assert any("COV-6" in x for x in g.check(pts + [{**pts[0], "point_id": "c", "simulator": other}], V))
+    wrong = {**sim, "engine": {"kind": "vllm", "version": "0.31.0"}}
+    assert any("running '0.31.0'" in x for x in g.check([{**pts[0], "simulator": wrong}], V))

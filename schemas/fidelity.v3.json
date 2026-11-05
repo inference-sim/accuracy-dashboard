@@ -11,7 +11,8 @@
     "build",
     "args",
     "resolved",
-    "run_release"
+    "run_release",
+    "simulator"
   ],
   "properties": {
     "build": {
@@ -66,6 +67,9 @@
         "string",
         "null"
       ]
+    },
+    "simulator": {
+      "$ref": "#/definitions/simulator"
     }
   },
   "definitions": {
@@ -612,7 +616,8 @@
         "measured",
         "grade",
         "g5_reason",
-        "g5_reasons"
+        "g5_reasons",
+        "simulator"
       ],
       "properties": {
         "point_id": {
@@ -693,6 +698,9 @@
           "items": {
             "$ref": "#/definitions/g5_reason"
           }
+        },
+        "simulator": {
+          "$ref": "#/definitions/simulator"
         }
       }
     },
@@ -712,7 +720,8 @@
         "conc",
         "run_release",
         "measured",
-        "faults"
+        "faults",
+        "simulator"
       ],
       "properties": {
         "point_id": {
@@ -785,6 +794,42 @@
           "uniqueItems": true,
           "items": {
             "$ref": "#/definitions/fault"
+          }
+        },
+        "simulator": {
+          "$ref": "#/definitions/simulator"
+        }
+      }
+    },
+    "simulator": {
+      "description": "The simulator build that scored the point and the engine release it runs (blis-substrate contracts/spec/pointrecord Simulator). Every point of one run names the same one (COV-6).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "build",
+        "engine"
+      ],
+      "properties": {
+        "build": {
+          "description": "A release tag vX.Y.Z, or a 40-hex commit.",
+          "type": "string",
+          "pattern": "^(v\\d+\\.\\d+\\.\\d+|[0-9a-f]{40})$"
+        },
+        "engine": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "version"
+          ],
+          "properties": {
+            "kind": {
+              "const": "vllm"
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         }
       }

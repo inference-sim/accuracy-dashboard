@@ -47,7 +47,8 @@
         "vllm_max_distance",
         "fields_sha256",
         "pulled_at",
-        "engine"
+        "engine",
+        "simulator"
       ],
       "properties": {
         "blis": {
@@ -191,6 +192,10 @@
           "type": "string",
           "pattern": "^[0-9a-f]{64}$",
           "description": "sha256 of the engine's fields.json the scorer read (design §11.1): the field statuses and estimation rules every grade rests on."
+        },
+        "simulator": {
+          "$ref": "https://inference-sim.github.io/accuracy-dashboard/schemas/fidelity.v3.json#/definitions/simulator",
+          "description": "The one simulator build that scored every point, and the engine release it runs (COV-6)."
         }
       }
     },

@@ -9,7 +9,10 @@ The reader is strict (SUB-12): unknown keys are refused.
 """
 from __future__ import annotations
 
+import argparse
 import json
+import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -65,3 +68,60 @@ def parse(text: str) -> Stack:
 
 def load(path) -> Stack:
     return parse(Path(path).read_text())
+
+
+# ------------------------------------------------------------------ COV-9: each release once
+
+_TAG = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+
+
+def _version(tag: str) -> tuple[int, int, int]:
+    m = _TAG.match(tag)
+    if not m:
+        raise StackError(f"{tag!r} is not a stable release tag vX.Y.Z")
+    return tuple(int(x) for x in m.groups())
+
+
+def unscored_releases(tags_in_tag_order: list[str], scored: set[str], first: str) -> list[str]:
+    """The releases a nightly run scores (COV-9): every stable release at or after `first`, in
+    the order they were tagged, that has no scores yet. Each is scored exactly once. A tag that is
+    not vX.Y.Z (a pre-release) is not a release to score. Empty when no such release exists yet."""
+    floor = _version(first)
+    return [t for t in tags_in_tag_order if _TAG.match(t) and _version(t) >= floor and t not in scored]
+
+
+def published_releases(snapshot_dirs: list[str]) -> set[str]:
+    """The simulator releases that have published scores: data/snapshots/<date>_blis-<tag>_<ix>."""
+    out = set()
+    for name in snapshot_dirs:
+        m = re.match(r"^\d{4}-\d{2}-\d{2}_blis-(v[^_]+)_", name)
+        if m:
+            out.add(m.group(1))
+    return out
+
+
+# The first simulator release scored on graded points and stack.json: every stable release from
+# it on is scored once (COV-9); the ones before keep their published snapshots.
+FIRST_GRADED_RELEASE = "v0.16.0"
+
+
+def main(argv=None) -> int:
+    """Print, one per line in tag order, the simulator releases a night scores (COV-9): every
+    stable release from FIRST_GRADED_RELEASE on with no published snapshot under --data-dir.
+
+        python3 orchestrator/ingest/stack.py --tags TAGS --data-dir data
+    """
+    ap = argparse.ArgumentParser(description=main.__doc__)
+    ap.add_argument("--tags", required=True, help="inference-sim tags, one per line, in the order they were tagged")
+    ap.add_argument("--data-dir", required=True, help="the published data tree (its snapshots/)")
+    a = ap.parse_args(argv)
+    tags = [t.strip() for t in Path(a.tags).read_text().splitlines() if t.strip()]
+    snaps = Path(a.data_dir) / "snapshots"
+    names = [p.name for p in snaps.iterdir()] if snaps.is_dir() else []
+    for t in unscored_releases(tags, published_releases(names), FIRST_GRADED_RELEASE):
+        print(t)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

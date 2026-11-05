@@ -146,7 +146,7 @@ def _setup(tmp: Path, *, log: str = LOG, repo: str = "org/m", conc: int = 4, isl
     env = sc.Env(blis=_fake_blis(tmp), blis_release="v0.12.0", blis_commit="b" * 40, catalog=tmp,
                  catalog_release="0.3.0", registry=tmp, registry_release="v0.2.0", kernel="v0.3.0",
                  corpus={"sha256": "c" * 64}, field_list=FIELDS, vllm_defaults=st.load_vllm_defaults()[0],
-                 engine_release="0.31.0")
+                 engine_release="0.31.0", sim_build="v0.12.0")
     env.catalog_obj = sp.Catalog(root=tmp, models={"m": repo}, speculators={"m": "mtp"},
                                  hardware={"h200": 139.8})
     env.parts = {"h200"}
@@ -158,7 +158,7 @@ def _score(tmp: Path, entry, env, out: Path):
     o = sc._score_one(entry, tmp / "pull", work, env)
     prov = {"ingest": "api", "blis": {"release": "v0.12.0", "commit_sha": "b" * 40, "catalog": "0.3.0",
                                       "registry": "v0.2.0", "extractor_version": "blis-latency-kernel@v0.3.0"},
-            "engine": {"kind": "vllm", "version": "0.31.0"}, "left_out_records": 0,
+            "simulator": env.simulator(), "engine": {"kind": "vllm", "version": "0.31.0"}, "left_out_records": 0,
             "vllm_ref": "v0.31.0", "vllm_max_distance": 2000, "fields_sha256": "d" * 64,
             "pulled_at": "2026-10-23T00:00:00Z", "corpus": None, "pull_manifest_sha256": "e" * 64,
             "source": {"name": "test", "url": "https://example.invalid/"}}
@@ -490,6 +490,8 @@ def test_the_scenario_engine_block_holds_the_runs_values_under_the_engines_own_n
             "method": "mtp", "num_spec_tokens": 2, "rejection_sample_method": "synthetic"}
         assert dep["pools"][0]["parallel"] == {"tp": 1, "pp": 1, "dp": 1, "enable_expert_parallel": False}
         assert o.fidelity["run_release"] == "0.31.0"
+        # Every point records the simulator build and engine release that scored it (COV-6).
+        assert o.fidelity["simulator"] == {"build": "v0.12.0", "engine": {"kind": "vllm", "version": "0.31.0"}}
     finally:
         shutil.rmtree(tmp)
 

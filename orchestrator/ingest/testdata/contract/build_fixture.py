@@ -249,8 +249,8 @@ def identity(row: dict) -> dict:
     return unit_identity(full, run_dates([full]))
 
 
-def _common(ident: dict, image: str, meas, run_release) -> dict:
-    return {"point_id": point_id(ident), "identity": ident, "measured_date": ident["measured_date"],
+def _common(ident: dict, image: str, meas, run_release, sim: dict) -> dict:
+    return {"simulator": sim, "point_id": point_id(ident), "identity": ident, "measured_date": ident["measured_date"],
             "model": ident["model"], "hardware": ident["hardware"], "precision": ident["precision"],
             "framework": ident["framework"], "benchmark_type": ident["benchmark_type"], "conc": ident["conc"],
             "image": image, "run_release": run_release, "measured": {"ttft_ms": meas[0], "tpot_ms": meas[1]}}
@@ -260,6 +260,7 @@ def write_run(name: str, run: dict, base: Path) -> Path:
     out = base / f"run-{name}"
     out.mkdir(parents=True, exist_ok=True)
     rows, fidelity, facets, not_scored, failed = [], [], {}, [], []
+    sim = {"build": run["blis"]["release"], "engine": {"kind": "vllm", "version": ENGINE}}
     for p in POINTS:
         ident = identity(p["row"])
         pid = point_id(ident)
@@ -267,7 +268,7 @@ def write_run(name: str, run: dict, base: Path) -> Path:
         rel = gr.run_release(p["fidelity"]["build"], f["vllm_version"])
         refused = run["refused"].get(p["row"]["recipe_fingerprint"])
         if refused:
-            failed.append({**_common(ident, f["image"], p["meas"], rel.version), "faults": [refused]})
+            failed.append({**_common(ident, f["image"], p["meas"], rel.version, sim), "faults": [refused]})
             continue
         sweep = f"{p['row']['curve_workflow_run_id']}|{f['scenario']}|{f['label']}"
         facets[pid] = {"identity": ident, "sweep_id": sweep, "scenario": f["scenario"], "label": f["label"],
@@ -281,7 +282,7 @@ def write_run(name: str, run: dict, base: Path) -> Path:
         fid["resolved"] = sorted(fid["resolved"], key=lambda r: r["quantity"])
         g = gr.grade(engine_version=ENGINE, release=rel,
                      substitutions=sc.substitutions(p["fidelity"].get("_subs", []), fid))
-        fid.update(grade=g.grade, substitutions=g.substitutions, run_release=rel.version)
+        fid.update(grade=g.grade, substitutions=g.substitutions, run_release=rel.version, simulator=sim)
         pttft, ptpot = p["pred"][name]
         rows.append([f["scenario"], f["model"], f["gpu"], f["label"], ident["conc"],
                      round(p["meas"][1] * 1000, 3), round(ptpot * 1000, 3),
@@ -292,7 +293,7 @@ def write_run(name: str, run: dict, base: Path) -> Path:
         ident = identity(row)
         rel = gr.run_release({"image": image}, None)
         g = gr.grade(engine_version=ENGINE, release=rel, substitutions=[], g5=reasons)
-        not_scored.append({**_common(ident, image, meas, rel.version), "grade": g.grade, "g5_reason": g.g5,
+        not_scored.append({**_common(ident, image, meas, rel.version, sim), "grade": g.grade, "g5_reason": g.g5,
                            "g5_reasons": sorted(reasons, key=lambda r: (r["code"], r.get("subject", "")))})
 
     rows.sort(key=lambda r: points_sort_key(dict(zip(POINTS_HEADER, map(str, r)))))
@@ -307,7 +308,7 @@ def write_run(name: str, run: dict, base: Path) -> Path:
     for fname, recs in ((NOT_SCORED_JSONL, not_scored), (FAILED_JSONL, failed)):
         recs.sort(key=lambda r: r["point_id"])
         (out / fname).write_text("".join(canonical_dumps(r) + "\n" for r in recs))
-    prov = {"ingest": "api", "blis": run["blis"], "engine": {"kind": "vllm", "version": ENGINE},
+    prov = {"ingest": "api", "blis": run["blis"], "simulator": sim, "engine": {"kind": "vllm", "version": ENGINE},
             "points": len(POINTS) + len(NOT_SCORED), "left_out_records": 3,
             "vllm_ref": VLLM_REF, "vllm_max_distance": 2000,
             "fields_sha256": FIELDS_SHA, "pulled_at": "2026-10-23T00:00:00Z", "corpus": CORPUS,

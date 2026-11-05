@@ -21,6 +21,7 @@ named. It holds no table of settings: field statuses come from the engine's fiel
 """
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 
@@ -152,9 +153,19 @@ def grade(*, engine_version: str, release: Release, substitutions: list[dict],
 
 def check(points: list[dict], engine_version: str) -> list[str]:
     """COV-4, COV-5 and COV-6 over a run's points: every point has exactly one grade, every G5
-    reason is on the closed list, every G2 to G4 substitution is named, and each point's grade
-    agrees with its recorded build and the simulator's engine release."""
+    reason is on the closed list, every G2 to G4 substitution is named, each point's grade
+    agrees with its recorded build and the simulator's engine release, and one simulator build,
+    running that engine release, scored every point."""
     out = []
+    sims = {(json.dumps(p["simulator"], sort_keys=True) if p.get("simulator") else None) for p in points}
+    if len(sims) > 1:
+        out.append(f"{len(sims)} simulator builds or engine releases scored this run's points; one must score "
+                   f"them all (COV-6): {sorted(s or 'none' for s in sims)}")
+    for p in points:
+        eng = ((p.get("simulator") or {}).get("engine") or {}).get("version")
+        if "simulator" in p and eng != engine_version:
+            out.append(f"{str(p.get('point_id'))[:12]}: scored by a simulator running {eng!r}, not {engine_version} (COV-6)")
+            break
     for p in points:
         pid = str(p.get("point_id"))[:12]
         g = p.get("grade")

@@ -73,7 +73,7 @@ def snapshot_id(snapshot_date: str, blis_tag: str, pull_date: str) -> str:
 
 
 def run_night(today: date, blis_tag: str, *, work_dir: Path, data_dir: Path, state_path: Path,
-              pull_fn, score_build_fn, snapshot_date: str, keep_api: int = 5) -> NightResult:
+              pull_fn, score_build_fn, backlog_fn, snapshot_date: str, keep_api: int = 5) -> NightResult:
     """One night of the no-storage pipeline (Discussion #15, revised 2026-10-25). Nothing raw is
     persisted: `work_dir` is this run's ephemeral pull, discarded after. Trigger detection reads
     last night's point-id SET from `state_path` (tiny; no raw store needed), so an IX release or an
@@ -84,7 +84,8 @@ def run_night(today: date, blis_tag: str, *, work_dir: Path, data_dir: Path, sta
     work_dir for the points that will be scored: on an IX-only night only the new points; on a BLIS
     release (blis_changed) the whole window, to rescore it. `score_build_fn(work_dir, blis_tag,
     score_ids, pull_date, window_ids) -> (summary, scored_count)` scores the delta and returns the
-    v2 summary (merging into the prior published summary on an IX-only night)."""
+    summary (merging into the prior published summary on an IX-only night). `backlog_fn(summary)`
+    is the backlog published beside it (build_summary_v2.backlog_of)."""
     work_dir, data_dir, state_path = Path(work_dir), Path(data_dir), Path(state_path)
     state = _read_state(state_path)
     last_ids = set(state.get("point_ids") or [])
@@ -122,6 +123,9 @@ def run_night(today: date, blis_tag: str, *, work_dir: Path, data_dir: Path, sta
     ui.main(["--data-dir", str(data_dir), "--keep-api", str(keep_api)])
     published = False
     if decision.update_live_view:
+        # The backlog is published beside the summary every night it changes (COV-7), written
+        # first so a live summary never stands without its backlog.
+        _write_summary(data_dir / "latest" / "backlog.json", backlog_fn(summary))
         _write_summary(data_dir / "latest" / "summary.json", summary)
         published = True
     _write_state(state_path, blis_tag, snap_id, sorted(window_ids))

@@ -161,7 +161,7 @@ def points_sort_key(row: dict) -> tuple:
 
 # A row the pull itself failed to read. Never a valid reason in a published contract.
 PULL_ERROR = "artifact_unmatched:pull_error"
-PROVENANCE_KEYS = ("ingest", "blis", "engine", "points", "left_out_records", "vllm_ref", "vllm_max_distance",
+PROVENANCE_KEYS = ("ingest", "blis", "simulator", "engine", "points", "left_out_records", "vllm_ref", "vllm_max_distance",
                    "fields_sha256", "pulled_at", "corpus", "pull_manifest_sha256", "source")
 
 
@@ -406,7 +406,13 @@ def validate_dir(directory: str | Path) -> list[str]:
     points = [{"point_id": pid, **rec, "build": {"release": rec.get("run_release")}} for pid, rec in fidelity.items()]
     points += [{**ns, "build": {"release": ns.get("run_release")}} for _, ns in ns_lines]
     if engine:
-        problems += [f"grade: {p}" for p in gr.check(points, engine)]
+        # Failed points carry no grade, but were scored by the same simulator (COV-6).
+        sims = [{"point_id": f.get("point_id"), "simulator": f.get("simulator"), "grade": gr.G5,
+                 "g5_reason": {"code": gr.G5_CODES[0]}} for _, f in failed_lines]
+        problems += [f"grade: {p}" for p in gr.check(points + sims, engine)]
+        sim_build = ((prov or {}).get("simulator") or {}).get("build")
+        if any((p.get("simulator") or {}).get("build") != sim_build for p in points + sims):
+            problems.append(f"{PROVENANCE_JSON}: simulator.build {sim_build!r} is not the build every point names (COV-6)")
     total = (prov or {}).get("points")
     counted = len(scored) + len(ns_lines) + len(failed_lines)
     if isinstance(total, int) and total != counted:

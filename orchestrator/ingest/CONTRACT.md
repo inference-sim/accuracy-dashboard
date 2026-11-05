@@ -136,6 +136,7 @@ One line per G5 point, sorted by `point_id` (`schemas/fidelity.v3.json#/definiti
 ```json
 {"ingest": "api",
  "blis": {"release": "v0.12.0", "commit_sha": "…", "catalog": "…", "registry": "…", "extractor_version": "…"},
+ "simulator": {"build": "v0.16.0", "engine": {"kind": "vllm", "version": "0.32.0"}},
  "engine": {"kind": "vllm", "version": "0.32.0"}, "points": 2035, "left_out_records": 0,
  "vllm_ref": "v0.32.0", "vllm_max_distance": 2000,
  "fields_sha256": "…", "pulled_at": "<UTC ISO-8601>",
@@ -145,6 +146,8 @@ One line per G5 point, sorted by `point_id` (`schemas/fidelity.v3.json#/definiti
 ```
 
 `source` names what was pulled: `{"name", "url"}` (the API the pull read), copied into summary.json's `ground_truth`.
+
+`simulator` is the simulator build that scored the run (its release tag) and the engine release it runs. Every fidelity, G5 and failed record carries the same `simulator` (blis-substrate `contracts/spec/pointrecord` Simulator), and the validator refuses a contract whose points name more than one, or another than provenance's (COV-6).
 
 `engine` is the engine release the scoring simulator runs, read from its stack.json (LIF-6); every point is scored on it, and graded against it. TEMPORARY until inference-sim v0.16.0 ships stack.json at its root: `cli.py score --stack FILE` names the file. A simulator checkout with no stack.json and no `--stack` is refused, because the build predates stack.json; the release is never read from installation.md.
 
@@ -162,6 +165,12 @@ One line per G5 point, sorted by `point_id` (`schemas/fidelity.v3.json#/definiti
 - `coverage`: graded points over all points, split by engine, engine release, chip and grade, with the failed points and the records the ledger left out (`headline.coverage`, COV-7). Every anchor unit counts, including repeat runs the tree shows as one point.
 - `backlog.top`: the ten most common reasons a point is not G1 (`backlog.top`).
 - `not_scored` and `failed`: the two lists, as the contract holds them.
+
+Beside `data/latest/summary.json` the nightly publishes `data/latest/backlog.json` (`build_summary_v2.backlog_of`, design §11.6): per engine, every G5 reason and every substitution, ranked by the points fixing it alone would grade (`alone`), then the points it blocks (G5) and demotes (graded below G1). The publish job fails when the summary has no coverage or the backlog is missing (COV-7).
+
+## Releases scored
+
+Each simulator release is scored exactly once (COV-9). The nightly scores, in the order they were tagged, every stable inference-sim release from v0.16.0 on (`stack.FIRST_GRADED_RELEASE`) that has no published snapshot (`data/snapshots/*_blis-<tag>_*`), one after another (`resolve_blis.sh`, `stack.unscored_releases`). When none is left, it scores the newest release's IX-only delta. A release's snapshot, once published, never changes (COV-8).
 
 ## G5 reasons
 

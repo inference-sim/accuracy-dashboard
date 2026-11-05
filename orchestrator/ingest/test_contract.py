@@ -232,6 +232,25 @@ def test_validator_holds_each_grade_to_the_points_release():
     assert any("COV-6" in p for p in c.validate_dir(d))
 
 
+def test_validator_requires_one_simulator_build_for_every_point():
+    # COV-6: one simulator release produced every score, failed points included.
+    d = _copy("run-b")
+    rows = _lines(d / c.FIDELITY_JSONL)
+    rows[0]["simulator"] = {**rows[0]["simulator"], "build": "v0.99.0"}
+    _write_lines(d / c.FIDELITY_JSONL, rows)
+    assert any("COV-6" in p for p in c.validate_dir(d))
+    d = _copy("run-b")
+    rows = _lines(d / c.FAILED_JSONL)
+    rows[0]["simulator"] = {"build": "v0.11.0", "engine": {"kind": "vllm", "version": "0.32.0"}}
+    _write_lines(d / c.FAILED_JSONL, rows)
+    assert any("COV-6" in p for p in c.validate_dir(d))
+    d = _copy("run-b")
+    prov = json.loads((d / c.PROVENANCE_JSON).read_text())
+    prov["simulator"]["build"] = "v0.12.0"
+    (d / c.PROVENANCE_JSON).write_text(c.canonical_dumps(prov) + "\n")
+    assert any("simulator.build" in p for p in c.validate_dir(d))
+
+
 def test_validator_rejects_a_graded_point_that_names_no_substitution():
     # COV-4: every substitution is named; a G2 point with none is refused by the schema.
     d = _copy("run-a")

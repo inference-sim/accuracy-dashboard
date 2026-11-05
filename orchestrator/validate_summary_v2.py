@@ -140,7 +140,15 @@ def _v3_problems(doc: dict, pts: list[dict]) -> list[str]:
                          "pred_ttft_us": _us((p.get("predicted") or {}).get("ttft_ms")),
                          "pred_tpot_us": _us((p.get("predicted") or {}).get("tpot_ms"))})
     g5 = [{**n, "build": {"release": n["run_release"]}, "release": n["run_release"]} for n in ns]
-    out += [f"grade: {x}" for x in gr.check(runs + g5, engine)]
+    out += [f"grade: {x}" for x in gr.check(runs + g5 + [{**f, "grade": gr.G5, "g5_reason": {"code": gr.G5_CODES[0]}}
+                                                        for f in failed], engine)]
+    gt = doc["provenance"]["ground_truth"]
+    if gt.get("measurement_date_through") and doc["provenance"]["pulled_at"][:10] < gt["measurement_date_through"]:
+        out.append(f"pulled {doc['provenance']['pulled_at'][:10]}, before its newest measurement "
+                   f"{gt['measurement_date_through']} (COV-9)")
+    sim = doc["provenance"]["simulator"]
+    if any(x.get("simulator") != sim for x in runs + g5 + failed):
+        out.append("a point names a simulator other than the provenance's; one build scores a release's points (COV-6)")
     if cov["graded"] != len(runs):
         out.append(f"coverage.graded {cov['graded']} != {len(runs)} graded points")
     if cov["not_scored"] != len(ns) or cov["failed"] != len(failed):
