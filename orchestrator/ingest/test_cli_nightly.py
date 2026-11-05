@@ -302,7 +302,7 @@ def test_sim_build_must_be_the_checkouts_tag_or_commit(tmp_path):
     assert check("v0.16.0") == [] and check(head) == []
     assert check("v0.17.0") == [f"--sim-build v0.17.0: the checkout {sim} is at v0.16.0"]
     assert check("0" * 40) == [f"--sim-build {'0' * 40}: the checkout {sim} is at commit {head}"]
-    assert check("main") == ["--sim-build 'main' is neither a release tag vX.Y.Z nor a 40-hex commit"]
+    assert check("main") == ["--sim-build 'main' is neither a tag vX.Y.Z[-suffix] nor a 40-hex commit"]
 
 
 def test_harness_digest_is_a_sha256_or_unreleased():
@@ -320,3 +320,19 @@ def test_units_select_the_points_of_the_pull_and_name_those_it_does_not_hold(tmp
     assert chosen == [{"point_id": a}]
     assert rec["count"] == 2 and rec["not_in_pull"] == [c_] and len(rec["sha256"]) == 64
     assert cli.select_units(pts, None) == (pts, None)
+
+
+def test_a_pre_release_tag_is_a_simulator_build_but_not_a_release_tag(tmp_path):
+    # harness/run.sh accepts vMAJOR.MINOR.PATCH-suffix; check_blis_inputs must agree, and the
+    # figures are experimental unless the build is a release tag with no suffix.
+    sim = tmp_path / "sim"
+    _tagged_repo(sim, "v0.16.0-rc1")
+    (sim / "blis").write_text("")
+    for r in ("cat", "reg"):
+        _tagged_repo(tmp_path / r, "v1.0.0")
+    check = lambda b: cli.check_blis_inputs(sim / "blis", tmp_path / "cat", tmp_path / "reg", b)  # noqa: E731
+    assert check("v0.16.0-rc1") == []
+    assert check("v0.16.0-rc2") == [f"--sim-build v0.16.0-rc2: the checkout {sim} is at v0.16.0-rc1"]
+    assert check("v0.16") == ["--sim-build 'v0.16' is neither a tag vX.Y.Z[-suffix] nor a 40-hex commit"]
+    assert cli.check_blis_inputs(sim / "blis", tmp_path / "cat", tmp_path / "reg") == []
+    assert cli._RELEASE_TAG.match("v0.16.0") and not cli._RELEASE_TAG.match("v0.16.0-rc1")

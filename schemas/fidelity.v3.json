@@ -812,9 +812,9 @@
       ],
       "properties": {
         "build": {
-          "description": "A release tag vX.Y.Z, or a 40-hex commit.",
+          "description": "A tag vX.Y.Z with an optional pre-release suffix (a figure at a suffixed tag is experimental), or a 40-hex commit.",
           "type": "string",
-          "pattern": "^(v\\d+\\.\\d+\\.\\d+|[0-9a-f]{40})$"
+          "pattern": "^(v\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?|[0-9a-f]{40})$"
         },
         "engine": {
           "type": "object",

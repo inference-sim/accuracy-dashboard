@@ -136,7 +136,7 @@ MANIFEST = {"window": ["2026-05-01", "2026-10-28"], "pulled_at": "2026-10-28T00:
             "ledger": {"revision": "r", "unlisted": []}, "points": []}
 
 
-def real_setup(tmp: Path):
+def real_setup(tmp: Path, tag: str = "v0.16.0"):
     """A bare git repository standing in for inference-sim (the tag v0.16.0 and its commit), a fake
     `go` and a python3 that records its arguments, and the smallest pull, units, catalog and registry."""
     work = tmp / "upstream"
@@ -147,7 +147,7 @@ def real_setup(tmp: Path):
     (work / "stack.json").write_text(json.dumps(STACK))
     git("add", ".", cwd=work)
     git("commit", "-q", "-m", "release", cwd=work)
-    git("tag", "v0.16.0", cwd=work)
+    git("tag", tag, cwd=work)
     commit = git("rev-parse", "HEAD", cwd=work)
     bare = tmp / "inference-sim.git"
     git("clone", "-q", "--bare", str(work), str(bare))
@@ -184,8 +184,8 @@ def real_setup(tmp: Path):
     return bare, commit, bin_, log, pull, units, fields, cat, reg
 
 
-def run_real(tmp: Path, sim_of, extra=()):
-    bare, commit, bin_, log, pull, units, fields, cat, reg = real_setup(tmp)
+def run_real(tmp: Path, sim_of, extra=(), tag="v0.16.0"):
+    bare, commit, bin_, log, pull, units, fields, cat, reg = real_setup(tmp, tag)
     out = tmp / "out"
     env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "HARNESS_DIGEST": "sha256:" + "b" * 64}
     p = subprocess.run(["bash", str(RUN), "--sim", sim_of(commit), "--sim-repo", str(bare), "--units", str(units),
@@ -235,3 +235,10 @@ def test_the_corpus_flags_are_required_only_for_an_agentic_point(tmp_path):
                         "--registry", str(reg), "--fields", str(fields)], capture_output=True, text=True, env=env)
     assert p.returncode == 2
     assert "--corpus and --corpus-revision are required" in p.stderr
+
+
+def test_the_real_path_scores_a_pre_release_tag_and_marks_its_figures_experimental(tmp_path):
+    p, out, log, commit = run_real(tmp_path, lambda c: "v0.16.0-rc1", tag="v0.16.0-rc1")
+    assert p.returncode == 0, p.stderr
+    prov = json.loads((out / "provenance.json").read_text())
+    assert prov["simulator"]["build"] == "v0.16.0-rc1" and prov["experimental"] is True

@@ -220,7 +220,10 @@ def _go_require(gomod: Path, module: str) -> str | None:
     return None
 
 
-_SIM_TAG = re.compile(r"^v\d+\.\d+\.\d+$")
+# A simulator tag: vMAJOR.MINOR.PATCH with an optional pre-release suffix, the same set harness/run.sh
+# accepts. A release tag has no suffix; a build at a pre-release tag is experimental (design §11.7).
+_SIM_TAG = re.compile(r"^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$")
+_RELEASE_TAG = re.compile(r"^v\d+\.\d+\.\d+$")
 _SIM_COMMIT = re.compile(r"^[0-9a-f]{40}$")
 _DIGEST = re.compile(r"^(sha256:[0-9a-f]{64}|unreleased)$")
 
@@ -246,7 +249,7 @@ def check_blis_inputs(blis: Path, catalog: Path, registry: Path, sim_build: str 
         if head != sim_build:
             out.append(f"--sim-build {sim_build}: the checkout {sim} is at commit {head or 'unknown'}")
     else:
-        out.append(f"--sim-build {sim_build!r} is neither a release tag vX.Y.Z nor a 40-hex commit")
+        out.append(f"--sim-build {sim_build!r} is neither a tag vX.Y.Z[-suffix] nor a 40-hex commit")
     for repo, flag in ((catalog, "--catalog"), (registry, "--registry")):
         if not _git(repo, "describe", "--tags", "--exact-match"):
             out.append(f"{flag} {repo} is not at a release tag")
@@ -386,7 +389,7 @@ def cmd_score(a) -> int:
             # Design §11.7, X8: a figure is experimental unless its build and its data are both
             # released. check_blis_inputs requires the catalog and registry at release tags, so the
             # data is released, and the build is released when it is a release tag.
-            "experimental": not _SIM_TAG.match(env.sim_build),
+            "experimental": not _RELEASE_TAG.match(env.sim_build),
             "left_out_records": len((manifest.get("ledger") or {}).get("unlisted") or []),
             "vllm_ref": manifest["vllm_ref"], "vllm_max_distance": manifest["vllm_max_distance"],
             "fields_sha256": fields_sha, "pulled_at": manifest["pulled_at"],
