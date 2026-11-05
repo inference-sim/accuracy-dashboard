@@ -143,11 +143,15 @@ a = sys.argv[1:]
 assert a[:3] == ["catalog", "resolve", "--catalog"] and a[-1] == "--json", a
 kind, q = a[4], a[5]
 ident = MODELS.get(q.lower()) if kind == "--model" else (q if q in CHIPS else None)
-print(json.dumps({{"query": q, "identity": ident, "reason": "fake"}}))
+out = {{"query": q, "identity": ident, "reason": "fake"}}
+if kind == "--chip" and ident is not None:
+    gpn, gpr = CHIPS[q]
+    out["packaging"] = {{"gpus_per_node": gpn, "gpus_per_rack": gpr}}
+print(json.dumps(out))
 """
 
 
-def _catalog(tmp: Path, models: dict, chips: list, speculators: dict) -> sp.Catalog:
+def _catalog(tmp: Path, models: dict, chips: dict, speculators: dict) -> sp.Catalog:
     """A catalog at tmp/catalog: identities from a fake `blis catalog resolve`, and each model's
     graph.yaml naming its speculator."""
     root = tmp / "catalog"
@@ -156,7 +160,7 @@ def _catalog(tmp: Path, models: dict, chips: list, speculators: dict) -> sp.Cata
         (root / "models" / name / "graph.yaml").write_text(f"speculator:\n  method: {method}\n")
     root.mkdir(parents=True, exist_ok=True)
     blis = _exe(tmp / "catalog-blis", CATALOG_BLIS.format(models={k.lower(): v for k, v in models.items()},
-                                                          chips=list(chips)))
+                                                          chips=dict(chips)))
     return sp.Catalog(blis=blis, root=root)
 
 
@@ -175,7 +179,7 @@ def job_log_text(isl: int, osl: int, conc: int, extra: str = "") -> str:
 
 def _setup(tmp: Path, *, log: str = LOG, job_log: str | None = "default", client_commit: bool = True, repo: str = "org/m", conc: int = 4, isl: int = 1024, osl: int = 1024,
            date: str = "2026-10-01", spec: str = "mtp", benchmark_type: str = "single_turn",
-           hardware: str = "mi355x", node_sizes: dict | None = None):
+           hardware: str = "mi355x", chips: dict | None = None, node_size: int | None = None):
     row = {"id": "1", "model": "m", "hardware": hardware, "precision": "fp8", "framework": "vllm",
            "benchmark_type": benchmark_type, "conc": conc, "isl": isl, "osl": osl, "spec_method": spec,
            "disagg": False, "is_multinode": False, "decode_tp": 1, "decode_ep": 1, "num_decode_gpu": 1,
@@ -194,6 +198,11 @@ def _setup(tmp: Path, *, log: str = LOG, job_log: str | None = "default", client
              "files": {"server_log": {"path": "server_log.gz", "sha256": "0" * 64, "from": "api:/server-log"}},
              "build": {"image": row["image"], "commit": "a" * 40, "source": "image_label", "ref": "v0.31.0",
                        "distance": 0, "match": "exact"}}
+    # The launch configuration states the node when asked: resources.gpus_per_node.
+    if node_size is not None:
+        lc = {"roles": {"agg": {"args": {}}}, "resources": {"gpu_type": hardware, "gpus_per_node": node_size}}
+        (pdir / "launch_config.gz").write_bytes(gzip.compress(json.dumps(lc).encode(), mtime=0))
+        entry["files"]["launch_config"] = {"path": "launch_config.gz", "sha256": "0" * 64, "from": "artifact"}
     if job_log == "default":
         job_log = job_log_text(isl, osl, conc)
     if job_log is not None:
@@ -206,11 +215,8 @@ def _setup(tmp: Path, *, log: str = LOG, job_log: str | None = "default", client
                  catalog_release="0.3.0", registry=tmp, registry_release="v0.2.0", kernel="v0.3.0",
                  corpus={"sha256": "c" * 64}, field_list=FIELDS, vllm_defaults=st.load_vllm_defaults()[0],
                  engine_release="0.31.0", sim_build="v0.12.0")
-    env.catalog_obj = _catalog(tmp, {repo: "m"}, [hardware], {"m": "mtp"})
-    for chip, size in (node_sizes or {}).items():
-        (env.catalog_obj.root / "hardware").mkdir(exist_ok=True)
-        (env.catalog_obj.root / "hardware" / f"{chip}.yaml").write_text(f"GPUsPerNode: {size}\n")
-    env.parts = {hardware}
+    env.catalog_obj = _catalog(tmp, {repo: "m"}, chips or {hardware: (None, None)}, {"m": "mtp"})
+    env.parts = set(chips or {hardware})
     return entry, env
 
 
@@ -625,7 +631,7 @@ def test_a_field_the_release_lacks_or_the_engine_does_not_model_is_g5():
         # The log's release is not the one the defaults table was read at, so only the launch
         # config can state a field inside a config object.
         pdir = tmp / "pull" / "points" / entry["point_id"]
-        lc = {"roles": {"agg": {"args": {"compilation-config": '{"custom_ops": ["+rms_norm"]}'}}}}
+        lc = {"roles": {"agg": {"args": {"compilation-config": '{"custom_ops": ["+rms_norm"]}'}}}, "resources": {"gpus_per_node": 8}}
         (pdir / "launch_config.gz").write_bytes(gzip.compress(json.dumps(lc).encode(), mtime=0))
         entry["files"]["launch_config"] = {"path": "launch_config.gz", "sha256": "0" * 64, "from": "artifact"}
         o, _ = _score(tmp, entry, env, tmp / "c2")
@@ -654,7 +660,7 @@ def test_launch_config_and_logged_args_that_disagree_are_g5_value_conflict():
     try:
         entry, env = _setup(tmp)
         pdir = tmp / "pull" / "points" / entry["point_id"]
-        lc = {"roles": {"agg": {"args": {"max-num-seqs": 32}}}}
+        lc = {"roles": {"agg": {"args": {"max-num-seqs": 32}}}, "resources": {"gpus_per_node": 8}}
         (pdir / "launch_config.gz").write_bytes(gzip.compress(json.dumps(lc).encode(), mtime=0))
         entry["files"]["launch_config"] = {"path": "launch_config.gz", "sha256": "0" * 64, "from": "artifact"}
         o, _ = _score(tmp, entry, env, tmp / "c1")
@@ -753,19 +759,6 @@ def test_an_unstable_label_before_its_first_record_stays_g5_value_not_recorded()
             "mi355x": dataclasses.replace(env.runner_table.labels["mi355x"], stable=False, problems=("x: changed",))})
         o, _ = _score(tmp, entry, env, tmp / "c1")
         assert o.g5 == {"code": "value_not_recorded", "subject": "cluster.gpus_per_node"}
-    finally:
-        shutil.rmtree(tmp)
-
-
-def test_a_chip_whose_catalog_entry_fixes_the_node_size_writes_none_whatever_the_table_says():
-    tmp = Path(tempfile.mkdtemp())
-    try:
-        entry, env = _setup(tmp, hardware="gb200", node_sizes={"gb200": 4}, date="2026-06-15")
-        _launch_size(tmp, entry, 4)
-        o, work = _score(tmp, entry, env, tmp / "c1")
-        assert o.fidelity is not None, o.reasons
-        assert "gpus_per_node" not in _scenario(work, entry)["cluster"] and "gpus_per_rack" not in _scenario(work, entry)["cluster"]
-        assert not [s for s in o.fidelity["substitutions"] if s["kind"] == "later_record"]
     finally:
         shutil.rmtree(tmp)
 
@@ -887,5 +880,48 @@ def test_a_run_with_no_recorded_inferencex_commit_names_client_release_unrecorde
         entry, env = _setup(tmp)
         o, _ = _score(tmp, entry, env, tmp / "c2")
         assert "client_release" not in [d["subject"] for d in o.fidelity["requests"]["differences"]]
+    finally:
+        shutil.rmtree(tmp)
+
+
+def _scenario_cluster(tmp, entry):
+    import yaml
+    text = next((tmp / ("work-c1") / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
+    return yaml.safe_load(text.split("\n---\n")[0])["cluster"]
+
+
+def test_a_gb200_nvl72_point_writes_neither_gpus_per_node_nor_gpus_per_rack():
+    # Design §2.2, SUB-3: the catalog entry fixes 4 GPUs per node and 72 per rack. The table is
+    # not consulted, so the point names no later_record.
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp, hardware="gb200", chips={"gb200-nvl72": (4, 72)}, node_size=4)
+        env.parts = {"gb200-nvl72"}
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.g5 is None and o.fidelity is not None
+        assert _scenario_cluster(tmp, entry) == {"hardware": "gb200-nvl72", "nodes": 1}
+        assert not [s for s in o.fidelity["substitutions"] if s["kind"] == "later_record"]
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_an_h100_point_writes_the_node_size_the_run_recorded():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp, hardware="h100", chips={"h100": (None, None)}, node_size=8)
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.g5 is None and o.fidelity is not None
+        assert _scenario_cluster(tmp, entry) == {"hardware": "h100", "gpus_per_node": 8, "nodes": 1}
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_point_with_no_recorded_node_size_on_a_chip_that_fixes_none_is_g5_value_not_recorded():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp, hardware="rtx6000pro", chips={"rtx6000pro": (None, None)}, node_size=None)
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is None
+        assert o.g5 == {"code": "value_not_recorded", "subject": "cluster.gpus_per_node"}
     finally:
         shutil.rmtree(tmp)

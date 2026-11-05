@@ -45,6 +45,7 @@ class Catalog:
     root: Path
     _models: dict = field(default_factory=dict)       # source repository -> identity | None
     _chips: dict = field(default_factory=dict)        # chip name -> identity | None
+    _packaging: dict = field(default_factory=dict)    # chip name -> {"gpus_per_node", "gpus_per_rack"}
 
     def model(self, repo: str) -> str | None:
         """The catalog model whose source repository is `repo`, or None."""
@@ -58,13 +59,27 @@ class Catalog:
             self._chips[name] = bc.catalog_resolve(self.blis, str(self.root), chip=name)
         return self._chips[name]
 
-    def node_size(self, chip: str) -> int | None:
-        """The GPUs per node the chip's catalog entry fixes, or None where it fixes none.
-        TEMPORARY until a command prints it: read from <catalog>/hardware/<chip>.yaml GPUsPerNode."""
-        import yaml
-        f = Path(self.root) / "hardware" / f"{chip}.yaml"
-        doc = (yaml.safe_load(f.read_text()) or {}) if f.is_file() else {}
-        return int(doc["GPUsPerNode"]) if doc.get("GPUsPerNode") else None
+    def packaging(self, chip: str) -> dict:
+        """What the chip's catalog entry fixes about its packaging: {"gpus_per_node",
+        "gpus_per_rack"}, each the entry's value or None where the entry leaves it to the scenario
+        (blis-substrate scenario.Cluster.Packaging, design SUB-3). The scenario omits a value the
+        entry fixes, and states the node size of a chip whose entry fixes none.
+
+        Read from `blis catalog resolve --chip`'s packaging field. TEMPORARY until the pinned blis
+        reports that field (inference-sim m1/packaging, 146e13d9): a build that does not is
+        answered from <catalog>/hardware/<chip>.yaml, its GPUsPerNode and GPUsPerRack."""
+        if chip not in self._packaging:
+            pk = bc.chip_packaging(self.blis, str(self.root), chip)
+            if pk is None:
+                import yaml
+                f = Path(self.root) / "hardware" / f"{chip}.yaml"
+                if not f.is_file():
+                    raise bc.CommandError(f"blis catalog resolve --chip {chip} reports no packaging, and "
+                                          f"{f} does not exist to read it from")
+                doc = yaml.safe_load(f.read_text()) or {}
+                pk = {"gpus_per_node": doc.get("GPUsPerNode") or None, "gpus_per_rack": doc.get("GPUsPerRack") or None}
+            self._packaging[chip] = pk
+        return self._packaging[chip]
 
     def check_unambiguous(self) -> None:
         """Ask `blis catalog resolve` for every model entry name and every source repository the

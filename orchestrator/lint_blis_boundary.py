@@ -65,8 +65,10 @@ DATA_READS = {
         "TEMPORARY until a command lists the catalog's models with their source repositories",
     ("orchestrator/ingest/cli.py", "cmd_score"):
         "TEMPORARY until a command prints the blis-latency-kernel version a build pins (go.mod)",
-    ("orchestrator/ingest/support.py", "Catalog.node_size"):
-        "TEMPORARY until a command prints the GPUs per node a chip's catalog entry fixes",
+    ("orchestrator/ingest/support.py", "Catalog.packaging"):
+        "TEMPORARY until the pinned blis reports `packaging` from `blis catalog resolve --chip` "
+        "(inference-sim m1/packaging, 146e13d9): until then hardware/<chip>.yaml GPUsPerNode and "
+        "GPUsPerRack are read from the catalog checkout",
     ("orchestrator/ingest/support.py", "Catalog.speculator"):
         "TEMPORARY until a command prints a catalog model graph's speculator method",
     ("orchestrator/ingest/support.py", "registry_parts"):

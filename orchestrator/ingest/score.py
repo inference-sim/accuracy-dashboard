@@ -579,7 +579,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         return o
     part = st.Part(name=part_name)
     name = f"p-{pid[:16]}"
-    catalog_size = cat.node_size(part_name)
+    catalog_size = cat.packaging(sup.chip)["gpus_per_node"]
     node = ir.resolve(env.runner_table, row["hardware"], run_date=ident["measured_date"],
                       launch_size=st.recorded_node_size(launch), fixes_packaging=catalog_size is not None)
     b = st.build(c, name=name, model=sup.model, part=part, engine_version=env.engine_release,

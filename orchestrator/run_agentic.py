@@ -62,7 +62,10 @@ import result  # noqa: E402
 
 from extract_agentic_replay_args import (AGENTX_SCENARIO, parse_job_log,  # noqa: E402
                                          parse_server_log)
-from gen_scenarios import emit  # noqa: E402
+from gen_scenarios import PackagingError, emit  # noqa: E402
+import blis_commands as bc  # noqa: E402
+import support as sp  # noqa: E402
+from settings import recorded_node_size  # noqa: E402
 
 # Agentic InferenceX model/GPU slug -> blis-catalog name. SEPARATE from the single-turn
 # extractor's maps (direct_corpus_common.MODELS/CHIPS), which were curated for the models
@@ -223,7 +226,7 @@ def _attention_dp_size(row: dict) -> int:
     return 2
 
 
-def sweep_from_row(row: dict, server: dict | None = None,
+def sweep_from_row(row: dict, server: dict | None = None, node_size: int | None = None,
                    max_context: int | None = None) -> dict:
     """A gen_scenarios.emit()-shaped deployment dict from an agentic API row.
 
@@ -282,6 +285,9 @@ def sweep_from_row(row: dict, server: dict | None = None,
         # A parseable "<ctx>:0" pair so gen_scenarios.emit() sizes max_model_len to the
         # agentic context window (emit expects isl:osl; agentic has no fixed osl).
         "workload": f"{ctx}:0",
+        # The GPUs in one node as the run recorded them (settings.recorded_node_size), or None:
+        # gen_scenarios.emit() writes it only for a chip whose catalog entry fixes none.
+        "gpus_per_node": node_size,
     }
 
 
@@ -404,6 +410,9 @@ def main() -> int:
     ap.add_argument("--blis", required=True, help="the blis binary; it runs in its own directory")
     ap.add_argument("--catalog", required=True)
     ap.add_argument("--registry", required=True)
+    ap.add_argument("--launch-config", default=None,
+                    help="the run's launch_config JSON; its resources.gpus_per_node is the node size, "
+                         "needed for a chip whose catalog entry fixes none")
     ap.add_argument("--out-dir", required=True)
     args = ap.parse_args()
 
@@ -441,7 +450,8 @@ def main() -> int:
     # Supported and replayable: build the deployment sweep + its facets corpus. `server`
     # supplies the speculative method/K the scenario must draft with; if the run pinned
     # --max-context-length (job log), size max_model_len to it, else the 256k default.
-    sweep = sweep_from_row(row, server=server,
+    launch = json.loads(Path(args.launch_config).read_text()) if args.launch_config else None
+    sweep = sweep_from_row(row, server=server, node_size=recorded_node_size(launch),
                            max_context=job.get("max_context_length"))
     corpus_doc = facets_corpus(sweep, row)
     (out / "agentic_corpus.json").write_text(json.dumps(corpus_doc, indent=2) + "\n")
@@ -449,10 +459,21 @@ def main() -> int:
     # Write the scenario the row's deployment prices from, into a scenarios dir blis reads.
     scen_dir = out / "scenarios"
     scen_dir.mkdir(exist_ok=True)
-    (scen_dir / sweep["scenario"]).write_text(
-        emit(sweep, {sweep["workload"]}, {AGENTIC_LABEL}))
-
     blis = str(Path(args.blis).resolve())
+    try:
+        packaging = sp.Catalog(blis=blis, root=Path(args.catalog).resolve()).packaging(sweep["gpu"])
+        text = emit(sweep, {sweep["workload"]}, {AGENTIC_LABEL}, packaging)
+    except PackagingError as e:
+        # The chip's entry fixes no node size and the row records none: the point is not scored
+        # (G5 value_not_recorded), and no size is assumed.
+        (out / "refusals.json").write_text(json.dumps(
+            {"row_id": str(row.get("id")), "refusals": [f"value_not_recorded:cluster.gpus_per_node: {e}"]}, indent=2) + "\n")
+        print(f"row {row.get('id')} NOT scored: {e}", file=sys.stderr)
+        return 0
+    except bc.CommandError as e:
+        raise SystemExit(f"row {row.get('id')}: {e}")
+    (scen_dir / sweep["scenario"]).write_text(text)
+
     argv = build_blis_argv(
         blis, sweep["scenario"], str(scen_dir), str(Path(args.catalog).resolve()),
         str(Path(args.registry).resolve()), str(Path(args.corpus).resolve()), args.corpus_sha256, replay)

@@ -39,11 +39,11 @@ def ledger_list(blis: str, role: str) -> bytes:
     return _run(blis, ["ledger", "--list", role, "--json"]).encode("utf-8")
 
 
-def catalog_resolve(blis: str, catalog: str, *, model: str | None = None, chip: str | None = None) -> str | None:
-    """`blis catalog resolve --catalog <catalog> --model|--chip <name> --json`: the catalog
-    identity of a model (an entry name, or a source repository its model.yaml names) or of a chip,
-    or None when the catalog has none. The command prints {"query", "identity", "reason"}, with
-    identity null when no entry exists, and exits non-zero when a name is ambiguous."""
+def _catalog_resolve(blis: str, catalog: str, model: str | None, chip: str | None) -> dict:
+    """`blis catalog resolve --catalog <catalog> --model|--chip <name> --json`, checked. The
+    command prints {"query", "identity", "reason"}, with identity null when no entry exists, and
+    exits non-zero when a name is ambiguous. A resolved chip also prints "packaging" (inference-sim
+    m1/packaging): {"gpus_per_node", "gpus_per_rack"}, each the value its entry fixes or null."""
     if (model is None) == (chip is None):
         raise CommandError("catalog resolve takes exactly one of model and chip")
     flag, query = ("--model", model) if model is not None else ("--chip", chip)
@@ -53,13 +53,34 @@ def catalog_resolve(blis: str, catalog: str, *, model: str | None = None, chip: 
         doc = json.loads(text)
     except json.JSONDecodeError as e:
         raise CommandError(f"blis {' '.join(args)} printed no JSON: {e}") from None
-    if not isinstance(doc, dict) or set(doc) != {"query", "identity", "reason"}:
+    base = {"query", "identity", "reason"}
+    if not isinstance(doc, dict) or not base <= set(doc) or set(doc) - base - {"packaging"}:
         raise CommandError(f"blis {' '.join(args)} printed {text.strip()[:200]!r}, "
                            f"not an object of query, identity and reason")
     if doc["query"] != query or not (doc["identity"] is None or isinstance(doc["identity"], str)):
         raise CommandError(f"blis {' '.join(args)} printed query {doc['query']!r} and identity "
                            f"{doc['identity']!r}; want query {query!r} and a name or null")
-    return doc["identity"]
+    pk = doc.get("packaging")
+    if pk is not None:
+        ok = isinstance(pk, dict) and set(pk) == {"gpus_per_node", "gpus_per_rack"} and all(
+            v is None or (isinstance(v, int) and not isinstance(v, bool) and v > 0) for v in pk.values())
+        if not ok:
+            raise CommandError(f"blis {' '.join(args)} printed packaging {pk!r}; want gpus_per_node and "
+                               f"gpus_per_rack, each a positive integer or null")
+    return doc
+
+
+def catalog_resolve(blis: str, catalog: str, *, model: str | None = None, chip: str | None = None) -> str | None:
+    """The catalog identity of a model (an entry name, or a source repository its model.yaml
+    names) or of a chip, or None when the catalog has none."""
+    return _catalog_resolve(blis, catalog, model, chip)["identity"]
+
+
+def chip_packaging(blis: str, catalog: str, chip: str) -> dict | None:
+    """The packaging `blis catalog resolve --chip` reports for a chip: {"gpus_per_node",
+    "gpus_per_rack"}, each the value the chip's catalog entry fixes or None. None when the command
+    reports no packaging (a build before inference-sim m1/packaging, or a chip with no entry)."""
+    return _catalog_resolve(blis, catalog, None, chip).get("packaging")
 
 
 def metrics(blis: str) -> dict:

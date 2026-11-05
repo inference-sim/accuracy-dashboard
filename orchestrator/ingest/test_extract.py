@@ -1139,3 +1139,67 @@ if __name__ == "__main__":
             traceback.print_exc()
     print(f"\n{len(fns) - failed}/{len(fns)} passed")
     sys.exit(1 if failed else 0)
+
+
+# ------------------------------------------------------------------ packaging (design §2.2, SUB-3)
+
+_DP4 = ("'tensor_parallel_size': 1, 'data_parallel_size': 4, 'max_num_seqs': 16, 'max_num_batched_tokens': 4096, "
+        "'block_size': 128, 'gpu_memory_utilization': 0.9")
+
+
+def _dp4():
+    return _classify(_log(_DP4, RESOLVED.replace("data_parallel_size=1", "data_parallel_size=4")))
+
+
+def test_a_chip_whose_entry_fixes_packaging_gets_neither_gpus_per_node_nor_gpus_per_rack():
+    # GB200 NVL72: 4 GPUs per tray and 72 per rack are facts of the product; the scenario takes
+    # them from the catalog entry and a restated value must equal it. The run recorded 8 here,
+    # which would be refused, so nothing is written, whatever the run recorded.
+    for node in (NODE8, ir.NodeSize()):
+        b = _build(_dp4(), catalog_node_size=4, node=node)
+        cl = b.scenario["cluster"]
+        assert "gpus_per_node" not in cl and "gpus_per_rack" not in cl, cl
+        assert cl == {"hardware": "h200", "nodes": 1} and b.reasons == []
+
+
+def test_a_gb200_point_with_more_ranks_than_a_tray_spans_nodes_of_the_entrys_size():
+    c = _classify(_log("'tensor_parallel_size': 8, 'max_num_seqs': 16, 'max_num_batched_tokens': 4096, "
+                       "'block_size': 128, 'gpu_memory_utilization': 0.9",
+                       RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=8")))
+    b = _build(c, catalog_node_size=4, node=ir.NodeSize())
+    assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 2}
+    assert b.deployment["pools"][0]["nodes"] == 2
+
+
+def test_an_h100_point_writes_the_node_size_the_run_recorded():
+    b = _build(_dp4(), node=NODE8)
+    assert b.scenario["cluster"] == {"hardware": "h200", "gpus_per_node": 8, "nodes": 1}
+    # Not the rank count: 4 ranks on a recorded 8-GPU server is one 8-GPU node.
+    assert b.scenario["cluster"]["gpus_per_node"] != 4
+    b = _build(_dp4(), node=ir.NodeSize(2, "cluster.gpus_per_node: launch_config"))
+    assert b.scenario["cluster"] == {"hardware": "h200", "gpus_per_node": 2, "nodes": 2}
+
+
+def test_packaging_comes_from_blis_catalog_resolve_and_falls_back_to_the_catalog_files_for_an_older_blis():
+    import blis_commands as bc
+    tmp = Path(tempfile.mkdtemp())
+    blis = tmp / "blis"
+    blis.write_text("#!/bin/sh\necho '{\"query\": \"gb200-nvl72\", \"identity\": \"gb200-nvl72\", \"reason\": \"\", "
+                    "\"packaging\": {\"gpus_per_node\": 4, \"gpus_per_rack\": 72}}'\n")
+    blis.chmod(0o755)
+    assert sp.Catalog(blis=str(blis), root=tmp).packaging("gb200-nvl72") == {"gpus_per_node": 4, "gpus_per_rack": 72}
+    # A blis before inference-sim m1/packaging prints no packaging: the catalog checkout answers.
+    (tmp / "hardware").mkdir()
+    (tmp / "hardware" / "gb200-nvl72.yaml").write_text("GPUsPerNode: 4\nGPUsPerRack: 72\n")
+    (tmp / "hardware" / "h100.yaml").write_text("MemoryGiB: 80\n")
+    blis.write_text("#!/bin/sh\necho '{\"query\": \"x\", \"identity\": \"x\", \"reason\": \"\"}'\n")
+    blis.write_text(blis.read_text().replace('"x"', '"gb200-nvl72"'))
+    cat = sp.Catalog(blis=str(blis), root=tmp)
+    assert cat.packaging("gb200-nvl72") == {"gpus_per_node": 4, "gpus_per_rack": 72}
+    blis.write_text(blis.read_text().replace("gb200-nvl72", "h100"))
+    assert sp.Catalog(blis=str(blis), root=tmp).packaging("h100") == {"gpus_per_node": None, "gpus_per_rack": None}
+    # A packaging of another shape is refused.
+    blis.write_text("#!/bin/sh\necho '{\"query\": \"h100\", \"identity\": \"h100\", \"reason\": \"\", "
+                    "\"packaging\": {\"gpus_per_node\": 0, \"gpus_per_rack\": null}}'\n")
+    with pytest.raises(bc.CommandError, match="packaging"):
+        sp.Catalog(blis=str(blis), root=tmp).packaging("h100")

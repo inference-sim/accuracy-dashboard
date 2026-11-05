@@ -151,7 +151,16 @@ def test_pure_functions():
     ck("a non-DP row has attention_dp_size 1", ra._attention_dp_size(ROW) == 1)
 
 
-def run_driver(td: Path, row: dict, blis_stub: str) -> subprocess.CompletedProcess:
+# `blis catalog resolve --chip X --json` as inference-sim m1/packaging prints it, for a chip whose
+# entry fixes no packaging (an 8-GPU HGX server): the scenario then states the node size.
+CATALOG_CASE = (
+    "if [ \"$1\" = catalog ]; then\n"
+    "  echo \"{\\\"query\\\": \\\"$6\\\", \\\"identity\\\": \\\"$6\\\", \\\"reason\\\": \\\"\\\", "
+    "\\\"packaging\\\": {\\\"gpus_per_node\\\": null, \\\"gpus_per_rack\\\": null}}\"; exit 0\n"
+    "fi\n")
+
+
+def run_driver(td: Path, row: dict, blis_stub: str, launch: dict | None = None) -> subprocess.CompletedProcess:
     """Drive run_agentic.main() with a fake blis that prints a fixed Result document.
 
     Deliberately passes NO --job-log: the external repo's Actions log is usually unreadable,
@@ -162,12 +171,16 @@ def run_driver(td: Path, row: dict, blis_stub: str) -> subprocess.CompletedProce
     blis = td / "blis_stub.sh"
     blis.write_text(blis_stub)
     blis.chmod(0o755)
+    extra = []
+    if launch is not None:
+        (td / "launch.json").write_text(json.dumps(launch))
+        extra = ["--launch-config", str(td / "launch.json")]
     return subprocess.run(
         [sys.executable, str(HERE / "run_agentic.py"),
          "--row", str(td / "row.json"), "--server-log", str(td / "server.log"),
          "--corpus", str(td / "traces.jsonl"),
          "--corpus-sha256", "deadbeef", "--blis", str(blis),
-         "--catalog", str(td), "--registry", str(td), "--out-dir", str(td / "out")],
+         "--catalog", str(td), "--registry", str(td), "--out-dir", str(td / "out"), *extra],
         capture_output=True, text=True)
 
 
@@ -181,13 +194,13 @@ def test_driver_scores_a_supported_row():
         # the per-token one.
         doc = json.dumps(_result({"ttft_mean_ms": 1500.0, "tpot_mean_ms": 4.5, "itl_mean_ms": 17.0}))
         stub = (
-            "#!/usr/bin/env bash\n"
+            "#!/usr/bin/env bash\n" + CATALOG_CASE +
             "[ \"$1\" = schema ] && exit 0\n"
             "printf '%s\\n' \"$@\" > \"$(dirname \"$0\")/argv.txt\"\n"
             "pwd > \"$(dirname \"$0\")/cwd.txt\"\n"
             f"echo '{doc}'\n"
         )
-        r = run_driver(td, ROW, stub)
+        r = run_driver(td, ROW, stub, launch={"resources": {"gpu_type": "b300", "gpus_per_node": 8}})
         ck("driver exits 0 on a supported, replayable row", r.returncode == 0,
            r.stderr[-300:])
         csv = td / "out" / "points.csv"
@@ -244,15 +257,36 @@ def test_driver_refuses_unsupported():
                any("brand-new-model" in x for x in doc["refusals"]), str(doc["refusals"]))
 
 
+def test_driver_writes_the_recorded_node_size_and_refuses_a_row_that_records_none():
+    import re
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_text("{}\n")
+        doc = json.dumps(_result({"ttft_mean_ms": 1500.0, "tpot_mean_ms": 4.5}))
+        stub = "#!/usr/bin/env bash\n" + CATALOG_CASE + "[ \"$1\" = schema ] && exit 0\n" + f"echo '{doc}'\n"
+        r = run_driver(td, ROW, stub, launch={"resources": {"gpu_type": "b300", "gpus_per_node": 8}})
+        scen = next((td / "out" / "scenarios").glob("*.yaml")).read_text()
+        m = re.search(r"^  gpus_per_node: (\d+)$", scen, re.M)
+        ck("the recorded node size is written (b300, 8 per node)", r.returncode == 0 and m and m.group(1) == "8", scen[:400])
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_text("{}\n")
+        r = run_driver(td, ROW, "#!/usr/bin/env bash\n" + CATALOG_CASE + "echo 'blis should not run' >&2\nexit 7\n")
+        ref = td / "out" / "refusals.json"
+        ck("a row with no recorded node size is not scored (exit 0, no CSV)", r.returncode == 0 and not (td / "out" / "points.csv").exists(), r.stderr[-200:])
+        ck("the refusal is value_not_recorded:cluster.gpus_per_node",
+           ref.exists() and any(x.startswith("value_not_recorded:cluster.gpus_per_node") for x in json.loads(ref.read_text())["refusals"]))
+
+
 def test_driver_refuses_a_result_that_does_not_validate():
     with tempfile.TemporaryDirectory() as d:
         td = Path(d)
         (td / "traces.jsonl").write_text("{}\n")
         doc = json.dumps(_result({"ttft_mean_ms": 1500.0, "tpot_mean_ms": 4.5}))
-        stub = ("#!/usr/bin/env bash\n"
+        stub = ("#!/usr/bin/env bash\n" + CATALOG_CASE +
                 "[ \"$1\" = schema ] && { echo 'metrics: bad' >&2; exit 1; }\n"
                 f"echo '{doc}'\n")
-        r = run_driver(td, ROW, stub)
+        r = run_driver(td, ROW, stub, launch={"resources": {"gpus_per_node": 8}})
         ck("a Result that does not validate stops the driver", r.returncode != 0, r.stderr[-200:])
         ck("the refusal says the Result does not validate", "does not validate" in r.stderr, r.stderr[-200:])
         ck("no CSV is written for an invalid Result", not (td / "out" / "points.csv").exists())
@@ -262,6 +296,7 @@ def main() -> int:
     test_pure_functions()
     test_driver_scores_a_supported_row()
     test_driver_refuses_unsupported()
+    test_driver_writes_the_recorded_node_size_and_refuses_a_row_that_records_none()
     test_driver_refuses_a_result_that_does_not_validate()
     print()
     if FAILURES:
