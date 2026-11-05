@@ -73,7 +73,11 @@ describe('a v3 snapshot renders', () => {
 
   it('names the grade and each substitution in a point\'s tooltip', () => {
     const pts = flattenPoints(v3a())
-    const g1 = pts.find((p) => p.fidelity?.grade === 'G1')!
+    // The scorer grades no point G1 until the four conditions it does not check are graded
+    // (grade.UNCHECKED_KINDS), so the fixture holds none; a G1 record is a G2 one with nothing named.
+    expect(pts.some((p) => p.fidelity?.grade === 'G1')).toBe(false)
+    const g2 = pts.find((p) => p.fidelity?.grade === 'G2')!
+    const g1 = { fidelity: { ...g2.fidelity!, grade: 'G1' as const, substitutions: [] } }
     const g4 = pts.find((p) => p.fidelity?.grade === 'G4' && p.fidelity.run_release === '0.25.0')!
     expect(renderToStaticMarkup(<ProvenanceBody fidelity={g1.fidelity!} />)).toContain('G1 · Exact match')
     const four = renderToStaticMarkup(<ProvenanceBody fidelity={g4.fidelity!} />)
@@ -82,10 +86,12 @@ describe('a v3 snapshot renders', () => {
   })
 
   it('puts only G1 points in the exact tier', () => {
-    for (const p of flattenPoints(v3a())) {
+    const pts = flattenPoints(v3a())
+    for (const p of pts) {
       expect(isEstimated(p.fidelity)).toBe(p.fidelity!.grade !== 'G1')
       expect(p.tier).toBe(p.fidelity!.grade === 'G1' ? 'measured_or_resolved' : 'all')
     }
+    expect(isEstimated({ ...pts[0]!.fidelity!, grade: 'G1', substitutions: [] })).toBe(false)
   })
 
   it('counts graded points over every point, and a failed one apart', () => {

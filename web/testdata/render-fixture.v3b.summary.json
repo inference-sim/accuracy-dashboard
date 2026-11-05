@@ -62,27 +62,27 @@
     },
     "grades": {
       "G1": {
-        "points": 2,
+        "points": 0,
         "share": "too few points",
         "ttft": {
           "mape": "too few points",
-          "n": 2
+          "n": 0
         },
         "tpot": {
           "mape": "too few points",
-          "n": 2
+          "n": 0
         }
       },
       "G2": {
-        "points": 3,
+        "points": 5,
         "share": "too few points",
         "ttft": {
           "mape": "too few points",
-          "n": 3
+          "n": 5
         },
         "tpot": {
           "mape": "too few points",
-          "n": 3
+          "n": 5
         }
       },
       "G3": {
@@ -124,8 +124,8 @@
         "points": 13,
         "graded": 8,
         "grades": {
-          "G1": 2,
-          "G2": 3,
+          "G1": 0,
+          "G2": 5,
           "G3": 0,
           "G4": 3,
           "G5": 5
@@ -148,8 +148,8 @@
         "points": 6,
         "graded": 5,
         "grades": {
-          "G1": 2,
-          "G2": 3,
+          "G1": 0,
+          "G2": 5,
           "G3": 0,
           "G4": 0,
           "G5": 1
@@ -205,8 +205,8 @@
         "points": 5,
         "graded": 4,
         "grades": {
-          "G1": 2,
-          "G2": 0,
+          "G1": 0,
+          "G2": 2,
           "G3": 0,
           "G4": 2,
           "G5": 1
@@ -214,8 +214,8 @@
       }
     },
     "by_grade": {
-      "G1": 2,
-      "G2": 3,
+      "G1": 0,
+      "G2": 5,
       "G3": 0,
       "G4": 3,
       "G5": 5
@@ -228,6 +228,22 @@
   },
   "backlog": {
     "top": [
+      {
+        "reason": "coefficient_range: not checked",
+        "points": 8
+      },
+      {
+        "reason": "kernel_hash: not checked",
+        "points": 8
+      },
+      {
+        "reason": "resolved_differs: not checked",
+        "points": 8
+      },
+      {
+        "reason": "value_class: not checked",
+        "points": 8
+      },
       {
         "reason": "client_difference: send_gap",
         "points": 3
@@ -251,22 +267,6 @@
       {
         "reason": "G5 not_in_catalog",
         "points": 1
-      },
-      {
-        "reason": "G5 router_unsupported: vllm-router",
-        "points": 1
-      },
-      {
-        "reason": "estimated: attention_config.indexer_kv_dtype",
-        "points": 1
-      },
-      {
-        "reason": "estimated: attention_config.indexer_sparse_logits",
-        "points": 1
-      },
-      {
-        "reason": "estimated: max_num_seqs",
-        "points": 1
       }
     ]
   },
@@ -281,7 +281,7 @@
       "mape": {
         "ttft": "too few points",
         "tpot": "too few points",
-        "n": 2
+        "n": 0
       },
       "shape": {
         "ttft": "too few points",
@@ -571,6 +571,26 @@
                             "detail": "the simulator admits the next request at the step that emitted the previous request's last token; the client sends it after the response stream closes, an interval not modelled",
                             "kind": "client_difference",
                             "subject": "send_gap"
+                          },
+                          {
+                            "detail": "coefficient_range is not graded yet",
+                            "kind": "coefficient_range",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "kernel_hash is not graded yet",
+                            "kind": "kernel_hash",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "resolved_differs is not graded yet",
+                            "kind": "resolved_differs",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "value_class is not graded yet",
+                            "kind": "value_class",
+                            "subject": "not checked"
                           }
                         ]
                       }
@@ -680,6 +700,26 @@
                             "detail": "the simulator admits the next request at the step that emitted the previous request's last token; the client sends it after the response stream closes, an interval not modelled",
                             "kind": "client_difference",
                             "subject": "send_gap"
+                          },
+                          {
+                            "detail": "coefficient_range is not graded yet",
+                            "kind": "coefficient_range",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "kernel_hash is not graded yet",
+                            "kind": "kernel_hash",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "resolved_differs is not graded yet",
+                            "kind": "resolved_differs",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "value_class is not graded yet",
+                            "kind": "value_class",
+                            "subject": "not checked"
                           }
                         ]
                       }
@@ -789,6 +829,26 @@
                             "detail": "the simulator admits the next request at the step that emitted the previous request's last token; the client sends it after the response stream closes, an interval not modelled",
                             "kind": "client_difference",
                             "subject": "send_gap"
+                          },
+                          {
+                            "detail": "coefficient_range is not graded yet",
+                            "kind": "coefficient_range",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "kernel_hash is not graded yet",
+                            "kind": "kernel_hash",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "resolved_differs is not graded yet",
+                            "kind": "resolved_differs",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "value_class is not graded yet",
+                            "kind": "value_class",
+                            "subject": "not checked"
                           }
                         ]
                       }
@@ -815,7 +875,7 @@
           "mape": {
             "ttft": "too few points",
             "tpot": "too few points",
-            "n": 2
+            "n": 0
           },
           "shape": {
             "ttft": "too few points",
@@ -853,7 +913,7 @@
               "mape": {
                 "ttft": "too few points",
                 "tpot": "too few points",
-                "n": 2
+                "n": 0
               },
               "shape": {
                 "ttft": "too few points",
@@ -1110,6 +1170,11 @@
                         },
                         "substitutions": [
                           {
+                            "detail": "coefficient_range is not graded yet",
+                            "kind": "coefficient_range",
+                            "subject": "not checked"
+                          },
+                          {
                             "detail": "left unset; the engine resolves the upstream default",
                             "kind": "estimated",
                             "subject": "attention_config.indexer_kv_dtype"
@@ -1120,9 +1185,24 @@
                             "subject": "attention_config.indexer_sparse_logits"
                           },
                           {
+                            "detail": "kernel_hash is not graded yet",
+                            "kind": "kernel_hash",
+                            "subject": "not checked"
+                          },
+                          {
                             "detail": "vllm/vllm-openai:nightly-dev-x86_64-cu130-ac9126e58aa7 (banner 0.30.1rc1.dev493+gac9126e58)",
                             "kind": "nightly_or_custom",
                             "subject": "engine build"
+                          },
+                          {
+                            "detail": "resolved_differs is not graded yet",
+                            "kind": "resolved_differs",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "value_class is not graded yet",
+                            "kind": "value_class",
+                            "subject": "not checked"
                           }
                         ]
                       }
@@ -1144,7 +1224,7 @@
                   "mape": {
                     "ttft": "too few points",
                     "tpot": "too few points",
-                    "n": 2
+                    "n": 0
                   },
                   "shape": {
                     "ttft": "too few points",
@@ -1192,7 +1272,7 @@
                       "mape": {
                         "ttft": "too few points",
                         "tpot": "too few points",
-                        "n": 2
+                        "n": 0
                       },
                       "shape": {
                         "ttft": "too few points",
@@ -1219,7 +1299,7 @@
                     {
                       "level": "point",
                       "concurrency": 1,
-                      "tier": "measured_or_resolved",
+                      "tier": "all",
                       "measured": {
                         "ttft_ms": 980.0,
                         "tpot_ms": 8.1
@@ -1283,7 +1363,7 @@
                           "ref": "v0.31.0",
                           "source": "release_tag"
                         },
-                        "grade": "G1",
+                        "grade": "G2",
                         "replay": {
                           "client": "aiperf",
                           "client_version": "0.12.0",
@@ -1318,13 +1398,34 @@
                           },
                           "harness_digest": "unreleased"
                         },
-                        "substitutions": []
+                        "substitutions": [
+                          {
+                            "detail": "coefficient_range is not graded yet",
+                            "kind": "coefficient_range",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "kernel_hash is not graded yet",
+                            "kind": "kernel_hash",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "resolved_differs is not graded yet",
+                            "kind": "resolved_differs",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "value_class is not graded yet",
+                            "kind": "value_class",
+                            "subject": "not checked"
+                          }
+                        ]
                       }
                     },
                     {
                       "level": "point",
                       "concurrency": 2,
-                      "tier": "measured_or_resolved",
+                      "tier": "all",
                       "measured": {
                         "ttft_ms": 1210.0,
                         "tpot_ms": 8.65
@@ -1388,7 +1489,7 @@
                           "ref": "v0.31.0",
                           "source": "release_tag"
                         },
-                        "grade": "G1",
+                        "grade": "G2",
                         "replay": {
                           "client": "aiperf",
                           "client_version": "0.12.0",
@@ -1423,7 +1524,28 @@
                           },
                           "harness_digest": "unreleased"
                         },
-                        "substitutions": []
+                        "substitutions": [
+                          {
+                            "detail": "coefficient_range is not graded yet",
+                            "kind": "coefficient_range",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "kernel_hash is not graded yet",
+                            "kind": "kernel_hash",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "resolved_differs is not graded yet",
+                            "kind": "resolved_differs",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "value_class is not graded yet",
+                            "kind": "value_class",
+                            "subject": "not checked"
+                          }
+                        ]
                       }
                     }
                   ]
@@ -1572,9 +1694,19 @@
                         },
                         "substitutions": [
                           {
+                            "detail": "coefficient_range is not graded yet",
+                            "kind": "coefficient_range",
+                            "subject": "not checked"
+                          },
+                          {
                             "detail": "not recorded; left unset, so the engine resolves the upstream default",
                             "kind": "estimated",
                             "subject": "max_num_seqs"
+                          },
+                          {
+                            "detail": "kernel_hash is not graded yet",
+                            "kind": "kernel_hash",
+                            "subject": "not checked"
                           },
                           {
                             "detail": "0.25.0, scored on 0.31.0",
@@ -1585,6 +1717,16 @@
                             "detail": "ported-function list not published",
                             "kind": "ported_functions_unpublished",
                             "subject": "engine release"
+                          },
+                          {
+                            "detail": "resolved_differs is not graded yet",
+                            "kind": "resolved_differs",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "value_class is not graded yet",
+                            "kind": "value_class",
+                            "subject": "not checked"
                           }
                         ]
                       }
@@ -1854,9 +1996,29 @@
                         },
                         "substitutions": [
                           {
+                            "detail": "coefficient_range is not graded yet",
+                            "kind": "coefficient_range",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "kernel_hash is not graded yet",
+                            "kind": "kernel_hash",
+                            "subject": "not checked"
+                          },
+                          {
                             "detail": "vllm/vllm-openai:vllm-minimax-m3-perf-x86_64-13.0.1-8b00f41 (banner 0.30.0rc2.dev44+g8b00f4123)",
                             "kind": "nightly_or_custom",
                             "subject": "engine build"
+                          },
+                          {
+                            "detail": "resolved_differs is not graded yet",
+                            "kind": "resolved_differs",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "value_class is not graded yet",
+                            "kind": "value_class",
+                            "subject": "not checked"
                           }
                         ]
                       }

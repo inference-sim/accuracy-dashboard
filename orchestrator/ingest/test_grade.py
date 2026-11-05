@@ -103,3 +103,12 @@ def test_check_requires_one_simulator_build_and_engine_release_for_every_point()
     assert any("COV-6" in x for x in g.check(pts + [{**pts[0], "point_id": "c", "simulator": other}], V))
     wrong = {**sim, "engine": {"kind": "vllm", "version": "0.31.0"}}
     assert any("running '0.31.0'" in x for x in g.check([{**pts[0], "simulator": wrong}], V))
+
+
+def test_the_four_conditions_that_are_not_graded_yet_are_g2_kinds_named_on_a_subject_of_their_own():
+    subs = g.unchecked()
+    assert [s["kind"] for s in subs] == ["coefficient_range", "kernel_hash", "resolved_differs", "value_class"]
+    assert all(s["kind"] in g.G2_KINDS and s["subject"] == "not checked" and s["detail"] == f"{s['kind']} is not graded yet"
+               for s in subs)
+    out = g.grade(engine_version=V, release=REL, substitutions=subs)
+    assert out.grade == g.G2 and out.substitutions == subs

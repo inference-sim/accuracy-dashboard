@@ -643,12 +643,20 @@ APPROX = {"kind": "estimated", "subject": "quantization", "detail": "left unset"
 DEFAULTED = {"kind": "estimated", "subject": "max_num_seqs", "detail": "not recorded; left unset"}
 
 
-def test_a_point_is_g1_only_on_the_release_the_simulator_runs_with_nothing_substituted():
+UNCHECKED = [{"kind": k, "subject": "not checked", "detail": f"{k} is not graded yet"}
+             for k in ("coefficient_range", "kernel_hash", "resolved_differs", "value_class")]
+
+
+def test_no_point_is_g1_while_four_of_the_g1_conditions_are_not_graded():
+    # Design 11.3's G1 also requires a kernel hash per library, no extrapolated or unidentified
+    # coefficient, a value class per modelled field, and no resolved value that differs. No source
+    # carries these yet, so each scored point names them (grade.UNCHECKED_KINDS) and is G2 at best.
     o = _graded()
-    assert o.fidelity["grade"] == "G1" and o.fidelity["substitutions"] == [] and o.csv_row[9] == "G1"
+    assert o.fidelity["grade"] == "G2" and o.csv_row[9] == "G2"
+    assert o.fidelity["substitutions"] == UNCHECKED
     assert o.fidelity["run_release"] == "0.32.0"
-    # build.match is not a grade input: the build decides G1 or G4 through its release alone.
-    assert _graded(build_match="estimated").fidelity["grade"] == "G1"
+    # build.match is not a grade input: the build decides G2 or G4 through its release alone.
+    assert _graded(build_match="estimated").fidelity["grade"] == "G2"
 
 
 def test_every_estimate_and_client_difference_is_named_and_makes_the_point_g2():
@@ -656,17 +664,21 @@ def test_every_estimate_and_client_difference_is_named_and_makes_the_point_g2():
     o = _graded(subs=[APPROX, DEFAULTED], requests={"differences": [gap]})
     assert o.fidelity["grade"] == "G2"
     assert [(s["kind"], s["subject"]) for s in o.fidelity["substitutions"]] == [
-        ("client_difference", "send_gap"), ("estimated", "max_num_seqs"), ("estimated", "quantization")]
-    assert o.fidelity["substitutions"][2]["detail"] == "left unset"
+        ("client_difference", "send_gap"), ("coefficient_range", "not checked"), ("estimated", "max_num_seqs"),
+        ("estimated", "quantization"), ("kernel_hash", "not checked"), ("resolved_differs", "not checked"),
+        ("value_class", "not checked")]
+    assert next(s for s in o.fidelity["substitutions"] if s["subject"] == "quantization")["detail"] == "left unset"
 
 
 def test_another_release_or_a_nightly_build_is_g4_and_says_so():
     o = _graded(image="vllm/vllm-openai:v0.25.0", banner="0.25.0")
     assert o.fidelity["grade"] == "G4" and o.fidelity["run_release"] == "0.25.0"
-    assert {s["kind"] for s in o.fidelity["substitutions"]} == {"other_release", "ported_functions_unpublished"}
+    assert {s["kind"] for s in o.fidelity["substitutions"]} == {
+        "other_release", "ported_functions_unpublished", *(u["kind"] for u in UNCHECKED)}
     o = _graded(image="vllm/vllm-openai:nightly-abc", banner="0.30.1rc1.dev493+gac9126e58")
     assert o.fidelity["grade"] == "G4" and o.fidelity["run_release"] is None
-    assert [s["kind"] for s in o.fidelity["substitutions"]] == ["nightly_or_custom"]
+    assert [s["kind"] for s in o.fidelity["substitutions"]] == [
+        "coefficient_range", "kernel_hash", "nightly_or_custom", "resolved_differs", "value_class"]
 
 
 def test_a_point_not_scored_is_g5_with_every_reason_on_the_closed_list():

@@ -88,20 +88,22 @@ def test_each_point_carries_its_identity_date_and_fidelity_record():
 def test_only_a_g1_point_counts_in_the_strict_tier():
     doc = _build()
     grades = Counter(p["fidelity"]["grade"] for p in _points(doc))
-    assert grades == {"G1": 3, "G2": 3, "G4": 3}
+    # The fixture holds no G1: every scored point names the four G1 conditions that are not
+    # graded yet (grade.UNCHECKED_KINDS), so the strict tier is empty.
+    assert grades == {"G2": 6, "G4": 3}
     assert all(p["tier"] == ("measured_or_resolved" if p["fidelity"]["grade"] == "G1" else "all") for p in _points(doc))
     assert doc["totals"]["all"]["mape"]["n"] == 9
-    assert doc["totals"]["measured_or_resolved"]["mape"]["n"] == 3
+    assert doc["totals"]["measured_or_resolved"]["mape"]["n"] == 0
 
 
 def test_the_headline_covers_g1_to_g4_with_each_grades_share_and_count():
-    # COV-11, by hand from run-a: 9 graded points (3 G1, 3 G2, 3 G4) and 5 G5. Every figure is
+    # COV-11, by hand from run-a: 9 graded points (6 G2, 3 G4) and 5 G5. Every figure is
     # over fewer than 10 points, so each is "too few points", never a number.
     h = _build()["headline"]
     assert (h["points"], h["graded"], h["not_scored"]) == (14, 9, 5)
     assert h["headline"]["ttft"] == {"mape": "too few points", "n": 9}
     assert {g: (r["points"], r["share"]) for g, r in h["grades"].items()} == \
-        {g: (n, "too few points") for g, n in (("G1", 3), ("G2", 3), ("G3", 0), ("G4", 3))}
+        {g: (n, "too few points") for g, n in (("G1", 0), ("G2", 6), ("G3", 0), ("G4", 3))}
     assert all(r["ttft"]["mape"] == "too few points" for r in h["grades"].values())
 
 
@@ -116,18 +118,21 @@ def test_the_headline_is_a_number_from_ten_points():
 def test_coverage_splits_by_engine_release_chip_and_grade_and_balances():
     c = _build()["coverage"]
     assert (c["points"], c["graded"], c["not_scored"], c["failed"]) == (14, 9, 5, 0)
-    assert c["by_grade"] == {"G1": 3, "G2": 3, "G3": 0, "G4": 3, "G5": 5}
-    assert c["by_engine_release"]["vllm 0.31.0"]["grades"] == {"G1": 3, "G2": 3, "G3": 0, "G4": 0, "G5": 1}
+    assert c["by_grade"] == {"G1": 0, "G2": 6, "G3": 0, "G4": 3, "G5": 5}
+    assert c["by_engine_release"]["vllm 0.31.0"]["grades"] == {"G1": 0, "G2": 6, "G3": 0, "G4": 0, "G5": 1}
     assert c["by_engine_release"]["vllm nightly or custom"]["graded"] == 2
-    # h200: the TP4 curve (3, G1), TP8 (G4), MiniMax-M3 (G4), and the router point (G5).
-    assert c["by_chip"]["h200"] == {"points": 6, "graded": 5, "grades": {"G1": 3, "G2": 0, "G3": 0, "G4": 2, "G5": 1}}
+    # h200: the TP4 curve (3, G2), TP8 (G4), MiniMax-M3 (G4), and the router point (G5).
+    assert c["by_chip"]["h200"] == {"points": 6, "graded": 5, "grades": {"G1": 0, "G2": 3, "G3": 0, "G4": 2, "G5": 1}}
     assert c["left_out_records"] == 3
     assert c["g5_reasons"] == {"field_not_modelled": 2, "not_in_catalog": 2, "router_unsupported": 1}
 
 
 def test_the_backlog_top_ranks_the_reasons_points_are_not_g1():
     top = _build()["backlog"]["top"]
-    assert top[0] == {"reason": "client_difference: send_gap", "points": 3}
+    # All nine graded points name the four conditions that are not graded yet, so those rank first.
+    assert top[:4] == [{"reason": f"{k}: not checked", "points": 9}
+                       for k in ("coefficient_range", "kernel_hash", "resolved_differs", "value_class")]
+    assert top[4] == {"reason": "client_difference: send_gap", "points": 3}
     assert {"reason": "G5 not_in_catalog: eagle3", "points": 2} in top and len(top) == 10
 
 
@@ -258,9 +263,34 @@ def test_the_validator_requires_one_simulator_for_every_point_of_a_summary():
     assert any("other than the provenance's" in p for p in vs2.problems(doc))
 
 
+def _build_with_a_g1_point():
+    """run-a with one G2 point made G1: its substitutions and client differences removed, its grade
+    column set. The scorer writes no G1 while grade.UNCHECKED_KINDS are not graded, so the
+    fixture holds none; the builder and the validator must still handle one."""
+    sys.path.insert(0, str(HERE / "ingest"))
+    import contract as c
+    d = Path(tempfile.mkdtemp()) / "run-a"
+    shutil.copytree(FIXTURE / "run-a", d)
+    recs = [json.loads(x) for x in (d / c.FIDELITY_JSONL).read_text().splitlines()]
+    pick = next(r for r in recs if r["grade"] == "G2")
+    pick.update(grade="G1", substitutions=[])
+    pick["requests"]["differences"] = []
+    (d / c.FIDELITY_JSONL).write_text("".join(c.canonical_dumps(r) + "\n" for r in recs))
+    text = (d / c.POINTS_CSV).read_text()
+    lines = text.splitlines(keepends=True)
+    col = lines[0].rstrip("\n").split(",").index("grade")
+    for i, ln in enumerate(lines[1:], 1):
+        cells = ln.rstrip("\n").split(",")
+        if cells[col + 1] == pick["point_id"]:
+            cells[col] = "G1"
+            lines[i] = ",".join(cells) + "\n"
+    (d / c.POINTS_CSV).write_text("".join(lines))
+    return b2.build(d, generated_at=STAMP, evaluator_commit="test")
+
+
 def test_the_validator_refuses_states_the_contract_forbids():
     import copy
-    base = _build()
+    base = _build_with_a_g1_point()
 
     def bad(mutate):
         doc = copy.deepcopy(base)

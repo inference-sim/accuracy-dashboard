@@ -49,6 +49,16 @@ G5_CODES = (
 # from the ones the run's client sent" (COV-12), which pointrecord has no kind for yet.
 G2_KINDS = ("coefficient_method", "coefficient_range", "execution_mode", "kernel_hash", "value_class",
             "estimated", "interim_status", "resolved_differs", "client_difference")
+
+# Four of design §11.3's G1 conditions cannot be checked yet, because no source carries the
+# datum: a library's kernel hash (the run's server log and launch configuration name library
+# versions at most, and the Result's selected-entry report carries set, name, method, scope and
+# file only), a coefficient lookup's extrapolated or unidentified range, a modelled field's value
+# class, and the resolved values the engine would choose. Each is named on every scored point as
+# a G2 substitution of its own kind, so no G1 and no G3 is published for a condition nobody
+# graded. A kind leaves this table when its condition is graded from data.
+NOT_CHECKED_SUBJECT = "not checked"
+UNCHECKED_KINDS = ("coefficient_range", "kernel_hash", "resolved_differs", "value_class")
 G34_KINDS = ("other_release", "changed_functions", "nightly_or_custom", "ported_functions_unpublished")
 
 PORTED_FUNCTIONS_UNPUBLISHED = "ported-function list not published"
@@ -92,6 +102,12 @@ class Graded:
     grade: str
     substitutions: list = field(default_factory=list)   # [{"kind", "subject", "detail"}], sorted
     g5: dict | None = None                               # {"code", "subject"} when G5
+
+
+def unchecked() -> list[dict]:
+    """The substitutions naming the G1 conditions that are not graded yet (UNCHECKED_KINDS)."""
+    return [{"kind": k, "subject": NOT_CHECKED_SUBJECT, "detail": f"{k} is not graded yet"}
+            for k in UNCHECKED_KINDS]
 
 
 def _sorted(subs: list[dict]) -> list[dict]:

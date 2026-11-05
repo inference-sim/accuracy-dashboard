@@ -865,8 +865,10 @@ def _prompt_lengths() -> ix.PromptLengthEvidence:
 def substitutions(o_subs: list[dict], fidelity: dict) -> list[dict]:
     """Every G2 substitution a scored point names (design §11.3): each one its settings named
     (an estimation rule applied, a field with a status allowed only during a release plan), and
-    each difference between the run's client and the simulated one (COV-12)."""
-    return list(o_subs) + list((fidelity.get("requests") or {}).get("differences") or [])
+    each difference between the run's client and the simulated one (COV-12). It also names, on
+    every point, each G1 condition that is not graded yet (grade.UNCHECKED_KINDS), so the scorer
+    publishes a G1 only when every condition has been checked."""
+    return list(o_subs) + list((fidelity.get("requests") or {}).get("differences") or []) + gr.unchecked()
 
 
 def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None) -> None:

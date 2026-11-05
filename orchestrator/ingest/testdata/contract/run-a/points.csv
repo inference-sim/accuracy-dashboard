@@ -3,8 +3,8 @@ deepseek-v4-pro-b200-fp4-vllm-tp8.yaml,deepseek-v4-pro,b200,8k1k,1,21500.0,20100
 deepseek-v4-pro-b200-fp4-vllm-tp8.yaml,deepseek-v4-pro,b200,8k1k,4,23800.0,22900.0,620000.0,590000.0,G2,f0f7e62ad6ea9e09f53396e6aa452ca358b726b6e473ce26f67ed39a9a00f5ce,2026-09-03
 deepseek-v4-pro-b200-fp4-vllm-tp8.yaml,deepseek-v4-pro,b200,8k1k,16,29600.0,30800.0,1340000.0,1450000.0,G2,43f2fa667be61739615a78e9229d367275169c2d269bf8424745df40d10ae47c,2026-09-03
 deepseek-v4.1-flash-b200-fp4-vllm-tp1-ep2-dp2-dspark5-agentx.yaml,deepseek-v4.1-flash,b200,agentx,8,5100.0,4447.0,1180000.0,1043900.0,G4,a18bae6a72af5bd78b30d45e0ebff7119ba4f87dded309b7aa9d26e8aecc7492,2026-10-03
-deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml,deepseek-v4.1-flash,h200,agentx,1,8100.0,7200.0,980000.0,1050000.0,G1,1bbb3ff5de3569ebf3687b780ac335e565bfa22acbb09ec37a0a120e3aa76357,2026-09-21
-deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml,deepseek-v4.1-flash,h200,agentx,2,8650.0,7700.0,1210000.0,1260000.0,G1,60ff4d8be33a50d998d6c44fc5843dd291b2353e5987bcc76a9896380bc71c15,2026-09-21
-deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml,deepseek-v4.1-flash,h200,agentx,4,9400.0,8550.0,1650000.0,1590000.0,G1,aea1341d6f453f1a20aa98212edff007ce436fcd770a5da6e6754281fca4115f,2026-09-21
+deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml,deepseek-v4.1-flash,h200,agentx,1,8100.0,7200.0,980000.0,1050000.0,G2,1bbb3ff5de3569ebf3687b780ac335e565bfa22acbb09ec37a0a120e3aa76357,2026-09-21
+deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml,deepseek-v4.1-flash,h200,agentx,2,8650.0,7700.0,1210000.0,1260000.0,G2,60ff4d8be33a50d998d6c44fc5843dd291b2353e5987bcc76a9896380bc71c15,2026-09-21
+deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml,deepseek-v4.1-flash,h200,agentx,4,9400.0,8550.0,1650000.0,1590000.0,G2,aea1341d6f453f1a20aa98212edff007ce436fcd770a5da6e6754281fca4115f,2026-09-21
 deepseek-v4.1-flash-h200-fp4-vllm-tp8-dspark5-agentx.yaml,deepseek-v4.1-flash,h200,agentx,1,6900.0,6100.0,760000.0,720000.0,G4,c82d02072bf078a7e9107ee4bc29c5a270038c72e6e76abcc6b0a91791816acc,2026-09-21
 minimax-m3-h200-fp8-vllm-tp8-agentx.yaml,minimax-m3,h200,agentx,4,11800.0,10900.0,1630000.0,1490000.0,G4,0ee56f7de59e054844f8f2b013e2cdbf80e97745123e6fd10f1df3492175dc94,2026-10-11

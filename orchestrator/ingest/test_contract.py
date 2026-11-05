@@ -38,6 +38,13 @@ def _write_lines(path: Path, rows: list[dict]) -> None:
     path.write_text("".join(c.canonical_dumps(r) + "\n" for r in rows))
 
 
+def _as_g1(rec: dict) -> dict:
+    """A G1 record, which the scorer publishes for no point until grade.UNCHECKED_KINDS are
+    graded: a G2 point of the scored release with its substitutions and client differences taken away."""
+    requests = {**rec["requests"], "differences": []} if "requests" in rec else None
+    return {**rec, "grade": "G1", "substitutions": [], **({"requests": requests} if requests else {})}
+
+
 # ------------------------------------------------------------------ identity + encoding
 
 def test_point_id_is_sha256_of_the_canonical_identity():
@@ -121,9 +128,15 @@ def test_fixture_run_b_shares_all_but_one_scored_point_with_run_a():
     assert dropped not in ids("run-b", c.NOT_SCORED_JSONL)
 
 
-def test_the_fixture_holds_every_graded_grade_but_g3_and_a_g5():
-    grades = {r["grade"] for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL)}
-    assert grades == {"G1", "G2", "G4"}
+def test_the_fixture_holds_g2_and_g4_but_no_g1_while_four_conditions_are_not_graded():
+    # Every scored point names the four G1 conditions nobody grades yet, so none is G1, and a G3
+    # (another release with no changed function) needs an engine that publishes its ported list.
+    recs = _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL)
+    assert {r["grade"] for r in recs} == {"G2", "G4"}
+    unchecked = [{"kind": k, "subject": "not checked", "detail": f"{k} is not graded yet"}
+                 for k in ("coefficient_range", "kernel_hash", "resolved_differs", "value_class")]
+    for r in recs:
+        assert [s for s in r["substitutions"] if s["subject"] == "not checked"] == unchecked, r["point_id"]
     assert {r["grade"] for r in _lines(FIXTURE / "run-a" / c.NOT_SCORED_JSONL)} == {"G5"}
 
 
@@ -219,10 +232,11 @@ def test_validator_requires_the_counts_to_sum_to_the_points():
 
 def test_validator_holds_each_grade_to_the_points_release():
     # COV-6: a point measured on another release is G3 or G4; one on the scored release is G1 or G2.
+    # (The fixture holds no G1; a G2 point stands for the pair.)
     d = _copy("run-a")
     rows = _lines(d / c.FIDELITY_JSONL)
-    g1 = next(r for r in rows if r["grade"] == "G1")
-    g1["run_release"] = "0.25.0"
+    g2 = next(r for r in rows if r["grade"] == "G2")
+    g2["run_release"] = "0.25.0"
     _write_lines(d / c.FIDELITY_JSONL, rows)
     assert any("COV-6" in p for p in c.validate_dir(d))
     d = _copy("run-a")
@@ -335,11 +349,13 @@ def test_fidelity_schema_ties_the_grade_to_its_substitutions():
     import jsonschema
     v = jsonschema.Draft7Validator(json.loads(c.FIDELITY_SCHEMA.read_text()))
     recs = [{k: x for k, x in r.items() if k != "point_id"} for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL)]
-    g1 = next(r for r in recs if r["grade"] == "G1")
     g2 = next(r for r in recs if r["grade"] == "G2")
+    g1 = _as_g1(g2)
     g4 = next(r for r in recs if r["grade"] == "G4")
     assert all(v.is_valid(r) for r in (g1, g2, g4))
     assert not v.is_valid({**g1, "substitutions": g2["substitutions"]})       # G1 names nothing
+    unchecked = [x for x in g2["substitutions"] if x["subject"] == "not checked"]
+    assert len(unchecked) == 4 and not v.is_valid({**g1, "substitutions": unchecked})   # a G1 names none
     assert not v.is_valid({**g2, "substitutions": []})                         # G2 names something
     assert not v.is_valid({**g2, "substitutions": g4["substitutions"]})        # another release is not G2
     assert not v.is_valid({**g4, "substitutions": g2["substitutions"]})        # G4 names the release or build
@@ -351,7 +367,8 @@ def test_fidelity_schema_ties_the_grade_to_its_substitutions():
 def test_an_estimated_build_is_scored_and_named():
     recs = [r for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL) if r["build"].get("why") == "custom_build"]
     assert len(recs) == 1 and recs[0]["grade"] == "G4" and recs[0]["run_release"] is None
-    assert [s["kind"] for s in recs[0]["substitutions"]] == ["nightly_or_custom"]
+    assert [s["kind"] for s in recs[0]["substitutions"]] == [
+        "coefficient_range", "kernel_hash", "nightly_or_custom", "resolved_differs", "value_class"]
 
 
 def test_validator_requires_every_provenance_key():
@@ -366,8 +383,8 @@ def test_validator_requires_every_provenance_key():
 def test_fidelity_schema_ties_match_to_its_fields():
     import jsonschema
     v = jsonschema.Draft7Validator(json.loads(c.FIDELITY_SCHEMA.read_text()))
-    rec = next({k: x for k, x in r.items() if k != "point_id"}
-               for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL) if r["grade"] == "G1")
+    rec = _as_g1(next({k: x for k, x in r.items() if k != "point_id"}
+                      for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL) if r["grade"] == "G2"))
     assert v.is_valid(rec)
     assert not v.is_valid({**rec, "reasons": ["blis_refused"]})               # a graded point has no reasons
     mapped = {"arg": "kernel_config.moe_backend", "measured": "x", "blis": "x", "match": "mapped"}
