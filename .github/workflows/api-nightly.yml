@@ -48,7 +48,7 @@ jobs:
       blis_tag: ${{ steps.r.outputs.blis_tag }}
       blis_tags: ${{ steps.r.outputs.blis_tags }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - id: r
         env:
           GH_TOKEN: ${{ github.token }}
@@ -63,14 +63,14 @@ jobs:
     # #15's 6 h budget. An IX-only night fetches only the delta and is minutes.
     timeout-minutes: 345
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: "1.27"
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.13"
-      - run: pip install --quiet jsonschema pyyaml
+      - run: pip install --quiet --require-hashes -r requirements-ci.txt
 
       # The ONLY thing cached across runs: the agentic artifact-download zips, keyed by artifact id
       # on disk (GitHubArtifacts.download). Ephemeral and NOT committed -- a cold cache just means a
@@ -78,7 +78,7 @@ jobs:
       # /server-log), so this holds only the agentic working set, well under the 10 GB cache limit.
       - name: Restore the artifact-download cache
         if: ${{ !inputs.ignore_cache }}
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ runner.temp }}/artifacts
           key: ix-artifacts-${{ github.run_id }}
@@ -186,7 +186,7 @@ jobs:
 
       - name: Package the published data for the publish job
         run: tar -czf data.tgz -C data . 2>/dev/null || tar -czf data.tgz --files-from /dev/null
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: night
           path: |
@@ -204,8 +204,8 @@ jobs:
       contents: write # commit data/ to main
       actions: write # dispatch the Pages deploy (the [skip ci] commit can't)
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: night
           path: incoming
@@ -226,7 +226,7 @@ jobs:
           python3 -c "import json,sys; json.load(open('newdata/index.json')); json.load(open('newdata/latest/summary.json'))"
           # COV-7: coverage and the blocker backlog are published every night beside accuracy. A
           # summary without its coverage, or a live view without backlog.json, is refused.
-          pip install --quiet jsonschema pyyaml
+          pip install --quiet --require-hashes -r requirements-ci.txt
           python3 orchestrator/validate_summary_v2.py newdata/latest/summary.json
           python3 - <<'PY'
           import json, sys

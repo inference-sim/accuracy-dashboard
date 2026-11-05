@@ -242,3 +242,30 @@ def test_the_real_path_scores_a_pre_release_tag_and_marks_its_figures_experiment
     assert p.returncode == 0, p.stderr
     prov = json.loads((out / "provenance.json").read_text())
     assert prov["simulator"]["build"] == "v0.16.0-rc1" and prov["experimental"] is True
+
+
+# ------------------------------------------------------------------ pinned workflows
+
+WORKFLOWS = sorted((HERE.parent / ".github" / "workflows").glob("*.yml"))
+
+
+def test_every_action_of_every_workflow_is_pinned_to_a_commit_with_its_version_in_a_comment():
+    assert len(WORKFLOWS) >= 4
+    for wf in WORKFLOWS:
+        uses = re.findall(r"^\s*-?\s*uses:\s*(\S+)(.*)$", wf.read_text(), re.M)
+        assert uses, wf
+        for ref, rest in uses:
+            assert re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", ref), f"{wf.name}: {ref} is not pinned to a commit SHA"
+            assert re.fullmatch(r"\s*# v\d+\.\d+\.\d+", rest), f"{wf.name}: {ref} has no version comment"
+
+
+def test_ci_installs_python_dependencies_only_from_the_hashed_requirements_file():
+    req = (HERE.parent / "requirements-ci.txt").read_text()
+    pins = [ln for ln in req.splitlines() if ln and not ln.startswith(("#", "-r"))]
+    assert {ln.split("==")[0] for ln in pins} >= {"pytest", "numpy"}
+    for ln in pins:
+        assert re.fullmatch(r"[\w.-]+==[\w.]+ --hash=sha256:[0-9a-f]{64}", ln), ln
+    assert "-r harness/requirements.txt" in req
+    for wf in WORKFLOWS:
+        for ln in re.findall(r"pip install[^\n]*", wf.read_text()):
+            assert "--require-hashes -r requirements-ci.txt" in ln, f"{wf.name}: {ln}"

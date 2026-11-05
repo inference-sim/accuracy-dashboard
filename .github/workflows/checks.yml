@@ -23,11 +23,11 @@ jobs:
   orchestrator:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.13"
-      - run: pip install --quiet jsonschema
+      - run: pip install --quiet --require-hashes -r requirements-ci.txt
       - name: Orchestrator arithmetic + self-consistency oracle + column contract
         run: python3 orchestrator/test_build_summary.py
       - name: Agentic replay arguments read from a row's CI and server logs
@@ -59,20 +59,20 @@ jobs:
           python3 orchestrator/validate_summary_v2.py web/testdata/render-fixture.v2.summary.json web/testdata/render-fixture.v2b.summary.json
       - name: Scoring harness entrypoint flags and its release workflow (design §11.7)
         run: |
-          pip install --quiet pytest pyyaml
+          pip install --quiet --require-hashes -r requirements-ci.txt
           python3 -m pytest -q harness/test_run_sh.py
       - name: vLLM build resolution + commit-distance gate (#28; not used by the nightly)
         run: python3 orchestrator/ingest/test_build.py
       - name: API ingest extractor - settings decided by the field list (COV-3), replay inputs, support, artifacts
         run: |
-          pip install --quiet pyyaml
+          pip install --quiet --require-hashes -r requirements-ci.txt
           python3 orchestrator/ingest/test_extract.py
           # points through score_point and write_contract, fake BLIS binaries (CI has no BLIS build)
           python3 orchestrator/ingest/test_score_e2e.py
       - name: API nightly pipeline - window, trigger table, no-storage merge, two-retention index, parallel pools, fabricated-release combos (#15)
         run: |
           # These use pytest fixtures (tmp_path, monkeypatch), unlike the older standalone scripts.
-          pip install --quiet pytest pyyaml numpy
+          pip install --quiet --require-hashes -r requirements-ci.txt
           python3 -m pytest -q \
             orchestrator/ingest/test_nightly.py \
             orchestrator/ingest/test_incremental.py \
@@ -100,8 +100,8 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
       - run: npm ci
@@ -134,7 +134,7 @@ jobs:
   grep-clean:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: No AISimulate / AIConfigurator / AIC in shipped code, config or data (RFC C1)
         run: |
           # The RFC + mockup legitimately reference the inspiration as prior art; the DASHBOARD's

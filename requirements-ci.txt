@@ -1,0 +1,13 @@
+# The Python dependencies CI installs, exact versions with the hashes of their wheels, installed with
+# `pip install --require-hashes -r requirements-ci.txt`. It adds pytest and numpy (and pytest's
+# dependencies) to the harness's own list. The hashes are of the CPython 3.13 wheels for linux x86_64
+# (ubuntu-latest). Regenerate with `pip download --no-deps --only-binary=:all: --python-version 3.13
+# --implementation cp --abi cp313 --platform manylinux_2_28_x86_64 --platform any <name>==<version>`
+# and `pip hash` of each wheel.
+-r harness/requirements.txt
+iniconfig==2.3.1 --hash=sha256:9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7
+numpy==2.5.4 --hash=sha256:6ffa07666f8da0eef81d149934a626d0d95fbd6838432a33e66245423a9062c0
+packaging==26.3 --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
+pluggy==1.7.0 --hash=sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec
+pygments==2.21.0 --hash=sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9
+pytest==9.2.0 --hash=sha256:07acdcf88ec174f907dc01af70bf52d49b014bbab03faeeade31c96b18c2e588
