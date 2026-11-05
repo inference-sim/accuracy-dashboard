@@ -111,14 +111,40 @@ def unscored_releases(tags_in_tag_order: list[str], scored: set[str], first: str
     return [t for t in tags_in_tag_order if _TAG.match(t) and _version(t) >= floor and t not in scored]
 
 
-def published_releases(snapshot_dirs: list[str]) -> set[str]:
-    """The simulator releases that have published scores: data/snapshots/<date>_blis-<tag>_<ix>."""
-    out = set()
-    for name in snapshot_dirs:
-        m = re.match(r"^\d{4}-\d{2}-\d{2}_blis-(v[^_]+)_", name)
-        if m:
-            out.add(m.group(1))
-    return out
+SCORED_KIND = "ScoredReleases"
+
+
+def read_scored(path) -> list[str]:
+    """The simulator releases whose scores are published (state/scored-releases.json), in the
+    order they were recorded. A missing or malformed file is an error: an empty list would make
+    the night score every release again (COV-9)."""
+    try:
+        doc = json.loads(Path(path).read_text())
+    except OSError as e:
+        raise StackError(f"{path}: {e.strerror or e}") from e
+    except json.JSONDecodeError as e:
+        raise StackError(f"{path}: not JSON: {e}") from e
+    if not isinstance(doc, dict) or set(doc) != {"kind", "releases"} or doc["kind"] != SCORED_KIND:
+        raise StackError(f"{path}: want an object with exactly kind {SCORED_KIND!r} and releases")
+    rel = doc["releases"]
+    if not isinstance(rel, list) or any(not isinstance(t, str) or not _TAG.match(t) for t in rel):
+        raise StackError(f"{path}: releases must be a list of stable release tags vX.Y.Z")
+    if len(set(rel)) != len(rel):
+        raise StackError(f"{path}: a release is listed twice; each is scored once (COV-9)")
+    return rel
+
+
+def record_scored(path, tag: str) -> bool:
+    """Append `tag` to the list of releases whose scores are published, once: False, with the file
+    untouched, when it is already there. The list is append-only and independent of the snapshots
+    on disk, so pruning old snapshots (update_index.py) never makes a release look unscored. The
+    previous release's scores stay published (design §11.5)."""
+    _version(tag)
+    rel = read_scored(path)
+    if tag in rel:
+        return False
+    Path(path).write_text(json.dumps({"kind": SCORED_KIND, "releases": rel + [tag]}, indent=2) + "\n")
+    return True
 
 
 # The first simulator release scored on graded points and stack.json: every stable release from
@@ -128,18 +154,21 @@ FIRST_GRADED_RELEASE = "v0.16.0"
 
 def main(argv=None) -> int:
     """Print, one per line in tag order, the simulator releases a night scores (COV-9): every
-    stable release from FIRST_GRADED_RELEASE on with no published snapshot under --data-dir.
+    stable release from FIRST_GRADED_RELEASE on that state/scored-releases.json does not list.
 
-        python3 orchestrator/ingest/stack.py --tags TAGS --data-dir data
+        python3 orchestrator/ingest/stack.py --tags TAGS --scored state/scored-releases.json
     """
     ap = argparse.ArgumentParser(description=main.__doc__)
     ap.add_argument("--tags", required=True, help="inference-sim tags, one per line, in the order they were tagged")
-    ap.add_argument("--data-dir", required=True, help="the published data tree (its snapshots/)")
+    ap.add_argument("--scored", required=True, help="state/scored-releases.json: the releases with published scores")
     a = ap.parse_args(argv)
     tags = [t.strip() for t in Path(a.tags).read_text().splitlines() if t.strip()]
-    snaps = Path(a.data_dir) / "snapshots"
-    names = [p.name for p in snaps.iterdir()] if snaps.is_dir() else []
-    for t in unscored_releases(tags, published_releases(names), FIRST_GRADED_RELEASE):
+    try:
+        scored = set(read_scored(a.scored))
+    except StackError as e:
+        print(f"FATAL: {e}", file=sys.stderr)
+        return 1
+    for t in unscored_releases(tags, scored, FIRST_GRADED_RELEASE):
         print(t)
     return 0
 

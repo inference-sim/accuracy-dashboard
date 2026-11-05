@@ -13,8 +13,8 @@ two-retention index -- into the sequence a CI night runs (no raw store; summary.
      build the v2 summary.
   5. A run that scored zero points becomes a no-op (the dashboard never blanks out).
   6. Publish: always refresh the live view; on a BLIS release also freeze a diffable snapshot.
-     Rebuild the index (count-based last-5 API snapshots; dump snapshots untouched) and record
-     tonight's state.
+     Rebuild the index (count-based last-5 API snapshots; dump snapshots untouched), record
+     tonight's state, and list a release whose snapshot was frozen as scored (stack.record_scored).
 
 The expensive, infrastructure-bound steps (the pull's network, BLIS scoring) are injected as
 `pull_fn` and `score_build_fn`, so this orchestration is tested with fakes -- no network, no BLIS,
@@ -34,6 +34,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 import nightly as nt  # noqa: E402
+import stack as sk  # noqa: E402
 import pull as pl  # noqa: E402
 import update_index as ui  # noqa: E402
 
@@ -73,7 +74,7 @@ def snapshot_id(snapshot_date: str, blis_tag: str, pull_date: str) -> str:
 
 
 def run_night(today: date, blis_tag: str, *, work_dir: Path, data_dir: Path, state_path: Path,
-              pull_fn, score_build_fn, backlog_fn, snapshot_date: str, keep_api: int = 5) -> NightResult:
+              scored_path: Path, pull_fn, score_build_fn, backlog_fn, snapshot_date: str, keep_api: int = 5) -> NightResult:
     """One night of the no-storage pipeline (Discussion #15, revised 2026-10-25). Nothing raw is
     persisted: `work_dir` is this run's ephemeral pull, discarded after. Trigger detection reads
     last night's point-id SET from `state_path` (tiny; no raw store needed), so an IX release or an
@@ -87,6 +88,7 @@ def run_night(today: date, blis_tag: str, *, work_dir: Path, data_dir: Path, sta
     summary (merging into the prior published summary on an IX-only night). `backlog_fn(summary)`
     is the backlog published beside it (build_summary_v2.backlog_of)."""
     work_dir, data_dir, state_path = Path(work_dir), Path(data_dir), Path(state_path)
+    scored_path = Path(scored_path)
     state = _read_state(state_path)
     last_ids = set(state.get("point_ids") or [])
     last_blis = state.get("blis_tag")
@@ -129,6 +131,10 @@ def run_night(today: date, blis_tag: str, *, work_dir: Path, data_dir: Path, sta
         _write_summary(data_dir / "latest" / "summary.json", summary)
         published = True
     _write_state(state_path, blis_tag, snap_id, sorted(window_ids))
+    if decision.freeze_snapshot and published:
+        # Last, and only when the release's scores are published: the list is what the next night
+        # reads to know this release has scores (COV-9).
+        sk.record_scored(scored_path, blis_tag)
     return NightResult(decision, snapshot_id=snap_id if decision.freeze_snapshot else None,
                        scored=scored, published=published)
 

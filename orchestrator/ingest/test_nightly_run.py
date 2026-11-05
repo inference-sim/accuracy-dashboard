@@ -20,6 +20,7 @@ import nightly as nt  # noqa: E402
 import nightly_run as nr  # noqa: E402
 import pull as pl  # noqa: E402
 import contract as c  # noqa: E402
+import stack as sk  # noqa: E402
 
 
 # ---------------------------------------------------------------- fakes
@@ -91,9 +92,12 @@ def _fake_summary(entries, blis_tag, pull_date):
 
 
 def _run(world, tmp, today, blis_tag, keep_api=5):
+    scored = tmp / "scored-releases.json"
+    if not scored.exists():
+        scored.write_text(json.dumps({"kind": "ScoredReleases", "releases": []}))
     return nr.run_night(date.fromisoformat(today), blis_tag,
                         work_dir=tmp / "work", data_dir=tmp / "data",
-                        state_path=tmp / "state.json",
+                        state_path=tmp / "state.json", scored_path=tmp / "scored-releases.json",
                         pull_fn=world.pull, score_build_fn=world.score,
                         backlog_fn=lambda s: {"kind": "Backlog", "snapshot_id": s["snapshot_id"], "engines": {}},
                         snapshot_date=today, keep_api=keep_api)
@@ -235,6 +239,39 @@ def test_sixth_api_release_prunes_oldest_api_never_a_dump(tmp_path):
     assert not any("v0.11.0" in i for i in api_ids)        # the oldest API snapshot was pruned
     assert dump_id in ids                                  # the dump snapshot survived
     assert (tmp_path / "data" / "snapshots" / dump_id).exists()
+
+
+def test_a_pruned_release_stays_scored_and_a_release_is_appended_exactly_once(tmp_path):
+    # COV-9, design 11.5: six releases with keep_api=5 prune the oldest snapshot, but the list of
+    # scored releases keeps all six, so no night scores the pruned one again.
+    w = World()
+    w.rows = [("m", 1, "2026-10-01")]
+    tags = ["v0.11.0", "v0.12.0", "v0.13.0", "v0.14.0", "v0.15.0", "v0.16.0"]
+    for i, tag in enumerate(tags):
+        _run(w, tmp_path, f"2026-10-0{i+2}", tag, keep_api=5)
+    assert not any("v0.11.0" in e["snapshot_id"] for e in _index(tmp_path)["runs"])   # pruned
+    scored = tmp_path / "scored-releases.json"
+    assert sk.read_scored(scored) == tags
+    assert sk.unscored_releases(tags, set(sk.read_scored(scored)), "v0.11.0") == []
+    # An IX-only night and a no-op night under the same release append nothing.
+    w.rows = [("m", 1, "2026-10-01"), ("m", 2, "2026-10-09")]
+    assert _run(w, tmp_path, "2026-10-10", "v0.16.0").action == nt.IX_ONLY
+    assert _run(w, tmp_path, "2026-10-11", "v0.16.0").decision.is_noop
+    assert sk.read_scored(scored) == tags
+
+
+def test_a_release_whose_scores_are_not_published_is_not_listed(tmp_path):
+    w = World()
+    w.rows = [("m", 1, "2026-10-01")]
+    _run(w, tmp_path, "2026-10-02", "v0.11.0")
+    def failing(*a, **k):
+        raise RuntimeError("score failed")
+    w.score = failing
+    try:
+        _run(w, tmp_path, "2026-10-03", "v0.12.0")
+    except RuntimeError:
+        pass
+    assert sk.read_scored(tmp_path / "scored-releases.json") == ["v0.11.0"]
 
 
 def test_seed_rescore_is_byte_identical(tmp_path):

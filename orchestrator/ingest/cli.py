@@ -483,7 +483,7 @@ def cmd_nightly(a) -> int:
         return summary, summary["coverage"]["graded"]
 
     res = nr.run_night(today, a.blis_tag, work_dir=work_dir, data_dir=data_dir, state_path=state_path,
-                       pull_fn=pull_fn, score_build_fn=score_build_fn,
+                       scored_path=Path(a.scored), pull_fn=pull_fn, score_build_fn=score_build_fn,
                        snapshot_date=a.today or today.isoformat(), keep_api=a.keep_api,
                        backlog_fn=bsv2.backlog_of)
     _log(f"nightly: {res.action} -- {res.decision.reason}")
@@ -544,6 +544,8 @@ def main(argv=None) -> int:
     n.add_argument("--work-dir", required=True, help="ephemeral dir for this night's pull (never persisted)")
     n.add_argument("--data-dir", required=True, help="the published data tree (latest/, snapshots/, index.json)")
     n.add_argument("--state", required=True, help="state/last-run.json for the API pipeline")
+    n.add_argument("--scored", required=True, help="state/scored-releases.json: the releases with published scores; "
+                                                   "this night appends its release when it publishes the scores")
     n.add_argument("--window-days", type=int, default=180)
     n.add_argument("--keep-api", type=int, default=5)
     n.add_argument("--today")

@@ -44,21 +44,52 @@ def test_every_unscored_release_from_the_first_on_is_scored_once_in_tag_order():
         sk.unscored_releases(tags, set(), "0.16")
 
 
-def test_the_published_releases_are_read_from_the_snapshot_names():
-    names = ["2026-10-19_blis-v0.10.0_ix-2026-09-28", "2026-10-31_blis-v0.15.0_ix-api-2026-10-31", "README"]
-    assert sk.published_releases(names) == {"v0.10.0", "v0.15.0"}
+def _scored(tmp_path, releases):
+    p = tmp_path / "scored-releases.json"
+    p.write_text(json.dumps({"kind": "ScoredReleases", "releases": releases}))
+    return p
+
+
+def test_a_release_is_recorded_once_and_the_list_only_grows(tmp_path):
+    p = _scored(tmp_path, ["v0.15.0"])
+    assert sk.record_scored(p, "v0.16.0") is True
+    assert sk.record_scored(p, "v0.16.0") is False
+    assert sk.read_scored(p) == ["v0.15.0", "v0.16.0"]
+    with pytest.raises(sk.StackError, match="not a stable release tag"):
+        sk.record_scored(p, "v0.17.0-rc1")
+
+
+def test_the_list_is_read_strictly_and_a_missing_one_is_an_error_not_an_empty_list(tmp_path):
+    with pytest.raises(sk.StackError, match="scored-releases.json"):
+        sk.read_scored(tmp_path / "scored-releases.json")
+    for doc in ('{"kind": "ScoredReleases"}', '{"kind": "Other", "releases": []}', '[]', 'x',
+                '{"kind": "ScoredReleases", "releases": ["main"]}',
+                '{"kind": "ScoredReleases", "releases": ["v0.15.0", "v0.15.0"]}'):
+        (tmp_path / "bad.json").write_text(doc)
+        with pytest.raises(sk.StackError):
+            sk.read_scored(tmp_path / "bad.json")
 
 
 def test_the_command_lists_every_unscored_stable_release_from_v0_16_0_oldest_first(tmp_path, capsys):
     tags = tmp_path / "tags.txt"
     tags.write_text("v0.15.0\nv0.16.0-rc1\nv0.16.0\nv0.17.0\n")
-    snaps = tmp_path / "data" / "snapshots"
-    (snaps / "2026-10-31_blis-v0.15.0_ix-api-2026-10-31").mkdir(parents=True)
-    assert sk.main(["--tags", str(tags), "--data-dir", str(tmp_path / "data")]) == 0
+    scored = _scored(tmp_path, ["v0.15.0"])
+    assert sk.main(["--tags", str(tags), "--scored", str(scored)]) == 0
     assert capsys.readouterr().out.split() == ["v0.16.0", "v0.17.0"]
-    (snaps / "2026-11-10_blis-v0.16.0_ix-api-2026-11-10").mkdir()
-    sk.main(["--tags", str(tags), "--data-dir", str(tmp_path / "data")])
+    sk.record_scored(scored, "v0.16.0")
+    sk.main(["--tags", str(tags), "--scored", str(scored)])
     assert capsys.readouterr().out.split() == ["v0.17.0"]
+    assert sk.main(["--tags", str(tags), "--scored", str(tmp_path / "none.json")]) == 1
+
+
+def test_the_committed_list_holds_every_release_with_a_published_snapshot():
+    # Seeded from data/snapshots and data/index.json (v0.10.0 to v0.15.0).
+    import re
+    data = ROOT.parent / "data"
+    in_dirs = {re.match(r"^\d{4}-\d{2}-\d{2}_blis-(v[^_]+)_", p.name).group(1) for p in (data / "snapshots").iterdir()}
+    in_index = {r["blis_release"] for r in json.loads((data / "index.json").read_text())["runs"]}
+    assert in_dirs == in_index
+    assert set(sk.read_scored(ROOT.parent / "state" / "scored-releases.json")) >= in_dirs
 
 
 # ------------------------------------------------------------------ what a release is scored with

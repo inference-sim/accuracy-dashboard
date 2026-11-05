@@ -14,8 +14,9 @@ name: api-nightly
 #     view; no snapshot/diff;
 #   * a BLIS release (a new stable inference-sim tag) -> re-fetch+rescore the whole window, freeze a
 #     snapshot, allow a diff. Agentic points whose artifacts expired (>90d) drop to not-scored.
-#     Every stable release from v0.16.0 on that has no published snapshot is scored once, oldest
-#     first, one after another in one run (COV-9; resolve_blis.sh).
+#     Every stable release from v0.16.0 on that state/scored-releases.json does not list is scored
+#     once, oldest first, one after another in one run (COV-9; resolve_blis.sh). A release is
+#     listed when its scores are published, and the list never shrinks when old snapshots are pruned.
 # A no-op night (neither trigger) writes nothing and the last good view stands.
 on:
   schedule:
@@ -169,6 +170,7 @@ jobs:
             python3 orchestrator/ingest/cli.py nightly \
               --blis-tag "$BLIS_TAG" \
               --work-dir "$RUNNER_TEMP/pull" --data-dir data --state state/last-run-api.json \
+              --scored state/scored-releases.json \
               --window-days "$WINDOW_DAYS" --keep-api "$KEEP_API" \
               --today "$TODAY" \
               --workers 4 --agentic-workers 1 --download-workers 4 --max-rss-mb 13000 \
@@ -190,6 +192,7 @@ jobs:
           path: |
             data.tgz
             state/last-run-api.json
+            state/scored-releases.json
           if-no-files-found: warn
 
   # ----------------------------------------------------------------- 3. publish (hosted-safe)
@@ -283,10 +286,18 @@ jobs:
             echo "FATAL: run-night produced data but no state file at $STATE_IN — refusing to publish data without its state"
             exit 1
           fi
-          mkdir -p state; cp "$STATE_IN" state/last-run-api.json
+          # The list of releases with published scores is committed with the rest of state/. It
+          # is append-only and independent of the snapshots retained (COV-9), so it comes from
+          # the night as it is; a missing one is a hard error for the same reason.
+          SCORED_IN="incoming/state/scored-releases.json"
+          if [ ! -f "$SCORED_IN" ]; then
+            echo "FATAL: run-night produced data but no scored-releases list at $SCORED_IN — refusing to publish"
+            exit 1
+          fi
+          mkdir -p state; cp "$STATE_IN" state/last-run-api.json; cp "$SCORED_IN" state/scored-releases.json
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A data state/last-run-api.json
+          git add -A data state/last-run-api.json state/scored-releases.json
           if git commit -m "api-nightly: ${{ needs.resolve.outputs.blis_tag }} $(date -u +%F) [skip ci]"; then
             # A long rescore can finish after another commit landed on main; rebase onto it so the
             # push doesn't fail and lose the night. Our commit only touches data/ + state/, which no

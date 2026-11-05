@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Resolve the simulator releases a night scores (COV-9; Discussion #15, "How the triggers are
 # detected"). Every stable inference-sim release, in the order they were tagged, from the first
-# one scored on graded points (stack.py FIRST_GRADED_RELEASE) on, that has no published snapshot
-# under data/snapshots/*_blis-<tag>_*, is scored once, oldest first. When every such release has
+# one scored on graded points (stack.py FIRST_GRADED_RELEASE) on, that state/scored-releases.json
+# does not list, is scored once, oldest first. The list is append-only and does not depend on which
+# snapshots are retained. When every such release has
 # its scores, the night scores the newest stable release's IX-only delta (a new point id), as
 # before. There is no IX_TAG to resolve: the InferenceX data is pulled live from the API.
 #
@@ -25,7 +26,7 @@ if [[ -z "${NEWEST}" ]]; then
   exit 1
 fi
 
-UNSCORED=$(python3 "$here/ingest/stack.py" --tags "$tags" --data-dir "$here/../data" | tr '\n' ' ' | sed 's/ *$//')
+UNSCORED=$(python3 "$here/ingest/stack.py" --tags "$tags" --scored "$here/../state/scored-releases.json" | tr '\n' ' ' | sed 's/ *$//')
 TONIGHT="${UNSCORED:-$NEWEST}"
 
 echo "blis_tags=${TONIGHT}" | tee -a "$out"

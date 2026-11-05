@@ -22,7 +22,7 @@ import ledger_fake  # noqa: E402
 
 def _args(tmp, **over):
     a = dict(blis_tag="v0.12.0", work_dir=str(tmp / "work"), data_dir=str(tmp / "data"),
-             state=str(tmp / "state.json"), window_days=180, keep_api=5, today="2026-10-23",
+             state=str(tmp / "state.json"), scored=str(tmp / "scored-releases.json"), window_days=180, keep_api=5, today="2026-10-23",
              cache=None, work=str(tmp / "contract"), score_work=str(tmp / "sw"), evaluator_commit="abc",
              blis=str(tmp / "sim" / "blis"), catalog=str(tmp / "cat"), registry=str(tmp / "reg"),
              fields=str(tmp / "fields.json"),
@@ -31,6 +31,8 @@ def _args(tmp, **over):
              timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0, stack=None,
              ledger=str(tmp / "ledger"))
     a.update(over)
+    if not Path(a["scored"]).exists():
+        Path(a["scored"]).write_text(json.dumps({"kind": "ScoredReleases", "releases": []}))
     return types.SimpleNamespace(**a)
 
 
@@ -247,8 +249,9 @@ def test_a_build_with_no_stack_json_is_refused_with_why(tmp_path):
 
 
 def test_resolve_blis_names_every_unscored_release_oldest_first_else_the_newest(tmp_path):
-    # COV-9: resolve_blis.sh lists every stable release from v0.16.0 on with no published
-    # snapshot, in tag order; with none left, it scores the newest release's delta.
+    # COV-9: resolve_blis.sh lists every stable release from v0.16.0 on that
+    # state/scored-releases.json does not list, in tag order; with none left, it scores the
+    # newest release's delta.
     import subprocess
     root = Path(__file__).resolve().parent.parent
     bin_ = tmp_path / "bin"
@@ -274,13 +277,16 @@ def test_resolve_blis_names_every_unscored_release_oldest_first_else_the_newest(
         return dict(line.split("=", 1) for line in out.read_text().splitlines())
     import shutil
     shutil.copytree(root, tmp_path / "repo" / "orchestrator", ignore=shutil.ignore_patterns("testdata", "__pycache__"))
-    snaps = tmp_path / "repo" / "data" / "snapshots"
-    (snaps / "2026-10-31_blis-v0.15.0_ix-api-2026-10-31").mkdir(parents=True)
+    state = tmp_path / "repo" / "state"
+    state.mkdir()
+
+    def listed(*tags):
+        (state / "scored-releases.json").write_text(json.dumps({"kind": "ScoredReleases", "releases": list(tags)}))
+    listed("v0.15.0")
     import sys as _sys
     (bin_ / "python3").symlink_to(_sys.executable)
     assert run() == {"blis_tags": "v0.16.0 v0.17.0", "blis_tag": "v0.17.0"}
-    (snaps / "2026-11-11_blis-v0.16.0_ix-api-2026-11-11").mkdir()
-    (snaps / "2026-12-02_blis-v0.17.0_ix-api-2026-12-02").mkdir()
+    listed("v0.15.0", "v0.16.0", "v0.17.0")
     assert run() == {"blis_tags": "v0.17.0", "blis_tag": "v0.17.0"}
 
 
