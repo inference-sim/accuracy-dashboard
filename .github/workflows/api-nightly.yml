@@ -99,6 +99,19 @@ jobs:
           git clone -q --depth 1 --branch "$catalog"  https://github.com/inference-sim/blis-catalog.git  "$RUNNER_TEMP/catalog"
           git clone -q --depth 1 --branch "$registry" https://github.com/inference-sim/blis-registry.git "$RUNNER_TEMP/registry"
           bash orchestrator/build_blisdefaults.sh "$SIM" "$RUNNER_TEMP/blisdefaults"
+          # The ledger at the blis-substrate commit this release pins: every point is one of its
+          # units (design §10.2). TEMPORARY until `blis ledger --list` (inference-sim m1/substrate)
+          # prints the unit list; the job then reads it from the simulator.
+          substrate=$(awk '$1=="github.com/inference-sim/blis-substrate" {print $2; exit}' "$SIM/go.mod")
+          if [ -n "$substrate" ]; then
+            ref="${substrate##*-}"
+            git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
+            git -C "$RUNNER_TEMP/substrate" checkout -q "$ref"
+            echo "LEDGER=$RUNNER_TEMP/substrate/catalog/ledger" >> "$GITHUB_ENV"
+          else
+            echo "FATAL: $BLIS_TAG pins no blis-substrate, so it has no ledger to name its points" >&2
+            exit 1
+          fi
           echo "SIM=$SIM" >> "$GITHUB_ENV"
           echo "CATALOG=$RUNNER_TEMP/catalog" >> "$GITHUB_ENV"
           echo "REGISTRY=$RUNNER_TEMP/registry" >> "$GITHUB_ENV"
@@ -163,6 +176,7 @@ jobs:
             --cache "$RUNNER_TEMP/artifacts" --corpus-cache "$RUNNER_TEMP/corpus-cache" \
             --work "$RUNNER_TEMP/contract" --score-work "$RUNNER_TEMP/scorework" \
             --evaluator-commit "$GITHUB_SHA" \
+            --ledger "$LEDGER" \
             --blis-dir "$SIM" --catalog "$CATALOG" --registry "$REGISTRY" \
             --defaults-helper "$DEFAULTS_HELPER" --signedprobe "$SIGNEDPROBE" \
             --corpus "$RUNNER_TEMP/corpus.json" --corpus-revision "$CORPUS_REVISION"

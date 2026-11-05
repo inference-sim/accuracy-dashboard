@@ -101,11 +101,12 @@ def plan_night(window_ids: set[str], last_ids: set[str], blis_tag: str,
                     reason=f"no new points, none aged out, BLIS still {blis_tag}: nothing to do")
 
 
-# A config is a measurement's identity with the date removed: one deployment (model, hardware,
-# precision, framework, recipe) at one concurrency and benchmark type. Two measurements of the
-# same config on different days are the same config, the newer superseding the older in the live
+# A config is a measurement's identity without its measured date and benchmark run: one
+# deployment (model, hardware, precision, framework, configuration hash, recipe fingerprint) at
+# one concurrency and benchmark type. Two measurements of the same config, on different days or
+# in different benchmark runs, are the same config, the newer superseding the older in the live
 # view (Discussion #15, Decided: "the live view shows the latest result per config").
-CONFIG_FIELDS = tuple(f for f in contract.IDENTITY_FIELDS if f != "measured_date")
+CONFIG_FIELDS = tuple(f for f in contract.IDENTITY_FIELDS if f not in ("measured_date", "benchmark_run"))
 
 
 def config_key(identity: dict) -> tuple:

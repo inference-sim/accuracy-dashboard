@@ -258,16 +258,19 @@
                         "ttft": null,
                         "tpot": null
                       },
-                      "point_id": "5a3fb11cd356440830825ea12907fc10ef0a7ae029a199142914ac989954fcc4",
+                      "point_id": "151265f6a3a9b4d5945acafa7a9b744d4a5bbae6a396d9d59b794d4ebadc431d",
                       "identity": {
+                        "benchmark_run": 2301,
                         "benchmark_type": "single_turn",
                         "conc": 1,
+                        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
                         "framework": "vllm",
                         "hardware": "b200",
                         "measured_date": "2026-09-03",
                         "model": "dsv4",
                         "precision": "fp4",
-                        "recipe": "d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1"
+                        "recipe_fingerprint": "d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1",
+                        "source": "inferencex"
                       },
                       "sweep_id": "2301|deepseek-v4-pro-b200-fp4-vllm-tp8.yaml|8k1k",
                       "measured_date": "2026-09-03",
@@ -335,16 +338,19 @@
                         "ttft": 2.674,
                         "tpot": 2.9203
                       },
-                      "point_id": "a7952faab9382b04aa735bdbc410f3f218d77a6b78a8413922d68fbd3caab011",
+                      "point_id": "f0f7e62ad6ea9e09f53396e6aa452ca358b726b6e473ce26f67ed39a9a00f5ce",
                       "identity": {
+                        "benchmark_run": 2301,
                         "benchmark_type": "single_turn",
                         "conc": 4,
+                        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
                         "framework": "vllm",
                         "hardware": "b200",
                         "measured_date": "2026-09-03",
                         "model": "dsv4",
                         "precision": "fp4",
-                        "recipe": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4"
+                        "recipe_fingerprint": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+                        "source": "inferencex"
                       },
                       "sweep_id": "2301|deepseek-v4-pro-b200-fp4-vllm-tp8.yaml|8k1k",
                       "measured_date": "2026-09-03",
@@ -412,16 +418,19 @@
                         "ttft": 16.7518,
                         "tpot": 11.3016
                       },
-                      "point_id": "a9d41834f0f7b8a82753aa70b443a591e2d0b72c8fca74d827de0dfd1660bb8e",
+                      "point_id": "43f2fa667be61739615a78e9229d367275169c2d269bf8424745df40d10ae47c",
                       "identity": {
+                        "benchmark_run": 2301,
                         "benchmark_type": "single_turn",
                         "conc": 16,
+                        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
                         "framework": "vllm",
                         "hardware": "b200",
                         "measured_date": "2026-09-03",
                         "model": "dsv4",
                         "precision": "fp4",
-                        "recipe": "dfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdf"
+                        "recipe_fingerprint": "dfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdf",
+                        "source": "inferencex"
                       },
                       "sweep_id": "2301|deepseek-v4-pro-b200-fp4-vllm-tp8.yaml|8k1k",
                       "measured_date": "2026-09-03",
@@ -656,16 +665,19 @@
                       },
                       "shape": null,
                       "shape_reason": "< 3 concurrencies",
-                      "point_id": "056cddbc496b43ff186e51b634dfbbfd07867f347482ff62d5d8b1391873a77d",
+                      "point_id": "a18bae6a72af5bd78b30d45e0ebff7119ba4f87dded309b7aa9d26e8aecc7492",
                       "identity": {
+                        "benchmark_run": 2560,
                         "benchmark_type": "agentic_traces",
                         "conc": 8,
+                        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
                         "framework": "vllm",
                         "hardware": "b200",
                         "measured_date": "2026-10-03",
                         "model": "dsv41flash",
                         "precision": "fp4",
-                        "recipe": "c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8"
+                        "recipe_fingerprint": "c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8",
+                        "source": "inferencex"
                       },
                       "sweep_id": "2560|deepseek-v4.1-flash-b200-fp4-vllm-tp1-ep2-dp2-dspark5-agentx.yaml|agentx",
                       "measured_date": "2026-10-03",
@@ -890,16 +902,19 @@
                         "ttft": null,
                         "tpot": null
                       },
-                      "point_id": "ce649d8e02c65226590e9df810e594539b495a295d46ce659722a81c28071356",
+                      "point_id": "1bbb3ff5de3569ebf3687b780ac335e565bfa22acbb09ec37a0a120e3aa76357",
                       "identity": {
+                        "benchmark_run": 2410,
                         "benchmark_type": "agentic_traces",
                         "conc": 1,
+                        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
                         "framework": "vllm",
                         "hardware": "h200",
                         "measured_date": "2026-09-21",
                         "model": "dsv41flash",
                         "precision": "fp4",
-                        "recipe": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+                        "recipe_fingerprint": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+                        "source": "inferencex"
                       },
                       "sweep_id": "2410|deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml|agentx",
                       "measured_date": "2026-09-21",
@@ -984,16 +999,19 @@
                         "ttft": -2.8099,
                         "tpot": 0.1445
                       },
-                      "point_id": "1cde80e14072cec25522c9361237fa84fea0c561f80f8126278281145c38db79",
+                      "point_id": "60ff4d8be33a50d998d6c44fc5843dd291b2353e5987bcc76a9896380bc71c15",
                       "identity": {
+                        "benchmark_run": 2410,
                         "benchmark_type": "agentic_traces",
                         "conc": 2,
+                        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
                         "framework": "vllm",
                         "hardware": "h200",
                         "measured_date": "2026-09-21",
                         "model": "dsv41flash",
                         "precision": "fp4",
-                        "recipe": "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2"
+                        "recipe_fingerprint": "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2",
+                        "source": "inferencex"
                       },
                       "sweep_id": "2410|deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml|agentx",
                       "measured_date": "2026-09-21",
@@ -1078,16 +1096,19 @@
                         "ttft": -10.0606,
                         "tpot": 2.3271
                       },
-                      "point_id": "553a53676cb345f42e9745446b737a2cc806b750008f587282003b2a939e4225",
+                      "point_id": "aea1341d6f453f1a20aa98212edff007ce436fcd770a5da6e6754281fca4115f",
                       "identity": {
+                        "benchmark_run": 2410,
                         "benchmark_type": "agentic_traces",
                         "conc": 4,
+                        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
                         "framework": "vllm",
                         "hardware": "h200",
                         "measured_date": "2026-09-21",
                         "model": "dsv41flash",
                         "precision": "fp4",
-                        "recipe": "a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4"
+                        "recipe_fingerprint": "a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4",
+                        "source": "inferencex"
                       },
                       "sweep_id": "2410|deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml|agentx",
                       "measured_date": "2026-09-21",
@@ -1220,16 +1241,19 @@
                       },
                       "shape": null,
                       "shape_reason": "< 3 concurrencies",
-                      "point_id": "59ed3ce626c2e97bbbf9de5d2b194d7dbf8b1b0430a74ef95dc3dff6f3e39723",
+                      "point_id": "c82d02072bf078a7e9107ee4bc29c5a270038c72e6e76abcc6b0a91791816acc",
                       "identity": {
+                        "benchmark_run": 2410,
                         "benchmark_type": "agentic_traces",
                         "conc": 1,
+                        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
                         "framework": "vllm",
                         "hardware": "h200",
                         "measured_date": "2026-09-21",
                         "model": "dsv41flash",
                         "precision": "fp4",
-                        "recipe": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+                        "recipe_fingerprint": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+                        "source": "inferencex"
                       },
                       "sweep_id": "2410|deepseek-v4.1-flash-h200-fp4-vllm-tp8-dspark5-agentx.yaml|agentx",
                       "measured_date": "2026-09-21",
@@ -1480,16 +1504,19 @@
                       },
                       "shape": null,
                       "shape_reason": "< 3 concurrencies",
-                      "point_id": "339e2060a615a384023a4808efd7a69aa287c72daf463fc3a3f55c4da19fa52e",
+                      "point_id": "0ee56f7de59e054844f8f2b013e2cdbf80e97745123e6fd10f1df3492175dc94",
                       "identity": {
+                        "benchmark_run": 2610,
                         "benchmark_type": "agentic_traces",
                         "conc": 4,
+                        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
                         "framework": "vllm",
                         "hardware": "h200",
                         "measured_date": "2026-10-11",
                         "model": "minimaxm3",
                         "precision": "fp8",
-                        "recipe": "e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4"
+                        "recipe_fingerprint": "e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4",
+                        "source": "inferencex"
                       },
                       "sweep_id": "2610|minimax-m3-h200-fp8-vllm-tp8-agentx.yaml|agentx",
                       "measured_date": "2026-10-11",
@@ -1567,14 +1594,17 @@
       "framework": "vllm",
       "hardware": "b200",
       "identity": {
+        "benchmark_run": null,
         "benchmark_type": "agentic_traces",
         "conc": 1,
+        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
         "framework": "vllm",
         "hardware": "b200",
         "measured_date": "2026-10-21",
         "model": "dsv4",
         "precision": "fp4",
-        "recipe": "row:445802"
+        "recipe_fingerprint": null,
+        "source": "inferencex"
       },
       "image": "vllm/vllm-openai:nightly-dev-x86_64-cu13.0.1-20ebb28",
       "measured": {
@@ -1583,39 +1613,10 @@
       },
       "measured_date": "2026-10-21",
       "model": "dsv4",
-      "point_id": "012a621f883620b38ce6013d1c0f7b0ea03538d3c8413d3ecc982133e30a78f2",
+      "point_id": "3864b0c5e03abbf5949cb0ec48c31209c998db425f1c655c06dd4b5a1e1fc695",
       "precision": "fp4",
       "reasons": [
         "model_not_in_catalog"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 6,
-      "framework": "vllm",
-      "hardware": "h100",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 6,
-        "framework": "vllm",
-        "hardware": "h100",
-        "measured_date": "2026-09-27",
-        "model": "minimaxm3",
-        "precision": "fp8",
-        "recipe": "e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6"
-      },
-      "image": "vllm/vllm-openai:nightly-ddd6fbca148a867aad1fcab7ec72f582b9977db4",
-      "measured": {
-        "tpot_ms": 12.4,
-        "ttft_ms": 2050.0
-      },
-      "measured_date": "2026-09-27",
-      "model": "minimaxm3",
-      "point_id": "8b51bc067b001668cdde3386d15c205410a31f461140bfa66229d5a19ae040d8",
-      "precision": "fp8",
-      "reasons": [
-        "drafter_not_in_catalog:eagle3",
-        "setting_not_modelled:kv_transfer_config.kv_connector"
       ]
     },
     {
@@ -1624,14 +1625,17 @@
       "framework": "vllm",
       "hardware": "b300",
       "identity": {
+        "benchmark_run": null,
         "benchmark_type": "agentic_traces",
         "conc": 8,
+        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
         "framework": "vllm",
         "hardware": "b300",
         "measured_date": "2026-10-20",
         "model": "dsv41flash",
         "precision": "fp4",
-        "recipe": "f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8"
+        "recipe_fingerprint": "f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8",
+        "source": "inferencex"
       },
       "image": "vllm/vllm-openai:cu134-nightly-x86_64-dev-20261019-mk",
       "measured": {
@@ -1646,10 +1650,42 @@
           "text": "No Deployment key states vLLM's prefill_schedule_interval, which holds prefills back for decode-only steps; BLIS schedules a prefill every step."
         }
       ],
-      "point_id": "cefb7a8bc91bf8efe67963ead7154970bb206bde0ac36c091f33643213871084",
+      "point_id": "5f85d0c1291c407e491ea719a28110098979767db0e8d257b967c5d3355d844c",
       "precision": "fp4",
       "reasons": [
         "setting_not_modelled:prefill_schedule_interval"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 6,
+      "framework": "vllm",
+      "hardware": "h100",
+      "identity": {
+        "benchmark_run": null,
+        "benchmark_type": "agentic_traces",
+        "conc": 6,
+        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
+        "framework": "vllm",
+        "hardware": "h100",
+        "measured_date": "2026-09-27",
+        "model": "minimaxm3",
+        "precision": "fp8",
+        "recipe_fingerprint": "e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6",
+        "source": "inferencex"
+      },
+      "image": "vllm/vllm-openai:nightly-ddd6fbca148a867aad1fcab7ec72f582b9977db4",
+      "measured": {
+        "tpot_ms": 12.4,
+        "ttft_ms": 2050.0
+      },
+      "measured_date": "2026-09-27",
+      "model": "minimaxm3",
+      "point_id": "634e63c43addc8ab45920e16c06c0585686fc90f38530c4222da31531acd2bc2",
+      "precision": "fp8",
+      "reasons": [
+        "drafter_not_in_catalog:eagle3",
+        "setting_not_modelled:kv_transfer_config.kv_connector"
       ]
     },
     {
@@ -1658,14 +1694,17 @@
       "framework": "vllm",
       "hardware": "b200",
       "identity": {
+        "benchmark_run": null,
         "benchmark_type": "agentic_traces",
         "conc": 1,
+        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
         "framework": "vllm",
         "hardware": "b200",
         "measured_date": "2026-09-30",
         "model": "minimaxm3",
         "precision": "fp4",
-        "recipe": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+        "recipe_fingerprint": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
+        "source": "inferencex"
       },
       "image": "vllm/vllm-openai:nightly-af7f9488c2210d67e1033ecdc845b087ee7fe92b",
       "measured": {
@@ -1674,7 +1713,7 @@
       },
       "measured_date": "2026-09-30",
       "model": "minimaxm3",
-      "point_id": "ed36f1f632cf954be99ac6e1ef48623197841190a670f1c3e7e82e40ae88b136",
+      "point_id": "a6d2a69f5e2d70c472bfe362577ebdda30796650a6c3a03323702e6ee3c84116",
       "precision": "fp4",
       "reasons": [
         "drafter_not_in_catalog:eagle3"

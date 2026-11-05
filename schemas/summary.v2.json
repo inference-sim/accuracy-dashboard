@@ -856,9 +856,15 @@
       }
     },
     "pointIdentity": {
+      "oneOf": [
+        {"$ref": "#/definitions/unitIdentity"},
+        {"$ref": "#/definitions/legacyPointIdentity"}
+      ]
+    },
+    "legacyPointIdentity": {
       "type": "object",
       "additionalProperties": false,
-      "description": "The point's identity in InferenceX's own terms; point_id is the sha256 of its canonical JSON (orchestrator/ingest/CONTRACT.md).",
+      "description": "The eight-field identity of a point in a snapshot published before point ids became ledger unit ids. Published snapshots never change (COV-8); data/legacy/point-ids.json maps each such point_id to its unit.",
       "required": [
         "model",
         "hardware",
@@ -897,6 +903,66 @@
         },
         "measured_date": {
           "$ref": "#/definitions/isoDate"
+        }
+      }
+    },
+    "unitIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The point's ledger unit identity (design §10.2): the source plus ten InferenceX fields. point_id is the sha256 of its canonical JSON, which is the ledger's unit_id (orchestrator/ingest/CONTRACT.md).",
+      "required": [
+        "source",
+        "model",
+        "hardware",
+        "precision",
+        "framework",
+        "benchmark_type",
+        "configuration_hash",
+        "recipe_fingerprint",
+        "conc",
+        "measured_date",
+        "benchmark_run"
+      ],
+      "properties": {
+        "source": {
+          "const": "inferencex"
+        },
+        "model": {
+          "type": "string"
+        },
+        "hardware": {
+          "type": "string"
+        },
+        "precision": {
+          "type": "string"
+        },
+        "framework": {
+          "type": "string"
+        },
+        "benchmark_type": {
+          "enum": [
+            "single_turn",
+            "agentic_traces"
+          ]
+        },
+        "configuration_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "recipe_fingerprint": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "conc": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "measured_date": {
+          "$ref": "#/definitions/isoDate"
+        },
+        "benchmark_run": {
+          "type": ["integer", "null"],
+          "minimum": 1
         }
       }
     }

@@ -75,7 +75,10 @@ jobs:
             orchestrator/ingest/test_cli_nightly.py \
             orchestrator/ingest/test_parallel.py \
             orchestrator/ingest/test_score_pool.py \
+            orchestrator/ingest/test_ledger.py \
             orchestrator/test_update_index.py
+      - name: Every point id of every published snapshot maps to a ledger unit (COV-8)
+        run: python3 orchestrator/ingest/legacy_ids.py check --map data/legacy/point-ids.json --data data
 
   blisdefaults:
     # The Go helper the extractor calls for BLIS's own batch defaults, built against the pinned

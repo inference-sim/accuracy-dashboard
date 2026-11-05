@@ -18,9 +18,10 @@ import contract as c  # noqa: E402
 FIXTURE = HERE / "testdata" / "contract"
 REPO = HERE.parent.parent
 
-IDENT = {"model": "dsv41flash", "hardware": "h200", "precision": "fp4", "framework": "vllm",
-         "benchmark_type": "agentic_traces", "recipe": "ab" * 32, "conc": 4,
-         "measured_date": "2026-09-21"}
+IDENT = {"source": "inferencex", "model": "dsv41flash", "hardware": "h200", "precision": "fp4",
+         "framework": "vllm", "benchmark_type": "agentic_traces", "configuration_hash": "cd" * 32,
+         "recipe_fingerprint": "ab" * 32, "conc": 4, "measured_date": "2026-09-21",
+         "benchmark_run": 123}
 
 
 def _copy(run: str) -> Path:
@@ -41,15 +42,28 @@ def _write_lines(path: Path, rows: list[dict]) -> None:
 
 def test_point_id_is_sha256_of_the_canonical_identity():
     # Worked by hand: sorted keys, no spaces.
-    text = ('{"benchmark_type":"agentic_traces","conc":4,"framework":"vllm","hardware":"h200",'
-            '"measured_date":"2026-09-21","model":"dsv41flash","precision":"fp4","recipe":"'
-            + "ab" * 32 + '"}')
+    text = ('{"benchmark_run":123,"benchmark_type":"agentic_traces","conc":4,"configuration_hash":"'
+            + "cd" * 32 + '","framework":"vllm","hardware":"h200","measured_date":"2026-09-21",'
+            '"model":"dsv41flash","precision":"fp4","recipe_fingerprint":"' + "ab" * 32
+            + '","source":"inferencex"}')
     assert c.point_id(IDENT) == hashlib.sha256(text.encode()).hexdigest()
 
 
-def test_point_id_changes_with_the_measurement_date():
-    # A re-measurement is a different point.
+def test_point_id_changes_with_the_measurement_date_and_the_benchmark_run():
+    # A re-measurement is a different point, and so is another run on the same day.
     assert c.point_id(IDENT) != c.point_id({**IDENT, "measured_date": "2026-09-22"})
+    assert c.point_id(IDENT) != c.point_id({**IDENT, "benchmark_run": 124})
+
+
+def test_point_id_takes_a_null_fingerprint_and_a_null_run():
+    assert c.point_id({**IDENT, "recipe_fingerprint": None, "benchmark_run": None})
+    for bad in ({**IDENT, "recipe_fingerprint": ""}, {**IDENT, "benchmark_run": "123"},
+                {**IDENT, "source": "aisimulate"}):
+        try:
+            c.point_id(bad)
+        except ValueError:
+            continue
+        raise AssertionError(f"accepted {bad}")
 
 
 def test_point_id_rejects_missing_or_extra_fields():
@@ -67,17 +81,6 @@ def test_point_id_rejects_a_string_concurrency():
     except ValueError:
         return
     raise AssertionError("accepted conc as a string")
-
-
-def test_recipe_key_falls_back_to_the_row_id():
-    assert c.recipe_key("cd" * 32, "445802") == "cd" * 32
-    assert c.recipe_key("", "445802") == "row:445802"
-    assert c.recipe_key(None, 445802) == "row:445802"
-    try:
-        c.recipe_key(None, None)
-    except ValueError:
-        return
-    raise AssertionError("accepted a point with neither fingerprint nor row id")
 
 
 def test_ratio_str_keeps_four_significant_figures_and_trailing_zeros():
@@ -311,7 +314,8 @@ def test_fidelity_schema_ties_approximate_status_to_an_approximated_arg():
     import jsonschema
     v = jsonschema.Draft7Validator(json.loads(c.FIDELITY_SCHEMA.read_text()))
     rec = next({k: x for k, x in r.items() if k != "point_id"}
-               for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL) if r["status"] == "approximate")
+               for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL)
+               if r["status"] == "approximate" and any(a["match"] == "approximated" for a in r["args"]))
     assert v.is_valid(rec)
     assert not v.is_valid({**rec, "status": "exact"})                         # exact with an approximation
     plain = [a for a in rec["args"] if a["match"] != "approximated"]

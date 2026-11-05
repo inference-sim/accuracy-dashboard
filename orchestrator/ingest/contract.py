@@ -10,6 +10,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -32,31 +33,93 @@ CONTRACT_FILES = (POINTS_CSV, FIDELITY_JSONL, FACETS_JSON, NOT_SCORED_JSONL, PRO
 # The signedprobe per-point CSV columns, then the two the contract adds.
 POINTS_HEADER = EXPECTED_HEADER + ["point_id", "measured_date"]
 
-# A point's identity, in InferenceX's own terms, so it never changes with a BLIS release or a
-# catalog mapping. `recipe_fingerprint` is InferenceX's sha256 of the bound recipe; rows that
-# have none are identified by their API row id instead ("row:<id>").
+# A point's identity is its ledger unit's identity (design §10.2; blis-substrate
+# ledger/inferencex/inferencex.go at 800ae263, IdentityFields): the source plus ten InferenceX
+# fields. The point_id is the unit_id, so a point is matched to its unit by identifier and the
+# id never changes with a BLIS release or a catalog mapping.
+SOURCE = "inferencex"
 IDENTITY_FIELDS = (
-    "model", "hardware", "precision", "framework", "benchmark_type",
-    "recipe", "conc", "measured_date",
+    "source", "model", "hardware", "precision", "framework", "benchmark_type",
+    "configuration_hash", "recipe_fingerprint", "conc", "measured_date", "benchmark_run",
 )
+# The 17 fields of a record's serving configuration that the configuration hash covers, in
+# InferenceX's own names (design §10.2).
+CONFIGURATION_FIELDS = (
+    "image", "isl", "osl", "offload_mode", "spec_method", "disagg", "is_multinode",
+    "prefill_tp", "prefill_ep", "prefill_dp_attention", "prefill_num_workers", "num_prefill_gpu",
+    "decode_tp", "decode_ep", "decode_dp_attention", "decode_num_workers", "num_decode_gpu",
+)
+DIGEST_MARK = "@sha256:"
+_RUN_ID = re.compile(r"/actions/runs/(\d+)")
 
 
 def canonical_dumps(value) -> str:
-    """The one JSON encoding every contract file uses: sorted keys, no spaces, UTF-8 kept."""
+    """The one JSON encoding every contract file uses: sorted keys, no spaces, UTF-8 kept. It is
+    the encoding blis-substrate's ledger.Canonical writes, so a point_id equals its unit_id."""
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
-def recipe_key(recipe_fingerprint: str | None, row_id: str | int | None) -> str:
-    """The `recipe` identity component: the fingerprint, else "row:<API row id>"."""
-    if recipe_fingerprint:
-        return recipe_fingerprint
-    if row_id is None or str(row_id) == "":
-        raise ValueError("a point needs a recipe_fingerprint or an API row id")
-    return f"row:{row_id}"
+def benchmark_run(run_url) -> int | None:
+    """The numeric GitHub Actions run id in a run_url, without its attempt number; None when the
+    record has no run_url or the URL names no run."""
+    m = _RUN_ID.search(run_url) if isinstance(run_url, str) else None
+    return int(m.group(1)) if m else None
+
+
+def configuration(row: dict) -> dict:
+    """The 17 configuration fields of an InferenceX record, every key present, a value the
+    record lacks as None, integers and booleans as the record types them. The image is written
+    without any suffix beginning "@sha256:", because InferenceX records the digest on some
+    attempts of a run and not on others."""
+    out = {}
+    for f in CONFIGURATION_FIELDS:
+        v = row.get(f)
+        if isinstance(v, float):
+            raise ValueError(f"row {row.get('id')}: {f} is a float ({v!r}); identifying fields hold no fractions")
+        out[f] = v
+    if isinstance(out["image"], str):
+        out["image"] = out["image"].split(DIGEST_MARK, 1)[0]
+    return out
+
+
+def configuration_hash(row: dict) -> str:
+    return hashlib.sha256(canonical_dumps(configuration(row)).encode("utf-8")).hexdigest()
+
+
+def run_dates(rows) -> dict:
+    """The measured date of each benchmark run: the earliest date among every record of the run,
+    so all its attempts share one date (design §10.2). Every record counts, whatever its
+    framework or measured values."""
+    out: dict = {}
+    for r in rows:
+        run = benchmark_run(r.get("run_url"))
+        if run is not None:
+            d = str(r.get("date"))[:10]
+            if run not in out or d < out[run]:
+                out[run] = d
+    return out
+
+
+def unit_identity(row: dict, dates: dict) -> dict:
+    """An InferenceX record's identity, as the ledger's ingest tool computes it. `dates` is
+    run_dates() over every record of the source, so a record with a run id takes its run's
+    earliest date; a record with no run id keeps its own date."""
+    run = benchmark_run(row.get("run_url"))
+    if run is not None and run not in dates:
+        raise ValueError(f"row {row.get('id')}: benchmark run {run} has no measured date in the records given")
+    conc = row.get("conc")
+    if isinstance(conc, str) and conc.isdigit():
+        conc = int(conc)
+    return {"source": SOURCE, "model": row["model"], "hardware": row["hardware"],
+            "precision": row["precision"], "framework": row["framework"],
+            "benchmark_type": row["benchmark_type"], "configuration_hash": configuration_hash(row),
+            "recipe_fingerprint": row.get("recipe_fingerprint") or None, "conc": conc,
+            "measured_date": dates[run] if run is not None else str(row["date"])[:10],
+            "benchmark_run": run}
 
 
 def point_id(identity: dict) -> str:
-    """sha256 (hex) of the canonical JSON of exactly IDENTITY_FIELDS."""
+    """sha256 (hex) of the canonical JSON of exactly IDENTITY_FIELDS: the unit_id."""
     if not isinstance(identity, dict):
         raise ValueError("identity must be an object")
     missing = [f for f in IDENTITY_FIELDS if f not in identity]
@@ -65,6 +128,14 @@ def point_id(identity: dict) -> str:
         raise ValueError(f"identity fields: missing {missing}, unexpected {extra}")
     if not isinstance(identity["conc"], int) or isinstance(identity["conc"], bool):
         raise ValueError("identity conc must be an int")
+    run = identity["benchmark_run"]
+    if run is not None and (not isinstance(run, int) or isinstance(run, bool)):
+        raise ValueError("identity benchmark_run must be an int or null")
+    fp = identity["recipe_fingerprint"]
+    if fp is not None and (not isinstance(fp, str) or not fp):
+        raise ValueError("identity recipe_fingerprint must be a non-empty string or null")
+    if identity["source"] != SOURCE:
+        raise ValueError(f"identity source must be {SOURCE!r}")
     return hashlib.sha256(canonical_dumps(identity).encode("utf-8")).hexdigest()
 
 

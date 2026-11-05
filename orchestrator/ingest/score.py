@@ -105,6 +105,21 @@ def _checkpoints(c: st.Classified, launch_cfg: dict | None) -> list[str]:
     return out
 
 
+def measured(entry: dict) -> dict:
+    """The point's measured values: the mean, over the unit's measurements, of each metric
+    (design §10.2: a unit holding several measurements is scored against their mean, COV-10).
+    A metric a measurement lacks is left out of that metric's mean; a metric no measurement
+    has is absent."""
+    ms = entry.get("measurements") or [{"metrics": entry["row"].get("metrics") or {}}]
+    out = {}
+    for key in sorted({k for m in ms for k in (m.get("metrics") or {})}):
+        vals = [(m["metrics"] or {}).get(key) for m in ms]
+        vals = [float(v) for v in vals if isinstance(v, (int, float)) and not isinstance(v, bool)]
+        if vals:
+            out[key] = sum(vals) / len(vals)
+    return out
+
+
 def _metrics_us(m: dict) -> tuple[float, float]:
     # TPOT is the per-token figure aiperf reports (request_itl_mean_ms), not the step interval.
     return float(m["ttft_mean_ms"]) * 1e3, float(m["request_itl_mean_ms"]) * 1e3
@@ -298,6 +313,7 @@ class Outcome:
     identity: dict
     row: dict
     reasons: list = field(default_factory=list)
+    measurements: list = field(default_factory=list)
     fidelity: dict | None = None
     facets: dict | None = None
     csv_row: list | None = None
@@ -310,7 +326,8 @@ def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         return score_point(entry, pull_dir, work, env)
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
         return Outcome(point_id=entry["point_id"], identity=entry["identity"], row=entry["row"],
-                       reasons=sorted(set(entry["reasons"] + ["blis_refused:extractor_error"])))
+                       reasons=sorted(set(entry["reasons"] + ["blis_refused:extractor_error"])),
+                       measurements=entry.get("measurements") or [])
 
 
 # A process-pool worker scores into its OWN work subdir, because score_point writes
@@ -391,7 +408,8 @@ def _run_pool(indexed: list, pull_dir: Path, work: Path, env: Env, workers: int,
 
 def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     row, ident, pid = entry["row"], entry["identity"], entry["point_id"]
-    o = Outcome(point_id=pid, identity=ident, row=row, reasons=list(entry["reasons"]))
+    o = Outcome(point_id=pid, identity=ident, row=row, reasons=list(entry["reasons"]),
+                measurements=entry.get("measurements") or [])
     pdir = pull_dir / "points" / pid
     log_b = _read(pdir, entry["files"], "server_log")
     if log_b is None:
@@ -560,7 +578,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         o.reasons = ["blis_refused:metrics_incomplete"]
         return o
 
-    m = row.get("metrics") or {}
+    m = measured(entry)
     status = point_status(_estimated(args), entry["build"])
     o.fidelity = {"status": status, "build": entry["build"], "args": args,
                   "resolved": resolved_kv(log, metrics), "replay": r.record(env.corpus["sha256"]),
@@ -723,7 +741,7 @@ _PROBE_FIELDS = (("max_num_seqs", "max_num_seqs"), ("max_num_batched_tokens", "m
                  ("max_cudagraph_capture_size", "max_cudagraph_capture_size"))
 
 
-def single_turn_inputs(row: dict, dep: dict, scenario_file: str) -> tuple[dict, dict, dict] | list[str]:
+def single_turn_inputs(row: dict, dep: dict, scenario_file: str, m: dict) -> tuple[dict, dict, dict] | list[str]:
     """signedprobe's three inputs for one point: a one-sweep corpus, the measured means
     (absolutes) and the engine settings, all keyed by the scenario file and workload label."""
     pool = dep["pools"][0]
@@ -732,7 +750,6 @@ def single_turn_inputs(row: dict, dep: dict, scenario_file: str) -> tuple[dict, 
         # signedprobe passes no acceptance flag to blis replay: a drafter is priced only when
         # the scenario pins its acceptance.
         return ["client_scenario_not_replayable:single_turn_speculative"]
-    m = row.get("metrics") or {}
     try:
         ttft_us, tpot_us = float(m["mean_ttft"]) * 1e6, float(m["mean_tpot"]) * 1e6
     except (KeyError, TypeError, ValueError):
@@ -766,7 +783,7 @@ def score_single_turn(o, entry, env, work: Path, sdir: Path, name: str, text: st
     row, pid, ident = entry["row"], entry["point_id"], entry["identity"]
     scen_doc = next((d for d in __import__("yaml").safe_load_all(text) if d.get("kind") == "Scenario"), {})
     dep = {**dep, "_model": scen_doc.get("model", ""), "_scenario": scen_doc}
-    got = single_turn_inputs(row, dep, f"{name}.yaml")
+    got = single_turn_inputs(row, dep, f"{name}.yaml", measured(entry))
     if isinstance(got, list):
         o.reasons = sorted(set(got))
         return o
@@ -909,7 +926,7 @@ def split_repeated_sweeps(scored: list[Outcome]) -> None:
         concs = [o.identity["conc"] for o in os_]
         if len(concs) != len(set(concs)):
             for o in os_:
-                o.facets["sweep_id"] = f"{sid}|{o.identity['recipe']}"
+                o.facets["sweep_id"] = f"{sid}|{o.point_id[:12]}"
 
 
 def write_contract(out: Path, outcomes: list[Outcome], provenance: dict) -> None:
@@ -931,7 +948,7 @@ def write_contract(out: Path, outcomes: list[Outcome], provenance: dict) -> None
     for o in outcomes:
         if o.fidelity is not None:
             continue
-        m = o.row.get("metrics") or {}
+        m = measured({"row": o.row, "measurements": o.measurements})
         reasons = sorted(set(o.reasons)) or ["blis_refused"]
         rec = {"point_id": o.point_id, "identity": o.identity, "measured_date": o.identity["measured_date"],
                "model": o.row["model"], "hardware": o.row["hardware"], "precision": o.row["precision"],

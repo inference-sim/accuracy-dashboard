@@ -22,7 +22,16 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "orchestrator" / "ingest"))
-from contract import point_id  # noqa: E402
+import contract  # noqa: E402
+import legacy_ids  # noqa: E402
+
+
+def point_id(identity: dict) -> str:
+    """The id an identity hashes to: a ledger unit identity, or the eight-field identity of a
+    snapshot published before point ids were unit ids (COV-8)."""
+    if isinstance(identity, dict) and "recipe" in identity:
+        return legacy_ids.legacy_point_id(identity)
+    return contract.point_id(identity)
 SCHEMA = REPO / "schemas" / "summary.v2.json"
 FIDELITY = REPO / "orchestrator" / "ingest" / "fidelity.schema.json"
 

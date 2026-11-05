@@ -867,11 +867,12 @@ def test_two_points_left_at_one_concurrency_in_a_sweep_get_a_sweep_each():
     outs = []
     for pid, conc, recipe in (("a", 1, "row:1"), ("b", 2, "row:2"), ("c", 2, "row:3")):
         x = o(pid, conc, recipe)
-        x.identity = {"conc": conc, "recipe": recipe}
+        x.identity = {"conc": conc}
+        x.point_id = recipe
         x.facets = {"sweep_id": "s"}
         outs.append(x)
     sc.split_repeated_sweeps(outs)
-    assert [x.facets["sweep_id"] for x in outs] == ["s|row:1", "s|row:2", "s|row:3"]
+    assert [x.facets["sweep_id"] for x in outs] == ["s|row:1", "s|row:2", "s|row:3"]   # the point ids' first 12
     clean = [outs[0]]
     clean[0].facets["sweep_id"] = "t"
     sc.split_repeated_sweeps(clean)

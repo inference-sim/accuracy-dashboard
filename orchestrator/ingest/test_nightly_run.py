@@ -25,9 +25,9 @@ import contract as c  # noqa: E402
 # ---------------------------------------------------------------- fakes
 
 def _ident(model, conc, measured_date):
-    return {"model": model, "hardware": "h100", "precision": "fp8", "framework": "vllm",
-            "benchmark_type": "agentic_traces", "recipe": f"r-{model}-{conc}", "conc": conc,
-            "measured_date": measured_date}
+    return {"source": "inferencex", "model": model, "hardware": "h100", "precision": "fp8", "framework": "vllm",
+            "benchmark_type": "agentic_traces", "configuration_hash": "cd" * 32, "recipe_fingerprint": f"r-{model}-{conc}",
+            "conc": conc, "measured_date": measured_date, "benchmark_run": None}
 
 
 def pid_of(model, conc, measured_date):

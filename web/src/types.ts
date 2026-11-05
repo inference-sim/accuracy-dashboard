@@ -87,8 +87,28 @@ export interface Fidelity {
   blis_kernel_provenance?: unknown
 }
 
-/** v2: a point's identity in InferenceX's own terms; point_id is the sha256 of its canonical JSON. */
-export interface PointIdentity {
+/** v2: a point's identity; point_id is the sha256 of its canonical JSON. A unit identity in
+ *  snapshots from this release on, the eight-field legacy identity in those published before
+ *  (published snapshots never change, COV-8). */
+export type PointIdentity = UnitIdentity | LegacyPointIdentity
+
+/** The ledger unit identity (design §10.2): point_id is the ledger's unit_id. */
+export interface UnitIdentity {
+  source: 'inferencex'
+  model: string
+  hardware: string
+  precision: string
+  framework: string
+  benchmark_type: string
+  configuration_hash: string
+  recipe_fingerprint: string | null
+  conc: number
+  measured_date: string
+  benchmark_run: number | null
+}
+
+/** The identity of a point in a snapshot published before point ids were unit ids. */
+export interface LegacyPointIdentity {
   model: string
   hardware: string
   precision: string

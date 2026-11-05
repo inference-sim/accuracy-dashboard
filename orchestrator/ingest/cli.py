@@ -28,6 +28,7 @@ import artifacts as art  # noqa: E402
 import build  # noqa: E402
 import clients  # noqa: E402
 import contract  # noqa: E402
+import ledger as ldg  # noqa: E402
 import pull as pl  # noqa: E402
 import recipes as rcp  # noqa: E402
 import score as sc  # noqa: E402
@@ -56,17 +57,27 @@ def cmd_pull(a) -> int:
         # rather than publish a pull that silently lacks a model.
         _log("FATAL: the site names no display name for " + ", ".join(p.unnamed_slugs))
         return 3
-    # --only <point_id ...>: freeze just these window rows (the nightly's delta fetch). The manifest
-    # then holds only the fetched subset; the whole window is listed by the caller, not here. `None`
-    # means "the whole window"; an EMPTY list means "none" (a night whose delta is empty -- an
-    # age-out or a true no-op) -- never conflate the two, or such a night re-freezes the whole window.
+    # Every row becomes a point only through the ledger: the point is the row's unit, and
+    # records the ledger joins are one point (design §10.2). Rows the ledger holds no unit for
+    # are listed with why, in the manifest, and counted in coverage.
+    lg = ldg.load(Path(a.ledger))
+    placed = pl.place(p.rows, lg)
+    _log(f"pull: {len(placed.points)} points (ledger units) from {len(p.rows)} rows; "
+         f"{len(placed.unlisted)} rows hold no unit of {lg.revision}")
+    points_in = placed.points
+    # --only <point_id ...>: freeze just these window points (the nightly's delta fetch). The
+    # manifest then holds only the fetched subset; the whole window is listed by the caller, not
+    # here. `None` means "the whole window"; an EMPTY list means "none" (a night whose delta is
+    # empty -- an age-out or a true no-op) -- never conflate the two, or such a night re-freezes
+    # the whole window.
     if getattr(a, "only", None) is not None:
         want = set(a.only)
-        p.rows = [r for r in p.rows if contract.point_id(pl.identity(r)) in want]
-        _log(f"pull: --only -> {len(p.rows)} of the window's rows")
+        points_in = [x for x in points_in if x.point_id in want]
+        _log(f"pull: --only -> {len(points_in)} of the window's points")
     # Incremental: extend a prior frozen pull. A point's measurement is immutable, so one already
-    # frozen is reused verbatim (files + manifest entry), only fresh rows are fetched, and aged-out
-    # points leave the store. A cold pull (no --prior, or --prior == --out) freezes every row.
+    # frozen is reused verbatim (files + manifest entry), only fresh points are fetched, and
+    # aged-out points leave the store. A cold pull (no --prior, or --prior == --out) freezes
+    # every point.
     prior_manifest = pl.load_prior_manifest(Path(a.prior)) if a.prior else None
     prior_points = prior_manifest["points"] if prior_manifest else []
     if any(PULL_ERROR in (e.get("reasons") or []) for e in prior_points):
@@ -74,7 +85,7 @@ def cmd_pull(a) -> int:
         # entries would re-raise the error (and wedge) every night. Start cold instead.
         _log("pull: prior manifest holds a pull error -- ignoring it and pulling cold")
         prior_manifest, prior_points = None, []
-    inc = pl.plan_incremental(p.rows, prior_points)
+    inc = pl.plan_incremental(points_in, prior_points)
     prior_dir = Path(a.prior) if a.prior else out
     _log(f"pull: reuse {len(inc.reuse)} frozen, freeze {len(inc.fresh)} fresh, drop {len(inc.dropped)} aged-out")
     token = clients.require_github_token()
@@ -104,35 +115,36 @@ def cmd_pull(a) -> int:
     from concurrent.futures import ThreadPoolExecutor, as_completed
     dl_workers = a.download_workers if getattr(a, "download_workers", 0) else min((os.cpu_count() or 4) * 2, 8)
 
-    def _freeze(row):
+    def _freeze(pt):
         try:
-            return row, pl.freeze_point(row, resolver=resolver, gh=gh, fetch=api.http_fetch, out=out,
-                                        recipes=recipes), None
+            return pt, pl.freeze_point(pt, resolver=resolver, gh=gh, fetch=api.http_fetch, out=out,
+                                       recipes=recipes), None
         except (clients.RateLimited, clients.FetchFailed):
-            raise   # the whole pull is invalid, not this row
-        except Exception as ex:  # noqa: BLE001 -- one row's failure is recorded with why, never kills the pull
-            ident = pl.identity(row)
-            return row, {"point_id": contract.point_id(ident), "identity": ident, "row": row, "files": {},
-                         "build": None, "reasons": [PULL_ERROR], "problems": [repr(ex)[:500]]}, ex
+            raise   # the whole pull is invalid, not this point
+        except Exception as ex:  # noqa: BLE001 -- one point's failure is recorded with why, never kills the pull
+            return pt, {"point_id": pt.point_id, "identity": dict(pt.unit.identity), "row": pt.row,
+                        "records": pt.records, "measurements": pt.measurements, "files": {},
+                        "build": None, "reasons": [PULL_ERROR], "problems": [repr(ex)[:500]]}, ex
 
     fresh_results = {}
     if dl_workers <= 1 or len(inc.fresh) <= 1:
-        for row in inc.fresh:
-            r, e, _ = _freeze(row)
-            fresh_results[contract.point_id(pl.identity(r))] = e
+        for pt in inc.fresh:
+            _, e, _ = _freeze(pt)
+            fresh_results[pt.point_id] = e
     else:
-        _log(f"pull: freezing {len(inc.fresh)} rows on {dl_workers} download workers")
+        _log(f"pull: freezing {len(inc.fresh)} points on {dl_workers} download workers")
         with ThreadPoolExecutor(max_workers=dl_workers) as ex:
-            futs = {ex.submit(_freeze, row): row for row in inc.fresh}
+            futs = {ex.submit(_freeze, pt): pt for pt in inc.fresh}
             done = 0
             for fut in as_completed(futs):
-                r, e, _ = fut.result()   # a fatal RateLimited/FetchFailed propagates here, aborting
-                fresh_results[contract.point_id(pl.identity(r))] = e
+                pt, e, _ = fut.result()   # a fatal RateLimited/FetchFailed propagates here, aborting
+                fresh_results[pt.point_id] = e
                 done += 1
+                r = pt.row
                 _log(f"  [{done}/{len(inc.fresh)}] {r['model']} {r['hardware']} c{r['conc']} -> {e['reasons'] or 'ok'}")
     # Append in the pull's stable order (by the fresh list), so the manifest is order-stable.
-    for row in inc.fresh:
-        points.append(fresh_results[contract.point_id(pl.identity(row))])
+    for pt in inc.fresh:
+        points.append(fresh_results[pt.point_id])
     # Aged-out points: drop their files so the store holds only the current window.
     for pid in sorted(inc.dropped):
         pl.prune_point_files(out, pid)
@@ -177,7 +189,8 @@ def cmd_pull(a) -> int:
     meta = {"window": list(p.window), "pulled_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "vllm_ref": vllm_ref, "vllm_max_distance": build.VLLM_MAX_DISTANCE,
             "unnamed_slugs": p.unnamed_slugs, "base_models": base,
-            "undated_row_ids": sorted(str(r["id"]) for r in p.undated)}
+            "undated_row_ids": sorted(str(r["id"]) for r in p.undated),
+            "ledger": {"revision": lg.revision, "unlisted": placed.unlisted}}
     sha = pl.write_manifest(out, meta, points)
     _log(f"pull: wrote {out / 'manifest.json'} (sha256 {sha})")
     failed = [e for e in points if PULL_ERROR in e["reasons"]]
@@ -317,6 +330,12 @@ def cmd_score(a) -> int:
     return 1 if problems else 0
 
 
+def _has_legacy_ids(summary: dict) -> bool:
+    """Whether a published summary carries the eight-field identity of before (legacy_ids.py)."""
+    return any("recipe" in (n.get("identity") or {}) for n in summary.get("not_scored", [])) or \
+        '"recipe":' in json.dumps(summary.get("matrix", []))
+
+
 def cmd_nightly(a) -> int:
     """One night of the no-storage API-ingest pipeline (Discussion #15, revised 2026-10-25):
     list the 180-day window, fetch+score only the delta (or the whole window on a BLIS release),
@@ -340,14 +359,15 @@ def cmd_nightly(a) -> int:
         # seed (no prior ids); otherwise only the new points. A row the pull itself can't read fails
         # the run (cmd_pull returns non-zero).
         p = api.pull(api.http_fetch, today=today_, window_days=a.window_days)
-        window_ids = {contract.point_id(pl.identity(r)) for r in p.rows}
+        window_ids = {x.point_id for x in pl.place(p.rows, ldg.load(Path(a.ledger))).points}
         whole = blis_changed or not last_ids
         to_fetch = window_ids if whole else (window_ids - set(last_ids))
         only = None if whole else sorted(to_fetch)
         _log(f"nightly: window {len(window_ids)} points; fetch {'whole window' if whole else f'{len(to_fetch)} new'}")
         rc = cmd_pull(types.SimpleNamespace(out=str(work), today=today_.isoformat(),
                                             window_days=a.window_days, cache=a.cache, prior=None,
-                                            only=only, download_workers=a.download_workers))
+                                            only=only, download_workers=a.download_workers,
+                                            ledger=a.ledger))
         if rc != 0:
             raise RuntimeError(f"pull failed (rc={rc}); the run stops rather than publish a partial pull")
         return json.loads((work / "manifest.json").read_text())["pulled_at"][:10], window_ids
@@ -368,7 +388,10 @@ def cmd_nightly(a) -> int:
         prior = json.loads(latest_path.read_text()) if latest_path.is_file() else None
         # IX-only night: merge the delta contract into last night's published summary (summary.json
         # IS the store). A BLIS release (or the seed) rebuilds the whole window from the contract.
-        if prior and prior.get("provenance", {}).get("blis", {}).get("release") == blis_tag:
+        # A prior summary published before point ids were unit ids holds no point tonight's
+        # window can match (COV-8 keeps it unchanged), so the window is rebuilt, not merged.
+        if prior and prior.get("provenance", {}).get("blis", {}).get("release") == blis_tag \
+                and not _has_legacy_ids(prior):
             summary = bsv2.build_merged(prior, contract_dir, window_ids, generated_at=gen_at,
                                         evaluator_commit=a.evaluator_commit or "local",
                                         work=Path(a.score_work or contract_dir.parent) / "merge")
@@ -396,6 +419,9 @@ def main(argv=None) -> int:
     p.add_argument("--prior", help="a prior frozen pull to extend: reuse its frozen points, freeze "
                                    "only new rows, drop aged-out ones. Omit for a cold pull.")
     p.add_argument("--only", nargs="*", help="freeze only these point_ids of the window (the nightly's delta fetch)")
+    p.add_argument("--ledger", required=True,
+                   help="blis-substrate's catalog/ledger at the commit the scoring simulator pins: "
+                        "every point is a unit of its unit list (design §10.2)")
     p.add_argument("--download-workers", type=int, default=0,
                    help="parallel artifact-download workers (default: min(2*cores, 8); I/O-bound)")
     s = sub.add_parser("score")
@@ -435,6 +461,7 @@ def main(argv=None) -> int:
     n.add_argument("--work", help="the contract directory the scored window is written to")
     n.add_argument("--score-work")
     n.add_argument("--evaluator-commit")
+    n.add_argument("--ledger", required=True, help="blis-substrate's catalog/ledger (see pull --ledger)")
     n.add_argument("--blis-dir", required=True)
     n.add_argument("--catalog", required=True)
     n.add_argument("--registry", required=True)

@@ -200,8 +200,7 @@ def _spec_and_nospec_contract():
     assert len(src) == 3
     for r in src:
         f = json.loads(json.dumps(facets[r["point_id"]]))
-        f["identity"]["recipe"] = "row:9" + f["identity"]["recipe"][-6:] if f["identity"]["recipe"].startswith("row:") \
-            else "9" + f["identity"]["recipe"][1:]
+        f["identity"]["configuration_hash"] = "9" + f["identity"]["configuration_hash"][1:]
         f["spec_method"] = "mtp"
         f["sweep_id"] += "|mtp"
         pid = contract.point_id(f["identity"])
@@ -307,7 +306,7 @@ def _twin_contract(same_inputs: bool):
         rows = list(csv.DictReader(fh))
     src = next(r for r in rows if facets[r["point_id"]]["model"] == "deepseek-v4-pro" and r["concurrency"] == "4")
     f = json.loads(json.dumps(facets[src["point_id"]]))
-    f["identity"]["recipe"] = "row:999"
+    f["identity"]["recipe_fingerprint"] = "99" * 32
     f["sweep_id"] += "|twin"
     pid = contract.point_id(f["identity"])
     facets[pid] = f

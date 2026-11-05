@@ -34,13 +34,6 @@ def run_repo(row: dict) -> str | None:
     return m.group(1) if m else None
 
 
-def identity(row: dict) -> dict:
-    return {"model": row["model"], "hardware": row["hardware"], "precision": row["precision"],
-            "framework": row["framework"], "benchmark_type": row["benchmark_type"],
-            "recipe": contract.recipe_key(row.get("recipe_fingerprint"), row.get("id")),
-            "conc": int(row["conc"]), "measured_date": str(row["date"])[:10]}
-
-
 @dataclass
 class Frozen:
     dir: Path
@@ -107,11 +100,18 @@ def recipe_checkpoint(row: dict, server_log: str | None, recipes) -> dict | None
     return {"repo": repo, "source": "inferencex_recipe", "commit": sha, "served_path": paths[0]} if repo else None
 
 
-def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts, fetch, out: Path,
-                 run_artifacts: dict = None, recipes=None) -> dict:
-    ident = identity(row)
+def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArtifacts, fetch, out: Path,
+                 recipes=None) -> dict:
+    """Freeze one point's inputs. The point is one ledger unit; its inputs are the kept
+    record's (the smallest row id the window holds), and its measured values are each
+    measurement's, so the score is against their mean (design §10.2)."""
+    row = point.row
+    # The unit's identity, from the unit list: the measured date of a benchmark run is the
+    # earliest date among all its records, which one row does not show (design §10.2).
+    ident = dict(point.unit.identity)
     pid = contract.point_id(ident)
-    entry = {"point_id": pid, "identity": ident, "row": row, "reasons": _row_reasons(row), "files": {}}
+    entry = {"point_id": pid, "identity": ident, "row": row, "records": point.records,
+             "measurements": point.measurements, "reasons": _row_reasons(row), "files": {}}
     agentic = row["benchmark_type"] == "agentic_traces"
     run = api.run_of(row)
     frozen = Frozen(out / "points" / pid)
@@ -216,38 +216,98 @@ def write_manifest(out: Path, meta: dict, points: list[dict]) -> str:
 
 
 @dataclass
+class Point:
+    """One ledger unit the window holds: its kept row, every record of it the window holds, and
+    each measurement's measured values (the metrics of the measurement's kept record)."""
+    unit: object
+    row: dict
+    records: list
+    measurements: list
+
+    @property
+    def point_id(self) -> str:
+        return self.unit.unit_id
+
+
+@dataclass
+class Placed:
+    """The window's rows, placed in the ledger: the points, and every row that is no point,
+    with why (the ingest report's reason for a record it left out, or not_in_source_revision
+    for a record newer than the ledger's pinned source revision)."""
+    points: list = field(default_factory=list)
+    unlisted: list = field(default_factory=list)    # {"record", "reason", "model", "date", ...}
+
+
+def place(rows: list[dict], lg) -> Placed:
+    """Group the window's rows by ledger unit (records the ledger joins are one point) and list
+    the rows the ledger holds no unit for. A row whose identity disagrees with the unit list
+    raises ledger.LedgerError: it is not the record the ledger was generated from."""
+    import ledger as ldg
+    by_unit: dict = {}
+    out = Placed()
+    window_dates = contract.run_dates(rows)
+    for r in sorted(rows, key=lambda r: int(r["id"])):
+        rid = str(r["id"])
+        p = lg.by_record.get(rid)
+        if p is None:
+            why = lg.left_out.get(rid)
+            out.unlisted.append({"record": rid, "reason": f"left_out:{why}" if why else "not_in_source_revision",
+                                 "model": r["model"], "hardware": r["hardware"], "framework": r["framework"],
+                                 "benchmark_type": r["benchmark_type"], "conc": r["conc"],
+                                 "date": str(r["date"])[:10]})
+            continue
+        # The measured date of a kept or duplicate record is its unit's: the earliest date of
+        # its benchmark run over every record of the source, which only the ledger's ingest saw.
+        # A merged record's own identity is another unit's, which the list does not hold, so
+        # its run's earliest date is taken from the window's rows.
+        dates = dict(window_dates)
+        run = contract.benchmark_run(r.get("run_url"))
+        if run is not None and p.how != ldg.MERGED:
+            dates[run] = p.unit.identity["measured_date"]
+        lg.place(r, dates)
+        by_unit.setdefault(p.unit.unit_id, []).append(r)
+    for uid in sorted(by_unit):
+        unit = lg.units[uid]
+        have = {str(r["id"]): r for r in by_unit[uid]}
+        kept = next((have[x] for x in unit.records() if x in have), None)
+        meas = [{"record": m["record"], "metrics": have[m["record"]].get("metrics") or {}}
+                for m in unit.measurements if m["record"] in have]
+        out.points.append(Point(unit=unit, row=kept, records=sorted(have, key=int), measurements=meas))
+    return out
+
+
+@dataclass
 class Incremental:
     """How tonight's window splits against a prior frozen pull (Discussion #15, "Store"):
 
       reuse   point ids the prior pull already froze and this window still holds -- their files
               and manifest entries carry over untouched (a measurement is immutable, so a frozen
               point never needs re-freezing).
-      fresh   rows in this window the prior pull didn't hold -- freeze them now.
+      fresh   points in this window the prior pull didn't hold -- freeze them now.
       dropped point ids the prior pull froze that this window no longer holds -- their files and
               manifest entries leave the store (aged out of the 180 days).
     """
     reuse: dict = field(default_factory=dict)    # point_id -> prior manifest entry
-    fresh: list = field(default_factory=list)    # API rows to freeze
+    fresh: list = field(default_factory=list)    # Points to freeze
     dropped: set = field(default_factory=set)    # point_ids to remove
 
 
-def plan_incremental(rows: list[dict], prior_points: list[dict]) -> Incremental:
-    """Split this window's `rows` against a prior pull's manifest `points`. A point is reused iff
-    the prior pull holds its id; identity is immutable, so the id alone decides. The pull itself
-    never applies the window (api.pull already did) -- this only reconciles against what's frozen."""
-    want = {}
-    for r in rows:
-        want[contract.point_id(identity(r))] = r
+def plan_incremental(points: list, prior_points: list[dict]) -> Incremental:
+    """Split this window's points against a prior pull's manifest `points`. A point is reused iff
+    the prior pull holds its id with the same records; identity is immutable, so the id and its
+    records alone decide. The pull itself never applies the window (api.pull already did) --
+    this only reconciles against what's frozen."""
+    want = {p.point_id: p for p in points}
     prior = {e["point_id"]: e for e in prior_points}
     inc = Incremental()
-    for pid, row in want.items():
-        if pid in prior:
+    for pid, p in want.items():
+        if pid in prior and prior[pid].get("records") == p.records:
             inc.reuse[pid] = prior[pid]
         else:
-            inc.fresh.append(row)
+            inc.fresh.append(p)
     inc.dropped = set(prior) - set(want)
-    # Freeze fresh rows in the same order api.pull sorted them, so a pull is order-stable.
-    inc.fresh.sort(key=lambda r: int(r["id"]) if str(r["id"]).isdigit() else str(r["id"]))
+    # Freeze fresh points in point-id order, so a pull is order-stable.
+    inc.fresh.sort(key=lambda p: p.point_id)
     return inc
 
 

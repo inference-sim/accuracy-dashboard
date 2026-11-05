@@ -17,6 +17,7 @@ import cli  # noqa: E402
 import contract as c  # noqa: E402
 import pull as pl  # noqa: E402
 import api  # noqa: E402
+import ledger_fake  # noqa: E402
 
 
 def _args(tmp, **over):
@@ -27,7 +28,8 @@ def _args(tmp, **over):
              defaults_helper=str(tmp / "helper"), signedprobe=str(tmp / "signedprobe"),
              corpus=str(tmp / "corpus.json"),
              corpus_sha256=None, corpus_dataset="d", corpus_revision="main", corpus_cache=None,
-             timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0)
+             timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0,
+             ledger=str(tmp / "ledger"))
     a.update(over)
     return types.SimpleNamespace(**a)
 
@@ -35,7 +37,8 @@ def _args(tmp, **over):
 def _row(model, conc, md):
     return {"model": model, "hardware": "h100", "precision": "fp8", "framework": "vllm",
             "benchmark_type": "agentic_traces", "recipe_fingerprint": f"rf-{model}-{conc}-{md}",
-            "conc": conc, "date": md, "id": f"{model}{conc}{md}"}
+            "conc": conc, "date": md, "id": str(conc * 100000 + int(md.replace("-", "")[2:])),
+            "run_url": f"https://github.com/o/r/actions/runs/{conc}{md.replace('-', '')}/attempts/1"}
 
 
 class Fakes:
@@ -47,15 +50,19 @@ class Fakes:
     def api_pull(self, fetch, *, today, window_days, framework="vllm"):
         return types.SimpleNamespace(rows=self.rows)
 
+    def ledger(self, tmp):
+        # The ledger the night reads: one unit per row, written before each night.
+        ledger_fake.write(tmp / "ledger", self.rows)
+
     def cmd_pull(self, a):
         self.pulled_only = a.only
         want = self.rows if a.only is None else [r for r in self.rows
-                                                 if c.point_id(pl.identity(r)) in set(a.only)]
+                                                 if ledger_fake.point_id(r) in set(a.only)]
         out = Path(a.out)
         points = []
         for r in want:
-            ident = pl.identity(r)
-            pid = c.point_id(ident)
+            pid = ledger_fake.point_id(r)
+            ident = c.unit_identity(r, c.run_dates([r]))
             (out / "points" / pid).mkdir(parents=True, exist_ok=True)
             points.append({"point_id": pid, "identity": ident, "row": r, "files": {}, "reasons": []})
         pl.write_manifest(out, {"window": ["", a.today], "pulled_at": a.today + "T00:00:00Z"}, points)
@@ -85,8 +92,9 @@ def _install(monkeypatch, fakes, scored_ids):
 def test_nightly_seed_lists_window_fetches_all_and_publishes(tmp_path, monkeypatch):
     rows = [_row("m", 1, "2026-10-01"), _row("m", 2, "2026-10-01")]
     fakes = Fakes(rows)
-    _install(monkeypatch, fakes, [c.point_id(pl.identity(r)) for r in rows])
+    _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
 
+    fakes.ledger(tmp_path)
     rc = cli.cmd_nightly(_args(tmp_path))
     assert rc == 0
     # Seed (no prior summary) -> whole window fetched, snapshot frozen, live view + state written.
@@ -96,24 +104,26 @@ def test_nightly_seed_lists_window_fetches_all_and_publishes(tmp_path, monkeypat
     assert (tmp_path / "data" / "latest" / "summary.json").is_file()
     state = json.loads((tmp_path / "state.json").read_text())
     assert state["ingest"] == "api" and state["blis_tag"] == "v0.12.0"
-    assert set(state["point_ids"]) == {c.point_id(pl.identity(r)) for r in rows}
+    assert set(state["point_ids"]) == {ledger_fake.point_id(r) for r in rows}
 
 
 def test_nightly_ix_only_fetches_only_the_delta(tmp_path, monkeypatch):
     rows = [_row("m", 1, "2026-10-01")]
     fakes = Fakes(rows)
-    _install(monkeypatch, fakes, [c.point_id(pl.identity(r)) for r in rows])
+    _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
+    fakes.ledger(tmp_path)
     cli.cmd_nightly(_args(tmp_path))                       # seed
 
     # Night 2: a new point, same BLIS -> only the new point is fetched (the delta).
     new = _row("m", 2, "2026-10-02")
     fakes.rows = rows + [new]
+    fakes.ledger(tmp_path)
     # the merge path calls build_merged; stub it to a trivial summary so we only test the delta fetch
     import build_summary_v2
     monkeypatch.setattr(build_summary_v2, "build_merged",
                         lambda prior, delta, window_ids, **k: {**prior, "coverage": {"scored": 2, "not_scored": 0}})
     cli.cmd_nightly(_args(tmp_path, today="2026-10-24"))
-    assert fakes.pulled_only == [c.point_id(pl.identity(new))]   # delta only
+    assert fakes.pulled_only == [ledger_fake.point_id(new)]   # delta only
 
 
 def test_nightly_noop_fetches_nothing_not_the_whole_window(tmp_path, monkeypatch):
@@ -123,7 +133,8 @@ def test_nightly_noop_fetches_nothing_not_the_whole_window(tmp_path, monkeypatch
     # all ~2000 points (the full BLIS-release cost) for a result the merge then throws away.
     rows = [_row("m", 1, "2026-10-01"), _row("m", 2, "2026-10-01")]
     fakes = Fakes(rows)
-    _install(monkeypatch, fakes, [c.point_id(pl.identity(r)) for r in rows])
+    _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
+    fakes.ledger(tmp_path)
     cli.cmd_nightly(_args(tmp_path))                       # seed: whole window
     assert fakes.pulled_only is None
 
@@ -137,6 +148,7 @@ def test_nightly_noop_fetches_nothing_not_the_whole_window(tmp_path, monkeypatch
 def test_nightly_stops_when_the_pull_fails(tmp_path, monkeypatch):
     fakes = Fakes([_row("m", 1, "2026-10-01")])
     _install(monkeypatch, fakes, [])
+    fakes.ledger(tmp_path)
     monkeypatch.setattr(cli, "cmd_pull", lambda a: 4)      # a pull error
     with pytest.raises(RuntimeError, match="pull failed"):
         cli.cmd_nightly(_args(tmp_path))

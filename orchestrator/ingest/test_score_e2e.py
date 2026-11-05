@@ -64,18 +64,18 @@ def _exe(path: Path, body: str) -> str:
 
 
 def _setup(tmp: Path):
-    ident = {"benchmark_type": "single_turn", "conc": 4, "framework": "vllm", "hardware": "h200",
-             "measured_date": "2026-10-01", "model": "m", "precision": "fp8", "recipe": "row:1"}
-    pid = c.point_id(ident)
-    pdir = tmp / "pull" / "points" / pid
-    pdir.mkdir(parents=True)
-    (pdir / "server_log.gz").write_bytes(gzip.compress(LOG.encode(), mtime=0))
     row = {"id": "1", "model": "m", "hardware": "h200", "precision": "fp8", "framework": "vllm",
            "benchmark_type": "single_turn", "conc": 4, "isl": 1024, "osl": 1024, "spec_method": "mtp",
            "disagg": False, "is_multinode": False, "decode_tp": 1, "decode_ep": 1, "num_decode_gpu": 1,
            "date": "2026-10-01", "run_url": "https://github.com/o/r/actions/runs/1", "curve_workflow_run_id": "7",
            "image": "vllm/vllm-openai:v0.31.0", "metrics": {"mean_ttft": 0.2, "mean_tpot": 0.01}}
-    entry = {"point_id": pid, "identity": ident, "row": row, "reasons": [],
+    ident = c.unit_identity(row, c.run_dates([row]))
+    pid = c.point_id(ident)
+    pdir = tmp / "pull" / "points" / pid
+    pdir.mkdir(parents=True)
+    (pdir / "server_log.gz").write_bytes(gzip.compress(LOG.encode(), mtime=0))
+    entry = {"point_id": pid, "identity": ident, "row": row, "reasons": [], "records": ["1"],
+             "measurements": [{"record": "1", "metrics": row["metrics"]}],
              "files": {"server_log": {"path": "server_log.gz", "sha256": "0" * 64, "from": "api:/server-log"}},
              "build": {"image": row["image"], "commit": "a" * 40, "source": "image_label", "ref": "v0.31.0",
                        "distance": 0, "match": "exact"}}
@@ -126,12 +126,15 @@ def test_crosscheck_matches_the_contract_to_the_api_rows_and_catches_a_change():
     try:
         entry, env = _setup(tmp)
         _score(tmp, entry, env, tmp / "c1")
-        n, problems = xc.check(tmp / "c1" / "points.csv", [entry["row"]])
+        import ledger as ldg
+        import ledger_fake
+        lg = ldg.load(ledger_fake.write(tmp / "ledger", [entry["row"]]))
+        n, problems = xc.check(tmp / "c1" / "points.csv", [entry["row"]], lg)
         assert (n, problems) == (2, [])
         changed = {**entry["row"], "metrics": {**entry["row"]["metrics"], "mean_tpot": 0.02}}
-        n, problems = xc.check(tmp / "c1" / "points.csv", [changed])
+        n, problems = xc.check(tmp / "c1" / "points.csv", [changed], lg)
         assert len(problems) == 1 and "meas_tpot_us" in problems[0]
-        assert xc.check(tmp / "c1" / "points.csv", [])[1][0].endswith("not in the API rows given")
+        assert xc.check(tmp / "c1" / "points.csv", [], lg)[1][0].endswith("not in the API rows given")
     finally:
         shutil.rmtree(tmp)
 

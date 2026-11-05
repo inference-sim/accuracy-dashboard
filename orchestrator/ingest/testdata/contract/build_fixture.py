@@ -20,7 +20,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent.parent))
 from contract import (  # noqa: E402
     FACETS_JSON, FIDELITY_JSONL, NOT_SCORED_JSONL, POINTS_CSV, POINTS_HEADER, PROVENANCE_JSON,
-    canonical_dumps, point_id, points_sort_key, ratio_str, recipe_key,
+    canonical_dumps, point_id, points_sort_key, ratio_str, run_dates, unit_identity,
 )
 
 VLLM_REF = "v0.31.0"
@@ -223,11 +223,20 @@ RUNS = {
 }
 
 
+# The serving configuration every fixture row shares, in InferenceX's own names; a row's
+# run_url is built from its curve run id, and a row with neither has no benchmark run.
+CONFIG = {"isl": None, "osl": None, "offload_mode": "off", "spec_method": "none", "disagg": False,
+          "is_multinode": False, "prefill_tp": 1, "prefill_ep": 1, "prefill_dp_attention": False,
+          "prefill_num_workers": 0, "num_prefill_gpu": 1, "decode_tp": 1, "decode_ep": 1,
+          "decode_dp_attention": False, "decode_num_workers": 0, "num_decode_gpu": 1}
+
+
 def identity(row: dict) -> dict:
-    return {"model": row["model"], "hardware": row["hardware"], "precision": row["precision"],
-            "framework": row["framework"], "benchmark_type": row["benchmark_type"],
-            "recipe": recipe_key(row.get("recipe_fingerprint"), row.get("row_id")),
-            "conc": row["conc"], "measured_date": row["date"]}
+    """The row's ledger identity (design §10.2), from contract.unit_identity."""
+    run = row.get("curve_workflow_run_id")
+    full = {**CONFIG, "image": row.get("image"), **row, "id": row.get("row_id", "0"),
+            "run_url": f"https://github.com/SemiAnalysisAI/InferenceX/actions/runs/{run}/attempts/1" if run else None}
+    return unit_identity(full, run_dates([full]))
 
 
 def write_run(name: str, run: dict, base: Path) -> Path:
