@@ -57,6 +57,10 @@ jobs:
           cmp /tmp/v3b.json web/testdata/render-fixture.v3b.summary.json
           python3 orchestrator/validate_summary_v2.py web/testdata/render-fixture.v3.summary.json web/testdata/render-fixture.v3b.summary.json
           python3 orchestrator/validate_summary_v2.py web/testdata/render-fixture.v2.summary.json web/testdata/render-fixture.v2b.summary.json
+      - name: Scoring harness entrypoint flags and its release workflow (design §11.7)
+        run: |
+          pip install --quiet pytest pyyaml
+          python3 -m pytest -q harness/test_run_sh.py
       - name: vLLM build resolution + commit-distance gate (#28; not used by the nightly)
         run: python3 orchestrator/ingest/test_build.py
       - name: API ingest extractor - settings decided by the field list (COV-3), replay inputs, support, artifacts

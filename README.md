@@ -40,6 +40,27 @@ and holds **no other scoring logic**, no copied extractors, no log parsing, and 
 reimplement the scorer's exclusions (RFC §4.3/§4.4). `signedprobe`, `metricscore`, `blis` and the
 extractors are all built/run from source at the CI-resolved release tag.
 
+## Scoring harness image
+
+The scoring harness is the one place a BLIS simulation is compared with a measured end-to-end
+benchmark (design §2.2, §11.7). It is released as a container image, built from each release
+tag by `.github/workflows/harness-release.yml`, published to
+`ghcr.io/inference-sim/accuracy-dashboard-harness`, and signed by digest with cosign keyless
+signing. The job summary and the `harness-digest` artifact give the digest.
+
+The image takes three inputs, as flags to its entrypoint `harness/run.sh`:
+
+- a simulator build: `--sim`, a release tag or a full 40-hex commit of inference-sim, which the
+  harness clones and builds (a branch name is refused, because it moves);
+- the data: `--catalog` and `--registry` (both required until the simulator can report the data it embeds);
+- a set of ledger units: `--units`, with `--pull`, the frozen recorded runs of those units.
+
+A repository whose pull requests run the harness pins one digest in one pin file, as it pins
+any dependency, pulls the image by that digest, and passes it to the run as `HARNESS_DIGEST`.
+The release bot moves the pin. Every figure records the digest of the harness that produced it
+(X8). A run without `HARNESS_DIGEST` records `unreleased`, and its figures are labelled
+experimental: they may be posted on a pull request, never published as BLIS's accuracy.
+
 ## Layout
 
 | Path | What |
