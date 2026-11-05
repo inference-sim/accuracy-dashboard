@@ -29,6 +29,7 @@ import artifacts as art  # noqa: E402
 import build  # noqa: E402
 import clients  # noqa: E402
 import contract  # noqa: E402
+import engines  # noqa: E402
 import fields as fl  # noqa: E402
 import ledger as ldg  # noqa: E402
 import pull as pl  # noqa: E402
@@ -53,8 +54,12 @@ def cmd_pull(a) -> int:
     out.mkdir(parents=True, exist_ok=True)
     today = date.fromisoformat(a.today) if a.today else date.today()
     p = api.pull(api.http_fetch, today=today, window_days=a.window_days)
-    _log(f"pull: {len(p.rows)} vllm rows in {p.window}; slugs with no site name: {p.unnamed_slugs}; "
+    _log(f"pull: {len(p.rows)} rows in {p.window}; slugs with no site name: {p.unnamed_slugs}; "
          f"rows with an unreadable date: {len(p.undated)}")
+    unknown = engines.unknown_labels(p.rows)
+    if unknown:
+        _log("FATAL: engines.FRAMEWORKS does not name the framework(s) " + ", ".join(unknown))
+        return 3
     if p.unnamed_slugs:
         # /benchmarks takes display names, so these models' rows can't be listed at all. Fail
         # rather than publish a pull that silently lacks a model.
@@ -65,6 +70,7 @@ def cmd_pull(a) -> int:
     # are listed with why, in the manifest, and counted in coverage.
     lg = ldg.load(Path(a.ledger))
     placed = pl.place(p.rows, lg)
+    pl.check_placed(p.rows, placed)
     _log(f"pull: {len(placed.points)} points (ledger units) from {len(p.rows)} rows; "
          f"{len(placed.unlisted)} rows hold no unit of {lg.revision}")
     points_in = placed.points
@@ -382,6 +388,11 @@ def cmd_score(a) -> int:
     agentic_workers = a.agentic_workers if getattr(a, "agentic_workers", 0) else 1
     outcomes = sc.score_points(points, pull_dir, work, env, workers=workers,
                                agentic_workers=agentic_workers, log=_log)
+    problems = sc.check_all_scored(points, outcomes)
+    if problems:
+        for p in problems:
+            _log(f"INVALID: {p}")
+        return 1
     prov = {"ingest": "api",
             "blis": {"release": env.blis_release, "commit_sha": env.blis_commit, "catalog": env.catalog_release,
                      "registry": env.registry_release, "extractor_version": f"blis-latency-kernel@{env.kernel}"},

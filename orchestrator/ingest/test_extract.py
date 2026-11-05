@@ -895,11 +895,9 @@ def test_display_map_is_read_from_the_site_and_rows_windowed_on_date():
                                     {"id": "1", "model": "dsv41flash", "framework": "vllm", "date": "2026-08-01",
                                      "curve_date": "2026-10-20"}],
             "GLM-5": [{"id": "3", "model": "glm5.1", "framework": "vllm", "date": "2026-10-21"},
-                      # every other serving stack InferenceX reports, including the ones that
-                      # wrap vLLM: only plain vLLM rows are pulled
+                      # every other serving stack InferenceX reports is pulled too
                       *[{"id": str(10 + i), "model": "glm5", "framework": f, "date": "2026-10-21"}
-                        for i, f in enumerate(("sglang", "trt", "dynamo-vllm", "vllm-disagg", "llmd-vllm",
-                                               "dynamo-sglang", "dynamo-trt", "atom", "VLLM", " vllm"))]]}
+                        for i, f in enumerate(("sglang", "trt", "dynamo-vllm"))]]}
 
     def fetch(url):
         path = url[len(api.BASE):]
@@ -909,7 +907,7 @@ def test_display_map_is_read_from_the_site_and_rows_windowed_on_date():
         return site[path]
 
     p = api.pull(fetch, today=date(2026, 10, 23), window_days=7)
-    assert [r["id"] for r in p.rows] == ["2", "3"]          # by date, not curve_date; vllm only
+    assert [r["id"] for r in p.rows] == ["2", "3", "10", "11", "12"]   # by date, not curve_date; every framework
     assert p.unnamed_slugs == ["newmodel"]                  # reported, not guessed
 
 

@@ -174,6 +174,10 @@ Beside `data/latest/summary.json` the nightly publishes `data/latest/backlog.jso
 
 Each simulator release is scored exactly once (COV-9). The nightly scores, in the order they were tagged, every stable inference-sim release from v0.16.0 on (`stack.FIRST_GRADED_RELEASE`) that has no published snapshot (`data/snapshots/*_blis-<tag>_*`), one after another (`resolve_blis.sh`, `stack.unscored_releases`). When none is left, it scores the newest release's IX-only delta. A release's snapshot, once published, never changes (COV-8).
 
+## Frameworks
+
+The pull lists every framework InferenceX reports in the window. `engines.FRAMEWORKS` maps each label to its engine (or none), the router its deployments run behind by construction, and its topology. Only `vllm`, `llmd-vllm`, `vllm-disagg` and `dynamo-vllm` run vLLM; they fetch artifacts and are scored. Every other label's point fetches nothing and is G5 with every reason true of it: `router_unsupported` when it ran behind a router other than llm-d's (the API row's `router_name`, else the label's own router), `field_unclassified` for the SGLang family, `engine_unsupported` for TensorRT-LLM, ATOM and TileRT. Reasons are listed together in `g5_reasons`, sorted by code; `g5_reason` is the first in design §11.4's order, which is `grade.G5_CODES`: `code_not_visible`, `router_unsupported`, `value_not_recorded`, `field_not_modelled`, `field_unclassified`, `engine_unsupported`, `not_in_catalog`, `field_not_in_release`, `value_conflict`, `build_unparseable`. So a point with both a router and an unsupported engine has `router_unsupported` as its `g5_reason`. A label the table does not name stops the pull. The pull records every row: a row in a point's records or listed under `ledger.unlisted` with its reason (`pull.check_placed`), and `cli.py score` refuses a run in which a unit is neither scored, G5 nor failed (`score.check_all_scored`; the contract validator holds the counts to `provenance.points`, COV-1).
+
 ## G5 reasons
 
 The closed list of design §11.4 (`grade.G5_CODES`; COV-5). A reason the scorer finds is mapped onto it by `assess.g5_of`; a reason with no place on the list raises, and is never published.
@@ -184,8 +188,8 @@ The closed list of design §11.4 (`grade.G5_CODES`; COV-5). A reason the scorer 
 | `router_unsupported` | The run was measured behind a router BLIS does not host: the API row's `router_name`, or the launch configuration's frontend, names one other than llm-d's. BLIS is not asked about such a point. |
 | `value_not_recorded` | A value the simulation needs is not recorded: the server log or the client export is missing, the row has no artifact, a disaggregated or multi-node run records no fabric, a required setting no source states, or a client scenario BLIS does not replay. |
 | `field_not_modelled` | The run sets a field the engine classifies as not modelled, with no estimation rule. |
-| `field_unclassified` | The engine has not classified a field the run sets. |
-| `engine_unsupported` | No BLIS engine repository models the run's framework. |
+| `field_unclassified` | The engine has not classified a field the run sets. For the SGLang family (`sglang`, `dynamo-sglang`, `mori-sglang`) the subject is `sglang: no field list published`: blis-sglang exists and is empty until M3, so `engine_unsupported` would be false. This needs the design owner's ruling (`engines.SGLANG_FIELD_LIST_UNPUBLISHED`). |
+| `engine_unsupported` | No BLIS engine repository exists for the run's engine (TensorRT-LLM, ATOM, TileRT). |
 | `not_in_catalog` | The run's model, chip or drafter has no catalog entry. |
 | `field_not_in_release` | The run sets a field the engine release BLIS runs does not have. |
 | `value_conflict` | Two sources that record the same stage of one field disagree. |

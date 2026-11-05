@@ -25,8 +25,3 @@ def test_a_router_blis_does_not_host_is_router_unsupported():
     assert asx.router_reason({"metrics": {}}, "dynamo-router") == ["router_unsupported:dynamo-router"]
     assert asx.router_reason({"metrics": {"router_name": "llm-d-router"}}, None) == []
     assert asx.router_reason({"metrics": {}}, None) == []
-
-
-def test_an_engine_no_blis_repository_models_is_engine_unsupported():
-    assert asx.engine_reason({"framework": "sglang"}, {"vllm"}) == ["engine_unsupported:sglang"]
-    assert asx.engine_reason({"framework": "vllm"}, {"vllm"}) == []

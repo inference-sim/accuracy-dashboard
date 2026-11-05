@@ -85,6 +85,7 @@ jobs:
             orchestrator/ingest/test_result.py \
             orchestrator/ingest/test_grade.py \
             orchestrator/ingest/test_assess.py \
+            orchestrator/ingest/test_engines.py \
             orchestrator/ingest/test_fields.py \
             orchestrator/ingest/test_headline.py \
             orchestrator/ingest/test_backlog.py \

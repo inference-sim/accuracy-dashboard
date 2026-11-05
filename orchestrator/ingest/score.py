@@ -28,6 +28,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import assess as asx  # noqa: E402
 import contract  # noqa: E402
+import engines  # noqa: E402
 import fields as fl  # noqa: E402
 import grade as gr  # noqa: E402
 import inferencex_client as ix  # noqa: E402
@@ -444,6 +445,20 @@ def score_points(points: list, pull_dir: Path, work: Path, env: Env, *, workers:
     return [results[i] for i in range(n)]   # input order; write_contract re-sorts anyway
 
 
+def check_all_scored(points: list, outcomes: list) -> list[str]:
+    """COV-1: every unit the window holds ends scored, G5 with a reason, or failed. The outcomes
+    are the points, one each, and each is one of those three."""
+    out = []
+    want = sorted(e["point_id"] for e in points)
+    got = sorted(o.point_id for o in outcomes)
+    if want != got:
+        out.append(f"{len(got)} outcomes for {len(want)} points: every unit must end scored or G5 (COV-1)")
+    for o in outcomes:
+        if o.fidelity is None and o.g5 is None and not o.faults:
+            out.append(f"{o.point_id[:12]}: neither scored, G5 nor failed (COV-1)")
+    return out
+
+
 def _run_pool(indexed: list, pull_dir: Path, work: Path, env: Env, workers: int, record) -> None:
     """Score a list of (index, entry) at the given concurrency, calling record(index, outcome) as
     each finishes. workers<=1 runs in-process (no pool), else a ProcessPoolExecutor."""
@@ -465,13 +480,17 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     work = work.resolve()
     o = Outcome(point_id=pid, identity=ident, row=row, reasons=list(entry["reasons"]),
                 measurements=entry.get("measurements") or [], build=entry.get("build"))
-    o.reasons += asx.engine_reason(row, ENGINES)
+    fw = engines.lookup(row["framework"])
+    if not engines.scored(fw):
+        # Nothing was fetched and BLIS is not asked: G5 for the label's reasons and its router.
+        o.reasons = sorted(set(o.reasons + engines.reasons(fw) + asx.router_reason(row, fw.router)))
+        return o
     pdir = pull_dir / "points" / pid
     log_b = _read(pdir, entry["files"], "server_log")
     if log_b is None:
         # The pull may already have said why (the API answered 413): that reason stands alone.
         bare = [] if "server_log_missing:api_413" in o.reasons else ["server_log_missing"]
-        o.reasons = sorted(set(o.reasons + bare + asx.router_reason(row, None)))
+        o.reasons = sorted(set(o.reasons + bare + asx.router_reason(row, fw.router)))
         return o
     log = log_b.decode("utf-8", "replace")
     o.banner = _banner_version(log)
@@ -479,7 +498,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     launch = json.loads(lc_b) if lc_b else None
     # A run measured behind a router BLIS does not host is never scored as if llm-d had routed
     # it (design §11.4, X4; inference-sim #2028), so BLIS is not asked about it.
-    o.reasons += asx.router_reason(row, _launch_router(launch))
+    o.reasons += asx.router_reason(row, _launch_router(launch) or fw.router)
 
     readings, problems = st.read_all(log, launch)
     # The API row's router is its own source: it states the frontend, nothing about the engine.
@@ -620,10 +639,6 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
                  round(float(m["mean_ttft"]) * 1e6, 3), round(pttft, 3),
                  None, pid, ident["measured_date"]]     # the grade column is filled by grade_outcome
     return o
-
-
-# The engines a BLIS engine repository models (design §11.4, engine_unsupported).
-ENGINES = {"vllm"}
 
 
 def _launch_router(launch: dict | None) -> str | None:

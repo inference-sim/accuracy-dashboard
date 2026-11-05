@@ -108,13 +108,14 @@ def in_window(measured_date, today: date, window_days: int = WINDOW_DAYS) -> boo
     return start <= d <= end
 
 
-def pull(fetch, *, today: date, window_days: int = WINDOW_DAYS, framework: str = "vllm") -> Pull:
-    """Every `framework` row measured within the N-day window ending today (both ends included),
-    for every model InferenceX lists. Sorted by row id, so a pull is order-stable."""
+def pull(fetch, *, today: date, window_days: int = WINDOW_DAYS) -> Pull:
+    """Every row of every framework measured within the N-day window ending today (both ends
+    included), for every model InferenceX lists. Which frameworks the harness scores is
+    engines.py's table, not this pull's. Sorted by row id, so a pull is order-stable."""
     start, end = window_bounds(today, window_days)
     avail = decode(fetch(API + "/availability"))
     slugs = {a["model"] for a in avail
-             if a.get("framework") == framework and in_window(a.get("date"), today, window_days)}
+             if in_window(a.get("date"), today, window_days)}
     names = display_names(fetch, slugs) if slugs else {}
     if slugs and not names:
         # Nothing at all named: the site changed shape, not the data. Fail rather than
@@ -127,7 +128,7 @@ def pull(fetch, *, today: date, window_days: int = WINDOW_DAYS, framework: str =
         if isinstance(rows, dict) and "error" in rows:
             raise RuntimeError(f"/benchmarks?model={display}: {rows['error']}")
         for r in rows:
-            if r.get("framework") != framework or r.get("model") not in slugs or str(r["id"]) in seen:
+            if r.get("model") not in slugs or str(r["id"]) in seen:
                 continue
             try:
                 date.fromisoformat(str(r.get("date"))[:10])

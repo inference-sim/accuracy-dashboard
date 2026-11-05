@@ -23,6 +23,7 @@ import api  # noqa: E402
 import artifacts as art  # noqa: E402
 import build  # noqa: E402
 import contract  # noqa: E402
+import engines  # noqa: E402
 import recipes as rcp  # noqa: E402
 
 IX_REPO = "SemiAnalysisAI/InferenceX"
@@ -117,6 +118,12 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
     pid = contract.point_id(ident)
     entry = {"point_id": pid, "identity": ident, "row": row, "records": point.records,
              "measurements": point.measurements, "reasons": _row_reasons(row), "files": {}}
+    fw = engines.lookup(row["framework"])
+    if not engines.scored(fw):
+        # No BLIS engine scores this framework, so nothing is fetched: the point is G5 for the
+        # reasons the label gives (engines.py), plus its router at scoring time.
+        entry.update(reasons=sorted(engines.reasons(fw)), build=None)
+        return entry
     agentic = row["benchmark_type"] == "agentic_traces"
     run = api.run_of(row)
     frozen = Frozen(out / "points" / pid)
@@ -221,6 +228,15 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
         if not entry["artifact_notes"]:
             del entry["artifact_notes"]
     return entry
+
+
+def check_placed(rows: list[dict], placed: "Placed") -> None:
+    """Every row of the window is recorded: it is in a point's records or listed unlisted with
+    its reason. A row in neither would vanish from the counts (COV-1)."""
+    kept = sum(len(p.records) for p in placed.points)
+    if kept + len(placed.unlisted) != len(rows):
+        raise ValueError(f"{len(rows)} rows in the window, but the points hold {kept} and {len(placed.unlisted)} "
+                         f"are listed unlisted (COV-1)")
 
 
 def write_manifest(out: Path, meta: dict, points: list[dict]) -> str:

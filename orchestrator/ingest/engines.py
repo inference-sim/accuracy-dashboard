@@ -3,9 +3,10 @@
 InferenceX labels every row with a `framework`. This table is the one place that maps a label to
 
   engine    the engine kind the run executed, or None when no BLIS engine repository exists for it
-  router    the router the label's deployments run behind by construction, or None when the
-            stack serves without one. A router the API row records (`metrics.router_name`)
-            or the launch configuration names takes precedence (assess.router_reason).
+  router    the router every deployment of the label runs behind by construction (Dynamo's
+            frontend, TileRT's prefill-decode router), or None when the label does not fix
+            one. A router the API row records (`metrics.router_name`) or the launch
+            configuration names takes precedence (assess.router_reason).
   topology  "aggregated", "disaggregated", or "either" when the label covers both
 
 The table is a fact about InferenceX's labels, not a classification of settings (design §11.1):
@@ -58,11 +59,11 @@ def _f(label, engine, router, topology):
 FRAMEWORKS = dict([
     _f("vllm", VLLM, None, AGGREGATED),
     _f("llmd-vllm", VLLM, "llm-d-router", DISAGGREGATED),
-    _f("vllm-disagg", VLLM, "vllm-router", DISAGGREGATED),
+    _f("vllm-disagg", VLLM, None, DISAGGREGATED),
     _f("dynamo-vllm", VLLM, "dynamo-router", EITHER),
     _f("sglang", SGLANG, None, AGGREGATED),
     _f("dynamo-sglang", SGLANG, "dynamo-router", EITHER),
-    _f("mori-sglang", SGLANG, "sglang-router", DISAGGREGATED),
+    _f("mori-sglang", SGLANG, None, DISAGGREGATED),
     _f("trt", None, None, AGGREGATED),
     _f("dynamo-trt", None, "dynamo-router", EITHER),
     _f("atom", None, None, AGGREGATED),
@@ -96,10 +97,3 @@ def reasons(fw: Framework) -> list[str]:
     if fw.engine == SGLANG:
         return [SGLANG_FIELD_LIST_UNPUBLISHED]
     return [f"engine_unsupported:{fw.label}"]
-
-
-def serving(fw: Framework, row: dict) -> str:
-    """aggregated or disaggregated: the label's topology, else the row's."""
-    if fw.topology != EITHER:
-        return fw.topology
-    return DISAGGREGATED if row.get("disagg") else AGGREGATED

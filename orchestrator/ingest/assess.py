@@ -77,9 +77,3 @@ def router_reason(row: dict, launch_router: str | None) -> list[str]:
     if name and not str(name).startswith("llm-d"):
         return [f"router_unsupported:{name}"]
     return []
-
-
-def engine_reason(row: dict, engines: set[str]) -> list[str]:
-    """A point measured on an engine no BLIS engine repository models (design §11.4)."""
-    fw = row.get("framework") or ""
-    return [] if fw in engines else [f"engine_unsupported:{fw}"]
