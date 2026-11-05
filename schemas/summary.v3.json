@@ -48,7 +48,10 @@
         "fields_sha256",
         "pulled_at",
         "engine",
-        "simulator"
+        "simulator",
+        "harness_digest",
+        "experimental",
+        "units"
       ],
       "properties": {
         "blis": {
@@ -196,6 +199,49 @@
         "simulator": {
           "$ref": "https://inference-sim.github.io/accuracy-dashboard/schemas/fidelity.v3.json#/definitions/simulator",
           "description": "The one simulator build that scored every point, and the engine release it runs (COV-6)."
+        },
+        "harness_digest": {
+          "description": "The digest of the harness image that produced every figure (design §11.7, X8), or unreleased.",
+          "type": "string",
+          "pattern": "^(sha256:[0-9a-f]{64}|unreleased)$"
+        },
+        "experimental": {
+          "description": "True unless the simulator build is a release tag and its data is released (design §11.7, X8): an experimental figure is never published as BLIS's accuracy.",
+          "type": "boolean"
+        },
+        "units": {
+          "description": "The ledger units the run was asked to score (cli.py score --units): the file's sha256, how many it names, and those the pull did not hold; null when the run scored every point of the pull.",
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "sha256",
+                "count",
+                "not_in_pull"
+              ],
+              "properties": {
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "not_in_pull": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  }
+                }
+              }
+            }
+          ]
         }
       }
     },

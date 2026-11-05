@@ -158,7 +158,8 @@ def _score(tmp: Path, entry, env, out: Path):
     o = sc._score_one(entry, tmp / "pull", work, env)
     prov = {"ingest": "api", "blis": {"release": "v0.12.0", "commit_sha": "b" * 40, "catalog": "0.3.0",
                                       "registry": "v0.2.0", "extractor_version": "blis-latency-kernel@v0.3.0"},
-            "simulator": env.simulator(), "engine": {"kind": "vllm", "version": "0.31.0"}, "left_out_records": 0,
+            "simulator": env.simulator(), "harness_digest": env.harness_digest, "experimental": False, "units": None,
+            "engine": {"kind": "vllm", "version": "0.31.0"}, "left_out_records": 0,
             "vllm_ref": "v0.31.0", "vllm_max_distance": 2000, "fields_sha256": "d" * 64,
             "pulled_at": "2026-10-23T00:00:00Z", "corpus": None, "pull_manifest_sha256": "e" * 64,
             "source": {"name": "test", "url": "https://example.invalid/"}}
@@ -491,7 +492,8 @@ def test_the_scenario_engine_block_holds_the_runs_values_under_the_engines_own_n
         assert dep["pools"][0]["parallel"] == {"tp": 1, "pp": 1, "dp": 1, "enable_expert_parallel": False}
         assert o.fidelity["run_release"] == "0.31.0"
         # Every point records the simulator build and engine release that scored it (COV-6).
-        assert o.fidelity["simulator"] == {"build": "v0.12.0", "engine": {"kind": "vllm", "version": "0.31.0"}}
+        assert o.fidelity["simulator"] == {"build": "v0.12.0", "engine": {"kind": "vllm", "version": "0.31.0"},
+                                           "harness_digest": "unreleased"}
     finally:
         shutil.rmtree(tmp)
 

@@ -282,3 +282,35 @@ def test_resolve_blis_names_every_unscored_release_oldest_first_else_the_newest(
     (snaps / "2026-11-11_blis-v0.16.0_ix-api-2026-11-11").mkdir()
     (snaps / "2026-12-02_blis-v0.17.0_ix-api-2026-12-02").mkdir()
     assert run() == {"blis_tags": "v0.17.0", "blis_tag": "v0.17.0"}
+
+
+def test_sim_build_must_be_the_checkouts_tag_or_commit(tmp_path):
+    import subprocess
+    sim = tmp_path / "sim"
+    _tagged_repo(sim, "v0.16.0")
+    (sim / "blis").write_text("")
+    for r in ("cat", "reg"):
+        _tagged_repo(tmp_path / r, "v1.0.0")
+    head = subprocess.run(["git", "-C", str(sim), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    check = lambda b: cli.check_blis_inputs(sim / "blis", tmp_path / "cat", tmp_path / "reg", b)  # noqa: E731
+    assert check("v0.16.0") == [] and check(head) == []
+    assert check("v0.17.0") == [f"--sim-build v0.17.0: the checkout {sim} is at v0.16.0"]
+    assert check("0" * 40) == [f"--sim-build {'0' * 40}: the checkout {sim} is at commit {head}"]
+    assert check("main") == ["--sim-build 'main' is neither a release tag vX.Y.Z nor a 40-hex commit"]
+
+
+def test_harness_digest_is_a_sha256_or_unreleased():
+    assert cli.check_harness_digest("sha256:" + "a" * 64) == [] and cli.check_harness_digest("unreleased") == []
+    assert cli.check_harness_digest("latest") == ["--harness-digest 'latest' is neither sha256:<64 hex> nor unreleased"]
+    assert cli.check_harness_digest(None)[0].startswith("--harness-digest is required")
+
+
+def test_units_select_the_points_of_the_pull_and_name_those_it_does_not_hold(tmp_path):
+    a, b, c_ = "a" * 64, "b" * 64, "c" * 64
+    units = tmp_path / "units.txt"
+    units.write_text(f"{a}\n{c_}\n")
+    pts = [{"point_id": a}, {"point_id": b}]
+    chosen, rec = cli.select_units(pts, str(units))
+    assert chosen == [{"point_id": a}]
+    assert rec["count"] == 2 and rec["not_in_pull"] == [c_] and len(rec["sha256"]) == 64
+    assert cli.select_units(pts, None) == (pts, None)

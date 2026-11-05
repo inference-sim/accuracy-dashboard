@@ -15,8 +15,12 @@
       "engine": {
         "kind": "vllm",
         "version": "0.31.0"
-      }
+      },
+      "harness_digest": "unreleased"
     },
+    "harness_digest": "unreleased",
+    "experimental": false,
+    "units": null,
     "engine": {
       "kind": "vllm",
       "version": "0.31.0"
@@ -559,7 +563,8 @@
                           "engine": {
                             "kind": "vllm",
                             "version": "0.31.0"
-                          }
+                          },
+                          "harness_digest": "unreleased"
                         },
                         "substitutions": [
                           {
@@ -667,7 +672,8 @@
                           "engine": {
                             "kind": "vllm",
                             "version": "0.31.0"
-                          }
+                          },
+                          "harness_digest": "unreleased"
                         },
                         "substitutions": [
                           {
@@ -775,7 +781,8 @@
                           "engine": {
                             "kind": "vllm",
                             "version": "0.31.0"
-                          }
+                          },
+                          "harness_digest": "unreleased"
                         },
                         "substitutions": [
                           {
@@ -1098,7 +1105,8 @@
                           "engine": {
                             "kind": "vllm",
                             "version": "0.31.0"
-                          }
+                          },
+                          "harness_digest": "unreleased"
                         },
                         "substitutions": [
                           {
@@ -1309,7 +1317,8 @@
                           "engine": {
                             "kind": "vllm",
                             "version": "0.31.0"
-                          }
+                          },
+                          "harness_digest": "unreleased"
                         },
                         "substitutions": []
                       }
@@ -1415,7 +1424,8 @@
                           "engine": {
                             "kind": "vllm",
                             "version": "0.31.0"
-                          }
+                          },
+                          "harness_digest": "unreleased"
                         },
                         "substitutions": []
                       }
@@ -1521,7 +1531,8 @@
                           "engine": {
                             "kind": "vllm",
                             "version": "0.31.0"
-                          }
+                          },
+                          "harness_digest": "unreleased"
                         },
                         "substitutions": []
                       }
@@ -1667,7 +1678,8 @@
                           "engine": {
                             "kind": "vllm",
                             "version": "0.31.0"
-                          }
+                          },
+                          "harness_digest": "unreleased"
                         },
                         "substitutions": [
                           {
@@ -1948,7 +1960,8 @@
                           "engine": {
                             "kind": "vllm",
                             "version": "0.31.0"
-                          }
+                          },
+                          "harness_digest": "unreleased"
                         },
                         "substitutions": [
                           {
@@ -2015,7 +2028,8 @@
         "engine": {
           "kind": "vllm",
           "version": "0.31.0"
-        }
+        },
+        "harness_digest": "unreleased"
       }
     },
     {
@@ -2062,7 +2076,8 @@
         "engine": {
           "kind": "vllm",
           "version": "0.31.0"
-        }
+        },
+        "harness_digest": "unreleased"
       }
     },
     {
@@ -2113,7 +2128,8 @@
         "engine": {
           "kind": "vllm",
           "version": "0.31.0"
-        }
+        },
+        "harness_digest": "unreleased"
       }
     },
     {
@@ -2160,7 +2176,8 @@
         "engine": {
           "kind": "vllm",
           "version": "0.31.0"
-        }
+        },
+        "harness_digest": "unreleased"
       }
     },
     {
@@ -2207,7 +2224,8 @@
         "engine": {
           "kind": "vllm",
           "version": "0.31.0"
-        }
+        },
+        "harness_digest": "unreleased"
       }
     }
   ],

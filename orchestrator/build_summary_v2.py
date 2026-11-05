@@ -344,6 +344,9 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     provenance = {
         "blis": prov_in["blis"],
         "simulator": prov_in["simulator"],
+        "harness_digest": prov_in["harness_digest"],
+        "experimental": prov_in["experimental"],
+        "units": prov_in["units"],
         "engine": prov_in["engine"],
         # What the extractor pulled, as it recorded it (provenance.json's source).
         "ground_truth": {"source": prov_in["source"]["name"], "source_url": prov_in["source"]["url"],
@@ -453,7 +456,9 @@ def summary_to_contract(summary: dict, out: Path) -> None:
 def _prov_out_to_in(prov: dict, coverage: dict) -> dict:
     """The summary's provenance back to the contract's provenance.json shape build() expects."""
     gt = prov.get("ground_truth", {})
-    return {"ingest": "api", "blis": prov["blis"], "simulator": prov["simulator"], "engine": prov["engine"],
+    return {"ingest": "api", "blis": prov["blis"], "simulator": prov["simulator"],
+            "harness_digest": prov["harness_digest"], "experimental": prov["experimental"], "units": prov["units"],
+            "engine": prov["engine"],
             "points": coverage["points"],
             "left_out_records": coverage["left_out_records"], "vllm_ref": prov["vllm_ref"],
             "vllm_max_distance": prov["vllm_max_distance"], "fields_sha256": prov["fields_sha256"],

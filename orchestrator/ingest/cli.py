@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import urllib.error
@@ -219,21 +220,58 @@ def _go_require(gomod: Path, module: str) -> str | None:
     return None
 
 
-def check_blis_inputs(blis: Path, catalog: Path, registry: Path) -> list[str]:
-    """Everything `score` needs to be one BLIS release, or what's wrong. The blis binary sits in
-    the inference-sim checkout it was built from, which must be at a release tag, as must the
-    catalog and registry. The releases recorded in provenance must be real tags, never
-    "unknown"."""
+_SIM_TAG = re.compile(r"^v\d+\.\d+\.\d+$")
+_SIM_COMMIT = re.compile(r"^[0-9a-f]{40}$")
+_DIGEST = re.compile(r"^(sha256:[0-9a-f]{64}|unreleased)$")
+
+
+def check_blis_inputs(blis: Path, catalog: Path, registry: Path, sim_build: str | None = None) -> list[str]:
+    """Everything `score` needs to name its simulator build, or what's wrong. The blis binary sits
+    in the inference-sim checkout it was built from. With --sim-build the checkout must be at that
+    build: the release tag, or the 40-hex commit. Without it the checkout must be at a release
+    tag, which is the build. The catalog and registry must be at release tags."""
     out = []
     sim = blis.parent
     if not blis.is_file():
         out.append(f"--blis {blis} is not a file (build it: go build -o blis main.go in an inference-sim checkout)")
-    if not _git(sim, "describe", "--tags", "--exact-match"):
-        out.append(f"--blis {blis}: its checkout {sim} is not at a release tag (fetch tags, or check out the tag)")
+    tag = _git(sim, "describe", "--tags", "--exact-match")
+    if sim_build is None:
+        if not tag:
+            out.append(f"--blis {blis}: its checkout {sim} is not at a release tag (fetch tags, or check out the tag)")
+    elif _SIM_TAG.match(sim_build):
+        if tag != sim_build:
+            out.append(f"--sim-build {sim_build}: the checkout {sim} is at {tag or 'no release tag'}")
+    elif _SIM_COMMIT.match(sim_build):
+        head = _git(sim, "rev-parse", "HEAD")
+        if head != sim_build:
+            out.append(f"--sim-build {sim_build}: the checkout {sim} is at commit {head or 'unknown'}")
+    else:
+        out.append(f"--sim-build {sim_build!r} is neither a release tag vX.Y.Z nor a 40-hex commit")
     for repo, flag in ((catalog, "--catalog"), (registry, "--registry")):
         if not _git(repo, "describe", "--tags", "--exact-match"):
             out.append(f"{flag} {repo} is not at a release tag")
     return out
+
+
+def check_harness_digest(digest: str | None) -> list[str]:
+    """The harness image digest every figure records (design §11.7, X8): sha256:<64 hex>, or
+    unreleased for a harness not run from a released image."""
+    if digest is None:
+        return ["--harness-digest is required: sha256:<64 hex> of the harness image, or unreleased"]
+    return [] if _DIGEST.match(digest) else [f"--harness-digest {digest!r} is neither sha256:<64 hex> nor unreleased"]
+
+
+def select_units(points: list[dict], units_path: str | None) -> tuple[list[dict], dict | None]:
+    """The pull's points a --units file names (design §11.7: the harness scores a set of ledger
+    units), and the record of the set: its sha256, its size, and the units the pull does not hold.
+    With no --units, every point of the pull and None."""
+    if units_path is None:
+        return points, None
+    want = ldg.read_unit_set(Path(units_path))
+    held = {p["point_id"] for p in points}
+    return ([p for p in points if p["point_id"] in want],
+            {"sha256": art.sha256(Path(units_path).read_bytes()), "count": len(want),
+             "not_in_pull": sorted(want - held)})
 
 
 def read_fields(path: str | None, engine_release: str) -> tuple["fl.FieldList", str]:
@@ -271,7 +309,9 @@ def read_stack(blis: Path, given: str | None) -> sk.Stack:
 def cmd_score(a) -> int:
     pull_dir = Path(a.pull)
     blis = Path(a.blis).resolve()
-    bad = check_blis_inputs(blis, Path(a.catalog), Path(a.registry))
+    sim_build = getattr(a, "sim_build", None)
+    bad = check_blis_inputs(blis, Path(a.catalog), Path(a.registry), sim_build)
+    bad += check_harness_digest(getattr(a, "harness_digest", None))
     try:
         stack = read_stack(blis, getattr(a, "stack", None))
         engine_release = stack.engine("vllm")
@@ -306,14 +346,17 @@ def cmd_score(a) -> int:
         vllm_ref=manifest["vllm_ref"], field_list=field_list, fields_sha256=fields_sha,
         base_models=manifest.get("base_models") or {}, timeout_s=a.timeout, vllm_defaults=vdefaults,
         max_rss_mb=getattr(a, "max_rss_mb", 0) or 0, engine_release=engine_release)
-    # The build every point records: the release tag the checkout is at (check_blis_inputs
-    # required one), with the engine release its stack.json names (COV-6).
-    env.sim_build = env.blis_release
+    # The build every point records: --sim-build, else the release tag the checkout is at
+    # (check_blis_inputs required one), with the engine release its stack.json names (COV-6).
+    env.sim_build = sim_build or env.blis_release
+    env.harness_digest = a.harness_digest
     env.catalog_obj = sp.Catalog.load(env.catalog)
     env.parts = sp.registry_parts(env.registry)
     work = Path(a.work or Path(a.out).parent / (Path(a.out).name + "-work"))
     work.mkdir(parents=True, exist_ok=True)
-    points = manifest["points"]
+    points, units = select_units(manifest["points"], getattr(a, "units", None))
+    if units and units["not_in_pull"]:
+        _log(f"score: {len(units['not_in_pull'])} of the {units['count']} units named are not in the pull")
     if a.only is not None:  # None = score the whole manifest; [] = score nothing (never "all")
         points = [p for p in points if any(p["point_id"].startswith(x) for x in a.only)]
     # Score serially or across a process pool. BLIS replays are CPU-bound subprocesses, so the
@@ -331,6 +374,11 @@ def cmd_score(a) -> int:
             "blis": {"release": env.blis_release, "commit_sha": env.blis_commit, "catalog": env.catalog_release,
                      "registry": env.registry_release, "extractor_version": f"blis-latency-kernel@{env.kernel}"},
             "simulator": env.simulator(), "engine": {"kind": "vllm", "version": engine_release},
+            "harness_digest": a.harness_digest, "units": units,
+            # Design §11.7, X8: a figure is experimental unless its build and its data are both
+            # released. check_blis_inputs requires the catalog and registry at release tags, so the
+            # data is released, and the build is released when it is a release tag.
+            "experimental": not _SIM_TAG.match(env.sim_build),
             "left_out_records": len((manifest.get("ledger") or {}).get("unlisted") or []),
             "vllm_ref": manifest["vllm_ref"], "vllm_max_distance": manifest["vllm_max_distance"],
             "fields_sha256": fields_sha, "pulled_at": manifest["pulled_at"],
@@ -401,7 +449,10 @@ def cmd_nightly(a) -> int:
     def score_build_fn(work: Path, blis_tag: str, score_ids, pull_date: str, window_ids: set):
         rc = cmd_score(types.SimpleNamespace(
             pull=str(work), out=str(contract_dir), blis=a.blis, catalog=a.catalog, stack=a.stack,
-            fields=a.fields, registry=a.registry,
+            fields=a.fields, registry=a.registry, sim_build=None, harness_digest="unreleased",
+            # TEMPORARY until blis-substrate publishes the anchor list (COV-2): the nightly scores
+            # every point of the window; it then passes that list as --units.
+            units=None,
             corpus=a.corpus,
             corpus_sha256=a.corpus_sha256, corpus_dataset=a.corpus_dataset,
             corpus_revision=a.corpus_revision, corpus_cache=a.corpus_cache, work=a.score_work,
@@ -460,6 +511,11 @@ def main(argv=None) -> int:
                                      "m1/substrate): blis-vllm's fields.json at the release the simulator runs")
     s.add_argument("--stack", help="TEMPORARY until inference-sim v0.16.0 ships stack.json: the scoring build's "
                                     "stack.json, when its checkout has none")
+    s.add_argument("--sim-build", help="the simulator build: a release tag or a 40-hex commit; the checkout must be at it "
+                                        "(default: the release tag the checkout is at)")
+    s.add_argument("--harness-digest", required=True, help="sha256:<64 hex> of the harness image, or unreleased (X8)")
+    s.add_argument("--units", help="the ledger units to score: a PublishedUnits list or a file of unit ids "
+                                    "(default: every point of the pull)")
     s.add_argument("--corpus", required=True)
     s.add_argument("--corpus-sha256")
     s.add_argument("--corpus-dataset", default="semianalysisai/cc-traces-weka-062126")

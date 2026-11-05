@@ -245,6 +245,9 @@ jobs:
                        "refusing to publish (COV-7)")
           if b.get("kind") != "Backlog" or b.get("snapshot_id") != s.get("snapshot_id") or not isinstance(b.get("engines"), dict):
               sys.exit("FATAL: data/latest/backlog.json is not the backlog of the published summary; refusing to publish (COV-7)")
+          if s["provenance"].get("experimental") is not False:
+              sys.exit("FATAL: the summary is experimental (its simulator build is not a release); it is never "
+                       "published as BLIS's accuracy (design §11.7, X8)")
           PY
           if [ -d data/snapshots ]; then
             for d in data/snapshots/*/; do

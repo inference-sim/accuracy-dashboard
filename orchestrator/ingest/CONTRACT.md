@@ -149,6 +149,8 @@ One line per G5 point, sorted by `point_id` (`schemas/fidelity.v3.json#/definiti
 
 `simulator` is the simulator build that scored the run (its release tag) and the engine release it runs. Every fidelity, G5 and failed record carries the same `simulator` (blis-substrate `contracts/spec/pointrecord` Simulator), and the validator refuses a contract whose points name more than one, or another than provenance's (COV-6).
 
+`harness_digest` is the digest of the harness image that produced every figure (`sha256:<64 hex>`), or `unreleased` (design §11.7, X8); every point's `simulator` carries it too. `experimental` is true unless the simulator build is a release tag (the catalog and registry are required at release tags), and an experimental figure is never published as BLIS's accuracy. `units` records the `--units` file the run scored (its sha256, how many units it names, and those the pull did not hold), or null when the run scored every point of the pull. TEMPORARY until blis-substrate publishes the anchor list (COV-2): the nightly scores the whole window and passes no `--units`.
+
 `engine` is the engine release the scoring simulator runs, read from its stack.json (LIF-6); every point is scored on it, and graded against it. TEMPORARY until inference-sim v0.16.0 ships stack.json at its root: `cli.py score --stack FILE` names the file. A simulator checkout with no stack.json and no `--stack` is refused, because the build predates stack.json; the release is never read from installation.md.
 
 `fields_sha256` is the sha256 of the fields.json the scorer read.

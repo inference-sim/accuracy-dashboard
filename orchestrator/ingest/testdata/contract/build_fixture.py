@@ -260,7 +260,8 @@ def write_run(name: str, run: dict, base: Path) -> Path:
     out = base / f"run-{name}"
     out.mkdir(parents=True, exist_ok=True)
     rows, fidelity, facets, not_scored, failed = [], [], {}, [], []
-    sim = {"build": run["blis"]["release"], "engine": {"kind": "vllm", "version": ENGINE}}
+    sim = {"build": run["blis"]["release"], "engine": {"kind": "vllm", "version": ENGINE},
+           "harness_digest": "unreleased"}
     for p in POINTS:
         ident = identity(p["row"])
         pid = point_id(ident)
@@ -308,7 +309,8 @@ def write_run(name: str, run: dict, base: Path) -> Path:
     for fname, recs in ((NOT_SCORED_JSONL, not_scored), (FAILED_JSONL, failed)):
         recs.sort(key=lambda r: r["point_id"])
         (out / fname).write_text("".join(canonical_dumps(r) + "\n" for r in recs))
-    prov = {"ingest": "api", "blis": run["blis"], "simulator": sim, "engine": {"kind": "vllm", "version": ENGINE},
+    prov = {"ingest": "api", "blis": run["blis"], "simulator": sim, "harness_digest": "unreleased",
+            "experimental": False, "units": None, "engine": {"kind": "vllm", "version": ENGINE},
             "points": len(POINTS) + len(NOT_SCORED), "left_out_records": 3,
             "vllm_ref": VLLM_REF, "vllm_max_distance": 2000,
             "fields_sha256": FIELDS_SHA, "pulled_at": "2026-10-23T00:00:00Z", "corpus": CORPUS,
