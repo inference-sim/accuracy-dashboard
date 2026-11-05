@@ -60,7 +60,7 @@ jobs:
       - name: Scoring harness entrypoint flags and its release workflow (design §11.7)
         run: |
           pip install --quiet --require-hashes -r requirements-ci.txt
-          python3 -m pytest -q harness/test_run_sh.py
+          python3 -m pytest -q harness/test_run_sh.py harness/test_dockerfile_paths.py
       - name: vLLM build resolution + commit-distance gate (#28; not used by the nightly)
         run: python3 orchestrator/ingest/test_build.py
       - name: API ingest extractor - settings decided by the field list (COV-3), replay inputs, support, artifacts
