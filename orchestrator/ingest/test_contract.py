@@ -459,6 +459,14 @@ def test_the_v2_schema_still_reads_the_published_snapshot_and_its_frozen_fidelit
     assert not _summary_validator(2).is_valid(_v3())
 
 
+def test_the_v2_fidelity_schema_is_byte_identical_to_the_one_main_published():
+    # COV-8: v2 snapshots cite this schema by its $id. The digest is that of
+    # orchestrator/ingest/fidelity.schema.json on origin/main before the schemas moved; every
+    # addition belongs in fidelity.v3.json.
+    digest = hashlib.sha256((REPO / "schemas" / "fidelity.v2.json").read_bytes()).hexdigest()
+    assert digest == "4a7a95e828051f7fd72148d26cc8e7b82139ec0399cfa366b510cece7cd95f46"
+
+
 def test_the_v3_schema_requires_a_graded_fidelity_record_on_every_point():
     v = _summary_validator(3)
     assert list(v.iter_errors(_v3())) == []
