@@ -18,13 +18,15 @@ resolve` takes only --model and --chip (inference-sim 2eff3576), so the entry is
 the catalog checkout the scorer is given (`--catalog`), at workloads/<name>.yaml, the layout
 blis-substrate's catalog/ has (design §3.3). lint_blis_boundary.py lists the site.
 
-This is a LOCAL helper for the agentic path (run by hand, like fetch_agentic_rows.py); it is
-not part of the automated pipeline.
+run_agentic.py uses one alias at a time. The API nightly resolves every date-pinned alias with
+--all into <out>/<workload>/<file>, the layout `cli.py score --corpus-dir` reads; a file already
+there that checks is kept, not downloaded again.
 
 Usage:
     python orchestrator/resolve_agentic_corpus.py --catalog $WORK/catalog \\
         --alias semianalysis_cc_traces_weka_062126 -o .work/agentic/corpus
     # -> writes <out>/traces.jsonl and prints the workload, its file, and the sha256
+    python orchestrator/resolve_agentic_corpus.py --catalog $WORK/catalog --all -o $WORK/corpora
 """
 
 from __future__ import annotations
@@ -88,7 +90,7 @@ def catalog_entry(catalog: Path, alias: str) -> dict:
     if problems:
         raise CorpusError(f"{path}: the entry does not pin the corpus of {alias!r}: " + "; ".join(problems))
     return {"workload": name, "path": path, "repo": want, "revision": source["revision"],
-            "file": source["file"], "sha256": corpus["sha256"]}
+            "file": source["file"], "split": source.get("split"), "sha256": corpus["sha256"]}
 
 
 def dataset_url(repo: str, revision: str, filename: str) -> str:
@@ -125,13 +127,22 @@ def check(path: Path, entry: dict) -> str:
     return digest
 
 
+def corpus_file(corpus_dir: Path, entry: dict) -> Path:
+    """Where --all puts an entry's corpus: <corpus_dir>/<workload>/<file>."""
+    return Path(corpus_dir, entry["workload"], entry["file"])
+
+
 def resolve(alias: str, catalog: Path, out_dir: Path, download=_download) -> tuple[dict, Path]:
     """Download the alias's corpus at the entry's revision into out_dir and check it.
-    Returns (entry, path). A file that fails the check is removed, never left as traces.jsonl."""
+    Returns (entry, path). A file already at the destination with the entry's sha256 is kept. A
+    downloaded file that fails the check is removed, never left as the corpus."""
     entry = catalog_entry(catalog, alias)
     url = dataset_url(entry["repo"], entry["revision"], entry["file"])
     out_dir.mkdir(parents=True, exist_ok=True)
     dest = out_dir / entry["file"]
+    if dest.is_file() and sha256_file(dest) == entry["sha256"]:
+        print(f"kept {dest}: it has the sha256 {entry['workload']} pins", file=sys.stderr)
+        return entry, dest
     part = dest.with_name(dest.name + ".part")
     print(f"downloading {url} -> {dest}", file=sys.stderr)
     download(url, part)
@@ -144,14 +155,44 @@ def resolve(alias: str, catalog: Path, out_dir: Path, download=_download) -> tup
     return entry, dest
 
 
+def resolve_all(catalog: Path, corpus_dir: Path, download=_download) -> dict:
+    """Every date-pinned alias's corpus, at <corpus_dir>/<workload>/<file>: {alias: (entry, path)}."""
+    out = {}
+    for alias in sorted(CATALOG_WORKLOADS):
+        entry = catalog_entry(catalog, alias)
+        out[alias] = resolve(alias, catalog, corpus_file(corpus_dir, entry).parent, download=download)
+    return out
+
+
+def checked_corpora(catalog: Path, corpus_dir: Path) -> dict:
+    """What the scorer replays with: for every date-pinned alias, its catalog entry with the
+    path of a corpus file under corpus_dir that has the entry's sha256. Nothing is downloaded;
+    a missing entry or file, or a file with another hash, raises CorpusError."""
+    out = {}
+    for alias in sorted(CATALOG_WORKLOADS):
+        entry = catalog_entry(catalog, alias)
+        path = corpus_file(corpus_dir, entry)
+        if not path.is_file():
+            raise CorpusError(f"{path} does not exist: run resolve_agentic_corpus.py --all -o {corpus_dir}")
+        check(path, entry)
+        out[alias] = {**entry, "path": str(path.resolve())}
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--alias", required=True,
-                    help="the corpus alias the run's aiperf command loaded (--public-dataset)")
+    which = ap.add_mutually_exclusive_group(required=True)
+    which.add_argument("--alias", help="the corpus alias the run's aiperf command loaded (--public-dataset)")
+    which.add_argument("--all", action="store_true",
+                       help="every date-pinned alias, each into <out>/<workload>/ (the nightly's --corpus-dir)")
     ap.add_argument("--catalog", required=True, help="the catalog checkout the scorer is given")
     ap.add_argument("-o", "--out", required=True, help="output directory for the corpus file")
     args = ap.parse_args()
 
+    if args.all:
+        for alias, (entry, dest) in resolve_all(Path(args.catalog), Path(args.out)).items():
+            print(f"{alias}: {entry['workload']} {dest} sha256 {entry['sha256']}")
+        return 0
     entry, dest = resolve(args.alias, Path(args.catalog), Path(args.out))
     print(f"workload:      {entry['workload']} ({entry['path']})")
     print(f"corpus:        {dest}")

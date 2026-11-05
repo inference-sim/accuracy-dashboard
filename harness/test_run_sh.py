@@ -6,6 +6,7 @@ with a fake `go`, so these tests need no network. The workflow is checked as YAM
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -19,7 +20,8 @@ HERE = Path(__file__).resolve().parent
 RUN = HERE / "run.sh"
 WORKFLOW = HERE.parent / ".github" / "workflows" / "harness-release.yml"
 COMMIT = "0123456789abcdef0123456789abcdef01234567"
-GOOD = ["--units", "units.txt", "--pull", "pull", "--out", "out", "--catalog", "c", "--registry", "r"]
+GOOD = ["--units", "units.txt", "--pull", "pull", "--out", "out", "--catalog", "c", "--registry", "r",
+        "--corpus-dir", "k"]
 
 
 def check(*args, env=None):
@@ -61,12 +63,21 @@ def test_the_field_list_is_not_a_flag():
 
 
 def test_catalog_and_registry_are_required():
-    base = ["--units", "units.txt", "--pull", "pull", "--out", "out"]
+    base = ["--units", "units.txt", "--pull", "pull", "--out", "out", "--corpus-dir", "k"]
     p = check("--sim", "v0.16.0", *base, "--catalog", "cat")
     assert p.returncode == 2 and "--registry is required" in p.stderr
     p = check("--sim", "v0.16.0", *base, "--registry", "reg")
     assert p.returncode == 2 and "--catalog is required" in p.stderr
     assert check("--sim", "v0.16.0", *GOOD).returncode == 0
+
+
+def test_the_corpus_directory_is_required_and_the_corpus_file_flags_are_gone():
+    # The corpora come from the catalog's replay workloads, not from flags (D3, X12).
+    p = check("--sim", "v0.16.0", *GOOD[:-2])
+    assert p.returncode == 2 and "--corpus-dir is required" in p.stderr
+    for flag in ("--corpus", "--corpus-revision", "--corpus-sha256", "--corpus-dataset"):
+        p = check("--sim", "v0.16.0", *GOOD, flag, "x")
+        assert p.returncode == 2 and f"unknown flag {flag}" in p.stderr, flag
 
 
 def test_a_malformed_harness_digest_is_refused():
@@ -192,7 +203,26 @@ def real_setup(tmp: Path, tag: str = "v0.16.0"):
     (cat / "hardware").mkdir()
     reg = tagged_dir(tmp / "reg", "v1.0.0")
     (reg / "coefficients").mkdir()
+    write_corpora(cat, tmp / "corpora")
     return bare, commit, bin_, log, pull, units, fields, cat, reg
+
+
+def write_corpora(cat: Path, corpus_dir: Path) -> None:
+    """The two AgentX replay workloads in the catalog, and their corpus files where
+    resolve_agentic_corpus.py --all puts them, each with the sha256 its entry pins."""
+    (cat / "workloads").mkdir(exist_ok=True)
+    for alias, name, repo, rev in (
+            ("semianalysis_cc_traces_weka_062126", "agentx-mvp-uncapped",
+             "semianalysisai/cc-traces-weka-062126", "23f152f6f0f9399a85901b89a6458def0ef16729"),
+            ("semianalysis_cc_traces_weka_062126_256k", "agentx-mvp",
+             "semianalysisai/cc-traces-weka-062126-256k", "8fecd2fc56694469f758f0afbbb6335ad3043740")):
+        body = f"{name}\n".encode()
+        (cat / "workloads" / f"{name}.yaml").write_text(
+            f"replay:\n  corpus:\n    loader: {alias}\n    source:\n      huggingface: {repo}\n"
+            f"      revision: {rev}\n      file: traces.jsonl\n      split: train\n"
+            f"    sha256: {hashlib.sha256(body).hexdigest()}\n")
+        (corpus_dir / name).mkdir(parents=True, exist_ok=True)
+        (corpus_dir / name / "traces.jsonl").write_bytes(body)
 
 
 def run_real(tmp: Path, sim_of, extra=(), tag="v0.16.0"):
@@ -202,7 +232,7 @@ def run_real(tmp: Path, sim_of, extra=(), tag="v0.16.0"):
            "FAKE_FIELDS": str(fields)}
     p = subprocess.run(["bash", str(RUN), "--sim", sim_of(commit), "--sim-repo", str(bare), "--units", str(units),
                         "--pull", str(pull), "--out", str(out), "--catalog", str(cat), "--registry", str(reg),
-                        *extra], capture_output=True, text=True, env=env)
+                        "--corpus-dir", str(tmp / "corpora"), *extra], capture_output=True, text=True, env=env)
     return p, out, log, commit
 
 
@@ -225,7 +255,8 @@ def test_the_real_path_builds_into_the_checkout_and_scores_with_it(tmp_path):
     assert prov["harness_digest"] == "sha256:" + "b" * 64
     assert prov["blis"]["release"] == "v0.16.0" and prov["blis"]["commit_sha"] == commit
     assert prov["blis"]["extractor_version"] == "blis-latency-kernel@v0.3.0"
-    assert prov["fields_sha256"] and prov["experimental"] is False and prov["corpus"] is None
+    assert prov["fields_sha256"] and prov["experimental"] is False and "corpus" not in prov
+    assert [c["workload"] for c in prov["corpora"]] == ["agentx-mvp-uncapped", "agentx-mvp"]
 
 
 def test_the_real_path_scores_a_full_commit(tmp_path):
@@ -235,18 +266,16 @@ def test_the_real_path_scores_a_full_commit(tmp_path):
     assert prov["simulator"]["build"] == commit and prov["experimental"] is True
 
 
-def test_the_corpus_flags_are_required_only_for_an_agentic_point(tmp_path):
-    pid = "a" * 64
+def test_the_real_path_refuses_a_corpus_that_is_not_the_catalog_entrys(tmp_path):
     bare, commit, bin_, log, pull, units, fields, cat, reg = real_setup(tmp_path)
-    (pull / "manifest.json").write_text(json.dumps(
-        {**MANIFEST, "points": [{"point_id": pid, "reasons": [], "row": {"benchmark_type": "agentic_traces"}}]}))
-    units.write_text(pid + "\n")
+    (tmp_path / "corpora" / "agentx-mvp" / "traces.jsonl").write_bytes(b"other\n")
     env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "FAKE_FIELDS": str(fields)}
     p = subprocess.run(["bash", str(RUN), "--sim", "v0.16.0", "--sim-repo", str(bare), "--units", str(units),
                         "--pull", str(pull), "--out", str(tmp_path / "out"), "--catalog", str(cat),
-                        "--registry", str(reg)], capture_output=True, text=True, env=env)
+                        "--registry", str(reg), "--corpus-dir", str(tmp_path / "corpora")],
+                       capture_output=True, text=True, env=env)
     assert p.returncode == 2
-    assert "--corpus and --corpus-revision are required" in p.stderr
+    assert "mismatch" in p.stderr
 
 
 def test_the_real_path_scores_a_pre_release_tag_and_marks_its_figures_experimental(tmp_path):

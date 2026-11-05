@@ -153,7 +153,7 @@ One line per G5 point, sorted by `point_id` (`schemas/fidelity.v3.json#/definiti
  "engine": {"kind": "vllm", "version": "0.32.0"}, "points": 2035, "left_out_records": 0,
  "vllm_ref": "v0.32.0", "vllm_max_distance": 2000,
  "fields_sha256": "…", "pulled_at": "<UTC ISO-8601>",
- "corpus": {"dataset": "…", "revision": "…", "sha256": "…"} | null,
+ "corpora": [{"alias": "…", "workload": "…", "dataset": "…", "revision": "<40 hex>", "sha256": "<64 hex>"}, …],
  "pull_manifest_sha256": "…",
  "source": {"name": "SemiAnalysis InferenceX API", "url": "https://inferencex.semianalysis.com/api/v1/"}}
 ```

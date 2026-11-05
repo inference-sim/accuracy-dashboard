@@ -570,7 +570,7 @@ def test_agentx_replays_as_the_mvp_scenario_with_the_runs_own_inputs():
     r = rp.from_export(_export())
     rp.cross_check(r, "agentx profile --concurrency 8 --benchmark-duration 3600", 8)
     assert r.reasons == [] and r.replayed_as == "inferencex-agentx-mvp"
-    spec = rp.workload_spec(r, "a" * 64, "rev", "traces.jsonl")
+    spec = rp.workload_spec(r, {"repo": "d/c", "revision": "rev", "file": "traces.jsonl", "sha256": "a" * 64})
     assert spec["concurrency"] == 8 and spec["random_seed"] == 42 and spec["benchmark_duration_s"] == 3600.0
     assert spec["trajectory_start"] == {"min_ratio": 0.25, "max_ratio": 0.75}
     assert "trace_idle_gap_cap_s" not in spec       # inference-sim#1971: not passed

@@ -37,6 +37,12 @@ FIELDS_SHA = "1" * 64
 CORPUS = {"dataset": "semianalysisai/cc-traces-weka-062126",
           "revision": "23f152f6f0f9399a85901b89a6458def0ef16729",
           "sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276"}
+# The two AgentX corpora, as the catalog replay workloads pin them (provenance.json's corpora).
+CORPORA = [{"alias": "semianalysis_cc_traces_weka_062126", "workload": "agentx-mvp-uncapped", **CORPUS},
+           {"alias": "semianalysis_cc_traces_weka_062126_256k", "workload": "agentx-mvp",
+            "dataset": "semianalysisai/cc-traces-weka-062126-256k",
+            "revision": "8fecd2fc56694469f758f0afbbb6335ad3043740",
+            "sha256": "e39cd2ff3eba21d4a3664be51da743ac3d2149a1933898cafc7bfeac8147eeef"}]
 
 # Builds, as #28's evidence resolved them: two nightly images.
 B_AC91 = {"image": "vllm/vllm-openai:nightly-dev-x86_64-cu130-ac9126e58aa7",
@@ -313,7 +319,7 @@ def write_run(name: str, run: dict, base: Path) -> Path:
             "experimental": False, "units": None, "engine": {"kind": "vllm", "version": ENGINE},
             "points": len(POINTS) + len(NOT_SCORED), "left_out_records": 3,
             "vllm_ref": VLLM_REF, "vllm_max_distance": 2000,
-            "fields_sha256": FIELDS_SHA, "pulled_at": "2026-10-23T00:00:00Z", "corpus": CORPUS,
+            "fields_sha256": FIELDS_SHA, "pulled_at": "2026-10-23T00:00:00Z", "corpora": CORPORA,
             "pull_manifest_sha256": "2" * 64,
             "source": {"name": "SemiAnalysis InferenceX API", "url": "https://inferencex.semianalysis.com/api/v1/"}}
     (out / PROVENANCE_JSON).write_text(canonical_dumps(prov) + "\n")

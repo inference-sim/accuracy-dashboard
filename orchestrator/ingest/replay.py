@@ -186,21 +186,23 @@ def cross_check(r: Replay, command: str | None, row_conc) -> None:
     r.reasons = sorted(set(r.reasons))
 
 
-def workload_spec(r: Replay, corpus_sha256: str, corpus_revision: str, corpus_file: str) -> dict:
-    """The blis-schemas Replay document (--workload-spec) for the run's inputs."""
+def workload_spec(r: Replay, corpus: dict) -> dict:
+    """The blis-schemas Replay document (--workload-spec) for the run's inputs. `corpus` is the
+    catalog replay workload entry of the alias the run loaded (resolve_agentic_corpus): it pins
+    the corpus by repository, revision and full sha256."""
     spec = {
         "scenario": r.replayed_as,
         "harness_version": BLIS_HARNESS,
         "corpus": {"loader": r.corpus, "format": "weka-trace-v7", "encoding": "jsonl",
-                   "source": {"huggingface": r.corpus_repo, "revision": corpus_revision,
-                              "file": corpus_file},
-                   "sha256": corpus_sha256},
+                   "source": {"huggingface": corpus["repo"], "revision": corpus["revision"],
+                              "file": corpus["file"]},
+                   "sha256": corpus["sha256"]},
         "random_seed": int(r.seed),
         "benchmark_duration_s": float(r.duration_s),
         "concurrency": int(r.concurrency),
     }
-    if r.corpus_split:
-        spec["corpus"]["source"]["split"] = r.corpus_split
+    if r.corpus_split or corpus.get("split"):
+        spec["corpus"]["source"]["split"] = r.corpus_split or corpus["split"]
     if r.grace_s is not None:
         spec["grace_period_s"] = float(r.grace_s)
     if r.system_idle_cap_s is not None:

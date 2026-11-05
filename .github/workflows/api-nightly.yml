@@ -85,18 +85,6 @@ jobs:
           restore-keys: |
             ix-artifacts-
 
-      # Fetch the pinned AgentX corpus once, by a RESOLVED HF revision (not a floating ref), so the
-      # sha256 recorded in provenance is reproducible and the corpus_changed guard is meaningful.
-      - name: Resolve the AgentX corpus (pinned HF revision + sha256)
-        run: |
-          set -euo pipefail
-          repo="semianalysisai/cc-traces-weka-062126"
-          file="traces.jsonl"
-          rev=$(curl -fsSL "https://huggingface.co/api/datasets/${repo}/revision/main" | python3 -c "import sys,json;print(json.load(sys.stdin)['sha'])")
-          curl -fsSL "https://huggingface.co/datasets/${repo}/resolve/${rev}/${file}" -o "$RUNNER_TEMP/corpus.json"
-          echo "CORPUS_REVISION=${rev}" >> "$GITHUB_ENV"
-          echo "fetched corpus ${repo}@${rev} ($(wc -c < "$RUNNER_TEMP/corpus.json") bytes)"
-
       # The scoring runs in the harness image named by its digest in harness/image.pin (design
       # §11.7, X8), so every figure records the digest of the image that produced it. While the pin
       # says `unpublished` no image exists and this step FAILS: a gate that does not run is a
@@ -146,6 +134,12 @@ jobs:
             # the full unit list with identities (catalog/ledger/units) and the ingest report:
             # `blis ledger --list` prints only the published unit ids.
             LEDGER="$RUNNER_TEMP/substrate/catalog/ledger"
+            # Every AgentX corpus, at the revision and full sha256 its replay workload in this
+            # release's catalog pins (agentx-mvp-uncapped, agentx-mvp; X12, D3). Each point is
+            # replayed with the corpus its own run's client loaded (COV-12). Nothing resolves a
+            # moving ref such as main. A file kept from an earlier release is reused only if it has
+            # the entry's hash.
+            python3 orchestrator/resolve_agentic_corpus.py --catalog "$CATALOG" --all -o "$RUNNER_TEMP/corpora"
             # The vLLM tag of the engine release the simulator runs (stack.json engines), so
             # cmd_pull stamps it into the manifest and anchors the build resolver on it.
             export VLLM_REF="$vllm_ref"
@@ -186,7 +180,7 @@ jobs:
               --ledger "$LEDGER" \
               --blis "$SIM/blis" --catalog "$CATALOG" --registry "$REGISTRY" \
               --harness-image "$HARNESS_IMAGE" \
-              --corpus "$RUNNER_TEMP/corpus.json" --corpus-revision "$CORPUS_REVISION"
+              --corpus-dir "$RUNNER_TEMP/corpora"
             echo "::endgroup::"
           done
 

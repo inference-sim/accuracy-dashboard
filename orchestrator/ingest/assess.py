@@ -28,7 +28,6 @@ G5_FOR_REASON = {
     "required_setting_missing": "value_not_recorded",
     "server_log_missing": "value_not_recorded",
     "artifact_unmatched": "value_not_recorded",
-    "corpus_changed": "value_not_recorded",
     "client_scenario_not_replayable": "value_not_recorded",
     "router_unsupported": "router_unsupported",
     "topology_unsupported": "topology_unsupported",

@@ -68,7 +68,11 @@ class Env:
     registry: Path
     registry_release: str
     kernel: str
-    corpus: dict          # {"dataset", "revision", "sha256", "path", "file"}
+    # Every date-pinned AgentX corpus alias -> its catalog replay workload entry, with the path of a
+    # local file checked against the entry's full sha256 (resolve_agentic_corpus.checked_corpora):
+    # {"workload", "repo", "revision", "file", "split", "sha256", "path"}. A point is replayed with
+    # the entry of the alias its own client recorded (COV-12, D3).
+    corpora: dict
     corpus_cache: Path | None = None
     vllm_ref: str = "v0.32.0"
     # The engine's field list (fields.py) at the release the simulator runs, and its sha256.
@@ -102,6 +106,32 @@ class Env:
         """The simulator block every point of this run records: its build and engine release."""
         return {"build": self.sim_build, "engine": {"kind": "vllm", "version": self.engine_release},
                 "harness_digest": self.harness_digest}
+
+
+def corpora_provenance(corpora: dict) -> list[dict]:
+    """provenance.json's corpora: each AgentX corpus the run could replay, by alias, with the
+    catalog workload that pins it, sorted by alias."""
+    return [{"alias": a, "workload": e["workload"], "dataset": e["repo"], "revision": e["revision"],
+             "sha256": e["sha256"]} for a, e in sorted(corpora.items())]
+
+
+def corpus_reasons(r: "rp.Replay", corpora: dict) -> list[str]:
+    """Why a run's corpus cannot be replayed, from the alias its client recorded (the export's
+    dataset, cross-checked against benchmark_command.txt's --public-dataset).
+
+    No alias: from_export already names required_setting_missing:replay.corpus. An alias that is
+    not date-pinned (a rolling one) does not say which corpus was read, so the run did not record
+    it: design §11.4's value_not_recorded, with the alias in the subject. A dataset repository the
+    export records that is not the one the alias loads is a conflict between two records of the
+    run (value_conflict)."""
+    if not r.corpus:
+        return []
+    entry = corpora.get(r.corpus)
+    if entry is None:
+        return [f"value_not_recorded:replay.corpus={r.corpus}"]
+    if r.corpus_repo and r.corpus_repo != entry["repo"]:
+        return ["conflict:replay.corpus_repo"]
+    return []
 
 
 def _read(point_dir: Path, files: dict, role: str) -> bytes | None:
@@ -564,10 +594,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
             cmd = _read(pdir, entry["files"], "client_command")
             rp.cross_check(r, cmd.decode("utf-8", "replace") if cmd else None, row.get("conc"))
             o.reasons += r.reasons
-            if not r.corpus_repo:
-                o.reasons.append("required_setting_missing:replay.corpus_repo")
-            elif r.corpus_repo != env.corpus["dataset"]:
-                o.reasons.append(f"corpus_changed:{r.corpus_repo}")
+            o.reasons += corpus_reasons(r, env.corpora)
     else:
         for k in ("isl", "osl", "conc"):
             v = row.get(k)
@@ -619,14 +646,15 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         return score_single_turn(o, entry, env, work, b, header, name, dep, args, log, sup, pdir)
 
     # ---- the replay
-    spec_doc = rp.workload_spec(r, env.corpus["sha256"], env.corpus["revision"], env.corpus["file"])
+    corpus = env.corpora[r.corpus]
+    spec_doc = rp.workload_spec(r, corpus)
     spec_path = work / "replay-specs" / f"{pid}.yaml"
     spec_path.parent.mkdir(parents=True, exist_ok=True)
     import yaml
     spec_path.write_text(yaml.safe_dump({"replay": spec_doc}, sort_keys=False))
     argv = [env.blis, "replay", "--agentic-scenario", r.replayed_as,
             "--workload-spec", str(spec_path), "--concurrency", str(r.concurrency),
-            "--seed", str(r.seed), "--corpus", env.corpus["path"], "--corpus-sha256", env.corpus["sha256"],
+            "--seed", str(r.seed), "--corpus", corpus["path"], "--corpus-sha256", corpus["sha256"],
             "--scenario", f"{name}.yaml", "--scenarios", str(sdir),
             "--catalog", str(env.catalog), "--registry", str(env.registry), "--format", "json"]
     if b.acceptance_length is not None:
@@ -654,7 +682,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         return o
     m = measured(entry)
     o.fidelity = {"build": entry["build"], "args": args,
-                  "resolved": resolved_kv(log, doc), "replay": r.record(env.corpus["sha256"]),
+                  "resolved": resolved_kv(log, doc), "replay": r.record(corpus["sha256"]),
                   "blis_kernel_provenance": result.kernel_report(doc)}
     par = dep["pools"][0]["parallel"]
     ep = (par["tp"] * par["dp"]) if par.get("enable_expert_parallel") else 1

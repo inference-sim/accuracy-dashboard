@@ -44,7 +44,7 @@ def _freeze(tmp, row):
 
 def _score(tmp, entry):
     env = sc.Env(blis="/nonexistent", blis_release="v0.16.0", blis_commit="a" * 40, catalog=tmp, catalog_release="c",
-                 registry=tmp, registry_release="r", kernel="k", corpus=None)
+                 registry=tmp, registry_release="r", kernel="k", corpora={})
     o = sc.score_point(entry, tmp / "pull", tmp / "w", env)
     sc.grade_outcome(o, "0.32.0", {"build": "v0.16.0", "engine": {"kind": "vllm", "version": "0.32.0"},
                                    "harness_digest": "unreleased"})
@@ -151,7 +151,7 @@ def _fields(*specs):
 def test_a_disaggregated_runs_recorded_topology_fields_go_through_the_field_list(tmp_path):
     kv = "'kv_transfer_config': KVTransferConfig(kv_connector='NixlConnector', kv_role='kv_producer')"
     env = sc.Env(blis="/nonexistent", blis_release="v0.16.0", blis_commit="a" * 40, catalog=tmp_path,
-                 catalog_release="c", registry=tmp_path, registry_release="r", kernel="k", corpus=None,
+                 catalog_release="c", registry=tmp_path, registry_release="r", kernel="k", corpora={},
                  field_list=_fields(("kv_transfer_config.kv_role", "not_modelled"),
                                     ("kv_transfer_config.kv_connector", "modelled")))
     o = sc.score_point(_disagg_entry(tmp_path / "a", kv), tmp_path / "a" / "pull", tmp_path / "w", env)
@@ -170,7 +170,7 @@ def test_a_disaggregated_runs_recorded_topology_fields_go_through_the_field_list
 def test_a_disaggregated_run_whose_topology_is_all_modelled_is_g5_topology_unsupported(tmp_path):
     kv = "'kv_transfer_config': KVTransferConfig(kv_connector='NixlConnector', kv_role='kv_producer')"
     env = sc.Env(blis="/nonexistent", blis_release="v0.16.0", blis_commit="a" * 40, catalog=tmp_path,
-                 catalog_release="c", registry=tmp_path, registry_release="r", kernel="k", corpus=None,
+                 catalog_release="c", registry=tmp_path, registry_release="r", kernel="k", corpora={},
                  field_list=_fields(("kv_transfer_config.kv_role", "modelled"),
                                     ("kv_transfer_config.kv_connector", "modelled")))
     o = sc.score_point(_disagg_entry(tmp_path / "c", kv), tmp_path / "c" / "pull", tmp_path / "w", env)

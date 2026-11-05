@@ -26,7 +26,7 @@
 #
 # Usage:
 #   run.sh --sim <tag|commit> [--sim-repo URL] --units FILE --pull DIR --out DIR
-#          --catalog DIR --registry DIR [--corpus FILE --corpus-revision REV] [--max-rss-mb N]
+#          --catalog DIR --registry DIR --corpus-dir DIR [--max-rss-mb N]
 #   run.sh --check-args <the same flags>     validate the flags, do nothing else
 #
 # Exit status: 0 on success, 2 for a refused flag or value, otherwise the failing step's status.
@@ -41,12 +41,12 @@ refuse() {
 }
 
 sim="" sim_repo="https://github.com/inference-sim/inference-sim.git"
-units="" pull="" out="" catalog="" registry="" corpus="" corpus_revision="" max_rss_mb="" check_only=0
+units="" pull="" out="" catalog="" registry="" corpus_dir="" max_rss_mb="" check_only=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --check-args) check_only=1; shift; continue ;;
-    --sim|--sim-repo|--units|--pull|--out|--catalog|--registry|--corpus|--corpus-revision|--max-rss-mb)
+    --sim|--sim-repo|--units|--pull|--out|--catalog|--registry|--corpus-dir|--max-rss-mb)
       [ $# -ge 2 ] || refuse "$1 needs a value"
       case "$1" in
         --sim) sim="$2" ;;
@@ -56,8 +56,7 @@ while [ $# -gt 0 ]; do
         --out) out="$2" ;;
         --catalog) catalog="$2" ;;
         --registry) registry="$2" ;;
-        --corpus) corpus="$2" ;;
-        --corpus-revision) corpus_revision="$2" ;;
+        --corpus-dir) corpus_dir="$2" ;;
         --max-rss-mb) max_rss_mb="$2" ;;
       esac
       shift 2 ;;
@@ -78,6 +77,7 @@ fi
 [ -n "$out" ] || refuse "--out is required: the directory the records are written to"
 [ -n "$catalog" ] || refuse "--catalog is required: the catalog the simulator reads"
 [ -n "$registry" ] || refuse "--registry is required: the registry the simulator reads"
+[ -n "$corpus_dir" ] || refuse "--corpus-dir is required: the directory of AgentX corpora, <workload>/<file>, that resolve_agentic_corpus.py --all fetched"
 
 digest="${HARNESS_DIGEST:-unreleased}"
 if [ "$digest" != unreleased ] && ! [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
@@ -91,7 +91,7 @@ fi
 
 [ -f "$units" ] || refuse "--units $units is not a file"
 [ -d "$pull" ] || refuse "--pull $pull is not a directory"
-if [ -n "$corpus" ] && [ ! -f "$corpus" ]; then refuse "--corpus $corpus is not a file"; fi
+[ -d "$corpus_dir" ] || refuse "--corpus-dir $corpus_dir is not a directory"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -116,10 +116,8 @@ echo "run.sh: inference-sim $sim at $got" >&2
 ( cd "$src" && go mod download && go build -o "$src/blis" main.go )
 
 args=(score --pull "$pull" --out "$out" --blis "$src/blis" --units "$units"
-      --sim-build "$sim" --harness-digest "$digest" --catalog "$catalog" --registry "$registry")
-# The agentic corpus and the replay memory ceiling are passed on only when given; the scorer
-# requires the corpus when a point to score is agentic.
-[ -z "$corpus" ] || args+=(--corpus "$corpus")
-[ -z "$corpus_revision" ] || args+=(--corpus-revision "$corpus_revision")
+      --sim-build "$sim" --harness-digest "$digest" --catalog "$catalog" --registry "$registry"
+      --corpus-dir "$corpus_dir")
+# The replay memory ceiling is passed on only when given.
 [ -z "$max_rss_mb" ] || args+=(--max-rss-mb "$max_rss_mb")
 python3 "$root/orchestrator/ingest/cli.py" "${args[@]}"

@@ -51,7 +51,7 @@ def digest(reference: str) -> str:
 
 
 def docker_command(reference: str, *, sim: str, units, pull, out, catalog, registry,
-                   corpus=None, corpus_revision: str | None = None, max_rss_mb: int = 0) -> list[str]:
+                   corpus_dir, max_rss_mb: int = 0) -> list[str]:
     """The `docker run` that scores through the image, with harness/run.sh's flags. The data is
     mounted under /data, and HARNESS_DIGEST is the pin's digest, so the figures record the image
     that produced them."""
@@ -61,15 +61,11 @@ def docker_command(reference: str, *, sim: str, units, pull, out, catalog, regis
            "-v", f"{Path(pull).resolve()}:{MOUNT}/pull:ro",
            "-v", f"{Path(out).resolve()}:{MOUNT}/out",
            "-v", f"{Path(catalog).resolve()}:{MOUNT}/catalog:ro",
-           "-v", f"{Path(registry).resolve()}:{MOUNT}/registry:ro"]
-    if corpus is not None:
-        cmd += ["-v", f"{Path(corpus).resolve()}:{MOUNT}/corpus.json:ro"]
+           "-v", f"{Path(registry).resolve()}:{MOUNT}/registry:ro",
+           "-v", f"{Path(corpus_dir).resolve()}:{MOUNT}/corpora:ro"]
     cmd += [reference, "--sim", sim, "--units", f"{MOUNT}/units.json", "--pull", f"{MOUNT}/pull",
-            "--out", f"{MOUNT}/out", "--catalog", f"{MOUNT}/catalog", "--registry", f"{MOUNT}/registry"]
-    if corpus is not None:
-        cmd += ["--corpus", f"{MOUNT}/corpus.json"]
-    if corpus_revision:
-        cmd += ["--corpus-revision", corpus_revision]
+            "--out", f"{MOUNT}/out", "--catalog", f"{MOUNT}/catalog", "--registry", f"{MOUNT}/registry",
+            "--corpus-dir", f"{MOUNT}/corpora"]
     if max_rss_mb:
         cmd += ["--max-rss-mb", str(max_rss_mb)]
     return cmd
