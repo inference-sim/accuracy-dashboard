@@ -1,4 +1,4 @@
-// Browser smoke for a v2 snapshot (#30): load the site in headless Chromium and fail on any
+// Browser smoke for a v2 or v3 snapshot: load the site in headless Chromium and fail on any
 // console error / page error / failed request, then drive the v2 parts: drill down to a
 // deployment, check the measured-date column and a provenance mark per point, open a provenance
 // tooltip by keyboard focus and check its content, and confirm not-scored points never render.
@@ -44,9 +44,12 @@ page.on('requestfailed', (r) => problems.push(`requestfailed: ${r.url()}`))
 page.on('response', (r) => r.status() >= 400 && problems.push(`HTTP ${r.status()}: ${r.url()}`))
 const shot = async (name) => SHOTS && page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true })
 
+let version = null
 try {
   const summary = await (await fetch(`${BASE}/data/latest/summary.json`)).json()
-  if (summary.schema_version !== 2) throw new Error(`staged summary is schema_version ${summary.schema_version}, not 2`)
+  if (summary.schema_version !== 2 && summary.schema_version !== 3)
+    throw new Error(`staged summary is schema_version ${summary.schema_version}, not 2 or 3`)
+  version = summary.schema_version
 
   await page.goto(`${BASE}/#/?tier=all`, { waitUntil: 'networkidle', timeout: 30000 })
   await page.waitForSelector('table.readout', { timeout: 15000 })
@@ -77,7 +80,7 @@ try {
   await page.focus('table.pts td.prov-cell .term')
   const tip = await page.waitForSelector('[role="tooltip"]', { timeout: 3000 })
   const text = await tip.textContent()
-  if (!/Exact match|Estimated/.test(text)) problems.push('tooltip says neither "Exact match" nor "Estimated"')
+  if (!/Exact match|Estimated|G[1-4] · /.test(text)) problems.push('tooltip names neither a match nor a grade')
   if (/attention_config|engine\.|from server args/.test(text)) problems.push('tooltip shows internal setting names')
   await shot('3-provenance-tooltip')
   await page.keyboard.press('Escape')
@@ -97,4 +100,4 @@ if (problems.length) {
   for (const p of problems) console.error(`  - ${p}`)
   process.exit(1)
 }
-console.log('v2 browser smoke OK: zero console errors, provenance on every point, not-scored points absent')
+console.log(`v${version} browser smoke OK: zero console errors, provenance on every point, not-scored points absent`)

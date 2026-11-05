@@ -33,6 +33,7 @@ import pull as pl  # noqa: E402
 import recipes as rcp  # noqa: E402
 import score as sc  # noqa: E402
 import settings as st  # noqa: E402
+import stack as sk  # noqa: E402
 import support as sp  # noqa: E402
 
 
@@ -247,10 +248,30 @@ def check_blis_inputs(blis: Path, helper: str, catalog: Path, registry: Path) ->
     return out
 
 
+def read_stack(blis: Path, given: str | None) -> sk.Stack:
+    """The scoring build's stack.json: the engine release it runs (LIF-6) and the modules it pins.
+
+    TEMPORARY until inference-sim v0.16.0, the first release that writes stack.json at its root
+    (inference-sim m1/substrate, task H): --stack names the file for a build that does not ship
+    one. Without --stack the file is the simulator checkout's own. A build with neither predates
+    stack.json and is refused; the engine release is never read from installation.md."""
+    path = Path(given) if given else blis.parent / "stack.json"
+    if not path.is_file():
+        raise sk.StackError(f"{blis.parent} has no stack.json: this simulator build predates stack.json "
+                            f"(inference-sim v0.16.0 writes it), so the engine release it runs is not stated; "
+                            f"pass --stack FILE")
+    return sk.load(path)
+
+
 def cmd_score(a) -> int:
     pull_dir = Path(a.pull)
     blis = Path(a.blis).resolve()
     bad = check_blis_inputs(blis, a.defaults_helper, Path(a.catalog), Path(a.registry))
+    try:
+        stack = read_stack(blis, getattr(a, "stack", None))
+        engine_release = stack.engine("vllm")
+    except (sk.StackError, OSError, ValueError) as e:
+        bad.append(str(e))
     if bad:
         for b in bad:
             _log(f"FATAL: {b}")
@@ -281,7 +302,7 @@ def cmd_score(a) -> int:
         vllm_ref=manifest["vllm_ref"], policy=policy, policy_sha256=policy_sha,
         base_models=manifest.get("base_models") or {}, timeout_s=a.timeout,
         vllm_defaults=vdefaults, vllm_defaults_sha256=vdefaults_sha,
-        max_rss_mb=getattr(a, "max_rss_mb", 0) or 0)
+        max_rss_mb=getattr(a, "max_rss_mb", 0) or 0, engine_release=engine_release)
     env.catalog_obj = sp.Catalog.load(env.catalog)
     env.parts = sp.registry_parts(env.registry)
     work = Path(a.work or Path(a.out).parent / (Path(a.out).name + "-work"))
@@ -303,17 +324,20 @@ def cmd_score(a) -> int:
     prov = {"ingest": "api",
             "blis": {"release": env.blis_release, "commit_sha": env.blis_commit, "catalog": env.catalog_release,
                      "registry": env.registry_release, "extractor_version": f"blis-latency-kernel@{env.kernel}"},
+            "engine": {"kind": "vllm", "version": engine_release},
+            "left_out_records": len((manifest.get("ledger") or {}).get("unlisted") or []),
             "vllm_ref": manifest["vllm_ref"], "vllm_max_distance": manifest["vllm_max_distance"],
             "policy_sha256": art.sha256((policy_sha + vdefaults_sha).encode()), "pulled_at": manifest["pulled_at"],
             "corpus": {"dataset": env.corpus["dataset"], "revision": env.corpus["revision"], "sha256": corpus_sha},
             "pull_manifest_sha256": art.sha256(manifest_text.encode()),
-            "source": {"name": "SemiAnalysis InferenceX API", "url": api.API + "/"}, "_policy": policy}
+            "source": {"name": "SemiAnalysis InferenceX API", "url": api.API + "/"}}
     sc.write_contract(Path(a.out), outcomes, prov)
     problems = contract.validate_dir(a.out)
     for p in problems:
         _log(f"INVALID: {p}")
     scored = sum(1 for o in outcomes if o.fidelity)
-    _log(f"score: {scored} scored, {len(outcomes) - scored} not scored -> {a.out}")
+    failed = sum(1 for o in outcomes if o.faults)
+    _log(f"score: {scored} scored, {len(outcomes) - scored - failed} not scored, {failed} failed -> {a.out}")
     return 1 if problems else 0
 
 
@@ -321,6 +345,14 @@ def _has_legacy_ids(summary: dict) -> bool:
     """Whether a published summary carries the eight-field identity of before (legacy_ids.py)."""
     return any("recipe" in (n.get("identity") or {}) for n in summary.get("not_scored", [])) or \
         '"recipe":' in json.dumps(summary.get("matrix", []))
+
+
+def mergeable(prior: dict | None, schema_version: int) -> bool:
+    """Whether tonight's delta can be merged into last night's published summary. A summary of
+    another schema version (v2, before grades) or one published before point ids were unit ids
+    holds no point tonight's contract can carry over (COV-8 keeps it unchanged), so the night
+    fetches and scores the whole window instead."""
+    return prior is not None and prior.get("schema_version") == schema_version and not _has_legacy_ids(prior)
 
 
 def cmd_nightly(a) -> int:
@@ -347,7 +379,8 @@ def cmd_nightly(a) -> int:
         # the run (cmd_pull returns non-zero).
         p = api.pull(api.http_fetch, today=today_, window_days=a.window_days)
         window_ids = {x.point_id for x in pl.place(p.rows, ldg.load(Path(a.ledger))).points}
-        whole = blis_changed or not last_ids
+        prior = json.loads(latest_path.read_text()) if latest_path.is_file() else None
+        whole = blis_changed or not last_ids or not mergeable(prior, bsv2.SCHEMA_VERSION)
         to_fetch = window_ids if whole else (window_ids - set(last_ids))
         only = None if whole else sorted(to_fetch)
         _log(f"nightly: window {len(window_ids)} points; fetch {'whole window' if whole else f'{len(to_fetch)} new'}")
@@ -361,7 +394,7 @@ def cmd_nightly(a) -> int:
 
     def score_build_fn(work: Path, blis_tag: str, score_ids, pull_date: str, window_ids: set):
         rc = cmd_score(types.SimpleNamespace(
-            pull=str(work), out=str(contract_dir), blis=a.blis, catalog=a.catalog,
+            pull=str(work), out=str(contract_dir), blis=a.blis, catalog=a.catalog, stack=a.stack,
             registry=a.registry, defaults_helper=a.defaults_helper,
             corpus=a.corpus,
             corpus_sha256=a.corpus_sha256, corpus_dataset=a.corpus_dataset,
@@ -375,16 +408,14 @@ def cmd_nightly(a) -> int:
         prior = json.loads(latest_path.read_text()) if latest_path.is_file() else None
         # IX-only night: merge the delta contract into last night's published summary (summary.json
         # IS the store). A BLIS release (or the seed) rebuilds the whole window from the contract.
-        # A prior summary published before point ids were unit ids holds no point tonight's
-        # window can match (COV-8 keeps it unchanged), so the window is rebuilt, not merged.
-        if prior and prior.get("provenance", {}).get("blis", {}).get("release") == blis_tag \
-                and not _has_legacy_ids(prior):
+        # A prior that is not mergeable was never merged into: pull_fn fetched the whole window.
+        if mergeable(prior, bsv2.SCHEMA_VERSION) and prior["provenance"]["blis"]["release"] == blis_tag:
             summary = bsv2.build_merged(prior, contract_dir, window_ids, generated_at=gen_at,
                                         evaluator_commit=a.evaluator_commit or "local",
                                         work=Path(a.score_work or contract_dir.parent) / "merge")
         else:
             summary = bsv2.build(contract_dir, generated_at=gen_at, evaluator_commit=a.evaluator_commit or "local")
-        return summary, summary["coverage"]["scored"]
+        return summary, summary["coverage"]["graded"]
 
     res = nr.run_night(today, a.blis_tag, work_dir=work_dir, data_dir=data_dir, state_path=state_path,
                        pull_fn=pull_fn, score_build_fn=score_build_fn,
@@ -419,6 +450,8 @@ def main(argv=None) -> int:
     s.add_argument("--catalog", required=True)
     s.add_argument("--registry", required=True)
     s.add_argument("--defaults-helper", required=True, help="orchestrator/blisdefaults built against --blis's tag")
+    s.add_argument("--stack", help="TEMPORARY until inference-sim v0.16.0 ships stack.json: the scoring build's "
+                                    "stack.json, when its checkout has none")
     s.add_argument("--corpus", required=True)
     s.add_argument("--corpus-sha256")
     s.add_argument("--corpus-dataset", default="semianalysisai/cc-traces-weka-062126")
@@ -451,6 +484,7 @@ def main(argv=None) -> int:
     n.add_argument("--catalog", required=True)
     n.add_argument("--registry", required=True)
     n.add_argument("--defaults-helper", required=True)
+    n.add_argument("--stack", help="TEMPORARY until inference-sim v0.16.0 (see score --stack)")
     n.add_argument("--corpus", required=True)
     n.add_argument("--corpus-sha256")
     n.add_argument("--corpus-dataset", default="semianalysisai/cc-traces-weka-062126")

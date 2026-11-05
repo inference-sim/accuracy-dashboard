@@ -1,4 +1,5 @@
-"""Tests for the v2 summary builder and validator (orchestrator/build_summary_v2.py, issue #30).
+"""Tests for the summary builder and validator (orchestrator/build_summary_v2.py, which writes
+summary.json v3, and validate_summary_v2.py, which reads v2 and v3).
 
 Expectations are worked by hand from the committed contract fixture
 (orchestrator/ingest/testdata/contract/run-a), not read back from the builder.
@@ -7,6 +8,7 @@ Run: python3 orchestrator/test_build_summary_v2.py
 """
 import json
 import shutil
+from collections import Counter
 import sys
 import tempfile
 from pathlib import Path
@@ -26,6 +28,15 @@ def _build(run="run-a", **kw):
 
 def _points(doc):
     return vs2.points(doc)
+
+
+def _recount(d: Path) -> None:
+    """Set provenance.json's point count to the points a test-built contract holds (COV-1)."""
+    sys.path.insert(0, str(HERE / "ingest"))
+    import contract as c
+    n = sum(1 for _ in open(d / c.FIDELITY_JSONL)) + sum(1 for name in (c.NOT_SCORED_JSONL, c.FAILED_JSONL)
+                                                       for x in open(d / name) if x.strip())
+    _set_prov(d, points=n)
 
 
 def _by_conc(doc, model, gpu, label_prefix):
@@ -74,40 +85,50 @@ def test_each_point_carries_its_identity_date_and_fidelity_record():
         assert p["fidelity"] == want and len(p["measured_date"]) == 10
 
 
-def test_an_approximate_point_counts_in_the_all_tier_only():
+def test_only_a_g1_point_counts_in_the_strict_tier():
     doc = _build()
-    approx = [p for p in _points(doc) if p["fidelity"]["status"] == "approximate"]
-    # one with approximated settings, one on a build BLIS doesn't model (a custom image)
-    assert len(approx) == 2 and all(p["tier"] == "all" for p in approx)
-    assert sorted(p["fidelity"]["build"]["match"] for p in approx) == ["estimated", "exact"]
-    # 9 scored points, 7 exact: the strict tier's TPOT error averages 7 points, "all" averages 9.
+    grades = Counter(p["fidelity"]["grade"] for p in _points(doc))
+    assert grades == {"G1": 3, "G2": 3, "G4": 3}
+    assert all(p["tier"] == ("measured_or_resolved" if p["fidelity"]["grade"] == "G1" else "all") for p in _points(doc))
     assert doc["totals"]["all"]["mape"]["n"] == 9
-    assert doc["totals"]["measured_or_resolved"]["mape"]["n"] == 7
+    assert doc["totals"]["measured_or_resolved"]["mape"]["n"] == 3
 
 
-def test_the_tier_comes_from_the_fidelity_status_not_the_harness_tier_string():
-    # Flip one exact point's points.csv tier string: the built tier still follows its fidelity record.
-    import build_summary as v1
-    orig = dict(v1.TIER_MAP)
-    try:
-        # If the builder read the harness string, every exact point would land in "all".
-        v1.TIER_MAP["MEASURED-OR-RESOLVED"] = "all"
-        doc = _build()
-    finally:
-        v1.TIER_MAP.clear()
-        v1.TIER_MAP.update(orig)
-    tiers = {p["fidelity"]["status"]: p["tier"] for p in _points(doc)}
-    assert tiers == {"exact": "measured_or_resolved", "approximate": "all"}
+def test_the_headline_covers_g1_to_g4_with_each_grades_share_and_count():
+    # COV-11, by hand from run-a: 9 graded points (3 G1, 3 G2, 3 G4) and 5 G5. Every figure is
+    # over fewer than 10 points, so each is "too few points", never a number.
+    h = _build()["headline"]
+    assert (h["points"], h["graded"], h["not_scored"]) == (14, 9, 5)
+    assert h["headline"]["ttft"] == {"mape": "too few points", "n": 9}
+    assert {g: (r["points"], r["share"]) for g, r in h["grades"].items()} == \
+        {"G1": (3, 1 / 3), "G2": (3, 1 / 3), "G3": (0, 0.0), "G4": (3, 1 / 3)}
+    assert all(r["ttft"]["mape"] == "too few points" for r in h["grades"].values())
 
 
-def test_coverage_balances_and_counts_reasons_by_code():
-    doc = _build()
-    assert doc["coverage"]["scored"] == 9 and doc["coverage"]["not_scored"] == 4
-    # run-a's not-scored records: drafter_not_in_catalog:eagle3 (x2, one also setting_not_modelled),
-    # setting_not_modelled:prefill_schedule_interval, and model_not_in_catalog. A build is never one.
-    assert doc["coverage"]["not_scored_reasons"] == {"drafter_not_in_catalog": 2, "model_not_in_catalog": 1,
-                                                     "setting_not_modelled": 2}
-    assert len(doc["not_scored"]) == 4
+def test_the_headline_is_a_number_from_ten_points():
+    import headline as hl
+    pts = [{"grade": "G2", "framework": "vllm", "hardware": "h200", "release": "0.31.0", "meas_ttft_us": 100.0,
+            "pred_ttft_us": 110.0, "meas_tpot_us": 10.0, "pred_tpot_us": 9.0}] * hl.MIN_POINTS
+    h = hl.headline(pts)
+    assert h["headline"]["ttft"]["n"] == 10 and abs(h["headline"]["ttft"]["mape"] - 10.0) < 1e-9
+
+
+def test_coverage_splits_by_engine_release_chip_and_grade_and_balances():
+    c = _build()["coverage"]
+    assert (c["points"], c["graded"], c["not_scored"], c["failed"]) == (14, 9, 5, 0)
+    assert c["by_grade"] == {"G1": 3, "G2": 3, "G3": 0, "G4": 3, "G5": 5}
+    assert c["by_engine_release"]["vllm 0.31.0"]["grades"] == {"G1": 3, "G2": 3, "G3": 0, "G4": 0, "G5": 1}
+    assert c["by_engine_release"]["vllm nightly or custom"]["graded"] == 2
+    # h200: the TP4 curve (3, G1), TP8 (G4), MiniMax-M3 (G4), and the router point (G5).
+    assert c["by_chip"]["h200"] == {"points": 6, "graded": 5, "grades": {"G1": 3, "G2": 0, "G3": 0, "G4": 2, "G5": 1}}
+    assert c["left_out_records"] == 3
+    assert c["g5_reasons"] == {"field_not_modelled": 2, "not_in_catalog": 2, "router_unsupported": 1}
+
+
+def test_the_backlog_top_ranks_the_reasons_points_are_not_g1():
+    top = _build()["backlog"]["top"]
+    assert top[0] == {"reason": "client_difference: send_gap", "points": 3}
+    assert {"reason": "G5 not_in_catalog: eagle3", "points": 2} in top and len(top) == 10
 
 
 def test_the_built_summary_is_schema_valid_and_byte_identical_on_rebuild():
@@ -126,11 +147,31 @@ def test_provenance_names_the_api_ingest_and_the_frozen_pull():
     assert doc["snapshot_id"] == "2026-10-23_blis-v0.12.0_ix-api-2026-10-23"
 
 
-def test_run_b_scored_by_an_older_blis_drops_the_refused_point():
+def test_run_b_lists_the_point_it_failed_on_and_grades_it_nowhere():
     a, b = _build("run-a"), _build("run-b")
     ids_a, ids_b = {p["point_id"] for p in _points(a)}, {p["point_id"] for p in _points(b)}
     assert len(ids_b) == 8 and ids_b < ids_a
-    assert b["coverage"]["not_scored_reasons"].get("blis_refused") == 1
+    assert [f["faults"] for f in b["failed"]] == [["blis_refused:timeout"]]
+    assert b["coverage"]["failed"] == 1 and b["coverage"]["points"] == 14 and b["headline"]["points"] == 13
+
+
+def test_a_failed_point_that_is_not_a_runner_limit_stops_the_publish():
+    # COV-8: a run that holds a run fault other than a runner limit publishes nothing.
+    import contract as c
+    d = Path(tempfile.mkdtemp()) / "run-b"
+    shutil.copytree(FIXTURE / "run-b", d)
+    rows = [json.loads(x) for x in (d / c.FAILED_JSONL).read_text().splitlines()]
+    for fault in ("blis_refused:max_cudagraph_capture_size", "setting_differs:max_num_seqs"):
+        (d / c.FAILED_JSONL).write_text(c.canonical_dumps({**rows[0], "faults": [fault]}) + "\n")
+        try:
+            b2.build(d, generated_at=STAMP, evaluator_commit="test")
+        except b2.PublishRefused as e:
+            assert "COV-8" in str(e) and fault in str(e)
+            continue
+        raise AssertionError(f"published a run holding {fault}")
+    for limit in ("blis_refused:insufficient_memory", "blis_refused:timeout"):
+        (d / c.FAILED_JSONL).write_text(c.canonical_dumps({**rows[0], "faults": [limit]}) + "\n")
+        b2.build(d, generated_at=STAMP, evaluator_commit="test")
 
 
 def test_an_invalid_contract_is_refused_not_built():
@@ -152,16 +193,38 @@ def test_an_invalid_contract_is_refused_not_built():
 def test_the_validator_catches_coverage_that_doesnt_balance_and_malformed_fidelity():
     doc = _build()
     doc["coverage"]["not_scored"] += 1
-    assert any("coverage.not_scored" in p for p in vs2.problems(doc))
+    assert any("not_scored/failed" in p for p in vs2.problems(doc))
     doc = _build()
-    doc["coverage"]["not_scored_reasons"]["model_not_in_catalog"] = 9
-    assert any("not_scored_reasons" in p for p in vs2.problems(doc))
+    doc["coverage"]["points"] += 1
+    assert any("COV-1" in p for p in vs2.problems(doc))
+    doc = _build()
+    doc["coverage"]["by_chip"]["h200"]["points"] += 1
+    assert any("coverage.by_chip" in p for p in vs2.problems(doc))
+    doc = _build()
+    doc["coverage"]["g5_reasons"]["not_in_catalog"] = 9
+    assert any("g5_reasons" in p for p in vs2.problems(doc))
     doc = _build()
     _points(doc)[0]["fidelity"]["build"]["distance"] = "near"
     assert vs2.problems(doc) != []
     doc = _build()
     doc["schema_version"] = 1
     assert vs2.problems(doc) != []
+
+
+def test_the_validator_refuses_a_figure_under_the_minimum_or_one_that_does_not_recompute():
+    # COV-11: every figure carries its count; under the minimum it is "too few points".
+    doc = _build()
+    doc["headline"]["grades"]["G1"]["ttft"]["mape"] = 4.2
+    assert vs2.problems(doc) != []
+    doc = _build()
+    doc["headline"]["grades"]["G2"]["points"] = 4
+    assert any("headline.grades.G2" in p for p in vs2.problems(doc))
+    doc = _build()
+    doc["backlog"]["top"].reverse()
+    assert any("backlog.top" in p for p in vs2.problems(doc))
+    doc = _build("run-b")
+    doc["failed"][0]["faults"] = ["setting_differs:max_num_seqs"]
+    assert any("COV-8" in p for p in vs2.problems(doc))
 
 
 def test_the_validator_refuses_states_the_contract_forbids():
@@ -173,14 +236,17 @@ def test_the_validator_refuses_states_the_contract_forbids():
         mutate(doc)
         return vs2.problems(doc) != []
     first = lambda d: _points(d)[0]
-    exact = lambda d: next(p for p in _points(d) if p["fidelity"]["status"] == "exact")
-    assert bad(lambda d: first(d)["fidelity"].update(status="not_scored", reasons=["blis_refused"]))
+    g1 = lambda d: next(p for p in _points(d) if p["fidelity"]["grade"] == "G1")
+    g2 = lambda d: next(p for p in _points(d) if p["fidelity"]["grade"] == "G2")
+    assert bad(lambda d: first(d)["fidelity"].update(grade="G5"))
     for m in ("differs", "absent_in_blis", "unreadable", "conflict"):       # a refusal can't be scored
-        assert bad(lambda d, m=m: exact(d)["fidelity"]["args"][0].update(match=m)), m
+        assert bad(lambda d, m=m: g1(d)["fidelity"]["args"][0].update(match=m)), m
+    assert bad(lambda d: g1(d).update(tier="all"))                          # a G1 point is in the strict tier
+    assert bad(lambda d: g2(d).update(tier="measured_or_resolved"))
+    assert bad(lambda d: g1(d)["fidelity"].update(run_release="0.25.0"))    # COV-6
     assert bad(lambda d: first(d)["fidelity"]["build"].update(ref="v0.99.0"))
-    assert bad(lambda d: exact(d)["fidelity"]["build"].update(distance=5000))
-    assert bad(lambda d: first(d)["fidelity"]["build"].update(match="estimated", why="outside_distance", distance=None))
     assert bad(lambda d: d["not_scored"][0]["identity"].update(conc=999))
+    assert bad(lambda d: d["not_scored"][0].update(g5_reason={"code": "blis_refused"}))   # COV-5
     assert vs2.problems(copy.deepcopy(base)) == []
 
 
@@ -214,6 +280,7 @@ def _spec_and_nospec_contract():
         w.writerows(rows)
     (d / "facets.json").write_text(contract.canonical_dumps(facets) + "\n")
     (d / "fidelity.jsonl").write_text("".join(contract.canonical_dumps(fid[k]) + "\n" for k in sorted(fid)))
+    _recount(d)
     return d, facets
 
 
@@ -322,6 +389,7 @@ def _twin_contract(same_inputs: bool):
         w.writerows(rows)
     (d / "facets.json").write_text(contract.canonical_dumps(facets) + "\n")
     (d / "fidelity.jsonl").write_text("".join(contract.canonical_dumps(fid[k]) + "\n" for k in sorted(fid)))
+    _recount(d)
     return d, src, pid
 
 
@@ -334,7 +402,8 @@ def test_two_inferencex_runs_of_one_measurement_are_shown_once_as_their_mean():
     assert sorted(r["point_id"] for r in p["repeats"]) == sorted([src["point_id"], pid])
     assert p["point_id"] == min(src["point_id"], pid)
     assert p["measured"]["ttft_ms"] == round((float(src["meas_ttft_us"]) * 2 + 2000.0) / 2 / 1000, 4)
-    assert doc["coverage"]["scored"] == 9 and doc["coverage"]["repeat_runs_folded"] == 1
+    # Both runs are graded anchor units; the matrix shows them as one point.
+    assert doc["coverage"]["graded"] == 10 and len(_points(doc)) == 9 and doc["coverage"]["repeat_runs_folded"] == 1
     # one curve again, so the trend is the same three-point sweep as without the twin
     assert all(q["sweep_id"] == pts[1]["sweep_id"] for q in pts.values())
     assert pts[1]["shape"] == {"ttft": None, "tpot": None} and pts[4]["shape"]["ttft"] is not None
@@ -343,7 +412,7 @@ def test_two_inferencex_runs_of_one_measurement_are_shown_once_as_their_mean():
 def test_runs_with_different_blis_inputs_are_not_folded():
     d, _, _ = _twin_contract(same_inputs=False)
     doc = b2.build(d, generated_at=STAMP, evaluator_commit="test")
-    assert doc["coverage"]["scored"] == 10 and doc["coverage"].get("repeat_runs_folded") == 0
+    assert doc["coverage"]["graded"] == 10 and doc["coverage"]["repeat_runs_folded"] == 0
     assert not any(p.get("repeats") for p in _points(doc))
     assert vs2.problems(doc) == []
 
@@ -361,9 +430,18 @@ def test_the_validator_checks_folded_runs():
     assert any("repeat_runs_folded" in p for p in vs2.problems(doc))
 
 
-def test_v1_documents_are_not_v2():
+def test_v1_documents_are_not_v2_or_v3():
     v1 = json.loads((HERE.parent / "web" / "testdata" / "render-fixture.summary.json").read_text())
     assert vs2.problems(v1) != []
+
+
+def test_every_published_v2_snapshot_still_validates():
+    # COV-8: published snapshots never change, so the validator keeps reading v2 as it was.
+    paths = sorted((HERE.parent / "data").glob("snapshots/*api*/summary.json")) + [HERE.parent / "data" / "latest" / "summary.json"]
+    v2 = [p for p in paths if json.loads(p.read_text())["schema_version"] == 2]
+    assert v2
+    for p in v2:
+        assert vs2.problems(json.loads(p.read_text())) == [], p
 
 
 # ---------------------------------------------------------------- no-storage merge (#15, revised)
@@ -378,8 +456,7 @@ def test_summary_inverts_to_a_valid_contract_and_rebuilds():
         assert c.validate_dir(tmp) == []
         rebuilt = b2.build(tmp, generated_at=STAMP, evaluator_commit="test")
         # Same points, same coverage -- the inversion is lossless for identity/fidelity/counts.
-        assert rebuilt["coverage"]["scored"] == summary["coverage"]["scored"]
-        assert rebuilt["coverage"]["not_scored"] == summary["coverage"]["not_scored"]
+        assert rebuilt["coverage"] == summary["coverage"] and rebuilt["headline"] == summary["headline"]
         assert {p["point_id"] for p in _points(rebuilt)} == {p["point_id"] for p in _points(summary)}
     finally:
         shutil.rmtree(tmp)
@@ -401,7 +478,7 @@ def test_ix_only_merge_of_delta_reproduces_the_full_summary():
         b2.summary_to_contract(full, prior_c)
         _strip_points(prior_c, delta_ids)
         prior = b2.build(prior_c, generated_at="2026-10-22T00:00:00Z", evaluator_commit="test")
-        assert prior["coverage"]["scored"] == full["coverage"]["scored"] - 2
+        assert prior["coverage"]["graded"] == full["coverage"]["graded"] - 2
 
         # delta contract = only the 2 new points, taken from the full fixture contract
         delta_c = tmp / "delta"
@@ -410,7 +487,7 @@ def test_ix_only_merge_of_delta_reproduces_the_full_summary():
         window = set(all_ids) | {n["point_id"] for n in full["not_scored"]}
         merged = b2.build_merged(prior, delta_c, window, generated_at=STAMP, evaluator_commit="test",
                                  work=tmp / "wk")
-        assert merged["coverage"]["scored"] == full["coverage"]["scored"]
+        assert merged["coverage"] == full["coverage"] and merged["headline"] == full["headline"]
         assert merged["totals"] == full["totals"]
         assert c.validate_dir(delta_c) == []
     finally:
@@ -482,6 +559,7 @@ def _strip_points(contract_dir: Path, drop: set):
     (contract_dir / c.FIDELITY_JSONL).write_text("".join(c.canonical_dumps(r) + "\n" for r in sorted(fid, key=lambda r: r["point_id"])))
     fac = {k: v for k, v in json.loads((contract_dir / c.FACETS_JSON).read_text()).items() if k not in drop}
     (contract_dir / c.FACETS_JSON).write_text(c.canonical_dumps(fac) + "\n")
+    _recount(contract_dir)
 
 
 def _subset_contract(src: Path, dst: Path, keep: set):
@@ -501,7 +579,9 @@ def _subset_contract(src: Path, dst: Path, keep: set):
     fac = {k: v for k, v in json.loads((src / c.FACETS_JSON).read_text()).items() if k in keep}
     (dst / c.FACETS_JSON).write_text(c.canonical_dumps(fac) + "\n")
     (dst / c.NOT_SCORED_JSONL).write_text("")
+    (dst / c.FAILED_JSONL).write_text("")
     shutil.copy(src / c.PROVENANCE_JSON, dst / c.PROVENANCE_JSON)
+    _recount(dst)
 
 
 if __name__ == "__main__":

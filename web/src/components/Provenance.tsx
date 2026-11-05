@@ -18,7 +18,7 @@
  */
 import { Term } from './Term'
 import { formatVersion } from '../format'
-import type { Fidelity, FidelityArg } from '../types'
+import { isEstimated, type Fidelity, type FidelityArg, type Substitution } from '../types'
 
 /** Plain names for settings a reader may see here. Anything else falls back to its own name. */
 const LABEL: Record<string, string> = {
@@ -121,10 +121,57 @@ function buildDiff(b: Fidelity['build']): string | null {
   }
 }
 
+/** A v3 substitution in plain words, for the tooltip. The full record stays in summary.json. */
+function substitutionText(s: Substitution): string {
+  switch (s.kind) {
+    case 'estimated':
+      return `${label(s.subject)}: estimated`
+    case 'client_difference':
+      return s.subject === 'send_gap' ? 'the client’s send gap is not simulated' : 'the sent prompt lengths are not verified'
+    case 'other_release':
+      return `measured on vLLM ${s.detail}`
+    case 'nightly_or_custom':
+      return 'measured on a nightly or custom vLLM build'
+    case 'ported_functions_unpublished':
+      return 'which upstream code changed between the releases is not yet published'
+    case 'changed_functions':
+      return `ported code changed: ${s.detail}`
+    case 'interim_status':
+      return `${label(s.subject)}: not yet proven to have no effect`
+    default:
+      return `${s.kind.replace(/_/g, ' ')}: ${s.subject}`
+  }
+}
+
+const GRADE_TITLE: Record<string, string> = {
+  G1: 'G1 · Exact match',
+  G2: 'G2 · Estimated',
+  G3: 'G3 · Another vLLM release, same code',
+  G4: 'G4 · Another vLLM release or build',
+}
+
 export function ProvenanceBody({ fidelity: f }: { fidelity: Fidelity }) {
   const approx = f.args.filter((a) => a.match === 'approximated')
   const build = buildDiff(f.build)
-  const exact = f.status !== 'approximate'
+  if (f.grade) {
+    const subs = f.substitutions ?? []
+    return (
+      <span className="prov-body">
+        <span className="prov-h">{GRADE_TITLE[f.grade]}</span>
+        <span className="prov-row">
+          {subs.length === 0
+            ? 'BLIS simulated the exact settings and requests this run used, on the vLLM release it measured.'
+            : 'BLIS simulated this run, except:'}
+        </span>
+        {subs.map((s) => (
+          <span className="prov-row" key={`${s.kind}|${s.subject}`}>
+            · {substitutionText(s)}
+          </span>
+        ))}
+      </span>
+    )
+  }
+  const exact = !isEstimated(f)
   return (
     <span className="prov-body">
       <span className="prov-h">{exact ? 'Exact match' : 'Estimated'}</span>
@@ -143,7 +190,7 @@ export function ProvenanceBody({ fidelity: f }: { fidelity: Fidelity }) {
 /** The ⓘ / ≈ trigger for a point's match details; nothing for a v1 point. */
 export function ProvenanceTip({ fidelity }: { fidelity?: Fidelity }) {
   if (!fidelity) return null
-  const approx = fidelity.status === 'approximate'
+  const approx = isEstimated(fidelity)
   return (
     <Term
       content={<ProvenanceBody fidelity={fidelity} />}

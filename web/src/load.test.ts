@@ -25,8 +25,18 @@ describe('validateSummary rejects malformed input loudly', () => {
     expect(() => validateSummary(42)).toThrow(SummaryLoadError)
   })
   it('throws on wrong schema_version', () => {
-    const d = clone(); d.schema_version = 3
+    const d = clone(); d.schema_version = 4
     expect(() => validateSummary(d)).toThrow(/schema_version/)
+  })
+  it('accepts the v3 fixture, and refuses a v3 body without its headline or a point without its grade', () => {
+    const v3 = JSON.parse(readFileSync(fileURLToPath(new URL('../testdata/render-fixture.v3.summary.json', import.meta.url)), 'utf8'))
+    expect(() => validateSummary(v3)).not.toThrow()
+    const noHead = JSON.parse(JSON.stringify(v3))
+    delete noHead.headline
+    expect(() => validateSummary(noHead)).toThrow(/headline/)
+    const noGrade = JSON.parse(JSON.stringify(v3))
+    delete noGrade.matrix[0].rows[0].rows[0].rows[0].rows[0].fidelity.grade
+    expect(() => validateSummary(noGrade)).toThrow(/fidelity\.grade/)
   })
   it('accepts the v2 fixture, and refuses a v1 body labelled v2 (#30)', () => {
     const v2 = JSON.parse(readFileSync(fileURLToPath(new URL('../testdata/render-fixture.v2.summary.json', import.meta.url)), 'utf8'))

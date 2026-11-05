@@ -5,7 +5,7 @@
  * parent aggregate — the "filters never show stale numbers" guarantee (B3).
  */
 import { aggregatePair, type FlatPoint } from './aggregate'
-import type { Fidelity, MetricBlockPair } from './types'
+import { isEstimated, type Fidelity, type MetricBlockPair } from './types'
 
 export interface RenderRow {
   level: 'model' | 'workload' | 'gpu' | 'topology'
@@ -107,8 +107,8 @@ export function buildRows(points: FlatPoint[], expanded: Set<string>): RenderRow
               ? {
                   // The record shown for the row: an estimated one when any point is estimated,
                   // so a mixed row's tooltip never reads "Exact match" under "N estimated".
-                  fidelity: (withFid.find((p) => p.fidelity!.status === 'approximate') ?? withFid[0]!).fidelity,
-                  approxCount: withFid.filter((p) => p.fidelity!.status === 'approximate').length,
+                  fidelity: (withFid.find((p) => isEstimated(p.fidelity)) ?? withFid[0]!).fidelity,
+                  approxCount: withFid.filter((p) => isEstimated(p.fidelity)).length,
                 }
               : {}),
           })

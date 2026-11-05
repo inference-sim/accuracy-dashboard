@@ -1,6 +1,6 @@
 # Extractor → summary contract (Discussion #28)
 
-The extractor (#29) writes one **contract directory** per scored run (one BLIS release over one frozen API pull). The v2 summary builder (#30) reads it and writes `summary.json` v2 (`schemas/summary.v2.json`).
+The scorer (`score.py`) writes one **contract directory** per scored run (one BLIS release over one frozen API pull). The summary builder (`build_summary_v2.py`) reads it and writes `summary.json` v3 (`schemas/summary.v3.json`). Snapshots published as v2 (`schemas/summary.v2.json`, with the frozen record schema `schemas/fidelity.v2.json`) never change (COV-8); the validator and the web still read them.
 
 The v1 db-dump pipeline has been retired (its workflows and dump-ingest scripts removed). `build_summary.py` (shared arithmetic), `schemas/summary.v1.json` and the three committed db-dump snapshots are unchanged and still read by the UI.
 
@@ -13,23 +13,48 @@ The v1 db-dump pipeline has been retired (its workflows and dump-ingest scripts 
 | `points.csv` | CSV, header below | scored point |
 | `fidelity.jsonl` | one canonical JSON object per line | scored point |
 | `facets.json` | one canonical JSON object, keyed by `point_id` | scored point |
-| `not_scored.jsonl` | one canonical JSON object per line | point InferenceX measured that this run didn't score |
+| `not_scored.jsonl` | one canonical JSON object per line | G5 point (design §11.4) |
+| `failed.jsonl` | one canonical JSON object per line | point whose scoring failed (below) |
 | `provenance.json` | one canonical JSON object | run |
 
-Every scored `point_id` appears exactly once in each of `points.csv`, `fidelity.jsonl` and `facets.json`. A not-scored `point_id` appears only in `not_scored.jsonl`.
+Every scored `point_id` appears exactly once in each of `points.csv`, `fidelity.jsonl` and `facets.json`. A G5 `point_id` appears only in `not_scored.jsonl`, and a failed one only in `failed.jsonl`. The three counts sum to `provenance.json`'s `points` (COV-1).
+
+## Grades
+
+Every point gets exactly one closeness grade, computed from data alone by `grade.grade` (design §11.3): the highest-numbered grade whose conditions apply.
+
+| Grade | When |
+|---|---|
+| `G1` | The run's engine release is the one the scoring simulator runs (`provenance.engine.version`, from stack.json), and nothing was substituted. |
+| `G2` | As G1, and the record names one or more substitutions. |
+| `G3` | The run's release is another one, and the engine publishes a function-level diff showing no ported function changed. |
+| `G4` | As G3 with a changed function; or the build is nightly or custom; or the engine publishes no ported-function list (every point on another release is G4 until it does). |
+| `G5` | Not scored, for one of design §11.4's reasons only (COV-5). |
+
+The run's release (`run_release`) is read by `grade.run_release` from the recorded build: an official `vllm/vllm-openai` or `vllm/vllm-openai-rocm` image tagged `vX.Y.Z` whose server-log banner, when there is one, prints that version; any other build is nightly or custom, and `run_release` is null. The build's `match` (the commit distance from `vllm_ref`) is not a grade input.
+
+A substitution is `{kind, subject, detail}`; the record's `substitutions` are sorted by kind, then subject. The G2 kinds are `estimated` (an `args` entry with `match: approximated`, its detail the entry's note; or with `match: blis_default`, its detail the entry's rule), `client_difference` (each of `requests.differences`, COV-12), and the kinds blis-substrate `contracts/spec/pointrecord` names (`coefficient_method`, `coefficient_range`, `execution_mode`, `kernel_hash`, `value_class`, `interim_status`, `resolved_differs`). The G3 and G4 kinds are `other_release`, `changed_functions`, `nightly_or_custom` and `ported_functions_unpublished`.
+
+`grade.check` holds every point of a contract to these rules (COV-4, COV-5, COV-6), and the validator runs it.
+
+## Failed points
+
+A reason that is a fault of the run, not a fact about the point, is not a grade: `blis_refused` (the simulator refused the scenario the harness wrote from recorded values, or its Result failed a check) and `setting_differs` (the written scenario lost a recorded value). Such a point is listed in `failed.jsonl` with its `faults`, and is counted in coverage as failed, never graded.
+
+The summary builder refuses to publish a contract holding a failed point unless every one of its faults is a runner limit: `blis_refused:insufficient_memory` (the replay exceeded the runner's memory ceiling) and `blis_refused:timeout`. A larger runner or a longer timeout scores those points; any other fault means the run has not finished scoring, so the night publishes nothing (COV-8).
 
 ### `points.csv`
 
 The per-point columns `build_summary.py` already reads (`EXPECTED_HEADER`), then two more:
 
 ```
-scenario,model,gpu,label,concurrency,meas_tpot_us,pred_tpot_us,meas_ttft_us,pred_ttft_us,tier_unbracketed,point_id,measured_date
+scenario,model,gpu,label,concurrency,meas_tpot_us,pred_tpot_us,meas_ttft_us,pred_ttft_us,grade,point_id,measured_date
 ```
 
 - Latencies are **microseconds**. Measured values come from the InferenceX row; predicted values from BLIS.
 - `scenario` is the **deployment** name, shared by every concurrency of one sweep. (The agentic driver may write one scenario file per point; their names are an implementation detail and aren't carried here.)
 - `label` is the workload label: `8k1k`-style for single-turn, `agentx` for agentic.
-- `tier_unbracketed` follows the point's fidelity `status`: `MEASURED-OR-RESOLVED` for `exact`, `ALL (approximate)` for `approximate` (the strings `build_summary.TIER_MAP` already reads). So an approximate point (an approximated setting or an estimated build) counts only in the `all` tier, never in `measured_or_resolved`.
+- `grade` is the point's grade, `G1` to `G4`, and equals its fidelity record's. In the summary's tree a G1 point is in the strict tier (`measured_or_resolved`), every other one in `all` only.
 - `measured_date` is the InferenceX row's `date` (`YYYY-MM-DD`). It is **not** `curve_date`, which is InferenceX's curve grouping and can be later than the measurement (append-only points).
 
 ### `point_id`
@@ -65,7 +90,7 @@ Snapshots published before this identity carry `point_id`s of an eight-field ide
 
 ### `fidelity.jsonl`
 
-`{"point_id": …, <record>}`, one line per scored point, sorted by `point_id`. The record is described by `fidelity.schema.json`, and its shape is explained in Discussion #28 ("Per-point fidelity record"). For a scored point, `status` is `exact` or `approximate`, and there is no `reasons` field (the schema enforces both ways: `not_scored` requires `reasons`, a scored status forbids it). A point is `approximate` exactly when one of its `args` has `match: approximated` (a quantization setting BLIS can't state, scored with what BLIS uses instead), or its `build.match` is `estimated` (the run's vLLM build isn't the one BLIS models: a custom image, a commit off vLLM's mainline or unresolvable, or more than `vllm_max_distance` commits from `vllm_ref`; `build.why` says which), or its `requests.differences` names a difference between the run's client and the simulated one (COV-12). A build never stops a point from being scored. A single-turn point's `requests` says how its client's requests were replayed: `cold` from an empty engine when the run disabled prefix caching, `primed` after `copies` warm-up copies of request 0 otherwise. Its differences always include `send_gap` (the client's interval between a response ending and its next request, which the simulator does not model), so every single-turn point is `approximate`, and `sent_prompt_lengths` where the sent prompt lengths are not verified equal to the replayed targets. That arg's `blis` is the value BLIS used, and its `note` says why (fixed text from the policy table). A `mapped` arg must name its `blis_field`, a `blis_default` arg its `rule`, an `approximated` arg its `note`, and a `conflict` arg its `values`.
+`{"point_id": …, <record>}`, one line per scored point, sorted by `point_id`. The record is described by `schemas/fidelity.v3.json`. It carries the point's `grade` (`G1` to `G4`), its `substitutions` (empty exactly for G1), its `run_release`, the recorded `build`, every classified setting in `args`, the engine outcomes compared in `resolved`, and for an agentic point `replay`, for a single-turn point `requests`. A build never stops a point from being scored. A single-turn point's `requests` says how its client's requests were replayed: `cold` from an empty engine when the run disabled prefix caching, `primed` after `copies` warm-up copies of request 0 otherwise. Its differences always include `send_gap` (the client's interval between a response ending and its next request, which the simulator does not model), so every single-turn point is at least G2, and `sent_prompt_lengths` where the sent prompt lengths are not verified equal to the replayed targets. An `approximated` arg's `blis` is the value BLIS used, and its `note` says why. A `mapped` arg must name its `blis_field`, a `blis_default` arg its `rule`, an `approximated` arg its `note`, and a `conflict` arg its `values`.
 
 ### `facets.json`
 
@@ -85,22 +110,23 @@ Snapshots published before this identity carry `point_id`s of an eight-field ide
 - `model` here is the catalog model BLIS priced, which is what the tables show. `identity.model` stays the InferenceX slug.
 - `vllm_version` is the build's version string from the server-log banner (e.g. `0.30.1rc1.dev493+gac9126e58`), shown as the row's vLLM badge.
 
-### `not_scored.jsonl`
+### `not_scored.jsonl` and `failed.jsonl`
 
 ```json
 {"point_id": …, "identity": {…}, "measured_date": …, "model": …, "hardware": …, "precision": …,
- "framework": …, "benchmark_type": …, "conc": …, "image": …,
- "measured": {"ttft_ms": …, "tpot_ms": …}, "reasons": ["<code>[:<qualifier>]", …],
- "notes": [{"reason": "<one of reasons>", "text": "…"}, …]}
+ "framework": …, "benchmark_type": …, "conc": …, "image": …, "run_release": "0.32.0" | null,
+ "measured": {"ttft_ms": …, "tpot_ms": …},
+ "grade": "G5", "g5_reason": {"code": …, "subject": …}, "g5_reasons": [{"code": …, "subject": …}, …]}
 ```
 
-One line per point, sorted by `point_id`. `reasons` is sorted and de-duplicated, and each one matches `fidelity.schema.json#/definitions/reason`. `notes` is optional: at most one per reason, sorted by reason, each naming one of the point's own reasons. A note says why the reason applies. Its text is fixed per reason in the policy table, never composed per point, so it stays deterministic. These records are written into `summary.json` v2's `not_scored` list as-is (including `identity`, so the id can be re-derived) and counted in `coverage.not_scored_reasons` by code (the part before `:`). They are never rendered.
+One line per G5 point, sorted by `point_id` (`schemas/fidelity.v3.json#/definitions/notScored`). `g5_reasons` is every G5 reason found, sorted by code then subject, so the backlog counts each; `g5_reason` is the first by design §11.4's order. `subject` names the field, model, chip, router or engine, and is absent when there is none. A `failed.jsonl` line has the same fields up to `measured`, then `faults`, sorted and unique (`#/definitions/failed`). Both lists are copied into `summary.json` as-is (including `identity`, so the id can be re-derived) and never rendered as figures.
 
 ### `provenance.json`
 
 ```json
 {"ingest": "api",
  "blis": {"release": "v0.12.0", "commit_sha": "…", "catalog": "…", "registry": "…", "extractor_version": "…"},
+ "engine": {"kind": "vllm", "version": "0.32.0"}, "points": 2035, "left_out_records": 0,
  "vllm_ref": "v0.32.0", "vllm_max_distance": 2000,
  "policy_sha256": "…", "pulled_at": "<UTC ISO-8601>",
  "corpus": {"dataset": "…", "revision": "…", "sha256": "…"} | null,
@@ -110,33 +136,43 @@ One line per point, sorted by `point_id`. `reasons` is sorted and de-duplicated,
 
 `source` names what was pulled: `{"name", "url"}` (the API the pull read), copied into summary.json's `ground_truth`.
 
+`engine` is the engine release the scoring simulator runs, read from its stack.json (LIF-6); every point is scored on it, and graded against it. TEMPORARY until inference-sim v0.16.0 ships stack.json at its root: `cli.py score --stack FILE` names the file. A simulator checkout with no stack.json and no `--stack` is refused, because the build predates stack.json; the release is never read from installation.md.
+
+`points` is the number of points the run holds (scored, G5 and failed), and `left_out_records` the number of source records the ledger holds no unit for (the pull manifest's `ledger.unlisted`), published in coverage (COV-7).
+
 `pull_manifest_sha256` is the sha256 of the frozen pull's manifest (each point's frozen inputs and their sha256s), and identifies exactly what that pull scored. On an IX-only nightly merge the published summary keeps this field (and `ground_truth.measurement_sha256`) from the **newest** pull — the one that fetched the delta — not from a manifest covering the whole merged window: the carried-over points come from the prior summary, which was scored under its own pull. So this hash verifies the delta's pull, not the entire window a merged summary shows (no single manifest covers a merged window). A whole-window pull — and a manifest that covers it — is only produced on a seed or a BLIS-release rebuild.
 
-## Reason codes
+## The summary
 
-Defined once in `fidelity.schema.json` (`definitions/reason`). An optional `:<qualifier>` names the arg, input or scenario involved (e.g. `setting_not_modelled:prefill_schedule_interval`).
+`summary.json` v3 carries, beside v1's tree of points:
 
-| Code | Meaning |
+- `headline`: the accuracy over every graded point, G1 to G4, and for each grade its share of the graded points and its own accuracy (`headline.headline`, COV-11). Each figure is `{mape, n}`; one over fewer than `min_points` (10) points is `"too few points"`, never a number.
+- `coverage`: graded points over all points, split by engine, engine release, chip and grade, with the failed points and the records the ledger left out (`headline.coverage`, COV-7). Every anchor unit counts, including repeat runs the tree shows as one point.
+- `backlog.top`: the ten most common reasons a point is not G1 (`backlog.top`).
+- `not_scored` and `failed`: the two lists, as the contract holds them.
+
+## G5 reasons
+
+The closed list of design §11.4 (`grade.G5_CODES`; COV-5). A reason the scorer finds is mapped onto it by `assess.g5_of`; a reason with no place on the list raises, and is never published.
+
+| Code | The scorer's finding |
 |---|---|
-| `artifact_unmatched` | No result JSON (or more than one) matches the row's `recipe_fingerprint` + `conc`. `artifact_unmatched:pull_error` (the pull itself failed on the row) is never valid in a contract: the validator refuses it. |
-| `server_log_missing` | The point's vLLM server log is unavailable (e.g. artifacts expired). |
-| `corpus_changed` | The corpus file's sha256 differs from the one recorded at first use. |
-| `conflict` | Two sources disagree on a setting or replay input. |
-| `unclassified_arg` | A vLLM arg the policy table doesn't classify. |
-| `setting_not_modelled` | A timing-relevant setting BLIS can't represent. |
-| `setting_differs` | A timing-relevant setting BLIS was given differs from what the run recorded (`differs` / `absent_in_blis` in the args diff). |
-| `required_setting_missing` | A setting BLIS requires that no source records and BLIS has no default for. |
-| `client_scenario_not_replayable` | The client scenario has no BLIS replay counterpart: an AgentX scenario BLIS does not replay, or a single-turn drafter whose acceptance the scenario does not pin. |
-| `model_not_in_catalog` | The served checkpoint (or its HF `base_model`) maps to no catalog model. |
-| `hardware_no_coefficients` | The registry has no coefficients for the part. |
-| `drafter_not_in_catalog` | The catalog graph doesn't describe the run's drafter. |
-| `blis_refused` | BLIS refused the deployment; the qualifier is a short slug and the full message goes in the fidelity record. |
+| `code_not_visible` | An out-of-tree connector or a patched private build. |
+| `router_unsupported` | The run was measured behind a router BLIS does not host: the API row's `router_name`, or the launch configuration's frontend, names one other than llm-d's. BLIS is not asked about such a point. |
+| `value_not_recorded` | A value the simulation needs is not recorded: the server log or the client export is missing, the row has no artifact, a disaggregated or multi-node run records no fabric, a required setting no source states, or a client scenario BLIS does not replay. |
+| `field_not_modelled` | The run sets a field the engine classifies as not modelled, with no estimation rule. |
+| `field_unclassified` | The engine has not classified a field the run sets. |
+| `engine_unsupported` | No BLIS engine repository models the run's framework. |
+| `not_in_catalog` | The run's model, chip or drafter has no catalog entry. |
+| `field_not_in_release` | The run sets a field the engine release BLIS runs does not have. |
+| `value_conflict` | Two sources that record the same stage of one field disagree. |
+| `build_unparseable` | The run's recorded engine build cannot be read. |
 
-Adding a code is an additive change to `fidelity.schema.json` plus a row here.
+TEMPORARY until the scorer reads the engine's fields.json: the dashboard's settings table names a setting it cannot represent `setting_not_modelled` and one it does not list `unclassified_arg`, which map to `field_not_modelled` and `field_unclassified`.
 
 ## Determinism
 
 - JSON is written with `canonical_dumps`: sorted keys, `(",", ":")` separators, UTF-8. Every JSON file and every JSONL line must equal its own canonical form.
-- Lists are sorted: `args` by `arg`, `resolved` by `quantity`, `reasons` lexically. `points.csv` rows are sorted by (`scenario`, `label`, `concurrency`, `measured_date`, `point_id`), and `not_scored.jsonl` by `point_id`.
+- Lists are sorted: `args` by `arg`, `resolved` by `quantity`, `substitutions` and `g5_reasons` by kind or code then subject, `faults` lexically. `points.csv` rows are sorted by (`scenario`, `label`, `concurrency`, `measured_date`, `point_id`), and `not_scored.jsonl` and `failed.jsonl` by `point_id`.
 - Floats the logs print are kept as the decimal string printed; `ratio` is `contract.ratio_str()` (4 significant figures, trailing zeros kept: `"1.000"`, `"1.048"`); integers are exact.
 - Same frozen inputs + same BLIS release + same config → byte-identical contract directory.

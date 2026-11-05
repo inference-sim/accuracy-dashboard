@@ -1,0 +1,733 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://inference-sim.github.io/accuracy-dashboard/orchestrator/ingest/fidelity.schema.json",
+  "title": "Per-point fidelity record (Discussion #28)",
+  "description": "The per-point fidelity record of summary.json v2 (Discussion #28), frozen: published v2 snapshots never change (COV-8). Its $id is the address it was published under. The contract and summary v3 use schemas/fidelity.v3.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "build",
+    "args",
+    "resolved"
+  ],
+  "properties": {
+    "status": {
+      "description": "exact: every timing-relevant setting is matched (recorded by the run, or BLIS's own default), the run's build is the one BLIS models, and the simulated requests are the ones the run's client sent. approximate: scored, but at least one setting BLIS can't state was approximated (an args entry with match approximated, which says what BLIS used instead and why), or build.match is estimated (the run's vLLM build isn't the one BLIS models), or requests names a difference between the run's client and the simulated one (COV-12). not_scored: the point carries at least one reason code.",
+      "enum": [
+        "exact",
+        "approximate",
+        "not_scored"
+      ]
+    },
+    "reasons": {
+      "description": "Present only when status is not_scored. Sorted, de-duplicated.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/definitions/reason"
+      }
+    },
+    "build": {
+      "$ref": "#/definitions/build"
+    },
+    "args": {
+      "description": "Every classified vLLM setting, sorted by arg.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/arg"
+      }
+    },
+    "resolved": {
+      "description": "Engine outcomes compared from both sides, sorted by quantity. Never passed to BLIS.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/resolved"
+      }
+    },
+    "replay": {
+      "$ref": "#/definitions/replay"
+    },
+    "requests": {
+      "$ref": "#/definitions/requests"
+    },
+    "blis_kernel_provenance": {
+      "description": "The kernel's own report from BLIS's Result (reports.kernel), verbatim, or null when the Result has none. Informational only.",
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "definitions": {
+    "reason": {
+      "description": "A reason code, optionally qualified by ':<qualifier>' naming the arg path, input or scenario involved (any non-space text, e.g. setting_not_modelled:prefill_schedule_interval or unclassified_arg:quantization_config.targets.*in_proj).",
+      "type": "string",
+      "pattern": "^(artifact_unmatched|server_log_missing|corpus_changed|conflict|unclassified_arg|setting_not_modelled|setting_differs|required_setting_missing|client_scenario_not_replayable|model_not_in_catalog|hardware_no_coefficients|drafter_not_in_catalog|blis_refused)(:[^\\s]+)?$"
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "image",
+        "commit",
+        "source",
+        "ref",
+        "distance",
+        "match"
+      ],
+      "properties": {
+        "image": {
+          "type": "string"
+        },
+        "commit": {
+          "description": "Full 40-char vllm-project/vllm SHA, or null when unresolvable.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "source": {
+          "enum": [
+            "image_label",
+            "label_by_tag",
+            "server_log_banner",
+            "image_tag",
+            "release_tag",
+            null
+          ]
+        },
+        "ref": {
+          "description": "VLLM_REF, e.g. v0.31.0.",
+          "type": "string"
+        },
+        "distance": {
+          "description": "Signed commits along main from VLLM_REF's branch point; null when the commit is unresolvable or off mainline.",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "match": {
+          "enum": [
+            "exact",
+            "estimated"
+          ]
+        },
+        "why": {
+          "description": "Why an estimated build isn't the one BLIS models.",
+          "enum": [
+            "custom_build",
+            "outside_distance",
+            "commit_unresolvable",
+            "commit_conflict"
+          ]
+        }
+      },
+      "description": "The vLLM build that measured the point. match is exact only for an official vllm/vllm-openai(-rocm) image whose commit is on vLLM's mainline within vllm_max_distance of ref's branch point; anything else is estimated, with why. A build never stops a point from being scored.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "const": "estimated"
+              }
+            },
+            "required": [
+              "match"
+            ]
+          },
+          "then": {
+            "required": [
+              "why"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "why"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "why": {
+                "const": "outside_distance"
+              }
+            },
+            "required": [
+              "why"
+            ]
+          },
+          "then": {
+            "properties": {
+              "distance": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arg",
+        "measured",
+        "blis",
+        "match"
+      ],
+      "properties": {
+        "arg": {
+          "type": "string"
+        },
+        "measured": {
+          "description": "As the run recorded it. Floats are the decimal string the log printed.",
+          "type": [
+            "string",
+            "integer",
+            "boolean",
+            "null"
+          ]
+        },
+        "source": {
+          "enum": [
+            "launch_config",
+            "args",
+            "resolved_config",
+            "engine_line",
+            "api_row",
+            "blis_default"
+          ]
+        },
+        "blis": {
+          "description": "Parsed back from the scenario / settings actually handed to BLIS.",
+          "type": [
+            "string",
+            "integer",
+            "boolean",
+            "null"
+          ]
+        },
+        "blis_field": {
+          "description": "The BLIS Deployment field a mapped arg was written to.",
+          "type": "string"
+        },
+        "match": {
+          "enum": [
+            "exact",
+            "mapped",
+            "inert",
+            "blis_default",
+            "approximated",
+            "differs",
+            "absent_in_blis",
+            "unreadable",
+            "conflict"
+          ]
+        },
+        "rule": {
+          "description": "For blis_default: the BLIS resolver rule used.",
+          "type": "string"
+        },
+        "occurrences": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "values": {
+          "description": "For conflict: every value found.",
+          "type": "array"
+        },
+        "delta": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        },
+        "ratio": {
+          "description": "4 significant figures, as a string.",
+          "type": "string"
+        },
+        "note": {
+          "description": "For approximated: why, and what BLIS used instead. Fixed text from the policy table, never composed per point.",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "const": "mapped"
+              }
+            },
+            "required": [
+              "match"
+            ]
+          },
+          "then": {
+            "required": [
+              "blis_field"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "const": "blis_default"
+              }
+            },
+            "required": [
+              "match"
+            ]
+          },
+          "then": {
+            "required": [
+              "rule",
+              "source"
+            ],
+            "properties": {
+              "source": {
+                "const": "blis_default"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "const": "conflict"
+              }
+            },
+            "required": [
+              "match"
+            ]
+          },
+          "then": {
+            "required": [
+              "values"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "const": "approximated"
+              }
+            },
+            "required": [
+              "match"
+            ]
+          },
+          "then": {
+            "required": [
+              "note"
+            ]
+          }
+        }
+      ]
+    },
+    "resolved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "quantity",
+        "measured",
+        "blis",
+        "match"
+      ],
+      "properties": {
+        "quantity": {
+          "type": "string"
+        },
+        "measured": {
+          "type": [
+            "integer",
+            "string",
+            "null"
+          ]
+        },
+        "blis": {
+          "type": [
+            "integer",
+            "string",
+            "null"
+          ]
+        },
+        "occurrences": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "delta": {
+          "type": [
+            "integer",
+            "string",
+            "null"
+          ]
+        },
+        "ratio": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "match": {
+          "enum": [
+            "exact",
+            "differs",
+            "unreadable",
+            "conflict",
+            "incomparable"
+          ]
+        },
+        "reason": {
+          "description": "For incomparable: why the scopes differ.",
+          "type": "string"
+        }
+      }
+    },
+    "replay": {
+      "description": "Agentic only: the client inputs passed to blis replay.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "client",
+        "client_version",
+        "scenario",
+        "concurrency",
+        "corpus",
+        "corpus_sha256",
+        "seed"
+      ],
+      "properties": {
+        "client": {
+          "type": "string"
+        },
+        "client_version": {
+          "type": "string"
+        },
+        "scenario": {
+          "type": "string"
+        },
+        "replayed_as": {
+          "type": "string"
+        },
+        "concurrency": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "duration_s": {
+          "type": "number"
+        },
+        "trajectory_start": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "min_ratio": {
+              "type": "number"
+            },
+            "max_ratio": {
+              "type": "number"
+            }
+          }
+        },
+        "corpus": {
+          "type": "string"
+        },
+        "corpus_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "seed": {
+          "type": "integer"
+        }
+      }
+    },
+    "note": {
+      "description": "Why a reason applies and what would lift it. Fixed text from the policy table (orchestrator/vllm_arg_policy.yaml), never composed per point, so it's deterministic.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reason",
+        "text"
+      ],
+      "properties": {
+        "reason": {
+          "$ref": "#/definitions/reason"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "requests": {
+      "description": "Single-turn only: how the requests the run's client sent were replayed (COV-12). The requests are the client's own draws for the point's isl, osl and concurrency, in its order. Every remaining difference between the run's client and the simulated one is named in differences; a point naming one is approximate.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "client",
+        "start",
+        "copies",
+        "count",
+        "differences"
+      ],
+      "properties": {
+        "client": {
+          "description": "The client whose requests were replayed.",
+          "type": "string",
+          "minLength": 1
+        },
+        "start": {
+          "description": "cold: the main phase ran from an empty engine, because the run disabled prefix caching and the warm-up leaves nothing the main phase reads. primed: the main phase ran after copies of request 0 had cached its prompt, as the client's drained warm-up leaves the engine.",
+          "enum": [
+            "cold",
+            "primed"
+          ]
+        },
+        "copies": {
+          "description": "The warm-up copies of request 0 replayed before the main phase: the deployment's dp width when primed, 0 when cold.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "count": {
+          "description": "The main-phase requests replayed, 10 per unit of concurrency; the predicted means are taken over them.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "differences": {
+          "description": "Each difference between the run's client and the simulated one, sorted by kind, then subject.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "subject",
+              "detail"
+            ],
+            "properties": {
+              "kind": {
+                "const": "client_difference"
+              },
+              "subject": {
+                "description": "send_gap: the client's interval between one response ending and the next request, which the simulator does not model. sent_prompt_lengths: the sent prompt lengths are not verified equal to the replayed targets.",
+                "enum": [
+                  "send_gap",
+                  "sent_prompt_lengths"
+                ]
+              },
+              "detail": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "start": {
+                "const": "cold"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "copies": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "start": {
+                "const": "primed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "copies": {
+                "minimum": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "not_scored"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "reasons"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "reasons"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "approximate"
+          }
+        }
+      },
+      "then": {
+        "anyOf": [
+          {
+            "properties": {
+              "args": {
+                "type": "array",
+                "contains": {
+                  "type": "object",
+                  "properties": {
+                    "match": {
+                      "const": "approximated"
+                    }
+                  },
+                  "required": [
+                    "match"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "properties": {
+              "build": {
+                "properties": {
+                  "match": {
+                    "const": "estimated"
+                  }
+                },
+                "required": [
+                  "match"
+                ]
+              }
+            },
+            "required": [
+              "build"
+            ]
+          },
+          {
+            "properties": {
+              "requests": {
+                "properties": {
+                  "differences": {
+                    "type": "array",
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "differences"
+                ]
+              }
+            },
+            "required": [
+              "requests"
+            ]
+          }
+        ]
+      },
+      "else": {
+        "if": {
+          "properties": {
+            "status": {
+              "const": "exact"
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        "then": {
+          "not": {
+            "anyOf": [
+              {
+                "properties": {
+                  "args": {
+                    "type": "array",
+                    "contains": {
+                      "type": "object",
+                      "properties": {
+                        "match": {
+                          "const": "approximated"
+                        }
+                      },
+                      "required": [
+                        "match"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "build": {
+                    "properties": {
+                      "match": {
+                        "const": "estimated"
+                      }
+                    },
+                    "required": [
+                      "match"
+                    ]
+                  }
+                },
+                "required": [
+                  "build"
+                ]
+              },
+              {
+                "properties": {
+                  "requests": {
+                    "properties": {
+                      "differences": {
+                        "type": "array",
+                        "minItems": 1
+                      }
+                    },
+                    "required": [
+                      "differences"
+                    ]
+                  }
+                },
+                "required": [
+                  "requests"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

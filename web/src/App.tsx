@@ -20,7 +20,7 @@ import type { RunIndex, RunRef } from './load'
 import { DEFAULT_ROUTE, parseRoute, routeToHash, type RouteState } from './route'
 import { buildRows } from './tree'
 import { nextSort, sortModelKeys, type SortKey, type SortSpec } from './sort'
-import type { Summary, TierKey } from './types'
+import { isEstimated, type Summary, type TierKey } from './types'
 
 interface Picker {
   index: RunIndex | null
@@ -203,14 +203,14 @@ function Overview({
   // user's explicit tier click is always honoured; this only rescues the DEFAULT.
   // 'estimated' is a view over the "all" tier: only the points BLIS estimated, aggregated as
   // the "all" tier aggregates (none of them is in the strict one). v1 has no such points.
-  const showEstimated = route.tier === 'estimated' && summary.schema_version === 2
+  const showEstimated = route.tier === 'estimated' && summary.schema_version >= 2
   const tierFellBack =
     route.tier === 'measured_or_resolved' &&
     visible.filter((p) => p.tier === 'measured_or_resolved').length === 0 &&
     visible.length > 0
   const effectiveTier: TierKey = tierFellBack || route.tier !== 'measured_or_resolved' ? 'all' : 'measured_or_resolved'
   const inTier = (p: FlatPoint) =>
-    showEstimated ? p.fidelity?.status === 'approximate' : effectiveTier === 'all' || p.tier === 'measured_or_resolved'
+    showEstimated ? isEstimated(p.fidelity) : effectiveTier === 'all' || p.tier === 'measured_or_resolved'
 
   // The headline always describes the full latest run under the default view (every scored
   // point, the "all" tier), never the current filter, so the top-line "how accurate is BLIS?"
@@ -220,7 +220,7 @@ function Overview({
   const headlineTier: TierKey = 'all'
   const totals = useMemo(() => aggregatePair(headlinePoints), [headlinePoints])
   const headlineSplit = useMemo(() => {
-    const estimated = headlinePoints.filter((p) => p.fidelity?.status === 'approximate').length
+    const estimated = headlinePoints.filter((p) => isEstimated(p.fidelity)).length
     return { exact: headlinePoints.length - estimated, estimated }
   }, [headlinePoints])
 
@@ -272,7 +272,7 @@ function Overview({
   const cov = summary.coverage
   // v2 tiers come from each point's match record: exact, or estimated (a setting BLIS can't
   // represent yet was estimated). v1 keeps the harness's measured·resolved / all wording.
-  const v2 = summary.schema_version === 2
+  const v2 = summary.schema_version >= 2
   const prov = summary.provenance
 
   return (
@@ -292,7 +292,8 @@ function Overview({
         dataDate={summary.provenance?.ground_truth?.release_tag?.replace(/^db-dump\//, '') ?? null}
         measuredRange={measuredRange(headlinePoints)}
         pulledAt={summary.provenance?.pulled_at ?? null}
-        split={v2 ? headlineSplit : null}
+        split={summary.schema_version === 2 ? headlineSplit : null}
+        graded={summary.headline ?? null}
       />
 
       <h2 className="sectitle">Accuracy by model</h2>
@@ -364,9 +365,16 @@ function Overview({
         <span>
           models <b>{formatCount(summary.matrix.length)}</b>
         </span>
-        <span>
-          <Term name="coverage">points scored</Term> <b>{formatCount(cov.scored)}</b>
-        </span>
+        {summary.schema_version === 3 ? (
+          <span>
+            <Term name="coverage">points graded</Term> <b>{formatCount(cov.graded)}</b> of{' '}
+            {formatCount(cov.points)}
+          </span>
+        ) : (
+          <span>
+            <Term name="coverage">points scored</Term> <b>{formatCount(cov.scored)}</b>
+          </span>
+        )}
         <span>
           {/* Only the count: the per-reason breakdown stays in summary.json (coverage.not_scored_reasons). */}
           not scored <b>{formatCount(cov.not_scored)}</b>
@@ -374,6 +382,11 @@ function Overview({
         {cov.measured_excluded != null && (
           <span>
             excluded (measured) <b>{formatCount(cov.measured_excluded)}</b>
+          </span>
+        )}
+        {summary.schema_version === 3 && cov.failed > 0 && (
+          <span>
+            failed <b>{formatCount(cov.failed)}</b>
           </span>
         )}
         {summary.schema_version === 1 && (

@@ -151,7 +151,7 @@ def _setup(tmp: Path, *, log: str = LOG, repo: str = "org/m", conc: int = 4, isl
     env = sc.Env(blis=_fake_blis(tmp), blis_release="v0.12.0", blis_commit="b" * 40, catalog=tmp,
                  catalog_release="0.3.0", registry=tmp, registry_release="v0.2.0", kernel="v0.3.0",
                  defaults_helper=_exe(tmp / "blisdefaults", FAKE_DEFAULTS), corpus={"sha256": "c" * 64},
-                 policy=st.load_policy()[0], vllm_defaults=st.load_vllm_defaults()[0])
+                 policy=st.load_policy()[0], vllm_defaults=st.load_vllm_defaults()[0], engine_release="0.31.0")
     env.catalog_obj = sp.Catalog(root=tmp, models={"m": repo}, speculators={"m": "mtp"},
                                  hardware={"h200": 139.8}, capability={"h200": 9})
     env.parts = {"h200"}
@@ -160,12 +160,13 @@ def _setup(tmp: Path, *, log: str = LOG, repo: str = "org/m", conc: int = 4, isl
 
 def _score(tmp: Path, entry, env, out: Path):
     work = tmp / ("work-" + out.name)
-    o = sc.score_point(entry, tmp / "pull", work, env)
+    o = sc._score_one(entry, tmp / "pull", work, env)
     prov = {"ingest": "api", "blis": {"release": "v0.12.0", "commit_sha": "b" * 40, "catalog": "0.3.0",
                                       "registry": "v0.2.0", "extractor_version": "blis-latency-kernel@v0.3.0"},
+            "engine": {"kind": "vllm", "version": "0.31.0"}, "left_out_records": 0,
             "vllm_ref": "v0.31.0", "vllm_max_distance": 2000, "policy_sha256": "d" * 64,
             "pulled_at": "2026-10-23T00:00:00Z", "corpus": None, "pull_manifest_sha256": "e" * 64,
-            "source": {"name": "test", "url": "https://example.invalid/"}, "_policy": env.policy}
+            "source": {"name": "test", "url": "https://example.invalid/"}}
     sc.write_contract(out, [o], prov)
     return o, work
 
@@ -224,7 +225,7 @@ def test_a_point_with_no_request_of_two_output_tokens_is_refused():
     try:
         entry, env = _setup(tmp, conc=1, osl=1)       # every output length is 0 or 1: no TPOT sample
         o, _ = _score(tmp, entry, env, tmp / "c1")
-        assert o.fidelity is None and o.reasons == ["blis_refused:metrics_incomplete"]
+        assert o.fidelity is None and o.faults == ["blis_refused:metrics_incomplete"]
     finally:
         shutil.rmtree(tmp)
 
@@ -235,7 +236,7 @@ def test_a_request_that_ran_other_lengths_than_its_target_is_refused():
         entry, env = _setup(tmp)
         env.blis = _fake_blis(tmp, short=True)
         o, _ = _score(tmp, entry, env, tmp / "c1")
-        assert o.fidelity is None and o.reasons == ["blis_refused:requests_not_the_points"]
+        assert o.fidelity is None and o.faults == ["blis_refused:requests_not_the_points"]
     finally:
         shutil.rmtree(tmp)
 
@@ -306,7 +307,7 @@ def test_a_primed_run_whose_warmup_was_not_drained_is_refused():
                             .replace("enable_prefix_caching=False", "enable_prefix_caching=True"))
         env.blis = _fake_blis(tmp, early_holder=True)
         o, _ = _score(tmp, entry, env, tmp / "c1")
-        assert o.fidelity is None and o.reasons == ["blis_refused:warmup_not_drained"]
+        assert o.fidelity is None and o.faults == ["blis_refused:warmup_not_drained"]
     finally:
         shutil.rmtree(tmp)
 
@@ -317,7 +318,7 @@ def test_a_result_with_a_dropped_request_is_refused():
         entry, env = _setup(tmp)
         env.blis = _fake_blis(tmp, drop=True)
         o, _ = _score(tmp, entry, env, tmp / "c1")
-        assert o.fidelity is None and o.reasons == ["blis_refused:requests_incomplete"]
+        assert o.fidelity is None and o.faults == ["blis_refused:requests_incomplete"]
         assert c.validate_dir(tmp / "c1") == []
     finally:
         shutil.rmtree(tmp)
@@ -329,13 +330,13 @@ def test_a_result_that_does_not_validate_is_refused():
         entry, env = _setup(tmp)
         env.blis = _fake_blis(tmp, validate=1)
         o, _ = _score(tmp, entry, env, tmp / "c1")
-        assert o.fidelity is None and o.reasons == ["blis_refused:result_invalid"]
+        assert o.fidelity is None and o.faults == ["blis_refused:result_invalid"]
         assert c.validate_dir(tmp / "c1") == []
     finally:
         shutil.rmtree(tmp)
 
 
-def test_every_single_turn_point_names_the_send_gap_and_is_approximate():
+def test_every_single_turn_point_names_the_send_gap_and_is_g2():
     tmp = Path(tempfile.mkdtemp())
     try:
         # A point the prompt-length evidence verifies: gpt-oss-120b, 2026-02-25, 1024:8192, c=4.
@@ -343,7 +344,8 @@ def test_every_single_turn_point_names_the_send_gap_and_is_approximate():
         o, _ = _score(tmp, entry, env, tmp / "c1")
         assert o.fidelity is not None, o.reasons
         assert [d["subject"] for d in o.fidelity["requests"]["differences"]] == ["send_gap"]
-        assert o.fidelity["status"] == "approximate"
+        assert o.fidelity["grade"] == "G2"
+        assert [s["subject"] for s in o.fidelity["substitutions"]] == ["send_gap"]
         assert c.validate_dir(tmp / "c1") == []
     finally:
         shutil.rmtree(tmp)
@@ -357,12 +359,12 @@ def test_an_unverified_point_names_the_sent_prompt_length_difference():
         diffs = o.fidelity["requests"]["differences"]
         assert [d["subject"] for d in diffs] == ["send_gap", "sent_prompt_lengths"]
         assert "not verified" in diffs[1]["detail"]
-        assert o.fidelity["status"] == "approximate"
+        assert o.fidelity["grade"] == "G2"
     finally:
         shutil.rmtree(tmp)
 
 
-def test_the_fidelity_schema_requires_an_approximate_status_for_a_client_difference():
+def test_the_fidelity_schema_refuses_g1_for_a_point_naming_a_client_difference():
     import jsonschema
     tmp = Path(tempfile.mkdtemp())
     try:
@@ -370,9 +372,39 @@ def test_the_fidelity_schema_requires_an_approximate_status_for_a_client_differe
         o, _ = _score(tmp, entry, env, tmp / "c1")
         v = jsonschema.Draft7Validator(json.loads(c.FIDELITY_SCHEMA.read_text()))
         assert v.is_valid(o.fidelity)
-        assert not v.is_valid({**o.fidelity, "status": "exact"})
+        assert not v.is_valid({**o.fidelity, "grade": "G1", "substitutions": []})
         assert not v.is_valid({**o.fidelity, "requests": {**o.fidelity["requests"], "extra": 1}})
         assert not v.is_valid({**o.fidelity, "requests": {**o.fidelity["requests"], "copies": 1}})  # cold
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_point_behind_a_router_blis_does_not_host_is_g5_and_never_simulated():
+    # Design §11.4, X4: BLIS hosts only llm-d's router (inference-sim #2028).
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        entry["row"]["metrics"]["router_name"] = "vllm-router"
+        env.blis = _exe(Path(env.blis), "#!/bin/sh\nexit 99\n")   # must not run
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is None and o.g5 == {"code": "router_unsupported", "subject": "vllm-router"}
+        ns = json.loads((tmp / "c1" / c.NOT_SCORED_JSONL).read_text())
+        assert ns["grade"] == "G5" and ns["g5_reasons"] == [o.g5]
+        assert c.validate_dir(tmp / "c1") == []
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_point_blis_refuses_is_listed_as_failed_not_graded():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        env.blis = _fake_blis(tmp, validate=1)
+        _score(tmp, entry, env, tmp / "c1")
+        failed = json.loads((tmp / "c1" / c.FAILED_JSONL).read_text())
+        assert failed["faults"] == ["blis_refused:result_invalid"] and "grade" not in failed
+        assert (tmp / "c1" / c.NOT_SCORED_JSONL).read_text() == ""
+        assert json.loads((tmp / "c1" / c.PROVENANCE_JSON).read_text())["points"] == 1
     finally:
         shutil.rmtree(tmp)
 
@@ -406,12 +438,12 @@ def test_the_agentic_path_reads_the_registry_means_and_the_engine_report():
         assert "--agentic-scenario" in argv and "--format" in argv and not any("metrics-path" in x for x in argv)
         # The Result is cached for the same inputs: a rescore in the same work dir runs no blis.
         env.blis = _exe(Path(env.blis), "#!/bin/sh\nexit 99\n")
-        o2 = sc.score_point(entry, tmp / "pull", work, env)
+        o2 = sc._score_one(entry, tmp / "pull", work, env)
         assert o2.fidelity == o.fidelity and o2.csv_row == o.csv_row
         # A cached Result whose key differs is not reused.
         next((work / "results").glob("*.key")).write_text("other")
-        o3 = sc.score_point(entry, tmp / "pull", work, env)
-        assert o3.fidelity is None and o3.reasons[0].startswith("blis_refused")
+        o3 = sc._score_one(entry, tmp / "pull", work, env)
+        assert o3.fidelity is None and o3.faults[0].startswith("blis_refused")
     finally:
         shutil.rmtree(tmp)
 
@@ -445,6 +477,7 @@ def test_a_point_refused_before_blis_never_calls_it():
         env.blis = _exe(Path(env.blis), "#!/bin/sh\nexit 99\n")   # must not run
         o, _ = _score(tmp, entry, env, tmp / "c1")
         assert o.fidelity is None and o.reasons == ["setting_not_modelled:prefill_schedule_interval"]
+        assert o.g5 == {"code": "field_not_modelled", "subject": "prefill_schedule_interval"}
         assert c.validate_dir(tmp / "c1") == []
     finally:
         shutil.rmtree(tmp)

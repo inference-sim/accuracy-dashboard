@@ -14,6 +14,8 @@ import zipfile
 from datetime import date
 from pathlib import Path
 
+import pytest
+
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import api  # noqa: E402
@@ -661,7 +663,7 @@ def test_what_blis_used_for_an_estimated_setting_is_read_from_blis():
         sc.blis_resolution = lambda env, d, f: {**res, "caches": [{"kind": "kv", "bytes_per_entry": 576, "head_dim": 576}]}
         a = args()[1:]
         assert sc.fill_blis_side(a, None, Path("."), "s.yaml", "m") == [] and a[0]["match"] == "inert"
-        assert not sc._estimated(a)
+        assert sc.substitutions({"args": a}) == []
         # BLIS refuses the scenario: its refusal is the reason, never a crash.
         sc.blis_resolution = lambda env, d, f: "blis_refused:quantization_mxfp8_is_not_one_this_kernel_prices"
         assert "blis_refused:quantization_mxfp8_is_not_one_this_kernel_prices" in sc.fill_blis_side(
@@ -712,17 +714,63 @@ def test_the_rows_gpu_count_is_read_in_inferencex_terms():
     assert t(row(decode_tp=8, decode_ep=1, num_decode_gpu=8), C(tp=1, dp=8)) == ["conflict:tp"]
 
 
-def test_a_point_is_exact_only_on_the_build_blis_models_with_nothing_approximated():
+def _graded(*, image="vllm/vllm-openai:v0.32.0", banner="0.32.0", args=(), requests=None, reasons=(),
+            scored=True, build_match="exact"):
     import score as sc
-    near = {"match": "exact", "distance": -738}
-    assert sc.point_status(False, near, []) == "exact"
-    assert sc.point_status(True, near, []) == "approximate"
-    for why in ("custom_build", "outside_distance", "commit_unresolvable", "commit_conflict"):
-        assert sc.point_status(False, {"match": "estimated", "why": why}, []) == "approximate", why
-    assert sc.point_status(False, {}, []) == "approximate"          # no build record: never exact
-    # A difference between the run's client and the simulated one is never exact (COV-12).
-    gap = [{"kind": "client_difference", "subject": "send_gap", "detail": "x"}]
-    assert sc.point_status(False, near, gap) == "approximate"
+    o = sc.Outcome(point_id="p" * 64, identity={}, row={"image": image}, reasons=list(reasons),
+                   build={"image": image, "match": build_match}, banner=banner)
+    if scored:
+        o.fidelity = {"build": o.build, "args": list(args), "resolved": [],
+                      **({"requests": requests} if requests else {})}
+        o.csv_row = [None] * 12
+    sc.grade_outcome(o, "0.32.0")
+    return o
+
+
+APPROX = {"arg": "quantization", "match": "approximated", "note": "fp8 for mxfp8"}
+DEFAULTED = {"arg": "max_num_seqs", "match": "blis_default", "rule": "ResolveVLLMBatchDefaults"}
+
+
+def test_a_point_is_g1_only_on_the_release_the_simulator_runs_with_nothing_substituted():
+    o = _graded()
+    assert o.fidelity["grade"] == "G1" and o.fidelity["substitutions"] == [] and o.csv_row[9] == "G1"
+    assert o.fidelity["run_release"] == "0.32.0"
+    # build.match is not a grade input: the build decides G1 or G4 through its release alone.
+    assert _graded(build_match="estimated").fidelity["grade"] == "G1"
+
+
+def test_every_estimate_and_client_difference_is_named_and_makes_the_point_g2():
+    gap = {"kind": "client_difference", "subject": "send_gap", "detail": "x"}
+    o = _graded(args=[APPROX, DEFAULTED], requests={"differences": [gap]})
+    assert o.fidelity["grade"] == "G2"
+    assert [(s["kind"], s["subject"]) for s in o.fidelity["substitutions"]] == [
+        ("client_difference", "send_gap"), ("estimated", "max_num_seqs"), ("estimated", "quantization")]
+    assert o.fidelity["substitutions"][2]["detail"] == "fp8 for mxfp8"
+
+
+def test_another_release_or_a_nightly_build_is_g4_and_says_so():
+    o = _graded(image="vllm/vllm-openai:v0.25.0", banner="0.25.0")
+    assert o.fidelity["grade"] == "G4" and o.fidelity["run_release"] == "0.25.0"
+    assert {s["kind"] for s in o.fidelity["substitutions"]} == {"other_release", "ported_functions_unpublished"}
+    o = _graded(image="vllm/vllm-openai:nightly-abc", banner="0.30.1rc1.dev493+gac9126e58")
+    assert o.fidelity["grade"] == "G4" and o.fidelity["run_release"] is None
+    assert [s["kind"] for s in o.fidelity["substitutions"]] == ["nightly_or_custom"]
+
+
+def test_a_point_not_scored_is_g5_with_every_reason_on_the_closed_list():
+    import grade as gr
+    o = _graded(scored=False, reasons=["drafter_not_in_catalog:eagle3", "router_unsupported:vllm-router"])
+    assert o.g5 == {"code": "router_unsupported", "subject": "vllm-router"}
+    assert o.g5_reasons == [{"code": "not_in_catalog", "subject": "eagle3"},
+                            {"code": "router_unsupported", "subject": "vllm-router"}]
+    with pytest.raises(gr.GradeError):
+        _graded(scored=False, reasons=[])
+
+
+def test_a_run_fault_is_never_graded():
+    for fault in ("blis_refused:timeout", "setting_differs:max_num_seqs"):
+        o = _graded(reasons=[fault, "model_not_in_catalog"], scored=False)
+        assert o.faults == [fault] and o.g5 is None and o.fidelity is None
 
 
 def test_a_build_never_refuses_a_point_at_pull_time():
@@ -730,6 +778,17 @@ def test_a_build_never_refuses_a_point_at_pull_time():
     src = (HERE / "pull.py").read_text()
     assert "b.reasons" not in src and 'entry["build"] = b.record()' in src
     assert not hasattr(__import__("build").Build(image="x"), "reasons")
+
+
+def test_a_multi_node_or_disaggregated_run_records_no_fabric_so_its_value_is_not_recorded():
+    # Design §11.4: a value the simulation needs (the fabric between engines) is not recorded.
+    import assess as asx
+    import pull as pl
+    for row in ({"disagg": True}, {"is_multinode": True}):
+        reasons = pl._row_reasons(row)
+        assert reasons == ["required_setting_missing:multi_node_fabric"]
+        assert asx.g5_of(reasons[0]) == {"code": "value_not_recorded", "subject": "multi_node_fabric"}
+    assert pl._row_reasons({"disagg": False, "is_multinode": False}) == []
 
 
 def test_a_block_size_no_source_recorded_is_the_one_blis_resolves():

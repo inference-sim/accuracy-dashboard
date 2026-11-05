@@ -3,7 +3,8 @@
 
 Per point: settings (settings.py) -> support (support.py) -> replay inputs (replay.py, agentic)
 -> the scenario file -> `blis replay --agentic-scenario` -> the diff of what BLIS was given
-against what the run recorded -> one fidelity record, or a not-scored record with reasons.
+against what the run recorded -> the point's grade (grade_outcome): a fidelity record graded G1
+to G4, a G5 record with its reasons, or a failed record with its run faults.
 
 Single-turn points go through the same extraction and are replayed as the run's client sent
 them (inferencex_client, COV-12) by `blis replay` (score_single_turn). Every run's Result is read
@@ -25,7 +26,9 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import assess as asx  # noqa: E402
 import contract  # noqa: E402
+import grade as gr  # noqa: E402
 import inferencex_client as ix  # noqa: E402
 import replay as rp  # noqa: E402
 import result  # noqa: E402
@@ -70,6 +73,8 @@ class Env:
     timeout_s: int = 7200
     vllm_defaults: dict = field(default_factory=dict)
     vllm_defaults_sha256: str = ""
+    # The engine release the scoring simulator runs (stack.json, LIF-6), e.g. "0.32.0".
+    engine_release: str = ""
     catalog_obj: sp.Catalog | None = None
     parts: set = field(default_factory=set)
     # A per-replay resident-memory ceiling in MB (0 = none). An agentic replay whose RSS exceeds
@@ -311,17 +316,27 @@ class Outcome:
     fidelity: dict | None = None
     facets: dict | None = None
     csv_row: list | None = None
+    banner: str | None = None       # the vLLM version the server log's banner prints
+    build: dict | None = None       # the run's recorded build (build.py), from the pull
+    # Set by grade_outcome: the run's own engine release (None for a nightly or custom build);
+    # for a G5 point its reason and every reason found; for a failed point its run faults.
+    run_release: str | None = None
+    g5: dict | None = None
+    g5_reasons: list = field(default_factory=list)
+    faults: list = field(default_factory=list)
 
 
 def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     """score_point with the uniform error capture the driver used to do inline, so both the serial
     and the parallel path record a point that raises as not-scored (never drop it)."""
     try:
-        return score_point(entry, pull_dir, work, env)
+        o = score_point(entry, pull_dir, work, env)
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
-        return Outcome(point_id=entry["point_id"], identity=entry["identity"], row=entry["row"],
-                       reasons=sorted(set(entry["reasons"] + ["blis_refused:extractor_error"])),
-                       measurements=entry.get("measurements") or [])
+        o = Outcome(point_id=entry["point_id"], identity=entry["identity"], row=entry["row"],
+                    reasons=sorted(set(entry["reasons"] + ["blis_refused:extractor_error"])),
+                    measurements=entry.get("measurements") or [], build=entry.get("build"))
+    grade_outcome(o, env.engine_release)
+    return o
 
 
 # A process-pool worker scores into its OWN work subdir, because score_point writes
@@ -374,7 +389,7 @@ def score_points(points: list, pull_dir: Path, work: Path, env: Env, *, workers:
         done[0] += 1
         e = points[idx]
         log(f"  [{done[0]}/{n}] {e['row']['model']} {e['row']['hardware']} c{e['row']['conc']} "
-            f"{e['point_id'][:12]} -> {o.fidelity['status'] if o.fidelity else o.reasons}")
+            f"{e['point_id'][:12]} -> {o.fidelity['grade'] if o.fidelity else o.faults or o.reasons}")
 
     if single:
         log(f"score: {len(single)} single-turn on {max(workers, 1)} worker(s)")
@@ -405,15 +420,20 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     # blis runs in its binary's directory, so every path it is given is absolute.
     work = work.resolve()
     o = Outcome(point_id=pid, identity=ident, row=row, reasons=list(entry["reasons"]),
-                measurements=entry.get("measurements") or [])
+                measurements=entry.get("measurements") or [], build=entry.get("build"))
+    o.reasons += asx.engine_reason(row, ENGINES)
     pdir = pull_dir / "points" / pid
     log_b = _read(pdir, entry["files"], "server_log")
     if log_b is None:
-        o.reasons = sorted(set(o.reasons + ["server_log_missing"]))
+        o.reasons = sorted(set(o.reasons + ["server_log_missing"] + asx.router_reason(row, None)))
         return o
     log = log_b.decode("utf-8", "replace")
+    o.banner = _banner_version(log)
     lc_b = _read(pdir, entry["files"], "launch_config")
     launch = json.loads(lc_b) if lc_b else None
+    # A run measured behind a router BLIS does not host is never scored as if llm-d had routed
+    # it (design §11.4, X4; inference-sim #2028), so BLIS is not asked about it.
+    o.reasons += asx.router_reason(row, _launch_router(launch))
 
     readings, problems = st.read_all(log, launch)
     # The API row's router is its own source: it states the frontend, nothing about the engine.
@@ -557,8 +577,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         return o
 
     m = measured(entry)
-    status = point_status(_estimated(args), entry["build"], [])
-    o.fidelity = {"status": status, "build": entry["build"], "args": args,
+    o.fidelity = {"build": entry["build"], "args": args,
                   "resolved": resolved_kv(log, doc), "replay": r.record(env.corpus["sha256"]),
                   "blis_kernel_provenance": result.kernel_report(doc)}
     par = dep["pools"][0]["parallel"]
@@ -573,8 +592,19 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     o.csv_row = [scen, sup.model, row["hardware"], AGENTIC_LABEL, ident["conc"],
                  round(float(m["mean_tpot"]) * 1e6, 3), round(ptpot, 3),
                  round(float(m["mean_ttft"]) * 1e6, 3), round(pttft, 3),
-                 contract.TIER_BY_STATUS[status], pid, ident["measured_date"]]
+                 None, pid, ident["measured_date"]]     # the grade column is filled by grade_outcome
     return o
+
+
+# The engines a BLIS engine repository models (design §11.4, engine_unsupported).
+ENGINES = {"vllm"}
+
+
+def _launch_router(launch: dict | None) -> str | None:
+    """The router a launch configuration's frontend names; vLLM's own API server is none."""
+    fe = (launch or {}).get("frontend") if isinstance(launch, dict) else None
+    t = fe.get("type") if isinstance(fe, dict) else None
+    return None if t in (None, "vllm") else str(t)
 
 
 def blis_resolution(env, scenarios: Path, scenario: str) -> dict | str:
@@ -820,8 +850,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
 
     verified, why = _prompt_lengths().verified(sup.checkpoint, row.get("date"), isl, osl, conc)
     differences = ix.client_differences(verified, why)
-    status = point_status(_estimated(args), entry["build"], differences)
-    o.fidelity = {"status": status, "build": entry["build"], "args": args, "resolved": [],
+    o.fidelity = {"build": entry["build"], "args": args, "resolved": [],
                   "blis_kernel_provenance": result.kernel_report(doc),
                   "requests": {"client": ix.CLIENT_SUBJECT, "start": "primed" if primed else "cold",
                                "copies": copies, "count": len(ins), "differences": differences}}
@@ -837,7 +866,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     o.csv_row = [scen, model, row["hardware"], label, ident["conc"],
                  round(meas_tpot_us, 3), round(s["mean_tpot_us"], 3),
                  round(meas_ttft_us, 3), round(s["mean_ttft_us"], 3),
-                 contract.TIER_BY_STATUS[status], pid, ident["measured_date"]]
+                 None, pid, ident["measured_date"]]     # the grade column is filled by grade_outcome
     return o
 
 
@@ -856,18 +885,48 @@ def _helper_failure(ex: Exception) -> str:
     return "blis_refused:timeout" if isinstance(ex, subprocess.TimeoutExpired) else "blis_refused:defaults_helper_failed"
 
 
-def _estimated(args: list) -> bool:
-    """Whether BLIS estimated any setting, from the final per-setting records (an estimate that
-    turned out to change nothing, e.g. an indexer setting on a model with no indexer, is inert)."""
-    return any(a.get("match") == "approximated" for a in args)
+def substitutions(fidelity: dict) -> list[dict]:
+    """Every G2 substitution a scored point's record names (design §11.3): each setting BLIS
+    estimated (an approximated value, with its note; a value no source recorded, taken from
+    BLIS's own resolution, with its rule), and each difference between the run's client and
+    the simulated one (COV-12). An estimate that changed nothing (an indexer setting on a model
+    with no indexer) is inert and names nothing."""
+    out = []
+    for a in fidelity["args"]:
+        if a.get("match") == "approximated":
+            out.append({"kind": "estimated", "subject": a["arg"], "detail": a["note"]})
+        elif a.get("match") == "blis_default":
+            out.append({"kind": "estimated", "subject": a["arg"], "detail": a["rule"]})
+    out += (fidelity.get("requests") or {}).get("differences") or []
+    return out
 
 
-def point_status(approximated: bool, build: dict, client_differences: list) -> str:
-    """exact only when BLIS was given every setting as the run recorded it, the run's build is
-    the one BLIS models, and the simulated requests are the ones the run's client sent (no
-    client difference, COV-12); otherwise approximate (shown as "estimated"). A build never
-    refuses."""
-    return "approximate" if approximated or build.get("match") != "exact" or client_differences else "exact"
+def grade_outcome(o: Outcome, engine_release: str) -> None:
+    """Give one outcome its grade (design §11.3, §11.4; COV-4, COV-5), from data alone.
+
+    A scored point is G1 to G4, its record naming every substitution, and its points.csv row
+    carrying the grade. A point not scored is G5 with every reason found, each mapped onto
+    §11.4's list (assess.g5_of; any other reason raises). A point carrying a run fault (the
+    simulator refused the scenario, or the scenario lost a recorded value) is neither: it is
+    listed as failed (o.faults), never graded. The run's own release is recorded on every point
+    (§11.2), read from its recorded build and the server log's banner."""
+    rel = gr.run_release(o.build or {"image": o.row.get("image")}, o.banner)
+    o.run_release = rel.version
+    faults = sorted({r for r in o.reasons if asx.is_fault(r)})
+    if faults:
+        o.fidelity, o.facets, o.csv_row, o.faults = None, None, None, faults
+        return
+    if o.fidelity is None:
+        g5 = sorted({tuple(sorted(asx.g5_of(r).items())) for r in o.reasons})
+        if not g5:
+            raise gr.GradeError(f"point {o.point_id[:12]} was not scored and names no reason")
+        g = gr.grade(engine_version=engine_release, release=rel, substitutions=[], g5=[dict(x) for x in g5])
+        o.g5 = g.g5
+        o.g5_reasons = sorted((dict(x) for x in g5), key=lambda r: (r["code"], r.get("subject", "")))
+        return
+    g = gr.grade(engine_version=engine_release, release=rel, substitutions=substitutions(o.fidelity))
+    o.fidelity = {**o.fidelity, "grade": g.grade, "substitutions": g.substitutions, "run_release": rel.version}
+    o.csv_row[contract.POINTS_HEADER.index(contract.GRADE_COLUMN)] = g.grade
 
 
 def row_vs_run(row: dict, c: st.Classified) -> list[str]:
@@ -948,39 +1007,26 @@ def write_contract(out: Path, outcomes: list[Outcome], provenance: dict) -> None
     fid = sorted(({"point_id": o.point_id, **o.fidelity} for o in scored), key=lambda r: r["point_id"])
     (out / contract.FIDELITY_JSONL).write_text("".join(contract.canonical_dumps(r) + "\n" for r in fid))
     (out / contract.FACETS_JSON).write_text(contract.canonical_dumps({o.point_id: o.facets for o in scored}) + "\n")
-    ns = []
-    policy = provenance.get("_policy") or {}
+    ns, failed = [], []
     for o in outcomes:
         if o.fidelity is not None:
             continue
         m = measured({"row": o.row, "measurements": o.measurements})
-        reasons = sorted(set(o.reasons)) or ["blis_refused"]
         rec = {"point_id": o.point_id, "identity": o.identity, "measured_date": o.identity["measured_date"],
                "model": o.row["model"], "hardware": o.row["hardware"], "precision": o.row["precision"],
                "framework": o.row["framework"], "benchmark_type": o.row["benchmark_type"],
-               "conc": o.identity["conc"], "image": o.row.get("image"),
-               "measured": {"ttft_ms": _ms(m.get("mean_ttft")), "tpot_ms": _ms(m.get("mean_tpot"))},
-               "reasons": reasons}
-        n = [{"reason": x, **nt} for x in reasons if (nt := note_for(policy, x))]
-        if n:
-            rec["notes"] = n
-        ns.append(rec)
-    ns.sort(key=lambda r: r["point_id"])
-    (out / contract.NOT_SCORED_JSONL).write_text("".join(contract.canonical_dumps(r) + "\n" for r in ns))
-    prov = {k: v for k, v in provenance.items() if not k.startswith("_")}
+               "conc": o.identity["conc"], "image": o.row.get("image"), "run_release": o.run_release,
+               "measured": {"ttft_ms": _ms(m.get("mean_ttft")), "tpot_ms": _ms(m.get("mean_tpot"))}}
+        if o.faults:
+            failed.append({**rec, "faults": o.faults})
+        else:
+            ns.append({**rec, "grade": gr.G5, "g5_reason": o.g5, "g5_reasons": o.g5_reasons})
+    for name, recs in ((contract.NOT_SCORED_JSONL, ns), (contract.FAILED_JSONL, failed)):
+        recs.sort(key=lambda r: r["point_id"])
+        (out / name).write_text("".join(contract.canonical_dumps(r) + "\n" for r in recs))
+    prov = {**provenance, "points": len(outcomes)}
     (out / contract.PROVENANCE_JSON).write_text(contract.canonical_dumps(prov) + "\n")
 
 
 def _ms(seconds):
     return None if seconds is None else round(float(seconds) * 1e3, 6)
-
-
-def note_for(policy: dict, reason: str) -> dict | None:
-    """The policy's fixed note for a setting_not_modelled:<path> reason, if it has one."""
-    code, _, path = reason.partition(":")
-    if code != "setting_not_modelled" or not policy:
-        return None
-    hit = st.lookup(policy, path)
-    if not hit or not hit[1].get("note"):
-        return None
-    return {"text": hit[1]["note"]}

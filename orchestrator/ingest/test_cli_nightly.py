@@ -28,7 +28,7 @@ def _args(tmp, **over):
              defaults_helper=str(tmp / "helper"),
              corpus=str(tmp / "corpus.json"),
              corpus_sha256=None, corpus_dataset="d", corpus_revision="main", corpus_cache=None,
-             timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0,
+             timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0, stack=None,
              ledger=str(tmp / "ledger"))
     a.update(over)
     return types.SimpleNamespace(**a)
@@ -80,11 +80,11 @@ def _install(monkeypatch, fakes, scored_ids):
     monkeypatch.setattr(cli, "cmd_score", fakes.cmd_score)
     import build_summary_v2
     def fake_build(contract_dir, *, generated_at, evaluator_commit):
-        return {"schema_version": 2, "snapshot_id": "2026-10-23_blis-v0.12.0_ix-api-2026-10-23",
+        return {"schema_version": 3, "snapshot_id": "2026-10-23_blis-v0.12.0_ix-api-2026-10-23",
                 "generated_at": generated_at,
                 "provenance": {"ingest": "api", "blis": {"release": "v0.12.0"},
                                "ground_truth": {"release_tag": "api-2026-10-23"}},
-                "coverage": {"scored": len(scored_ids), "not_scored": 0}, "matrix": [], "not_scored": []}
+                "coverage": {"graded": len(scored_ids), "not_scored": 0}, "matrix": [], "not_scored": []}
     monkeypatch.setattr(build_summary_v2, "build", fake_build)
     return build_summary_v2
 
@@ -121,9 +121,28 @@ def test_nightly_ix_only_fetches_only_the_delta(tmp_path, monkeypatch):
     # the merge path calls build_merged; stub it to a trivial summary so we only test the delta fetch
     import build_summary_v2
     monkeypatch.setattr(build_summary_v2, "build_merged",
-                        lambda prior, delta, window_ids, **k: {**prior, "coverage": {"scored": 2, "not_scored": 0}})
+                        lambda prior, delta, window_ids, **k: {**prior, "coverage": {"graded": 2, "not_scored": 0}})
     cli.cmd_nightly(_args(tmp_path, today="2026-10-24"))
     assert fakes.pulled_only == [ledger_fake.point_id(new)]   # delta only
+
+
+def test_a_night_after_a_v2_summary_fetches_and_scores_the_whole_window(tmp_path, monkeypatch):
+    # A published v2 summary holds no grades, so the delta cannot be merged into it: the night
+    # rescores the whole window rather than publish a summary of the delta alone.
+    rows = [_row("m", 1, "2026-10-01")]
+    fakes = Fakes(rows)
+    _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
+    fakes.ledger(tmp_path)
+    cli.cmd_nightly(_args(tmp_path))                       # seed
+    latest = tmp_path / "data" / "latest" / "summary.json"
+    latest.write_text(json.dumps({**json.loads(latest.read_text()), "schema_version": 2}))
+    new = _row("m", 2, "2026-10-02")
+    fakes.rows = rows + [new]
+    fakes.ledger(tmp_path)
+    import build_summary_v2
+    monkeypatch.setattr(build_summary_v2, "build_merged", lambda *a, **k: (_ for _ in ()).throw(AssertionError("merged")))
+    cli.cmd_nightly(_args(tmp_path, today="2026-10-24"))
+    assert fakes.pulled_only is None                      # the whole window
 
 
 def test_nightly_noop_fetches_nothing_not_the_whole_window(tmp_path, monkeypatch):

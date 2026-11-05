@@ -738,7 +738,7 @@ def build(c: Classified, *, name: str, model: str, part: Part, engine_version: s
     # The run's own GPUs, on one node: the API row says whether it spanned nodes, and a
     # multi-node run needs a fabric the run doesn't record.
     if multinode:
-        b.reasons.append("blis_refused:multi_node_fabric_unstated")
+        b.reasons.append("required_setting_missing:multi_node_fabric")
     pool["nodes"] = 1
     b.scenario = {"kind": "Scenario", "name": name, "engine_version": engine_version.lstrip("v"),
                   "model": model, "coefficients": COEFFICIENTS,

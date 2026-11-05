@@ -46,11 +46,16 @@ class Frozen:
         self.files[role] = {"path": name, "sha256": art.sha256(data), "from": origin}
 
 
+MULTI_NODE_FABRIC = "multi_node_fabric"
+
+
 def _row_reasons(row: dict) -> list[str]:
-    """Rows this extractor doesn't handle at all, by the row's own shape."""
+    """Rows this extractor doesn't handle at all, by the row's own shape. A disaggregated or
+    multi-node run records no fabric between its engines, so a value the simulation needs is
+    not recorded (design §11.4, value_not_recorded)."""
     out = []
     if row.get("disagg") or row.get("is_multinode"):
-        out.append("blis_refused:disaggregated_or_multinode")
+        out.append(f"required_setting_missing:{MULTI_NODE_FABRIC}")
     return out
 
 
