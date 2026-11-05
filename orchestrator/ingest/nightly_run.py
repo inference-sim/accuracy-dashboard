@@ -1,7 +1,7 @@
 """The nightly driver: one run of the API-ingest pipeline (Discussion #15).
 
 run_night() composes the pieces the rest of this package builds -- the incremental pull, the
-trigger decision (nightly.plan_night), the cumulative-but-cached score, the v2 summary, the
+trigger decision (nightly.plan_night), the cumulative-but-cached score, the v3 summary, the
 two-retention index -- into the sequence a CI night runs (no raw store; summary.json is the store):
 
   1. Pull the current 180-day window into the store, incrementally (reuse frozen points, freeze
@@ -10,7 +10,7 @@ two-retention index -- into the sequence a CI night runs (no raw store; summary.
      resolved BLIS tag against last night's.
   3. If it's a no-op, stop -- the last good published view stands, nothing is written.
   4. Otherwise score the window (cached by exact inputs, so only changed points do real work) and
-     build the v2 summary.
+     build the v3 summary.
   5. A run that scored zero points becomes a no-op (the dashboard never blanks out).
   6. Publish: always refresh the live view; on a BLIS release also freeze a diffable snapshot.
      Rebuild the index (count-based last-5 API snapshots; dump snapshots untouched), record

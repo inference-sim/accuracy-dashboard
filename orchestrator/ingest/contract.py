@@ -1,9 +1,9 @@
 """The extractor-to-summary contract (Discussion #28; orchestrator/ingest/CONTRACT.md).
 
-Shared by both sides: the extractor (#29) writes a contract directory and the v2 summary
-builder (#30) reads one. This module holds only what both must agree on byte-for-byte: the
-point identity, the canonical JSON encoding, the file names, and a validator for a contract
-directory. It runs nothing in the nightly pipeline.
+Shared by both sides: the extractor (#29) writes a contract directory and the summary builder
+(build_summary_v2.py, which writes summary v3) reads one. This module holds only what both must
+agree on byte-for-byte: the point identity, the canonical JSON encoding, the file names, and a
+validator for a contract directory. It runs nothing in the nightly pipeline.
 """
 from __future__ import annotations
 

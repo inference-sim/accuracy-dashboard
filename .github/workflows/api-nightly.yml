@@ -3,7 +3,7 @@ name: api-nightly
 # The API-ingest nightly pipeline (Discussion #15, revised 2026-10-25: the no-storage design).
 # Replaces the db-dump nightly (nightly.yml): instead of restoring a ~323 GB Postgres dump, it
 # pulls the live InferenceX API, scores the 180-day window with the resolved BLIS release, and
-# publishes v2 `api` snapshots. NOTHING RAW IS PERSISTED -- no ix-store branch, no committed logs;
+# publishes summary v3 `api` snapshots. NOTHING RAW IS PERSISTED -- no ix-store branch, no committed logs;
 # the work dir is ephemeral and summary.json IS the score store (an IX-only night merges the delta
 # into the published summary). Only the agentic artifact downloads are cached, via actions/cache
 # (ephemeral, not committed), to keep a BLIS-release night fast.

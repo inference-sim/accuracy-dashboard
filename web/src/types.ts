@@ -36,7 +36,7 @@ export interface CoverageCount {
   total: number
 }
 
-/** One classified vLLM setting in a v2 fidelity record (orchestrator/ingest/fidelity.schema.json). */
+/** One classified vLLM setting in a v2 fidelity record (schemas/fidelity.v2.json). */
 export interface FidelityArg {
   arg: string
   measured: string | number | boolean | null
