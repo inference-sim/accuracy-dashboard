@@ -109,7 +109,8 @@ jobs:
       - run: npm run build
       - name: v2 and v3 browser smoke - real Chromium on each fixture, zero console errors, provenance per point
         run: |
-          npm install --no-save playwright@1.56.0
+          # Playwright is a locked devDependency (web/package.json), installed by npm ci. 1.61.0 is
+          # the first release that supports ubuntu-latest's Ubuntu 26.04; 1.56.0 refused it.
           npx playwright install --with-deps chromium
           for v in v2 v3; do
             rm -rf public/data dist
