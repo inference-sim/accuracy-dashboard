@@ -404,18 +404,23 @@ class Outcome:
     g5: dict | None = None
     g5_reasons: list = field(default_factory=list)
     faults: list = field(default_factory=list)
+    # Set by score_point(simulate=False) when the scorer would now hand the point to the simulator:
+    # the point carries what its data gives so far and is not a scored point (no figures).
+    would_run_simulator: bool = False
 
 
-def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
+def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env, simulate: bool = True) -> Outcome:
     """score_point with the uniform error capture the driver used to do inline, so both the serial
-    and the parallel path record a point that raises as not-scored (never drop it)."""
+    and the parallel path record a point that raises as not-scored (never drop it). With
+    simulate=False the point is graded without a simulator (score_point) and carries no
+    simulator block."""
     try:
-        o = score_point(entry, pull_dir, work, env)
+        o = score_point(entry, pull_dir, work, env, simulate=simulate)
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
         o = Outcome(point_id=entry["point_id"], identity=entry["identity"], row=entry["row"],
                     reasons=sorted(set(entry["reasons"] + ["blis_refused:extractor_error"])),
                     measurements=entry.get("measurements") or [], build=entry.get("build"))
-    grade_outcome(o, env.engine_release, env.simulator())
+    grade_outcome(o, env.engine_release, env.simulator() if simulate else None)
     return o
 
 
@@ -427,9 +432,10 @@ def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
 _W: dict = {}
 
 
-def _worker_init(pull_dir: str, env: Env, work: str):
+def _worker_init(pull_dir: str, env: Env, work: str, simulate: bool):
     _W["pull_dir"] = Path(pull_dir)
     _W["env"] = env
+    _W["simulate"] = simulate
     # os.getpid() is stable for the life of a pool worker -> a fixed per-worker dir it reuses, so
     # the scenario cache within one worker still helps across its tasks.
     import os
@@ -438,7 +444,7 @@ def _worker_init(pull_dir: str, env: Env, work: str):
 
 
 def _worker_score(entry: dict) -> Outcome:
-    return _score_one(entry, _W["pull_dir"], _W["work"], _W["env"])
+    return _score_one(entry, _W["pull_dir"], _W["work"], _W["env"], _W["simulate"])
 
 
 def _is_agentic(entry: dict) -> bool:
@@ -446,7 +452,7 @@ def _is_agentic(entry: dict) -> bool:
 
 
 def score_points(points: list, pull_dir: Path, work: Path, env: Env, *, workers: int = 1,
-                 agentic_workers: int = 1, log=lambda m: None) -> list:
+                 agentic_workers: int = 1, log=lambda m: None, simulate: bool = True) -> list:
     """Score every point. The result is collected in input order regardless of completion order,
     and write_contract re-sorts by point_id, so the contract is identical whatever the worker
     count -- concurrency is a speed knob, never a correctness or determinism lever.
@@ -473,14 +479,21 @@ def score_points(points: list, pull_dir: Path, work: Path, env: Env, *, workers:
 
     if single:
         log(f"score: {len(single)} single-turn on {max(workers, 1)} worker(s)")
-        _run_pool(single, pull_dir, work, env, max(workers, 1), record)
+        _run_pool(single, pull_dir, work, env, max(workers, 1), record, simulate)
     if agentic:
         log(f"score: {len(agentic)} agentic on {max(agentic_workers, 1)} worker(s) (corpus-heavy)")
-        _run_pool(agentic, pull_dir, work, env, max(agentic_workers, 1), record)
+        _run_pool(agentic, pull_dir, work, env, max(agentic_workers, 1), record, simulate)
     return [results[i] for i in range(n)]   # input order; write_contract re-sorts anyway
 
 
-def _acceptance_subs(b: st.Built, doc: dict) -> list[dict]:
+def unread_result_substitutions(b: st.Built) -> list[dict]:
+    """The substitutions only the simulator's Result can replace, named while it has not been read
+    (score_point with simulate=False): the selected-entry report, and the acceptance profile of a
+    drafter whose acceptance the run did not record."""
+    return result.coefficient_substitutions({}) + _acceptance_subs(b, None)
+
+
+def _acceptance_subs(b: st.Built, doc: dict | None) -> list[dict]:
     """A drafter with no recorded acceptance is simulated with the substrate's profile (D8); the
     scenario pins nothing and the point names the profile blis resolved."""
     spec = b.deployment["pools"][0]["engine"].get("speculative")
@@ -503,22 +516,34 @@ def check_all_scored(points: list, outcomes: list) -> list[str]:
     return out
 
 
-def _run_pool(indexed: list, pull_dir: Path, work: Path, env: Env, workers: int, record) -> None:
+def _run_pool(indexed: list, pull_dir: Path, work: Path, env: Env, workers: int, record,
+              simulate: bool = True) -> None:
     """Score a list of (index, entry) at the given concurrency, calling record(index, outcome) as
     each finishes. workers<=1 runs in-process (no pool), else a ProcessPoolExecutor."""
     if workers <= 1:
         for idx, e in indexed:
-            record(idx, _score_one(e, pull_dir, work, env))
+            record(idx, _score_one(e, pull_dir, work, env, simulate))
         return
     from concurrent.futures import ProcessPoolExecutor, as_completed
     with ProcessPoolExecutor(max_workers=workers, initializer=_worker_init,
-                             initargs=(str(pull_dir), env, str(work))) as ex:
+                             initargs=(str(pull_dir), env, str(work), simulate)) as ex:
         futs = {ex.submit(_worker_score, e): idx for idx, e in indexed}
         for fut in as_completed(futs):
             record(futs[fut], fut.result())
 
 
-def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
+def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: bool = True) -> Outcome:
+    """One frozen point, scored: the checks, the scenario, the simulator run, the figures.
+
+    With simulate=False the same code runs up to the simulator call (the checks, the scenario, the
+    simulator's command line) and a point the scorer would hand to the simulator is returned
+    there, with would_run_simulator true, no figures, and the substitutions its data gives so far:
+    those its settings named, the single-turn client's differences, the data-parallel balancer,
+    and "selected-entry report not read" (and, for a drafter with no recorded acceptance, the
+    profile not read), which only the Result can replace. Its grade (grade_outcome) is the grade
+    that data gives, so it is G2 at best, never G1. A point the scorer refuses before the
+    simulator is the same outcome with or without it. `blis` is not run, and a point from
+    simulate=False is never written to a contract (write_contract refuses it)."""
     row, ident, pid = entry["row"], entry["identity"], entry["point_id"]
     # blis runs in its binary's directory, so every path it is given is absolute.
     work = work.resolve()
@@ -643,7 +668,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         return o
 
     if not agentic:
-        return score_single_turn(o, entry, env, work, b, header, name, dep, args, log, sup, pdir)
+        return score_single_turn(o, entry, env, work, b, header, name, dep, args, log, sup, pdir, simulate=simulate)
 
     # ---- the replay
     corpus = env.corpora[r.corpus]
@@ -661,6 +686,11 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         argv += ["--speculative-acceptance-length", b.acceptance_length]
     if env.corpus_cache:
         argv += ["--corpus-cache", str(env.corpus_cache)]
+    if not simulate:
+        o.subs += unread_result_substitutions(b)
+        o.fidelity = {"build": entry["build"], "args": args, "resolved": []}
+        o.would_run_simulator = True
+        return o
     # The cached Result is reused only for the exact same inputs: scenario, workload, argv.
     key = hashlib.sha256((text + spec_path.read_text() + "\0".join(argv[1:])).encode()).hexdigest()
     doc = _run_result(o, argv, key, work / "results" / f"{pid}.json", env, work,
@@ -782,7 +812,8 @@ def client_reasons(entry: dict, pdir: Path, client: dict) -> list[str]:
 
 
 def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built, header: list[str],
-                      name: str, dep: dict, args: list, log: str, sup: sp.Support, pdir_in: Path) -> Outcome:
+                      name: str, dep: dict, args: list, log: str, sup: sp.Support, pdir_in: Path, *,
+                      simulate: bool = True) -> Outcome:
     """One single-turn point, replayed as the run's client sent it (COV-12).
 
     The requests are the client's seed-0 draws for the row's (isl, osl, conc)
@@ -831,6 +862,17 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
         argv += ["--catalog", str(env.catalog)]
     if env.registry:
         argv += ["--registry", str(env.registry)]
+    verified, why = _prompt_lengths().verified(sup.checkpoint, row.get("date"), isl, osl, conc)
+    differences = ix.client_differences(verified, why, **client)
+    if int(par.get("dp") or 1) > 1:
+        o.subs.append(DP_BALANCER)
+    requests = {"client": ix.CLIENT_SUBJECT, "start": "primed" if primed else "cold",
+                "copies": copies, "count": len(ins), "differences": differences}
+    if not simulate:
+        o.subs += unread_result_substitutions(b)
+        o.fidelity = {"build": entry["build"], "args": args, "resolved": [], "requests": requests}
+        o.would_run_simulator = True
+        return o
     key = hashlib.sha256(b"\0".join([text.encode(), router, header_path.read_bytes(), data_path.read_bytes(),
                                       "\0".join(argv[1:]).encode()])).hexdigest()
     doc = _run_result(o, argv, key, pdir / "result.json", env, work)
@@ -863,14 +905,8 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     except result.ResultError as e:
         o.reasons = [f"blis_refused:{e.slug}"]
         return o
-    verified, why = _prompt_lengths().verified(sup.checkpoint, row.get("date"), isl, osl, conc)
-    differences = ix.client_differences(verified, why, **client)
-    if int(par.get("dp") or 1) > 1:
-        o.subs.append(DP_BALANCER)
     o.fidelity = {"build": entry["build"], "args": args, "resolved": [],
-                  "blis_kernel_provenance": result.kernel_report(doc),
-                  "requests": {"client": ix.CLIENT_SUBJECT, "start": "primed" if primed else "cold",
-                               "copies": copies, "count": len(ins), "differences": differences}}
+                  "blis_kernel_provenance": result.kernel_report(doc), "requests": requests}
     ep = (par["tp"] * par["dp"]) if par.get("enable_expert_parallel") else 1
     label = _single_turn_label(isl, osl)
     scen = f"{model}-{row['hardware']}-{row['precision']}-vllm-tp{par['tp']}-dp{par['dp']}-ep{ep}"
@@ -935,7 +971,8 @@ def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None
     g = gr.grade(engine_version=engine_release, release=rel, substitutions=substitutions(o.subs, o.fidelity))
     o.fidelity = {**o.fidelity, "grade": g.grade, "substitutions": g.substitutions, "run_release": rel.version,
                   "simulator": simulator}
-    o.csv_row[contract.POINTS_HEADER.index(contract.GRADE_COLUMN)] = g.grade
+    if not o.would_run_simulator:      # a point graded without the simulator has no points.csv row
+        o.csv_row[contract.POINTS_HEADER.index(contract.GRADE_COLUMN)] = g.grade
 
 
 def row_vs_run(row: dict, c: st.Decided) -> list[str]:
@@ -1003,6 +1040,10 @@ def split_repeated_sweeps(scored: list[Outcome]) -> None:
 
 
 def write_contract(out: Path, outcomes: list[Outcome], provenance: dict) -> None:
+    unsimulated = [o.point_id[:12] for o in outcomes if o.would_run_simulator]
+    if unsimulated:
+        raise ValueError(f"{len(unsimulated)} point(s) were graded without the simulator and have no figures "
+                         f"({', '.join(unsimulated[:3])}); a contract holds only scored points")
     out.mkdir(parents=True, exist_ok=True)
     scored = [o for o in outcomes if o.fidelity is not None]
     split_repeated_sweeps(scored)

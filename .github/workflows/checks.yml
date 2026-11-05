@@ -92,6 +92,7 @@ jobs:
             orchestrator/ingest/test_fields.py \
             orchestrator/ingest/test_headline.py \
             orchestrator/ingest/test_backlog.py \
+            orchestrator/ingest/test_coverage.py \
             orchestrator/ingest/test_stack.py \
             orchestrator/ingest/test_server_log.py \
             orchestrator/test_update_index.py

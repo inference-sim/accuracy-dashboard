@@ -107,6 +107,54 @@ class Catalog:
         return spec.get("method") if isinstance(spec, dict) else None
 
 
+@dataclass
+class CheckoutCatalog(Catalog):
+    """The catalog read from a checkout, with no blis binary: the answers `blis catalog resolve`
+    gives (a model by entry name or by source repository, compared without regard to case; a chip
+    by hardware file, with the packaging its file fixes), taken from <catalog>/models/*/model.yaml
+    and <catalog>/hardware/*.yaml.
+
+    TEMPORARY, for `cli.py coverage` only, which runs no simulator and so has no blis build to ask,
+    until a command answers a catalog queried offline. The checkout is not validated here: its
+    schema check is blis's. A source repository two entries claim raises CommandError, as the
+    command does."""
+    _read: dict | None = None
+
+    def _checkout(self) -> dict:
+        if self._read is None:
+            import yaml
+            root = Path(self.root)
+            repos: dict = {}
+            for m in sorted(root.glob("models/*/model.yaml")):
+                repo = (((yaml.safe_load(m.read_text()) or {}).get("source")) or {}).get("repo")
+                if repo:
+                    repos.setdefault(repo.casefold(), []).append(m.parent.name)
+            chips = {}
+            for h in sorted(root.glob("hardware/*.yaml")):
+                doc = yaml.safe_load(h.read_text()) or {}
+                chips[h.stem] = {"gpus_per_node": doc.get("GPUsPerNode") or None,
+                                 "gpus_per_rack": doc.get("GPUsPerRack") or None}
+            self._read = {"entries": {m.parent.name for m in root.glob("models/*/model.yaml")},
+                          "repos": repos, "chips": chips}
+        return self._read
+
+    def model(self, repo: str) -> str | None:
+        if repo not in self._models:
+            c = self._checkout()
+            names = [repo] if repo in c["entries"] else c["repos"].get(repo.casefold(), [])
+            if len(names) > 1:
+                raise bc.CommandError(f"model {repo!r} is the source repository of {len(names)} catalog entries "
+                                      f"({', '.join(names)}); name the entry instead")
+            self._models[repo] = names[0] if names else None
+        return self._models[repo]
+
+    def chip(self, name: str) -> str | None:
+        return name if name in self._checkout()["chips"] else None
+
+    def packaging(self, chip: str) -> dict:
+        return self._checkout()["chips"][chip]
+
+
 def catalog_part(cat: Catalog, parts: set[str], label: str) -> str | None:
     """The catalog part an InferenceX hardware label names: the part of that name, else the
     one part named `<label>-<variant>` with registry coefficients (InferenceX's `gb200` is the

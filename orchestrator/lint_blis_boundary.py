@@ -67,6 +67,10 @@ DATA_READS = {
         "TEMPORARY until the pinned blis reports `packaging` from `blis catalog resolve --chip` "
         "(inference-sim m1/packaging, 146e13d9): until then hardware/<chip>.yaml GPUsPerNode and "
         "GPUsPerRack are read from the catalog checkout",
+    ("orchestrator/ingest/support.py", "CheckoutCatalog._checkout"):
+        "TEMPORARY until a command answers `catalog resolve` for a catalog checkout with no simulator "
+        "build: `cli.py coverage` grades a frozen pull without a simulator and reads models/*/model.yaml "
+        "and hardware/*.yaml itself",
     ("orchestrator/ingest/support.py", "Catalog.speculator"):
         "TEMPORARY until a command prints a catalog model graph's speculator method",
     ("orchestrator/ingest/support.py", "registry_parts"):

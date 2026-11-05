@@ -204,11 +204,14 @@ def coefficient_substitutions(doc: dict) -> list[dict]:
 ACCEPTANCE_SUBJECT = "speculative_config.acceptance_length"
 
 
-def acceptance_substitution(doc: dict) -> dict:
+def acceptance_substitution(doc: dict | None) -> dict:
     """The G2 substitution for a drafter whose acceptance the run did not record (design D8):
     blis resolves it from the substrate's profile, and the Result's input.workload_properties
     says which. Kind estimated; the detail names the profile (set/key), or says the Result does
-    not report it."""
+    not report it. With no Result yet (doc None, a point graded without the simulator) the detail
+    says the profile is not read."""
+    if doc is None:
+        return {"kind": "estimated", "subject": ACCEPTANCE_SUBJECT, "detail": "profile not read"}
     for p in (doc.get("input") or {}).get("workload_properties") or []:
         if p.get("name") == "speculative_acceptance":
             if p.get("source") == "profile" and p.get("profile"):

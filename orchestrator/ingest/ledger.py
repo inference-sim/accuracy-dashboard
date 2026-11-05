@@ -35,6 +35,14 @@ class LedgerError(ValueError):
     """The ledger files, or a record checked against them, are not what the harness requires."""
 
 
+class RowDiffers(LedgerError):
+    """A row whose identity is not the one the unit list gives its id; `record` is the row id."""
+
+    def __init__(self, record: str, message: str):
+        super().__init__(message)
+        self.record = record
+
+
 @dataclass
 class Unit:
     unit_id: str
@@ -82,7 +90,7 @@ class Ledger:
             return None
         got = contract.point_id(contract.unit_identity(row, dates))
         if got != p.own_unit_id:
-            raise LedgerError(
+            raise RowDiffers(rid,
                 f"row {rid}: its identity hashes to {got}, but the ledger's unit list ({self.revision}) "
                 f"gives {p.own_unit_id}; the row differs from the pinned source revision")
         return p

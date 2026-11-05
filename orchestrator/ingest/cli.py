@@ -11,6 +11,11 @@
       `blis fields --engine vllm --json` prints. --corpus-dir holds each AgentX corpus as
       resolve_agentic_corpus.py --all fetched it from the catalog's replay workloads.
 
+  cli.py coverage --pull PULL --ledger LEDGER --fields FILE --stack FILE --catalog DIR --registry DIR
+                  [--rows ROWS.json] [--units FILE] [--out FILE.json]
+      The grade split of a frozen pull, graded from its data by the scorer without a simulator, as
+      one JSON document counting rows and units apart (coverage.py).
+
 Nothing in the nightly pipeline calls this. Run by path, like the other orchestrator scripts.
 """
 from __future__ import annotations
@@ -33,6 +38,7 @@ import blis_commands as bc  # noqa: E402
 import build  # noqa: E402
 import clients  # noqa: E402
 import contract  # noqa: E402
+import coverage as cv  # noqa: E402
 import engines  # noqa: E402
 import fields as fl  # noqa: E402
 import harness_pin as hp  # noqa: E402
@@ -438,6 +444,23 @@ def cmd_score(a) -> int:
     return 1 if problems else 0
 
 
+def cmd_coverage(a) -> int:
+    try:
+        doc = cv.run(pull_dir=Path(a.pull), ledger=Path(a.ledger), fields_path=Path(a.fields), stack_path=Path(a.stack),
+                     catalog=Path(a.catalog), registry=Path(a.registry), rows_path=Path(a.rows) if a.rows else None,
+                     units_path=Path(a.units) if a.units else None, workers=a.workers or 1,
+                     work=Path(a.work) if a.work else None)
+    except (cv.CoverageError, ldg.LedgerError, fl.FieldsError, sk.StackError, bc.CommandError, OSError, KeyError,
+            ValueError) as e:
+        _log(f"FATAL: {e}")
+        return 2
+    text = json.dumps(doc, indent=1, sort_keys=False) + "\n"
+    if a.out:
+        Path(a.out).write_text(text)
+    sys.stdout.write(text)
+    return 0
+
+
 def _has_legacy_ids(summary: dict) -> bool:
     """Whether a published summary carries the eight-field identity of before (legacy_ids.py)."""
     return any("recipe" in (n.get("identity") or {}) for n in summary.get("not_scored", [])) or \
@@ -605,6 +628,25 @@ def main(argv=None) -> int:
     s.add_argument("--max-rss-mb", type=int, default=0,
                    help="per-replay resident-memory ceiling MB (0=none); over-limit agentic replays -> not_scored:insufficient_memory")
 
+    c = sub.add_parser("coverage", formatter_class=argparse.RawDescriptionHelpFormatter,
+                       help="the grade split of a frozen pull, graded from its data without a simulator",
+                       description=cv.__doc__ + "\nThe pull's point ids may be of an older identity: with --rows the window's rows "
+                       "are placed in --ledger afresh and each unit takes the artifacts of the manifest entry of "
+                       "its rows, by row id.")
+    c.add_argument("--pull", required=True, help="a frozen pull (manifest.json and points/)")
+    c.add_argument("--ledger", required=True, help="blis-substrate's catalog/ledger (see pull --ledger)")
+    c.add_argument("--fields", required=True, help="the engine's fields.json, for the release stack.json names")
+    c.add_argument("--stack", required=True, help="the scoring build's stack.json (the engine release)")
+    c.add_argument("--catalog", required=True,
+                   help="a catalog checkout, read as `blis catalog resolve` answers it (TEMPORARY, support.CheckoutCatalog); "
+                        "it must hold the replay workload of each AgentX corpus alias")
+    c.add_argument("--registry", required=True)
+    c.add_argument("--rows", help="a JSON list of the API rows (every framework); those in the pull's window are placed")
+    c.add_argument("--units", help="a PublishedUnits list or a file of unit ids (the anchor list): adds the `anchor` section")
+    c.add_argument("--work")
+    c.add_argument("--workers", type=int, default=1)
+    c.add_argument("--out", help="also write the JSON document here")
+
     n = sub.add_parser("nightly", help="one night: list window -> fetch+score delta -> merge -> publish")
     n.add_argument("--blis-tag", required=True, help="the stable inference-sim tag resolve_blis.sh resolved")
     n.add_argument("--work-dir", required=True, help="ephemeral dir for this night's pull (never persisted)")
@@ -635,7 +677,7 @@ def main(argv=None) -> int:
     n.add_argument("--max-rss-mb", type=int, default=0, help="per-replay RSS ceiling MB (0=none); over-limit agentic -> not_scored:insufficient_memory")
 
     a = ap.parse_args(argv)
-    return {"pull": cmd_pull, "score": cmd_score, "nightly": cmd_nightly}[a.cmd](a)
+    return {"pull": cmd_pull, "score": cmd_score, "coverage": cmd_coverage, "nightly": cmd_nightly}[a.cmd](a)
 
 
 if __name__ == "__main__":
