@@ -70,6 +70,27 @@ def load(path) -> Stack:
     return parse(Path(path).read_text())
 
 
+SUBSTRATE = "github.com/inference-sim/blis-substrate"
+VLLM_MODULE = "github.com/inference-sim/blis-vllm"
+
+
+def pins(stack: Stack) -> dict:
+    """What the nightly fetches to score one release, all from its stack.json (design §11, X8):
+    the commits of the blis-substrate module (whose catalog/, registry/ and catalog/ledger the
+    release runs) and of the blis-vllm module (whose root holds fields.json), and the vLLM tag the
+    engine release names. A release scored later needs no change here."""
+    out = {}
+    for key, path in (("substrate_commit", SUBSTRATE), ("vllm_module_commit", VLLM_MODULE)):
+        m = stack.modules.get(path)
+        if m is None:
+            raise StackError(f"stack.json lists no module {path}")
+        if not re.fullmatch(r"[0-9a-f]{40}", m["commit"] or ""):
+            raise StackError(f"stack.json: module {path} has commit {m['commit']!r}, want 40 hex digits")
+        out[key] = m["commit"]
+    out["vllm_ref"] = "v" + stack.engine("vllm")
+    return out
+
+
 # ------------------------------------------------------------------ COV-9: each release once
 
 _TAG = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")

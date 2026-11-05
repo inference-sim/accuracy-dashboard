@@ -93,7 +93,7 @@ def cmd_pull(a) -> int:
     _log(f"pull: reuse {len(inc.reuse)} frozen, freeze {len(inc.fresh)} fresh, drop {len(inc.dropped)} aged-out")
     token = clients.require_github_token()
     # The vLLM ref rides the resolved BLIS release: the nightly exports $VLLM_REF from
-    # resolve_versions.sh (blis-vllm's Upstream provenance). It anchors the WHOLE build resolver
+    # resolve_stack.py (stack.json's vLLM engine release). It anchors the WHOLE build resolver
     # (exact-vs-estimated commit distance) and is stamped into the manifest, so a local run with
     # nothing resolved falls back to build.VLLM_REF. Resolved once here, used in both places.
     import os

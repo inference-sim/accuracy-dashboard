@@ -110,44 +110,38 @@ jobs:
           set -euo pipefail
           for BLIS_TAG in $BLIS_TAGS; do
             echo "::group::score $BLIS_TAG"
-            rm -rf "$RUNNER_TEMP/sim" "$RUNNER_TEMP/catalog" "$RUNNER_TEMP/registry" "$RUNNER_TEMP/blis-vllm" \
-              "$RUNNER_TEMP/substrate" "$RUNNER_TEMP/pull" "$RUNNER_TEMP/contract" "$RUNNER_TEMP/scorework"
+            rm -rf "$RUNNER_TEMP/sim" "$RUNNER_TEMP/blis-vllm" "$RUNNER_TEMP/substrate" \
+              "$RUNNER_TEMP/pull" "$RUNNER_TEMP/contract" "$RUNNER_TEMP/scorework"
             SIM="$RUNNER_TEMP/sim"
             git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$SIM"
             ( cd "$SIM" && GOFLAGS=-mod=mod go build -o blis main.go )
-            eval "$(bash orchestrator/resolve_versions.sh "$SIM")"
-            git clone -q --depth 1 --branch "$catalog"  https://github.com/inference-sim/blis-catalog.git  "$RUNNER_TEMP/catalog"
-            git clone -q --depth 1 --branch "$registry" https://github.com/inference-sim/blis-registry.git "$RUNNER_TEMP/registry"
+            # Everything else the release runs is named by its stack.json (SIM-3, X8), so a new
+            # release is scored with no change to this file: the blis-substrate commit (its
+            # catalog/, registry/ and catalog/ledger), the blis-vllm commit (its fields.json) and
+            # the vLLM tag of the engine release.
+            eval "$(python3 orchestrator/resolve_stack.py "$SIM")"
+            git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
+            git -C "$RUNNER_TEMP/substrate" checkout -q "$substrate_commit"
+            CATALOG="$RUNNER_TEMP/substrate/catalog"
+            REGISTRY="$RUNNER_TEMP/substrate/registry"
+            # The ledger at the same commit: every point is one of its units (design §10.2).
+            # TEMPORARY until `blis ledger --list` (inference-sim m1/substrate) prints the unit
+            # list; the job then reads it from the simulator.
+            LEDGER="$RUNNER_TEMP/substrate/catalog/ledger"
             # The engine's field list (design §11.1): every field's status and estimation rule.
             # TEMPORARY until `blis fields --engine vllm --json` exists (inference-sim m1/substrate,
-            # task H): read from the blis-vllm module the build pins, at its root. A module that
+            # task H): read from the blis-vllm commit stack.json names, at its root. A module that
             # publishes none fails the night; there is no fallback.
-            vllm_mod=$(awk '$1=="github.com/inference-sim/blis-vllm" {print $2; exit}' "$SIM/go.mod")
             git clone -q --filter=blob:none https://github.com/inference-sim/blis-vllm.git "$RUNNER_TEMP/blis-vllm"
-            git -C "$RUNNER_TEMP/blis-vllm" checkout -q "${vllm_mod##*-}" 2>/dev/null || git -C "$RUNNER_TEMP/blis-vllm" checkout -q "$vllm_mod"
+            git -C "$RUNNER_TEMP/blis-vllm" checkout -q "$vllm_module_commit"
             if [ ! -f "$RUNNER_TEMP/blis-vllm/fields.json" ]; then
-              echo "FATAL: blis-vllm $vllm_mod publishes no fields.json, so no point can be graded" >&2
+              echo "FATAL: blis-vllm $vllm_module_commit publishes no fields.json, so no point can be graded" >&2
               exit 1
             fi
             FIELDS="$RUNNER_TEMP/blis-vllm/fields.json"
-            # The ledger at the blis-substrate commit this release pins: every point is one of its
-            # units (design §10.2). TEMPORARY until `blis ledger --list` (inference-sim m1/substrate)
-            # prints the unit list; the job then reads it from the simulator.
-            substrate=$(awk '$1=="github.com/inference-sim/blis-substrate" {print $2; exit}' "$SIM/go.mod")
-            if [ -n "$substrate" ]; then
-              ref="${substrate##*-}"
-              git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
-              git -C "$RUNNER_TEMP/substrate" checkout -q "$ref"
-              LEDGER="$RUNNER_TEMP/substrate/catalog/ledger"
-            else
-              echo "FATAL: $BLIS_TAG pins no blis-substrate, so it has no ledger to name its points" >&2
-              exit 1
-            fi
-            CATALOG="$RUNNER_TEMP/catalog"
-            REGISTRY="$RUNNER_TEMP/registry"
-            # The vLLM ref the resolved BLIS release models (blis-vllm's Upstream), so cmd_pull stamps
-            # it into the manifest and anchors the build resolver on it -- no hardcoded VLLM_REF.
-            export VLLM_REF="$vllm"
+            # The vLLM tag of the engine release the simulator runs (stack.json engines), so
+            # cmd_pull stamps it into the manifest and anchors the build resolver on it.
+            export VLLM_REF="$vllm_ref"
             # data/ is the checkout's own main tree, so the dump snapshots and any prior API snapshots
             # (incl. the live view the merge reads) are present; cli.py nightly adds/prunes only API
             # snapshots and never touches a dump one.
