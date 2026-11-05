@@ -475,6 +475,50 @@ def test_every_published_v2_snapshot_still_validates():
         assert vs2.problems(json.loads(p.read_text())) == [], p
 
 
+# ---------------------------------------------------------------- frozen v2 (COV-8)
+
+FROZEN_V2 = {  # sha256 of the files as origin/main published them
+    "schemas/summary.v2.json": "15959e9835ac62b9706a844fbf851a72c2727f42f3fe45b2e36612d8f5fc65e1",
+    "web/testdata/render-fixture.v2.summary.json": "45bc0718088abfc4d44d061cd9aaf586bc4c71f9986dbd7728962e800b3e240e",
+    "web/testdata/render-fixture.v2b.summary.json": "6dec2cb4d7f5e4adf35524726d01b72ee87d52a4216f20c8ee7c897756cf8aa5",
+}
+
+
+def _v2_fixture(name="render-fixture.v2.summary.json"):
+    return json.loads((HERE.parent / "web" / "testdata" / name).read_text())
+
+
+def test_the_v2_schema_and_its_fixtures_are_frozen_files():
+    import hashlib
+    for rel, want in FROZEN_V2.items():
+        assert hashlib.sha256((HERE.parent / rel).read_bytes()).hexdigest() == want, rel
+
+
+def test_the_frozen_v2_fixtures_validate_with_the_legacy_identity_and_ids_hash_from_it():
+    import legacy_ids
+    for name in ("render-fixture.v2.summary.json", "render-fixture.v2b.summary.json"):
+        doc = _v2_fixture(name)
+        assert vs2.problems(doc) == [], name
+        pts = _points(doc)
+        assert pts and all("recipe" in p["identity"] for p in pts)
+        assert all(legacy_ids.legacy_point_id(p["identity"]) == p["point_id"] for p in pts)
+
+
+def test_the_v2_schema_refuses_a_unit_identity_no_v2_publisher_wrote():
+    # The unit identity belongs to summary v3 only; v2 stays what v2 publishers wrote.
+    doc = _v2_fixture()
+    unit = _build()
+    uid = _points(unit)[0]["identity"]
+    assert "source" in uid and "recipe" not in uid
+    assert vs2.validator(2).is_valid(doc)
+    _points(doc)[0]["identity"] = uid
+    assert not vs2.validator(2).is_valid(doc)
+    assert vs2.problems(unit) == []        # v3 takes it
+    legacy_in_v3 = _build()
+    _points(legacy_in_v3)[0]["identity"] = _points(_v2_fixture())[0]["identity"]
+    assert vs2.problems(legacy_in_v3) != []
+
+
 # ---------------------------------------------------------------- no-storage merge (#15, revised)
 
 def test_summary_inverts_to_a_valid_contract_and_rebuilds():
