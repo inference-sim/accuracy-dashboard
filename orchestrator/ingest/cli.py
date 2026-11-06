@@ -247,11 +247,24 @@ _SIM_COMMIT = re.compile(r"^[0-9a-f]{40}$")
 _DIGEST = re.compile(r"^(sha256:[0-9a-f]{64}|unreleased)$")
 
 
-def check_blis_inputs(blis: Path, catalog: Path, registry: Path, sim_build: str | None = None) -> list[str]:
+_DATA_RELEASE = re.compile(r"^[0-9A-Za-z][0-9A-Za-z._+-]*$")
+
+
+def release_of(repo: Path) -> str | None:
+    """The release tag a data checkout (catalog or registry) is at, or None when it is at none.
+    Needs the checkout's .git, so it runs where the checkout is, not in the harness image, which
+    is given the names (`--catalog-release`, `--registry-release`)."""
+    return _git(repo, "describe", "--tags", "--exact-match") or None
+
+
+def check_blis_inputs(blis: Path, catalog_release: str | None, registry_release: str | None,
+                      sim_build: str | None = None) -> list[str]:
     """Everything `score` needs to name its simulator build, or what's wrong. The blis binary sits
     in the inference-sim checkout it was built from. With --sim-build the checkout must be at that
     build: the release tag, or the 40-hex commit. Without it the checkout must be at a release
-    tag, which is the build. The catalog and registry must be at release tags."""
+    tag, which is the build. The catalog and registry are named by the release tags they are at;
+    the caller read them from the checkouts (release_of), because the harness image mounts the
+    data without its git history."""
     out = []
     sim = blis.parent
     if not blis.is_file():
@@ -269,9 +282,11 @@ def check_blis_inputs(blis: Path, catalog: Path, registry: Path, sim_build: str 
             out.append(f"--sim-build {sim_build}: the checkout {sim} is at commit {head or 'unknown'}")
     else:
         out.append(f"--sim-build {sim_build!r} is neither a tag vX.Y.Z[-suffix] nor a 40-hex commit")
-    for repo, flag in ((catalog, "--catalog"), (registry, "--registry")):
-        if not _git(repo, "describe", "--tags", "--exact-match"):
-            out.append(f"{flag} {repo} is not at a release tag")
+    for release, flag in ((catalog_release, "--catalog-release"), (registry_release, "--registry-release")):
+        if release is None:
+            out.append(f"{flag} is required: the release tag the data is at")
+        elif not _DATA_RELEASE.match(release):
+            out.append(f"{flag} {release!r} is not a release tag")
     return out
 
 
@@ -343,7 +358,7 @@ def cmd_score(a) -> int:
     pull_dir = Path(a.pull)
     blis = Path(a.blis).resolve()
     sim_build = getattr(a, "sim_build", None)
-    bad = check_blis_inputs(blis, Path(a.catalog), Path(a.registry), sim_build)
+    bad = check_blis_inputs(blis, getattr(a, "catalog_release", None), getattr(a, "registry_release", None), sim_build)
     bad += check_harness_digest(getattr(a, "harness_digest", None))
     try:
         stack = read_stack(blis, getattr(a, "stack", None))
@@ -381,8 +396,8 @@ def cmd_score(a) -> int:
     env = sc.Env(
         blis=str(blis), blis_release=_git(sim, "describe", "--tags", "--exact-match") or "unknown",
         blis_commit=_git(sim, "rev-parse", "HEAD"), catalog=Path(a.catalog).resolve(),
-        catalog_release=_git(a.catalog, "describe", "--tags") or "unknown", registry=Path(a.registry).resolve(),
-        registry_release=_git(a.registry, "describe", "--tags") or "unknown",
+        catalog_release=a.catalog_release, registry=Path(a.registry).resolve(),
+        registry_release=a.registry_release,
         kernel=next((l.split()[1] for l in (sim / "go.mod").read_text().splitlines()
                      if "blis-latency-kernel " in l), "unknown"),
         corpora=corpora,
@@ -425,8 +440,8 @@ def cmd_score(a) -> int:
             "simulator": env.simulator(), "engine": {"kind": "vllm", "version": engine_release},
             "harness_digest": a.harness_digest, "units": units,
             # Design §11.7, X8: a figure is experimental unless its build and its data are both
-            # released. check_blis_inputs requires the catalog and registry at release tags, so the
-            # data is released, and the build is released when it is a release tag.
+            # released. check_blis_inputs requires the catalog and registry to be named by release
+            # tags, so the data is released, and the build is released when it is a release tag.
             "experimental": not _RELEASE_TAG.match(env.sim_build),
             "left_out_records": len((manifest.get("ledger") or {}).get("unlisted") or []),
             "vllm_ref": manifest["vllm_ref"], "vllm_max_distance": manifest["vllm_max_distance"],
@@ -547,6 +562,14 @@ def cmd_nightly(a) -> int:
             raise RuntimeError(f"pull failed (rc={rc}); the run stops rather than publish a partial pull")
         return json.loads((work / "manifest.json").read_text())["pulled_at"][:10], window_ids
 
+    # The image mounts the data without its git history, so the releases the data is at are read
+    # here, where the checkouts are, and passed by name.
+    releases = {"catalog": release_of(Path(a.catalog)), "registry": release_of(Path(a.registry))}
+    unnamed = [k for k, v in releases.items() if v is None]
+    if unnamed:
+        _log(f"FATAL: the {' and '.join(unnamed)} checkout is not at a release tag")
+        return 2
+
     def score_build_fn(work: Path, blis_tag: str, score_ids, pull_date: str, window_ids: set):
         # The night scores through the released harness image, named by its digest (design
         # §11.7): the figures record that digest, and no scorer runs from this source tree.
@@ -554,6 +577,7 @@ def cmd_nightly(a) -> int:
         rc = run_image(hp.docker_command(
             a.harness_image, sim=blis_tag, units=anchor_path, pull=work, out=contract_dir,
             catalog=a.catalog, registry=a.registry, corpus_dir=a.corpus_dir,
+            catalog_release=releases["catalog"], registry_release=releases["registry"],
             max_rss_mb=a.max_rss_mb))
         if rc != 0:
             raise RuntimeError(f"score failed (rc={rc})")
@@ -607,6 +631,10 @@ def main(argv=None) -> int:
                    help="the blis binary, built in an inference-sim checkout at a release tag; it runs in that directory")
     s.add_argument("--catalog", required=True)
     s.add_argument("--registry", required=True)
+    s.add_argument("--catalog-release", required=True,
+                   help="the release tag the catalog is at (cli.release_of reads it from a checkout; the harness "
+                        "image mounts the data without its git history)")
+    s.add_argument("--registry-release", required=True, help="the release tag the registry is at")
     s.add_argument("--stack", help="TEMPORARY until inference-sim v0.16.0 ships stack.json: the scoring build's "
                                     "stack.json, when its checkout has none")
     s.add_argument("--sim-build", help="the simulator build: a release tag or a 40-hex commit; the checkout must be at it "

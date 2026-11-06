@@ -56,13 +56,14 @@ def test_a_good_digest_is_read_and_builds_the_docker_command(tmp_path):
     assert hp.read(pin(tmp_path, GOOD + "\n")) == GOOD
     cmd = hp.docker_command(GOOD, sim="v0.16.0", units=tmp_path / "u.json", pull=tmp_path / "p",
                             out=tmp_path / "o", catalog=tmp_path / "c", registry=tmp_path / "r",
-                            corpus_dir=tmp_path / "k", max_rss_mb=13000)
+                            corpus_dir=tmp_path / "k", catalog_release="v0.3.0", registry_release="v0.2.0", max_rss_mb=13000)
     assert cmd[:3] == ["docker", "run", "--rm"]
     assert f"HARNESS_DIGEST=sha256:{'c' * 64}" in cmd
     i = cmd.index(GOOD)
     assert cmd[i + 1:] == ["--sim", "v0.16.0", "--units", "/data/units.json", "--pull", "/data/pull",
                            "--out", "/data/out", "--catalog", "/data/catalog", "--registry", "/data/registry",
-                           "--corpus-dir", "/data/corpora", "--max-rss-mb", "13000"]
+                           "--corpus-dir", "/data/corpora", "--catalog-release", "v0.3.0",
+                           "--registry-release", "v0.2.0", "--max-rss-mb", "13000"]
     mounts = [cmd[j + 1] for j, v in enumerate(cmd[:i]) if v == "-v"]
     assert f"{(tmp_path / 'u.json').resolve()}:/data/units.json:ro" in mounts
     assert f"{(tmp_path / 'o').resolve()}:/data/out" in mounts          # the output is writable
@@ -72,7 +73,7 @@ def test_a_good_digest_is_read_and_builds_the_docker_command(tmp_path):
 
 def test_every_flag_of_the_command_is_one_run_sh_accepts(tmp_path):
     cmd = hp.docker_command(GOOD, sim="v0.16.0", units="u", pull="p", out="o", catalog="c", registry="r",
-                            corpus_dir="k", max_rss_mb=1)
+                            corpus_dir="k", catalog_release="v1", registry_release="v1", max_rss_mb=1)
     flags = cmd[cmd.index(GOOD) + 1:]
     (tmp_path / "x").write_text("")
     p = subprocess.run(["bash", str(HERE / "run.sh"), "--check-args", *flags], capture_output=True, text=True)

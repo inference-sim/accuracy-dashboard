@@ -9,6 +9,9 @@
 #                       to blis, and reads two facts from them that no blis command prints yet,
 #                       the graph's speculator method and the registry's coefficient scopes
 #                       (orchestrator/ingest/support.py, TEMPORARY).
+#                       --catalog-release TAG and --registry-release TAG name the releases the two
+#                       directories are at. The directories may carry no git history (a container
+#                       mount), so the scorer is told the names, not left to read them.
 #   a set of units      --units FILE, the ledger units to score, and --pull DIR, their frozen
 #                       recorded runs.
 #
@@ -26,7 +29,8 @@
 #
 # Usage:
 #   run.sh --sim <tag|commit> [--sim-repo URL] --units FILE --pull DIR --out DIR
-#          --catalog DIR --registry DIR --corpus-dir DIR [--max-rss-mb N]
+#          --catalog DIR --registry DIR --corpus-dir DIR
+#          --catalog-release TAG --registry-release TAG [--max-rss-mb N]
 #   run.sh --check-args <the same flags>     validate the flags, do nothing else
 #
 # Exit status: 0 on success, 2 for a refused flag or value, otherwise the failing step's status.
@@ -42,11 +46,12 @@ refuse() {
 
 sim="" sim_repo="https://github.com/inference-sim/inference-sim.git"
 units="" pull="" out="" catalog="" registry="" corpus_dir="" max_rss_mb="" check_only=0
+catalog_release="" registry_release=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --check-args) check_only=1; shift; continue ;;
-    --sim|--sim-repo|--units|--pull|--out|--catalog|--registry|--corpus-dir|--max-rss-mb)
+    --sim|--sim-repo|--units|--pull|--out|--catalog|--registry|--corpus-dir|--catalog-release|--registry-release|--max-rss-mb)
       [ $# -ge 2 ] || refuse "$1 needs a value"
       case "$1" in
         --sim) sim="$2" ;;
@@ -57,6 +62,8 @@ while [ $# -gt 0 ]; do
         --catalog) catalog="$2" ;;
         --registry) registry="$2" ;;
         --corpus-dir) corpus_dir="$2" ;;
+        --catalog-release) catalog_release="$2" ;;
+        --registry-release) registry_release="$2" ;;
         --max-rss-mb) max_rss_mb="$2" ;;
       esac
       shift 2 ;;
@@ -78,6 +85,9 @@ fi
 [ -n "$catalog" ] || refuse "--catalog is required: the catalog the simulator reads"
 [ -n "$registry" ] || refuse "--registry is required: the registry the simulator reads"
 [ -n "$corpus_dir" ] || refuse "--corpus-dir is required: the directory of AgentX corpora, <workload>/<file>, that resolve_agentic_corpus.py --all fetched"
+
+[ -n "$catalog_release" ] || refuse "--catalog-release is required: the release tag the catalog is at"
+[ -n "$registry_release" ] || refuse "--registry-release is required: the release tag the registry is at"
 
 digest="${HARNESS_DIGEST:-unreleased}"
 if [ "$digest" != unreleased ] && ! [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
@@ -117,7 +127,7 @@ echo "run.sh: inference-sim $sim at $got" >&2
 
 args=(score --pull "$pull" --out "$out" --blis "$src/blis" --units "$units"
       --sim-build "$sim" --harness-digest "$digest" --catalog "$catalog" --registry "$registry"
-      --corpus-dir "$corpus_dir")
+      --corpus-dir "$corpus_dir" --catalog-release "$catalog_release" --registry-release "$registry_release")
 # The replay memory ceiling is passed on only when given.
 [ -z "$max_rss_mb" ] || args+=(--max-rss-mb "$max_rss_mb")
 python3 "$root/orchestrator/ingest/cli.py" "${args[@]}"

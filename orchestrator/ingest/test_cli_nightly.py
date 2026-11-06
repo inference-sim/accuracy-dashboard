@@ -97,6 +97,9 @@ class Fakes:
         # that prints the anchor list of the substrate release it pins.
         ledger_fake.write(tmp / "ledger", self.rows)
         anchors = [ledger_fake.point_id(r) for r in self.rows] if self.anchors is None else self.anchors
+        for r in ("cat", "reg"):
+            if not (tmp / r / ".git").exists():
+                _tagged_repo(tmp / r, "v1.0.0")
         cat = write_catalog(tmp / "cat", {"m": "org/m"})
         fake_blis(tmp / "sim" / "blis", {"ledger --list anchor --json": [0, published("anchor", anchors), ""],
                                          **resolves(cat, {"m": "org/m"})})
@@ -316,6 +319,23 @@ def test_the_nightly_scores_through_the_harness_image_by_digest(tmp_path, monkey
     cmd = fakes.image_cmd
     assert cmd[:3] == ["docker", "run", "--rm"] and IMAGE in cmd and "HARNESS_DIGEST=sha256:" + "a" * 64 in cmd
     assert cmd[cmd.index(IMAGE) + 1:cmd.index(IMAGE) + 3] == ["--sim", "v0.12.0"]
+    # The image mounts the data without .git, so the night reads the releases from its checkouts
+    # and passes the names.
+    tail = cmd[cmd.index(IMAGE) + 1:]
+    assert tail[tail.index("--catalog-release") + 1] == "v1.0.0" and tail[tail.index("--registry-release") + 1] == "v1.0.0"
+
+
+def test_the_nightly_stops_before_scoring_when_a_data_checkout_is_not_at_a_release_tag(tmp_path, monkeypatch):
+    rows = [_row("m", 1, "2026-10-01")]
+    fakes = Fakes(rows)
+    _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
+    fakes.ledger(tmp_path)
+    _git("-C", str(tmp_path / "reg"), "tag", "-d", "v1.0.0")
+    monkeypatch.setattr(cli, "run_image", lambda cmd: (_ for _ in ()).throw(AssertionError("scored")))
+    msgs = []
+    monkeypatch.setattr(cli, "_log", msgs.append)
+    assert cli.cmd_nightly(_args(tmp_path)) == 2
+    assert "FATAL: the registry checkout is not at a release tag" in msgs, msgs
 
 
 def _git(*a):
@@ -335,10 +355,8 @@ def test_check_blis_inputs_reads_the_release_from_the_binarys_checkout(tmp_path)
     sim = tmp_path / "sim"
     _tagged_repo(sim, "v0.16.0")
     (sim / "blis").write_text("")
-    for r in ("cat", "reg"):
-        _tagged_repo(tmp_path / r, "v1.0.0")
-    assert cli.check_blis_inputs(sim / "blis", tmp_path / "cat", tmp_path / "reg") == []
-    bad = cli.check_blis_inputs(sim / "nope", tmp_path / "cat", tmp_path / "reg")
+    assert cli.check_blis_inputs(sim / "blis", "v1.0.0", "v1.0.0") == []
+    bad = cli.check_blis_inputs(sim / "nope", "v1.0.0", "v1.0.0")
     assert len(bad) == 1 and bad[0].startswith(f"--blis {sim / 'nope'} is not a file")
 
 
@@ -346,10 +364,27 @@ def test_check_blis_inputs_refuses_a_checkout_not_at_a_tag(tmp_path):
     sim = tmp_path / "sim"
     _tagged_repo(sim, None)
     (sim / "blis").write_text("")
-    for r in ("cat", "reg"):
-        _tagged_repo(tmp_path / r, "v1.0.0")
-    bad = cli.check_blis_inputs(sim / "blis", tmp_path / "cat", tmp_path / "reg")
+    bad = cli.check_blis_inputs(sim / "blis", "v1.0.0", "v1.0.0")
     assert any("is not at a release tag" in b for b in bad)
+
+
+def test_the_data_releases_are_named_by_the_caller_and_need_no_git_history(tmp_path):
+    # The harness image mounts the catalog and registry without .git (harness_pin.docker_command),
+    # so check_blis_inputs takes the release names; release_of reads them where a checkout is.
+    sim = tmp_path / "sim"
+    _tagged_repo(sim, "v0.16.0")
+    (sim / "blis").write_text("")
+    bare = tmp_path / "mount" / "catalog"
+    (bare / "models").mkdir(parents=True)
+    assert not (bare / ".git").exists()
+    assert cli.check_blis_inputs(sim / "blis", "v1.0.0", "v2.3.4-rc1") == []
+    assert cli.check_blis_inputs(sim / "blis", None, "v1.0.0") == ["--catalog-release is required: the release tag the data is at"]
+    assert cli.check_blis_inputs(sim / "blis", "v1.0.0", "bad tag") == ["--registry-release 'bad tag' is not a release tag"]
+    _tagged_repo(tmp_path / "cat", "v1.0.0")
+    _tagged_repo(tmp_path / "reg", None)
+    assert cli.release_of(tmp_path / "cat") == "v1.0.0"
+    assert cli.release_of(tmp_path / "reg") is None
+    assert cli.release_of(bare) is None
 
 
 FIELD_LIST = {"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": []}
@@ -431,10 +466,8 @@ def test_sim_build_must_be_the_checkouts_tag_or_commit(tmp_path):
     sim = tmp_path / "sim"
     _tagged_repo(sim, "v0.16.0")
     (sim / "blis").write_text("")
-    for r in ("cat", "reg"):
-        _tagged_repo(tmp_path / r, "v1.0.0")
     head = subprocess.run(["git", "-C", str(sim), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
-    check = lambda b: cli.check_blis_inputs(sim / "blis", tmp_path / "cat", tmp_path / "reg", b)  # noqa: E731
+    check = lambda b: cli.check_blis_inputs(sim / "blis", "v1.0.0", "v1.0.0", b)  # noqa: E731
     assert check("v0.16.0") == [] and check(head) == []
     assert check("v0.17.0") == [f"--sim-build v0.17.0: the checkout {sim} is at v0.16.0"]
     assert check("0" * 40) == [f"--sim-build {'0' * 40}: the checkout {sim} is at commit {head}"]
@@ -464,13 +497,11 @@ def test_a_pre_release_tag_is_a_simulator_build_but_not_a_release_tag(tmp_path):
     sim = tmp_path / "sim"
     _tagged_repo(sim, "v0.16.0-rc1")
     (sim / "blis").write_text("")
-    for r in ("cat", "reg"):
-        _tagged_repo(tmp_path / r, "v1.0.0")
-    check = lambda b: cli.check_blis_inputs(sim / "blis", tmp_path / "cat", tmp_path / "reg", b)  # noqa: E731
+    check = lambda b: cli.check_blis_inputs(sim / "blis", "v1.0.0", "v1.0.0", b)  # noqa: E731
     assert check("v0.16.0-rc1") == []
     assert check("v0.16.0-rc2") == [f"--sim-build v0.16.0-rc2: the checkout {sim} is at v0.16.0-rc1"]
     assert check("v0.16") == ["--sim-build 'v0.16' is neither a tag vX.Y.Z[-suffix] nor a 40-hex commit"]
-    assert cli.check_blis_inputs(sim / "blis", tmp_path / "cat", tmp_path / "reg") == []
+    assert cli.check_blis_inputs(sim / "blis", "v1.0.0", "v1.0.0") == []
     assert cli._RELEASE_TAG.match("v0.16.0") and not cli._RELEASE_TAG.match("v0.16.0-rc1")
 
 
@@ -500,8 +531,9 @@ def _agentx_corpora(catalog, corpus_dir):
 
 def _score_inputs(tmp_path, commands: dict):
     """What cmd_score needs, with a fake blis answering `commands` beside a stack.json for vLLM
-    0.32.0, in a checkout at v0.16.0; the catalog and registry at release tags; and a pull of no
-    points."""
+    0.32.0, in a checkout at v0.16.0; the catalog and registry as the harness image mounts them,
+    plain directories with no .git, named by --catalog-release and --registry-release; and a pull
+    of no points."""
     sim = tmp_path / "sim"
     _tagged_repo(sim, "v0.16.0")
     (sim / "go.mod").write_text("module x\n")
@@ -509,15 +541,16 @@ def _score_inputs(tmp_path, commands: dict):
     blis = fake_blis(sim / "blis", {"fields --engine vllm --json": [0, json.dumps(FIELD_LIST), ""],
                                     "metrics --json": [0, json.dumps({"metrics": list(REGISTRY.values())}), ""],
                                     **commands})
-    for r in ("cat", "reg"):
-        _tagged_repo(tmp_path / r, "v1.0.0")
+    (tmp_path / "cat").mkdir()
+    (tmp_path / "reg").mkdir()
+    assert not (tmp_path / "cat" / ".git").exists() and not (tmp_path / "reg" / ".git").exists()
     _agentx_corpora(tmp_path / "cat", tmp_path / "corpora")
     (tmp_path / "pull").mkdir()
     pl.write_manifest(tmp_path / "pull", {"window": ["", ""], "pulled_at": "2026-10-23T00:00:00Z",
                                           "vllm_ref": "v0.32.0", "vllm_max_distance": 0}, [])
     return types.SimpleNamespace(
         pull=str(tmp_path / "pull"), out=str(tmp_path / "contract"), blis=str(blis), catalog=str(tmp_path / "cat"),
-        registry=str(tmp_path / "reg"), stack=None, sim_build=None, harness_digest="unreleased", units=None,
+        registry=str(tmp_path / "reg"), catalog_release="v1.0.0", registry_release="v1.0.0", stack=None, sim_build=None, harness_digest="unreleased", units=None,
         corpus_dir=str(tmp_path / "corpora"),
         corpus_cache=None, work=str(tmp_path / "work"), timeout=60, only=None, workers=1, agentic_workers=1,
         max_rss_mb=0)
@@ -596,7 +629,8 @@ def test_a_score_run_replays_every_agentx_corpus_by_its_catalog_entry(tmp_path, 
     for flag in ("--corpus-dataset", "--corpus-revision", "--corpus-sha256"):
         with pytest.raises(SystemExit):
             cli.main(["score", "--pull", "p", "--out", "o", "--blis", "b", "--catalog", "c", "--registry", "r",
-                      "--harness-digest", "unreleased", "--corpus-dir", "d", flag, "x"])
+                      "--catalog-release", "v1", "--registry-release", "v1", "--harness-digest", "unreleased",
+                      "--corpus-dir", "d", flag, "x"])
 
 
 @pytest.mark.parametrize("damage,match", [

@@ -21,7 +21,7 @@ RUN = HERE / "run.sh"
 WORKFLOW = HERE.parent / ".github" / "workflows" / "harness-release.yml"
 COMMIT = "0123456789abcdef0123456789abcdef01234567"
 GOOD = ["--units", "units.txt", "--pull", "pull", "--out", "out", "--catalog", "c", "--registry", "r",
-        "--corpus-dir", "k"]
+        "--corpus-dir", "k", "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0"]
 
 
 def check(*args, env=None):
@@ -62,6 +62,13 @@ def test_the_field_list_is_not_a_flag():
     assert "unknown flag --fields" in p.stderr
 
 
+def test_the_data_releases_are_required_and_passed_to_the_scorer():
+    without = lambda flag: [x for i, x in enumerate(GOOD) if x != flag and GOOD[i - 1] != flag]  # noqa: E731
+    for flag in ("--catalog-release", "--registry-release"):
+        p = check("--sim", "v0.16.0", *without(flag))
+        assert p.returncode == 2 and f"{flag} is required" in p.stderr, flag
+
+
 def test_catalog_and_registry_are_required():
     base = ["--units", "units.txt", "--pull", "pull", "--out", "out", "--corpus-dir", "k"]
     p = check("--sim", "v0.16.0", *base, "--catalog", "cat")
@@ -73,7 +80,7 @@ def test_catalog_and_registry_are_required():
 
 def test_the_corpus_directory_is_required_and_the_corpus_file_flags_are_gone():
     # The corpora come from the catalog's replay workloads, not from flags (D3, X12).
-    p = check("--sim", "v0.16.0", *GOOD[:-2])
+    p = check("--sim", "v0.16.0", *[x for i, x in enumerate(GOOD) if GOOD[max(i - 1, 0)] != "--corpus-dir" and x != "--corpus-dir"])
     assert p.returncode == 2 and "--corpus-dir is required" in p.stderr
     for flag in ("--corpus", "--corpus-revision", "--corpus-sha256", "--corpus-dataset"):
         p = check("--sim", "v0.16.0", *GOOD, flag, "x")
@@ -139,11 +146,10 @@ def git(*args, cwd=None):
     return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True, env=env).stdout.strip()
 
 
-def tagged_dir(path: Path, tag: str) -> Path:
+def mounted_dir(path: Path) -> Path:
+    """A data directory as the harness image receives it: mounted, with no .git."""
     path.mkdir(parents=True)
-    git("init", "-q", cwd=path)
-    git("commit", "-q", "--allow-empty", "-m", "x", cwd=path)
-    git("tag", tag, cwd=path)
+    assert not (path / ".git").exists()
     return path
 
 
@@ -198,10 +204,10 @@ def real_setup(tmp: Path, tag: str = "v0.16.0"):
     sys.path.insert(0, str(HERE.parent / "orchestrator" / "ingest"))
     from test_result import REGISTRY
     (tmp / "fields.json.metrics").write_text(json.dumps({"metrics": list(REGISTRY.values())}))
-    cat = tagged_dir(tmp / "cat", "v1.0.0")
+    cat = mounted_dir(tmp / "cat")
     (cat / "models").mkdir()
     (cat / "hardware").mkdir()
-    reg = tagged_dir(tmp / "reg", "v1.0.0")
+    reg = mounted_dir(tmp / "reg")
     (reg / "coefficients").mkdir()
     write_corpora(cat, tmp / "corpora")
     return bare, commit, bin_, log, pull, units, fields, cat, reg
@@ -232,7 +238,8 @@ def run_real(tmp: Path, sim_of, extra=(), tag="v0.16.0"):
            "FAKE_FIELDS": str(fields)}
     p = subprocess.run(["bash", str(RUN), "--sim", sim_of(commit), "--sim-repo", str(bare), "--units", str(units),
                         "--pull", str(pull), "--out", str(out), "--catalog", str(cat), "--registry", str(reg),
-                        "--corpus-dir", str(tmp / "corpora"), *extra], capture_output=True, text=True, env=env)
+                        "--corpus-dir", str(tmp / "corpora"),
+                        "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0", *extra], capture_output=True, text=True, env=env)
     return p, out, log, commit
 
 
@@ -250,6 +257,8 @@ def test_the_real_path_builds_into_the_checkout_and_scores_with_it(tmp_path):
     prov = json.loads((out / "provenance.json").read_text())
     # The stack.json of the checkout gave the engine release; the checkout gave the build.
     assert prov["engine"] == {"kind": "vllm", "version": "0.32.0"}
+    # The data carries no git history; its releases are the names run.sh was given.
+    assert (prov["blis"]["catalog"], prov["blis"]["registry"]) == ("v0.3.0", "v0.2.0")
     assert prov["simulator"] == {"build": "v0.16.0", "engine": {"kind": "vllm", "version": "0.32.0"},
                                  "harness_digest": "sha256:" + "b" * 64}
     assert prov["harness_digest"] == "sha256:" + "b" * 64
@@ -272,7 +281,8 @@ def test_the_real_path_refuses_a_corpus_that_is_not_the_catalog_entrys(tmp_path)
     env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "FAKE_FIELDS": str(fields)}
     p = subprocess.run(["bash", str(RUN), "--sim", "v0.16.0", "--sim-repo", str(bare), "--units", str(units),
                         "--pull", str(pull), "--out", str(tmp_path / "out"), "--catalog", str(cat),
-                        "--registry", str(reg), "--corpus-dir", str(tmp_path / "corpora")],
+                        "--registry", str(reg), "--corpus-dir", str(tmp_path / "corpora"),
+                        "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0"],
                        capture_output=True, text=True, env=env)
     assert p.returncode == 2
     assert "mismatch" in p.stderr
