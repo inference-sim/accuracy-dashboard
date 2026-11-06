@@ -550,6 +550,7 @@
             "interim_status",
             "resolved_differs",
             "client_difference",
+            "later_record",
             "other_release",
             "changed_functions",
             "nightly_or_custom",
@@ -918,7 +919,8 @@
                     "estimated",
                     "interim_status",
                     "resolved_differs",
-                    "client_difference"
+                    "client_difference",
+                    "later_record"
                   ]
                 }
               }

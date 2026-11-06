@@ -1,0 +1,7 @@
+{
+  "source": "blis-substrate catalog/hardware/gb200-nvl72.yaml:14 and catalog/hardware/gb300.yaml:12 (GPUsPerNode), at blis-substrate 800ae263. A copy of the two numbers; update it with the catalog.",
+  "chips": {
+    "gb200": {"catalog_entry": "gb200-nvl72", "GPUsPerNode": 4},
+    "gb300": {"catalog_entry": "gb300", "GPUsPerNode": 4}
+  }
+}

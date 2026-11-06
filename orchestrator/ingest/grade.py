@@ -47,8 +47,12 @@ G5_CODES = (
 # Substitution kinds (blis-substrate contracts/spec/pointrecord): the G2 conditions, and the G3
 # and G4 ones. client_difference is design §11.3's G2 condition "the simulated requests differ
 # from the ones the run's client sent" (COV-12), which pointrecord has no kind for yet.
+# later_record is §11.3's "a fact of the cluster the run's own record lacks was taken from the
+# benchmark's later record of the same runner" (inferencex_runners.py); pointrecord has no kind
+# for it yet.
 G2_KINDS = ("coefficient_method", "coefficient_range", "execution_mode", "kernel_hash", "value_class",
-            "estimated", "interim_status", "resolved_differs", "client_difference")
+            "estimated", "interim_status", "resolved_differs", "client_difference",
+            "later_record")
 
 # Four of design §11.3's G1 conditions cannot be checked yet, because no source carries the
 # datum: a library's kernel hash (the run's server log and launch configuration name library
