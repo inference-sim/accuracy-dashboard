@@ -55,7 +55,7 @@ def docker_command(reference: str, *, sim: str, units, pull, out, catalog, regis
     """The `docker run` that scores through the image, with harness/run.sh's flags. The data is
     mounted under /data, and HARNESS_DIGEST is the pin's digest, so the figures record the image
     that produced them. The mounted data carries no git history, so the releases it is at are
-    passed by name (`catalog_release`, `registry_release`, read by cli.release_of)."""
+    passed by name (`catalog_release`, `registry_release`, the substrate release stack.json names)."""
     d = digest(reference)
     cmd = ["docker", "run", "--rm", "-e", f"HARNESS_DIGEST={d}",
            "-v", f"{Path(units).resolve()}:{MOUNT}/units.json:ro",

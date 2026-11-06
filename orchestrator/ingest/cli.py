@@ -250,21 +250,13 @@ _DIGEST = re.compile(r"^(sha256:[0-9a-f]{64}|unreleased)$")
 _DATA_RELEASE = re.compile(r"^[0-9A-Za-z][0-9A-Za-z._+-]*$")
 
 
-def release_of(repo: Path) -> str | None:
-    """The release tag a data checkout (catalog or registry) is at, or None when it is at none.
-    Needs the checkout's .git, so it runs where the checkout is, not in the harness image, which
-    is given the names (`--catalog-release`, `--registry-release`)."""
-    return _git(repo, "describe", "--tags", "--exact-match") or None
-
-
 def check_blis_inputs(blis: Path, catalog_release: str | None, registry_release: str | None,
                       sim_build: str | None = None) -> list[str]:
     """Everything `score` needs to name its simulator build, or what's wrong. The blis binary sits
     in the inference-sim checkout it was built from. With --sim-build the checkout must be at that
     build: the release tag, or the 40-hex commit. Without it the checkout must be at a release
     tag, which is the build. The catalog and registry are named by the release tags they are at;
-    the caller read them from the checkouts (release_of), because the harness image mounts the
-    data without its git history."""
+    the caller names them, because the harness image mounts the data without its git history."""
     out = []
     sim = blis.parent
     if not blis.is_file():
@@ -562,12 +554,17 @@ def cmd_nightly(a) -> int:
             raise RuntimeError(f"pull failed (rc={rc}); the run stops rather than publish a partial pull")
         return json.loads((work / "manifest.json").read_text())["pulled_at"][:10], window_ids
 
-    # The image mounts the data without its git history, so the releases the data is at are read
-    # here, where the checkouts are, and passed by name.
-    releases = {"catalog": release_of(Path(a.catalog)), "registry": release_of(Path(a.registry))}
-    unnamed = [k for k, v in releases.items() if v is None]
-    if unnamed:
-        _log(f"FATAL: the {' and '.join(unnamed)} checkout is not at a release tag")
+    # The catalog and registry are directories of the one substrate checkout, so both are at the
+    # release stack.json names for it. A draft build's substrate is a pseudo-version: it is not a
+    # release and its figures are not published (X8). The checkout must be that release's commit.
+    release = sk.release_name({"version": a.substrate_version})
+    if release is None:
+        _log(f"FATAL: blis-substrate {a.substrate_version} in stack.json is not a release tag; "
+             f"a release is scored on a tagged substrate")
+        return 2
+    problems = sk.verify_checkout(Path(a.substrate_dir), release, a.substrate_commit)
+    if problems:
+        _log("FATAL: the blis-substrate checkout is not release " + release + ": " + "; ".join(problems))
         return 2
 
     def score_build_fn(work: Path, blis_tag: str, score_ids, pull_date: str, window_ids: set):
@@ -577,7 +574,7 @@ def cmd_nightly(a) -> int:
         rc = run_image(hp.docker_command(
             a.harness_image, sim=blis_tag, units=anchor_path, pull=work, out=contract_dir,
             catalog=a.catalog, registry=a.registry, corpus_dir=a.corpus_dir,
-            catalog_release=releases["catalog"], registry_release=releases["registry"],
+            catalog_release=release, registry_release=release,
             max_rss_mb=a.max_rss_mb))
         if rc != 0:
             raise RuntimeError(f"score failed (rc={rc})")
@@ -632,8 +629,8 @@ def main(argv=None) -> int:
     s.add_argument("--catalog", required=True)
     s.add_argument("--registry", required=True)
     s.add_argument("--catalog-release", required=True,
-                   help="the release tag the catalog is at (cli.release_of reads it from a checkout; the harness "
-                        "image mounts the data without its git history)")
+                   help="the release tag the catalog is at (the harness image mounts the data without "
+                        "its git history, so it is named)")
     s.add_argument("--registry-release", required=True, help="the release tag the registry is at")
     s.add_argument("--stack", help="TEMPORARY until inference-sim v0.16.0 ships stack.json: the scoring build's "
                                     "stack.json, when its checkout has none")
@@ -695,6 +692,10 @@ def main(argv=None) -> int:
                    help="the harness image by digest (harness/image.pin): the night scores through it")
     n.add_argument("--catalog", required=True)
     n.add_argument("--registry", required=True)
+    n.add_argument("--substrate-dir", required=True, help="the blis-substrate checkout --catalog, --registry and --ledger are in")
+    n.add_argument("--substrate-version", required=True,
+                   help="the blis-substrate version in stack.json (resolve_stack.py substrate_version); a release tag names the release")
+    n.add_argument("--substrate-commit", required=True, help="the blis-substrate commit in stack.json (resolve_stack.py substrate_commit)")
     n.add_argument("--stack", help="TEMPORARY until inference-sim v0.16.0 (see score --stack)")
     n.add_argument("--corpus-dir", required=True, help="see score --corpus-dir")
     n.add_argument("--corpus-cache")

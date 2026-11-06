@@ -91,6 +91,9 @@ TEXT_READS = {
         "blis-substrate at the commit stack.json pins, for catalog/, registry/ and catalog/ledger",
     ("orchestrator/resolve_stack.py", "pins"):
         "TEMPORARY with the api-nightly.yml substrate checkout: prints the commit it clones",
+    ("orchestrator/ingest/cli.py", "pins"):
+        "TEMPORARY with the api-nightly.yml substrate checkout: the nightly checks that checkout is "
+        "the release stack.json names",
     ("orchestrator/ingest/stack.py", "pins"):
         "TEMPORARY with the api-nightly.yml substrate checkout: stack.pins names the commits to clone",
 }

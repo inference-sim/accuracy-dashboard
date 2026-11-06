@@ -179,6 +179,8 @@ jobs:
               --evaluator-commit "$GITHUB_SHA" \
               --ledger "$LEDGER" \
               --blis "$SIM/blis" --catalog "$CATALOG" --registry "$REGISTRY" \
+              --substrate-dir "$RUNNER_TEMP/substrate" \
+              --substrate-version "$substrate_version" --substrate-commit "$substrate_commit" \
               --harness-image "$HARNESS_IMAGE" \
               --corpus-dir "$RUNNER_TEMP/corpora"
             echo "::endgroup::"

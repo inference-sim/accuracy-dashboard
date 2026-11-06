@@ -56,6 +56,12 @@ def resolves(catalog: Path, models: dict) -> dict:
 IMAGE = "ghcr.io/inference-sim/accuracy-dashboard-harness@sha256:" + "a" * 64
 
 
+def _head(repo):
+    import subprocess
+    r = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else "0" * 40
+
+
 def _args(tmp, **over):
     a = dict(blis_tag="v0.12.0", work_dir=str(tmp / "work"), data_dir=str(tmp / "data"),
              state=str(tmp / "state.json"), scored=str(tmp / "scored-releases.json"), window_days=180, keep_api=5, today="2026-10-23",
@@ -63,7 +69,8 @@ def _args(tmp, **over):
              blis=str(tmp / "sim" / "blis"), catalog=str(tmp / "cat"), registry=str(tmp / "reg"),
              corpus_dir=str(tmp / "corpora"), harness_image=IMAGE, corpus_cache=None,
              timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0, stack=None,
-             ledger=str(tmp / "ledger"))
+             ledger=str(tmp / "ledger"), substrate_dir=str(tmp / "substrate"), substrate_version="v1.0.0",
+             substrate_commit=_head(tmp / "substrate"))
     a.update(over)
     if not Path(a["scored"]).exists():
         Path(a["scored"]).write_text(json.dumps({"kind": "ScoredReleases", "releases": []}))
@@ -97,9 +104,8 @@ class Fakes:
         # that prints the anchor list of the substrate release it pins.
         ledger_fake.write(tmp / "ledger", self.rows)
         anchors = [ledger_fake.point_id(r) for r in self.rows] if self.anchors is None else self.anchors
-        for r in ("cat", "reg"):
-            if not (tmp / r / ".git").exists():
-                _tagged_repo(tmp / r, "v1.0.0")
+        if not (tmp / "substrate" / ".git").exists():
+            _tagged_repo(tmp / "substrate", "v1.0.0")
         cat = write_catalog(tmp / "cat", {"m": "org/m"})
         fake_blis(tmp / "sim" / "blis", {"ledger --list anchor --json": [0, published("anchor", anchors), ""],
                                          **resolves(cat, {"m": "org/m"})})
@@ -319,23 +325,37 @@ def test_the_nightly_scores_through_the_harness_image_by_digest(tmp_path, monkey
     cmd = fakes.image_cmd
     assert cmd[:3] == ["docker", "run", "--rm"] and IMAGE in cmd and "HARNESS_DIGEST=sha256:" + "a" * 64 in cmd
     assert cmd[cmd.index(IMAGE) + 1:cmd.index(IMAGE) + 3] == ["--sim", "v0.12.0"]
-    # The image mounts the data without .git, so the night reads the releases from its checkouts
-    # and passes the names.
+    # The image mounts the data without .git, so the night passes the release stack.json names
+    # for the one substrate checkout the catalog and registry are directories of.
     tail = cmd[cmd.index(IMAGE) + 1:]
     assert tail[tail.index("--catalog-release") + 1] == "v1.0.0" and tail[tail.index("--registry-release") + 1] == "v1.0.0"
 
 
-def test_the_nightly_stops_before_scoring_when_a_data_checkout_is_not_at_a_release_tag(tmp_path, monkeypatch):
+def _nightly_refused(tmp_path, monkeypatch, **over):
     rows = [_row("m", 1, "2026-10-01")]
     fakes = Fakes(rows)
     _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
     fakes.ledger(tmp_path)
-    _git("-C", str(tmp_path / "reg"), "tag", "-d", "v1.0.0")
     monkeypatch.setattr(cli, "run_image", lambda cmd: (_ for _ in ()).throw(AssertionError("scored")))
     msgs = []
     monkeypatch.setattr(cli, "_log", msgs.append)
-    assert cli.cmd_nightly(_args(tmp_path)) == 2
-    assert "FATAL: the registry checkout is not at a release tag" in msgs, msgs
+    assert cli.cmd_nightly(_args(tmp_path, **over)) == 2
+    return msgs
+
+
+def test_the_nightly_stops_before_scoring_on_a_substrate_that_is_a_pseudo_version(tmp_path, monkeypatch):
+    # A draft build pins a Go pseudo-version; it is not a release and cannot be published (X8).
+    msgs = _nightly_refused(tmp_path, monkeypatch, substrate_version="v0.0.0-20261105035832-817e83e0018b")
+    assert ("FATAL: blis-substrate v0.0.0-20261105035832-817e83e0018b in stack.json is not a release tag; "
+            "a release is scored on a tagged substrate") in msgs, msgs
+
+
+def test_the_nightly_stops_before_scoring_when_the_checkout_is_not_the_tags_commit(tmp_path, monkeypatch):
+    # stack.json pins a commit that is not the one the tag names: both are in the message.
+    other = "1" * 40
+    msgs = _nightly_refused(tmp_path, monkeypatch, substrate_commit=other)
+    head = _head(tmp_path / "substrate")
+    assert any("FATAL" in m and head in m and other in m and "v1.0.0" in m for m in msgs), msgs
 
 
 def _git(*a):
@@ -370,7 +390,7 @@ def test_check_blis_inputs_refuses_a_checkout_not_at_a_tag(tmp_path):
 
 def test_the_data_releases_are_named_by_the_caller_and_need_no_git_history(tmp_path):
     # The harness image mounts the catalog and registry without .git (harness_pin.docker_command),
-    # so check_blis_inputs takes the release names; release_of reads them where a checkout is.
+    # so check_blis_inputs takes the release names.
     sim = tmp_path / "sim"
     _tagged_repo(sim, "v0.16.0")
     (sim / "blis").write_text("")
@@ -380,11 +400,6 @@ def test_the_data_releases_are_named_by_the_caller_and_need_no_git_history(tmp_p
     assert cli.check_blis_inputs(sim / "blis", "v1.0.0", "v2.3.4-rc1") == []
     assert cli.check_blis_inputs(sim / "blis", None, "v1.0.0") == ["--catalog-release is required: the release tag the data is at"]
     assert cli.check_blis_inputs(sim / "blis", "v1.0.0", "bad tag") == ["--registry-release 'bad tag' is not a release tag"]
-    _tagged_repo(tmp_path / "cat", "v1.0.0")
-    _tagged_repo(tmp_path / "reg", None)
-    assert cli.release_of(tmp_path / "cat") == "v1.0.0"
-    assert cli.release_of(tmp_path / "reg") is None
-    assert cli.release_of(bare) is None
 
 
 FIELD_LIST = {"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": []}
