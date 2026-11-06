@@ -25,6 +25,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import inferencex_runners as ir
 import pyrepr
 
 VLLM_DEFAULTS_PATH = Path(__file__).resolve().parent.parent / "vllm_defaults.json"
@@ -647,12 +648,22 @@ class Built:
     gpus: int = 0
     reasons: list = field(default_factory=list)
     substitutions: list = field(default_factory=list)  # estimates of values the run did not record
+    node_source: str | None = None                    # where the scenario's gpus_per_node came from
 
 
 FRONTEND = {True: "rust", False: "python"}   # VLLM_USE_RUST_FRONTEND, parsed as a bool
 
 
-def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str, field_list) -> Built:
+def recorded_node_size(launch: dict | None) -> int | None:
+    """The GPUs in one node as the run's launch configuration recorded them
+    (resources.gpus_per_node), or None. Never a rank count: the GPUs a run used are not the GPUs
+    of its node (tp=2 on an 8-GPU server)."""
+    gpn = ((launch or {}).get("resources") or {}).get("gpus_per_node") if isinstance(launch, dict) else None
+    return gpn if isinstance(gpn, int) and not isinstance(gpn, bool) and gpn > 0 else None
+
+
+def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str, field_list,
+          catalog_node_size: int | None, node: ir.NodeSize) -> Built:
     """The Scenario + Deployment for one point, from the decided settings.
 
     Only what the run recorded is written, under the engine's own names (LOCATIONS), and the
@@ -660,8 +671,15 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
     runs (stack.json), not the run's own (design §11.2). A setting no source recorded is left
     unset, so the engine resolves it (X19); the dashboard holds no list of the settings an
     engine needs (design §11.1). If the engine refuses the scenario for want of one, score.py
-    maps its refusal to value_not_recorded, naming the field. The cluster is sized to the
-    run's own GPUs (one engine replica)."""
+    maps its refusal to value_not_recorded, naming the field. The cluster holds the run's own
+    GPUs (one engine replica).
+
+    Node size (design §2.2, SUB-3). A chip whose catalog entry fixes GPUs per node
+    (`catalog_node_size`) has it taken from the entry, so the scenario states none. For another
+    chip the scenario states `node.gpus_per_node`, decided by inferencex_runners.resolve: the
+    launch configuration's, else InferenceX's runner table. If it is unknown the point is G5
+    value_not_recorded, or value_conflict where the two sources differ, and no size is invented.
+    A later record the table supplied is named as a G2 substitution."""
     import fields as fl
     b = Built()
     acc = d.mapped.get("replay.acceptance_length")
@@ -699,10 +717,22 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
         b.reasons += _write_offload(dep, offload, d, par)
     ranks = par["tp"] * par["pp"] * par["dp"] * par.get("pcp", 1)
     b.gpus = ranks
-    pool["nodes"] = 1
+    cluster = {"hardware": part.name}
+    per_node = catalog_node_size
+    if per_node is None:
+        per_node = node.gpus_per_node
+        if node.reason is not None:
+            b.reasons.append(f"{node.reason['code']}:{node.reason['subject']}")
+            per_node = ranks      # only to size the placeholder; the point is already not scored
+        else:
+            cluster["gpus_per_node"] = per_node
+            b.node_source = node.provenance
+            if node.substitution is not None:
+                b.substitutions.append(node.substitution)
+    cluster["nodes"] = max(1, -(-ranks // per_node))
+    pool["nodes"] = cluster["nodes"]
     b.scenario = {"kind": "Scenario", "name": name, "engine_version": engine_version.lstrip("v"),
-                  "model": model, "coefficients": COEFFICIENTS,
-                  "cluster": {"hardware": part.name, "nodes": 1, "gpus_per_node": ranks}}
+                  "model": model, "coefficients": COEFFICIENTS, "cluster": cluster}
     b.deployment = dep
     return b
 

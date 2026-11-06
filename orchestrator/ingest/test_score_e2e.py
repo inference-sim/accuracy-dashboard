@@ -17,6 +17,7 @@ Run: python3 orchestrator/ingest/test_score_e2e.py
 from __future__ import annotations
 
 import csv
+import dataclasses
 import gzip
 import json
 import shutil
@@ -30,6 +31,7 @@ sys.path.insert(0, str(HERE))
 import assess as asx  # noqa: E402
 import contract as c  # noqa: E402
 import inferencex_client as ix  # noqa: E402
+import inferencex_runners as ir  # noqa: E402
 import score as sc  # noqa: E402
 import fields as fl  # noqa: E402
 import settings as st  # noqa: E402
@@ -144,8 +146,9 @@ def job_log_text(isl: int, osl: int, conc: int, extra: str = "") -> str:
 
 
 def _setup(tmp: Path, *, log: str = LOG, job_log: str | None = "default", client_commit: bool = True, repo: str = "org/m", conc: int = 4, isl: int = 1024, osl: int = 1024,
-           date: str = "2026-10-01", spec: str = "mtp", benchmark_type: str = "single_turn"):
-    row = {"id": "1", "model": "m", "hardware": "h200", "precision": "fp8", "framework": "vllm",
+           date: str = "2026-10-01", spec: str = "mtp", benchmark_type: str = "single_turn",
+           hardware: str = "mi355x", node_sizes: dict | None = None):
+    row = {"id": "1", "model": "m", "hardware": hardware, "precision": "fp8", "framework": "vllm",
            "benchmark_type": benchmark_type, "conc": conc, "isl": isl, "osl": osl, "spec_method": spec,
            "disagg": False, "is_multinode": False, "decode_tp": 1, "decode_ep": 1, "num_decode_gpu": 1,
            "date": date, "run_url": "https://github.com/o/r/actions/runs/1", "curve_workflow_run_id": "7",
@@ -176,8 +179,8 @@ def _setup(tmp: Path, *, log: str = LOG, job_log: str | None = "default", client
                  corpus={"sha256": "c" * 64}, field_list=FIELDS, vllm_defaults=st.load_vllm_defaults()[0],
                  engine_release="0.31.0", sim_build="v0.12.0")
     env.catalog_obj = sp.Catalog(root=tmp, models={"m": repo}, speculators={"m": "mtp"},
-                                 hardware={"h200": 139.8})
-    env.parts = {"h200"}
+                                 hardware={hardware: 139.8}, node_sizes=node_sizes or {})
+    env.parts = {hardware}
     return entry, env
 
 
@@ -626,6 +629,113 @@ def test_launch_config_and_logged_args_that_disagree_are_g5_value_conflict():
         entry["files"]["launch_config"] = {"path": "launch_config.gz", "sha256": "0" * 64, "from": "artifact"}
         o, _ = _score(tmp, entry, env, tmp / "c1")
         assert o.g5 == {"code": "value_conflict", "subject": "max_num_seqs"}
+    finally:
+        shutil.rmtree(tmp)
+
+
+def _launch_size(tmp: Path, entry, size: int) -> None:
+    pdir = tmp / "pull" / "points" / entry["point_id"]
+    lc = {"roles": {"agg": {"args": {}}}, "resources": {"gpu_type": "x", "gpus_per_node": size}}
+    (pdir / "launch_config.gz").write_bytes(gzip.compress(json.dumps(lc).encode(), mtime=0))
+    entry["files"]["launch_config"] = {"path": "launch_config.gz", "sha256": "0" * 64, "from": "artifact"}
+
+
+def _scenario(work: Path, entry) -> dict:
+    import yaml
+    return next(d for d in yaml.safe_load_all(_scenario_text(work, entry)) if d.get("kind") == "Scenario")
+
+
+def _scenario_text(work: Path, entry) -> str:
+    return next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
+
+
+def test_a_launch_configs_node_size_is_written_and_named_as_the_launch_configs():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        _launch_size(tmp, entry, 8)
+        o, work = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        assert _scenario(work, entry)["cluster"]["gpus_per_node"] == 8
+        assert "cluster.gpus_per_node: launch_config" in _scenario_text(work, entry)
+        assert not [s for s in o.fidelity["substitutions"] if s["kind"] == "later_record"]
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_node_size_only_the_runner_table_has_is_written_and_the_point_names_its_commit():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        o, work = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        assert _scenario(work, entry)["cluster"]["gpus_per_node"] == 8
+        assert "cluster.gpus_per_node: InferenceX runners.yaml at 5d06e10c" in _scenario_text(work, entry)
+        assert not [s for s in o.fidelity["substitutions"] if s["kind"] == "later_record"]
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_launch_size_that_differs_from_the_runner_table_is_g5_value_conflict():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        _launch_size(tmp, entry, 4)
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.g5 == {"code": "value_conflict", "subject": "cluster.gpus_per_node"}
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_label_the_runner_table_does_not_size_is_g5_value_not_recorded():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        for hw in ("rtx6000pro", "vr200"):
+            entry, env = _setup(tmp, hardware=hw)
+            o, _ = _score(tmp, entry, env, tmp / ("c-" + hw))
+            assert o.g5 == {"code": "value_not_recorded", "subject": "cluster.gpus_per_node"}, hw
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_row_before_the_first_record_is_g2_with_the_later_record_substitution():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp, date="2026-06-15")
+        o, work = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        later = [s for s in o.fidelity["substitutions"] if s["kind"] == "later_record"]
+        assert later == [{"kind": "later_record", "subject": "cluster.gpus_per_node",
+                          "detail": "taken from InferenceX runners.yaml at 303669b0, recorded after the run "
+                                    "(303669b0 of 2026-07-02)"}]
+        assert o.fidelity["grade"] == "G2" and _scenario(work, entry)["cluster"]["gpus_per_node"] == 8
+        assert c.validate_dir(tmp / "c1") == []
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_an_unstable_label_before_its_first_record_stays_g5_value_not_recorded():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp, date="2026-06-15")
+        env.runner_table = ir.Table(env.runner_table.versions, {
+            **env.runner_table.labels,
+            "mi355x": dataclasses.replace(env.runner_table.labels["mi355x"], stable=False, problems=("x: changed",))})
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.g5 == {"code": "value_not_recorded", "subject": "cluster.gpus_per_node"}
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_chip_whose_catalog_entry_fixes_the_node_size_writes_none_whatever_the_table_says():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp, hardware="gb200", node_sizes={"gb200": 4}, date="2026-06-15")
+        _launch_size(tmp, entry, 4)
+        o, work = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        assert "gpus_per_node" not in _scenario(work, entry)["cluster"] and "gpus_per_rack" not in _scenario(work, entry)["cluster"]
+        assert not [s for s in o.fidelity["substitutions"] if s["kind"] == "later_record"]
     finally:
         shutil.rmtree(tmp)
 

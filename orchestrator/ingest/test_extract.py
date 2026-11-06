@@ -22,6 +22,7 @@ sys.path.insert(0, str(HERE))
 import api  # noqa: E402
 import artifacts as art  # noqa: E402
 import fields as fl  # noqa: E402
+import inferencex_runners as ir  # noqa: E402
 import pyrepr  # noqa: E402
 import replay as rp  # noqa: E402
 import settings as st  # noqa: E402
@@ -56,7 +57,12 @@ def _classify(log: str, launch=None, extra_readings=None):
     return st.decide(st.merge(readings, DEFAULTS), FIELDS)
 
 
+NODE8 = ir.NodeSize(8, "cluster.gpus_per_node: launch_config")
+
+
 def _build(c, **kw):
+    kw.setdefault("catalog_node_size", None)
+    kw.setdefault("node", NODE8)
     return st.build(c, name="p", model="m", part=PART_H200, engine_version="0.31.0", field_list=FIELDS, **kw)
 
 
@@ -456,22 +462,55 @@ def test_a_setting_nothing_recorded_is_left_unset_and_no_list_of_required_settin
 def test_a_built_scenario_holds_only_recorded_values_and_states_engine_version_from_stack_json():
     # X19: nothing the run did not record is written; engine_version is the release passed in.
     c = _classify(_log("'tensor_parallel_size': 1, 'max_num_batched_tokens': 4096"))
-    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="0.32.0", field_list=FIELDS)
+    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="0.32.0", field_list=FIELDS,
+                 catalog_node_size=None, node=NODE8)
     assert b.scenario["engine_version"] == "0.32.0"
     recorded = {loc.split(".", 1)[1] for loc in c.mapped if loc.startswith("engine.")}
     assert set(b.deployment["pools"][0]["engine"]) == recorded
 
 
-def test_the_cluster_is_sized_to_the_runs_own_gpus():
+def test_the_cluster_states_the_node_size_and_holds_the_runs_own_gpus():
     c = _classify(_log("'tensor_parallel_size': 1, 'data_parallel_size': 2, 'enable_expert_parallel': True, "
                        "'max_num_seqs': 16, 'max_num_batched_tokens': 4096, 'block_size': 128, 'gpu_memory_utilization': 0.9",
                        RESOLVED.replace("data_parallel_size=1", "data_parallel_size=2")))
     b = _build(c)
-    assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 1, "gpus_per_node": 2}
+    assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 1, "gpus_per_node": 8}
     assert b.scenario["engine_version"] == "0.31.0"
     par = b.deployment["pools"][0]["parallel"]
     assert (par["tp"], par["dp"], par["enable_expert_parallel"]) == (1, 2, True)
 
+
+RANKS = ("'tensor_parallel_size': 16, 'max_num_seqs': 16, 'max_num_batched_tokens': 4096, 'block_size': 128, "
+         "'gpu_memory_utilization': 0.9")
+
+
+def test_a_chip_whose_catalog_entry_fixes_the_node_size_states_none_and_nodes_follow_from_it():
+    b = _build(_classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16"))),
+               catalog_node_size=4, node=ir.NodeSize())
+    assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 4}
+    assert b.reasons == [] and b.node_source is None
+
+
+def test_a_node_size_the_table_supplied_is_written_and_its_later_record_is_named():
+    sub = {"kind": "later_record", "subject": "cluster.gpus_per_node", "detail": "d"}
+    node = ir.NodeSize(8, "cluster.gpus_per_node: InferenceX runners.yaml at 303669b0", sub)
+    b = _build(_classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16"))), node=node)
+    assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 2, "gpus_per_node": 8}
+    assert b.node_source == node.provenance and b.substitutions == [sub]
+
+
+def test_a_node_size_nothing_records_or_two_sources_disagree_on_makes_the_point_g5():
+    c = _classify(_log("'max_num_seqs': 16, 'block_size': 128", RESOLVED))
+    for code in ("value_not_recorded", "value_conflict"):
+        b = _build(c, node=ir.NodeSize(reason={"code": code, "subject": "cluster.gpus_per_node"}))
+        assert b.reasons == [f"{code}:cluster.gpus_per_node"] and "gpus_per_node" not in b.scenario["cluster"]
+
+
+def test_the_launch_configs_node_size_is_read_only_when_it_is_a_positive_integer():
+    assert st.recorded_node_size({"resources": {"gpus_per_node": 8}}) == 8
+    for bad in (None, {}, {"resources": None}, {"resources": {"gpus_per_node": 0}},
+                {"resources": {"gpus_per_node": True}}, {"resources": {"gpus_per_node": "8"}}):
+        assert st.recorded_node_size(bad) is None
 
 def test_offload_bytes_are_the_engines_from_the_server_wide_total():
     # cpu_bytes_to_use is server-wide and vLLM divides it by the engine's world size (TP4 here);

@@ -36,6 +36,7 @@ class Catalog:
     models: dict = field(default_factory=dict)        # catalog name -> source.repo
     speculators: dict = field(default_factory=dict)   # catalog name -> speculator method | None
     hardware: dict = field(default_factory=dict)      # part -> MemoryGiB
+    node_sizes: dict = field(default_factory=dict)    # part -> GPUsPerNode, for a part whose entry states one
 
     @staticmethod
     def load(root) -> "Catalog":
@@ -59,6 +60,8 @@ class Catalog:
             doc = yaml.safe_load(h.read_text()) or {}
             if "MemoryGiB" in doc:
                 c.hardware[h.stem] = float(doc["MemoryGiB"])
+            if doc.get("GPUsPerNode"):
+                c.node_sizes[h.stem] = int(doc["GPUsPerNode"])
         return c
 
 
