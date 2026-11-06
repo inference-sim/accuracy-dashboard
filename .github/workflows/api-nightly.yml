@@ -186,7 +186,18 @@ jobs:
       contents: write # commit data/ to main
       actions: write # dispatch the Pages deploy (the [skip ci] commit can't)
     steps:
+      # Check out with PUBLISH_PAT, a PAT on a human account (susiejojo) with contents:write. The
+      # push below must authenticate AS that account: main's ruleset (id 26705484) lists that user
+      # as its only bypass actor, and a ruleset User-bypass is matched by the *pusher's* identity
+      # (the token type -- classic or fine-grained -- does not matter; only the account does). The
+      # default GITHUB_TOKEN can't be used -- it pushes as the GitHub Actions app integration, which
+      # this org repo refuses as a bypass actor (422), so its push is rejected "due to repository
+      # rule violations" (verified run 42246296162). persist-credentials keeps this token wired into
+      # the git remote for the push step.
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PUBLISH_PAT }}
+          persist-credentials: true
       - uses: actions/download-artifact@v4
         with:
           name: night
