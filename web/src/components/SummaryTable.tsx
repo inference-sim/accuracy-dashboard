@@ -6,7 +6,7 @@
  * populates the points table (handled by the parent). Numbers are recomputed client-side from
  * the visible points, so a filter never shows a stale aggregate (RFC B3).
  */
-import { formatPct } from '../format'
+import { formatFigure } from '../format'
 import { Term } from './Term'
 import { ProvenanceBody } from './Provenance'
 import type { RenderRow } from '../tree'
@@ -24,8 +24,8 @@ interface Props {
   expanded: Set<string>
 }
 
-function Num({ v }: { v: number | null }) {
-  return <span className="num">{formatPct(v)}</span>
+function Num({ v }: { v: number | null | 'too few points' }) {
+  return <span className="num">{formatFigure(v)}</span>
 }
 
 function HeaderButton({

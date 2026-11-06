@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { App } from './App'
 import { validateSummary } from './load'
-import { aggregate, flattenPoints, intersectByKey, pointKey, type FlatPoint } from './aggregate'
+import { aggregate, figureValue, flattenPoints, intersectByKey, pointKey, type FlatPoint } from './aggregate'
 import type { Summary } from './types'
 
 function loadFixture(): Summary {
@@ -149,7 +149,7 @@ describe('A-vs-B compare (RFC discussion #2 point 3)', () => {
     const bSmall = Array.from({ length: 4 }, () => pt(18))
     const aAll = aggregate([...aBig, ...aSmall], 'all')
     const bAll = aggregate([...bBig, ...bSmall], 'all')
-    const overall = (bAll.mape.ttft ?? 0) - (aAll.mape.ttft ?? 0)
+    const overall = (figureValue(bAll.mape.ttft) ?? 0) - (figureValue(aAll.mape.ttft) ?? 0)
     // Pooled: A mean = (100·10 + 4·2)/104 = 9.69, B mean = (100·2 + 4·18)/104 = 2.62 → Δ ≈ −7.08 (improved).
     expect(overall).toBeLessThan(0)
     // Mean of per-model Δs would be (−8 + +16)/2 = +4 (regressed) — the opposite sign. Prove they disagree.

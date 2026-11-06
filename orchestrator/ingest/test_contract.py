@@ -18,9 +18,10 @@ import contract as c  # noqa: E402
 FIXTURE = HERE / "testdata" / "contract"
 REPO = HERE.parent.parent
 
-IDENT = {"model": "dsv41flash", "hardware": "h200", "precision": "fp4", "framework": "vllm",
-         "benchmark_type": "agentic_traces", "recipe": "ab" * 32, "conc": 4,
-         "measured_date": "2026-09-21"}
+IDENT = {"source": "inferencex", "model": "dsv41flash", "hardware": "h200", "precision": "fp4",
+         "framework": "vllm", "benchmark_type": "agentic_traces", "configuration_hash": "cd" * 32,
+         "recipe_fingerprint": "ab" * 32, "conc": 4, "measured_date": "2026-09-21",
+         "benchmark_run": 123}
 
 
 def _copy(run: str) -> Path:
@@ -37,19 +38,39 @@ def _write_lines(path: Path, rows: list[dict]) -> None:
     path.write_text("".join(c.canonical_dumps(r) + "\n" for r in rows))
 
 
+def _as_g1(rec: dict) -> dict:
+    """A G1 record, which the scorer publishes for no point until grade.UNCHECKED_KINDS are
+    graded: a G2 point of the scored release with its substitutions and client differences taken away."""
+    requests = {**rec["requests"], "differences": []} if "requests" in rec else None
+    return {**rec, "grade": "G1", "substitutions": [], **({"requests": requests} if requests else {})}
+
+
 # ------------------------------------------------------------------ identity + encoding
 
 def test_point_id_is_sha256_of_the_canonical_identity():
     # Worked by hand: sorted keys, no spaces.
-    text = ('{"benchmark_type":"agentic_traces","conc":4,"framework":"vllm","hardware":"h200",'
-            '"measured_date":"2026-09-21","model":"dsv41flash","precision":"fp4","recipe":"'
-            + "ab" * 32 + '"}')
+    text = ('{"benchmark_run":123,"benchmark_type":"agentic_traces","conc":4,"configuration_hash":"'
+            + "cd" * 32 + '","framework":"vllm","hardware":"h200","measured_date":"2026-09-21",'
+            '"model":"dsv41flash","precision":"fp4","recipe_fingerprint":"' + "ab" * 32
+            + '","source":"inferencex"}')
     assert c.point_id(IDENT) == hashlib.sha256(text.encode()).hexdigest()
 
 
-def test_point_id_changes_with_the_measurement_date():
-    # A re-measurement is a different point.
+def test_point_id_changes_with_the_measurement_date_and_the_benchmark_run():
+    # A re-measurement is a different point, and so is another run on the same day.
     assert c.point_id(IDENT) != c.point_id({**IDENT, "measured_date": "2026-09-22"})
+    assert c.point_id(IDENT) != c.point_id({**IDENT, "benchmark_run": 124})
+
+
+def test_point_id_takes_a_null_fingerprint_and_a_null_run():
+    assert c.point_id({**IDENT, "recipe_fingerprint": None, "benchmark_run": None})
+    for bad in ({**IDENT, "recipe_fingerprint": ""}, {**IDENT, "benchmark_run": "123"},
+                {**IDENT, "source": "another-source"}):
+        try:
+            c.point_id(bad)
+        except ValueError:
+            continue
+        raise AssertionError(f"accepted {bad}")
 
 
 def test_point_id_rejects_missing_or_extra_fields():
@@ -67,17 +88,6 @@ def test_point_id_rejects_a_string_concurrency():
     except ValueError:
         return
     raise AssertionError("accepted conc as a string")
-
-
-def test_recipe_key_falls_back_to_the_row_id():
-    assert c.recipe_key("cd" * 32, "445802") == "cd" * 32
-    assert c.recipe_key("", "445802") == "row:445802"
-    assert c.recipe_key(None, 445802) == "row:445802"
-    try:
-        c.recipe_key(None, None)
-    except ValueError:
-        return
-    raise AssertionError("accepted a point with neither fingerprint nor row id")
 
 
 def test_ratio_str_keeps_four_significant_figures_and_trailing_zeros():
@@ -114,7 +124,20 @@ def test_fixture_run_b_shares_all_but_one_scored_point_with_run_a():
     a, b = ids("run-a", c.FIDELITY_JSONL), ids("run-b", c.FIDELITY_JSONL)
     assert len(a) == 9 and len(b) == 8 and b < a
     dropped = (a - b).pop()
-    assert dropped in ids("run-b", c.NOT_SCORED_JSONL)
+    assert dropped in ids("run-b", c.FAILED_JSONL)
+    assert dropped not in ids("run-b", c.NOT_SCORED_JSONL)
+
+
+def test_the_fixture_holds_g2_and_g4_but_no_g1_while_four_conditions_are_not_graded():
+    # Every scored point names the four G1 conditions nobody grades yet, so none is G1, and a G3
+    # (another release with no changed function) needs an engine that publishes its ported list.
+    recs = _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL)
+    assert {r["grade"] for r in recs} == {"G2", "G4"}
+    unchecked = [{"kind": k, "subject": "not checked", "detail": f"{k} is not graded yet"}
+                 for k in ("coefficient_range", "kernel_hash", "resolved_differs", "value_class")]
+    for r in recs:
+        assert [s for s in r["substitutions"] if s["subject"] == "not checked"] == unchecked, r["point_id"]
+    assert {r["grade"] for r in _lines(FIXTURE / "run-a" / c.NOT_SCORED_JSONL)} == {"G5"}
 
 
 # ------------------------------------------------------------------ the validator catches breakage
@@ -149,80 +172,108 @@ def test_validator_rejects_an_unknown_match_value():
     assert any("close_enough" in p for p in c.validate_dir(d))
 
 
-def test_validator_rejects_a_scored_point_that_is_not_exact():
+def test_validator_rejects_a_scored_point_graded_g5():
     d = _copy("run-a")
     rows = _lines(d / c.FIDELITY_JSONL)
-    rows[0]["status"] = "not_scored"
-    rows[0]["reasons"] = ["blis_refused"]
+    rows[0]["grade"] = "G5"
     _write_lines(d / c.FIDELITY_JSONL, rows)
-    assert any("must be status exact" in p for p in c.validate_dir(d))
+    assert any("grade" in p and "G5" in p for p in c.validate_dir(d))
 
 
-def test_validator_rejects_an_unknown_reason_code():
-    d = _copy("run-a")
-    rows = _lines(d / c.NOT_SCORED_JSONL)
-    rows[0]["reasons"] = ["looked_wrong"]
-    _write_lines(d / c.NOT_SCORED_JSONL, rows)
-    assert any("unknown reason 'looked_wrong'" in p for p in c.validate_dir(d))
-
-
-def test_validator_rejects_a_pull_error():
-    # PR #32 review: a row the pull couldn't read must fail the run, not shrink it.
-    d = _copy("run-a")
-    rows = _lines(d / c.NOT_SCORED_JSONL)
-    rows[0]["reasons"] = [c.PULL_ERROR]
-    rows[0].pop("notes", None)
-    _write_lines(d / c.NOT_SCORED_JSONL, rows)
-    assert any("the pull failed on this row" in p for p in c.validate_dir(d))
-
-
-def test_validator_accepts_a_qualified_reason_and_rejects_unsorted_reasons():
-    d = _copy("run-a")
-    rows = _lines(d / c.NOT_SCORED_JSONL)
-    rows[0]["reasons"] = ["setting_not_modelled:prefill_schedule_interval", "conflict:max_num_seqs"]
-    _write_lines(d / c.NOT_SCORED_JSONL, rows)
-    problems = c.validate_dir(d)
-    assert any("sorted and unique" in p for p in problems)
-    assert not any("unknown reason" in p for p in problems)
-
-
-def _noted(rows: list[dict]) -> dict:
-    return next(r for r in rows if "notes" in r)
-
-
-def test_fixture_notes_the_not_modelled_setting_on_its_not_scored_point():
-    noted = _noted(_lines(FIXTURE / "run-a" / c.NOT_SCORED_JSONL))
-    assert noted["hardware"] == "b300"
-    assert [n["reason"] for n in noted["notes"]] == ["setting_not_modelled:prefill_schedule_interval"]
-    assert noted["notes"][0]["reason"] in noted["reasons"]
-
-
-def test_validator_rejects_a_note_for_a_reason_the_point_does_not_carry():
-    d = _copy("run-a")
-    rows = _lines(d / c.NOT_SCORED_JSONL)
-    _noted(rows)["notes"][0]["reason"] = "drafter_not_in_catalog:eagle3"
-    _write_lines(d / c.NOT_SCORED_JSONL, rows)
-    assert any("which is not one of its reasons" in p for p in c.validate_dir(d))
-
-
-def test_validator_rejects_malformed_duplicate_or_unsorted_notes():
-    for mutate, expect in (
-        (lambda n: n[0].pop("text"), "malformed note"),
-        (lambda n: n[0].update(link="inference-sim/blis-schemas#57"), "malformed note"),
-        (lambda n: n.append(dict(n[0])), "one per reason"),
-    ):
+def test_validator_rejects_a_g5_reason_off_the_closed_list():
+    # COV-5: G5 is only for design §11.4's reasons.
+    for code in ("looked_wrong", "blis_refused", "setting_not_modelled"):
         d = _copy("run-a")
         rows = _lines(d / c.NOT_SCORED_JSONL)
-        mutate(_noted(rows)["notes"])
+        rows[0]["g5_reason"] = rows[0]["g5_reasons"][0] = {"code": code}
         _write_lines(d / c.NOT_SCORED_JSONL, rows)
-        assert any(expect in p for p in c.validate_dir(d)), expect
+        assert any(f"G5 reason {code!r}" in p for p in c.validate_dir(d)), code
+
+
+def test_validator_rejects_unsorted_g5_reasons_and_a_reason_not_among_them():
     d = _copy("run-a")
     rows = _lines(d / c.NOT_SCORED_JSONL)
-    noted = _noted(rows)
-    noted["reasons"] = ["conflict:max_num_seqs", "setting_not_modelled:prefill_schedule_interval"]
-    noted["notes"] = [{"reason": noted["reasons"][1], "text": "b"}, {"reason": noted["reasons"][0], "text": "a"}]
+    two = next(r for r in rows if len(r["g5_reasons"]) == 2)
+    two["g5_reasons"].reverse()
     _write_lines(d / c.NOT_SCORED_JSONL, rows)
-    assert any("sorted by reason" in p for p in c.validate_dir(d))
+    assert any("g5_reasons must be sorted" in p for p in c.validate_dir(d))
+    d = _copy("run-a")
+    rows = _lines(d / c.NOT_SCORED_JSONL)
+    rows[0]["g5_reason"] = {"code": "value_conflict", "subject": "max_num_seqs"}
+    _write_lines(d / c.NOT_SCORED_JSONL, rows)
+    assert any("not one of its g5_reasons" in p for p in c.validate_dir(d))
+
+
+def test_validator_rejects_a_fault_that_is_not_a_run_fault():
+    d = _copy("run-b")
+    rows = _lines(d / c.FAILED_JSONL)
+    rows[0]["faults"] = ["model_not_in_catalog"]
+    _write_lines(d / c.FAILED_JSONL, rows)
+    assert any("failed.jsonl:1 at faults/0" in p for p in c.validate_dir(d))
+
+
+def test_validator_rejects_a_point_that_is_both_not_scored_and_failed():
+    d = _copy("run-b")
+    ns = _lines(d / c.NOT_SCORED_JSONL)
+    f = _lines(d / c.FAILED_JSONL)
+    _write_lines(d / c.FAILED_JSONL, sorted(f + [{**{k: v for k, v in ns[0].items() if not k.startswith(("g5", "grade"))},
+                                                  "faults": ["blis_refused"]}], key=lambda r: r["point_id"]))
+    assert any("both not scored and failed" in p for p in c.validate_dir(d))
+
+
+def test_validator_requires_the_counts_to_sum_to_the_points():
+    # COV-1: every point is graded G1 to G4, listed as G5, or listed as failed, exactly once.
+    d = _copy("run-b")
+    prov = json.loads((d / c.PROVENANCE_JSON).read_text())
+    prov["points"] += 1
+    (d / c.PROVENANCE_JSON).write_text(c.canonical_dumps(prov) + "\n")
+    assert any("(COV-1)" in p for p in c.validate_dir(d))
+
+
+def test_validator_holds_each_grade_to_the_points_release():
+    # COV-6: a point measured on another release is G3 or G4; one on the scored release is G1 or G2.
+    # (The fixture holds no G1; a G2 point stands for the pair.)
+    d = _copy("run-a")
+    rows = _lines(d / c.FIDELITY_JSONL)
+    g2 = next(r for r in rows if r["grade"] == "G2")
+    g2["run_release"] = "0.25.0"
+    _write_lines(d / c.FIDELITY_JSONL, rows)
+    assert any("COV-6" in p for p in c.validate_dir(d))
+    d = _copy("run-a")
+    prov = json.loads((d / c.PROVENANCE_JSON).read_text())
+    prov["engine"]["version"] = "0.32.0"
+    (d / c.PROVENANCE_JSON).write_text(c.canonical_dumps(prov) + "\n")
+    assert any("COV-6" in p for p in c.validate_dir(d))
+
+
+def test_validator_requires_one_simulator_build_for_every_point():
+    # COV-6: one simulator release produced every score, failed points included.
+    d = _copy("run-b")
+    rows = _lines(d / c.FIDELITY_JSONL)
+    rows[0]["simulator"] = {**rows[0]["simulator"], "build": "v0.99.0"}
+    _write_lines(d / c.FIDELITY_JSONL, rows)
+    assert any("COV-6" in p for p in c.validate_dir(d))
+    d = _copy("run-b")
+    rows = _lines(d / c.FAILED_JSONL)
+    rows[0]["simulator"] = {"build": "v0.11.0", "engine": {"kind": "vllm", "version": "0.32.0"},
+                            "harness_digest": "unreleased"}
+    _write_lines(d / c.FAILED_JSONL, rows)
+    assert any("COV-6" in p for p in c.validate_dir(d))
+    d = _copy("run-b")
+    prov = json.loads((d / c.PROVENANCE_JSON).read_text())
+    prov["simulator"]["build"] = "v0.12.0"
+    (d / c.PROVENANCE_JSON).write_text(c.canonical_dumps(prov) + "\n")
+    assert any("simulator.build" in p for p in c.validate_dir(d))
+
+
+def test_validator_rejects_a_graded_point_that_names_no_substitution():
+    # COV-4: every substitution is named; a G2 point with none is refused by the schema.
+    d = _copy("run-a")
+    rows = _lines(d / c.FIDELITY_JSONL)
+    g2 = next(r for r in rows if r["grade"] == "G2")
+    g2["substitutions"] = []
+    _write_lines(d / c.FIDELITY_JSONL, rows)
+    assert any("substitution" in p for p in c.validate_dir(d))
 
 
 def test_validator_rejects_a_point_that_is_both_scored_and_not_scored():
@@ -281,61 +332,43 @@ def test_validator_rejects_unsorted_rows_args_and_lines():
     assert any("not_scored.jsonl: lines are not sorted" in p for p in c.validate_dir(d))
 
 
-def test_validator_rejects_a_csv_concurrency_or_tier_that_disagrees():
+def test_validator_rejects_a_csv_concurrency_or_grade_that_disagrees():
     d = _copy("run-a")
     lines = (d / c.POINTS_CSV).read_text().splitlines()
     cols = lines[1].split(",")
     cols[4] = str(int(cols[4]) + 1)
-    exact_tier = cols[9] == "MEASURED-OR-RESOLVED"
-    cols[9] = "ALL (approximate)" if exact_tier else "MEASURED-OR-RESOLVED"
+    cols[9] = "G3" if cols[9] != "G3" else "G2"
     lines[1] = ",".join(cols)
     (d / c.POINTS_CSV).write_text("\n".join(lines) + "\n")
     problems = c.validate_dir(d)
     assert any("concurrency disagrees" in p for p in problems)
-    assert any("so its tier is" in p for p in problems)
+    assert any("its record" in p for p in problems)
 
 
-def test_an_approximate_point_is_scored_in_the_all_tier_only():
-    import csv as _csv
-    rows = {r["point_id"]: r for r in _csv.DictReader(open(FIXTURE / "run-a" / c.POINTS_CSV))}
-    for rec in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL):
-        approx = [a for a in rec["args"] if a["match"] == "approximated"]
-        assert (rec["status"] == "approximate") == (bool(approx) or rec["build"]["match"] == "estimated")
-        assert rows[rec["point_id"]]["tier_unbracketed"] == c.TIER_BY_STATUS[rec["status"]]
-        for a in approx:
-            assert a["note"] and "upstream" not in a, a
-    assert any(r["status"] == "approximate" for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL))
-
-
-def test_fidelity_schema_ties_approximate_status_to_an_approximated_arg():
-    import jsonschema
-    v = jsonschema.Draft7Validator(json.loads(c.FIDELITY_SCHEMA.read_text()))
-    rec = next({k: x for k, x in r.items() if k != "point_id"}
-               for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL) if r["status"] == "approximate")
-    assert v.is_valid(rec)
-    assert not v.is_valid({**rec, "status": "exact"})                         # exact with an approximation
-    plain = [a for a in rec["args"] if a["match"] != "approximated"]
-    assert not v.is_valid({**rec, "args": plain})                             # approximate with none
-    bare = [{**a, "note": None} if a["match"] == "approximated" else a for a in rec["args"]]
-    assert not v.is_valid({**rec, "args": [{k: x for k, x in a.items() if x is not None} for a in bare]})
-
-
-def test_an_estimated_build_is_scored_and_makes_the_point_approximate():
+def test_fidelity_schema_ties_the_grade_to_its_substitutions():
     import jsonschema
     v = jsonschema.Draft7Validator(json.loads(c.FIDELITY_SCHEMA.read_text()))
     recs = [{k: x for k, x in r.items() if k != "point_id"} for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL)]
-    est = next(r for r in recs if r["build"]["match"] == "estimated")
-    assert est["status"] == "approximate" and est["build"]["why"] == "custom_build"
-    assert not any(a["match"] == "approximated" for a in est["args"])          # only the build differs
-    assert v.is_valid(est)
-    assert not v.is_valid({**est, "status": "exact"})                          # exact with an estimated build
-    exact = next(r for r in recs if r["status"] == "exact")
-    assert not v.is_valid({**exact, "build": {**exact["build"], "match": "estimated"}})   # estimated needs why
-    assert not v.is_valid({**exact, "build": {**exact["build"], "why": "custom_build"}})  # exact has no why
-    assert not v.is_valid({**exact, "build": {k: x for k, x in exact["build"].items() if k != "match"}})
-    # Build problems are no longer reasons a point isn't scored.
-    for code in ("custom_build", "outside_distance", "build_commit_unresolvable", "build_commit_conflict"):
-        assert not v.is_valid({**exact, "status": "not_scored", "reasons": [code]}), code
+    g2 = next(r for r in recs if r["grade"] == "G2")
+    g1 = _as_g1(g2)
+    g4 = next(r for r in recs if r["grade"] == "G4")
+    assert all(v.is_valid(r) for r in (g1, g2, g4))
+    assert not v.is_valid({**g1, "substitutions": g2["substitutions"]})       # G1 names nothing
+    unchecked = [x for x in g2["substitutions"] if x["subject"] == "not checked"]
+    assert len(unchecked) == 4 and not v.is_valid({**g1, "substitutions": unchecked})   # a G1 names none
+    assert not v.is_valid({**g2, "substitutions": []})                         # G2 names something
+    assert not v.is_valid({**g2, "substitutions": g4["substitutions"]})        # another release is not G2
+    assert not v.is_valid({**g4, "substitutions": g2["substitutions"]})        # G4 names the release or build
+    assert not v.is_valid({**g2, "grade": "G1", "substitutions": []})          # a client difference is not G1
+    assert not v.is_valid({**g1, "status": "exact"})                           # the old status field is gone
+    assert not v.is_valid({**g1, "substitutions": [{"kind": "guess", "subject": "x", "detail": ""}]})
+
+
+def test_an_estimated_build_is_scored_and_named():
+    recs = [r for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL) if r["build"].get("why") == "custom_build"]
+    assert len(recs) == 1 and recs[0]["grade"] == "G4" and recs[0]["run_release"] is None
+    assert [s["kind"] for s in recs[0]["substitutions"]] == [
+        "coefficient_range", "kernel_hash", "nightly_or_custom", "resolved_differs", "value_class"]
 
 
 def test_validator_requires_every_provenance_key():
@@ -347,21 +380,19 @@ def test_validator_requires_every_provenance_key():
         assert f"provenance.json: missing {key}" in c.validate_dir(d), key
 
 
-def test_fidelity_schema_ties_status_to_reasons_and_match_to_its_fields():
+def test_fidelity_schema_ties_match_to_its_fields():
     import jsonschema
     v = jsonschema.Draft7Validator(json.loads(c.FIDELITY_SCHEMA.read_text()))
-    rec = next({k: x for k, x in r.items() if k != "point_id"}
-               for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL) if r["status"] == "exact")
+    rec = _as_g1(next({k: x for k, x in r.items() if k != "point_id"}
+                      for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL) if r["grade"] == "G2"))
     assert v.is_valid(rec)
-    assert not v.is_valid({**rec, "reasons": ["blis_refused"]})               # exact with reasons
-    assert not v.is_valid({**rec, "status": "not_scored"})                    # not_scored without reasons
-    assert v.is_valid({**rec, "status": "not_scored", "reasons": ["blis_refused"]})
+    assert not v.is_valid({**rec, "reasons": ["blis_refused"]})               # a graded point has no reasons
     mapped = {"arg": "kernel_config.moe_backend", "measured": "x", "blis": "x", "match": "mapped"}
     assert not v.is_valid({**rec, "args": [mapped]})                          # mapped needs blis_field
     assert v.is_valid({**rec, "args": [{**mapped, "blis_field": "engine.moe_backend"}]})
-    dflt = {"arg": "max_num_seqs", "measured": None, "blis": 1024, "match": "blis_default", "source": "blis_default"}
-    assert not v.is_valid({**rec, "args": [dflt]})                            # blis_default needs rule
-    assert v.is_valid({**rec, "args": [{**dflt, "rule": "r"}]})
+    # The scorer never writes a value of its own: no arg is a BLIS default (X19).
+    dflt = {"arg": "max_num_seqs", "measured": None, "blis": 1024, "match": "blis_default", "rule": "r"}
+    assert not v.is_valid({**rec, "args": [dflt]})
 
 
 def test_validator_rejects_a_facets_record_missing_a_key_the_builder_reads():
@@ -413,91 +444,86 @@ def test_cli_exit_codes():
     assert bad.returncode == 1 and "missing points.csv" in bad.stderr
 
 
-# ------------------------------------------------------------------ summary.v2 schema
+# ------------------------------------------------------------------ the summary schemas
 
-def _v2_validator():
-    import jsonschema
-    from referencing import Registry, Resource
-    v2 = json.loads((REPO / "schemas" / "summary.v2.json").read_text())
-    fid = json.loads(c.FIDELITY_SCHEMA.read_text())
-    registry = Registry().with_resource(fid["$id"], Resource.from_contents(fid))
-    return jsonschema.Draft7Validator(v2, registry=registry)
+def _summary_validator(version: int):
+    sys.path.insert(0, str(REPO / "orchestrator"))
+    import validate_summary_v2 as vs
+    return vs.validator(version)
 
 
-def _minimal_v2(point: dict) -> dict:
-    block = {"mape": {"ttft": 1.0, "tpot": 1.0, "n": 1}, "shape": {"ttft": None, "tpot": None, "n": 0}}
-    pair = {"measured_or_resolved": block, "all": block}
-    cov = {"scored": 1, "total": 1}
-    topo = {"level": "topology", "framework": "vllm", "engine_version": "0.30.1rc1", "precision": "fp4",
-            "is_multinode": False, "parallelism": {"tp": 4}, "serving": "aggregated", "spec_method": "mtp",
-            "label": "tp4 · fp4", "coverage": cov, "metrics": pair, "rows": [point]}
-    gpu = {"level": "gpu", "label": "h200", "precision": "fp4", "coverage": cov, "metrics": pair, "rows": [topo]}
-    wl = {"level": "workload", "label": "agentx", "isl": None, "osl": None, "coverage": cov, "metrics": pair, "rows": [gpu]}
-    model = {"level": "model", "model": "deepseek-v4.1-flash", "vllm_version": "0.30.1rc1", "coverage": cov,
-             "metrics": pair, "rows": [wl]}
-    return {
-        "schema_version": 2, "snapshot_id": "2026-10-23_blis-v0.12.0_ix-api-2026-10-23",
-        "generated_at": "2026-10-23T00:00:00Z",
-        "provenance": {
-            "blis": {"release": "v0.12.0", "commit_sha": "f" * 40, "catalog": "0.3.0", "registry": "v0.2.0",
-                     "extractor_version": "blis-latency-kernel@v0.3.0"},
-            "ground_truth": {"source": "SemiAnalysis InferenceX API", "release_tag": "api-2026-10-23",
-                             "measurement_sha256": "2" * 64},
-            "evaluator_commit": "local", "scorer": "signedprobe", "ingest": "api", "vllm_ref": "v0.31.0",
-            "vllm_max_distance": 2000, "policy_sha256": "1" * 64, "pulled_at": "2026-10-23T00:00:00Z"},
-        "coverage": {"scored": 1, "not_scored": 0, "multinode_hidden": 0, "failed": 0, "not_scored_reasons": {}},
-        "metrics": ["ttft", "tpot"], "totals": pair, "matrix": [model], "scope": {}, "not_scored": [],
-    }
+def _published_v2() -> dict:
+    return json.loads((REPO / "data" / "latest" / "summary.json").read_text())
 
 
-def _fixture_point() -> dict:
-    rec = next(r for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL) if r["status"] == "exact")
-    fid = {k: v for k, v in rec.items() if k != "point_id"}
-    # The identity that hashes to this point_id (a scored point now carries it, like not_scored).
-    ident = json.loads((FIXTURE / "run-a" / c.FACETS_JSON).read_text())[rec["point_id"]]["identity"]
-    return {"level": "point", "concurrency": ident["conc"], "tier": "measured_or_resolved", "point_id": rec["point_id"],
-            "identity": ident, "measured_date": ident["measured_date"],
-            "sweep_id": "2410|deepseek-v4.1-flash-h200|agentx", "fidelity": fid,
-            "measured": {"ttft_ms": 1650.0, "tpot_ms": 9.4}, "predicted": {"ttft_ms": 1590.0, "tpot_ms": 8.55},
-            "error_pct": {"ttft": -3.6, "tpot": -9.0}, "shape": None, "shape_reason": "< 3 concurrencies"}
+def _v3() -> dict:
+    sys.path.insert(0, str(REPO / "orchestrator"))
+    import build_summary_v2 as b2
+    return b2.build(FIXTURE / "run-a", generated_at="2026-10-23T00:00:00Z", evaluator_commit="test")
 
 
-def test_v2_schema_accepts_a_point_carrying_a_fixture_fidelity_record():
-    errors = list(_v2_validator().iter_errors(_minimal_v2(_fixture_point())))
-    assert errors == [], [e.message for e in errors]
+def _first_point(doc: dict) -> dict:
+    return doc["matrix"][0]["rows"][0]["rows"][0]["rows"][0]["rows"][0]
 
 
-def test_v2_schema_requires_fidelity_point_id_measured_date_and_sweep_on_every_point():
+def test_the_v2_schema_still_reads_the_published_snapshot_and_its_frozen_fidelity_record():
+    # COV-8: published v2 snapshots never change; their schema and fidelity record are frozen.
+    v = _summary_validator(2)
+    doc = _published_v2()
+    assert list(v.iter_errors(doc)) == []
+    _first_point(doc)["fidelity"]["build"]["distance"] = "near"
+    assert not v.is_valid(doc)
+    assert not _summary_validator(2).is_valid(_v3())
+
+
+def test_the_v2_fidelity_schema_is_byte_identical_to_the_one_main_published():
+    # COV-8: v2 snapshots cite this schema by its $id. The digest is that of
+    # orchestrator/ingest/fidelity.schema.json on origin/main before the schemas moved; every
+    # addition belongs in fidelity.v3.json.
+    digest = hashlib.sha256((REPO / "schemas" / "fidelity.v2.json").read_bytes()).hexdigest()
+    assert digest == "4a7a95e828051f7fd72148d26cc8e7b82139ec0399cfa366b510cece7cd95f46"
+
+
+def test_the_v3_schema_requires_a_graded_fidelity_record_on_every_point():
+    v = _summary_validator(3)
+    assert list(v.iter_errors(_v3())) == []
     for field in ("fidelity", "point_id", "identity", "measured_date", "sweep_id"):
-        point = _fixture_point()
-        del point[field]
-        assert not _v2_validator().is_valid(_minimal_v2(point)), field
+        doc = _v3()
+        del _first_point(doc)[field]
+        assert not v.is_valid(doc), field
+    doc = _v3()
+    del _first_point(doc)["fidelity"]["grade"]
+    assert not v.is_valid(doc)
+    assert not v.is_valid(_published_v2())
 
 
-def test_v2_schema_rejects_a_malformed_fidelity_record():
-    point = _fixture_point()
-    point["fidelity"]["build"]["distance"] = "near"
-    assert not _v2_validator().is_valid(_minimal_v2(point))
+def test_the_v3_schema_accepts_not_scored_and_failed_records_exactly_as_the_contract_writes_them():
+    v = _summary_validator(3)
+    doc = _v3()
+    doc["not_scored"] = _lines(FIXTURE / "run-a" / c.NOT_SCORED_JSONL)
+    doc["failed"] = _lines(FIXTURE / "run-b" / c.FAILED_JSONL)
+    assert list(v.iter_errors(doc)) == []
+    doc["not_scored"] = [{**doc["not_scored"][0], "reasons": ["model_not_in_catalog"]}]
+    assert not v.is_valid(doc)
 
 
-def test_v2_schema_rejects_v1_documents():
+def test_the_v3_schema_requires_a_count_with_every_figure_and_too_few_points_under_the_minimum():
+    v = _summary_validator(3)
+    doc = _v3()
+    del doc["headline"]["headline"]["ttft"]["n"]
+    assert not v.is_valid(doc)
+    doc = _v3()
+    doc["headline"]["grades"]["G1"]["ttft"] = {"mape": 3.5, "n": 3}           # a number under the minimum
+    assert not v.is_valid(doc)
+    doc["headline"]["grades"]["G1"]["ttft"] = {"mape": "too few points", "n": 12}
+    assert not v.is_valid(doc)
+    doc["headline"]["grades"]["G1"]["ttft"] = {"mape": 3.5, "n": 12}
+    assert v.is_valid(doc)
+
+
+def test_v1_documents_are_neither_v2_nor_v3():
     v1 = json.loads((REPO / "web" / "testdata" / "render-fixture.summary.json").read_text())
-    assert not _v2_validator().is_valid(v1)
-
-
-def test_v2_schema_accepts_a_not_scored_record_exactly_as_the_contract_writes_it():
-    doc = _minimal_v2(_fixture_point())
-    for ns in _lines(FIXTURE / "run-a" / c.NOT_SCORED_JSONL):
-        doc["not_scored"] = [ns]
-        errors = list(_v2_validator().iter_errors(doc))
-        assert errors == [], [e.message for e in errors]
-    doc["not_scored"] = [{**ns, "reasons": ["looked_wrong"]}]
-    assert not _v2_validator().is_valid(doc)
-    noted = _noted(_lines(FIXTURE / "run-a" / c.NOT_SCORED_JSONL))
-    doc["not_scored"] = [noted]
-    assert _v2_validator().is_valid(doc)
-    doc["not_scored"] = [{**noted, "notes": [{"reason": noted["reasons"][0]}]}]   # no text
-    assert not _v2_validator().is_valid(doc)
+    assert not _summary_validator(2).is_valid(v1) and not _summary_validator(3).is_valid(v1)
 
 
 if __name__ == "__main__":

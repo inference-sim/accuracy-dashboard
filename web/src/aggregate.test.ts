@@ -17,7 +17,8 @@ function loadFixture(): Summary {
   return validateSummary(JSON.parse(readFileSync(path, 'utf8')))
 }
 
-const close = (a: number | null, b: number | null, eps = 1e-6) => {
+const close = (a: number | null | 'too few points', b: number | null | 'too few points', eps = 1e-6) => {
+  if (typeof a === 'string' || typeof b === 'string') return a === b
   if (a == null && b == null) return true
   if (a == null || b == null) return false
   return Math.abs(a - b) <= eps * Math.max(1, Math.abs(a), Math.abs(b))

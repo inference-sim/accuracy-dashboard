@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""Validate a summary.json v2 against schemas/summary.v2.json (issue #30).
+"""Validate a summary.json v2 or v3 against its schema (schemas/summary.v2.json, summary.v3.json).
 
-v2 $refs the fidelity record's schema (orchestrator/ingest/fidelity.schema.json) by its $id, so
-the validator is given a registry holding it. Beyond the schema: schema_version is 2, the
-coverage counts match the lists, not_scored_reasons count the not-scored codes, no point is
-both scored and not scored, every build is measured from the snapshot's own vllm_ref and an
-exact build sits within its vllm_max_distance, every not-scored record's identity hashes to
-its point_id, and the matrix agrees with itself (tree_problems: metrics recompute from points,
-labels match their rows, one point per concurrency per sweep). Exits non-zero on any problem,
-never a silent pass.
+Each $refs its fidelity record's schema (schemas/fidelity.v2.json, fidelity.v3.json) by its $id,
+so the validator is given a registry holding it. v2 is what snapshots published before grades
+hold; they never change (COV-8), and are checked as they were. Beyond the schema, for both: the
+coverage counts match the lists, no point is both scored and not scored, every not-scored
+record's identity hashes to its point_id, and the matrix agrees with itself (tree_problems:
+metrics recompute from points, labels match their rows, one point per concurrency per sweep).
+v2 also: not_scored_reasons count the not-scored codes, every build is measured from the
+snapshot's own vllm_ref, and an exact build sits within its vllm_max_distance. v3 also: every
+point's grade agrees with its release and the engine release (grade.check: COV-4 to COV-6),
+the headline and coverage recompute from the points and every figure under the minimum is "too
+few points" (COV-11), the grade counts sum to the total (COV-1), and no failed point is other
+than a runner limit (COV-8). Exits non-zero on any problem, never a silent pass.
 
 v1 snapshots keep using orchestrator/validate_summary.py, unchanged.
 """
@@ -22,17 +26,32 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "orchestrator" / "ingest"))
-from contract import point_id  # noqa: E402
-SCHEMA = REPO / "schemas" / "summary.v2.json"
-FIDELITY = REPO / "orchestrator" / "ingest" / "fidelity.schema.json"
+import contract  # noqa: E402
+import legacy_ids  # noqa: E402
 
 
-def validator():
+def point_id(identity: dict) -> str:
+    """The id an identity hashes to: a ledger unit identity, or the eight-field identity of a
+    snapshot published before point ids were unit ids (COV-8)."""
+    if isinstance(identity, dict) and "recipe" in identity:
+        return legacy_ids.legacy_point_id(identity)
+    return contract.point_id(identity)
+import assess  # noqa: E402
+import backlog as bl  # noqa: E402
+import grade as gr  # noqa: E402
+import headline as hl  # noqa: E402
+
+SCHEMAS = {2: (REPO / "schemas" / "summary.v2.json", REPO / "schemas" / "fidelity.v2.json"),
+           3: (REPO / "schemas" / "summary.v3.json", REPO / "schemas" / "fidelity.v3.json")}
+
+
+def validator(version: int):
     import jsonschema
     from referencing import Registry, Resource
-    fid = json.loads(FIDELITY.read_text())
+    schema, fidelity = SCHEMAS[version]
+    fid = json.loads(fidelity.read_text())
     reg = Registry().with_resource(fid["$id"], Resource.from_contents(fid))
-    return jsonschema.Draft7Validator(json.loads(SCHEMA.read_text()), registry=reg)
+    return jsonschema.Draft7Validator(json.loads(schema.read_text()), registry=reg)
 
 
 def points(doc: dict) -> list[dict]:
@@ -41,21 +60,25 @@ def points(doc: dict) -> list[dict]:
 
 
 def problems(doc: dict) -> list[str]:
+    version = doc.get("schema_version")
+    if version not in SCHEMAS:
+        return [f"schema_version is {version!r}, expected one of {sorted(SCHEMAS)}"]
     out = []
-    for e in sorted(validator().iter_errors(doc), key=lambda e: list(e.path))[:25]:
+    for e in sorted(validator(version).iter_errors(doc), key=lambda e: list(e.path))[:25]:
         out.append(f"at {'/'.join(str(p) for p in e.path) or '(root)'}: {e.message[:300]}")
     if out:
         return out
-    if doc.get("schema_version") != 2:
-        return [f"schema_version is {doc.get('schema_version')!r}, expected 2"]
     pts, ns, cov = points(doc), doc["not_scored"], doc["coverage"]
-    if cov["scored"] != len(pts):
-        out.append(f"coverage.scored {cov['scored']} != {len(pts)} points in the matrix")
-    if cov["not_scored"] != len(ns):
-        out.append(f"coverage.not_scored {cov['not_scored']} != {len(ns)} not_scored records")
-    want = dict(sorted(Counter(c for n in ns for c in sorted({r.split(":", 1)[0] for r in n["reasons"]})).items()))
-    if cov["not_scored_reasons"] != want:
-        out.append(f"coverage.not_scored_reasons {cov['not_scored_reasons']} != the not_scored codes {want}")
+    if version == 2:
+        if cov["scored"] != len(pts):
+            out.append(f"coverage.scored {cov['scored']} != {len(pts)} points in the matrix")
+        if cov["not_scored"] != len(ns):
+            out.append(f"coverage.not_scored {cov['not_scored']} != {len(ns)} not_scored records")
+        want = dict(sorted(Counter(c for n in ns for c in sorted({r.split(":", 1)[0] for r in n["reasons"]})).items()))
+        if cov["not_scored_reasons"] != want:
+            out.append(f"coverage.not_scored_reasons {cov['not_scored_reasons']} != the not_scored codes {want}")
+    else:
+        out += _v3_problems(doc, pts)
     scored = [p["point_id"] for p in pts]
     if len(set(scored)) != len(scored):
         out.append("a point_id appears twice in the matrix")
@@ -101,6 +124,82 @@ def problems(doc: dict) -> list[str]:
     return out + tree_problems(doc)
 
 
+def _v3_problems(doc: dict, pts: list[dict]) -> list[str]:
+    """What schema v3 adds: the grades, headline, coverage and backlog agree with the points."""
+    out = []
+    ns, failed, cov = doc["not_scored"], doc["failed"], doc["coverage"]
+    engine = doc["provenance"]["engine"]["version"]
+    # Every graded point, repeats unfolded: each run is an anchor unit of its own.
+    runs = []
+    for m, w, g, t, p in _leaves(doc):
+        for r in p.get("repeats") or [{"point_id": p["point_id"], "identity": p["identity"], "measured": p["measured"]}]:
+            runs.append({**p["fidelity"], "point_id": r["point_id"], "build": {"release": p["fidelity"]["run_release"]},
+                         "framework": t["framework"], "hardware": r["identity"]["hardware"],
+                         "release": p["fidelity"]["run_release"], "grade": p["fidelity"]["grade"],
+                         "meas_ttft_us": _us(r["measured"].get("ttft_ms")), "meas_tpot_us": _us(r["measured"].get("tpot_ms")),
+                         "pred_ttft_us": _us((p.get("predicted") or {}).get("ttft_ms")),
+                         "pred_tpot_us": _us((p.get("predicted") or {}).get("tpot_ms"))})
+    g5 = [{**n, "build": {"release": n["run_release"]}, "release": n["run_release"]} for n in ns]
+    out += [f"grade: {x}" for x in gr.check(runs + g5 + [{**f, "grade": gr.G5, "g5_reason": {"code": gr.G5_CODES[0]}}
+                                                        for f in failed], engine)]
+    gt = doc["provenance"]["ground_truth"]
+    if gt.get("measurement_date_through") and doc["provenance"]["pulled_at"][:10] < gt["measurement_date_through"]:
+        out.append(f"pulled {doc['provenance']['pulled_at'][:10]}, before its newest measurement "
+                   f"{gt['measurement_date_through']} (COV-9)")
+    sim = doc["provenance"]["simulator"]
+    if any(x.get("simulator") != sim for x in runs + g5 + failed):
+        out.append("a point names a simulator other than the provenance's; one build scores a release's points (COV-6)")
+    if cov["graded"] != len(runs):
+        out.append(f"coverage.graded {cov['graded']} != {len(runs)} graded points")
+    if cov["not_scored"] != len(ns) or cov["failed"] != len(failed):
+        out.append(f"coverage not_scored/failed {cov['not_scored']}/{cov['failed']} != {len(ns)}/{len(failed)} records")
+    if cov["points"] != len(runs) + len(ns) + len(failed):
+        out.append(f"coverage.points {cov['points']} != graded + not scored + failed (COV-1)")
+    want = hl.coverage(runs + g5, left_out_records=cov["left_out_records"])
+    for k in ("by_engine", "by_engine_release", "by_chip", "by_grade"):
+        if cov[k] != want[k]:
+            out.append(f"coverage.{k} does not recompute from the points")
+    if cov["g5_reasons"] != dict(sorted(Counter(n["g5_reason"]["code"] for n in ns).items())):
+        out.append("coverage.g5_reasons does not count the not_scored reasons")
+    head = doc["headline"]
+    out += [f"headline: {x}" for x in hl.check(head)]
+    out += [f"COV-11: {x}" for x in hl.check_document(doc)]
+    again = hl.headline(runs + g5)
+    for m in ("ttft", "tpot"):
+        a, b = head["headline"][m], again["headline"][m]
+        if a["n"] != b["n"] or (isinstance(a["mape"], float) != isinstance(b["mape"], float)) or \
+                (isinstance(a["mape"], float) and abs(a["mape"] - b["mape"]) > HEADLINE_TOLERANCE):
+            out.append(f"headline.{m} {a} does not recompute from the points ({b})")
+    for g in gr.GRADED:
+        if head["grades"][g]["points"] != again["grades"][g]["points"]:
+            out.append(f"headline.grades.{g} counts {head['grades'][g]['points']} points, the matrix {again['grades'][g]['points']}")
+    if [e["reason"] for e in doc["backlog"]["top"]] != [r for r, _ in bl.top(runs + g5, len(doc["backlog"]["top"]))]:
+        out.append("backlog.top does not recompute from the points")
+    for f in failed:
+        if not set(f["faults"]) <= set(assess.RUNNER_LIMITS):
+            out.append(f"failed {f['point_id'][:12]}: {f['faults']} is not a runner limit; nothing may be published (COV-8)")
+    return out
+
+
+def _leaves(doc: dict):
+    for m in doc.get("matrix", []):
+        for w in m.get("rows", []):
+            for g in w.get("rows", []):
+                for t in g.get("rows", []):
+                    for p in t.get("rows", []):
+                        yield m, w, g, t, p
+
+
+def _us(ms):
+    return None if ms is None else float(ms) * 1000.0
+
+
+# Points carry measured and predicted values rounded to 4 decimals of a millisecond, so a headline
+# recomputed from them agrees with the one built from the contract to within this many points of
+# percentage error.
+HEADLINE_TOLERANCE = 1e-2
+
+
 # Stored metrics are means of unrounded errors; points carry them rounded to 4 decimals, so a
 # recomputation from the points agrees to within half a unit in the 4th place.
 METRIC_TOLERANCE = 1e-3
@@ -124,7 +223,15 @@ def recompute(pts: list[dict], tier: str) -> dict:
     return out
 
 
-def _metric_problems(where: str, node: dict, pts: list[dict]) -> list[str]:
+def _tier_pts(pts: list[dict], tier: str) -> list[dict]:
+    return [p for p in pts if tier == "all" or p["tier"] == "measured_or_resolved"]
+
+
+def _get(p: dict, kind: str, m: str):
+    return (p.get("error_pct" if kind == "mape" else "shape") or {}).get(m)
+
+
+def _metric_problems(where: str, node: dict, pts: list[dict], doc_version: int = 2) -> list[str]:
     out = []
     if node["coverage"]["scored"] != len(pts):
         out.append(f"{where}: coverage.scored {node['coverage']['scored']} != its {len(pts)} points")
@@ -135,6 +242,15 @@ def _metric_problems(where: str, node: dict, pts: list[dict]) -> list[str]:
                 out.append(f"{where}: {tier} {kind} n {got[kind]['n']} != {want[kind]['n']} from its points")
             for m in ("ttft", "tpot"):
                 a, b = got[kind][m], want[kind][m]
+                if doc_version == 3 and a == hl.TOO_FEW:
+                    # Published as too few points: the points under it must be fewer than the minimum.
+                    if sum(1 for p in _tier_pts(pts, tier) if _get(p, kind, m) is not None) >= hl.MIN_POINTS:
+                        out.append(f"{where}: {tier} {kind}.{m} is 'too few points' over enough points")
+                    continue
+                if doc_version == 3 and b is not None and \
+                        sum(1 for p in _tier_pts(pts, tier) if _get(p, kind, m) is not None) < hl.MIN_POINTS:
+                    out.append(f"{where}: {tier} {kind}.{m} is a number over fewer than {hl.MIN_POINTS} points (COV-11)")
+                    continue
                 if (a is None) != (b is None) or (a is not None and abs(a - b) > METRIC_TOLERANCE):
                     out.append(f"{where}: {tier} {kind}.{m} {a} != {b} from its points")
     return out
@@ -153,16 +269,19 @@ def tree_problems(doc: dict) -> list[str]:
     pts_of = lambda n: points({"matrix": [n]}) if n["level"] == "model" else (  # noqa: E731
         [p for g in n["rows"] for t in g["rows"] for p in t["rows"]] if n["level"] == "workload" else
         [p for t in n["rows"] for p in t["rows"]] if n["level"] == "gpu" else n["rows"])
-    out += _metric_problems("totals", {"coverage": {"scored": doc["coverage"]["scored"]}, "metrics": doc["totals"]},
-                            points(doc))
+    # v2 counts the matrix's points as coverage.scored; v3 counts graded anchor units, so the
+    # matrix's own count (repeats folded) is what its totals cover.
+    shown = doc["coverage"]["scored"] if doc["schema_version"] == 2 else len(points(doc))
+    v = doc["schema_version"]
+    out += _metric_problems("totals", {"coverage": {"scored": shown}, "metrics": doc["totals"]}, points(doc), v)
     row_of_sweep: dict = {}
     for m in doc["matrix"]:
-        out += _metric_problems(f"{m['model']}", m, pts_of(m))
+        out += _metric_problems(f"{m['model']}", m, pts_of(m), v)
         for w in m["rows"]:
-            out += _metric_problems(f"{m['model']} › {w['label']}", w, pts_of(w))
+            out += _metric_problems(f"{m['model']} › {w['label']}", w, pts_of(w), v)
             for g in w["rows"]:
                 gw = f"{m['model']} › {w['label']} › {g['label']}"
-                out += _metric_problems(gw, g, pts_of(g))
+                out += _metric_problems(gw, g, pts_of(g), v)
                 labels = [t["label"] for t in g["rows"]]
                 if len(labels) != len(set(labels)):
                     out.append(f"{gw}: two deployment rows share a label")
@@ -170,7 +289,7 @@ def tree_problems(doc: dict) -> list[str]:
                     out.append(f"{gw}: GPU precision {g['precision']} but a row has another")
                 for t in g["rows"]:
                     tw = f"{gw} › {t['label']}"
-                    out += _metric_problems(tw, t, t["rows"])
+                    out += _metric_problems(tw, t, t["rows"], v)
                     # "<parallelism> · <precision>[ · <drafter>][ · vLLM <version>]"
                     label = t["label"].split(" · vLLM ", 1)[0]
                     spec = _spec(t.get("spec_method"))
@@ -207,7 +326,7 @@ def main(argv=None) -> int:
             for p in found:
                 print(f"  {p}", file=sys.stderr)
         else:
-            print(f"VALID: {path} conforms to schema_version 2")
+            print(f"VALID: {path} conforms to schema_version {json.loads(Path(path).read_text())['schema_version']}")
     return 1 if bad else 0
 
 

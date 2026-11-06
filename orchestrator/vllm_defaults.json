@@ -26,6 +26,8 @@
   "attention_config.minimax_m3_msa_decode_backend": "triton",
   "attention_config.mla_prefill_backend": null,
   "attention_config.sparse_mla_force_mqa": false,
+  "attention_config.sparse_mla_prefill_workspace_factor": null,
+  "attention_config.tokenspeed_mla_min_split_kv": 1,
   "attention_config.tq_max_kv_splits_for_cuda_graph": 32,
   "attention_config.use_non_causal": false,
   "attention_config.use_prefill_query_quantization": false,
@@ -48,12 +50,15 @@
   "compilation_config.compile_sizes": null,
   "compilation_config.cudagraph_capture_sizes": null,
   "compilation_config.cudagraph_copy_inputs": false,
+  "compilation_config.cudagraph_decoder_replay": true,
   "compilation_config.cudagraph_mm_encoder": false,
   "compilation_config.cudagraph_mode": null,
   "compilation_config.cudagraph_num_of_warmups": 0,
   "compilation_config.cudagraph_specialize_lora": true,
   "compilation_config.custom_ops": [],
   "compilation_config.debug_dump_path": null,
+  "compilation_config.decoder_replay_cudagraph_capture_sizes": [],
+  "compilation_config.decoder_replay_trim_threshold": 768,
   "compilation_config.disabled_custom_ops": {
    "unliteral": "field(default_factory=Counter, init=False)"
   },
@@ -76,20 +81,17 @@
   "compilation_config.mode": null,
   "compilation_config.pass_config.eliminate_noops": true,
   "compilation_config.pass_config.enable_qk_norm_rope_fusion": null,
-  "compilation_config.pass_config.enable_sp": null,
   "compilation_config.pass_config.fi_allreduce_fusion_max_size_mb": null,
   "compilation_config.pass_config.fuse_act_padding": null,
   "compilation_config.pass_config.fuse_act_quant": null,
   "compilation_config.pass_config.fuse_allreduce_rms": null,
   "compilation_config.pass_config.fuse_attn_quant": null,
-  "compilation_config.pass_config.fuse_gemm_comms": null,
   "compilation_config.pass_config.fuse_mla_dual_rms_norm": null,
   "compilation_config.pass_config.fuse_norm_quant": null,
   "compilation_config.pass_config.fuse_qk_norm_rope_kvcache": null,
   "compilation_config.pass_config.fuse_rope_kvcache": null,
   "compilation_config.pass_config.fuse_rope_kvcache_cat_mla": null,
   "compilation_config.pass_config.rope_kvcache_fusion_max_token_num": 256,
-  "compilation_config.pass_config.sp_min_token_num": null,
   "compilation_config.splitting_ops": null,
   "compilation_config.static_all_moe_layers": [],
   "compilation_config.static_forward_context": {},
@@ -108,6 +110,9 @@
   "cudagraph_capture_sizes": null,
   "cudagraph_metrics": {
    "unliteral": "ObservabilityConfig.cudagraph_metrics"
+  },
+  "custom_histogram_buckets": {
+   "unliteral": "ObservabilityConfig.custom_histogram_buckets"
   },
   "data_parallel_address": null,
   "data_parallel_backend": "mp",
@@ -130,7 +135,7 @@
   },
   "device_ids": null,
   "diffusion_config": null,
-  "disable_cascade_attn": true,
+  "disable_cascade_attn": null,
   "disable_chunked_mm_input": false,
   "disable_custom_all_reduce": false,
   "disable_hybrid_kv_cache_manager": null,
@@ -159,6 +164,7 @@
   "enable_flashinfer_autotune": {
    "unliteral": "get_field(KernelConfig, 'enable_flashinfer_autotune')"
   },
+  "enable_hc_sp": false,
   "enable_layerwise_nvtx_tracing": {
    "unliteral": "ObservabilityConfig.enable_layerwise_nvtx_tracing"
   },
@@ -189,6 +195,7 @@
   "enable_prefix_caching": null,
   "enable_prompt_embeds": false,
   "enable_return_routed_experts": false,
+  "enable_shm_tensor_arena": false,
   "enable_sleep_mode": false,
   "enable_tower_connector_lora": {
    "unliteral": "LoRAConfig.enable_tower_connector_lora"
@@ -239,6 +246,7 @@
   "kernel_config.enable_cutedsl_warmup": true,
   "kernel_config.enable_flashinfer_autotune": null,
   "kernel_config.enable_jit_warmup": true,
+  "kernel_config.enable_rocm_segmented_attn_autotune": false,
   "kernel_config.ir_op_priority.fused_add_rms_norm": [],
   "kernel_config.ir_op_priority.gelu_and_mul_sparse": [],
   "kernel_config.ir_op_priority.rms_norm": [],
@@ -266,15 +274,11 @@
   "kv_transfer_config.kv_buffer_device": {
    "unliteral": "field(default_factory=kv_buffer_device_default_factory)"
   },
-  "kv_transfer_config.kv_buffer_size": 1000000000.0,
   "kv_transfer_config.kv_connector": null,
   "kv_transfer_config.kv_connector_extra_config": {},
   "kv_transfer_config.kv_connector_module_path": null,
-  "kv_transfer_config.kv_ip": "127.0.0.1",
   "kv_transfer_config.kv_load_failure_policy": "fail",
-  "kv_transfer_config.kv_parallel_size": 1,
   "kv_transfer_config.kv_port": 14579,
-  "kv_transfer_config.kv_rank": null,
   "kv_transfer_config.kv_role": null,
   "language_model_only": {
    "unliteral": "MultiModalConfig.language_model_only"
@@ -404,6 +408,7 @@
   "numa_bind_nodes": null,
   "observability_config.collect_detailed_traces": null,
   "observability_config.cudagraph_metrics": false,
+  "observability_config.custom_histogram_buckets": null,
   "observability_config.enable_layerwise_nvtx_tracing": false,
   "observability_config.enable_logging_iteration_details": false,
   "observability_config.enable_mfu_metrics": false,
@@ -495,6 +500,7 @@
    "unliteral": "MultiModalConfig.skip_mm_profiling"
   },
   "skip_tokenizer_init": false,
+  "sleep_mode_offload_cudagraph": false,
   "sleep_preserve_parameter_names": {
    "unliteral": "get_field(ModelConfig, 'sleep_preserve_parameter_names')"
   },
@@ -574,5 +580,5 @@
   "worker_cls": "auto",
   "worker_extension_cls": ""
  },
- "vllm_ref": "v0.31.0"
+ "vllm_ref": "v0.32.0"
 }

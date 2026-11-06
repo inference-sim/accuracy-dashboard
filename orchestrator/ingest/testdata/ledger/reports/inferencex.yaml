@@ -1,0 +1,16 @@
+kind: IngestReport
+source: inferencex
+revision: fixture
+input: ecca0029540aac5fd6aa4fc08529f9611e6b9d2fd9225a74c7cce884065930e1
+records: 9
+units: 5
+role_keys: 1
+duplicates: 1
+merged: 1
+joined_units: 1
+joined_records: 2
+left_out:
+    error_reported:
+        - 108
+units_by_framework:
+    vllm: 5

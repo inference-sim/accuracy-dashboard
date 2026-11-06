@@ -296,7 +296,7 @@ describe('the default view is every point, and the tier text names the build win
     expect(html).toContain('<span class="clk on">all</span>')
     const n = flattenPoints(a).length
     expect(html).toContain(`${n} measurements`)
-    const all = aggregatePair(flattenPoints(a)).all.mape.ttft!
+    const all = aggregatePair(flattenPoints(a)).all.mape.ttft as number
     const pct = (v: number) => `${v.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
     expect(html.slice(html.indexOf('class="stats"'), html.indexOf('class="context"'))).toContain(pct(all))
   })

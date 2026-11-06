@@ -92,8 +92,9 @@ def test_a_run_that_scores_keeps_its_action():
 
 def _pt(pid, model, conc, date_):
     return {"point_id": pid,
-            "identity": {"model": model, "hardware": "h100", "precision": "fp8", "framework": "vllm",
-                         "benchmark_type": "agentic_traces", "recipe": "r1", "conc": conc, "measured_date": date_}}
+            "identity": {"source": "inferencex", "model": model, "hardware": "h100", "precision": "fp8",
+                         "framework": "vllm", "benchmark_type": "agentic_traces", "configuration_hash": "cd" * 32,
+                         "recipe_fingerprint": "r1", "conc": conc, "measured_date": date_, "benchmark_run": None}}
 
 
 def test_latest_per_config_keeps_only_the_newest_measurement():

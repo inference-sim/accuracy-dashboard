@@ -11,6 +11,7 @@
  * concurrency and excludes the anchor; every level averages |individual point errors|, never
  * child-node means.
  */
+import { TOO_FEW } from './types'
 import type { Fidelity, Metric, MetricBlock, MetricBlockPair, PointNode, Summary, TierKey } from './types'
 
 /** A leaf point flattened out of the tree with its full ancestry, for filtering + regrouping. */
@@ -151,20 +152,31 @@ function meanAbs(values: (number | null)[]): { mean: number | null; n: number } 
 }
 
 /** A metricBlock recomputed from a flat list of points, for one tier. */
-export function aggregate(points: FlatPoint[], tier: TierKey): MetricBlock {
+export function aggregate(points: FlatPoint[], tier: TierKey, minPoints = 0): MetricBlock {
   const scoped = tier === 'measured_or_resolved' ? points.filter((p) => p.tier === 'measured_or_resolved') : points
   const mapeTtft = meanAbs(scoped.map((p) => p.errTtft))
   const mapeTpot = meanAbs(scoped.map((p) => p.errTpot))
   const shapeTtft = meanAbs(scoped.map((p) => p.shapeTtft))
   const shapeTpot = meanAbs(scoped.map((p) => p.shapeTpot))
+  // v3 (COV-11): a mean over fewer than minPoints points is "too few points", never a number.
+  // minPoints is 0 for v1 and v2, whose figures render as they always have.
+  const fig = (r: { mean: number | null; n: number }) => (r.n > 0 && r.n < minPoints ? TOO_FEW : r.mean)
   return {
-    mape: { ttft: mapeTtft.mean, tpot: mapeTpot.mean, n: Math.max(mapeTtft.n, mapeTpot.n) },
-    shape: { ttft: shapeTtft.mean, tpot: shapeTpot.mean, n: Math.max(shapeTtft.n, shapeTpot.n) },
+    mape: { ttft: fig(mapeTtft), tpot: fig(mapeTpot), n: Math.max(mapeTtft.n, mapeTpot.n) },
+    shape: { ttft: fig(shapeTtft), tpot: fig(shapeTpot), n: Math.max(shapeTtft.n, shapeTpot.n) },
   }
 }
 
-export function aggregatePair(points: FlatPoint[]): MetricBlockPair {
-  return { measured_or_resolved: aggregate(points, 'measured_or_resolved'), all: aggregate(points, 'all') }
+/** A figure for arithmetic: a number, or null when it is missing or "too few points" (COV-11). */
+export function figureValue(v: number | null | typeof TOO_FEW): number | null {
+  return v === TOO_FEW ? null : v
+}
+
+export function aggregatePair(points: FlatPoint[], minPoints = 0): MetricBlockPair {
+  return {
+    measured_or_resolved: aggregate(points, 'measured_or_resolved', minPoints),
+    all: aggregate(points, 'all', minPoints),
+  }
 }
 
 /**

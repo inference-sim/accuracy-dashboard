@@ -17,25 +17,30 @@ import cli  # noqa: E402
 import contract as c  # noqa: E402
 import pull as pl  # noqa: E402
 import api  # noqa: E402
+import ledger_fake  # noqa: E402
 
 
 def _args(tmp, **over):
     a = dict(blis_tag="v0.12.0", work_dir=str(tmp / "work"), data_dir=str(tmp / "data"),
-             state=str(tmp / "state.json"), window_days=180, keep_api=5, today="2026-10-23",
+             state=str(tmp / "state.json"), scored=str(tmp / "scored-releases.json"), window_days=180, keep_api=5, today="2026-10-23",
              cache=None, work=str(tmp / "contract"), score_work=str(tmp / "sw"), evaluator_commit="abc",
-             blis_dir=str(tmp / "sim"), catalog=str(tmp / "cat"), registry=str(tmp / "reg"),
-             defaults_helper=str(tmp / "helper"), signedprobe=str(tmp / "signedprobe"),
+             blis=str(tmp / "sim" / "blis"), catalog=str(tmp / "cat"), registry=str(tmp / "reg"),
+             fields=str(tmp / "fields.json"),
              corpus=str(tmp / "corpus.json"),
              corpus_sha256=None, corpus_dataset="d", corpus_revision="main", corpus_cache=None,
-             timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0)
+             timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0, stack=None,
+             ledger=str(tmp / "ledger"))
     a.update(over)
+    if not Path(a["scored"]).exists():
+        Path(a["scored"]).write_text(json.dumps({"kind": "ScoredReleases", "releases": []}))
     return types.SimpleNamespace(**a)
 
 
 def _row(model, conc, md):
     return {"model": model, "hardware": "h100", "precision": "fp8", "framework": "vllm",
             "benchmark_type": "agentic_traces", "recipe_fingerprint": f"rf-{model}-{conc}-{md}",
-            "conc": conc, "date": md, "id": f"{model}{conc}{md}"}
+            "conc": conc, "date": md, "id": str(conc * 100000 + int(md.replace("-", "")[2:])),
+            "run_url": f"https://github.com/o/r/actions/runs/{conc}{md.replace('-', '')}/attempts/1"}
 
 
 class Fakes:
@@ -47,15 +52,19 @@ class Fakes:
     def api_pull(self, fetch, *, today, window_days, framework="vllm"):
         return types.SimpleNamespace(rows=self.rows)
 
+    def ledger(self, tmp):
+        # The ledger the night reads: one unit per row, written before each night.
+        ledger_fake.write(tmp / "ledger", self.rows)
+
     def cmd_pull(self, a):
         self.pulled_only = a.only
         want = self.rows if a.only is None else [r for r in self.rows
-                                                 if c.point_id(pl.identity(r)) in set(a.only)]
+                                                 if ledger_fake.point_id(r) in set(a.only)]
         out = Path(a.out)
         points = []
         for r in want:
-            ident = pl.identity(r)
-            pid = c.point_id(ident)
+            pid = ledger_fake.point_id(r)
+            ident = c.unit_identity(r, c.run_dates([r]))
             (out / "points" / pid).mkdir(parents=True, exist_ok=True)
             points.append({"point_id": pid, "identity": ident, "row": r, "files": {}, "reasons": []})
         pl.write_manifest(out, {"window": ["", a.today], "pulled_at": a.today + "T00:00:00Z"}, points)
@@ -73,11 +82,12 @@ def _install(monkeypatch, fakes, scored_ids):
     monkeypatch.setattr(cli, "cmd_score", fakes.cmd_score)
     import build_summary_v2
     def fake_build(contract_dir, *, generated_at, evaluator_commit):
-        return {"schema_version": 2, "snapshot_id": "2026-10-23_blis-v0.12.0_ix-api-2026-10-23",
+        return {"schema_version": 3, "snapshot_id": "2026-10-23_blis-v0.12.0_ix-api-2026-10-23",
                 "generated_at": generated_at,
                 "provenance": {"ingest": "api", "blis": {"release": "v0.12.0"},
+                               "simulator": {"build": "v0.12.0", "engine": {"kind": "vllm", "version": "0.32.0"}},
                                "ground_truth": {"release_tag": "api-2026-10-23"}},
-                "coverage": {"scored": len(scored_ids), "not_scored": 0}, "matrix": [], "not_scored": []}
+                "coverage": {"graded": len(scored_ids), "not_scored": 0}, "matrix": [], "not_scored": []}
     monkeypatch.setattr(build_summary_v2, "build", fake_build)
     return build_summary_v2
 
@@ -85,8 +95,9 @@ def _install(monkeypatch, fakes, scored_ids):
 def test_nightly_seed_lists_window_fetches_all_and_publishes(tmp_path, monkeypatch):
     rows = [_row("m", 1, "2026-10-01"), _row("m", 2, "2026-10-01")]
     fakes = Fakes(rows)
-    _install(monkeypatch, fakes, [c.point_id(pl.identity(r)) for r in rows])
+    _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
 
+    fakes.ledger(tmp_path)
     rc = cli.cmd_nightly(_args(tmp_path))
     assert rc == 0
     # Seed (no prior summary) -> whole window fetched, snapshot frozen, live view + state written.
@@ -96,24 +107,45 @@ def test_nightly_seed_lists_window_fetches_all_and_publishes(tmp_path, monkeypat
     assert (tmp_path / "data" / "latest" / "summary.json").is_file()
     state = json.loads((tmp_path / "state.json").read_text())
     assert state["ingest"] == "api" and state["blis_tag"] == "v0.12.0"
-    assert set(state["point_ids"]) == {c.point_id(pl.identity(r)) for r in rows}
+    assert set(state["point_ids"]) == {ledger_fake.point_id(r) for r in rows}
 
 
 def test_nightly_ix_only_fetches_only_the_delta(tmp_path, monkeypatch):
     rows = [_row("m", 1, "2026-10-01")]
     fakes = Fakes(rows)
-    _install(monkeypatch, fakes, [c.point_id(pl.identity(r)) for r in rows])
+    _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
+    fakes.ledger(tmp_path)
     cli.cmd_nightly(_args(tmp_path))                       # seed
 
     # Night 2: a new point, same BLIS -> only the new point is fetched (the delta).
     new = _row("m", 2, "2026-10-02")
     fakes.rows = rows + [new]
+    fakes.ledger(tmp_path)
     # the merge path calls build_merged; stub it to a trivial summary so we only test the delta fetch
     import build_summary_v2
     monkeypatch.setattr(build_summary_v2, "build_merged",
-                        lambda prior, delta, window_ids, **k: {**prior, "coverage": {"scored": 2, "not_scored": 0}})
+                        lambda prior, delta, window_ids, **k: {**prior, "coverage": {"graded": 2, "not_scored": 0}})
     cli.cmd_nightly(_args(tmp_path, today="2026-10-24"))
-    assert fakes.pulled_only == [c.point_id(pl.identity(new))]   # delta only
+    assert fakes.pulled_only == [ledger_fake.point_id(new)]   # delta only
+
+
+def test_a_night_after_a_v2_summary_fetches_and_scores_the_whole_window(tmp_path, monkeypatch):
+    # A published v2 summary holds no grades, so the delta cannot be merged into it: the night
+    # rescores the whole window rather than publish a summary of the delta alone.
+    rows = [_row("m", 1, "2026-10-01")]
+    fakes = Fakes(rows)
+    _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
+    fakes.ledger(tmp_path)
+    cli.cmd_nightly(_args(tmp_path))                       # seed
+    latest = tmp_path / "data" / "latest" / "summary.json"
+    latest.write_text(json.dumps({**json.loads(latest.read_text()), "schema_version": 2}))
+    new = _row("m", 2, "2026-10-02")
+    fakes.rows = rows + [new]
+    fakes.ledger(tmp_path)
+    import build_summary_v2
+    monkeypatch.setattr(build_summary_v2, "build_merged", lambda *a, **k: (_ for _ in ()).throw(AssertionError("merged")))
+    cli.cmd_nightly(_args(tmp_path, today="2026-10-24"))
+    assert fakes.pulled_only is None                      # the whole window
 
 
 def test_nightly_noop_fetches_nothing_not_the_whole_window(tmp_path, monkeypatch):
@@ -123,7 +155,8 @@ def test_nightly_noop_fetches_nothing_not_the_whole_window(tmp_path, monkeypatch
     # all ~2000 points (the full BLIS-release cost) for a result the merge then throws away.
     rows = [_row("m", 1, "2026-10-01"), _row("m", 2, "2026-10-01")]
     fakes = Fakes(rows)
-    _install(monkeypatch, fakes, [c.point_id(pl.identity(r)) for r in rows])
+    _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
+    fakes.ledger(tmp_path)
     cli.cmd_nightly(_args(tmp_path))                       # seed: whole window
     assert fakes.pulled_only is None
 
@@ -137,6 +170,169 @@ def test_nightly_noop_fetches_nothing_not_the_whole_window(tmp_path, monkeypatch
 def test_nightly_stops_when_the_pull_fails(tmp_path, monkeypatch):
     fakes = Fakes([_row("m", 1, "2026-10-01")])
     _install(monkeypatch, fakes, [])
+    fakes.ledger(tmp_path)
     monkeypatch.setattr(cli, "cmd_pull", lambda a: 4)      # a pull error
     with pytest.raises(RuntimeError, match="pull failed"):
         cli.cmd_nightly(_args(tmp_path))
+
+
+def test_the_nightly_passes_the_blis_binary_to_score(tmp_path, monkeypatch):
+    rows = [_row("m", 1, "2026-10-01")]
+    fakes = Fakes(rows)
+    _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
+    seen = {}
+    real = fakes.cmd_score
+    monkeypatch.setattr(cli, "cmd_score", lambda a: (seen.setdefault("a", a), real(a))[1])
+    fakes.ledger(tmp_path)
+    cli.cmd_nightly(_args(tmp_path))
+    assert seen["a"].blis == str(tmp_path / "sim" / "blis")
+    assert not hasattr(seen["a"], "blis_dir") and not hasattr(seen["a"], "signedprobe")
+
+
+def _git(*a):
+    import subprocess
+    subprocess.run(["git", *a], check=True, capture_output=True)
+
+
+def _tagged_repo(path, tag):
+    path.mkdir(parents=True)
+    _git("-C", str(path), "init", "-q")
+    _git("-C", str(path), "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "x")
+    if tag:
+        _git("-C", str(path), "tag", tag)
+
+
+def test_check_blis_inputs_reads_the_release_from_the_binarys_checkout(tmp_path):
+    sim = tmp_path / "sim"
+    _tagged_repo(sim, "v0.16.0")
+    (sim / "blis").write_text("")
+    for r in ("cat", "reg"):
+        _tagged_repo(tmp_path / r, "v1.0.0")
+    assert cli.check_blis_inputs(sim / "blis", tmp_path / "cat", tmp_path / "reg") == []
+    bad = cli.check_blis_inputs(sim / "nope", tmp_path / "cat", tmp_path / "reg")
+    assert len(bad) == 1 and bad[0].startswith(f"--blis {sim / 'nope'} is not a file")
+
+
+def test_check_blis_inputs_refuses_a_checkout_not_at_a_tag(tmp_path):
+    sim = tmp_path / "sim"
+    _tagged_repo(sim, None)
+    (sim / "blis").write_text("")
+    for r in ("cat", "reg"):
+        _tagged_repo(tmp_path / r, "v1.0.0")
+    bad = cli.check_blis_inputs(sim / "blis", tmp_path / "cat", tmp_path / "reg")
+    assert any("is not at a release tag" in b for b in bad)
+
+
+FIELD_LIST = {"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": []}
+
+
+def test_the_field_list_must_be_the_release_the_simulator_runs(tmp_path):
+    p = tmp_path / "fields.json"
+    p.write_text(json.dumps(FIELD_LIST))
+    fl_, sha = cli.read_fields(str(p), "0.32.0")
+    assert fl_.engine == {"kind": "vllm", "version": "0.32.0"} and len(sha) == 64
+    import fields
+    with pytest.raises(fields.FieldsError, match="the simulator runs vllm 0.31.0"):
+        cli.read_fields(str(p), "0.31.0")
+    with pytest.raises(fields.FieldsError, match="--fields is required"):
+        cli.read_fields(None, "0.32.0")
+
+
+def test_a_build_with_no_stack_json_is_refused_with_why(tmp_path):
+    import stack
+    (tmp_path / "sim").mkdir()
+    with pytest.raises(stack.StackError, match="predates stack.json"):
+        cli.read_stack(tmp_path / "sim" / "blis", None)
+    s = tmp_path / "stack.json"
+    s.write_text(json.dumps({"kind": "Stack", "engines": [{"kind": "vllm", "version": "0.32.0"}]}))
+    assert cli.read_stack(tmp_path / "sim" / "blis", str(s)).engine("vllm") == "0.32.0"
+
+
+def test_resolve_blis_names_every_unscored_release_oldest_first_else_the_newest(tmp_path):
+    # COV-9: resolve_blis.sh lists every stable release from v0.16.0 on that
+    # state/scored-releases.json does not list, in tag order; with none left, it scores the
+    # newest release's delta.
+    import subprocess
+    root = Path(__file__).resolve().parent.parent
+    bin_ = tmp_path / "bin"
+    bin_.mkdir()
+    releases = [{"tagName": t, "createdAt": d} for t, d in
+                (("v0.17.0", "2026-12-01"), ("v0.15.0", "2026-10-30"), ("v0.16.0", "2026-11-10"))]
+    gh = bin_ / "gh"
+    # The fake gh applies the jq query the script passes, as gh does.
+    gh.write_text("#!/usr/bin/env python3\nimport json, sys\nrel = " + json.dumps(releases) + "\n"
+                  "q = sys.argv[sys.argv.index('-q') + 1]\n"
+                  "assert q == 'sort_by(.createdAt) | .[].tagName', q\n"
+                  "print('\\n'.join(r['tagName'] for r in sorted(rel, key=lambda r: r['createdAt'])))\n")
+    gh.chmod(0o755)
+
+    def run():
+        out = tmp_path / "out"
+        out.unlink(missing_ok=True)
+        env = {"PATH": f"{bin_}:/usr/bin:/bin", "GITHUB_OUTPUT": str(out)}
+        work = tmp_path / "repo"
+        r = subprocess.run(["bash", str(work / "orchestrator" / "resolve_blis.sh")], env=env,
+                           capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr
+        return dict(line.split("=", 1) for line in out.read_text().splitlines())
+    import shutil
+    shutil.copytree(root, tmp_path / "repo" / "orchestrator", ignore=shutil.ignore_patterns("testdata", "__pycache__"))
+    state = tmp_path / "repo" / "state"
+    state.mkdir()
+
+    def listed(*tags):
+        (state / "scored-releases.json").write_text(json.dumps({"kind": "ScoredReleases", "releases": list(tags)}))
+    listed("v0.15.0")
+    import sys as _sys
+    (bin_ / "python3").symlink_to(_sys.executable)
+    assert run() == {"blis_tags": "v0.16.0 v0.17.0", "blis_tag": "v0.17.0"}
+    listed("v0.15.0", "v0.16.0", "v0.17.0")
+    assert run() == {"blis_tags": "v0.17.0", "blis_tag": "v0.17.0"}
+
+
+def test_sim_build_must_be_the_checkouts_tag_or_commit(tmp_path):
+    import subprocess
+    sim = tmp_path / "sim"
+    _tagged_repo(sim, "v0.16.0")
+    (sim / "blis").write_text("")
+    for r in ("cat", "reg"):
+        _tagged_repo(tmp_path / r, "v1.0.0")
+    head = subprocess.run(["git", "-C", str(sim), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    check = lambda b: cli.check_blis_inputs(sim / "blis", tmp_path / "cat", tmp_path / "reg", b)  # noqa: E731
+    assert check("v0.16.0") == [] and check(head) == []
+    assert check("v0.17.0") == [f"--sim-build v0.17.0: the checkout {sim} is at v0.16.0"]
+    assert check("0" * 40) == [f"--sim-build {'0' * 40}: the checkout {sim} is at commit {head}"]
+    assert check("main") == ["--sim-build 'main' is neither a tag vX.Y.Z[-suffix] nor a 40-hex commit"]
+
+
+def test_harness_digest_is_a_sha256_or_unreleased():
+    assert cli.check_harness_digest("sha256:" + "a" * 64) == [] and cli.check_harness_digest("unreleased") == []
+    assert cli.check_harness_digest("latest") == ["--harness-digest 'latest' is neither sha256:<64 hex> nor unreleased"]
+    assert cli.check_harness_digest(None)[0].startswith("--harness-digest is required")
+
+
+def test_units_select_the_points_of_the_pull_and_name_those_it_does_not_hold(tmp_path):
+    a, b, c_ = "a" * 64, "b" * 64, "c" * 64
+    units = tmp_path / "units.txt"
+    units.write_text(f"{a}\n{c_}\n")
+    pts = [{"point_id": a}, {"point_id": b}]
+    chosen, rec = cli.select_units(pts, str(units))
+    assert chosen == [{"point_id": a}]
+    assert rec["count"] == 2 and rec["not_in_pull"] == [c_] and len(rec["sha256"]) == 64
+    assert cli.select_units(pts, None) == (pts, None)
+
+
+def test_a_pre_release_tag_is_a_simulator_build_but_not_a_release_tag(tmp_path):
+    # harness/run.sh accepts vMAJOR.MINOR.PATCH-suffix; check_blis_inputs must agree, and the
+    # figures are experimental unless the build is a release tag with no suffix.
+    sim = tmp_path / "sim"
+    _tagged_repo(sim, "v0.16.0-rc1")
+    (sim / "blis").write_text("")
+    for r in ("cat", "reg"):
+        _tagged_repo(tmp_path / r, "v1.0.0")
+    check = lambda b: cli.check_blis_inputs(sim / "blis", tmp_path / "cat", tmp_path / "reg", b)  # noqa: E731
+    assert check("v0.16.0-rc1") == []
+    assert check("v0.16.0-rc2") == [f"--sim-build v0.16.0-rc2: the checkout {sim} is at v0.16.0-rc1"]
+    assert check("v0.16") == ["--sim-build 'v0.16' is neither a tag vX.Y.Z[-suffix] nor a 40-hex commit"]
+    assert cli.check_blis_inputs(sim / "blis", tmp_path / "cat", tmp_path / "reg") == []
+    assert cli._RELEASE_TAG.match("v0.16.0") and not cli._RELEASE_TAG.match("v0.16.0-rc1")

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Behavioural tests for the agentic scoring driver.
 
-No network and no real blis build: these feed a fixed agentic row and a fixed blis metrics
-JSON and check that the driver (1) maps the row to a scoreable deployment, (2) places
+No network and no real blis build: these feed a fixed agentic row and a fixed blis Result
+document and check that the driver (1) maps the row to a scoreable deployment, (2) places
 measured and predicted mean TTFT/TPOT in the right CSV columns and units, (3) refuses an
 unsupported model/hardware or an unreplayable row rather than scoring it with a guess.
 
@@ -40,6 +40,14 @@ SERVER_LOG = (
     "'speculative_config': {'method': 'dspark', 'num_speculative_tokens': 7, "
     "'rejection_sample_method': 'synthetic', 'synthetic_acceptance_length': 3.84}}\n"
 )
+def _result(metrics: dict) -> dict:
+    """A schema-version-2 Result document with these figures (metric id -> value)."""
+    return {"kind": "Result", "schema_version": 2, "name": "x",
+            "metrics": {k: {"value": v, "samples": 10} for k, v in metrics.items()},
+            "requests": {"generated": 10, "completed": 10, "timed_out": 0, "in_flight_at_horizon": 0,
+                         "queued_at_horizon": 0, "not_started": 0, "length_capped": 0}}
+
+
 def ck(label, ok, detail=""):
     print(f"  {'OK  ' if ok else 'FAIL'} {label}{(': ' + detail) if detail else ''}")
     if not ok:
@@ -73,19 +81,19 @@ def test_pure_functions():
     ck("measured TPOT is seconds scaled to microseconds",
        abs(mp - 4540.0) < 1, f"{mp}")
 
-    # Point 1: predicted TPOT is request_itl_mean_ms (per TOKEN), NOT itl_mean_ms (per step).
-    # Under DSpark they differ by ~AL, so reading the wrong one inflates TPOT ~AL x.
-    pt, pp = ra.predicted_us({"ttft_mean_ms": 1500.0,
-                              "request_itl_mean_ms": 4.5, "itl_mean_ms": 17.0})
+    # Point 1: predicted TPOT is the registry's tpot_mean_ms (per TOKEN), not the per-step
+    # interval (itl_mean_ms here). Under DSpark they differ by ~AL, so reading the wrong one
+    # inflates TPOT ~AL x.
+    pt, pp = ra.predicted_us(_result({"ttft_mean_ms": 1500.0, "tpot_mean_ms": 4.5, "itl_mean_ms": 17.0}))
     ck("predicted TTFT is ms scaled to microseconds", abs(pt - 1.5e6) < 1, f"{pt}")
-    ck("predicted TPOT comes from request_itl_mean_ms (per token), not itl_mean_ms",
+    ck("predicted TPOT comes from tpot_mean_ms (per token), not itl_mean_ms",
        abs(pp - 4500.0) < 1, f"{pp}")
-    # Missing request_itl_mean_ms fails loud rather than silently using the step interval.
+    # A Result without tpot_mean_ms fails loud rather than silently using another figure.
     try:
-        ra.predicted_us({"ttft_mean_ms": 1500.0, "itl_mean_ms": 17.0})
-        ck("a metrics file without request_itl_mean_ms is rejected", False, "no error raised")
+        ra.predicted_us(_result({"ttft_mean_ms": 1500.0, "itl_mean_ms": 17.0}))
+        ck("a Result without tpot_mean_ms is rejected", False, "no error raised")
     except SystemExit:
-        ck("a metrics file without request_itl_mean_ms is rejected", True)
+        ck("a Result without tpot_mean_ms is rejected", True)
 
     r = ra.csv_row(ROW, sweep, pt, pp)
     ck("the CSV row has exactly build_summary's columns",
@@ -144,7 +152,7 @@ def test_pure_functions():
 
 
 def run_driver(td: Path, row: dict, blis_stub: str) -> subprocess.CompletedProcess:
-    """Drive run_agentic.main() with a fake blis that writes a fixed metrics file.
+    """Drive run_agentic.main() with a fake blis that prints a fixed Result document.
 
     Deliberately passes NO --job-log: the external repo's Actions log is usually unreadable,
     and the driver must score without it (seed/duration default, concurrency from the row).
@@ -167,28 +175,30 @@ def test_driver_scores_a_supported_row():
     with tempfile.TemporaryDirectory() as d:
         td = Path(d)
         (td / "traces.jsonl").write_text("{}\n")
-        # A fake blis: record its argv, and on --metrics-path write a fixed MetricsOutput.
-        # It writes BOTH itl_mean_ms (step interval) and request_itl_mean_ms (per token) so
-        # the test confirms the driver reads the per-token one.
+        # A fake blis: `schema validate result` accepts; `replay` records its argv and its
+        # working directory and prints a fixed Result. The Result carries BOTH itl_mean_ms
+        # (step interval) and tpot_mean_ms (per token) so the test confirms the driver reads
+        # the per-token one.
+        doc = json.dumps(_result({"ttft_mean_ms": 1500.0, "tpot_mean_ms": 4.5, "itl_mean_ms": 17.0}))
         stub = (
             "#!/usr/bin/env bash\n"
+            "[ \"$1\" = schema ] && exit 0\n"
             "printf '%s\\n' \"$@\" > \"$(dirname \"$0\")/argv.txt\"\n"
-            "while [ $# -gt 0 ]; do [ \"$1\" = --metrics-path ] && echo "
-            "'{\"ttft_mean_ms\": 1500.0, \"request_itl_mean_ms\": 4.5, \"itl_mean_ms\": 17.0}'"
-            " > \"$2\"; shift; done\n"
+            "pwd > \"$(dirname \"$0\")/cwd.txt\"\n"
+            f"echo '{doc}'\n"
         )
         r = run_driver(td, ROW, stub)
         ck("driver exits 0 on a supported, replayable row", r.returncode == 0,
            r.stderr[-300:])
-        csv = td / "out" / "signedprobe.csv"
-        ck("a signedprobe.csv is written", csv.exists())
+        csv = td / "out" / "points.csv"
+        ck("a points.csv is written", csv.exists())
         if csv.exists():
             lines = csv.read_text().strip().splitlines()
             ck("the CSV has a header + one data row", len(lines) == 2, str(lines))
             ck("the header is build_summary's EXPECTED_HEADER",
                lines[0] == ",".join(ra.CSV_HEADER))
             row_cells = dict(zip(ra.CSV_HEADER, lines[1].split(",")))
-            # Predicted TPOT = request_itl_mean_ms (4.5ms = 4500us), NOT itl_mean_ms (17ms).
+            # Predicted TPOT = tpot_mean_ms (4.5ms = 4500us), NOT itl_mean_ms (17ms).
             ck("predicted TPOT in the CSV is the per-token metric (4500us, not 17000)",
                row_cells["pred_tpot_us"] == "4500.0", row_cells["pred_tpot_us"])
             ck("the CSV point is ALL tier", row_cells["tier_unbracketed"] == "ALL (approximate)")
@@ -198,6 +208,10 @@ def test_driver_scores_a_supported_row():
         ck("--speculative-acceptance-length is passed to blis",
            "--speculative-acceptance-length" in argv)
         ck("--benchmark-duration 3600s is passed to blis", "3600s" in argv)
+        ck("no --metrics-path is passed; the Result is read from standard output",
+           "--metrics-path" not in argv and "--format\njson" in argv, argv)
+        cwd = (td / "cwd.txt").read_text().strip() if (td / "cwd.txt").exists() else ""
+        ck("blis runs in its binary's directory", Path(cwd).resolve() == td.resolve(), cwd)
         scen = list((td / "out" / "scenarios").glob("*.yaml"))
         ck("a scenario file is written", len(scen) == 1, str(scen))
         if scen:
@@ -221,7 +235,7 @@ def test_driver_refuses_unsupported():
         ck("driver exits 0 (not scored, not an error) on an unsupported model",
            r.returncode == 0, r.stderr[-200:])
         ck("no CSV is written for an unsupported row",
-           not (td / "out" / "signedprobe.csv").exists())
+           not (td / "out" / "points.csv").exists())
         refusals = td / "out" / "refusals.json"
         ck("a refusals.json records why", refusals.exists())
         if refusals.exists():
@@ -230,10 +244,25 @@ def test_driver_refuses_unsupported():
                any("brand-new-model" in x for x in doc["refusals"]), str(doc["refusals"]))
 
 
+def test_driver_refuses_a_result_that_does_not_validate():
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_text("{}\n")
+        doc = json.dumps(_result({"ttft_mean_ms": 1500.0, "tpot_mean_ms": 4.5}))
+        stub = ("#!/usr/bin/env bash\n"
+                "[ \"$1\" = schema ] && { echo 'metrics: bad' >&2; exit 1; }\n"
+                f"echo '{doc}'\n")
+        r = run_driver(td, ROW, stub)
+        ck("a Result that does not validate stops the driver", r.returncode != 0, r.stderr[-200:])
+        ck("the refusal says the Result does not validate", "does not validate" in r.stderr, r.stderr[-200:])
+        ck("no CSV is written for an invalid Result", not (td / "out" / "points.csv").exists())
+
+
 def main() -> int:
     test_pure_functions()
     test_driver_scores_a_supported_row()
     test_driver_refuses_unsupported()
+    test_driver_refuses_a_result_that_does_not_validate()
     print()
     if FAILURES:
         print(f"FAIL: {len(FAILURES)} failure(s): {FAILURES}")

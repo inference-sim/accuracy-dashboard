@@ -68,8 +68,8 @@ describe('App renders the real CI-shaped snapshot', () => {
     const t = aggregatePair(flattenPoints(summary)).all.mape
     const pct = (v: number) => `${v.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
     const stats = html.slice(html.indexOf('class="stats"'), html.indexOf('class="context"'))
-    expect(stats).toContain(pct(t.ttft!))
-    expect(stats).toContain(pct(t.tpot!))
+    expect(stats).toContain(pct(t.ttft as number))
+    expect(stats).toContain(pct(t.tpot as number))
     expect(html).toContain('lower is better')
     // ...and it appears once, as the headline, not again as a table row.
     expect(html).not.toContain('ALL MODELS')

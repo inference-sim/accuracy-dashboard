@@ -40,8 +40,8 @@ _FLAGS = {
 
 
 # Every key a profiling phase / dataset / endpoint can carry, and what the extractor does with
-# it. A key not listed refuses the point (unclassified_arg:replay.<key>), so a client input added
-# later can't silently change the workload BLIS replays.
+# it. A key not listed refuses the point (client_scenario_not_replayable:<where>.<key>), so a client
+# input added later can't silently change the workload BLIS replays.
 #   read        passed to BLIS (or checked against the one value BLIS's scenario locks)
 #   inert       no effect on what is sent or when
 #   gap_1971    the two AgentX inputs BLIS can't state yet (inference-sim#1971): not passed, not
@@ -64,7 +64,7 @@ ENDPOINT_KEYS = {"urls": "inert", "type": "read", "path": "inert", "streaming": 
 
 
 def _unknown_keys(where: str, doc: dict, known: dict) -> list[str]:
-    return [f"unclassified_arg:replay.{where}.{k}" for k in sorted(doc) if k not in known]
+    return [f"client_scenario_not_replayable:{where}.{k}" for k in sorted(doc) if k not in known]
 
 
 @dataclass
@@ -134,9 +134,9 @@ def from_export(export: dict) -> Replay:
     else:
         r.replayed_as = REPLAYABLE[r.scenario]
     if r.system_idle_cap_s is not None and float(r.system_idle_cap_s) != LOCKED_SYSTEM_IDLE_CAP_S:
-        r.reasons.append("setting_not_modelled:replay.system_idle_gap_cap_seconds")
+        r.reasons.append("client_scenario_not_replayable:system_idle_gap_cap_seconds")
     if ep.get("streaming") is False:
-        r.reasons.append("setting_not_modelled:replay.streaming")
+        r.reasons.append("client_scenario_not_replayable:streaming_off")
     for need in ("concurrency", "duration_s", "seed", "corpus"):
         if getattr(r, need) is None:
             r.reasons.append(f"required_setting_missing:replay.{need}")

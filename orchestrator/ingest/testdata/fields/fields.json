@@ -1,0 +1,470 @@
+{
+ "kind": "FieldList",
+ "engine": {
+  "kind": "vllm",
+  "version": "0.31.0"
+ },
+ "fields": [
+  {
+   "name": "VLLM_FLASHINFER_ALLREDUCE_BACKEND",
+   "source": "env",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "VLLM_MXFP4_USE_MARLIN",
+   "source": "env",
+   "status": "not_modelled",
+   "evidence": {
+    "issue": "inference-sim/blis-vllm#1"
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "VLLM_USE_RUST_FRONTEND",
+   "source": "env",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "attention_config.backend",
+   "source": "config",
+   "status": "inert_unproven",
+   "evidence": {
+    "note": "believed inert"
+   },
+   "estimation": {
+    "rule": "leave_unset"
+   }
+  },
+  {
+   "name": "attention_config.flex_attn_block_m",
+   "source": "config",
+   "status": "proven_inert",
+   "evidence": {
+    "proof": "TestInert"
+   },
+   "estimation": {
+    "rule": "leave_unset"
+   }
+  },
+  {
+   "name": "attention_config.indexer_kv_dtype",
+   "source": "config",
+   "status": "not_modelled",
+   "evidence": {
+    "issue": "inference-sim/blis-vllm#1"
+   },
+   "estimation": {
+    "rule": "leave_unset"
+   }
+  },
+  {
+   "name": "attention_config.indexer_sparse_logits",
+   "source": "config",
+   "status": "not_modelled",
+   "evidence": {
+    "issue": "inference-sim/blis-vllm#1"
+   },
+   "estimation": {
+    "rule": "leave_unset"
+   }
+  },
+  {
+   "name": "block_size",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "leave_unset"
+   }
+  },
+  {
+   "name": "compilation_config.cudagraph_mode",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "compilation_config.custom_ops",
+   "source": "config",
+   "status": "not_modelled",
+   "evidence": {
+    "issue": "inference-sim/blis-vllm#1"
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "compilation_config.max_cudagraph_capture_size",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "compilation_config.mode",
+   "source": "config",
+   "status": "proven_inert",
+   "evidence": {
+    "proof": "TestInert"
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "data_parallel_size",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "enable_expert_parallel",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "enable_prefix_caching",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "gpu_memory_utilization",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "kernel_config.moe_backend",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "kv_cache_dtype",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "kv_transfer_config.kv_connector",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "kv_transfer_config.kv_connector_extra_config",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "kv_transfer_config.kv_load_failure_policy",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "kv_transfer_config.kv_role",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "language_model_only",
+   "source": "config",
+   "status": "not_modelled",
+   "evidence": {
+    "issue": "inference-sim/blis-vllm#1"
+   },
+   "estimation": {
+    "rule": "substitute",
+    "setting": {
+     "max_model_len": 8192
+    },
+    "reason": "a stand-in for the test"
+   }
+  },
+  {
+   "name": "max_cudagraph_capture_size",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "max_model_len",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "max_num_batched_tokens",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "max_num_seqs",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "leave_unset"
+   }
+  },
+  {
+   "name": "model",
+   "source": "config",
+   "status": "inert_unproven",
+   "evidence": {
+    "note": "believed inert"
+   },
+   "estimation": {
+    "rule": "leave_unset"
+   }
+  },
+  {
+   "name": "pipeline_parallel_size",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "prefill_schedule_interval",
+   "source": "config",
+   "status": "not_modelled",
+   "evidence": {
+    "issue": "inference-sim/blis-vllm#1"
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "quantization",
+   "source": "config",
+   "status": "not_modelled",
+   "evidence": {
+    "issue": "inference-sim/blis-vllm#1"
+   },
+   "estimation": {
+    "rule": "leave_unset"
+   }
+  },
+  {
+   "name": "served_model_name",
+   "source": "config",
+   "status": "inert_unproven",
+   "evidence": {
+    "note": "believed inert"
+   },
+   "estimation": {
+    "rule": "leave_unset"
+   }
+  },
+  {
+   "name": "speculative_config.method",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "speculative_config.num_speculative_tokens",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "speculative_config.rejection_sample_method",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  },
+  {
+   "name": "speculative_config.synthetic_acceptance_length",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "leave_unset"
+   }
+  },
+  {
+   "name": "tensor_parallel_size",
+   "source": "config",
+   "status": "modelled",
+   "evidence": {
+    "traces": [
+     "core/sched/testdata/golden/t.json"
+    ]
+   },
+   "estimation": {
+    "rule": "none"
+   }
+  }
+ ]
+}

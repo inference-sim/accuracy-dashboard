@@ -8,12 +8,8 @@ web/public/data/
 # OS
 .DS_Store
 
-# local upstream build artifacts (never committed; CI builds from source). The trailing-slash
-# exceptions keep orchestrator/signedprobe/ (this repo's scorer source) tracked: only a binary
-# named signedprobe is ignored, never the directory.
+# local upstream build artifacts (never committed; CI builds from source).
 blis
-signedprobe
-!orchestrator/signedprobe/
 metricscore
 
 # python cache

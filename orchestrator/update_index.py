@@ -6,7 +6,7 @@ Two independent retentions (Discussion #15, "Retention: two independent limits")
 here because collapsing them into one knob (what the old 30-day --retention-days did) is exactly
 the bug #15 calls out:
 
-  * API-release snapshots (v2, provenance.ingest == "api"): keep the newest `--keep-api` by
+  * API-release snapshots (provenance.ingest == "api"): keep the newest `--keep-api` by
     snapshot date, prune the rest. Count-based, not a time window: BLIS releases are bursty
     (v0.10→v0.12 in 8 days, then a ~4-month gap), so "the last 5 releases" always gives 5
     comparison points where a day window could hold none.
