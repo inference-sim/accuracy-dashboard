@@ -136,9 +136,11 @@ def test_the_scorer_finishes_a_run_from_a_tree_holding_only_the_copied_paths(tmp
     work.mkdir()
     bare, commit, bin_, log, pull, units, fields, cat, reg = rs.real_setup(work)
     out = work / "out"
-    env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "HARNESS_DIGEST": "sha256:" + "b" * 64}
+    env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "HARNESS_DIGEST": "sha256:" + "b" * 64,
+           "FAKE_FIELDS": str(fields)}
     p = subprocess.run(["bash", str(run_sh), "--sim", "v0.16.0", "--sim-repo", str(bare), "--units", str(units),
                         "--pull", str(pull), "--out", str(out), "--catalog", str(cat), "--registry", str(reg),
-                        "--fields", str(fields)], capture_output=True, text=True, env=env, cwd=root)
+                        "--corpus-dir", str(work / "corpora"),
+                        "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0"], capture_output=True, text=True, env=env, cwd=root)
     assert p.returncode == 0, p.stderr
     assert json.loads((out / "provenance.json").read_text())["simulator"]["build"] == "v0.16.0"

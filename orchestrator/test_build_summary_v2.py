@@ -691,7 +691,7 @@ def test_merge_takes_the_pull_date_from_the_delta_not_the_prior():
         # ...and the release-identity fields stay the prior's (nothing was re-scored).
         assert p["blis"] == prior["provenance"]["blis"]
         assert p["fields_sha256"] == prior["provenance"]["fields_sha256"]
-        assert p["corpus"] == prior["provenance"]["corpus"]
+        assert p["corpora"] == prior["provenance"]["corpora"]
         assert c.validate_dir(delta_c) == []
     finally:
         shutil.rmtree(tmp)

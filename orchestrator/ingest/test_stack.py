@@ -105,7 +105,8 @@ VLLM_COMMIT = "a8bf6ee4fca6d019c98b369be10b5ea044033159"
 
 def test_the_pins_come_from_stack_json_modules_and_engines():
     assert sk.pins(sk.load(SUBSTRATE_STACK)) == {
-        "substrate_commit": SUBSTRATE_COMMIT, "vllm_module_commit": VLLM_COMMIT, "vllm_ref": "v0.32.0"}
+        "substrate_commit": SUBSTRATE_COMMIT, "substrate_version": "v0.0.0-20261105035832-817e83e0018b",
+        "vllm_module_commit": VLLM_COMMIT, "vllm_ref": "v0.32.0"}
 
 
 def test_the_vllm_ref_follows_the_engine_release_with_no_code_change():
@@ -129,12 +130,58 @@ def test_a_stack_without_the_substrate_or_blis_vllm_module_or_a_commit_is_refuse
         sk.pins(sk.parse(json.dumps(bad)))
 
 
+@pytest.mark.parametrize("version,name", [
+    ("v1.2.3", "v1.2.3"), ("v1.2.3-rc1", "v1.2.3-rc1"), ("v1.2.3-rc.1", "v1.2.3-rc.1"),
+    ("v0.0.0-20261105035832-817e83e0018b", None),
+    ("v1.0.0-blis.2.0.20261105040605-fd1830412b30", None),
+    ("v0.32.1-0.20261105040818-a8bf6ee4fca6", None),
+    ("1.2.3", None), ("v1.2", None), ("", None)])
+def test_a_release_name_is_a_release_tag_and_not_a_pseudo_version(version, name):
+    assert sk.release_name({"path": "p", "version": version, "commit": "c"}) == name
+
+
+def _repo_with_tag(path):
+    def git(*a):
+        subprocess.run(["git", "-C", str(path), "-c", "user.email=t@t", "-c", "user.name=t", *a],
+                       check=True, capture_output=True)
+    path.mkdir()
+    git("init", "-q")
+    git("commit", "-q", "--allow-empty", "-m", "one")
+    git("tag", "v1.0.0")
+    git("commit", "-q", "--allow-empty", "-m", "two")
+    rev = lambda ref: subprocess.run(["git", "-C", str(path), "rev-parse", ref], capture_output=True,  # noqa: E731
+                                     text=True).stdout.strip()
+    return git, rev("v1.0.0"), rev("HEAD")
+
+
+def test_a_checkout_at_the_tags_commit_that_stack_json_pins_has_no_problems(tmp_path):
+    git, tagged, _ = _repo_with_tag(tmp_path / "r")
+    git("checkout", "-q", "v1.0.0")
+    assert sk.verify_checkout(tmp_path / "r", "v1.0.0", tagged) == []
+
+
+def test_a_checkout_not_at_the_tags_commit_is_refused_naming_both(tmp_path):
+    _, tagged, head = _repo_with_tag(tmp_path / "r")
+    problems = sk.verify_checkout(tmp_path / "r", "v1.0.0", head)
+    assert len(problems) == 2 and all(tagged in p or head in p for p in problems)
+    assert any(head in p and tagged in p and "v1.0.0" in p for p in problems)
+
+
+def test_a_tag_that_does_not_exist_or_a_commit_stack_json_does_not_pin_is_refused(tmp_path):
+    git, tagged, head = _repo_with_tag(tmp_path / "r")
+    assert sk.verify_checkout(tmp_path / "r", "v9.9.9", head) == [f"{tmp_path / 'r'}: tag v9.9.9 does not exist"]
+    git("checkout", "-q", "v1.0.0")
+    problems = sk.verify_checkout(tmp_path / "r", "v1.0.0", head)
+    assert problems == [f"tag v1.0.0 is commit {tagged}, but stack.json pins {head}"]
+
+
 def test_resolve_stack_prints_the_pins_for_a_checkout_and_fails_without_a_stack(tmp_path):
     script = ROOT / "resolve_stack.py"
     (tmp_path / "stack.json").write_bytes(SUBSTRATE_STACK.read_bytes())
     r = subprocess.run([sys.executable, str(script), str(tmp_path)], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
-    assert r.stdout.splitlines() == [f"substrate_commit={SUBSTRATE_COMMIT}", f"vllm_module_commit={VLLM_COMMIT}",
+    assert r.stdout.splitlines() == [f"substrate_commit={SUBSTRATE_COMMIT}",
+                                     "substrate_version=v0.0.0-20261105035832-817e83e0018b", f"vllm_module_commit={VLLM_COMMIT}",
                                      "vllm_ref=v0.32.0"]
     empty = tmp_path / "empty"
     empty.mkdir()
@@ -147,6 +194,7 @@ def test_the_nightly_resolves_through_stack_json_and_not_through_installation_md
     text = (ROOT.parent / ".github" / "workflows" / "api-nightly.yml").read_text()
     yaml.safe_load(text)
     assert "resolve_stack.py" in text and 'VLLM_REF="$vllm_ref"' in text
+    assert '--substrate-version "$substrate_version" --substrate-commit "$substrate_commit"' in text
     for gone in ("resolve_versions", "installation.md", "go doc", "blis-catalog", "blis-registry", "go.mod"):
         assert gone not in text.replace("# ", ""), gone
     assert not (ROOT / "resolve_versions.sh").exists()

@@ -248,7 +248,10 @@ export interface Provenance {
   /** v3 only: the sha256 of the engine's fields.json the scorer read. */
   fields_sha256?: string
   pulled_at?: string
+  /** v2 only. */
   corpus?: { dataset: string; revision: string; sha256: string } | null
+  /** v3 only: each AgentX corpus by alias, pinned by its catalog replay workload. */
+  corpora?: { alias: string; workload: string; dataset: string; revision: string; sha256: string }[]
 }
 
 export interface Coverage {

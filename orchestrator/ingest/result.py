@@ -25,6 +25,36 @@ KIND = "Result"
 TTFT_MEAN_MS = "ttft_mean_ms"
 TPOT_MEAN_MS = "tpot_mean_ms"
 
+# The measured side's definitions (DEV-8): what the InferenceX client reports as mean TTFT and
+# mean TPOT (inferencex_client.summarize). Mean TTFT is the mean over requests of each request's
+# time to first token; mean TPOT is the mean, over requests with two or more output tokens, of
+# each request's (E2E - TTFT) / (output tokens - 1). Both over the measured window, in
+# milliseconds, with requests unfinished at the horizon giving no sample. The keys are the
+# fields blis-substrate contracts/metrics compares (Comparable): two figures are comparable only
+# when all of them are equal.
+CLIENT_DEFINITIONS = {
+    TTFT_MEAN_MS: {"formula": "ttft", "statistic": "mean", "population": "requests", "window": "measured",
+                   "unit": "ms", "percentile_method": None, "unfinished": "excluded"},
+    TPOT_MEAN_MS: {"formula": "tpot", "statistic": "mean", "population": "requests_min_2_output_tokens",
+                   "window": "measured", "unit": "ms", "percentile_method": None, "unfinished": "excluded"},
+}
+
+
+def check_definitions(registry: dict) -> list[str]:
+    """Why the simulator's metric registry (blis_commands.metrics) cannot be compared with the
+    client, or [] when it can: each metric the harness reads must exist and have the client's
+    definition, field for field (DEV-8)."""
+    out = []
+    for metric, want in CLIENT_DEFINITIONS.items():
+        d = registry.get(metric)
+        if d is None:
+            out.append(f"the simulator's metric registry has no {metric}")
+            continue
+        for k, v in want.items():
+            if d.get(k) != v:
+                out.append(f"the simulator's {metric} has {k} {d.get(k)!r}; the InferenceX client's has {v!r}")
+    return out
+
 
 class ResultError(RuntimeError):
     """The simulator refused the run, or wrote a document the harness cannot read."""
@@ -174,11 +204,14 @@ def coefficient_substitutions(doc: dict) -> list[dict]:
 ACCEPTANCE_SUBJECT = "speculative_config.acceptance_length"
 
 
-def acceptance_substitution(doc: dict) -> dict:
+def acceptance_substitution(doc: dict | None) -> dict:
     """The G2 substitution for a drafter whose acceptance the run did not record (design D8):
     blis resolves it from the substrate's profile, and the Result's input.workload_properties
     says which. Kind estimated; the detail names the profile (set/key), or says the Result does
-    not report it."""
+    not report it. With no Result yet (doc None, a point graded without the simulator) the detail
+    says the profile is not read."""
+    if doc is None:
+        return {"kind": "estimated", "subject": ACCEPTANCE_SUBJECT, "detail": "profile not read"}
     for p in (doc.get("input") or {}).get("workload_properties") or []:
         if p.get("name") == "speculative_acceptance":
             if p.get("source") == "profile" and p.get("profile"):

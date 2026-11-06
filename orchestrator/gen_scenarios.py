@@ -68,6 +68,11 @@ import collections
 import json
 import os
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "ingest"))
+import blis_commands as bc  # noqa: E402
+import support as sp  # noqa: E402
 
 COEFFICIENTS = (
     "[cost-model-primitives, cost-model-collectives, cost-model-host-overheads, "
@@ -112,7 +117,26 @@ UNPRICED_SPECULATORS = {("minimax-m3", "eagle3")}
 # arms in these frameworks; bf16 serving keeps an unquantised cache.
 CACHE_DTYPE = {"fp4": "fp8", "fp8": "fp8", "bf16": "auto", "int4": "auto"}
 
-GPUS_PER_NODE = 8
+
+
+class PackagingError(ValueError):
+    """A deployment's node size is neither fixed by its chip's catalog entry nor recorded by the
+    run (G5 value_not_recorded, design §11.4)."""
+
+
+def node_size(dep: dict, packaging: dict) -> int:
+    """The GPUs in one node of the deployment's cluster (design §2.2, SUB-3). A chip whose catalog
+    entry fixes it (`packaging["gpus_per_node"]`, as `blis catalog resolve --chip` reports it)
+    gives that value; any other chip takes the size the run recorded, `dep["gpus_per_node"]`.
+    Neither is an error: no size is assumed."""
+    fixed = packaging["gpus_per_node"]
+    if fixed is not None:
+        return fixed
+    recorded = dep.get("gpus_per_node")
+    if not isinstance(recorded, int) or isinstance(recorded, bool) or recorded < 1:
+        raise PackagingError(f"{dep['scenario']}: the catalog entry of {dep['gpu']} fixes no node size and the run "
+                             f"recorded none (gpus_per_node {recorded!r}); value_not_recorded")
+    return recorded
 
 
 def context_length(workloads: set[str]) -> int:
@@ -129,21 +153,28 @@ def context_length(workloads: set[str]) -> int:
     return window
 
 
-def emit(dep: dict, workloads: set[str], labels: set[str]) -> str:
+def emit(dep: dict, workloads: set[str], labels: set[str], packaging: dict) -> str:
+    """The scenario+deployment file. `packaging` is what the chip's catalog entry fixes:
+    {"gpus_per_node", "gpus_per_rack"}, each the entry's value or None (Catalog.packaging).
+    The cluster states gpus_per_node only for a chip whose entry fixes none, and never states
+    gpus_per_rack (the scenario takes both from the entry, and a restated value must equal it)."""
     par = dep["parallelism"]
     tp, ep, dp = par["tp_size"], par["moe_ep_size"], par["attention_dp_size"]
     # A dense model records moe_ep_size as null: it has no expert group, which is a different
     # thing from one unsharded group (ep=1). Expert parallelism is off either way.
     expert_parallel = ep is not None and ep > 1
     ranks = tp * dp
-    nodes = max(1, -(-ranks // GPUS_PER_NODE))
+    per_node = node_size(dep, packaging)
+    nodes = max(1, -(-ranks // per_node))
     quant = QUANT[dep["precision"]]
-    max_len = context_length(workloads)
+    stated = dep.get("stated_config", {})
+    # A stated max_model_len is the run's own (None: left unset, so the engine resolves it, X19);
+    # otherwise it is sized to the longest isl+osl the deployment's workloads run.
+    max_len = stated["max_model_len"] if "max_model_len" in stated else context_length(workloads)
     name = dep["scenario"][: -len(".yaml")]
     block_size = 64 if dep["model"] in DSA_MODELS else 16
     if dep["model"] in V4_MODELS:
         block_size = v4_block_size(dep["gpu"])
-    stated = dep.get("stated_config", {})
     block_size = stated.get("block_size", block_size)
     gmu = stated.get("gpu_memory_utilization", GPU_MEMORY_UTILIZATION_DEFAULT)
     spec = stated.get("speculative_method")
@@ -168,6 +199,9 @@ def emit(dep: dict, workloads: set[str], labels: set[str]) -> str:
     ]
     if "enable_prefix_caching" in stated:
         lines.append("# enable_prefix_caching: stated by the run.")
+    if "max_model_len" in stated:
+        lines.append("# max_model_len: " + ("recorded by the run." if max_len is not None else
+                                            "not recorded; left unset, so the engine resolves it."))
     if spec and unpriced_spec:
         lines += [f"# speculative: the run drafts with {spec} x"
                   f"{stated['num_speculative_tokens']}, NOT written: the catalog graph",
@@ -220,9 +254,10 @@ def emit(dep: dict, workloads: set[str], labels: set[str]) -> str:
     ]
     if nodes > 1:
         lines.append("  fabric: ib-400g")
+    lines.append(f"  nodes: {nodes}")
+    if packaging["gpus_per_node"] is None:
+        lines.append(f"  gpus_per_node: {per_node}")
     lines += [
-        f"  nodes: {nodes}",
-        f"  gpus_per_node: {GPUS_PER_NODE}",
         # The tunable half, as its own document. Same file because a measurement row
         # addresses a deployment by one filename; same name because there is exactly one
         # deployment per scenario here.
@@ -247,7 +282,10 @@ def emit(dep: dict, workloads: set[str], labels: set[str]) -> str:
         f"      block_size: {block_size}",
         "      max_num_batched_tokens: 8192",
         "      max_num_seqs: 256",
-        f"      max_model_len: {max_len}",
+    ]
+    if max_len is not None:
+        lines.append(f"      max_model_len: {max_len}")
+    lines += [
         "      cudagraph_mode: PIECEWISE",
         f"      gpu_memory_utilization: {gmu}",
     ]
@@ -268,6 +306,8 @@ def main() -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("corpus")
     ap.add_argument("-o", "--out", required=True, help="scenario directory")
+    ap.add_argument("--blis", required=True, help="the blis binary; it reports each chip's packaging")
+    ap.add_argument("--catalog", required=True)
     ap.add_argument("--check", action="store_true",
                     help="verify the files on disk match what would be generated")
     args = ap.parse_args()
@@ -307,8 +347,12 @@ def main() -> int:
 
     os.makedirs(args.out, exist_ok=True)
     stale = []
+    cat = sp.Catalog(blis=str(Path(args.blis).resolve()), root=Path(args.catalog))
     for name, dep in sorted(deps.items()):
-        text = emit(dep, workloads[name], labels[name])
+        try:
+            text = emit(dep, workloads[name], labels[name], cat.packaging(dep["gpu"]))
+        except (PackagingError, bc.CommandError) as e:
+            return fail(str(e))
         path = os.path.join(args.out, name)
         if args.check:
             try:

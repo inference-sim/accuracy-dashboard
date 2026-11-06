@@ -29,7 +29,7 @@ import settings as st  # noqa: E402
 import support as sp  # noqa: E402
 
 DEFAULTS, _ = st.load_vllm_defaults()
-FIELDS = fl.load(HERE / "testdata" / "fields" / "fields.json")
+FIELDS = fl.parse((HERE / "testdata" / "fields" / "fields.json").read_bytes())
 
 # A resolved engine-config line as vLLM v0.31.0 prints it (every engine log has one).
 RESOLVED = ("model='m', tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, "
@@ -570,7 +570,7 @@ def test_agentx_replays_as_the_mvp_scenario_with_the_runs_own_inputs():
     r = rp.from_export(_export())
     rp.cross_check(r, "agentx profile --concurrency 8 --benchmark-duration 3600", 8)
     assert r.reasons == [] and r.replayed_as == "inferencex-agentx-mvp"
-    spec = rp.workload_spec(r, "a" * 64, "rev", "traces.jsonl")
+    spec = rp.workload_spec(r, {"repo": "d/c", "revision": "rev", "file": "traces.jsonl", "sha256": "a" * 64})
     assert spec["concurrency"] == 8 and spec["random_seed"] == 42 and spec["benchmark_duration_s"] == 3600.0
     assert spec["trajectory_start"] == {"min_ratio": 0.25, "max_ratio": 0.75}
     assert "trace_idle_gap_cap_s" not in spec       # inference-sim#1971: not passed
@@ -597,26 +597,63 @@ def test_a_system_idle_cap_other_than_the_locked_one_is_not_modelled():
 
 # ------------------------------------------------------------------ support checks
 
-def _catalog(tmp: Path) -> sp.Catalog:
-    for name, repo, spec in (("dsv41", "deepseek-ai/DeepSeek-V4.1-Flash", "dspark"),
-                             ("mm3", "MiniMaxAI/MiniMax-M3", "minimax_m3_mtp")):
+# The scorer reads catalog identities through `blis catalog resolve` (design §5). This fake
+# answers it as inference-sim 2eff3576 does: a model by entry name or by the source repository
+# its model.yaml names (without regard to case), a chip by hardware/<name>.yaml; null otherwise;
+# a repository two entries claim exits 1. Every argv is recorded in <blis>.saw.
+FAKE_RESOLVE = """#!/usr/bin/env python3
+import json, sys
+MODELS, CHIPS = {models!r}, {chips!r}
+a = sys.argv[1:]
+open(sys.argv[0] + ".saw", "a").write(json.dumps(a) + "\\n")
+assert a[:3] == ["catalog", "resolve", "--catalog"] and a[-1] == "--json", a
+kind, q = a[4], a[5]
+if kind == "--model":
+    hits = sorted({{n for n, r in MODELS.items() if n == q or r.lower() == q.lower()}})
+    if len(hits) > 1:
+        sys.stderr.write(f"model {{q!r}} is the source repository of {{len(hits)}} catalog entries\\n")
+        sys.exit(1)
+    ident = hits[0] if hits else None
+else:
+    ident = q if q in CHIPS else None
+print(json.dumps({{"query": q, "identity": ident, "reason": "fake"}}))
+"""
+
+
+def _catalog(tmp: Path, models=None, chips=("h200", "tpuv7")) -> sp.Catalog:
+    models = models or {"dsv41": "deepseek-ai/DeepSeek-V4.1-Flash", "mm3": "MiniMaxAI/MiniMax-M3"}
+    for name, spec in (("dsv41", "dspark"), ("mm3", "minimax_m3_mtp")):
         (tmp / "models" / name).mkdir(parents=True)
-        (tmp / "models" / name / "model.yaml").write_text(f"name: {name}\nsource:\n  repo: {repo}\n")
         (tmp / "models" / name / "graph.yaml").write_text(f"global: {{}}\nspeculator:\n  method: {spec}\n")
-    (tmp / "hardware").mkdir()
-    (tmp / "hardware" / "h200.yaml").write_text("MemoryGiB: 139.8\n")
-    (tmp / "hardware" / "tpuv7.yaml").write_text("MemoryGiB: 192\n")
-    return sp.Catalog.load(tmp)
+    blis = tmp / "blis"
+    blis.write_text(FAKE_RESOLVE.format(models=models, chips=list(chips)))
+    blis.chmod(0o755)
+    return sp.Catalog(blis=str(blis), root=tmp)
+
+
+def _asked(cat: sp.Catalog) -> list[list[str]]:
+    saw = Path(cat.blis + ".saw")
+    return [json.loads(x) for x in saw.read_text().splitlines()] if saw.exists() else []
 
 
 def test_support_matches_the_checkpoint_then_its_base_model():
     cat = _catalog(Path(tempfile.mkdtemp()))
     s = sp.check(cat, {"h200"}, checkpoints=["deepseek-ai/DeepSeek-V4.1-Flash"], base_models={}, hardware="h200",
                  spec_method="dspark")
-    assert (s.model, s.matched_by, s.reasons) == ("dsv41", "checkpoint", [])
+    assert (s.model, s.matched_by, s.chip, s.reasons) == ("dsv41", "checkpoint", "h200", [])
     s = sp.check(cat, {"h200"}, checkpoints=["nvidia/MiniMax-M3-NVFP4"],
                  base_models={"nvidia/MiniMax-M3-NVFP4": "MiniMaxAI/MiniMax-M3"}, hardware="h200", spec_method=None)
     assert (s.model, s.matched_by) == ("mm3", "base_model")
+
+
+def test_support_asks_blis_catalog_resolve_with_the_catalog_and_caches_each_answer():
+    cat = _catalog(Path(tempfile.mkdtemp()))
+    for _ in range(2):
+        sp.check(cat, {"h200"}, checkpoints=["deepseek-ai/DeepSeek-V4.1-Flash"], base_models={}, hardware="h200",
+                 spec_method=None)
+    root = str(cat.root)
+    assert _asked(cat) == [["catalog", "resolve", "--catalog", root, "--model", "deepseek-ai/DeepSeek-V4.1-Flash", "--json"],
+                           ["catalog", "resolve", "--catalog", root, "--chip", "h200", "--json"]]
 
 
 def test_support_refuses_an_unknown_model_part_or_drafter():
@@ -626,13 +663,37 @@ def test_support_refuses_an_unknown_model_part_or_drafter():
     s = sp.check(cat, {"h200"}, checkpoints=["deepseek-ai/DeepSeek-V4.1-Flash"], base_models={}, hardware="tpuv7",
                  spec_method="dspark")
     assert s.reasons == ["hardware_no_coefficients"]
+    # A part the registry has coefficients for but the catalog has no entry of.
+    s = sp.check(cat, {"h200", "mi355x"}, checkpoints=["deepseek-ai/DeepSeek-V4.1-Flash"], base_models={},
+                 hardware="mi355x", spec_method="dspark")
+    assert (s.chip, s.reasons) == (None, ["hardware_no_coefficients"])
     s = sp.check(cat, {"h200"}, checkpoints=["MiniMaxAI/MiniMax-M3"], base_models={}, hardware="h200",
                  spec_method="eagle3")
     assert s.reasons == ["drafter_not_in_catalog:eagle3"]
 
 
+def test_a_repository_two_catalog_entries_claim_stops_the_run():
+    import blis_commands as bc
+    cat = _catalog(Path(tempfile.mkdtemp()), models={"dsv41": "org/m", "mm3": "org/m"})
+    with pytest.raises(bc.CommandError, match="source repository of 2 catalog entries"):
+        sp.check(cat, {"h200"}, checkpoints=["org/m"], base_models={}, hardware="h200", spec_method=None)
+
+
+def test_catalog_resolve_output_of_another_shape_is_refused():
+    import blis_commands as bc
+    tmp = Path(tempfile.mkdtemp())
+    blis = tmp / "blis"
+    for out, match in (('{"query": "h200", "identity": "h200"}', "not an object of query, identity and reason"),
+                       ('{"query": "b200", "identity": "h200", "reason": ""}', "want query 'h200'"),
+                       ("h200", "printed no JSON")):
+        blis.write_text(f"#!/bin/sh\necho '{out}'\n")
+        blis.chmod(0o755)
+        with pytest.raises(bc.CommandError, match=match):
+            bc.catalog_resolve(str(blis), str(tmp), chip="h200")
+
+
 def test_an_inferencex_hardware_label_names_one_catalog_part():
-    cat = sp.Catalog(root=Path("."), hardware={"b200": 178.0, "gb200-nvl72": 184.0, "a100-80": 79.2, "a100-sxm": 39.4})
+    cat = _catalog(Path(tempfile.mkdtemp()), chips=("b200", "gb200-nvl72", "a100-80", "a100-sxm"))
     parts = {"b200", "gb200-nvl72", "a100-80", "a100-sxm"}
     assert sp.catalog_part(cat, parts, "b200") == "b200"                 # the part of that name
     assert sp.catalog_part(cat, parts, "gb200") == "gb200-nvl72"         # its one <label>-variant
@@ -1078,3 +1139,67 @@ if __name__ == "__main__":
             traceback.print_exc()
     print(f"\n{len(fns) - failed}/{len(fns)} passed")
     sys.exit(1 if failed else 0)
+
+
+# ------------------------------------------------------------------ packaging (design §2.2, SUB-3)
+
+_DP4 = ("'tensor_parallel_size': 1, 'data_parallel_size': 4, 'max_num_seqs': 16, 'max_num_batched_tokens': 4096, "
+        "'block_size': 128, 'gpu_memory_utilization': 0.9")
+
+
+def _dp4():
+    return _classify(_log(_DP4, RESOLVED.replace("data_parallel_size=1", "data_parallel_size=4")))
+
+
+def test_a_chip_whose_entry_fixes_packaging_gets_neither_gpus_per_node_nor_gpus_per_rack():
+    # GB200 NVL72: 4 GPUs per tray and 72 per rack are facts of the product; the scenario takes
+    # them from the catalog entry and a restated value must equal it. The run recorded 8 here,
+    # which would be refused, so nothing is written, whatever the run recorded.
+    for node in (NODE8, ir.NodeSize()):
+        b = _build(_dp4(), catalog_node_size=4, node=node)
+        cl = b.scenario["cluster"]
+        assert "gpus_per_node" not in cl and "gpus_per_rack" not in cl, cl
+        assert cl == {"hardware": "h200", "nodes": 1} and b.reasons == []
+
+
+def test_a_gb200_point_with_more_ranks_than_a_tray_spans_nodes_of_the_entrys_size():
+    c = _classify(_log("'tensor_parallel_size': 8, 'max_num_seqs': 16, 'max_num_batched_tokens': 4096, "
+                       "'block_size': 128, 'gpu_memory_utilization': 0.9",
+                       RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=8")))
+    b = _build(c, catalog_node_size=4, node=ir.NodeSize())
+    assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 2}
+    assert b.deployment["pools"][0]["nodes"] == 2
+
+
+def test_an_h100_point_writes_the_node_size_the_run_recorded():
+    b = _build(_dp4(), node=NODE8)
+    assert b.scenario["cluster"] == {"hardware": "h200", "gpus_per_node": 8, "nodes": 1}
+    # Not the rank count: 4 ranks on a recorded 8-GPU server is one 8-GPU node.
+    assert b.scenario["cluster"]["gpus_per_node"] != 4
+    b = _build(_dp4(), node=ir.NodeSize(2, "cluster.gpus_per_node: launch_config"))
+    assert b.scenario["cluster"] == {"hardware": "h200", "gpus_per_node": 2, "nodes": 2}
+
+
+def test_packaging_comes_from_blis_catalog_resolve_and_falls_back_to_the_catalog_files_for_an_older_blis():
+    import blis_commands as bc
+    tmp = Path(tempfile.mkdtemp())
+    blis = tmp / "blis"
+    blis.write_text("#!/bin/sh\necho '{\"query\": \"gb200-nvl72\", \"identity\": \"gb200-nvl72\", \"reason\": \"\", "
+                    "\"packaging\": {\"gpus_per_node\": 4, \"gpus_per_rack\": 72}}'\n")
+    blis.chmod(0o755)
+    assert sp.Catalog(blis=str(blis), root=tmp).packaging("gb200-nvl72") == {"gpus_per_node": 4, "gpus_per_rack": 72}
+    # A blis before inference-sim m1/packaging prints no packaging: the catalog checkout answers.
+    (tmp / "hardware").mkdir()
+    (tmp / "hardware" / "gb200-nvl72.yaml").write_text("GPUsPerNode: 4\nGPUsPerRack: 72\n")
+    (tmp / "hardware" / "h100.yaml").write_text("MemoryGiB: 80\n")
+    blis.write_text("#!/bin/sh\necho '{\"query\": \"x\", \"identity\": \"x\", \"reason\": \"\"}'\n")
+    blis.write_text(blis.read_text().replace('"x"', '"gb200-nvl72"'))
+    cat = sp.Catalog(blis=str(blis), root=tmp)
+    assert cat.packaging("gb200-nvl72") == {"gpus_per_node": 4, "gpus_per_rack": 72}
+    blis.write_text(blis.read_text().replace("gb200-nvl72", "h100"))
+    assert sp.Catalog(blis=str(blis), root=tmp).packaging("h100") == {"gpus_per_node": None, "gpus_per_rack": None}
+    # A packaging of another shape is refused.
+    blis.write_text("#!/bin/sh\necho '{\"query\": \"h100\", \"identity\": \"h100\", \"reason\": \"\", "
+                    "\"packaging\": {\"gpus_per_node\": 0, \"gpus_per_rack\": null}}'\n")
+    with pytest.raises(bc.CommandError, match="packaging"):
+        sp.Catalog(blis=str(blis), root=tmp).packaging("h100")

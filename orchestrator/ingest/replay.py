@@ -36,6 +36,7 @@ _FLAGS = {
     "--scenario": ("scenario", str),
     "--public-dataset": ("corpus", str),
     "--benchmark-grace-period": ("grace_s", float),
+    "--max-context-length": ("max_context_length", int),
 }
 
 
@@ -57,6 +58,7 @@ PHASE_KEYS = {
 DATASET_KEYS = {
     "name": "inert", "type": "read", "dataset": "read", "random_seed": "read",
     "entries": "inert",                         # the corpus' own trace count (393), not a sample
+    "max_context_length": "read",               # the client's trace filter, a token count
     "trace_idle_gap_cap_seconds": "gap_1971",
 }
 ENDPOINT_KEYS = {"urls": "inert", "type": "read", "path": "inert", "streaming": "read",
@@ -82,6 +84,7 @@ class Replay:
     corpus_repo: str | None = None         # its HF dataset
     corpus_split: str | None = None
     entries: int | None = None
+    max_context_length: int | None = None  # the client's trace filter; None: it filtered nothing
     system_idle_cap_s: float | None = None
     reasons: list = field(default_factory=list)
 
@@ -120,6 +123,7 @@ def from_export(export: dict) -> Replay:
     r.seed = ds.get("random_seed")
     r.corpus = ds.get("dataset")
     r.entries = ds.get("entries")
+    r.max_context_length = ds.get("max_context_length")
     meta = ((export.get("metadata") or {}).get("dataset") or {})
     r.corpus_repo = meta.get("hf_dataset_name")
     r.corpus_split = meta.get("hf_split")
@@ -186,21 +190,27 @@ def cross_check(r: Replay, command: str | None, row_conc) -> None:
     r.reasons = sorted(set(r.reasons))
 
 
-def workload_spec(r: Replay, corpus_sha256: str, corpus_revision: str, corpus_file: str) -> dict:
-    """The blis-schemas Replay document (--workload-spec) for the run's inputs."""
+def workload_spec(r: Replay, corpus: dict) -> dict:
+    """The blis-schemas Replay document (--workload-spec) for the run's inputs. `corpus` is the
+    catalog replay workload entry of the alias the run loaded (resolve_agentic_corpus): it pins
+    the corpus by repository, revision and full sha256."""
     spec = {
         "scenario": r.replayed_as,
         "harness_version": BLIS_HARNESS,
         "corpus": {"loader": r.corpus, "format": "weka-trace-v7", "encoding": "jsonl",
-                   "source": {"huggingface": r.corpus_repo, "revision": corpus_revision,
-                              "file": corpus_file},
-                   "sha256": corpus_sha256},
+                   "source": {"huggingface": corpus["repo"], "revision": corpus["revision"],
+                              "file": corpus["file"]},
+                   "sha256": corpus["sha256"]},
         "random_seed": int(r.seed),
         "benchmark_duration_s": float(r.duration_s),
         "concurrency": int(r.concurrency),
     }
-    if r.corpus_split:
-        spec["corpus"]["source"]["split"] = r.corpus_split
+    if r.corpus_split or corpus.get("split"):
+        spec["corpus"]["source"]["split"] = r.corpus_split or corpus["split"]
+    # The client's trace filter, as it recorded it. An unset one filtered nothing, and is left
+    # unset. It is a token count, never the deployment's max_model_len, which the scenario states.
+    if r.max_context_length is not None:
+        spec["max_context_length"] = int(r.max_context_length)
     if r.grace_s is not None:
         spec["grace_period_s"] = float(r.grace_s)
     if r.system_idle_cap_s is not None:

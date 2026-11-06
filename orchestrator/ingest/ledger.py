@@ -35,6 +35,14 @@ class LedgerError(ValueError):
     """The ledger files, or a record checked against them, are not what the harness requires."""
 
 
+class RowDiffers(LedgerError):
+    """A row whose identity is not the one the unit list gives its id; `record` is the row id."""
+
+    def __init__(self, record: str, message: str):
+        super().__init__(message)
+        self.record = record
+
+
 @dataclass
 class Unit:
     unit_id: str
@@ -82,7 +90,7 @@ class Ledger:
             return None
         got = contract.point_id(contract.unit_identity(row, dates))
         if got != p.own_unit_id:
-            raise LedgerError(
+            raise RowDiffers(rid,
                 f"row {rid}: its identity hashes to {got}, but the ledger's unit list ({self.revision}) "
                 f"gives {p.own_unit_id}; the row differs from the pinned source revision")
         return p
@@ -141,9 +149,10 @@ def load(ledger_dir: Path, source: str = contract.SOURCE) -> Ledger:
     return lg
 
 
-def read_unit_set(path: Path) -> set[str]:
-    """A set of ledger units to score (design §11.7): a published list (published/<role>.yaml,
-    kind PublishedUnits) or a plain file of unit ids, one per line."""
+def read_unit_set(path: Path, role: str | None = None) -> set[str]:
+    """A set of ledger units to score (design §11.7): a published list (kind PublishedUnits, as
+    YAML or JSON) or a plain file of unit ids, one per line. With `role`, the file must be the
+    published list of that role."""
     text = Path(path).read_text()
     first = next((ln for ln in text.splitlines() if ln.strip() and not ln.startswith("#")), "")
     if first.startswith("kind:") or first.startswith("{"):
@@ -151,7 +160,11 @@ def read_unit_set(path: Path) -> set[str]:
         doc = _strict(yaml.safe_load(text), PUBLISHED_KEYS, str(path))
         if doc["kind"] != "PublishedUnits":
             raise LedgerError(f"{path}: kind {doc['kind']!r}, want PublishedUnits")
+        if role is not None and doc["role"] != role:
+            raise LedgerError(f"{path}: the published list of role {doc['role']!r}, want {role!r}")
         ids = doc["units"]
+    elif role is not None:
+        raise LedgerError(f"{path}: not a published list (kind PublishedUnits) of role {role!r}")
     else:
         ids = [ln.strip() for ln in text.splitlines() if ln.strip() and not ln.startswith("#")]
     bad = [i for i in ids if not (isinstance(i, str) and len(i) == 64 and all(c in "0123456789abcdef" for c in i))]

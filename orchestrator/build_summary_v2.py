@@ -370,7 +370,7 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
                          "measurement_sha256": prov_in["pull_manifest_sha256"]},
         "evaluator_commit": evaluator_commit, "scorer": "orchestrator/ingest/score.py", "ingest": "api",
         "vllm_ref": prov_in["vllm_ref"], "vllm_max_distance": prov_in["vllm_max_distance"],
-        "fields_sha256": prov_in["fields_sha256"], "pulled_at": prov_in["pulled_at"], "corpus": prov_in["corpus"],
+        "fields_sha256": prov_in["fields_sha256"], "pulled_at": prov_in["pulled_at"], "corpora": prov_in["corpora"],
     }
     return {
         "schema_version": SCHEMA_VERSION,
@@ -477,7 +477,7 @@ def _prov_out_to_in(prov: dict, coverage: dict) -> dict:
             "points": coverage["points"],
             "left_out_records": coverage["left_out_records"], "vllm_ref": prov["vllm_ref"],
             "vllm_max_distance": prov["vllm_max_distance"], "fields_sha256": prov["fields_sha256"],
-            "pulled_at": prov["pulled_at"], "corpus": prov["corpus"],
+            "pulled_at": prov["pulled_at"], "corpora": prov["corpora"],
             "pull_manifest_sha256": gt.get("measurement_sha256", ""),
             "source": {"name": gt.get("source", ""), "url": gt.get("source_url", "")}}
 

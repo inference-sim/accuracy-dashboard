@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -87,7 +88,47 @@ def pins(stack: Stack) -> dict:
         if not re.fullmatch(r"[0-9a-f]{40}", m["commit"] or ""):
             raise StackError(f"stack.json: module {path} has commit {m['commit']!r}, want 40 hex digits")
         out[key] = m["commit"]
+        if key == "substrate_commit":
+            version = m["version"]
+            if not isinstance(version, str) or not re.fullmatch(r"[0-9A-Za-z._+-]+", version):
+                raise StackError(f"stack.json: module {path} has version {version!r}, want letters, digits and . _ + -")
+            out["substrate_version"] = version
     out["vllm_ref"] = "v" + stack.engine("vllm")
+    return out
+
+
+_RELEASE_NAME = re.compile(r"^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$")
+_PSEUDO = re.compile(r"(^|[.-])\d{14}-[0-9a-f]{12}$")
+
+
+def release_name(module_entry: dict) -> str | None:
+    """The release a module entry of stack.json names: its version when that is a release tag
+    (vX.Y.Z or vX.Y.Z-rc1), None when it is a Go pseudo-version (v0.0.0-<14-digit time>-<12 hex>),
+    which a draft build carries and no release does (X8)."""
+    version = module_entry.get("version")
+    if not isinstance(version, str) or not _RELEASE_NAME.match(version) or _PSEUDO.search(version):
+        return None
+    return version
+
+
+def verify_checkout(repo: Path, tag: str, commit: str) -> list[str]:
+    """What is wrong with a checkout that should be release `tag` at stack.json's `commit`; empty
+    when nothing is. Its HEAD must be the commit the tag resolves to in the repository, and that
+    must be `commit`. The tag must exist locally (clone without --depth so tags are fetched)."""
+    def rev(ref):
+        r = subprocess.run(["git", "-C", str(repo), "rev-parse", "--verify", "-q", ref],
+                           capture_output=True, text=True)
+        return r.stdout.strip() if r.returncode == 0 else None
+    head, tagged = rev("HEAD^{commit}"), rev(f"refs/tags/{tag}^{{commit}}")
+    if head is None:
+        return [f"{repo}: no HEAD commit"]
+    if tagged is None:
+        return [f"{repo}: tag {tag} does not exist"]
+    out = []
+    if head != tagged:
+        out.append(f"{repo} is at {head}, but tag {tag} is commit {tagged}")
+    if tagged != commit:
+        out.append(f"tag {tag} is commit {tagged}, but stack.json pins {commit}")
     return out
 
 

@@ -48,7 +48,7 @@ def test_the_413_point_is_g5_value_not_recorded_with_one_reason(tmp_path):
     entry = _freeze_single_turn(tmp_path, lambda url: (_ for _ in ()).throw(_http_error(413)))
     o = sc.score_point(entry, tmp_path / "pull", tmp_path / "w", sc.Env(
         blis="x", blis_release="v0.16.0", blis_commit="a" * 40, catalog=tmp_path, catalog_release="c",
-        registry=tmp_path, registry_release="r", kernel="k", corpus=None))
+        registry=tmp_path, registry_release="r", kernel="k", corpora={}))
     assert o.fidelity is None and o.reasons == ["server_log_missing:api_413"]
 
 

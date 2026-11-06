@@ -42,6 +42,8 @@ jobs:
         run: python3 orchestrator/test_gen_direct_corpus.py
       - name: Agentic scoring driver (row -> replay args -> CSV; refusals not scored)
         run: python3 orchestrator/test_run_agentic.py
+      - name: Agentic corpus pinned by its catalog workload's revision and full sha256 (X12, D3, COV-12)
+        run: python3 -m pytest -q orchestrator/test_resolve_agentic_corpus.py
       - name: Schema validates the committed render fixture (RFC C3)
         run: python3 orchestrator/validate_summary.py --schema schemas/summary.v1.json web/testdata/render-fixture.summary.json
       - name: Contract, fidelity schemas, grades (COV-1, COV-4 to COV-6) and the summary schemas
@@ -60,7 +62,7 @@ jobs:
       - name: Scoring harness entrypoint flags and its release workflow (design §11.7)
         run: |
           pip install --quiet --require-hashes -r requirements-ci.txt
-          python3 -m pytest -q harness/test_run_sh.py harness/test_dockerfile_paths.py
+          python3 -m pytest -q harness/test_run_sh.py harness/test_dockerfile_paths.py harness/test_image_pin.py
       - name: vLLM build resolution + commit-distance gate (#28; not used by the nightly)
         run: python3 orchestrator/ingest/test_build.py
       - name: API ingest extractor - settings decided by the field list (COV-3), replay inputs, support, artifacts
@@ -90,11 +92,16 @@ jobs:
             orchestrator/ingest/test_fields.py \
             orchestrator/ingest/test_headline.py \
             orchestrator/ingest/test_backlog.py \
+            orchestrator/ingest/test_coverage.py \
             orchestrator/ingest/test_stack.py \
             orchestrator/ingest/test_server_log.py \
             orchestrator/test_update_index.py
       - name: Every point id of every published snapshot maps to a ledger unit (COV-8)
         run: python3 orchestrator/ingest/legacy_ids.py check --map data/legacy/point-ids.json --data data
+      - name: BLIS is read only through the inference-sim commands, except the listed TEMPORARY sites (X7)
+        run: |
+          python3 -m pytest -q orchestrator/test_lint_blis_boundary.py
+          python3 orchestrator/lint_blis_boundary.py
 
   web:
     runs-on: ubuntu-latest

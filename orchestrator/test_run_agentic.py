@@ -9,6 +9,7 @@ unsupported model/hardware or an unreplayable row rather than scoring it with a 
 Run: python3 orchestrator/test_run_agentic.py
 """
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -37,9 +38,12 @@ ROW = {
 SERVER_LOG = (
     "(APIServer pid=1) INFO  version 0.17.2rc1.dev4996+g5894fdf98\n"
     "non-default args: {'model': '/scratch/models/Kimi-K3', 'tensor_parallel_size': 8, "
+    "'max_model_len': 262144, "
     "'speculative_config': {'method': 'dspark', 'num_speculative_tokens': 7, "
     "'rejection_sample_method': 'synthetic', 'synthetic_acceptance_length': 3.84}}\n"
 )
+# The same run with no max_model_len recorded anywhere in its server log.
+SERVER_LOG_NO_LEN = SERVER_LOG.replace("'max_model_len': 262144, ", "")
 def _result(metrics: dict) -> dict:
     """A schema-version-2 Result document with these figures (metric id -> value)."""
     return {"kind": "Result", "schema_version": 2, "name": "x",
@@ -151,43 +155,225 @@ def test_pure_functions():
     ck("a non-DP row has attention_dp_size 1", ra._attention_dp_size(ROW) == 1)
 
 
-def run_driver(td: Path, row: dict, blis_stub: str) -> subprocess.CompletedProcess:
+# `blis catalog resolve --chip X --json` as inference-sim m1/packaging prints it, for a chip whose
+# entry fixes no packaging (an 8-GPU HGX server): the scenario then states the node size.
+CATALOG_CASE = (
+    "if [ \"$1\" = catalog ]; then\n"
+    "  echo \"{\\\"query\\\": \\\"$6\\\", \\\"identity\\\": \\\"$6\\\", \\\"reason\\\": \\\"\\\", "
+    "\\\"packaging\\\": {\\\"gpus_per_node\\\": null, \\\"gpus_per_rack\\\": null}}\"; exit 0\n"
+    "fi\n")
+
+
+UNCAPPED = "semianalysis_cc_traces_weka_062126"
+CAPPED = "semianalysis_cc_traces_weka_062126_256k"
+CORPUS = b"{}\n"
+
+
+def write_catalog(td: Path, uncapped_sha: str | None = None, capped_sha: str | None = None) -> None:
+    """A catalog checkout with the two AgentX replay workloads, pinned to the test corpus's hash
+    unless told otherwise."""
+    want = hashlib.sha256(CORPUS).hexdigest()
+    (td / "workloads").mkdir(exist_ok=True)
+    for name, alias, repo, rev, sha in (
+            ("agentx-mvp-uncapped", UNCAPPED, "semianalysisai/cc-traces-weka-062126",
+             "23f152f6f0f9399a85901b89a6458def0ef16729", uncapped_sha or want),
+            ("agentx-mvp", CAPPED, "semianalysisai/cc-traces-weka-062126-256k",
+             "8fecd2fc56694469f758f0afbbb6335ad3043740", capped_sha or want)):
+        (td / "workloads" / f"{name}.yaml").write_text(
+            f"_comment: \"{name}\"\nreplay:\n  scenario: inferencex-agentx-mvp\n  harness_version: 0.12.0\n"
+            f"  corpus:\n    loader: {alias}\n    format: weka-trace-v7\n    encoding: jsonl\n"
+            f"    source:\n      huggingface: {repo}\n      revision: {rev}\n      file: traces.jsonl\n"
+            f"      split: train\n    sha256: {sha}\n  random_seed: 42\n  max_context_length: max_model_len\n"
+            f"  category: coding\n")
+
+
+
+NODE8 = {"resources": {"gpus_per_node": 8}}
+
+
+def run_driver(td: Path, row: dict, blis_stub: str, alias: str | None = UNCAPPED,
+               job_log: str | None = None, extra: list | None = None,
+               launch: dict | None = NODE8, server_log: str = SERVER_LOG) -> subprocess.CompletedProcess:
     """Drive run_agentic.main() with a fake blis that prints a fixed Result document.
 
-    Deliberately passes NO --job-log: the external repo's Actions log is usually unreadable,
+    By default passes NO --job-log: the external repo's Actions log is usually unreadable,
     and the driver must score without it (seed/duration default, concurrency from the row).
+    The corpus the run loaded is then stated with --corpus-alias.
     """
     (td / "row.json").write_text(json.dumps(row))
-    (td / "server.log").write_text(SERVER_LOG)
+    (td / "server.log").write_text(server_log)
+    if not (td / "workloads").exists():
+        write_catalog(td)
     blis = td / "blis_stub.sh"
     blis.write_text(blis_stub)
     blis.chmod(0o755)
-    return subprocess.run(
-        [sys.executable, str(HERE / "run_agentic.py"),
-         "--row", str(td / "row.json"), "--server-log", str(td / "server.log"),
-         "--corpus", str(td / "traces.jsonl"),
-         "--corpus-sha256", "deadbeef", "--blis", str(blis),
-         "--catalog", str(td), "--registry", str(td), "--out-dir", str(td / "out")],
-        capture_output=True, text=True)
+    argv = [sys.executable, str(HERE / "run_agentic.py"),
+            "--row", str(td / "row.json"), "--server-log", str(td / "server.log"),
+            "--corpus", str(td / "traces.jsonl"), "--blis", str(blis),
+            "--catalog", str(td), "--registry", str(td), "--out-dir", str(td / "out")]
+    if alias is not None:
+        argv += ["--corpus-alias", alias]
+    if job_log is not None:
+        (td / "job.log").write_text(job_log)
+        argv += ["--job-log", str(td / "job.log")]
+    if launch is not None:
+        (td / "launch.json").write_text(json.dumps(launch))
+        argv += ["--launch-config", str(td / "launch.json")]
+    return subprocess.run(argv + (extra or []), capture_output=True, text=True)
+
+
+RECORDING_STUB_HEAD = (
+    "#!/usr/bin/env bash\n" + CATALOG_CASE +
+    "[ \"$1\" = schema ] && exit 0\n"
+    "printf '%s\\n' \"$@\" > \"$(dirname \"$0\")/argv.txt\"\n"
+    "pwd > \"$(dirname \"$0\")/cwd.txt\"\n"
+)
+
+
+def _flag(argv: list, flag: str):
+    return argv[argv.index(flag) + 1] if flag in argv else None
+
+
+def test_driver_scores_each_alias_with_its_own_entry():
+    doc = json.dumps(_result({"ttft_mean_ms": 1500.0, "tpot_mean_ms": 4.5}))
+    for alias, name in ((UNCAPPED, "agentx-mvp-uncapped"), (CAPPED, "agentx-mvp")):
+        with tempfile.TemporaryDirectory() as d:
+            td = Path(d)
+            (td / "traces.jsonl").write_bytes(CORPUS)
+            r = run_driver(td, ROW, RECORDING_STUB_HEAD + f"echo '{doc}'\n", alias=alias)
+            ck(f"{alias}: the driver scores", r.returncode == 0, r.stderr[-300:])
+            argv = (td / "argv.txt").read_text().splitlines() if (td / "argv.txt").exists() else []
+            spec = _flag(argv, "--workload-spec")
+            text = Path(spec).read_text() if spec else ""
+            ck(f"{alias}: blis is given the catalog entry {name} as --workload-spec",
+               f"loader: {alias}\n" in text and "category: coding" in text and "_comment" not in text, text[:200])
+            ck(f"{alias}: --corpus-sha256 is the entry's full hash",
+               _flag(argv, "--corpus-sha256") == hashlib.sha256(CORPUS).hexdigest(), str(argv))
+
+
+def test_driver_refuses_a_corpus_that_is_not_the_entrys():
+    stub = "#!/usr/bin/env bash\n[ \"$1\" = schema ] && exit 0\necho 'blis should not run' >&2\nexit 7\n"
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_bytes(CORPUS)
+        full = hashlib.sha256(CORPUS).hexdigest()
+        # The entry shares the file's 12-hex prefix but not its whole hash.
+        write_catalog(td, uncapped_sha=full[:12] + ("0" if full[12] != "0" else "1") + full[13:])
+        r = run_driver(td, ROW, stub)
+        ck("a corpus matching the entry's hash only in its prefix is refused",
+           r.returncode != 0 and "mismatch" in r.stderr and "should not run" not in r.stderr, r.stderr[-300:])
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_bytes(CORPUS)
+        r = run_driver(td, ROW, stub, extra=["--corpus-sha256", "0" * 64])
+        ck("a --corpus-sha256 that is not the entry's is refused",
+           r.returncode != 0 and "is not the sha256" in r.stderr, r.stderr[-300:])
+
+
+def _scenario_engine(td: Path) -> dict:
+    import yaml
+    scen = list((td / "out" / "scenarios").glob("*.yaml"))
+    return list(yaml.safe_load_all(scen[0].read_text()))[1]["pools"][0]["engine"] if scen else {}
+
+
+def test_max_model_len_is_the_runs_own_and_never_a_default():
+    doc = json.dumps(_result({"ttft_mean_ms": 1500.0, "tpot_mean_ms": 4.5}))
+    ck("no AGENTIC_CONTEXT_DEFAULT constant remains", not hasattr(ra, "AGENTIC_CONTEXT_DEFAULT"))
+    # An uncapped row with a recorded 1048576, and no job log: the scenario serves 1M tokens, so
+    # the replay's max_context_length: max_model_len keeps the traces over 256k.
+    long_log = SERVER_LOG.replace("'max_model_len': 262144", "'max_model_len': 1048576")
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_bytes(CORPUS)
+        r = run_driver(td, ROW, RECORDING_STUB_HEAD + f"echo '{doc}'\n", server_log=long_log)
+        eng = _scenario_engine(td)
+        argv = (td / "argv.txt").read_text().splitlines() if (td / "argv.txt").exists() else []
+        spec = _flag(argv, "--workload-spec")
+        ck("a recorded max_model_len 1048576 is copied, not replaced by 262144",
+           r.returncode == 0 and eng.get("max_model_len") == 1048576, f"{eng} {r.stderr[-300:]}")
+        ck("the uncapped replay filters by the deployment's max_model_len, so traces over 256k are kept",
+           spec is not None and "max_context_length: max_model_len" in Path(spec).read_text()
+           and "--max-context-length" not in argv, str(argv))
+    # The resolved engine-config line alone (max_seq_len) is a record of the run as well.
+    resolved = ("(EngineCore pid=7) INFO Initializing a V1 LLM engine (v0.32.0) with config: model='x', "
+                "max_seq_len=524288, tensor_parallel_size=8\n")
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_bytes(CORPUS)
+        r = run_driver(td, ROW, RECORDING_STUB_HEAD + f"echo '{doc}'\n", server_log=SERVER_LOG_NO_LEN + resolved)
+        ck("a max_model_len recorded only as resolved (max_seq_len) is copied",
+           _scenario_engine(td).get("max_model_len") == 524288, r.stderr[-300:])
+    # Not recorded: nothing is written. The scenario leaves max_model_len unset, and blis
+    # resolves it or refuses the scenario; the driver assumes no value and asks for no field list.
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_bytes(CORPUS)
+        r = run_driver(td, ROW, RECORDING_STUB_HEAD + f"echo '{doc}'\n", server_log=SERVER_LOG_NO_LEN)
+        ck("an unrecorded max_model_len is left unset in the scenario",
+           r.returncode == 0 and "max_model_len" not in _scenario_engine(td) and bool(_scenario_engine(td)),
+           r.stderr[-300:])
+    # The launch configuration and the passed args are two records of the run; if they disagree
+    # the point is not scored (value_conflict).
+    launch = {"resources": {"gpus_per_node": 8},
+              "roles": {"decode": {"args": {"max-model-len": 786432}}}}
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_bytes(CORPUS)
+        r = run_driver(td, ROW, "#!/usr/bin/env bash\nexit 7\n", launch=launch)
+        ref = td / "out" / "refusals.json"
+        ck("a run whose launch configuration and args give different max_model_len is not scored (value_conflict)",
+           r.returncode == 0 and ref.exists()
+           and any(x.startswith("value_conflict") for x in json.loads(ref.read_text())["refusals"]),
+           r.stderr[-300:])
+    # A launch configuration that states it is a record of the run as well.
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_bytes(CORPUS)
+        r = run_driver(td, ROW, RECORDING_STUB_HEAD + f"echo '{doc}'\n", server_log=SERVER_LOG_NO_LEN, launch=launch)
+        ck("a max_model_len the launch configuration states is copied",
+           _scenario_engine(td).get("max_model_len") == 786432, r.stderr[-300:])
+
+
+def test_driver_reads_the_alias_from_the_job_log():
+    doc = json.dumps(_result({"ttft_mean_ms": 1500.0, "tpot_mean_ms": 4.5}))
+    log = f"+ aiperf profile --scenario inferencex-agentx-mvp --concurrency 2 --public-dataset {CAPPED}\n"
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_bytes(CORPUS)
+        r = run_driver(td, ROW, RECORDING_STUB_HEAD + f"echo '{doc}'\n", alias=None, job_log=log)
+        argv = (td / "argv.txt").read_text().splitlines() if (td / "argv.txt").exists() else []
+        spec = _flag(argv, "--workload-spec")
+        ck("the job log's --public-dataset picks the capped entry",
+           r.returncode == 0 and spec is not None and f"loader: {CAPPED}\n" in Path(spec).read_text(),
+           r.stderr[-300:])
+    for alias, log_, want in ((UNCAPPED, log, "differ"), (None, None, "not recorded")):
+        with tempfile.TemporaryDirectory() as d:
+            td = Path(d)
+            (td / "traces.jsonl").write_bytes(CORPUS)
+            r = run_driver(td, ROW, "#!/usr/bin/env bash\nexit 7\n", alias=alias, job_log=log_)
+            ref = td / "out" / "refusals.json"
+            ck(f"a corpus that is {want} is not scored",
+               r.returncode == 0 and ref.exists() and any(want in x for x in json.loads(ref.read_text())["refusals"]),
+               r.stderr[-300:])
 
 
 def test_driver_scores_a_supported_row():
     with tempfile.TemporaryDirectory() as d:
         td = Path(d)
-        (td / "traces.jsonl").write_text("{}\n")
+        (td / "traces.jsonl").write_bytes(CORPUS)
         # A fake blis: `schema validate result` accepts; `replay` records its argv and its
         # working directory and prints a fixed Result. The Result carries BOTH itl_mean_ms
         # (step interval) and tpot_mean_ms (per token) so the test confirms the driver reads
         # the per-token one.
         doc = json.dumps(_result({"ttft_mean_ms": 1500.0, "tpot_mean_ms": 4.5, "itl_mean_ms": 17.0}))
         stub = (
-            "#!/usr/bin/env bash\n"
+            "#!/usr/bin/env bash\n" + CATALOG_CASE +
             "[ \"$1\" = schema ] && exit 0\n"
             "printf '%s\\n' \"$@\" > \"$(dirname \"$0\")/argv.txt\"\n"
             "pwd > \"$(dirname \"$0\")/cwd.txt\"\n"
             f"echo '{doc}'\n"
         )
-        r = run_driver(td, ROW, stub)
+        r = run_driver(td, ROW, stub, launch={"resources": {"gpu_type": "b300", "gpus_per_node": 8}})
         ck("driver exits 0 on a supported, replayable row", r.returncode == 0,
            r.stderr[-300:])
         csv = td / "out" / "points.csv"
@@ -244,15 +430,36 @@ def test_driver_refuses_unsupported():
                any("brand-new-model" in x for x in doc["refusals"]), str(doc["refusals"]))
 
 
+def test_driver_writes_the_recorded_node_size_and_refuses_a_row_that_records_none():
+    import re
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_text("{}\n")
+        doc = json.dumps(_result({"ttft_mean_ms": 1500.0, "tpot_mean_ms": 4.5}))
+        stub = "#!/usr/bin/env bash\n" + CATALOG_CASE + "[ \"$1\" = schema ] && exit 0\n" + f"echo '{doc}'\n"
+        r = run_driver(td, ROW, stub, launch={"resources": {"gpu_type": "b300", "gpus_per_node": 8}})
+        scen = next((td / "out" / "scenarios").glob("*.yaml")).read_text()
+        m = re.search(r"^  gpus_per_node: (\d+)$", scen, re.M)
+        ck("the recorded node size is written (b300, 8 per node)", r.returncode == 0 and m and m.group(1) == "8", scen[:400])
+    with tempfile.TemporaryDirectory() as d:
+        td = Path(d)
+        (td / "traces.jsonl").write_text("{}\n")
+        r = run_driver(td, ROW, "#!/usr/bin/env bash\n" + CATALOG_CASE + "echo 'blis should not run' >&2\nexit 7\n", launch=None)
+        ref = td / "out" / "refusals.json"
+        ck("a row with no recorded node size is not scored (exit 0, no CSV)", r.returncode == 0 and not (td / "out" / "points.csv").exists(), r.stderr[-200:])
+        ck("the refusal is value_not_recorded:cluster.gpus_per_node",
+           ref.exists() and any(x.startswith("value_not_recorded:cluster.gpus_per_node") for x in json.loads(ref.read_text())["refusals"]))
+
+
 def test_driver_refuses_a_result_that_does_not_validate():
     with tempfile.TemporaryDirectory() as d:
         td = Path(d)
         (td / "traces.jsonl").write_text("{}\n")
         doc = json.dumps(_result({"ttft_mean_ms": 1500.0, "tpot_mean_ms": 4.5}))
-        stub = ("#!/usr/bin/env bash\n"
+        stub = ("#!/usr/bin/env bash\n" + CATALOG_CASE +
                 "[ \"$1\" = schema ] && { echo 'metrics: bad' >&2; exit 1; }\n"
                 f"echo '{doc}'\n")
-        r = run_driver(td, ROW, stub)
+        r = run_driver(td, ROW, stub, launch={"resources": {"gpus_per_node": 8}})
         ck("a Result that does not validate stops the driver", r.returncode != 0, r.stderr[-200:])
         ck("the refusal says the Result does not validate", "does not validate" in r.stderr, r.stderr[-200:])
         ck("no CSV is written for an invalid Result", not (td / "out" / "points.csv").exists())
@@ -262,7 +469,12 @@ def main() -> int:
     test_pure_functions()
     test_driver_scores_a_supported_row()
     test_driver_refuses_unsupported()
+    test_driver_writes_the_recorded_node_size_and_refuses_a_row_that_records_none()
     test_driver_refuses_a_result_that_does_not_validate()
+    test_driver_scores_each_alias_with_its_own_entry()
+    test_driver_refuses_a_corpus_that_is_not_the_entrys()
+    test_driver_reads_the_alias_from_the_job_log()
+    test_max_model_len_is_the_runs_own_and_never_a_default()
     print()
     if FAILURES:
         print(f"FAIL: {len(FAILURES)} failure(s): {FAILURES}")

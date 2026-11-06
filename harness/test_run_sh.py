@@ -6,6 +6,7 @@ with a fake `go`, so these tests need no network. The workflow is checked as YAM
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -19,7 +20,8 @@ HERE = Path(__file__).resolve().parent
 RUN = HERE / "run.sh"
 WORKFLOW = HERE.parent / ".github" / "workflows" / "harness-release.yml"
 COMMIT = "0123456789abcdef0123456789abcdef01234567"
-GOOD = ["--units", "units.txt", "--pull", "pull", "--out", "out", "--catalog", "c", "--registry", "r"]
+GOOD = ["--units", "units.txt", "--pull", "pull", "--out", "out", "--catalog", "c", "--registry", "r",
+        "--corpus-dir", "k", "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0"]
 
 
 def check(*args, env=None):
@@ -53,13 +55,36 @@ def test_an_unknown_flag_is_refused():
     assert "unknown flag --metrics-path" in p.stderr
 
 
+def test_the_field_list_is_not_a_flag():
+    # The scorer asks the blis it built for the field list (COV-3); no file stands in for it.
+    p = check("--sim", "v0.16.0", *GOOD, "--fields", "fields.json")
+    assert p.returncode == 2
+    assert "unknown flag --fields" in p.stderr
+
+
+def test_the_data_releases_are_required_and_passed_to_the_scorer():
+    without = lambda flag: [x for i, x in enumerate(GOOD) if x != flag and GOOD[i - 1] != flag]  # noqa: E731
+    for flag in ("--catalog-release", "--registry-release"):
+        p = check("--sim", "v0.16.0", *without(flag))
+        assert p.returncode == 2 and f"{flag} is required" in p.stderr, flag
+
+
 def test_catalog_and_registry_are_required():
-    base = ["--units", "units.txt", "--pull", "pull", "--out", "out"]
+    base = ["--units", "units.txt", "--pull", "pull", "--out", "out", "--corpus-dir", "k"]
     p = check("--sim", "v0.16.0", *base, "--catalog", "cat")
     assert p.returncode == 2 and "--registry is required" in p.stderr
     p = check("--sim", "v0.16.0", *base, "--registry", "reg")
     assert p.returncode == 2 and "--catalog is required" in p.stderr
     assert check("--sim", "v0.16.0", *GOOD).returncode == 0
+
+
+def test_the_corpus_directory_is_required_and_the_corpus_file_flags_are_gone():
+    # The corpora come from the catalog's replay workloads, not from flags (D3, X12).
+    p = check("--sim", "v0.16.0", *[x for i, x in enumerate(GOOD) if GOOD[max(i - 1, 0)] != "--corpus-dir" and x != "--corpus-dir"])
+    assert p.returncode == 2 and "--corpus-dir is required" in p.stderr
+    for flag in ("--corpus", "--corpus-revision", "--corpus-sha256", "--corpus-dataset"):
+        p = check("--sim", "v0.16.0", *GOOD, flag, "x")
+        assert p.returncode == 2 and f"unknown flag {flag}" in p.stderr, flag
 
 
 def test_a_malformed_harness_digest_is_refused():
@@ -121,11 +146,10 @@ def git(*args, cwd=None):
     return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True, env=env).stdout.strip()
 
 
-def tagged_dir(path: Path, tag: str) -> Path:
+def mounted_dir(path: Path) -> Path:
+    """A data directory as the harness image receives it: mounted, with no .git."""
     path.mkdir(parents=True)
-    git("init", "-q", cwd=path)
-    git("commit", "-q", "--allow-empty", "-m", "x", cwd=path)
-    git("tag", tag, cwd=path)
+    assert not (path / ".git").exists()
     return path
 
 
@@ -157,7 +181,7 @@ def real_setup(tmp: Path, tag: str = "v0.16.0"):
     go = bin_ / "go"
     go.write_text('#!/bin/sh\n'
                   'if [ "$1 $2" = "mod download" ]; then exit 0; fi\n'
-                  'if [ "$1 $2" = "build -o" ]; then printf "#!/bin/sh\\nexit 0\\n" > "$3"; chmod +x "$3"; exit 0; fi\n'
+                  'if [ "$1 $2" = "build -o" ]; then printf "#!/bin/sh\\ncase \\"\\$1\\" in fields) cat \\"\\$FAKE_FIELDS\\";; metrics) cat \\"\\$FAKE_FIELDS.metrics\\";; esac\\nexit 0\\n" > "$3"; chmod +x "$3"; exit 0; fi\n'
                   'echo "fake go: unexpected $*" >&2; exit 9\n')
     py = bin_ / "python3"
     log = tmp / "python-args.txt"
@@ -176,21 +200,46 @@ def real_setup(tmp: Path, tag: str = "v0.16.0"):
     units.write_text("")
     fields = tmp / "fields.json"
     fields.write_text(json.dumps(FIELDS))
-    cat = tagged_dir(tmp / "cat", "v1.0.0")
+    # `blis metrics --json`: the client's two definitions (DEV-8).
+    sys.path.insert(0, str(HERE.parent / "orchestrator" / "ingest"))
+    from test_result import REGISTRY
+    (tmp / "fields.json.metrics").write_text(json.dumps({"metrics": list(REGISTRY.values())}))
+    cat = mounted_dir(tmp / "cat")
     (cat / "models").mkdir()
     (cat / "hardware").mkdir()
-    reg = tagged_dir(tmp / "reg", "v1.0.0")
+    reg = mounted_dir(tmp / "reg")
     (reg / "coefficients").mkdir()
+    write_corpora(cat, tmp / "corpora")
     return bare, commit, bin_, log, pull, units, fields, cat, reg
+
+
+def write_corpora(cat: Path, corpus_dir: Path) -> None:
+    """The two AgentX replay workloads in the catalog, and their corpus files where
+    resolve_agentic_corpus.py --all puts them, each with the sha256 its entry pins."""
+    (cat / "workloads").mkdir(exist_ok=True)
+    for alias, name, repo, rev in (
+            ("semianalysis_cc_traces_weka_062126", "agentx-mvp-uncapped",
+             "semianalysisai/cc-traces-weka-062126", "23f152f6f0f9399a85901b89a6458def0ef16729"),
+            ("semianalysis_cc_traces_weka_062126_256k", "agentx-mvp",
+             "semianalysisai/cc-traces-weka-062126-256k", "8fecd2fc56694469f758f0afbbb6335ad3043740")):
+        body = f"{name}\n".encode()
+        (cat / "workloads" / f"{name}.yaml").write_text(
+            f"replay:\n  corpus:\n    loader: {alias}\n    source:\n      huggingface: {repo}\n"
+            f"      revision: {rev}\n      file: traces.jsonl\n      split: train\n"
+            f"    sha256: {hashlib.sha256(body).hexdigest()}\n")
+        (corpus_dir / name).mkdir(parents=True, exist_ok=True)
+        (corpus_dir / name / "traces.jsonl").write_bytes(body)
 
 
 def run_real(tmp: Path, sim_of, extra=(), tag="v0.16.0"):
     bare, commit, bin_, log, pull, units, fields, cat, reg = real_setup(tmp, tag)
     out = tmp / "out"
-    env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "HARNESS_DIGEST": "sha256:" + "b" * 64}
+    env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "HARNESS_DIGEST": "sha256:" + "b" * 64,
+           "FAKE_FIELDS": str(fields)}
     p = subprocess.run(["bash", str(RUN), "--sim", sim_of(commit), "--sim-repo", str(bare), "--units", str(units),
                         "--pull", str(pull), "--out", str(out), "--catalog", str(cat), "--registry", str(reg),
-                        "--fields", str(fields), *extra], capture_output=True, text=True, env=env)
+                        "--corpus-dir", str(tmp / "corpora"),
+                        "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0", *extra], capture_output=True, text=True, env=env)
     return p, out, log, commit
 
 
@@ -208,12 +257,15 @@ def test_the_real_path_builds_into_the_checkout_and_scores_with_it(tmp_path):
     prov = json.loads((out / "provenance.json").read_text())
     # The stack.json of the checkout gave the engine release; the checkout gave the build.
     assert prov["engine"] == {"kind": "vllm", "version": "0.32.0"}
+    # The data carries no git history; its releases are the names run.sh was given.
+    assert (prov["blis"]["catalog"], prov["blis"]["registry"]) == ("v0.3.0", "v0.2.0")
     assert prov["simulator"] == {"build": "v0.16.0", "engine": {"kind": "vllm", "version": "0.32.0"},
                                  "harness_digest": "sha256:" + "b" * 64}
     assert prov["harness_digest"] == "sha256:" + "b" * 64
     assert prov["blis"]["release"] == "v0.16.0" and prov["blis"]["commit_sha"] == commit
     assert prov["blis"]["extractor_version"] == "blis-latency-kernel@v0.3.0"
-    assert prov["fields_sha256"] and prov["experimental"] is False and prov["corpus"] is None
+    assert prov["fields_sha256"] and prov["experimental"] is False and "corpus" not in prov
+    assert [c["workload"] for c in prov["corpora"]] == ["agentx-mvp-uncapped", "agentx-mvp"]
 
 
 def test_the_real_path_scores_a_full_commit(tmp_path):
@@ -223,18 +275,17 @@ def test_the_real_path_scores_a_full_commit(tmp_path):
     assert prov["simulator"]["build"] == commit and prov["experimental"] is True
 
 
-def test_the_corpus_flags_are_required_only_for_an_agentic_point(tmp_path):
-    pid = "a" * 64
+def test_the_real_path_refuses_a_corpus_that_is_not_the_catalog_entrys(tmp_path):
     bare, commit, bin_, log, pull, units, fields, cat, reg = real_setup(tmp_path)
-    (pull / "manifest.json").write_text(json.dumps(
-        {**MANIFEST, "points": [{"point_id": pid, "reasons": [], "row": {"benchmark_type": "agentic_traces"}}]}))
-    units.write_text(pid + "\n")
-    env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}"}
+    (tmp_path / "corpora" / "agentx-mvp" / "traces.jsonl").write_bytes(b"other\n")
+    env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "FAKE_FIELDS": str(fields)}
     p = subprocess.run(["bash", str(RUN), "--sim", "v0.16.0", "--sim-repo", str(bare), "--units", str(units),
                         "--pull", str(pull), "--out", str(tmp_path / "out"), "--catalog", str(cat),
-                        "--registry", str(reg), "--fields", str(fields)], capture_output=True, text=True, env=env)
+                        "--registry", str(reg), "--corpus-dir", str(tmp_path / "corpora"),
+                        "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0"],
+                       capture_output=True, text=True, env=env)
     assert p.returncode == 2
-    assert "--corpus and --corpus-revision are required" in p.stderr
+    assert "mismatch" in p.stderr
 
 
 def test_the_real_path_scores_a_pre_release_tag_and_marks_its_figures_experimental(tmp_path):

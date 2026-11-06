@@ -45,7 +45,9 @@ Each value goes under the engine's own name for it (`settings.LOCATIONS`). That 
 
 Which fields are modelled, and each field's estimation rule, come only from the engine's fields.json (`fields.py`, VLM-3); the dashboard holds no settings table. Each field the run set is handled by its status. A field the release does not list is G5 `field_not_in_release`. A `not_modelled` field with rule `none` is G5 `field_not_modelled`. A `not_modelled` field with `leave_unset` is left out of the scenario so the engine resolves it (X19). With `substitute`, the rule's stated setting is written instead. Both are named on the point as `estimated`. An `inert_unproven` field is named as `interim_status`. `modelled` and `proven_inert` fields change no grade. The dashboard holds no list of the settings an engine needs (design §11.1). A setting no source recorded is left unset in the engine block and the engine resolves it (X19). Suppose blis refuses the scenario because a value is required (its text says `states no <field>`). The point is then G5 `value_not_recorded`, with the field parsed from the refusal as the subject (`score.value_refusal`). A refusal that names no parseable field uses the refusal's slug as the subject. A field the list does not know is `field_not_in_release`. The estimation rule is consulted for that field only when the engine refuses (`fields.estimate_missing`): the dashboard cannot name an unrecorded field the engine would accept, so it does not state estimates for fields nobody asked about. A field inside a config object that vLLM prints whole (`settings.WHOLE_PRINTED`) is set by the run by this rule (`settings._requested`). vLLM prints only the top-level arguments that differ from their defaults, but prints a config object passed as an argument whole, defaults included. Where the run has a launch config, the launch config decides: a field it states is set, one it does not is not. Where it has none, a field is not set when it equals the default of the run's own release: `orchestrator/vllm_defaults.json` is read at v0.32.0 by `gen_vllm_defaults.py` and is used only for a run whose server-log banner names exactly that release (`settings.defaults_for`). A field with no defaults entry for the run's release, and any such field of a run of another release, is judged unset: nothing says the run set it, so it cannot be `field_not_in_release`. No per-release table is derived from the logs; a table for another release is generated with `gen_vllm_defaults.py --ref`.
 
-TEMPORARY until `blis fields --engine vllm --json` exists (inference-sim m1/substrate, task H): `cli.py score --fields FILE` names the field list, blis-vllm's `fields.json` at the release the simulator runs. A list for another release is refused.
+The scorer reads the field list from the simulator it scores with: `blis fields --engine vllm --json` prints the engine's fields.json at the release that build runs. A list whose `engine` is not the release stack.json names is refused.
+
+The scenario's cluster follows the packaging rule (design §2.2, SUB-3; blis-substrate `Cluster.Packaging`). For a chip whose catalog entry fixes GPUs per node and per rack (GB200 NVL72, GB300: 4 and 72) the scenario writes neither `gpus_per_node` nor `gpus_per_rack`, and `nodes` is the run's ranks over the entry's node size. For any other chip the node size is decided as the next section says. `gpus_per_rack` is never written. Whether an entry fixes packaging is read from `blis catalog resolve --chip`'s `packaging` field (inference-sim m1/packaging); TEMPORARY until the pinned blis reports it, the catalog checkout's `hardware/<chip>.yaml` `GPUsPerNode` and `GPUsPerRack` answer (`support.Catalog.packaging`, listed in `lint_blis_boundary.py`).
 
 ## The node size of InferenceX's machines
 
@@ -72,6 +74,7 @@ scenario,model,gpu,label,concurrency,meas_tpot_us,pred_tpot_us,meas_ttft_us,pred
 ```
 
 - Latencies are **microseconds**. Measured values come from the InferenceX row; predicted values from BLIS.
+- A measured and a predicted value are compared only under one definition (DEV-8). Before it scores, `cli.py score` reads the simulator's metric registry (`blis metrics --json`) and refuses the run unless `ttft_mean_ms` is the mean over requests of each request's TTFT, and `tpot_mean_ms` the mean, over requests with two or more output tokens, of each request's (E2E - TTFT) / (output tokens - 1), both over the measured window in milliseconds, unfinished requests excluded: the InferenceX client's definitions (`result.CLIENT_DEFINITIONS`).
 - `scenario` is the **deployment** name, shared by every concurrency of one sweep. (The agentic driver may write one scenario file per point; their names are an implementation detail and aren't carried here.)
 - `label` is the workload label: `8k1k`-style for single-turn, `agentx` for agentic.
 - `grade` is the point's grade, `G1` to `G4`, and equals its fidelity record's. In the summary's tree a G1 point is in the strict tier (`measured_or_resolved`), every other one in `all` only.
@@ -150,7 +153,7 @@ One line per G5 point, sorted by `point_id` (`schemas/fidelity.v3.json#/definiti
  "engine": {"kind": "vllm", "version": "0.32.0"}, "points": 2035, "left_out_records": 0,
  "vllm_ref": "v0.32.0", "vllm_max_distance": 2000,
  "fields_sha256": "…", "pulled_at": "<UTC ISO-8601>",
- "corpus": {"dataset": "…", "revision": "…", "sha256": "…"} | null,
+ "corpora": [{"alias": "…", "workload": "…", "dataset": "…", "revision": "<40 hex>", "sha256": "<64 hex>"}, …],
  "pull_manifest_sha256": "…",
  "source": {"name": "SemiAnalysis InferenceX API", "url": "https://inferencex.semianalysis.com/api/v1/"}}
 ```
@@ -159,11 +162,11 @@ One line per G5 point, sorted by `point_id` (`schemas/fidelity.v3.json#/definiti
 
 `simulator` is the simulator build that scored the run (its release tag) and the engine release it runs. Every fidelity, G5 and failed record carries the same `simulator` (blis-substrate `contracts/spec/pointrecord` Simulator), and the validator refuses a contract whose points name more than one, or another than provenance's (COV-6).
 
-`harness_digest` is the digest of the harness image that produced every figure (`sha256:<64 hex>`), or `unreleased` (design §11.7, X8); every point's `simulator` carries it too. `experimental` is true unless the simulator build is a release tag (the catalog and registry are required at release tags), and an experimental figure is never published as BLIS's accuracy. `units` records the `--units` file the run scored (its sha256, how many units it names, and those the pull did not hold), or null when the run scored every point of the pull. TEMPORARY until blis-substrate publishes the anchor list (COV-2): the nightly scores the whole window and passes no `--units`.
+`harness_digest` is the digest of the harness image that produced every figure (`sha256:<64 hex>`), or `unreleased` (design §11.7, X8); every point's `simulator` carries it too. `experimental` is true unless the simulator build is a release tag (the catalog and registry are required at release tags), and an experimental figure is never published as BLIS's accuracy. `units` records the `--units` file the run scored (its sha256, how many units it names, and those the pull did not hold), or null when the run scored every point of the pull. The nightly scores only the anchor units of the substrate release the build pins (COV-2): it passes as `--units` the list `blis ledger --list anchor --json` prints, and a build that prints no anchor unit fails the night.
 
 `engine` is the engine release the scoring simulator runs, read from its stack.json (LIF-6); every point is scored on it, and graded against it. TEMPORARY until inference-sim v0.16.0 ships stack.json at its root: `cli.py score --stack FILE` names the file. A simulator checkout with no stack.json and no `--stack` is refused, because the build predates stack.json; the release is never read from installation.md.
 
-`fields_sha256` is the sha256 of the fields.json the scorer read.
+`fields_sha256` is the sha256 of the field list `blis fields --engine vllm --json` printed.
 
 `points` is the number of points the run holds (scored, G5 and failed), and `left_out_records` the number of source records the ledger holds no unit for (the pull manifest's `ledger.unlisted`), published in coverage (COV-7).
 

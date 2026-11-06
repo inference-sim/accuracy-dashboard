@@ -6,8 +6,15 @@
       GitHub (artifacts + vllm-project/vllm), Docker Hub, HuggingFace (base_model only).
 
   cli.py score --pull PULL --out CONTRACT --blis BLIS --catalog CAT --registry REG
-               --fields FIELDS [--stack STACK] --corpus FILE [--work DIR] [--only PID ...]
-      Score a frozen pull with one BLIS release. No network.
+               [--stack STACK] --corpus-dir DIR [--work DIR] [--only PID ...]
+      Score a frozen pull with one BLIS release. No network. The engine's field list is what
+      `blis fields --engine vllm --json` prints. --corpus-dir holds each AgentX corpus as
+      resolve_agentic_corpus.py --all fetched it from the catalog's replay workloads.
+
+  cli.py coverage --pull PULL --ledger LEDGER --fields FILE --stack FILE --catalog DIR --registry DIR
+                  [--rows ROWS.json] [--units FILE] [--out FILE.json]
+      The grade split of a frozen pull, graded from its data by the scorer without a simulator, as
+      one JSON document counting rows and units apart (coverage.py).
 
 Nothing in the nightly pipeline calls this. Run by path, like the other orchestrator scripts.
 """
@@ -24,16 +31,22 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(1, str(HERE.parent))
 import api  # noqa: E402
 import artifacts as art  # noqa: E402
+import blis_commands as bc  # noqa: E402
 import build  # noqa: E402
 import clients  # noqa: E402
 import contract  # noqa: E402
+import coverage as cv  # noqa: E402
 import engines  # noqa: E402
 import fields as fl  # noqa: E402
+import harness_pin as hp  # noqa: E402
 import ledger as ldg  # noqa: E402
 import pull as pl  # noqa: E402
+import resolve_agentic_corpus as rac  # noqa: E402
 import recipes as rcp  # noqa: E402
+import result  # noqa: E402
 import score as sc  # noqa: E402
 import settings as st  # noqa: E402
 import stack as sk  # noqa: E402
@@ -234,11 +247,16 @@ _SIM_COMMIT = re.compile(r"^[0-9a-f]{40}$")
 _DIGEST = re.compile(r"^(sha256:[0-9a-f]{64}|unreleased)$")
 
 
-def check_blis_inputs(blis: Path, catalog: Path, registry: Path, sim_build: str | None = None) -> list[str]:
+_DATA_RELEASE = re.compile(r"^[0-9A-Za-z][0-9A-Za-z._+-]*$")
+
+
+def check_blis_inputs(blis: Path, catalog_release: str | None, registry_release: str | None,
+                      sim_build: str | None = None) -> list[str]:
     """Everything `score` needs to name its simulator build, or what's wrong. The blis binary sits
     in the inference-sim checkout it was built from. With --sim-build the checkout must be at that
     build: the release tag, or the 40-hex commit. Without it the checkout must be at a release
-    tag, which is the build. The catalog and registry must be at release tags."""
+    tag, which is the build. The catalog and registry are named by the release tags they are at;
+    the caller names them, because the harness image mounts the data without its git history."""
     out = []
     sim = blis.parent
     if not blis.is_file():
@@ -256,9 +274,11 @@ def check_blis_inputs(blis: Path, catalog: Path, registry: Path, sim_build: str 
             out.append(f"--sim-build {sim_build}: the checkout {sim} is at commit {head or 'unknown'}")
     else:
         out.append(f"--sim-build {sim_build!r} is neither a tag vX.Y.Z[-suffix] nor a 40-hex commit")
-    for repo, flag in ((catalog, "--catalog"), (registry, "--registry")):
-        if not _git(repo, "describe", "--tags", "--exact-match"):
-            out.append(f"{flag} {repo} is not at a release tag")
+    for release, flag in ((catalog_release, "--catalog-release"), (registry_release, "--registry-release")):
+        if release is None:
+            out.append(f"{flag} is required: the release tag the data is at")
+        elif not _DATA_RELEASE.match(release):
+            out.append(f"{flag} {release!r} is not a release tag")
     return out
 
 
@@ -283,21 +303,32 @@ def select_units(points: list[dict], units_path: str | None) -> tuple[list[dict]
              "not_in_pull": sorted(want - held)})
 
 
-def read_fields(path: str | None, engine_release: str) -> tuple["fl.FieldList", str]:
-    """The engine's field list at the release the scoring build runs, and its sha256.
-
-    TEMPORARY until `blis fields --engine vllm --json` exists (inference-sim m1/substrate, task
-    H): --fields names the file blis-vllm publishes at its root. The list must be for the engine
-    release stack.json names; one for another release is refused (LIF-6)."""
-    if not path:
-        raise fl.FieldsError("--fields is required: the engine's fields.json at the release the simulator runs "
-                             "(until `blis fields --engine vllm --json` exists)")
-    raw = Path(path).read_bytes()
+def read_fields(blis: Path, engine_release: str) -> tuple["fl.FieldList", str]:
+    """The engine's field list at the release the scoring build runs, and its sha256: what
+    `blis fields --engine vllm --json` prints (COV-3). The list must be for the engine release
+    stack.json names; one for another release is refused (LIF-6)."""
+    raw = bc.fields(str(blis), "vllm")
     field_list = fl.parse(raw)
     if field_list.engine != {"kind": "vllm", "version": engine_release}:
-        raise fl.FieldsError(f"--fields {path} is the field list of {field_list.engine}, but the simulator runs "
-                             f"vllm {engine_release} (stack.json)")
+        raise fl.FieldsError(f"blis fields --engine vllm printed the field list of {field_list.engine}, but the "
+                             f"simulator runs vllm {engine_release} (stack.json)")
     return field_list, art.sha256(raw)
+
+
+def read_anchor_units(blis: Path, out: Path) -> set[str]:
+    """The anchor units of the substrate release the scoring build pins (COV-2): the list
+    `blis ledger --list anchor --json` prints, written to `out` so the score step can name it as
+    --units. An empty list is refused: until the ledger's seed exists the release publishes no
+    anchor unit, and a night that scored anything else would publish figures on units that may
+    fit or select values (X8)."""
+    raw = bc.ledger_list(str(blis), "anchor")
+    out.write_bytes(raw)
+    units = ldg.read_unit_set(out, role="anchor")
+    if not units:
+        raise ldg.LedgerError("blis ledger --list anchor printed no unit: the substrate release this build pins "
+                              "publishes no anchor list yet (the ledger seed is not created), so there is no unit "
+                              "the nightly may score (COV-2)")
+    return units
 
 
 def read_stack(blis: Path, given: str | None) -> sk.Stack:
@@ -319,13 +350,21 @@ def cmd_score(a) -> int:
     pull_dir = Path(a.pull)
     blis = Path(a.blis).resolve()
     sim_build = getattr(a, "sim_build", None)
-    bad = check_blis_inputs(blis, Path(a.catalog), Path(a.registry), sim_build)
+    bad = check_blis_inputs(blis, getattr(a, "catalog_release", None), getattr(a, "registry_release", None), sim_build)
     bad += check_harness_digest(getattr(a, "harness_digest", None))
     try:
         stack = read_stack(blis, getattr(a, "stack", None))
         engine_release = stack.engine("vllm")
-        field_list, fields_sha = read_fields(getattr(a, "fields", None), engine_release)
-    except (sk.StackError, fl.FieldsError, OSError, ValueError) as e:
+        field_list, fields_sha = read_fields(blis, engine_release)
+        # DEV-8: a predicted figure is compared with a measured one only under one definition.
+        bad += result.check_definitions(bc.metrics(str(blis)))
+    except (sk.StackError, fl.FieldsError, bc.CommandError, OSError, ValueError) as e:
+        bad.append(str(e))
+    # Every date-pinned AgentX corpus, by the catalog replay workload of its alias, checked against
+    # the entry's full sha256 (X12, D3). A point is replayed with its own run's alias (score.py).
+    try:
+        corpora = rac.checked_corpora(Path(a.catalog), Path(a.corpus_dir))
+    except rac.CorpusError as e:
         bad.append(str(e))
     if bad:
         for b in bad:
@@ -346,26 +385,14 @@ def cmd_score(a) -> int:
         _log(f"score: {len(units['not_in_pull'])} of the {units['count']} units named are not in the pull")
     if a.only is not None:  # None = score the whole manifest; [] = score nothing (never "all")
         points = [p for p in points if any(p["point_id"].startswith(x) for x in a.only)]
-    # The corpus is read only by an agentic replay, so it is required only when a point to score
-    # is agentic. Superseded by --corpus-dir on the corpus branch.
-    corpus = None
-    if any(p["row"].get("benchmark_type") == "agentic_traces" for p in points):
-        if not a.corpus or not a.corpus_revision:
-            _log("FATAL: the points to score include an agentic one, so --corpus and --corpus-revision are required")
-            return 2
-        # blis runs in its binary's directory, so every path it is given is absolute.
-        path = Path(a.corpus).resolve()
-        sha = a.corpus_sha256 or art.sha256(path.read_bytes())
-        corpus = {"dataset": a.corpus_dataset, "revision": a.corpus_revision, "sha256": sha,
-                  "path": str(path), "file": path.name}
     env = sc.Env(
         blis=str(blis), blis_release=_git(sim, "describe", "--tags", "--exact-match") or "unknown",
         blis_commit=_git(sim, "rev-parse", "HEAD"), catalog=Path(a.catalog).resolve(),
-        catalog_release=_git(a.catalog, "describe", "--tags") or "unknown", registry=Path(a.registry).resolve(),
-        registry_release=_git(a.registry, "describe", "--tags") or "unknown",
+        catalog_release=a.catalog_release, registry=Path(a.registry).resolve(),
+        registry_release=a.registry_release,
         kernel=next((l.split()[1] for l in (sim / "go.mod").read_text().splitlines()
                      if "blis-latency-kernel " in l), "unknown"),
-        corpus=corpus,
+        corpora=corpora,
         corpus_cache=Path(a.corpus_cache).resolve() if a.corpus_cache else None,
         vllm_ref=manifest["vllm_ref"], field_list=field_list, fields_sha256=fields_sha,
         base_models=manifest.get("base_models") or {}, timeout_s=a.timeout, vllm_defaults=vdefaults,
@@ -375,7 +402,7 @@ def cmd_score(a) -> int:
     # (check_blis_inputs required one), with the engine release its stack.json names (COV-6).
     env.sim_build = sim_build or env.blis_release
     env.harness_digest = a.harness_digest
-    env.catalog_obj = sp.Catalog.load(env.catalog)
+    env.catalog_obj = sp.Catalog(blis=str(blis), root=env.catalog)
     env.parts = sp.registry_parts(env.registry)
     # Score serially or across a process pool. BLIS replays are CPU-bound subprocesses, so the
     # worker count is clamped to the machine's cores (4 on an ubuntu-latest runner) -- more would
@@ -386,8 +413,14 @@ def cmd_score(a) -> int:
     # Agentic replays hold the 1.8GB corpus in RAM, so they serialize (default 1) even while
     # single-turn runs `workers`-wide; override only on a box with the RAM for concurrent corpora.
     agentic_workers = a.agentic_workers if getattr(a, "agentic_workers", 0) else 1
-    outcomes = sc.score_points(points, pull_dir, work, env, workers=workers,
-                               agentic_workers=agentic_workers, log=_log)
+    try:
+        outcomes = sc.score_points(points, pull_dir, work, env, workers=workers,
+                                   agentic_workers=agentic_workers, log=_log)
+    except bc.CommandError as e:
+        # A blis command the scorer reads catalog identities through failed (an ambiguous
+        # name, or a build without the command): no point of the run is graded on a guess.
+        _log(f"FATAL: {e}")
+        return 2
     problems = sc.check_all_scored(points, outcomes)
     if problems:
         for p in problems:
@@ -399,13 +432,13 @@ def cmd_score(a) -> int:
             "simulator": env.simulator(), "engine": {"kind": "vllm", "version": engine_release},
             "harness_digest": a.harness_digest, "units": units,
             # Design §11.7, X8: a figure is experimental unless its build and its data are both
-            # released. check_blis_inputs requires the catalog and registry at release tags, so the
-            # data is released, and the build is released when it is a release tag.
+            # released. check_blis_inputs requires the catalog and registry to be named by release
+            # tags, so the data is released, and the build is released when it is a release tag.
             "experimental": not _RELEASE_TAG.match(env.sim_build),
             "left_out_records": len((manifest.get("ledger") or {}).get("unlisted") or []),
             "vllm_ref": manifest["vllm_ref"], "vllm_max_distance": manifest["vllm_max_distance"],
             "fields_sha256": fields_sha, "pulled_at": manifest["pulled_at"],
-            "corpus": corpus and {k: corpus[k] for k in ("dataset", "revision", "sha256")},
+            "corpora": sc.corpora_provenance(env.corpora),
             "pull_manifest_sha256": art.sha256(manifest_text.encode()),
             "source": {"name": "SemiAnalysis InferenceX API", "url": api.API + "/"}}
     sc.write_contract(Path(a.out), outcomes, prov)
@@ -416,6 +449,23 @@ def cmd_score(a) -> int:
     failed = sum(1 for o in outcomes if o.faults)
     _log(f"score: {scored} scored, {len(outcomes) - scored - failed} not scored, {failed} failed -> {a.out}")
     return 1 if problems else 0
+
+
+def cmd_coverage(a) -> int:
+    try:
+        doc = cv.run(pull_dir=Path(a.pull), ledger=Path(a.ledger), fields_path=Path(a.fields), stack_path=Path(a.stack),
+                     catalog=Path(a.catalog), registry=Path(a.registry), rows_path=Path(a.rows) if a.rows else None,
+                     units_path=Path(a.units) if a.units else None, workers=a.workers or 1,
+                     work=Path(a.work) if a.work else None)
+    except (cv.CoverageError, ldg.LedgerError, fl.FieldsError, sk.StackError, bc.CommandError, OSError, KeyError,
+            ValueError) as e:
+        _log(f"FATAL: {e}")
+        return 2
+    text = json.dumps(doc, indent=1, sort_keys=False) + "\n"
+    if a.out:
+        Path(a.out).write_text(text)
+    sys.stdout.write(text)
+    return 0
 
 
 def _has_legacy_ids(summary: dict) -> bool:
@@ -430,6 +480,11 @@ def mergeable(prior: dict | None, schema_version: int) -> bool:
     holds no point tonight's contract can carry over (COV-8 keeps it unchanged), so the night
     fetches and scores the whole window instead."""
     return prior is not None and prior.get("schema_version") == schema_version and not _has_legacy_ids(prior)
+
+
+def run_image(cmd: list[str]) -> int:
+    """Run the harness image (harness_pin.docker_command) and return its exit status."""
+    return subprocess.run(cmd).returncode
 
 
 def cmd_nightly(a) -> int:
@@ -448,38 +503,78 @@ def cmd_nightly(a) -> int:
     work_dir, data_dir, state_path = Path(a.work_dir), Path(a.data_dir), Path(a.state)
     contract_dir = Path(a.work or data_dir.parent / "_contract")
     latest_path = data_dir / "latest" / "summary.json"
+    # The night scores only the anchor units of the substrate release the build pins (COV-2).
+    # The list is read before anything is pulled, so a release without one fails the night
+    # at once.
+    work_dir.mkdir(parents=True, exist_ok=True)
+    anchor_path = work_dir / "anchor-units.json"
+    try:
+        anchors = read_anchor_units(Path(a.blis), anchor_path)
+    except (bc.CommandError, ldg.LedgerError, OSError, ValueError) as e:
+        _log(f"FATAL: {e}")
+        return 2
+
+    # The catalog is checked once, before any artifact is fetched: a source repository two
+    # entries claim makes `blis catalog resolve` refuse, and the night stops here, not
+    # mid-score.
+    try:
+        sp.Catalog(blis=str(Path(a.blis).resolve()), root=Path(a.catalog)).check_unambiguous()
+    except (bc.CommandError, OSError, ValueError) as e:
+        _log(f"FATAL: the catalog is ambiguous or unreadable: {e}")
+        return 2
 
     def pull_fn(work: Path, today_: date, last_ids: set, blis_changed: bool):
-        # List the whole window (cheap -- api.pull hits only the REST API, no artifacts), then fetch
-        # inputs for the points to score. The whole window is fetched on a BLIS release AND on the
-        # seed (no prior ids); otherwise only the new points. A row the pull itself can't read fails
-        # the run (cmd_pull returns non-zero).
+        # List the whole window (cheap -- api.pull hits only the REST API, no artifacts); its points
+        # are the anchor units, all of which its rows must hold. Then fetch inputs for the points
+        # to score: every point on a BLIS release AND on the seed (no prior ids), otherwise only
+        # the new points. A row the pull itself can't read fails the run (cmd_pull returns
+        # non-zero).
         p = api.pull(api.http_fetch, today=today_, window_days=a.window_days)
-        window_ids = {x.point_id for x in pl.place(p.rows, ldg.load(Path(a.ledger))).points}
+        listed = {x.point_id for x in pl.place(p.rows, ldg.load(Path(a.ledger))).points}
+        # Every anchor unit must be in this window's pull, whatever its engine: a unit of a
+        # framework no BLIS engine models is a point too, and engines.py gives it its G5 reason
+        # without an artifact. An anchor unit with no row in the window would be dropped from the
+        # counts without a word, so the night fails (COV-1, COV-2).
+        missing = anchors - listed
+        if missing:
+            raise RuntimeError(f"{len(missing)} of the {len(anchors)} anchor units are neither a point of the "
+                               f"window nor listed with a reason (first: {sorted(missing)[0]}); the run stops "
+                               f"rather than publish counts that omit them (COV-1)")
+        window_ids = set(anchors)
         prior = json.loads(latest_path.read_text()) if latest_path.is_file() else None
         whole = blis_changed or not last_ids or not mergeable(prior, bsv2.SCHEMA_VERSION)
         to_fetch = window_ids if whole else (window_ids - set(last_ids))
-        only = None if whole else sorted(to_fetch)
-        _log(f"nightly: window {len(window_ids)} points; fetch {'whole window' if whole else f'{len(to_fetch)} new'}")
+        _log(f"nightly: window {len(listed)} units, {len(window_ids)} of them anchor units; "
+             f"fetch {'every one' if whole else f'{len(to_fetch)} new'}")
         rc = cmd_pull(types.SimpleNamespace(out=str(work), today=today_.isoformat(),
                                             window_days=a.window_days, cache=a.cache, prior=None,
-                                            only=only, download_workers=a.download_workers,
+                                            only=sorted(to_fetch), download_workers=a.download_workers,
                                             ledger=a.ledger))
         if rc != 0:
             raise RuntimeError(f"pull failed (rc={rc}); the run stops rather than publish a partial pull")
         return json.loads((work / "manifest.json").read_text())["pulled_at"][:10], window_ids
 
+    # The catalog and registry are directories of the one substrate checkout, so both are at the
+    # release stack.json names for it. A draft build's substrate is a pseudo-version: it is not a
+    # release and its figures are not published (X8). The checkout must be that release's commit.
+    release = sk.release_name({"version": a.substrate_version})
+    if release is None:
+        _log(f"FATAL: blis-substrate {a.substrate_version} in stack.json is not a release tag; "
+             f"a release is scored on a tagged substrate")
+        return 2
+    problems = sk.verify_checkout(Path(a.substrate_dir), release, a.substrate_commit)
+    if problems:
+        _log("FATAL: the blis-substrate checkout is not release " + release + ": " + "; ".join(problems))
+        return 2
+
     def score_build_fn(work: Path, blis_tag: str, score_ids, pull_date: str, window_ids: set):
-        rc = cmd_score(types.SimpleNamespace(
-            pull=str(work), out=str(contract_dir), blis=a.blis, catalog=a.catalog, stack=a.stack,
-            fields=a.fields, registry=a.registry, sim_build=None, harness_digest="unreleased",
-            # TEMPORARY until blis-substrate publishes the anchor list (COV-2): the nightly scores
-            # every point of the window; it then passes that list as --units.
-            units=None,
-            corpus=a.corpus,
-            corpus_sha256=a.corpus_sha256, corpus_dataset=a.corpus_dataset,
-            corpus_revision=a.corpus_revision, corpus_cache=a.corpus_cache, work=a.score_work,
-            timeout=a.timeout, only=None, workers=a.workers, agentic_workers=a.agentic_workers,
+        # The night scores through the released harness image, named by its digest (design
+        # §11.7): the figures record that digest, and no scorer runs from this source tree.
+        contract_dir.mkdir(parents=True, exist_ok=True)
+        rc = run_image(hp.docker_command(
+            a.harness_image, sim=blis_tag, units=anchor_path, pull=work, out=contract_dir,
+            catalog=a.catalog, registry=a.registry, corpus_dir=a.corpus_dir,
+            catalog_release=release, registry_release=release,
             max_rss_mb=a.max_rss_mb))
         if rc != 0:
             raise RuntimeError(f"score failed (rc={rc})")
@@ -520,7 +615,10 @@ def main(argv=None) -> int:
     p.add_argument("--only", nargs="*", help="freeze only these point_ids of the window (the nightly's delta fetch)")
     p.add_argument("--ledger", required=True,
                    help="blis-substrate's catalog/ledger at the commit the scoring simulator pins: "
-                        "every point is a unit of its unit list (design §10.2)")
+                        "every point is a unit of its unit list (design §10.2). TEMPORARY until an "
+                        "inference-sim command prints the full unit list with identities "
+                        "(catalog/ledger/units) and the ingest report; `blis ledger --list` prints "
+                        "only the published unit ids")
     p.add_argument("--download-workers", type=int, default=0,
                    help="parallel artifact-download workers (default: min(2*cores, 8); I/O-bound)")
     s = sub.add_parser("score")
@@ -530,8 +628,10 @@ def main(argv=None) -> int:
                    help="the blis binary, built in an inference-sim checkout at a release tag; it runs in that directory")
     s.add_argument("--catalog", required=True)
     s.add_argument("--registry", required=True)
-    s.add_argument("--fields", help="TEMPORARY until `blis fields --engine vllm --json` exists (inference-sim "
-                                     "m1/substrate): blis-vllm's fields.json at the release the simulator runs")
+    s.add_argument("--catalog-release", required=True,
+                   help="the release tag the catalog is at (the harness image mounts the data without "
+                        "its git history, so it is named)")
+    s.add_argument("--registry-release", required=True, help="the release tag the registry is at")
     s.add_argument("--stack", help="TEMPORARY until inference-sim v0.16.0 ships stack.json: the scoring build's "
                                     "stack.json, when its checkout has none")
     s.add_argument("--sim-build", help="the simulator build: a release tag or a 40-hex commit; the checkout must be at it "
@@ -539,10 +639,9 @@ def main(argv=None) -> int:
     s.add_argument("--harness-digest", required=True, help="sha256:<64 hex> of the harness image, or unreleased (X8)")
     s.add_argument("--units", help="the ledger units to score: a PublishedUnits list or a file of unit ids "
                                     "(default: every point of the pull)")
-    s.add_argument("--corpus", help="the agentic corpus file; required only when a point to score is agentic")
-    s.add_argument("--corpus-sha256")
-    s.add_argument("--corpus-dataset", default="semianalysisai/cc-traces-weka-062126")
-    s.add_argument("--corpus-revision", help="the corpus's resolved revision; required with --corpus")
+    s.add_argument("--corpus-dir", required=True,
+                   help="each AgentX corpus at <dir>/<workload>/<file>, as resolve_agentic_corpus.py --all "
+                        "fetched it at the revision its catalog replay workload pins")
     s.add_argument("--corpus-cache")
     s.add_argument("--work")
     s.add_argument("--timeout", type=int, default=7200)
@@ -553,6 +652,25 @@ def main(argv=None) -> int:
                    help="agentic scoring parallelism (default 1: each replay holds the 1.8GB corpus; raise only with RAM)")
     s.add_argument("--max-rss-mb", type=int, default=0,
                    help="per-replay resident-memory ceiling MB (0=none); over-limit agentic replays -> not_scored:insufficient_memory")
+
+    c = sub.add_parser("coverage", formatter_class=argparse.RawDescriptionHelpFormatter,
+                       help="the grade split of a frozen pull, graded from its data without a simulator",
+                       description=cv.__doc__ + "\nThe pull's point ids may be of an older identity: with --rows the window's rows "
+                       "are placed in --ledger afresh and each unit takes the artifacts of the manifest entry of "
+                       "its rows, by row id.")
+    c.add_argument("--pull", required=True, help="a frozen pull (manifest.json and points/)")
+    c.add_argument("--ledger", required=True, help="blis-substrate's catalog/ledger (see pull --ledger)")
+    c.add_argument("--fields", required=True, help="the engine's fields.json, for the release stack.json names")
+    c.add_argument("--stack", required=True, help="the scoring build's stack.json (the engine release)")
+    c.add_argument("--catalog", required=True,
+                   help="a catalog checkout, read as `blis catalog resolve` answers it (TEMPORARY, support.CheckoutCatalog); "
+                        "it must hold the replay workload of each AgentX corpus alias")
+    c.add_argument("--registry", required=True)
+    c.add_argument("--rows", help="a JSON list of the API rows (every framework); those in the pull's window are placed")
+    c.add_argument("--units", help="a PublishedUnits list or a file of unit ids (the anchor list): adds the `anchor` section")
+    c.add_argument("--work")
+    c.add_argument("--workers", type=int, default=1)
+    c.add_argument("--out", help="also write the JSON document here")
 
     n = sub.add_parser("nightly", help="one night: list window -> fetch+score delta -> merge -> publish")
     n.add_argument("--blis-tag", required=True, help="the stable inference-sim tag resolve_blis.sh resolved")
@@ -570,14 +688,16 @@ def main(argv=None) -> int:
     n.add_argument("--evaluator-commit")
     n.add_argument("--ledger", required=True, help="blis-substrate's catalog/ledger (see pull --ledger)")
     n.add_argument("--blis", required=True, help="the blis binary (see score --blis)")
+    n.add_argument("--harness-image", required=True,
+                   help="the harness image by digest (harness/image.pin): the night scores through it")
     n.add_argument("--catalog", required=True)
     n.add_argument("--registry", required=True)
-    n.add_argument("--fields", help="TEMPORARY until `blis fields --engine vllm --json` exists (see score --fields)")
+    n.add_argument("--substrate-dir", required=True, help="the blis-substrate checkout --catalog, --registry and --ledger are in")
+    n.add_argument("--substrate-version", required=True,
+                   help="the blis-substrate version in stack.json (resolve_stack.py substrate_version); a release tag names the release")
+    n.add_argument("--substrate-commit", required=True, help="the blis-substrate commit in stack.json (resolve_stack.py substrate_commit)")
     n.add_argument("--stack", help="TEMPORARY until inference-sim v0.16.0 (see score --stack)")
-    n.add_argument("--corpus", required=True)
-    n.add_argument("--corpus-sha256")
-    n.add_argument("--corpus-dataset", default="semianalysisai/cc-traces-weka-062126")
-    n.add_argument("--corpus-revision", required=True)
+    n.add_argument("--corpus-dir", required=True, help="see score --corpus-dir")
     n.add_argument("--corpus-cache")
     n.add_argument("--timeout", type=int, default=7200)
     n.add_argument("--workers", type=int, default=0, help="single-turn scoring parallelism (default: min(cores, 4))")
@@ -586,7 +706,7 @@ def main(argv=None) -> int:
     n.add_argument("--max-rss-mb", type=int, default=0, help="per-replay RSS ceiling MB (0=none); over-limit agentic -> not_scored:insufficient_memory")
 
     a = ap.parse_args(argv)
-    return {"pull": cmd_pull, "score": cmd_score, "nightly": cmd_nightly}[a.cmd](a)
+    return {"pull": cmd_pull, "score": cmd_score, "coverage": cmd_coverage, "nightly": cmd_nightly}[a.cmd](a)
 
 
 if __name__ == "__main__":

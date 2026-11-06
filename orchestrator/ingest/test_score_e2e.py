@@ -37,7 +37,7 @@ import fields as fl  # noqa: E402
 import settings as st  # noqa: E402
 import support as sp  # noqa: E402
 
-FIELDS = fl.load(HERE / "testdata" / "fields" / "fields.json")
+FIELDS = fl.parse((HERE / "testdata" / "fields" / "fields.json").read_bytes())
 
 LOG = (
     "INFO [api_utils.py:286] non-default args: {'model': 'org/m', 'served_model_name': ['org/m'], "
@@ -132,6 +132,38 @@ def _fake_blis(tmp: Path, *, validate: int = 0, drop: bool = False, early_holder
                                                      wp=repr(workload_properties)))
 
 
+# A blis that answers only `catalog resolve --catalog DIR --model|--chip NAME --json`: a model
+# is the entry MODELS gives its source repository (compared without regard to case), a chip is
+# itself when CHIPS holds it, and anything else is null. The scorer asks the blis it scores
+# with; the tests give the catalog its own fake so a replay fake can be swapped alone.
+CATALOG_BLIS = """#!/usr/bin/env python3
+import json, sys
+MODELS, CHIPS = {models!r}, {chips!r}
+a = sys.argv[1:]
+assert a[:3] == ["catalog", "resolve", "--catalog"] and a[-1] == "--json", a
+kind, q = a[4], a[5]
+ident = MODELS.get(q.lower()) if kind == "--model" else (q if q in CHIPS else None)
+out = {{"query": q, "identity": ident, "reason": "fake"}}
+if kind == "--chip" and ident is not None:
+    gpn, gpr = CHIPS[q]
+    out["packaging"] = {{"gpus_per_node": gpn, "gpus_per_rack": gpr}}
+print(json.dumps(out))
+"""
+
+
+def _catalog(tmp: Path, models: dict, chips: dict, speculators: dict) -> sp.Catalog:
+    """A catalog at tmp/catalog: identities from a fake `blis catalog resolve`, and each model's
+    graph.yaml naming its speculator."""
+    root = tmp / "catalog"
+    for name, method in speculators.items():
+        (root / "models" / name).mkdir(parents=True, exist_ok=True)
+        (root / "models" / name / "graph.yaml").write_text(f"speculator:\n  method: {method}\n")
+    root.mkdir(parents=True, exist_ok=True)
+    blis = _exe(tmp / "catalog-blis", CATALOG_BLIS.format(models={k.lower(): v for k, v in models.items()},
+                                                          chips=dict(chips)))
+    return sp.Catalog(blis=blis, root=root)
+
+
 def _saw(env) -> list[dict]:
     p = Path(env.blis).parent / "blis_saw.json"
     return [json.loads(x) for x in p.read_text().splitlines()] if p.exists() else []
@@ -147,7 +179,7 @@ def job_log_text(isl: int, osl: int, conc: int, extra: str = "") -> str:
 
 def _setup(tmp: Path, *, log: str = LOG, job_log: str | None = "default", client_commit: bool = True, repo: str = "org/m", conc: int = 4, isl: int = 1024, osl: int = 1024,
            date: str = "2026-10-01", spec: str = "mtp", benchmark_type: str = "single_turn",
-           hardware: str = "mi355x", node_sizes: dict | None = None):
+           hardware: str = "mi355x", chips: dict | None = None, node_size: int | None = None):
     row = {"id": "1", "model": "m", "hardware": hardware, "precision": "fp8", "framework": "vllm",
            "benchmark_type": benchmark_type, "conc": conc, "isl": isl, "osl": osl, "spec_method": spec,
            "disagg": False, "is_multinode": False, "decode_tp": 1, "decode_ep": 1, "num_decode_gpu": 1,
@@ -166,6 +198,11 @@ def _setup(tmp: Path, *, log: str = LOG, job_log: str | None = "default", client
              "files": {"server_log": {"path": "server_log.gz", "sha256": "0" * 64, "from": "api:/server-log"}},
              "build": {"image": row["image"], "commit": "a" * 40, "source": "image_label", "ref": "v0.31.0",
                        "distance": 0, "match": "exact"}}
+    # The launch configuration states the node when asked: resources.gpus_per_node.
+    if node_size is not None:
+        lc = {"roles": {"agg": {"args": {}}}, "resources": {"gpu_type": hardware, "gpus_per_node": node_size}}
+        (pdir / "launch_config.gz").write_bytes(gzip.compress(json.dumps(lc).encode(), mtime=0))
+        entry["files"]["launch_config"] = {"path": "launch_config.gz", "sha256": "0" * 64, "from": "artifact"}
     if job_log == "default":
         job_log = job_log_text(isl, osl, conc)
     if job_log is not None:
@@ -176,11 +213,10 @@ def _setup(tmp: Path, *, log: str = LOG, job_log: str | None = "default", client
         entry["client_args"] = None
     env = sc.Env(blis=_fake_blis(tmp), blis_release="v0.12.0", blis_commit="b" * 40, catalog=tmp,
                  catalog_release="0.3.0", registry=tmp, registry_release="v0.2.0", kernel="v0.3.0",
-                 corpus={"sha256": "c" * 64}, field_list=FIELDS, vllm_defaults=st.load_vllm_defaults()[0],
+                 corpora={}, field_list=FIELDS, vllm_defaults=st.load_vllm_defaults()[0],
                  engine_release="0.31.0", sim_build="v0.12.0")
-    env.catalog_obj = sp.Catalog(root=tmp, models={"m": repo}, speculators={"m": "mtp"},
-                                 hardware={hardware: 139.8}, node_sizes=node_sizes or {})
-    env.parts = {hardware}
+    env.catalog_obj = _catalog(tmp, {repo: "m"}, chips or {hardware: (None, None)}, {"m": "mtp"})
+    env.parts = set(chips or {hardware})
     return entry, env
 
 
@@ -192,7 +228,7 @@ def _score(tmp: Path, entry, env, out: Path):
             "simulator": env.simulator(), "harness_digest": env.harness_digest, "experimental": False, "units": None,
             "engine": {"kind": "vllm", "version": "0.31.0"}, "left_out_records": 0,
             "vllm_ref": "v0.31.0", "vllm_max_distance": 2000, "fields_sha256": "d" * 64,
-            "pulled_at": "2026-10-23T00:00:00Z", "corpus": None, "pull_manifest_sha256": "e" * 64,
+            "pulled_at": "2026-10-23T00:00:00Z", "corpora": [], "pull_manifest_sha256": "e" * 64,
             "source": {"name": "test", "url": "https://example.invalid/"}}
     sc.write_contract(out, [o], prov)
     return o, work
@@ -467,9 +503,93 @@ def _agentic(tmp: Path):
     pdir = tmp / "pull" / "points" / entry["point_id"]
     (pdir / "export.gz").write_bytes(gzip.compress(json.dumps(_export()).encode(), mtime=0))
     entry["files"]["client_export"] = {"path": "export.gz", "sha256": "0" * 64, "from": "artifact"}
-    env.corpus = {"dataset": "semianalysisai/cc-traces-weka-062126", "revision": "rev", "sha256": "c" * 64,
-                  "path": str(tmp / "traces.jsonl"), "file": "traces.jsonl"}
+    env.corpora = {
+        UNCAPPED: {"workload": "agentx-mvp-uncapped", "repo": "semianalysisai/cc-traces-weka-062126",
+                   "revision": "23f152f6f0f9399a85901b89a6458def0ef16729", "file": "traces.jsonl",
+                   "split": "train", "sha256": "c" * 64, "path": str(tmp / "uncapped" / "traces.jsonl")},
+        CAPPED: {"workload": "agentx-mvp", "repo": "semianalysisai/cc-traces-weka-062126-256k",
+                 "revision": "8fecd2fc56694469f758f0afbbb6335ad3043740", "file": "traces.jsonl",
+                 "split": "train", "sha256": "d" * 64, "path": str(tmp / "capped" / "traces.jsonl")}}
     return entry, env
+
+
+UNCAPPED = "semianalysis_cc_traces_weka_062126"
+CAPPED = "semianalysis_cc_traces_weka_062126_256k"
+
+
+def _set_alias(tmp: Path, entry, alias: str, repo: str | None):
+    """Rewrite the point's client export so its run loaded `alias` (and recorded `repo`)."""
+    from test_extract import _export
+    doc = _export()
+    doc["input_config"]["datasets"][0]["dataset"] = alias
+    doc["metadata"]["dataset"]["loader"] = alias
+    if repo is None:
+        del doc["metadata"]["dataset"]["hf_dataset_name"]
+    else:
+        doc["metadata"]["dataset"]["hf_dataset_name"] = repo
+    pdir = tmp / "pull" / "points" / entry["point_id"]
+    (pdir / "export.gz").write_bytes(gzip.compress(json.dumps(doc).encode(), mtime=0))
+
+
+def test_each_agentic_point_replays_the_corpus_its_own_run_loaded():
+    # COV-12, D3: the alias the run's client recorded picks the catalog entry, and blis is given
+    # that entry's revision, full sha256 and file, never one corpus for the whole night.
+    import yaml
+    for alias, repo, rev, sha, sub in (
+            (UNCAPPED, "semianalysisai/cc-traces-weka-062126", "23f152f6f0f9399a85901b89a6458def0ef16729",
+             "c" * 64, "uncapped"),
+            (CAPPED, "semianalysisai/cc-traces-weka-062126-256k", "8fecd2fc56694469f758f0afbbb6335ad3043740",
+             "d" * 64, "capped")):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            entry, env = _agentic(tmp)
+            _set_alias(tmp, entry, alias, repo)
+            o, _ = _score(tmp, entry, env, tmp / "c1")
+            assert o.fidelity is not None, o.reasons
+            argv = _saw(env)[0]["argv"]
+            assert argv[argv.index("--corpus-sha256") + 1] == sha
+            assert argv[argv.index("--corpus") + 1] == str(tmp / sub / "traces.jsonl")
+            spec = yaml.safe_load(Path(argv[argv.index("--workload-spec") + 1]).read_text())["replay"]["corpus"]
+            assert spec["loader"] == alias and spec["sha256"] == sha
+            assert spec["source"] == {"huggingface": repo, "revision": rev, "file": "traces.jsonl", "split": "train"}
+            assert o.fidelity["replay"]["corpus"] == alias and o.fidelity["replay"]["corpus_sha256"] == sha
+        finally:
+            shutil.rmtree(tmp)
+
+
+def test_an_agentic_point_whose_corpus_is_not_date_pinned_is_g5_value_not_recorded():
+    for alias, repo, want in (
+            ("semianalysis_cc_traces_weka_with_subagents", "semianalysisai/cc-traces-weka-062126",
+             "value_not_recorded:replay.corpus=semianalysis_cc_traces_weka_with_subagents"),
+            # The recorded repository is not the one the alias loads: two records of the run disagree.
+            (UNCAPPED, "semianalysisai/cc-traces-weka-062126-256k", "conflict:replay.corpus_repo")):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            entry, env = _agentic(tmp)
+            _set_alias(tmp, entry, alias, repo)
+            o, _ = _score(tmp, entry, env, tmp / "c1")
+            assert o.fidelity is None and want in o.reasons, o.reasons
+            assert _saw(env) == []
+            assert c.validate_dir(tmp / "c1") == []
+            ns = [json.loads(x) for x in (tmp / "c1" / c.NOT_SCORED_JSONL).read_text().splitlines()]
+            code = want.partition(":")[0].replace("conflict", "value_conflict")
+            assert ns[0]["grade"] == "G5" and {"code": code, "subject": want.partition(":")[2]} in ns[0]["g5_reasons"], ns[0]
+        finally:
+            shutil.rmtree(tmp)
+    # No alias at all: from_export names it, and it is value_not_recorded too.
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _agentic(tmp)
+        from test_extract import _export
+        doc = _export()
+        del doc["input_config"]["datasets"][0]["dataset"]
+        del doc["metadata"]["dataset"]["loader"]
+        (tmp / "pull" / "points" / entry["point_id"] / "export.gz").write_bytes(
+            gzip.compress(json.dumps(doc).encode(), mtime=0))
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert "required_setting_missing:replay.corpus" in o.reasons and _saw(env) == []
+    finally:
+        shutil.rmtree(tmp)
 
 
 def test_the_agentic_path_reads_the_registry_means_and_the_engine_report():
@@ -595,7 +715,7 @@ def test_a_field_the_release_lacks_or_the_engine_does_not_model_is_g5():
         # The log's release is not the one the defaults table was read at, so only the launch
         # config can state a field inside a config object.
         pdir = tmp / "pull" / "points" / entry["point_id"]
-        lc = {"roles": {"agg": {"args": {"compilation-config": '{"custom_ops": ["+rms_norm"]}'}}}}
+        lc = {"roles": {"agg": {"args": {"compilation-config": '{"custom_ops": ["+rms_norm"]}'}}}, "resources": {"gpus_per_node": 8}}
         (pdir / "launch_config.gz").write_bytes(gzip.compress(json.dumps(lc).encode(), mtime=0))
         entry["files"]["launch_config"] = {"path": "launch_config.gz", "sha256": "0" * 64, "from": "artifact"}
         o, _ = _score(tmp, entry, env, tmp / "c2")
@@ -624,7 +744,7 @@ def test_launch_config_and_logged_args_that_disagree_are_g5_value_conflict():
     try:
         entry, env = _setup(tmp)
         pdir = tmp / "pull" / "points" / entry["point_id"]
-        lc = {"roles": {"agg": {"args": {"max-num-seqs": 32}}}}
+        lc = {"roles": {"agg": {"args": {"max-num-seqs": 32}}}, "resources": {"gpus_per_node": 8}}
         (pdir / "launch_config.gz").write_bytes(gzip.compress(json.dumps(lc).encode(), mtime=0))
         entry["files"]["launch_config"] = {"path": "launch_config.gz", "sha256": "0" * 64, "from": "artifact"}
         o, _ = _score(tmp, entry, env, tmp / "c1")
@@ -727,19 +847,6 @@ def test_an_unstable_label_before_its_first_record_stays_g5_value_not_recorded()
         shutil.rmtree(tmp)
 
 
-def test_a_chip_whose_catalog_entry_fixes_the_node_size_writes_none_whatever_the_table_says():
-    tmp = Path(tempfile.mkdtemp())
-    try:
-        entry, env = _setup(tmp, hardware="gb200", node_sizes={"gb200": 4}, date="2026-06-15")
-        _launch_size(tmp, entry, 4)
-        o, work = _score(tmp, entry, env, tmp / "c1")
-        assert o.fidelity is not None, o.reasons
-        assert "gpus_per_node" not in _scenario(work, entry)["cluster"] and "gpus_per_rack" not in _scenario(work, entry)["cluster"]
-        assert not [s for s in o.fidelity["substitutions"] if s["kind"] == "later_record"]
-    finally:
-        shutil.rmtree(tmp)
-
-
 def test_a_point_refused_before_blis_never_calls_it():
     tmp = Path(tempfile.mkdtemp())
     try:
@@ -790,6 +897,58 @@ def test_a_single_turn_point_with_data_parallel_ranks_names_the_balancer_substit
                 "llm-d endpoint picker profile vllm-dp-lb stands in for vLLM's internal load balancer"} \
             in o.fidelity["substitutions"]
         assert c.validate_dir(tmp / "c2") == []
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_an_agentic_points_max_model_len_is_the_runs_own_and_never_a_default():
+    # X19, design §11.2: the replay filters its corpus against the deployment's max_model_len,
+    # so a recorded 1048576 is copied, and an unrecorded one is left unset, never a context length
+    # the run did not state. blis refuses what it cannot resolve (value_not_recorded, score.value_refusal).
+    import yaml
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _agentic(tmp)
+        _with_log(tmp, entry, LOG.replace("'max_model_len': 2304", "'max_model_len': 1048576"))
+        o, work = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        argv = _saw(env)[0]["argv"]
+        scen = Path(argv[argv.index("--scenarios") + 1]) / argv[argv.index("--scenario") + 1]
+        eng = list(yaml.safe_load_all(scen.read_text()))[1]["pools"][0]["engine"]
+        assert eng["max_model_len"] == 1048576
+        spec = yaml.safe_load(Path(argv[argv.index("--workload-spec") + 1]).read_text())["replay"]
+        assert "max_context_length" not in spec          # the client filtered nothing
+    finally:
+        shutil.rmtree(tmp)
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _agentic(tmp)
+        _with_log(tmp, entry, LOG.replace("'max_model_len': 2304, ", ""))
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        argv = _saw(env)[0]["argv"]
+        scen = Path(argv[argv.index("--scenarios") + 1]) / argv[argv.index("--scenario") + 1]
+        eng = list(yaml.safe_load_all(scen.read_text()))[1]["pools"][0]["engine"]
+        assert "max_model_len" not in eng             # left unset: blis resolves it or refuses
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_an_agentic_clients_max_context_length_reaches_the_replay_as_recorded():
+    import yaml
+    from test_extract import _export
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _agentic(tmp)
+        doc = _export()
+        doc["input_config"]["datasets"][0]["max_context_length"] = 1048576
+        (tmp / "pull" / "points" / entry["point_id"] / "export.gz").write_bytes(
+            gzip.compress(json.dumps(doc).encode(), mtime=0))
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        argv = _saw(env)[0]["argv"]
+        spec = yaml.safe_load(Path(argv[argv.index("--workload-spec") + 1]).read_text())["replay"]
+        assert spec["max_context_length"] == 1048576
     finally:
         shutil.rmtree(tmp)
 
@@ -857,5 +1016,48 @@ def test_a_run_with_no_recorded_inferencex_commit_names_client_release_unrecorde
         entry, env = _setup(tmp)
         o, _ = _score(tmp, entry, env, tmp / "c2")
         assert "client_release" not in [d["subject"] for d in o.fidelity["requests"]["differences"]]
+    finally:
+        shutil.rmtree(tmp)
+
+
+def _scenario_cluster(tmp, entry):
+    import yaml
+    text = next((tmp / ("work-c1") / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
+    return yaml.safe_load(text.split("\n---\n")[0])["cluster"]
+
+
+def test_a_gb200_nvl72_point_writes_neither_gpus_per_node_nor_gpus_per_rack():
+    # Design §2.2, SUB-3: the catalog entry fixes 4 GPUs per node and 72 per rack. The table is
+    # not consulted, so the point names no later_record.
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp, hardware="gb200", chips={"gb200-nvl72": (4, 72)}, node_size=4)
+        env.parts = {"gb200-nvl72"}
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.g5 is None and o.fidelity is not None
+        assert _scenario_cluster(tmp, entry) == {"hardware": "gb200-nvl72", "nodes": 1}
+        assert not [s for s in o.fidelity["substitutions"] if s["kind"] == "later_record"]
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_an_h100_point_writes_the_node_size_the_run_recorded():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp, hardware="h100", chips={"h100": (None, None)}, node_size=8)
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.g5 is None and o.fidelity is not None
+        assert _scenario_cluster(tmp, entry) == {"hardware": "h100", "gpus_per_node": 8, "nodes": 1}
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_point_with_no_recorded_node_size_on_a_chip_that_fixes_none_is_g5_value_not_recorded():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp, hardware="rtx6000pro", chips={"rtx6000pro": (None, None)}, node_size=None)
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is None
+        assert o.g5 == {"code": "value_not_recorded", "subject": "cluster.gpus_per_node"}
     finally:
         shutil.rmtree(tmp)

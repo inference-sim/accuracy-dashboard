@@ -5,16 +5,20 @@
 #                       pre-release suffix) or a full 40-hex commit of inference-sim, from
 #                       --sim-repo. A branch name is refused: a branch moves, so the figures it
 #                       gave could not be regenerated (X8).
-#   the data            --catalog DIR and --registry DIR. Both are required until the simulator can
-#                       report the data it embeds: the scorer reads the catalog and registry itself
-#                       to grade not_in_catalog before the simulator runs.
+#   the data            --catalog DIR and --registry DIR. Both are required: the scorer passes them
+#                       to blis, and reads two facts from them that no blis command prints yet,
+#                       the graph's speculator method and the registry's coefficient scopes
+#                       (orchestrator/ingest/support.py, TEMPORARY).
+#                       --catalog-release TAG and --registry-release TAG name the releases the two
+#                       directories are at. The directories may carry no git history (a container
+#                       mount), so the scorer is told the names, not left to read them.
 #   a set of units      --units FILE, the ledger units to score, and --pull DIR, their frozen
 #                       recorded runs.
 #
 # It clones inference-sim at the ref, builds blis, and runs the scorer
 # (orchestrator/ingest/cli.py score), which writes the per-point records and aggregates to --out.
-# The field list is --fields FILE, or else the fields.json of the blis-vllm module the build
-# selects (COV-3: the dashboard reads field status and estimation rules only from the engine).
+# The scorer asks the blis it built for the engine's field list (`blis fields --engine vllm
+# --json`; COV-3), so the list is always the one of the engine release that build runs.
 #
 # The harness digest. Every figure records the digest of the harness that produced it (X8). An
 # image cannot hold its own digest, since the digest is known only after the image is built.
@@ -25,7 +29,8 @@
 #
 # Usage:
 #   run.sh --sim <tag|commit> [--sim-repo URL] --units FILE --pull DIR --out DIR
-#          --catalog DIR --registry DIR [--fields FILE]
+#          --catalog DIR --registry DIR --corpus-dir DIR
+#          --catalog-release TAG --registry-release TAG [--max-rss-mb N]
 #   run.sh --check-args <the same flags>     validate the flags, do nothing else
 #
 # Exit status: 0 on success, 2 for a refused flag or value, otherwise the failing step's status.
@@ -40,12 +45,13 @@ refuse() {
 }
 
 sim="" sim_repo="https://github.com/inference-sim/inference-sim.git"
-units="" pull="" out="" catalog="" registry="" fields="" check_only=0
+units="" pull="" out="" catalog="" registry="" corpus_dir="" max_rss_mb="" check_only=0
+catalog_release="" registry_release=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --check-args) check_only=1; shift; continue ;;
-    --sim|--sim-repo|--units|--pull|--out|--catalog|--registry|--fields)
+    --sim|--sim-repo|--units|--pull|--out|--catalog|--registry|--corpus-dir|--catalog-release|--registry-release|--max-rss-mb)
       [ $# -ge 2 ] || refuse "$1 needs a value"
       case "$1" in
         --sim) sim="$2" ;;
@@ -55,7 +61,10 @@ while [ $# -gt 0 ]; do
         --out) out="$2" ;;
         --catalog) catalog="$2" ;;
         --registry) registry="$2" ;;
-        --fields) fields="$2" ;;
+        --corpus-dir) corpus_dir="$2" ;;
+        --catalog-release) catalog_release="$2" ;;
+        --registry-release) registry_release="$2" ;;
+        --max-rss-mb) max_rss_mb="$2" ;;
       esac
       shift 2 ;;
     *) refuse "unknown flag $1" ;;
@@ -75,6 +84,10 @@ fi
 [ -n "$out" ] || refuse "--out is required: the directory the records are written to"
 [ -n "$catalog" ] || refuse "--catalog is required: the catalog the simulator reads"
 [ -n "$registry" ] || refuse "--registry is required: the registry the simulator reads"
+[ -n "$corpus_dir" ] || refuse "--corpus-dir is required: the directory of AgentX corpora, <workload>/<file>, that resolve_agentic_corpus.py --all fetched"
+
+[ -n "$catalog_release" ] || refuse "--catalog-release is required: the release tag the catalog is at"
+[ -n "$registry_release" ] || refuse "--registry-release is required: the release tag the registry is at"
 
 digest="${HARNESS_DIGEST:-unreleased}"
 if [ "$digest" != unreleased ] && ! [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
@@ -88,7 +101,7 @@ fi
 
 [ -f "$units" ] || refuse "--units $units is not a file"
 [ -d "$pull" ] || refuse "--pull $pull is not a directory"
-if [ -n "$fields" ] && [ ! -f "$fields" ]; then refuse "--fields $fields is not a file"; fi
+[ -d "$corpus_dir" ] || refuse "--corpus-dir $corpus_dir is not a directory"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -112,12 +125,9 @@ echo "run.sh: inference-sim $sim at $got" >&2
 # and go.mod from the directory the binary sits in.
 ( cd "$src" && go mod download && go build -o "$src/blis" main.go )
 
-if [ -z "$fields" ]; then
-  vllm_dir="$(cd "$src" && go list -m -f '{{.Dir}}' github.com/inference-sim/blis-vllm)"
-  fields="$vllm_dir/fields.json"
-  [ -f "$fields" ] || refuse "the blis-vllm module this build selects ($vllm_dir) publishes no fields.json; pass --fields"
-fi
-
-args=(score --pull "$pull" --out "$out" --blis "$src/blis" --fields "$fields" --units "$units"
-      --sim-build "$sim" --harness-digest "$digest" --catalog "$catalog" --registry "$registry")
+args=(score --pull "$pull" --out "$out" --blis "$src/blis" --units "$units"
+      --sim-build "$sim" --harness-digest "$digest" --catalog "$catalog" --registry "$registry"
+      --corpus-dir "$corpus_dir" --catalog-release "$catalog_release" --registry-release "$registry_release")
+# The replay memory ceiling is passed on only when given.
+[ -z "$max_rss_mb" ] || args+=(--max-rss-mb "$max_rss_mb")
 python3 "$root/orchestrator/ingest/cli.py" "${args[@]}"
