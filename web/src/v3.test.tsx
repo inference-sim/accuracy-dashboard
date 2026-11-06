@@ -10,11 +10,12 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { App } from './App'
 import { validateSummary } from './load'
-import { aggregatePair, flattenPoints } from './aggregate'
+import { aggregatePair, flattenPoints, intersectByKey } from './aggregate'
 import { formatFigure } from './format'
 import { sortModelKeys } from './sort'
 import { buildRows } from './tree'
 import { ProvenanceBody } from './components/Provenance'
+import { Compare } from './components/Compare'
 import { Headline } from './components/Headline'
 import { isEstimated, type Summary } from './types'
 
@@ -128,5 +129,39 @@ describe('a v3 node over fewer than the minimum points (COV-11)', () => {
     expect(formatFigure('too few points')).toBe('too few points')
     expect(formatFigure(12.34)).toBe('12.3%')
     expect(formatFigure(null)).toBe('—')
+  })
+})
+
+describe('Compare across v3 runs applies the minimum point count to the overall change', () => {
+  const overall = (a: Summary, b: Summary) =>
+    render(<Compare a={a} b={b} tier="all" />).html.match(/<div class="cmp-overall-grid">[\s\S]*?<\/div><\/div>/)![0]
+
+  it('says "too few points" where the shared points are fewer than the minimum', () => {
+    const a = v3a()
+    const b = v3b()
+    // run-a holds 9 graded points and run-b 8 of them: both under the minimum of 10.
+    expect(a.min_points).toBe(10)
+    const { pairs } = intersectByKey(flattenPoints(a), flattenPoints(b))
+    expect(pairs.length).toBeLessThan(10)
+    const h = overall(a, b)
+    expect(h).toContain('too few points')
+    expect(h).not.toMatch(/[+−-]\d+\.\d/)
+  })
+
+  it('shows numbers when neither run states a minimum above the points it has', () => {
+    const a = v3a()
+    const b = v3b()
+    a.min_points = b.min_points = 1
+    const h = overall(a, b)
+    expect(h).not.toContain('too few points')
+    expect(h).toMatch(/[+−-]\d+\.\d/)
+  })
+
+  it('uses the larger of the two minimums', () => {
+    const a = v3a()
+    const b = v3b()
+    a.min_points = 1
+    b.min_points = 10
+    expect(overall(a, b)).toContain('too few points')
   })
 })
