@@ -138,7 +138,9 @@ jobs:
           cp testdata/render-fixture.v2.summary.json public/data/latest/summary.json
           node -e "const s=require('./testdata/render-fixture.v2.summary.json');require('fs').writeFileSync('public/data/index.json',JSON.stringify({schema_version:1,latest:s.snapshot_id,keep_api:5,runs:[{snapshot_id:s.snapshot_id,generated_at:s.generated_at,blis_release:s.provenance.blis.release,ix_release:s.provenance.ground_truth.release_tag,ingest:'api',path:'latest/summary.json'}]}))"
           npm run build
-          npm install --no-save playwright@1.56.0
+          # Pin >=1.61: GitHub's ubuntu-latest runners moved to Ubuntu 26.04, which Playwright
+          # first supports in 1.61.0 (1.56.0 errors "does not support chromium on ubuntu26.04-x64").
+          npm install --no-save playwright@1.65.0
           npx playwright install --with-deps chromium
           node smoke_v2.mjs
       - name: v1 browser smoke - the nightly's own smoke (browser_smoke.mjs) on the committed v1 snapshot
