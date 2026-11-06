@@ -173,6 +173,10 @@ def report(*, rows: list[dict], placed: pl.Placed, records: list[dict], missing:
     unlisted = Counter(x["reason"] for x in placed.unlisted)
     graded = [u for u in units if u["grade"] in (*gr.GRADES,)]
     sim_pending = Counter(u["framework"] for u in units if u.get("would_run_simulator"))
+    # G2 units, split by whether one of their substitutions is a later_record: a fact of the
+    # cluster taken from InferenceX's record made after the run (inferencex_runners.py).
+    g2 = [u for u in units if u["grade"] == gr.G2]
+    g2_later = [u for u in g2 if any(s["kind"] == "later_record" for s in u["substitutions"])]
     first = Counter(f"{u['g5']['code']}" + (f":{u['g5']['subject']}" if u["g5"].get("subject") else "")
                     for u in graded if u["grade"] == gr.G5)
     every = Counter()
@@ -195,6 +199,11 @@ def report(*, rows: list[dict], placed: pl.Placed, records: list[dict], missing:
             "grades": {g: sum(c[g] for c in by_fw.values()) for g in GRADE_KEYS},
             "by_framework": {fw: {"units": sum(c.values()), **{g: c[g] for g in GRADE_KEYS}}
                              for fw, c in sorted(by_fw.items())},
+            "g2": {"counted": "units", "total": len(g2), "later_record": len(g2_later),
+                   "other": len(g2) - len(g2_later),
+                   "later_record_by_framework": dict(sorted(Counter(u["framework"] for u in g2_later).items())),
+                   "note": "later_record: a G2 unit whose cluster fact was taken from InferenceX's runners.yaml "
+                           "as recorded after the run"},
             "would_run_simulator": {"counted": "units", "total": sum(sim_pending.values()),
                                     "by_framework": dict(sorted(sim_pending.items()))},
             "not_in_pull": dict(sorted(Counter(m["why"] for m in missing).items())),

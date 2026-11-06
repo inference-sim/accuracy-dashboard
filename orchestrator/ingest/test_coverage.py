@@ -54,7 +54,7 @@ def test_a_point_graded_without_a_simulator_is_g2_never_g1_and_the_simulator_is_
 def test_a_point_the_scorer_refuses_before_the_simulator_is_the_same_with_or_without_it():
     tmp = Path(tempfile.mkdtemp())
     try:
-        entry, env = e2e._setup(tmp, log=LOG, spec="none", hardware="h100", chips={"h100": (None, None)}, node_size=None)
+        entry, env = e2e._setup(tmp, log=LOG, spec="none", hardware="rtx6000pro", chips={"rtx6000pro": (None, None)}, node_size=None)
         a = sc._score_one(entry, tmp / "pull", tmp / "w1", env, simulate=False)
         b = sc._score_one(entry, tmp / "pull", tmp / "w2", env)
         assert not a.would_run_simulator and a.g5 == b.g5 == {"code": "value_not_recorded", "subject": "cluster.gpus_per_node"}
@@ -160,6 +160,8 @@ def test_rows_and_units_are_counted_apart_every_framework_appears_and_the_grades
         # The two vLLM units took the artifacts of their rows by row id, under the pull's older ids.
         assert doc["units"]["by_framework"]["vllm"]["G2"] == 2 and doc["units"]["grades"]["G1"] == 0
         assert doc["units"]["would_run_simulator"]["total"] == 2
+        # h200's catalog entry fixes its node size, so no unit takes a later record.
+        assert doc["units"]["g2"]["total"] == 2 and doc["units"]["g2"]["later_record"] == 0
         assert doc["g5_reasons"]["first_reason"] == {"engine_unsupported:trt": 1,
                                                      "field_unclassified:sglang: no field list published": 1}
         assert {t["reason"] for t in doc["top_not_g1"]["top"]} >= {"coefficient_method: selected-entry report"}
@@ -221,5 +223,36 @@ def test_a_unit_of_a_scored_engine_with_no_artifacts_in_the_pull_is_counted_apar
         doc = cv.run(**kw)
         assert doc["units"]["grades"]["not_in_pull"] == 1 and doc["units"]["not_in_pull"] == {"no_entry": 1}
         assert sum(doc["units"]["grades"].values()) == doc["units"]["total"] == 4
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_the_units_made_g2_by_a_later_record_are_counted_apart_from_the_other_g2_units(monkeypatch):
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        kw = _pull(tmp)
+        # h200's entry no longer fixes a node size, so both runs (dated 2026-06, before InferenceX
+        # first recorded node sizes) take mi355x's record, as a later_record substitution; one
+        # unit has its own launch size and takes none.
+        (kw["catalog"] / "hardware" / "h200.yaml").write_text("MemoryGiB: 139.8\n")
+        manifest = json.loads((kw["pull_dir"] / "manifest.json").read_text())
+        pid = manifest["points"][0]["point_id"]
+        lc = {"roles": {"agg": {"args": {}}}, "resources": {"gpus_per_node": 8}}
+        (kw["pull_dir"] / "points" / pid / "launch_config.gz").write_bytes(gzip.compress(json.dumps(lc).encode(), mtime=0))
+        manifest["points"][0]["files"]["launch_config"] = {"path": "launch_config.gz", "sha256": "0" * 64, "from": "artifact"}
+        (kw["pull_dir"] / "manifest.json").write_text(json.dumps(manifest))
+        import inferencex_runners as ir
+        real = cv.make_env
+
+        def make_env(**k):
+            env = real(**k)
+            t = env.runner_table
+            env.runner_table = ir.Table(t.versions, {**t.labels, "h200": t.labels["mi355x"]})
+            return env
+        monkeypatch.setattr(cv, "make_env", make_env)
+        doc = cv.run(**kw)
+        g2 = doc["units"]["g2"]
+        assert g2["total"] == 2 and g2["later_record"] == 1 and g2["other"] == 1
+        assert g2["later_record_by_framework"] == {"vllm": 1}
     finally:
         shutil.rmtree(tmp)
