@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "snapshot_id": "2026-11-06_blis-v0.15.0_ix-api-2026-11-06",
-  "generated_at": "2026-11-06T16:31:21Z",
+  "snapshot_id": "2026-11-07_blis-v0.15.0_ix-api-2026-11-07",
+  "generated_at": "2026-11-07T11:25:02Z",
   "provenance": {
     "blis": {
       "catalog": "0.3.0",
@@ -13,17 +13,17 @@
     "ground_truth": {
       "source": "SemiAnalysis InferenceX API",
       "source_url": "https://inferencex.semianalysis.com/api/v1/",
-      "release_tag": "api-2026-11-06",
+      "release_tag": "api-2026-11-07",
       "measurement_date_through": "2026-11-06",
-      "measurement_sha256": "00f1f0dedd3e81bdd06dba9c4ba784acdc112ebceb92c32cfc2e3362e845edb4"
+      "measurement_sha256": "24cef04596678fe327ba711d578130f762a17e046557d476c74dce4f5c959d2e"
     },
-    "evaluator_commit": "f0c6b10a43a4e77771719a004dea557c62cc172c",
+    "evaluator_commit": "ea91d79bce26db4c2724cb855550723fa4badf10",
     "scorer": "signedprobe",
     "ingest": "api",
     "vllm_ref": "v0.32.0",
     "vllm_max_distance": 2000,
     "policy_sha256": "602b03250d7bca865bbe29813c316c00dad0f3e387ef00a4855e2290f54b00a8",
-    "pulled_at": "2026-11-06T16:31:21Z",
+    "pulled_at": "2026-11-07T11:25:02Z",
     "corpus": {
       "dataset": "semianalysisai/cc-traces-weka-062126",
       "revision": "23f152f6f0f9399a85901b89a6458def0ef16729",
@@ -59,26 +59,26 @@
   "totals": {
     "measured_or_resolved": {
       "mape": {
-        "ttft": 57.652965265571105,
-        "tpot": 19.84747929443538,
+        "ttft": 57.65296475587164,
+        "tpot": 19.84748093989335,
         "n": 20
       },
       "shape": {
-        "ttft": 28.947986789585645,
-        "tpot": 18.22093174163958,
+        "ttft": 28.947986600299455,
+        "tpot": 18.22071403820468,
         "n": 17
       },
       "noise_floor_pct": 1.6
     },
     "all": {
       "mape": {
-        "ttft": 35.71236879359184,
-        "tpot": 16.843202750577817,
+        "ttft": 35.695395380501125,
+        "tpot": 16.87298075380727,
         "n": 748
       },
       "shape": {
-        "ttft": 18.90311038059986,
-        "tpot": 13.00935744598508,
+        "ttft": 18.911440260046678,
+        "tpot": 13.002322135464016,
         "n": 568
       },
       "noise_floor_pct": 1.6
@@ -59136,26 +59136,26 @@
       "metrics": {
         "measured_or_resolved": {
           "mape": {
-            "ttft": 57.652965265571105,
-            "tpot": 19.84747929443538,
+            "ttft": 57.65296475587164,
+            "tpot": 19.84748093989335,
             "n": 20
           },
           "shape": {
-            "ttft": 28.947986789585645,
-            "tpot": 18.22093174163958,
+            "ttft": 28.947986600299455,
+            "tpot": 18.22071403820468,
             "n": 17
           },
           "noise_floor_pct": 1.6
         },
         "all": {
           "mape": {
-            "ttft": 60.68876050313039,
-            "tpot": 22.08856164272496,
+            "ttft": 60.180915983456195,
+            "tpot": 22.979519499350186,
             "n": 25
           },
           "shape": {
-            "ttft": 26.615485415630204,
-            "tpot": 17.095211579170403,
+            "ttft": 26.864504969619276,
+            "tpot": 16.88489282254073,
             "n": 19
           },
           "noise_floor_pct": 1.6
@@ -59174,26 +59174,26 @@
           "metrics": {
             "measured_or_resolved": {
               "mape": {
-                "ttft": 57.652965265571105,
-                "tpot": 19.84747929443538,
+                "ttft": 57.65296475587164,
+                "tpot": 19.84748093989335,
                 "n": 20
               },
               "shape": {
-                "ttft": 28.947986789585645,
-                "tpot": 18.22093174163958,
+                "ttft": 28.947986600299455,
+                "tpot": 18.22071403820468,
                 "n": 17
               },
               "noise_floor_pct": 1.6
             },
             "all": {
               "mape": {
-                "ttft": 60.68876050313039,
-                "tpot": 22.08856164272496,
+                "ttft": 60.180915983456195,
+                "tpot": 22.979519499350186,
                 "n": 25
               },
               "shape": {
-                "ttft": 26.615485415630204,
-                "tpot": 17.095211579170403,
+                "ttft": 26.864504969619276,
+                "tpot": 16.88489282254073,
                 "n": 19
               },
               "noise_floor_pct": 1.6
@@ -59224,13 +59224,13 @@
                 },
                 "all": {
                   "mape": {
-                    "ttft": 72.83194145336753,
-                    "tpot": 31.052891035883288,
+                    "ttft": 70.29272089379444,
+                    "tpot": 35.50767373717751,
                     "n": 5
                   },
                   "shape": {
-                    "ttft": 6.789223737008954,
-                    "tpot": 7.526590198182436,
+                    "ttft": 9.154911108837755,
+                    "tpot": 5.530412489397197,
                     "n": 2
                   },
                   "noise_floor_pct": 1.6
@@ -59240,7 +59240,7 @@
                 {
                   "level": "topology",
                   "framework": "vllm",
-                  "engine_version": "0.30.1rc1.dev493+gac9126e58",
+                  "engine_version": "0.32.1rc1.dev505+g00b6c4c56",
                   "precision": "fp4",
                   "is_multinode": false,
                   "parallelism": {
@@ -59272,13 +59272,13 @@
                     },
                     "all": {
                       "mape": {
-                        "ttft": 22.286538465090626,
-                        "tpot": 27.45106008938051,
+                        "ttft": 6.461602850963065,
+                        "tpot": 31.66205759948055,
                         "n": 3
                       },
                       "shape": {
-                        "ttft": 6.789223737008954,
-                        "tpot": 7.526590198182436,
+                        "ttft": 9.154911108837755,
+                        "tpot": 5.530412489397197,
                         "n": 2
                       },
                       "noise_floor_pct": 1.6
@@ -59290,34 +59290,34 @@
                       "concurrency": 1,
                       "tier": "all",
                       "measured": {
-                        "ttft_ms": 190.09,
-                        "tpot_ms": 1.63
+                        "ttft_ms": 236.94,
+                        "tpot_ms": 1.6
                       },
                       "predicted": {
                         "ttft_ms": 243.4745,
                         "tpot_ms": 2.1872
                       },
                       "error_pct": {
-                        "ttft": 28.0838,
-                        "tpot": 34.184
+                        "ttft": 2.7579,
+                        "tpot": 36.7022
                       },
                       "shape": {
                         "ttft": null,
                         "tpot": null
                       },
-                      "point_id": "441dd63d6143ddceadbfce062e94e728beb14bf983d7f2f8606480a2e9f085d4",
+                      "point_id": "06bbb4da33df75c67b88f5ad644d99b1fe0580c995adff36f5f4909c48b2d880",
                       "identity": {
                         "benchmark_type": "agentic_traces",
                         "conc": 1,
                         "framework": "vllm",
                         "hardware": "gb300",
-                        "measured_date": "2026-10-02",
+                        "measured_date": "2026-11-06",
                         "model": "dsv41flash",
                         "precision": "fp4",
-                        "recipe": "963e6ab08e4d38d962719e5bab13083edc8fc43d9c243e94a246edc5802f7d6e"
+                        "recipe": "98d102056c745bc3fbdeb05eb25baba2f64762b3361f81c3d6d8ac801d26b831"
                       },
-                      "sweep_id": "2593|deepseek-v4.1-flash-gb300-fp4-vllm-tp4-dp1-ep1-agentx|agentx|c36bfb29f28f",
-                      "measured_date": "2026-10-02",
+                      "sweep_id": "2928|deepseek-v4.1-flash-gb300-fp4-vllm-tp4-dp1-ep1-agentx|agentx|b50a741db2fb",
+                      "measured_date": "2026-11-06",
                       "fidelity": {
                         "args": [
                           {
@@ -59372,6 +59372,13 @@
                             "match": "exact",
                             "measured": "[6.0, 12.0, 18.0, 24.0, 30.0, 36.0, 48.0, 60.0, 72.0, 96.0, 120.0, 144.0, 192.0, 240.0, 288.0, 384.0, 480.0, 576.0, 768.0, 1020.0, 1536.0, 2046.0, 3072.0, 4092.0]",
                             "source": "resolved_config"
+                          },
+                          {
+                            "arg": "compilation_config.cudagraph_decoder_replay",
+                            "blis": null,
+                            "match": "inert",
+                            "measured": true,
+                            "source": "args"
                           },
                           {
                             "arg": "compilation_config.cudagraph_mode",
@@ -59550,6 +59557,13 @@
                             "blis": "auto",
                             "match": "exact",
                             "measured": "auto",
+                            "source": "args"
+                          },
+                          {
+                            "arg": "kernel_config.monokernel",
+                            "blis": null,
+                            "match": "inert",
+                            "measured": false,
                             "source": "args"
                           },
                           {
@@ -60107,16 +60121,16 @@
                           }
                         },
                         "build": {
-                          "commit": "ac9126e58aa7bbab1856ba6593ba4d5003fea516",
-                          "distance": -617,
-                          "image": "vllm/vllm-openai:nightly-dev-arm64-cu130-ac9126e58aa7",
+                          "commit": "00b6c4c565a8732c131e1f452d4a17803bb0842b",
+                          "distance": 875,
+                          "image": "vllm/vllm-openai:nightly-00b6c4c565a8732c131e1f452d4a17803bb0842b@sha256:76a9614ed4ed20694914c87e82a0344bd73e1c6e081459a2467175ab903657e4",
                           "match": "exact",
                           "ref": "v0.32.0",
-                          "source": "label_by_tag"
+                          "source": "image_label"
                         },
                         "replay": {
                           "client": "aiperf",
-                          "client_version": "0.12.0",
+                          "client_version": "1.0.12",
                           "concurrency": 1,
                           "corpus": "semianalysis_cc_traces_weka_062126",
                           "corpus_sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
@@ -60132,11 +60146,11 @@
                         "resolved": [
                           {
                             "blis": 177426432,
-                            "delta": 69989678,
+                            "delta": 68552640,
                             "match": "differs",
-                            "measured": 107436754,
+                            "measured": 108873792,
                             "quantity": "kv_cache_tokens_per_replica",
-                            "ratio": "1.651"
+                            "ratio": "1.630"
                           }
                         ],
                         "status": "approximate"
@@ -60147,34 +60161,34 @@
                       "concurrency": 4,
                       "tier": "all",
                       "measured": {
-                        "ttft_ms": 138.72,
-                        "tpot_ms": 1.81
+                        "ttft_ms": 207.68,
+                        "tpot_ms": 1.79
                       },
                       "predicted": {
                         "ttft_ms": 176.6049,
                         "tpot_ms": 2.3652
                       },
                       "error_pct": {
-                        "ttft": 27.3103,
-                        "tpot": 30.674
+                        "ttft": -14.963,
+                        "tpot": 32.1316
                       },
                       "shape": {
-                        "ttft": -0.6039,
-                        "tpot": -2.6158
+                        "ttft": -17.2452,
+                        "tpot": -3.3435
                       },
-                      "point_id": "00cfac0c3d201925507cc8527b9add44d4a12d98ccdab9a04519efebc070ab35",
+                      "point_id": "d2479e5aeec2c00e435fe5901a95ae4cfc7f3a2ac445feeae0013fcc3c448143",
                       "identity": {
                         "benchmark_type": "agentic_traces",
                         "conc": 4,
                         "framework": "vllm",
                         "hardware": "gb300",
-                        "measured_date": "2026-10-02",
+                        "measured_date": "2026-11-06",
                         "model": "dsv41flash",
                         "precision": "fp4",
-                        "recipe": "963e6ab08e4d38d962719e5bab13083edc8fc43d9c243e94a246edc5802f7d6e"
+                        "recipe": "98d102056c745bc3fbdeb05eb25baba2f64762b3361f81c3d6d8ac801d26b831"
                       },
-                      "sweep_id": "2593|deepseek-v4.1-flash-gb300-fp4-vllm-tp4-dp1-ep1-agentx|agentx|c36bfb29f28f",
-                      "measured_date": "2026-10-02",
+                      "sweep_id": "2928|deepseek-v4.1-flash-gb300-fp4-vllm-tp4-dp1-ep1-agentx|agentx|b50a741db2fb",
+                      "measured_date": "2026-11-06",
                       "fidelity": {
                         "args": [
                           {
@@ -60229,6 +60243,13 @@
                             "match": "exact",
                             "measured": "[6.0, 12.0, 18.0, 24.0, 30.0, 36.0, 48.0, 60.0, 72.0, 96.0, 120.0, 144.0, 192.0, 240.0, 288.0, 384.0, 480.0, 576.0, 768.0, 1020.0, 1536.0, 2046.0, 3072.0, 4092.0]",
                             "source": "resolved_config"
+                          },
+                          {
+                            "arg": "compilation_config.cudagraph_decoder_replay",
+                            "blis": null,
+                            "match": "inert",
+                            "measured": true,
+                            "source": "args"
                           },
                           {
                             "arg": "compilation_config.cudagraph_mode",
@@ -60407,6 +60428,13 @@
                             "blis": "auto",
                             "match": "exact",
                             "measured": "auto",
+                            "source": "args"
+                          },
+                          {
+                            "arg": "kernel_config.monokernel",
+                            "blis": null,
+                            "match": "inert",
+                            "measured": false,
                             "source": "args"
                           },
                           {
@@ -60964,16 +60992,16 @@
                           }
                         },
                         "build": {
-                          "commit": "ac9126e58aa7bbab1856ba6593ba4d5003fea516",
-                          "distance": -617,
-                          "image": "vllm/vllm-openai:nightly-dev-arm64-cu130-ac9126e58aa7",
+                          "commit": "00b6c4c565a8732c131e1f452d4a17803bb0842b",
+                          "distance": 875,
+                          "image": "vllm/vllm-openai:nightly-00b6c4c565a8732c131e1f452d4a17803bb0842b@sha256:76a9614ed4ed20694914c87e82a0344bd73e1c6e081459a2467175ab903657e4",
                           "match": "exact",
                           "ref": "v0.32.0",
-                          "source": "label_by_tag"
+                          "source": "image_label"
                         },
                         "replay": {
                           "client": "aiperf",
-                          "client_version": "0.12.0",
+                          "client_version": "1.0.12",
                           "concurrency": 4,
                           "corpus": "semianalysis_cc_traces_weka_062126",
                           "corpus_sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
@@ -60989,11 +61017,11 @@
                         "resolved": [
                           {
                             "blis": 177426432,
-                            "delta": 69989678,
+                            "delta": 68552640,
                             "match": "differs",
-                            "measured": 107436754,
+                            "measured": 108873792,
                             "quantity": "kv_cache_tokens_per_replica",
-                            "ratio": "1.651"
+                            "ratio": "1.630"
                           }
                         ],
                         "status": "approximate"
@@ -61004,34 +61032,34 @@
                       "concurrency": 8,
                       "tier": "all",
                       "measured": {
-                        "ttft_ms": 124.26,
-                        "tpot_ms": 2.04
+                        "ttft_ms": 136.24,
+                        "tpot_ms": 1.9
                       },
                       "predicted": {
                         "ttft_ms": 138.507,
                         "tpot_ms": 2.3969
                       },
                       "error_pct": {
-                        "ttft": 11.4655,
-                        "tpot": 17.4951
+                        "ttft": 1.664,
+                        "tpot": 26.1524
                       },
                       "shape": {
-                        "ttft": -12.9746,
-                        "tpot": -12.4374
+                        "ttft": -1.0646,
+                        "tpot": -7.7173
                       },
-                      "point_id": "deb1205590a61a3392d6e834a7cffd54e286f46338a12b6c02393186fdae9d32",
+                      "point_id": "d9adfdd49b4f90a7b6332d142de373b84dddb0ae90756c6c380c1f3a5ae5f080",
                       "identity": {
                         "benchmark_type": "agentic_traces",
                         "conc": 8,
                         "framework": "vllm",
                         "hardware": "gb300",
-                        "measured_date": "2026-10-02",
+                        "measured_date": "2026-11-06",
                         "model": "dsv41flash",
                         "precision": "fp4",
-                        "recipe": "963e6ab08e4d38d962719e5bab13083edc8fc43d9c243e94a246edc5802f7d6e"
+                        "recipe": "b57ac1c125e7696d02d9c20c70a8409f3c783b1941004e58918b9544605fdf84"
                       },
-                      "sweep_id": "2593|deepseek-v4.1-flash-gb300-fp4-vllm-tp4-dp1-ep1-agentx|agentx|c36bfb29f28f",
-                      "measured_date": "2026-10-02",
+                      "sweep_id": "2928|deepseek-v4.1-flash-gb300-fp4-vllm-tp4-dp1-ep1-agentx|agentx|b50a741db2fb",
+                      "measured_date": "2026-11-06",
                       "fidelity": {
                         "args": [
                           {
@@ -61088,6 +61116,13 @@
                             "source": "resolved_config"
                           },
                           {
+                            "arg": "compilation_config.cudagraph_decoder_replay",
+                            "blis": null,
+                            "match": "inert",
+                            "measured": true,
+                            "source": "args"
+                          },
+                          {
                             "arg": "compilation_config.cudagraph_mode",
                             "blis": "FULL_AND_PIECEWISE",
                             "match": "exact",
@@ -61264,6 +61299,13 @@
                             "blis": "auto",
                             "match": "exact",
                             "measured": "auto",
+                            "source": "args"
+                          },
+                          {
+                            "arg": "kernel_config.monokernel",
+                            "blis": null,
+                            "match": "inert",
+                            "measured": false,
                             "source": "args"
                           },
                           {
@@ -61821,16 +61863,16 @@
                           }
                         },
                         "build": {
-                          "commit": "ac9126e58aa7bbab1856ba6593ba4d5003fea516",
-                          "distance": -617,
-                          "image": "vllm/vllm-openai:nightly-dev-arm64-cu130-ac9126e58aa7",
+                          "commit": "00b6c4c565a8732c131e1f452d4a17803bb0842b",
+                          "distance": 875,
+                          "image": "vllm/vllm-openai:nightly-00b6c4c565a8732c131e1f452d4a17803bb0842b@sha256:76a9614ed4ed20694914c87e82a0344bd73e1c6e081459a2467175ab903657e4",
                           "match": "exact",
                           "ref": "v0.32.0",
-                          "source": "label_by_tag"
+                          "source": "image_label"
                         },
                         "replay": {
                           "client": "aiperf",
-                          "client_version": "0.12.0",
+                          "client_version": "1.0.12",
                           "concurrency": 8,
                           "corpus": "semianalysis_cc_traces_weka_062126",
                           "corpus_sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
@@ -61846,11 +61888,11 @@
                         "resolved": [
                           {
                             "blis": 176804736,
-                            "delta": 82607131,
+                            "delta": 81479664,
                             "match": "differs",
-                            "measured": 94197605,
+                            "measured": 95325072,
                             "quantity": "kv_cache_tokens_per_replica",
-                            "ratio": "1.877"
+                            "ratio": "1.855"
                           }
                         ],
                         "status": "approximate"
@@ -61861,7 +61903,7 @@
                 {
                   "level": "topology",
                   "framework": "vllm",
-                  "engine_version": "0.30.1rc1.dev493+gac9126e58",
+                  "engine_version": "0.32.1rc1.dev505+g00b6c4c56",
                   "precision": "fp4",
                   "is_multinode": false,
                   "parallelism": {
@@ -61893,8 +61935,8 @@
                     },
                     "all": {
                       "mape": {
-                        "ttft": 148.6500459357829,
-                        "tpot": 36.45563745563746,
+                        "ttft": 166.0393979580415,
+                        "tpot": 41.27609794372296,
                         "n": 2
                       },
                       "shape": {
@@ -61911,32 +61953,32 @@
                       "concurrency": 8,
                       "tier": "all",
                       "measured": {
-                        "ttft_ms": 186.76,
-                        "tpot_ms": 2.97
+                        "ttft_ms": 147.82,
+                        "tpot_ms": 2.8
                       },
                       "predicted": {
                         "ttft_ms": 296.8849,
                         "tpot_ms": 4.1196
                       },
                       "error_pct": {
-                        "ttft": 58.966,
-                        "tpot": 38.7071
+                        "ttft": 100.8422,
+                        "tpot": 47.1289
                       },
                       "shape": null,
                       "shape_reason": "< 3 concurrencies",
-                      "point_id": "f518624409696db26e0989adab7d396325881ca9537275f2214f8ec0213cd693",
+                      "point_id": "ad33fbbb8f7dc02209cc02216b3a5bb33a03b94c0e8b0723ff9a788044dfc3cf",
                       "identity": {
                         "benchmark_type": "agentic_traces",
                         "conc": 8,
                         "framework": "vllm",
                         "hardware": "gb300",
-                        "measured_date": "2026-10-02",
+                        "measured_date": "2026-11-06",
                         "model": "dsv41flash",
                         "precision": "fp4",
-                        "recipe": "ecd447d478cf126f6732bedd1711d201e109f140ad384a01f2e741c172cafc2d"
+                        "recipe": "d892a1e427cf88bc999958be4b0ddcd4322c45224ef4d00815c9479d46b62baa"
                       },
-                      "sweep_id": "2593|deepseek-v4.1-flash-gb300-fp4-vllm-tp1-dp2-ep2-agentx|agentx|5a305f5bd82b",
-                      "measured_date": "2026-10-02",
+                      "sweep_id": "2928|deepseek-v4.1-flash-gb300-fp4-vllm-tp1-dp2-ep2-agentx|agentx|a24068f7a444",
+                      "measured_date": "2026-11-06",
                       "fidelity": {
                         "args": [
                           {
@@ -61991,6 +62033,13 @@
                             "match": "exact",
                             "measured": "[6.0, 12.0, 18.0, 24.0, 30.0, 36.0, 48.0, 60.0, 72.0, 96.0, 120.0, 144.0, 192.0, 240.0, 288.0, 384.0, 480.0, 576.0, 768.0, 1020.0, 1536.0, 2046.0, 3072.0, 4092.0, 6144.0, 8190.0]",
                             "source": "resolved_config"
+                          },
+                          {
+                            "arg": "compilation_config.cudagraph_decoder_replay",
+                            "blis": null,
+                            "match": "inert",
+                            "measured": true,
+                            "source": "args"
                           },
                           {
                             "arg": "compilation_config.cudagraph_mode",
@@ -62184,6 +62233,13 @@
                             "match": "exact",
                             "measured": "deep_gemm_mega_moe",
                             "source": "launch_config"
+                          },
+                          {
+                            "arg": "kernel_config.monokernel",
+                            "blis": null,
+                            "match": "inert",
+                            "measured": false,
+                            "source": "args"
                           },
                           {
                             "arg": "kv_cache_dtype",
@@ -62759,16 +62815,16 @@
                           }
                         },
                         "build": {
-                          "commit": "ac9126e58aa7bbab1856ba6593ba4d5003fea516",
-                          "distance": -617,
-                          "image": "vllm/vllm-openai:nightly-dev-arm64-cu130-ac9126e58aa7",
+                          "commit": "00b6c4c565a8732c131e1f452d4a17803bb0842b",
+                          "distance": 875,
+                          "image": "vllm/vllm-openai:nightly-00b6c4c565a8732c131e1f452d4a17803bb0842b@sha256:76a9614ed4ed20694914c87e82a0344bd73e1c6e081459a2467175ab903657e4",
                           "match": "exact",
                           "ref": "v0.32.0",
-                          "source": "label_by_tag"
+                          "source": "image_label"
                         },
                         "replay": {
                           "client": "aiperf",
-                          "client_version": "0.12.0",
+                          "client_version": "1.0.12",
                           "concurrency": 8,
                           "corpus": "semianalysis_cc_traces_weka_062126",
                           "corpus_sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
@@ -62784,12 +62840,12 @@
                         "resolved": [
                           {
                             "blis": 197704704,
-                            "delta": 144327169,
+                            "delta": 143315279,
                             "match": "differs",
-                            "measured": 53377535,
+                            "measured": 54389425,
                             "occurrences": 2,
                             "quantity": "kv_cache_tokens_per_replica",
-                            "ratio": "3.704"
+                            "ratio": "3.635"
                           }
                         ],
                         "status": "approximate"
@@ -62800,32 +62856,32 @@
                       "concurrency": 16,
                       "tier": "all",
                       "measured": {
-                        "ttft_ms": 162.41,
-                        "tpot_ms": 3.33
+                        "ttft_ms": 165.89,
+                        "tpot_ms": 3.3
                       },
                       "predicted": {
                         "ttft_ms": 549.4884,
                         "tpot_ms": 4.469
                       },
                       "error_pct": {
-                        "ttft": 238.3341,
-                        "tpot": 34.2042
+                        "ttft": 231.2366,
+                        "tpot": 35.4233
                       },
                       "shape": null,
                       "shape_reason": "< 3 concurrencies",
-                      "point_id": "014f86a339ce1e7be1debef0a50d792219035350049491d5c5956e7969875538",
+                      "point_id": "15419ee9729fe8643d4dbebbf677c47f33874c07eb7da0bd06259e3f89e53477",
                       "identity": {
                         "benchmark_type": "agentic_traces",
                         "conc": 16,
                         "framework": "vllm",
                         "hardware": "gb300",
-                        "measured_date": "2026-10-02",
+                        "measured_date": "2026-11-06",
                         "model": "dsv41flash",
                         "precision": "fp4",
-                        "recipe": "ecd447d478cf126f6732bedd1711d201e109f140ad384a01f2e741c172cafc2d"
+                        "recipe": "d892a1e427cf88bc999958be4b0ddcd4322c45224ef4d00815c9479d46b62baa"
                       },
-                      "sweep_id": "2593|deepseek-v4.1-flash-gb300-fp4-vllm-tp1-dp2-ep2-agentx|agentx|5a305f5bd82b",
-                      "measured_date": "2026-10-02",
+                      "sweep_id": "2928|deepseek-v4.1-flash-gb300-fp4-vllm-tp1-dp2-ep2-agentx|agentx|a24068f7a444",
+                      "measured_date": "2026-11-06",
                       "fidelity": {
                         "args": [
                           {
@@ -62880,6 +62936,13 @@
                             "match": "exact",
                             "measured": "[6.0, 12.0, 18.0, 24.0, 30.0, 36.0, 48.0, 60.0, 72.0, 96.0, 120.0, 144.0, 192.0, 240.0, 288.0, 384.0, 480.0, 576.0, 768.0, 1020.0, 1536.0, 2046.0, 3072.0, 4092.0, 6144.0, 8190.0]",
                             "source": "resolved_config"
+                          },
+                          {
+                            "arg": "compilation_config.cudagraph_decoder_replay",
+                            "blis": null,
+                            "match": "inert",
+                            "measured": true,
+                            "source": "args"
                           },
                           {
                             "arg": "compilation_config.cudagraph_mode",
@@ -63073,6 +63136,13 @@
                             "match": "exact",
                             "measured": "deep_gemm_mega_moe",
                             "source": "launch_config"
+                          },
+                          {
+                            "arg": "kernel_config.monokernel",
+                            "blis": null,
+                            "match": "inert",
+                            "measured": false,
+                            "source": "args"
                           },
                           {
                             "arg": "kv_cache_dtype",
@@ -63648,16 +63718,16 @@
                           }
                         },
                         "build": {
-                          "commit": "ac9126e58aa7bbab1856ba6593ba4d5003fea516",
-                          "distance": -617,
-                          "image": "vllm/vllm-openai:nightly-dev-arm64-cu130-ac9126e58aa7",
+                          "commit": "00b6c4c565a8732c131e1f452d4a17803bb0842b",
+                          "distance": 875,
+                          "image": "vllm/vllm-openai:nightly-00b6c4c565a8732c131e1f452d4a17803bb0842b@sha256:76a9614ed4ed20694914c87e82a0344bd73e1c6e081459a2467175ab903657e4",
                           "match": "exact",
                           "ref": "v0.32.0",
-                          "source": "label_by_tag"
+                          "source": "image_label"
                         },
                         "replay": {
                           "client": "aiperf",
-                          "client_version": "0.12.0",
+                          "client_version": "1.0.12",
                           "concurrency": 16,
                           "corpus": "semianalysis_cc_traces_weka_062126",
                           "corpus_sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
@@ -63673,12 +63743,12 @@
                         "resolved": [
                           {
                             "blis": 197704704,
-                            "delta": 144327169,
+                            "delta": 143315279,
                             "match": "differs",
-                            "measured": 53377535,
+                            "measured": 54389425,
                             "occurrences": 2,
                             "quantity": "kv_cache_tokens_per_replica",
-                            "ratio": "3.704"
+                            "ratio": "3.635"
                           }
                         ],
                         "status": "approximate"
@@ -63699,26 +63769,26 @@
               "metrics": {
                 "measured_or_resolved": {
                   "mape": {
-                    "ttft": 50.62685527389399,
-                    "tpot": 16.380307299909223,
+                    "ttft": 50.626853999645334,
+                    "tpot": 16.380311413554157,
                     "n": 8
                   },
                   "shape": {
-                    "ttft": 37.789460336001774,
-                    "tpot": 19.4015617184668,
+                    "ttft": 37.789459876306736,
+                    "tpot": 19.401033010124905,
                     "n": 7
                   },
                   "noise_floor_pct": 1.6
                 },
                 "all": {
                   "mape": {
-                    "ttft": 50.62685527389399,
-                    "tpot": 16.380307299909223,
+                    "ttft": 50.626853999645334,
+                    "tpot": 16.380311413554157,
                     "n": 8
                   },
                   "shape": {
-                    "ttft": 37.789460336001774,
-                    "tpot": 19.4015617184668,
+                    "ttft": 37.789459876306736,
+                    "tpot": 19.401033010124905,
                     "n": 7
                   },
                   "noise_floor_pct": 1.6
@@ -63747,26 +63817,26 @@
                   "metrics": {
                     "measured_or_resolved": {
                       "mape": {
-                        "ttft": 50.62685527389399,
-                        "tpot": 16.380307299909223,
+                        "ttft": 50.626853999645334,
+                        "tpot": 16.380311413554157,
                         "n": 8
                       },
                       "shape": {
-                        "ttft": 37.789460336001774,
-                        "tpot": 19.4015617184668,
+                        "ttft": 37.789459876306736,
+                        "tpot": 19.401033010124905,
                         "n": 7
                       },
                       "noise_floor_pct": 1.6
                     },
                     "all": {
                       "mape": {
-                        "ttft": 50.62685527389399,
-                        "tpot": 16.380307299909223,
+                        "ttft": 50.626853999645334,
+                        "tpot": 16.380311413554157,
                         "n": 8
                       },
                       "shape": {
-                        "ttft": 37.789460336001774,
-                        "tpot": 19.4015617184668,
+                        "ttft": 37.789459876306736,
+                        "tpot": 19.401033010124905,
                         "n": 7
                       },
                       "noise_floor_pct": 1.6
@@ -63787,7 +63857,7 @@
                       },
                       "error_pct": {
                         "ttft": 18.8803,
-                        "tpot": 1.8049
+                        "tpot": 1.8035
                       },
                       "shape": {
                         "ttft": null,
@@ -64568,11 +64638,11 @@
                       },
                       "error_pct": {
                         "ttft": 49.9309,
-                        "tpot": -4.0148
+                        "tpot": -4.016
                       },
                       "shape": {
-                        "ttft": 26.1192,
-                        "tpot": -5.7165
+                        "ttft": 26.1193,
+                        "tpot": -5.7164
                       },
                       "point_id": "a141f645942e5ce46943f2d38cb4b087fe9cb16ca216af16339a63a7a67a3f75",
                       "identity": {
@@ -65349,11 +65419,11 @@
                       },
                       "error_pct": {
                         "ttft": 24.8473,
-                        "tpot": 5.7617
+                        "tpot": 5.7629
                       },
                       "shape": {
                         "ttft": 5.0193,
-                        "tpot": 3.8866
+                        "tpot": 3.8893
                       },
                       "point_id": "a4461464ea7bfef25c7808569729fe1e8179d12e32542437293b2002751600b3",
                       "identity": {
@@ -66130,11 +66200,11 @@
                       },
                       "error_pct": {
                         "ttft": 7.5121,
-                        "tpot": -14.6596
+                        "tpot": -14.6593
                       },
                       "shape": {
                         "ttft": -9.5628,
-                        "tpot": -16.1727
+                        "tpot": -16.1711
                       },
                       "point_id": "d46575ff2123619d050e54361eda109db42be9167b37dc87f1c9b911082ce69a",
                       "identity": {
@@ -66911,11 +66981,11 @@
                       },
                       "error_pct": {
                         "ttft": 137.4759,
-                        "tpot": -25.9967
+                        "tpot": -25.9962
                       },
                       "shape": {
                         "ttft": 99.7605,
-                        "tpot": -27.3088
+                        "tpot": -27.3072
                       },
                       "point_id": "619b7c04d35122c4de52adbe286677d15dd0229b5f418d654929dd5066482c12",
                       "identity": {
@@ -67692,11 +67762,11 @@
                       },
                       "error_pct": {
                         "ttft": 81.569,
-                        "tpot": -29.6205
+                        "tpot": -29.6212
                       },
                       "shape": {
                         "ttft": 52.7326,
-                        "tpot": -30.8683
+                        "tpot": -30.868
                       },
                       "point_id": "88b6cd7962be6d3f5cac216dcc2e2f133158e584f4332d63b9c086261900a439",
                       "identity": {
@@ -68473,11 +68543,11 @@
                       },
                       "error_pct": {
                         "ttft": 77.0361,
-                        "tpot": -22.0208
+                        "tpot": -22.0205
                       },
                       "shape": {
                         "ttft": 48.9197,
-                        "tpot": -23.4034
+                        "tpot": -23.402
                       },
                       "point_id": "09bcd95cba4bd01c14b3f7d2e53589a50e6cad19c9e657404c70fef9e4d17512",
                       "identity": {
@@ -69254,11 +69324,11 @@
                       },
                       "error_pct": {
                         "ttft": -7.7633,
-                        "tpot": -27.1634
+                        "tpot": -27.1629
                       },
                       "shape": {
                         "ttft": -22.4121,
-                        "tpot": -28.4547
+                        "tpot": -28.4533
                       },
                       "point_id": "edb97e24a0b20fb4a879606677c7b8cbec2fdb44825ca421ed9edd0999bc5ad5",
                       "identity": {
@@ -141200,7 +141270,7 @@
                         "precision": "fp8",
                         "recipe": "row:411032"
                       },
-                      "sweep_id": "1883|minimax-m2.5-b300-fp8-vllm-tp2-dp1-ep2|1k1k|0bbc1a68e232#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1",
+                      "sweep_id": "1883|minimax-m2.5-b300-fp8-vllm-tp2-dp1-ep2|1k1k|0bbc1a68e232#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1",
                       "repeats": [
                         {
                           "point_id": "3dcd808d7fd1180f1c3176ea7dffe0f9d4e0f84438e5c06a8428b5cf75cb428f",
@@ -252967,51 +253037,6 @@
       "benchmark_type": "agentic_traces",
       "conc": 8,
       "framework": "vllm",
-      "hardware": "mi300x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 8,
-        "framework": "vllm",
-        "hardware": "mi300x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "14080c8a078ec89dfcdfc7a5d588a41002f6eda8562e8ebfef2287f4c268ba47"
-      },
-      "image": "vllm/vllm-openai-rocm:v0.32.0@sha256:14f6a575e1fb0a580b0f633c09e06f648709d60405b85f6a7ff3f80d49f39905",
-      "measured": {
-        "tpot_ms": 9.37,
-        "ttft_ms": 825.01
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        }
-      ],
-      "point_id": "0457f1ce3166d067f7edf4989e0b8207f98a6c4830508b6a90492177c56d1035",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 8,
-      "framework": "vllm",
       "hardware": "h200",
       "identity": {
         "benchmark_type": "agentic_traces",
@@ -253439,6 +253464,51 @@
       "reasons": [
         "server_log_missing",
         "server_log_missing:run_in_SemiAnalysisAI_InferenceX-Private-TPU"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 2,
+      "framework": "vllm",
+      "hardware": "mi300x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 2,
+        "framework": "vllm",
+        "hardware": "mi300x",
+        "measured_date": "2026-11-06",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "93f55e70d2a8eda544e54e463576be78e51445d70a1041ca8ab708ec4a5f9ae0"
+      },
+      "image": "vllm/vllm-openai-rocm:v0.33.0@sha256:4fcd39b758b660c4e9c345c021e2ea8f0ccdb31e3c32507d676cc3005ae83fba",
+      "measured": {
+        "tpot_ms": 4.78,
+        "ttft_ms": 633.91
+      },
+      "measured_date": "2026-11-06",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "07f5e80b4ce9ccd4052d0ef43e0ce5a14128678bebb1d4f7d6421299f8a7ac71",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
       ]
     },
     {
@@ -254612,51 +254682,6 @@
     },
     {
       "benchmark_type": "agentic_traces",
-      "conc": 16,
-      "framework": "vllm",
-      "hardware": "mi300x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 16,
-        "framework": "vllm",
-        "hardware": "mi300x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "254e97022c64557d2b49e53779f2262068571c512899f85bb52c60ba3759b463"
-      },
-      "image": "vllm/vllm-openai-rocm:v0.32.0@sha256:14f6a575e1fb0a580b0f633c09e06f648709d60405b85f6a7ff3f80d49f39905",
-      "measured": {
-        "tpot_ms": 12.61,
-        "ttft_ms": 894.4
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        }
-      ],
-      "point_id": "0f65b311d84839ef887ef464364a69863242b6318645b1d3a6f8883df59784b1",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
       "conc": 6,
       "framework": "vllm",
       "hardware": "h100",
@@ -255680,6 +255705,40 @@
       "precision": "fp8",
       "reasons": [
         "drafter_not_in_catalog:eagle3"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 64,
+      "framework": "vllm",
+      "hardware": "gb300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 64,
+        "framework": "vllm",
+        "hardware": "gb300",
+        "measured_date": "2026-11-06",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "8cde5ccfec4934029f035a6f9c5e70d131c51b5dd8431703cc7daf3fd8975373"
+      },
+      "image": "vllm/vllm-openai:nightly-00b6c4c565a8732c131e1f452d4a17803bb0842b@sha256:76a9614ed4ed20694914c87e82a0344bd73e1c6e081459a2467175ab903657e4",
+      "measured": {
+        "tpot_ms": 7.47,
+        "ttft_ms": 238.5
+      },
+      "measured_date": "2026-11-06",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes",
+          "text": "DeepSeek-V4.1 decoder-replay CUDA graphs (a nightly feature after v0.31.0) aren't modelled."
+        }
+      ],
+      "point_id": "15503e146b09df6cedd782dd6c4ca223f0e1044500deb189b45fee9bbcabe491",
+      "precision": "fp4",
+      "reasons": [
+        "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes"
       ]
     },
     {
@@ -258593,6 +258652,40 @@
       "reasons": [
         "setting_not_modelled:attention_config.mla_prefill_backend",
         "setting_not_modelled:linear_backend"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 16,
+      "framework": "vllm",
+      "hardware": "gb300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 16,
+        "framework": "vllm",
+        "hardware": "gb300",
+        "measured_date": "2026-11-06",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "550611b50d4ba9e8a83de92b5067bb4bb1d078ded699dfa3caa6ae54344378ac"
+      },
+      "image": "vllm/vllm-openai:nightly-00b6c4c565a8732c131e1f452d4a17803bb0842b@sha256:76a9614ed4ed20694914c87e82a0344bd73e1c6e081459a2467175ab903657e4",
+      "measured": {
+        "tpot_ms": 2.34,
+        "ttft_ms": 153.23
+      },
+      "measured_date": "2026-11-06",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes",
+          "text": "DeepSeek-V4.1 decoder-replay CUDA graphs (a nightly feature after v0.31.0) aren't modelled."
+        }
+      ],
+      "point_id": "23c68991028ba1c2109b37326617b835a8f9bf1ea62709f1e365b1ab0d6ed34a",
+      "precision": "fp4",
+      "reasons": [
+        "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes"
       ]
     },
     {
@@ -262242,51 +262335,6 @@
     },
     {
       "benchmark_type": "agentic_traces",
-      "conc": 4,
-      "framework": "vllm",
-      "hardware": "mi300x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 4,
-        "framework": "vllm",
-        "hardware": "mi300x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "14080c8a078ec89dfcdfc7a5d588a41002f6eda8562e8ebfef2287f4c268ba47"
-      },
-      "image": "vllm/vllm-openai-rocm:v0.32.0@sha256:14f6a575e1fb0a580b0f633c09e06f648709d60405b85f6a7ff3f80d49f39905",
-      "measured": {
-        "tpot_ms": 6.22,
-        "ttft_ms": 820.68
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        }
-      ],
-      "point_id": "35e8194516afcd596f3d07b4615702ca8d8687bf0762a5f4debfe50551541365",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
       "conc": 56,
       "framework": "vllm",
       "hardware": "b300",
@@ -265281,51 +265329,6 @@
     },
     {
       "benchmark_type": "agentic_traces",
-      "conc": 1,
-      "framework": "vllm",
-      "hardware": "mi300x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 1,
-        "framework": "vllm",
-        "hardware": "mi300x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "14080c8a078ec89dfcdfc7a5d588a41002f6eda8562e8ebfef2287f4c268ba47"
-      },
-      "image": "vllm/vllm-openai-rocm:v0.32.0@sha256:14f6a575e1fb0a580b0f633c09e06f648709d60405b85f6a7ff3f80d49f39905",
-      "measured": {
-        "tpot_ms": 5.21,
-        "ttft_ms": 1061.87
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        }
-      ],
-      "point_id": "4778b25f0a6720229263ce7b227e9682a1fc13bea5dad8749dbce560df074947",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
       "conc": 20,
       "framework": "vllm",
       "hardware": "b300",
@@ -266763,40 +266766,6 @@
       "reasons": [
         "hardware_no_coefficients",
         "unclassified_arg:mm_encoder_tp_mode"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 16,
-      "framework": "vllm",
-      "hardware": "gb300",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 16,
-        "framework": "vllm",
-        "hardware": "gb300",
-        "measured_date": "2026-10-02",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "963e6ab08e4d38d962719e5bab13083edc8fc43d9c243e94a246edc5802f7d6e"
-      },
-      "image": "vllm/vllm-openai:nightly-dev-arm64-cu130-ac9126e58aa7",
-      "measured": {
-        "tpot_ms": 2.4,
-        "ttft_ms": 139.44
-      },
-      "measured_date": "2026-10-02",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes",
-          "text": "DeepSeek-V4.1 decoder-replay CUDA graphs (a nightly feature after v0.31.0) aren't modelled."
-        }
-      ],
-      "point_id": "4de726bf3f909fe54ecbd6ac7961c3968965fb2d6535fc9d4f5e463032e91e19",
-      "precision": "fp4",
-      "reasons": [
-        "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes"
       ]
     },
     {
@@ -270603,6 +270572,51 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 4,
+      "framework": "vllm",
+      "hardware": "mi300x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 4,
+        "framework": "vllm",
+        "hardware": "mi300x",
+        "measured_date": "2026-11-06",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "93f55e70d2a8eda544e54e463576be78e51445d70a1041ca8ab708ec4a5f9ae0"
+      },
+      "image": "vllm/vllm-openai-rocm:v0.33.0@sha256:4fcd39b758b660c4e9c345c021e2ea8f0ccdb31e3c32507d676cc3005ae83fba",
+      "measured": {
+        "tpot_ms": 5.07,
+        "ttft_ms": 568.75
+      },
+      "measured_date": "2026-11-06",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "642b7b62c272ecbe4a6b1f9467694935bcc68da200952d2825f397e3df1a3771",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 512,
       "framework": "vllm",
@@ -270860,51 +270874,6 @@
       ]
     },
     {
-      "benchmark_type": "agentic_traces",
-      "conc": 32,
-      "framework": "vllm",
-      "hardware": "mi300x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 32,
-        "framework": "vllm",
-        "hardware": "mi300x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "254e97022c64557d2b49e53779f2262068571c512899f85bb52c60ba3759b463"
-      },
-      "image": "vllm/vllm-openai-rocm:v0.32.0@sha256:14f6a575e1fb0a580b0f633c09e06f648709d60405b85f6a7ff3f80d49f39905",
-      "measured": {
-        "tpot_ms": 21.55,
-        "ttft_ms": 1178.03
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        }
-      ],
-      "point_id": "6661a731f175c069cba70ffced84e48322cdd654028d3883b266471052bdf30c",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
-      ]
-    },
-    {
       "benchmark_type": "single_turn",
       "conc": 32,
       "framework": "vllm",
@@ -271081,51 +271050,6 @@
       "reasons": [
         "setting_not_modelled:attention_config.mla_prefill_backend",
         "setting_not_modelled:linear_backend"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 8,
-      "framework": "vllm",
-      "hardware": "mi300x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 8,
-        "framework": "vllm",
-        "hardware": "mi300x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "254e97022c64557d2b49e53779f2262068571c512899f85bb52c60ba3759b463"
-      },
-      "image": "vllm/vllm-openai-rocm:v0.32.0@sha256:14f6a575e1fb0a580b0f633c09e06f648709d60405b85f6a7ff3f80d49f39905",
-      "measured": {
-        "tpot_ms": 7.04,
-        "ttft_ms": 651.18
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        }
-      ],
-      "point_id": "68294b23269b524c6c7e1bfaf930b0a27f203b84676ad3734f6a0567a0d439ec",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
       ]
     },
     {
@@ -273126,6 +273050,51 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 1,
+      "framework": "vllm",
+      "hardware": "mi300x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 1,
+        "framework": "vllm",
+        "hardware": "mi300x",
+        "measured_date": "2026-11-06",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "bee9877f90a375c7a13e6c746fe44a5eabb84c80f6bdd3665ada0ab80729fb53"
+      },
+      "image": "vllm/vllm-openai-rocm:v0.33.0@sha256:4fcd39b758b660c4e9c345c021e2ea8f0ccdb31e3c32507d676cc3005ae83fba",
+      "measured": {
+        "tpot_ms": 5.35,
+        "ttft_ms": 954.65
+      },
+      "measured_date": "2026-11-06",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "714e156bce1b95c4d713f408fd1a99e2d272fb0a811ff439ba19f4fafeb28158",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 4,
       "framework": "vllm",
@@ -274354,6 +274323,51 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 4,
+      "framework": "vllm",
+      "hardware": "mi300x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 4,
+        "framework": "vllm",
+        "hardware": "mi300x",
+        "measured_date": "2026-11-06",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "bee9877f90a375c7a13e6c746fe44a5eabb84c80f6bdd3665ada0ab80729fb53"
+      },
+      "image": "vllm/vllm-openai-rocm:v0.33.0@sha256:4fcd39b758b660c4e9c345c021e2ea8f0ccdb31e3c32507d676cc3005ae83fba",
+      "measured": {
+        "tpot_ms": 6.19,
+        "ttft_ms": 725.52
+      },
+      "measured_date": "2026-11-06",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "76d1db385a1544fddb25b20dede229b8d9590db2d6a05eb37ea328776613d3a8",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 64,
       "framework": "vllm",
@@ -274765,6 +274779,40 @@
         "setting_not_modelled:additional_config.decode_backend",
         "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes",
         "setting_not_modelled:prefill_schedule_interval"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 32,
+      "framework": "vllm",
+      "hardware": "gb300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 32,
+        "framework": "vllm",
+        "hardware": "gb300",
+        "measured_date": "2026-11-06",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "3f55718c3af8b07f2ae57f64ab62352611c1163eefe11a8d38d1efa4e06a4624"
+      },
+      "image": "vllm/vllm-openai:nightly-00b6c4c565a8732c131e1f452d4a17803bb0842b@sha256:76a9614ed4ed20694914c87e82a0344bd73e1c6e081459a2467175ab903657e4",
+      "measured": {
+        "tpot_ms": 4.47,
+        "ttft_ms": 212.12
+      },
+      "measured_date": "2026-11-06",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes",
+          "text": "DeepSeek-V4.1 decoder-replay CUDA graphs (a nightly feature after v0.31.0) aren't modelled."
+        }
+      ],
+      "point_id": "7b369d3bb256f1c66c985faa7b8e693536ea0208c064680508b4f721dce9618d",
+      "precision": "fp4",
+      "reasons": [
+        "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes"
       ]
     },
     {
@@ -275273,25 +275321,25 @@
     },
     {
       "benchmark_type": "agentic_traces",
-      "conc": 4,
+      "conc": 16,
       "framework": "vllm",
       "hardware": "mi300x",
       "identity": {
         "benchmark_type": "agentic_traces",
-        "conc": 4,
+        "conc": 16,
         "framework": "vllm",
         "hardware": "mi300x",
-        "measured_date": "2026-10-27",
+        "measured_date": "2026-11-06",
         "model": "dsv41flash",
         "precision": "fp4",
-        "recipe": "254e97022c64557d2b49e53779f2262068571c512899f85bb52c60ba3759b463"
+        "recipe": "bee9877f90a375c7a13e6c746fe44a5eabb84c80f6bdd3665ada0ab80729fb53"
       },
-      "image": "vllm/vllm-openai-rocm:v0.32.0@sha256:14f6a575e1fb0a580b0f633c09e06f648709d60405b85f6a7ff3f80d49f39905",
+      "image": "vllm/vllm-openai-rocm:v0.33.0@sha256:4fcd39b758b660c4e9c345c021e2ea8f0ccdb31e3c32507d676cc3005ae83fba",
       "measured": {
-        "tpot_ms": 5.56,
-        "ttft_ms": 716.46
+        "tpot_ms": 14.49,
+        "ttft_ms": 993.52
       },
-      "measured_date": "2026-10-27",
+      "measured_date": "2026-11-06",
       "model": "dsv41flash",
       "notes": [
         {
@@ -275307,7 +275355,7 @@
           "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
         }
       ],
-      "point_id": "7da365b4d57f7bd7daeffce88cc019c93c7efdc9272512e7da8e7e813dd1f1ec",
+      "point_id": "7d8da09af39264aa4bc948d440973038bfdfb9e2a119495e9c0463a91bd6198b",
       "precision": "fp4",
       "reasons": [
         "hardware_no_coefficients",
@@ -276545,51 +276593,6 @@
       ]
     },
     {
-      "benchmark_type": "agentic_traces",
-      "conc": 32,
-      "framework": "vllm",
-      "hardware": "mi300x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 32,
-        "framework": "vllm",
-        "hardware": "mi300x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "14080c8a078ec89dfcdfc7a5d588a41002f6eda8562e8ebfef2287f4c268ba47"
-      },
-      "image": "vllm/vllm-openai-rocm:v0.32.0@sha256:14f6a575e1fb0a580b0f633c09e06f648709d60405b85f6a7ff3f80d49f39905",
-      "measured": {
-        "tpot_ms": 29.17,
-        "ttft_ms": 1560.14
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        }
-      ],
-      "point_id": "850bcf6b589f11a92529a5f773aca8e7139dcd18f50b661c106d6c33ad231074",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
-      ]
-    },
-    {
       "benchmark_type": "single_turn",
       "conc": 2,
       "framework": "vllm",
@@ -277551,6 +277554,51 @@
     },
     {
       "benchmark_type": "agentic_traces",
+      "conc": 8,
+      "framework": "vllm",
+      "hardware": "mi300x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 8,
+        "framework": "vllm",
+        "hardware": "mi300x",
+        "measured_date": "2026-11-06",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "93f55e70d2a8eda544e54e463576be78e51445d70a1041ca8ab708ec4a5f9ae0"
+      },
+      "image": "vllm/vllm-openai-rocm:v0.33.0@sha256:4fcd39b758b660c4e9c345c021e2ea8f0ccdb31e3c32507d676cc3005ae83fba",
+      "measured": {
+        "tpot_ms": 6.35,
+        "ttft_ms": 562.06
+      },
+      "measured_date": "2026-11-06",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "88da3f9027180bc36b7aba3d56db0291d0871a7ef69df466c20b067d9bfebab6",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
       "conc": 64,
       "framework": "vllm",
       "hardware": "b200",
@@ -278188,51 +278236,6 @@
       "reasons": [
         "setting_not_modelled:attention_config.mla_prefill_backend",
         "setting_not_modelled:linear_backend"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 1,
-      "framework": "vllm",
-      "hardware": "mi300x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 1,
-        "framework": "vllm",
-        "hardware": "mi300x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "254e97022c64557d2b49e53779f2262068571c512899f85bb52c60ba3759b463"
-      },
-      "image": "vllm/vllm-openai-rocm:v0.32.0@sha256:14f6a575e1fb0a580b0f633c09e06f648709d60405b85f6a7ff3f80d49f39905",
-      "measured": {
-        "tpot_ms": 4.55,
-        "ttft_ms": 915.33
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        }
-      ],
-      "point_id": "8b368f09c36c6d9a577510b743694cfd96e2e9bf475887a3cc6b0b03ef04fd47",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
       ]
     },
     {
@@ -280604,6 +280607,51 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 32,
+      "framework": "vllm",
+      "hardware": "mi300x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 32,
+        "framework": "vllm",
+        "hardware": "mi300x",
+        "measured_date": "2026-11-06",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "bee9877f90a375c7a13e6c746fe44a5eabb84c80f6bdd3665ada0ab80729fb53"
+      },
+      "image": "vllm/vllm-openai-rocm:v0.33.0@sha256:4fcd39b758b660c4e9c345c021e2ea8f0ccdb31e3c32507d676cc3005ae83fba",
+      "measured": {
+        "tpot_ms": 25.6,
+        "ttft_ms": 1300.64
+      },
+      "measured_date": "2026-11-06",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "971c05fd3d89938b071b01468a16fc063bf71b9041d7c29c346a4876146e96bb",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 32,
       "framework": "vllm",
@@ -280940,6 +280988,51 @@
       "reasons": [
         "hardware_no_coefficients",
         "unclassified_arg:mm_encoder_tp_mode"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 8,
+      "framework": "vllm",
+      "hardware": "mi300x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 8,
+        "framework": "vllm",
+        "hardware": "mi300x",
+        "measured_date": "2026-11-06",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "bee9877f90a375c7a13e6c746fe44a5eabb84c80f6bdd3665ada0ab80729fb53"
+      },
+      "image": "vllm/vllm-openai-rocm:v0.33.0@sha256:4fcd39b758b660c4e9c345c021e2ea8f0ccdb31e3c32507d676cc3005ae83fba",
+      "measured": {
+        "tpot_ms": 8.49,
+        "ttft_ms": 716.34
+      },
+      "measured_date": "2026-11-06",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "9897a051f2fcf9acb331dfbd6eec8ac43c8d3ce8641ca1732a179be1f777b8f7",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
       ]
     },
     {
@@ -282398,6 +282491,51 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 1,
+      "framework": "vllm",
+      "hardware": "mi300x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 1,
+        "framework": "vllm",
+        "hardware": "mi300x",
+        "measured_date": "2026-11-06",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "93f55e70d2a8eda544e54e463576be78e51445d70a1041ca8ab708ec4a5f9ae0"
+      },
+      "image": "vllm/vllm-openai-rocm:v0.33.0@sha256:4fcd39b758b660c4e9c345c021e2ea8f0ccdb31e3c32507d676cc3005ae83fba",
+      "measured": {
+        "tpot_ms": 4.38,
+        "ttft_ms": 757.86
+      },
+      "measured_date": "2026-11-06",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "a1878b48b3ae67a841eee3b1436e9e691e8679893672a0b2b7f9fd589138e7f1",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 64,
       "framework": "vllm",
@@ -282960,6 +283098,40 @@
         "setting_not_modelled:compilation_config.custom_ops",
         "unclassified_arg:compilation_config.pass_config.fuse_rope_kvcache",
         "unclassified_arg:compilation_config.use_inductor_graph_partition"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 128,
+      "framework": "vllm",
+      "hardware": "gb300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 128,
+        "framework": "vllm",
+        "hardware": "gb300",
+        "measured_date": "2026-11-06",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "feb71b906c8afd296766520b522239aabec5e01b8c0a651ebc33552b5153cae4"
+      },
+      "image": "vllm/vllm-openai:nightly-00b6c4c565a8732c131e1f452d4a17803bb0842b@sha256:76a9614ed4ed20694914c87e82a0344bd73e1c6e081459a2467175ab903657e4",
+      "measured": {
+        "tpot_ms": 11.38,
+        "ttft_ms": 295.56
+      },
+      "measured_date": "2026-11-06",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes",
+          "text": "DeepSeek-V4.1 decoder-replay CUDA graphs (a nightly feature after v0.31.0) aren't modelled."
+        }
+      ],
+      "point_id": "a522e28948097bdcab2f91061903ae50d641cbcde11520d93ff4b7804aff99fb",
+      "precision": "fp4",
+      "reasons": [
+        "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes"
       ]
     },
     {
@@ -283663,51 +283835,6 @@
     },
     {
       "benchmark_type": "agentic_traces",
-      "conc": 2,
-      "framework": "vllm",
-      "hardware": "mi300x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 2,
-        "framework": "vllm",
-        "hardware": "mi300x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "254e97022c64557d2b49e53779f2262068571c512899f85bb52c60ba3759b463"
-      },
-      "image": "vllm/vllm-openai-rocm:v0.32.0@sha256:14f6a575e1fb0a580b0f633c09e06f648709d60405b85f6a7ff3f80d49f39905",
-      "measured": {
-        "tpot_ms": 4.89,
-        "ttft_ms": 724.83
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        }
-      ],
-      "point_id": "a8b7700d15ddb4b1a5094880c17993c03c089635c1d8417ab7db73a8ba2fa83c",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
       "conc": 8,
       "framework": "vllm",
       "hardware": "b300",
@@ -284078,6 +284205,51 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 16,
+      "framework": "vllm",
+      "hardware": "mi300x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 16,
+        "framework": "vllm",
+        "hardware": "mi300x",
+        "measured_date": "2026-11-06",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "93f55e70d2a8eda544e54e463576be78e51445d70a1041ca8ab708ec4a5f9ae0"
+      },
+      "image": "vllm/vllm-openai-rocm:v0.33.0@sha256:4fcd39b758b660c4e9c345c021e2ea8f0ccdb31e3c32507d676cc3005ae83fba",
+      "measured": {
+        "tpot_ms": 10.9,
+        "ttft_ms": 735.56
+      },
+      "measured_date": "2026-11-06",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "a9a294bd90cd65fe1af09ff1853d1a118f8a669f3bb4ca3aa7993ce97d4aba35",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 4,
       "framework": "vllm",
@@ -284201,40 +284373,6 @@
       "precision": "fp4",
       "reasons": [
         "drafter_not_in_catalog:eagle3"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 192,
-      "framework": "vllm",
-      "hardware": "gb300",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 192,
-        "framework": "vllm",
-        "hardware": "gb300",
-        "measured_date": "2026-10-02",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "ecd447d478cf126f6732bedd1711d201e109f140ad384a01f2e741c172cafc2d"
-      },
-      "image": "vllm/vllm-openai:nightly-dev-arm64-cu130-ac9126e58aa7",
-      "measured": {
-        "tpot_ms": 17.39,
-        "ttft_ms": 459.37
-      },
-      "measured_date": "2026-10-02",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes",
-          "text": "DeepSeek-V4.1 decoder-replay CUDA graphs (a nightly feature after v0.31.0) aren't modelled."
-        }
-      ],
-      "point_id": "aa344fc5bab6e9123ac7b6d072775e883de409d4b04c027efa6c265aaa277eff",
-      "precision": "fp4",
-      "reasons": [
-        "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes"
       ]
     },
     {
@@ -287691,40 +287829,6 @@
     },
     {
       "benchmark_type": "agentic_traces",
-      "conc": 128,
-      "framework": "vllm",
-      "hardware": "gb300",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 128,
-        "framework": "vllm",
-        "hardware": "gb300",
-        "measured_date": "2026-10-02",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "ecd447d478cf126f6732bedd1711d201e109f140ad384a01f2e741c172cafc2d"
-      },
-      "image": "vllm/vllm-openai:nightly-dev-arm64-cu130-ac9126e58aa7",
-      "measured": {
-        "tpot_ms": 12.46,
-        "ttft_ms": 365.16
-      },
-      "measured_date": "2026-10-02",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes",
-          "text": "DeepSeek-V4.1 decoder-replay CUDA graphs (a nightly feature after v0.31.0) aren't modelled."
-        }
-      ],
-      "point_id": "bba6da43a66e806952c13ebbb73fb00022d380c430c4ab923203de5e9d6b4375",
-      "precision": "fp4",
-      "reasons": [
-        "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
       "conc": 3,
       "framework": "vllm",
       "hardware": "h100",
@@ -287827,6 +287931,40 @@
         "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FUSION_SHARED_EXPERTS",
         "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
         "setting_not_modelled:speculative_config.kv_cache_dtype"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 192,
+      "framework": "vllm",
+      "hardware": "gb300",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 192,
+        "framework": "vllm",
+        "hardware": "gb300",
+        "measured_date": "2026-11-06",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "60b49b3581777dc49f335f386d6419ecaa18e02bd4aa1b38e3605ee2db04b417"
+      },
+      "image": "vllm/vllm-openai:nightly-00b6c4c565a8732c131e1f452d4a17803bb0842b@sha256:76a9614ed4ed20694914c87e82a0344bd73e1c6e081459a2467175ab903657e4",
+      "measured": {
+        "tpot_ms": 17.46,
+        "ttft_ms": 417.22
+      },
+      "measured_date": "2026-11-06",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes",
+          "text": "DeepSeek-V4.1 decoder-replay CUDA graphs (a nightly feature after v0.31.0) aren't modelled."
+        }
+      ],
+      "point_id": "bc956bdeba02661044eaa50173d87561f40a6fbcc1ca7a82e8746c0c5d7a6c81",
+      "precision": "fp4",
+      "reasons": [
+        "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes"
       ]
     },
     {
@@ -289032,51 +289170,6 @@
       "precision": "fp4",
       "reasons": [
         "drafter_not_in_catalog:eagle3"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 16,
-      "framework": "vllm",
-      "hardware": "mi300x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 16,
-        "framework": "vllm",
-        "hardware": "mi300x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "14080c8a078ec89dfcdfc7a5d588a41002f6eda8562e8ebfef2287f4c268ba47"
-      },
-      "image": "vllm/vllm-openai-rocm:v0.32.0@sha256:14f6a575e1fb0a580b0f633c09e06f648709d60405b85f6a7ff3f80d49f39905",
-      "measured": {
-        "tpot_ms": 14.99,
-        "ttft_ms": 1115.87
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        }
-      ],
-      "point_id": "c4c2fa146df780d6f7f1bcd7d0fea4f580c24f3db370bed4ccdab23cb1e4878f",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
       ]
     },
     {
@@ -292351,40 +292444,6 @@
     },
     {
       "benchmark_type": "agentic_traces",
-      "conc": 32,
-      "framework": "vllm",
-      "hardware": "gb300",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 32,
-        "framework": "vllm",
-        "hardware": "gb300",
-        "measured_date": "2026-10-02",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "ecd447d478cf126f6732bedd1711d201e109f140ad384a01f2e741c172cafc2d"
-      },
-      "image": "vllm/vllm-openai:nightly-dev-arm64-cu130-ac9126e58aa7",
-      "measured": {
-        "tpot_ms": 4.52,
-        "ttft_ms": 206.41
-      },
-      "measured_date": "2026-10-02",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes",
-          "text": "DeepSeek-V4.1 decoder-replay CUDA graphs (a nightly feature after v0.31.0) aren't modelled."
-        }
-      ],
-      "point_id": "d6db3311a6bf58d6a5459278e444dd1792874e6ac04415df16c1414a8721a8f9",
-      "precision": "fp4",
-      "reasons": [
-        "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
       "conc": 5,
       "framework": "vllm",
       "hardware": "mi355x",
@@ -295321,6 +295380,51 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 2,
+      "framework": "vllm",
+      "hardware": "mi300x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 2,
+        "framework": "vllm",
+        "hardware": "mi300x",
+        "measured_date": "2026-11-06",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe": "bee9877f90a375c7a13e6c746fe44a5eabb84c80f6bdd3665ada0ab80729fb53"
+      },
+      "image": "vllm/vllm-openai-rocm:v0.33.0@sha256:4fcd39b758b660c4e9c345c021e2ea8f0ccdb31e3c32507d676cc3005ae83fba",
+      "measured": {
+        "tpot_ms": 5.5,
+        "ttft_ms": 805.88
+      },
+      "measured_date": "2026-11-06",
+      "model": "dsv41flash",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        }
+      ],
+      "point_id": "e873ff90a906c0f81f5553866bb00db6c98022b29edd512bd6e4e843b1fea19d",
+      "precision": "fp4",
+      "reasons": [
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 2,
       "framework": "vllm",
@@ -297109,36 +297213,47 @@
     },
     {
       "benchmark_type": "agentic_traces",
-      "conc": 64,
+      "conc": 32,
       "framework": "vllm",
-      "hardware": "gb300",
+      "hardware": "mi300x",
       "identity": {
         "benchmark_type": "agentic_traces",
-        "conc": 64,
+        "conc": 32,
         "framework": "vllm",
-        "hardware": "gb300",
-        "measured_date": "2026-10-02",
+        "hardware": "mi300x",
+        "measured_date": "2026-11-06",
         "model": "dsv41flash",
         "precision": "fp4",
-        "recipe": "ecd447d478cf126f6732bedd1711d201e109f140ad384a01f2e741c172cafc2d"
+        "recipe": "93f55e70d2a8eda544e54e463576be78e51445d70a1041ca8ab708ec4a5f9ae0"
       },
-      "image": "vllm/vllm-openai:nightly-dev-arm64-cu130-ac9126e58aa7",
+      "image": "vllm/vllm-openai-rocm:v0.33.0@sha256:4fcd39b758b660c4e9c345c021e2ea8f0ccdb31e3c32507d676cc3005ae83fba",
       "measured": {
-        "tpot_ms": 7.3,
-        "ttft_ms": 249.22
+        "tpot_ms": 19.51,
+        "ttft_ms": 979.11
       },
-      "measured_date": "2026-10-02",
+      "measured_date": "2026-11-06",
       "model": "dsv41flash",
       "notes": [
         {
-          "reason": "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes",
-          "text": "DeepSeek-V4.1 decoder-replay CUDA graphs (a nightly feature after v0.31.0) aren't modelled."
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
         }
       ],
-      "point_id": "f359c4eab53032853436f86f1a4313e7b4c46df8ceef3ff2ce8743ae810a22dd",
+      "point_id": "f35697173b14489bc0513545507c0479217cb99ba1810dd1ccb32131002004ab",
       "precision": "fp4",
       "reasons": [
-        "setting_not_modelled:compilation_config.decoder_replay_cudagraph_capture_sizes"
+        "hardware_no_coefficients",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
       ]
     },
     {
@@ -297247,51 +297362,6 @@
       "precision": "fp8",
       "reasons": [
         "hardware_no_coefficients"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 2,
-      "framework": "vllm",
-      "hardware": "mi300x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 2,
-        "framework": "vllm",
-        "hardware": "mi300x",
-        "measured_date": "2026-10-27",
-        "model": "dsv41flash",
-        "precision": "fp4",
-        "recipe": "14080c8a078ec89dfcdfc7a5d588a41002f6eda8562e8ebfef2287f4c268ba47"
-      },
-      "image": "vllm/vllm-openai-rocm:v0.32.0@sha256:14f6a575e1fb0a580b0f633c09e06f648709d60405b85f6a7ff3f80d49f39905",
-      "measured": {
-        "tpot_ms": 5.81,
-        "ttft_ms": 917.04
-      },
-      "measured_date": "2026-10-27",
-      "model": "dsv41flash",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        }
-      ],
-      "point_id": "f399a84c05d25a3585d3e420da2d3b86b33c078f18a0a36fc5a651ef8b2dcc8b",
-      "precision": "fp4",
-      "reasons": [
-        "hardware_no_coefficients",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
       ]
     },
     {
