@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "snapshot_id": "2026-11-07_blis-v0.15.0_ix-api-2026-11-07",
-  "generated_at": "2026-11-07T11:25:02Z",
+  "snapshot_id": "2026-11-08_blis-v0.15.0_ix-api-2026-11-08",
+  "generated_at": "2026-11-08T11:34:55Z",
   "provenance": {
     "blis": {
       "catalog": "0.3.0",
@@ -13,17 +13,17 @@
     "ground_truth": {
       "source": "SemiAnalysis InferenceX API",
       "source_url": "https://inferencex.semianalysis.com/api/v1/",
-      "release_tag": "api-2026-11-07",
-      "measurement_date_through": "2026-11-06",
-      "measurement_sha256": "24cef04596678fe327ba711d578130f762a17e046557d476c74dce4f5c959d2e"
+      "release_tag": "api-2026-11-08",
+      "measurement_date_through": "2026-11-08",
+      "measurement_sha256": "1de8d1d886cd920970974a4884eacd6a23e48b78bd1ae373738fde6bad909327"
     },
-    "evaluator_commit": "ea91d79bce26db4c2724cb855550723fa4badf10",
+    "evaluator_commit": "b738e44aa165269198064fd30fc29d6da46c2134",
     "scorer": "signedprobe",
     "ingest": "api",
     "vllm_ref": "v0.32.0",
     "vllm_max_distance": 2000,
     "policy_sha256": "602b03250d7bca865bbe29813c316c00dad0f3e387ef00a4855e2290f54b00a8",
-    "pulled_at": "2026-11-07T11:25:02Z",
+    "pulled_at": "2026-11-08T11:34:55Z",
     "corpus": {
       "dataset": "semianalysisai/cc-traces-weka-062126",
       "revision": "23f152f6f0f9399a85901b89a6458def0ef16729",
@@ -72,13 +72,13 @@
     },
     "all": {
       "mape": {
-        "ttft": 35.695395380501125,
-        "tpot": 16.87298075380727,
+        "ttft": 35.69539536635737,
+        "tpot": 16.872982297868987,
         "n": 748
       },
       "shape": {
-        "ttft": 18.911440260046678,
-        "tpot": 13.002322135464016,
+        "ttft": 18.91144018362347,
+        "tpot": 13.002313303621325,
         "n": 568
       },
       "noise_floor_pct": 1.6
@@ -59149,13 +59149,13 @@
         },
         "all": {
           "mape": {
-            "ttft": 60.180915983456195,
-            "tpot": 22.979519499350186,
+            "ttft": 60.180915560275004,
+            "tpot": 22.979565697676755,
             "n": 25
           },
           "shape": {
-            "ttft": 26.864504969619276,
-            "tpot": 16.88489282254073,
+            "ttft": 26.86450268496754,
+            "tpot": 16.884628796927604,
             "n": 19
           },
           "noise_floor_pct": 1.6
@@ -59187,13 +59187,13 @@
             },
             "all": {
               "mape": {
-                "ttft": 60.180915983456195,
-                "tpot": 22.979519499350186,
+                "ttft": 60.180915560275004,
+                "tpot": 22.979565697676755,
                 "n": 25
               },
               "shape": {
-                "ttft": 26.864504969619276,
-                "tpot": 16.88489282254073,
+                "ttft": 26.86450268496754,
+                "tpot": 16.884628796927604,
                 "n": 19
               },
               "noise_floor_pct": 1.6
@@ -59224,13 +59224,13 @@
                 },
                 "all": {
                   "mape": {
-                    "ttft": 70.29272089379444,
-                    "tpot": 35.50767373717751,
+                    "ttft": 70.2927187778885,
+                    "tpot": 35.507904728810345,
                     "n": 5
                   },
                   "shape": {
-                    "ttft": 9.154911108837755,
-                    "tpot": 5.530412489397197,
+                    "ttft": 9.154889404646276,
+                    "tpot": 5.527904246072462,
                     "n": 2
                   },
                   "noise_floor_pct": 1.6
@@ -59272,13 +59272,13 @@
                     },
                     "all": {
                       "mape": {
-                        "ttft": 6.461602850963065,
-                        "tpot": 31.66205759948055,
+                        "ttft": 6.461606136157798,
+                        "tpot": 31.66223659707929,
                         "n": 3
                       },
                       "shape": {
-                        "ttft": 9.154911108837755,
-                        "tpot": 5.530412489397197,
+                        "ttft": 9.154889404646276,
+                        "tpot": 5.527904246072462,
                         "n": 2
                       },
                       "noise_floor_pct": 1.6
@@ -59299,7 +59299,7 @@
                       },
                       "error_pct": {
                         "ttft": 2.7579,
-                        "tpot": 36.7022
+                        "tpot": 36.7
                       },
                       "shape": {
                         "ttft": null,
@@ -60170,11 +60170,11 @@
                       },
                       "error_pct": {
                         "ttft": -14.963,
-                        "tpot": 32.1316
+                        "tpot": 32.1341
                       },
                       "shape": {
                         "ttft": -17.2452,
-                        "tpot": -3.3435
+                        "tpot": -3.3401
                       },
                       "point_id": "d2479e5aeec2c00e435fe5901a95ae4cfc7f3a2ac445feeae0013fcc3c448143",
                       "identity": {
@@ -61041,11 +61041,11 @@
                       },
                       "error_pct": {
                         "ttft": 1.664,
-                        "tpot": 26.1524
+                        "tpot": 26.1526
                       },
                       "shape": {
-                        "ttft": -1.0646,
-                        "tpot": -7.7173
+                        "ttft": -1.0645,
+                        "tpot": -7.7157
                       },
                       "point_id": "d9adfdd49b4f90a7b6332d142de373b84dddb0ae90756c6c380c1f3a5ae5f080",
                       "identity": {
@@ -61935,8 +61935,8 @@
                     },
                     "all": {
                       "mape": {
-                        "ttft": 166.0393979580415,
-                        "tpot": 41.27609794372296,
+                        "ttft": 166.03938774048453,
+                        "tpot": 41.27640692640693,
                         "n": 2
                       },
                       "shape": {
@@ -61962,7 +61962,7 @@
                       },
                       "error_pct": {
                         "ttft": 100.8422,
-                        "tpot": 47.1289
+                        "tpot": 47.1286
                       },
                       "shape": null,
                       "shape_reason": "< 3 concurrencies",
@@ -62865,7 +62865,7 @@
                       },
                       "error_pct": {
                         "ttft": 231.2366,
-                        "tpot": 35.4233
+                        "tpot": 35.4242
                       },
                       "shape": null,
                       "shape_reason": "< 3 concurrencies",
@@ -141270,7 +141270,7 @@
                         "precision": "fp8",
                         "recipe": "row:411032"
                       },
-                      "sweep_id": "1883|minimax-m2.5-b300-fp8-vllm-tp2-dp1-ep2|1k1k|0bbc1a68e232#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1",
+                      "sweep_id": "1883|minimax-m2.5-b300-fp8-vllm-tp2-dp1-ep2|1k1k|0bbc1a68e232#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1#3dcd808d7fd1",
                       "repeats": [
                         {
                           "point_id": "3dcd808d7fd1180f1c3176ea7dffe0f9d4e0f84438e5c06a8428b5cf75cb428f",
@@ -261726,145 +261726,6 @@
       ]
     },
     {
-      "benchmark_type": "agentic_traces",
-      "conc": 10,
-      "framework": "vllm",
-      "hardware": "mi355x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 10,
-        "framework": "vllm",
-        "hardware": "mi355x",
-        "measured_date": "2026-11-06",
-        "model": "kimik3.1",
-        "precision": "fp4",
-        "recipe": "c3b170c2a6aab3a29bf5584497bfed1aa16ef3f4d0dbd09f515274854d4aef7d"
-      },
-      "image": "vllm/vllm-openai-rocm:kimi-k31@sha256:5f47cc1004d9a7ac65f8a913725edb20c62c99a07e31cbf4ba21741bd0b4f9b1",
-      "measured": {
-        "tpot_ms": 10.01,
-        "ttft_ms": 1535.17
-      },
-      "measured_date": "2026-11-06",
-      "model": "kimik3.1",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:additional_config.kda_prefill_backend",
-          "text": "A model-specific engine option (additional_config) has no Deployment field; e.g. DeepSeek-V4.1's latency-specialized decode."
-        },
-        {
-          "reason": "setting_not_modelled:compilation_config.custom_ops",
-          "text": "Enabling or disabling vLLM custom ops changes which kernels run; the Deployment can't state it."
-        },
-        {
-          "reason": "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
-          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
-        }
-      ],
-      "point_id": "32b0d27167230b672ecf4d9f8f78b77f066687f4114f8f37510c53fff376f927",
-      "precision": "fp4",
-      "reasons": [
-        "conflict:kv_cache_dtype",
-        "hardware_no_coefficients",
-        "model_not_in_catalog",
-        "setting_not_modelled:additional_config.kda_prefill_backend",
-        "setting_not_modelled:compilation_config.custom_ops",
-        "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
-        "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
-        "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
-        "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
-        "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
-        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
-        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
-        "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
-        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
-        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
-        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
-        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
-        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
-        "setting_not_modelled:speculative_config.kv_cache_dtype",
-        "unclassified_arg:cp_kv_cache_interleave_size",
-        "unclassified_arg:prefix_match_unit"
-      ]
-    },
-    {
       "benchmark_type": "single_turn",
       "conc": 32,
       "framework": "vllm",
@@ -263564,17 +263425,17 @@
         "conc": 32,
         "framework": "vllm",
         "hardware": "mi355x",
-        "measured_date": "2026-11-06",
+        "measured_date": "2026-11-08",
         "model": "kimik3.1",
         "precision": "fp4",
-        "recipe": "6ddda10f9688db96f576f796a6d27283dc678ce2a20d4d9c85b24301a65a2fbd"
+        "recipe": "4ff44ba586981053d88e6df43b99ebd307c124b56247054aeb7593a97b48da2a"
       },
       "image": "vllm/vllm-openai-rocm:kimi-k31@sha256:5f47cc1004d9a7ac65f8a913725edb20c62c99a07e31cbf4ba21741bd0b4f9b1",
       "measured": {
-        "tpot_ms": 19.9,
-        "ttft_ms": 2122.34
+        "tpot_ms": 17.17,
+        "ttft_ms": 3001.17
       },
-      "measured_date": "2026-11-06",
+      "measured_date": "2026-11-08",
       "model": "kimik3.1",
       "notes": [
         {
@@ -263662,7 +263523,7 @@
           "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
         }
       ],
-      "point_id": "3bc75da2a581e087568e230ef5e941ce99726322fc24403937ab41a626d7d5d9",
+      "point_id": "3be764d69dbcd01d97b1e264256fc8ed0876a3eda508914f6d3a81c886760a3a",
       "precision": "fp4",
       "reasons": [
         "conflict:kv_cache_dtype",
@@ -266593,150 +266454,6 @@
         "drafter_not_in_catalog:eagle3",
         "hardware_no_coefficients",
         "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 1,
-      "framework": "vllm",
-      "hardware": "mi355x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 1,
-        "framework": "vllm",
-        "hardware": "mi355x",
-        "measured_date": "2026-11-06",
-        "model": "kimik3.1",
-        "precision": "fp4",
-        "recipe": "b436d9db8c0ccb43b59447480ec19f8a031f4cd064119989e55cfb6ae20a03c6"
-      },
-      "image": "vllm/vllm-openai-rocm:kimi-k31@sha256:5f47cc1004d9a7ac65f8a913725edb20c62c99a07e31cbf4ba21741bd0b4f9b1",
-      "measured": {
-        "tpot_ms": 5.03,
-        "ttft_ms": 2069.84
-      },
-      "measured_date": "2026-11-06",
-      "model": "kimik3.1",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:additional_config.decode_backend",
-          "text": "A model-specific engine option (additional_config) has no Deployment field; e.g. DeepSeek-V4.1's latency-specialized decode."
-        },
-        {
-          "reason": "setting_not_modelled:additional_config.kda_prefill_backend",
-          "text": "A model-specific engine option (additional_config) has no Deployment field; e.g. DeepSeek-V4.1's latency-specialized decode."
-        },
-        {
-          "reason": "setting_not_modelled:compilation_config.custom_ops",
-          "text": "Enabling or disabling vLLM custom ops changes which kernels run; the Deployment can't state it."
-        },
-        {
-          "reason": "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
-          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
-        }
-      ],
-      "point_id": "4c8b767049226ccf23db334a597f5ae42c92106e0cd29c86d24364a099bbe37b",
-      "precision": "fp4",
-      "reasons": [
-        "conflict:kv_cache_dtype",
-        "hardware_no_coefficients",
-        "model_not_in_catalog",
-        "setting_not_modelled:additional_config.decode_backend",
-        "setting_not_modelled:additional_config.kda_prefill_backend",
-        "setting_not_modelled:compilation_config.custom_ops",
-        "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
-        "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
-        "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
-        "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
-        "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
-        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
-        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
-        "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
-        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
-        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
-        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
-        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
-        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
-        "setting_not_modelled:speculative_config.kv_cache_dtype",
-        "unclassified_arg:cp_kv_cache_interleave_size",
-        "unclassified_arg:prefix_match_unit"
       ]
     },
     {
@@ -274404,6 +274121,145 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 10,
+      "framework": "vllm",
+      "hardware": "mi355x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 10,
+        "framework": "vllm",
+        "hardware": "mi355x",
+        "measured_date": "2026-11-08",
+        "model": "kimik3.1",
+        "precision": "fp4",
+        "recipe": "aaf77bd38c1f6a0cb2948f59963ce1d3f4de308e2da658d03a0c098dd56791af"
+      },
+      "image": "vllm/vllm-openai-rocm:kimi-k31@sha256:5f47cc1004d9a7ac65f8a913725edb20c62c99a07e31cbf4ba21741bd0b4f9b1",
+      "measured": {
+        "tpot_ms": 12.06,
+        "ttft_ms": 1588.17
+      },
+      "measured_date": "2026-11-08",
+      "model": "kimik3.1",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:additional_config.kda_prefill_backend",
+          "text": "A model-specific engine option (additional_config) has no Deployment field; e.g. DeepSeek-V4.1's latency-specialized decode."
+        },
+        {
+          "reason": "setting_not_modelled:compilation_config.custom_ops",
+          "text": "Enabling or disabling vLLM custom ops changes which kernels run; the Deployment can't state it."
+        },
+        {
+          "reason": "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "778576a9043bac22375d264c5a9c2b8924ed1836bf658e71e9711ddd547cf905",
+      "precision": "fp4",
+      "reasons": [
+        "conflict:kv_cache_dtype",
+        "hardware_no_coefficients",
+        "model_not_in_catalog",
+        "setting_not_modelled:additional_config.kda_prefill_backend",
+        "setting_not_modelled:compilation_config.custom_ops",
+        "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
+        "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
+        "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
+        "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
+        "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
+        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
+        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
+        "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
+        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
+        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
+        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
+        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
+        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
+        "setting_not_modelled:speculative_config.kv_cache_dtype",
+        "unclassified_arg:cp_kv_cache_interleave_size",
+        "unclassified_arg:prefix_match_unit"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 32,
       "framework": "vllm",
@@ -277469,6 +277325,149 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 1,
+      "framework": "vllm",
+      "hardware": "mi355x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 1,
+        "framework": "vllm",
+        "hardware": "mi355x",
+        "measured_date": "2026-11-08",
+        "model": "kimik3.1",
+        "precision": "fp4",
+        "recipe": "2dd084fb8235354718b0002a74d6f8232908ef3abd9567e9c957ab43992efbbf"
+      },
+      "image": "vllm/vllm-openai-rocm:kimi-k31@sha256:5f47cc1004d9a7ac65f8a913725edb20c62c99a07e31cbf4ba21741bd0b4f9b1",
+      "measured": {
+        "tpot_ms": 4.83,
+        "ttft_ms": 2158.28
+      },
+      "measured_date": "2026-11-08",
+      "model": "kimik3.1",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:additional_config.decode_backend",
+          "text": "A model-specific engine option (additional_config) has no Deployment field; e.g. DeepSeek-V4.1's latency-specialized decode."
+        },
+        {
+          "reason": "setting_not_modelled:additional_config.kda_prefill_backend",
+          "text": "A model-specific engine option (additional_config) has no Deployment field; e.g. DeepSeek-V4.1's latency-specialized decode."
+        },
+        {
+          "reason": "setting_not_modelled:compilation_config.custom_ops",
+          "text": "Enabling or disabling vLLM custom ops changes which kernels run; the Deployment can't state it."
+        },
+        {
+          "reason": "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "887dab0a5fe687a05b23d123dbbf3b751856ed0b9132eaac19efbad00406969a",
+      "precision": "fp4",
+      "reasons": [
+        "conflict:kv_cache_dtype",
+        "hardware_no_coefficients",
+        "model_not_in_catalog",
+        "setting_not_modelled:additional_config.decode_backend",
+        "setting_not_modelled:additional_config.kda_prefill_backend",
+        "setting_not_modelled:compilation_config.custom_ops",
+        "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
+        "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
+        "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
+        "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
+        "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
+        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
+        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
+        "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
+        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
+        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
+        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
+        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
+        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
+        "setting_not_modelled:speculative_config.kv_cache_dtype",
+        "unclassified_arg:prefix_match_unit"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 4,
       "framework": "vllm",
@@ -277939,145 +277938,6 @@
       "reasons": [
         "setting_not_modelled:enable_chunked_prefill",
         "unclassified_arg:attention_config.minimax_m3_msa_decode_backend"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 48,
-      "framework": "vllm",
-      "hardware": "mi355x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 48,
-        "framework": "vllm",
-        "hardware": "mi355x",
-        "measured_date": "2026-11-06",
-        "model": "kimik3.1",
-        "precision": "fp4",
-        "recipe": "aedecf3517bfa15a506ea47dc107a504fb5dea94a31b6896330650b986be1a40"
-      },
-      "image": "vllm/vllm-openai-rocm:kimi-k31@sha256:5f47cc1004d9a7ac65f8a913725edb20c62c99a07e31cbf4ba21741bd0b4f9b1",
-      "measured": {
-        "tpot_ms": 31.13,
-        "ttft_ms": 1439.58
-      },
-      "measured_date": "2026-11-06",
-      "model": "kimik3.1",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:additional_config.kda_prefill_backend",
-          "text": "A model-specific engine option (additional_config) has no Deployment field; e.g. DeepSeek-V4.1's latency-specialized decode."
-        },
-        {
-          "reason": "setting_not_modelled:compilation_config.custom_ops",
-          "text": "Enabling or disabling vLLM custom ops changes which kernels run; the Deployment can't state it."
-        },
-        {
-          "reason": "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
-          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
-        }
-      ],
-      "point_id": "89fa0b42e3ece391055f96086ced86c5ecb4721f0440af84a7fde580af19351d",
-      "precision": "fp4",
-      "reasons": [
-        "conflict:kv_cache_dtype",
-        "hardware_no_coefficients",
-        "model_not_in_catalog",
-        "setting_not_modelled:additional_config.kda_prefill_backend",
-        "setting_not_modelled:compilation_config.custom_ops",
-        "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
-        "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
-        "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
-        "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
-        "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
-        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
-        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
-        "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
-        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
-        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
-        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
-        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
-        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
-        "setting_not_modelled:speculative_config.kv_cache_dtype",
-        "unclassified_arg:cp_kv_cache_interleave_size",
-        "unclassified_arg:prefix_match_unit"
       ]
     },
     {
@@ -278716,145 +278576,6 @@
         "unclassified_arg:engram_config.disk_offload",
         "unclassified_arg:kv_cache_memory",
         "unclassified_arg:numa_bind_nodes"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 16,
-      "framework": "vllm",
-      "hardware": "mi355x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 16,
-        "framework": "vllm",
-        "hardware": "mi355x",
-        "measured_date": "2026-11-06",
-        "model": "kimik3.1",
-        "precision": "fp4",
-        "recipe": "71200d2be1798a1e843d2263783c7efb08775ab16620ed52c2228a47aaee7fc0"
-      },
-      "image": "vllm/vllm-openai-rocm:kimi-k31@sha256:5f47cc1004d9a7ac65f8a913725edb20c62c99a07e31cbf4ba21741bd0b4f9b1",
-      "measured": {
-        "tpot_ms": 13.02,
-        "ttft_ms": 1405.31
-      },
-      "measured_date": "2026-11-06",
-      "model": "kimik3.1",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:additional_config.kda_prefill_backend",
-          "text": "A model-specific engine option (additional_config) has no Deployment field; e.g. DeepSeek-V4.1's latency-specialized decode."
-        },
-        {
-          "reason": "setting_not_modelled:compilation_config.custom_ops",
-          "text": "Enabling or disabling vLLM custom ops changes which kernels run; the Deployment can't state it."
-        },
-        {
-          "reason": "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
-          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
-        }
-      ],
-      "point_id": "8ced7f59a2a4e7f89da4ab54f0490ac89e8b8cc3af6aed5ad72be48e156e26c2",
-      "precision": "fp4",
-      "reasons": [
-        "conflict:kv_cache_dtype",
-        "hardware_no_coefficients",
-        "model_not_in_catalog",
-        "setting_not_modelled:additional_config.kda_prefill_backend",
-        "setting_not_modelled:compilation_config.custom_ops",
-        "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
-        "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
-        "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
-        "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
-        "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
-        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
-        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
-        "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
-        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
-        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
-        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
-        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
-        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
-        "setting_not_modelled:speculative_config.kv_cache_dtype",
-        "unclassified_arg:cp_kv_cache_interleave_size",
-        "unclassified_arg:prefix_match_unit"
       ]
     },
     {
@@ -280422,6 +280143,145 @@
       "precision": "fp4",
       "reasons": [
         "client_scenario_not_replayable:single_turn_8192:1024_c1024"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 16,
+      "framework": "vllm",
+      "hardware": "mi355x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 16,
+        "framework": "vllm",
+        "hardware": "mi355x",
+        "measured_date": "2026-11-08",
+        "model": "kimik3.1",
+        "precision": "fp4",
+        "recipe": "5f6f006c3d6e3de9cc8be2a568da8acb33ba13a9a717e1d0b34871d335a287e4"
+      },
+      "image": "vllm/vllm-openai-rocm:kimi-k31@sha256:5f47cc1004d9a7ac65f8a913725edb20c62c99a07e31cbf4ba21741bd0b4f9b1",
+      "measured": {
+        "tpot_ms": 11.3,
+        "ttft_ms": 2426.07
+      },
+      "measured_date": "2026-11-08",
+      "model": "kimik3.1",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:additional_config.kda_prefill_backend",
+          "text": "A model-specific engine option (additional_config) has no Deployment field; e.g. DeepSeek-V4.1's latency-specialized decode."
+        },
+        {
+          "reason": "setting_not_modelled:compilation_config.custom_ops",
+          "text": "Enabling or disabling vLLM custom ops changes which kernels run; the Deployment can't state it."
+        },
+        {
+          "reason": "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "95c100db7f18c6ccfba793cac57698ee3e2599a7ae09ac2ee2b2f2fb9d16d889",
+      "precision": "fp4",
+      "reasons": [
+        "conflict:kv_cache_dtype",
+        "hardware_no_coefficients",
+        "model_not_in_catalog",
+        "setting_not_modelled:additional_config.kda_prefill_backend",
+        "setting_not_modelled:compilation_config.custom_ops",
+        "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
+        "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
+        "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
+        "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
+        "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
+        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
+        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
+        "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
+        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
+        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
+        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
+        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
+        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
+        "setting_not_modelled:speculative_config.kv_cache_dtype",
+        "unclassified_arg:cp_kv_cache_interleave_size",
+        "unclassified_arg:prefix_match_unit"
       ]
     },
     {
@@ -282572,145 +282432,6 @@
       "reasons": [
         "setting_not_modelled:attention_config.mla_prefill_backend",
         "setting_not_modelled:linear_backend"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 24,
-      "framework": "vllm",
-      "hardware": "mi355x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 24,
-        "framework": "vllm",
-        "hardware": "mi355x",
-        "measured_date": "2026-11-06",
-        "model": "kimik3.1",
-        "precision": "fp4",
-        "recipe": "11ace29bc9e13650cbf8ac5035b31e332641e484194101b68b6b6d457638b30d"
-      },
-      "image": "vllm/vllm-openai-rocm:kimi-k31@sha256:5f47cc1004d9a7ac65f8a913725edb20c62c99a07e31cbf4ba21741bd0b4f9b1",
-      "measured": {
-        "tpot_ms": 16.51,
-        "ttft_ms": 2266.22
-      },
-      "measured_date": "2026-11-06",
-      "model": "kimik3.1",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:additional_config.kda_prefill_backend",
-          "text": "A model-specific engine option (additional_config) has no Deployment field; e.g. DeepSeek-V4.1's latency-specialized decode."
-        },
-        {
-          "reason": "setting_not_modelled:compilation_config.custom_ops",
-          "text": "Enabling or disabling vLLM custom ops changes which kernels run; the Deployment can't state it."
-        },
-        {
-          "reason": "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
-          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
-        }
-      ],
-      "point_id": "a2057066528d2750649ef5639d286c193607258688297872e52c255d72b4157e",
-      "precision": "fp4",
-      "reasons": [
-        "conflict:kv_cache_dtype",
-        "hardware_no_coefficients",
-        "model_not_in_catalog",
-        "setting_not_modelled:additional_config.kda_prefill_backend",
-        "setting_not_modelled:compilation_config.custom_ops",
-        "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
-        "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
-        "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
-        "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
-        "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
-        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
-        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
-        "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
-        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
-        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
-        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
-        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
-        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
-        "setting_not_modelled:speculative_config.kv_cache_dtype",
-        "unclassified_arg:cp_kv_cache_interleave_size",
-        "unclassified_arg:prefix_match_unit"
       ]
     },
     {
@@ -287613,6 +287334,145 @@
     },
     {
       "benchmark_type": "agentic_traces",
+      "conc": 48,
+      "framework": "vllm",
+      "hardware": "mi355x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 48,
+        "framework": "vllm",
+        "hardware": "mi355x",
+        "measured_date": "2026-11-08",
+        "model": "kimik3.1",
+        "precision": "fp4",
+        "recipe": "aedecf3517bfa15a506ea47dc107a504fb5dea94a31b6896330650b986be1a40"
+      },
+      "image": "vllm/vllm-openai-rocm:kimi-k31@sha256:5f47cc1004d9a7ac65f8a913725edb20c62c99a07e31cbf4ba21741bd0b4f9b1",
+      "measured": {
+        "tpot_ms": 31.41,
+        "ttft_ms": 1522.49
+      },
+      "measured_date": "2026-11-08",
+      "model": "kimik3.1",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:additional_config.kda_prefill_backend",
+          "text": "A model-specific engine option (additional_config) has no Deployment field; e.g. DeepSeek-V4.1's latency-specialized decode."
+        },
+        {
+          "reason": "setting_not_modelled:compilation_config.custom_ops",
+          "text": "Enabling or disabling vLLM custom ops changes which kernels run; the Deployment can't state it."
+        },
+        {
+          "reason": "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "ba718e7a3f73e35b9bc178e2ce1d0478e502e196d918cdbf52cb41772df52cc6",
+      "precision": "fp4",
+      "reasons": [
+        "conflict:kv_cache_dtype",
+        "hardware_no_coefficients",
+        "model_not_in_catalog",
+        "setting_not_modelled:additional_config.kda_prefill_backend",
+        "setting_not_modelled:compilation_config.custom_ops",
+        "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
+        "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
+        "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
+        "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
+        "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
+        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
+        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
+        "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
+        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
+        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
+        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
+        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
+        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
+        "setting_not_modelled:speculative_config.kv_cache_dtype",
+        "unclassified_arg:cp_kv_cache_interleave_size",
+        "unclassified_arg:prefix_match_unit"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
       "conc": 6,
       "framework": "vllm",
       "hardware": "h100",
@@ -289170,145 +289030,6 @@
       "precision": "fp4",
       "reasons": [
         "drafter_not_in_catalog:eagle3"
-      ]
-    },
-    {
-      "benchmark_type": "agentic_traces",
-      "conc": 4,
-      "framework": "vllm",
-      "hardware": "mi355x",
-      "identity": {
-        "benchmark_type": "agentic_traces",
-        "conc": 4,
-        "framework": "vllm",
-        "hardware": "mi355x",
-        "measured_date": "2026-11-06",
-        "model": "kimik3.1",
-        "precision": "fp4",
-        "recipe": "e4012537102395c36c9a66dc3039ea518977fdc9ac7e8e10a31d62f2ca5dcafb"
-      },
-      "image": "vllm/vllm-openai-rocm:kimi-k31@sha256:5f47cc1004d9a7ac65f8a913725edb20c62c99a07e31cbf4ba21741bd0b4f9b1",
-      "measured": {
-        "tpot_ms": 7.21,
-        "ttft_ms": 2433.63
-      },
-      "measured_date": "2026-11-06",
-      "model": "kimik3.1",
-      "notes": [
-        {
-          "reason": "setting_not_modelled:additional_config.kda_prefill_backend",
-          "text": "A model-specific engine option (additional_config) has no Deployment field; e.g. DeepSeek-V4.1's latency-specialized decode."
-        },
-        {
-          "reason": "setting_not_modelled:compilation_config.custom_ops",
-          "text": "Enabling or disabling vLLM custom ops changes which kernels run; the Deployment can't state it."
-        },
-        {
-          "reason": "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
-          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
-        },
-        {
-          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
-          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
-        }
-      ],
-      "point_id": "c51e9e877d4716094b1d56045c6abb05b434a66375b2c33c87c0867a7b7d5441",
-      "precision": "fp4",
-      "reasons": [
-        "conflict:kv_cache_dtype",
-        "hardware_no_coefficients",
-        "model_not_in_catalog",
-        "setting_not_modelled:additional_config.kda_prefill_backend",
-        "setting_not_modelled:compilation_config.custom_ops",
-        "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
-        "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
-        "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
-        "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
-        "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
-        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
-        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
-        "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
-        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
-        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
-        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
-        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
-        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
-        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
-        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
-        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
-        "setting_not_modelled:speculative_config.kv_cache_dtype",
-        "unclassified_arg:cp_kv_cache_interleave_size",
-        "unclassified_arg:prefix_match_unit"
       ]
     },
     {
@@ -295493,6 +295214,145 @@
       ]
     },
     {
+      "benchmark_type": "agentic_traces",
+      "conc": 24,
+      "framework": "vllm",
+      "hardware": "mi355x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 24,
+        "framework": "vllm",
+        "hardware": "mi355x",
+        "measured_date": "2026-11-08",
+        "model": "kimik3.1",
+        "precision": "fp4",
+        "recipe": "0fbfc4c1cf8a9f00e9e88d5ebd6960a42a7444ad85dfc93b39613b2d8ed05c77"
+      },
+      "image": "vllm/vllm-openai-rocm:kimi-k31@sha256:5f47cc1004d9a7ac65f8a913725edb20c62c99a07e31cbf4ba21741bd0b4f9b1",
+      "measured": {
+        "tpot_ms": 13.97,
+        "ttft_ms": 3968.62
+      },
+      "measured_date": "2026-11-08",
+      "model": "kimik3.1",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:additional_config.kda_prefill_backend",
+          "text": "A model-specific engine option (additional_config) has no Deployment field; e.g. DeepSeek-V4.1's latency-specialized decode."
+        },
+        {
+          "reason": "setting_not_modelled:compilation_config.custom_ops",
+          "text": "Enabling or disabling vLLM custom ops changes which kernels run; the Deployment can't state it."
+        },
+        {
+          "reason": "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "e8c6130ee45b2f71d81d0dee83fa8b13c6f8c7be726acbdf8612e41af6378a77",
+      "precision": "fp4",
+      "reasons": [
+        "conflict:kv_cache_dtype",
+        "hardware_no_coefficients",
+        "model_not_in_catalog",
+        "setting_not_modelled:additional_config.kda_prefill_backend",
+        "setting_not_modelled:compilation_config.custom_ops",
+        "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
+        "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
+        "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
+        "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
+        "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
+        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
+        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
+        "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
+        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
+        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
+        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
+        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
+        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
+        "setting_not_modelled:speculative_config.kv_cache_dtype",
+        "unclassified_arg:cp_kv_cache_interleave_size",
+        "unclassified_arg:prefix_match_unit"
+      ]
+    },
+    {
       "benchmark_type": "single_turn",
       "conc": 8,
       "framework": "vllm",
@@ -296477,6 +296337,145 @@
       "precision": "fp8",
       "reasons": [
         "hardware_no_coefficients"
+      ]
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 4,
+      "framework": "vllm",
+      "hardware": "mi355x",
+      "identity": {
+        "benchmark_type": "agentic_traces",
+        "conc": 4,
+        "framework": "vllm",
+        "hardware": "mi355x",
+        "measured_date": "2026-11-08",
+        "model": "kimik3.1",
+        "precision": "fp4",
+        "recipe": "150f530e48e120389e0be32d712cf99a6f875d45b9bbf9793b04cc786e4e453a"
+      },
+      "image": "vllm/vllm-openai-rocm:kimi-k31@sha256:5f47cc1004d9a7ac65f8a913725edb20c62c99a07e31cbf4ba21741bd0b4f9b1",
+      "measured": {
+        "tpot_ms": 7.01,
+        "ttft_ms": 2174.17
+      },
+      "measured_date": "2026-11-08",
+      "model": "kimik3.1",
+      "notes": [
+        {
+          "reason": "setting_not_modelled:additional_config.kda_prefill_backend",
+          "text": "A model-specific engine option (additional_config) has no Deployment field; e.g. DeepSeek-V4.1's latency-specialized decode."
+        },
+        {
+          "reason": "setting_not_modelled:compilation_config.custom_ops",
+          "text": "Enabling or disabling vLLM custom ops changes which kernels run; the Deployment can't state it."
+        },
+        {
+          "reason": "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
+          "text": "A vLLM environment variable the policy table hasn't classified; it may change kernel selection."
+        },
+        {
+          "reason": "setting_not_modelled:speculative_config.kv_cache_dtype",
+          "text": "A separate drafter KV-cache dtype isn't stated by the Deployment."
+        }
+      ],
+      "point_id": "ef13964bd69799fdb46f658bae87d02d5c2be4fdbf3fd5f74a8ce7f21ebfbf11",
+      "precision": "fp4",
+      "reasons": [
+        "conflict:kv_cache_dtype",
+        "hardware_no_coefficients",
+        "model_not_in_catalog",
+        "setting_not_modelled:additional_config.kda_prefill_backend",
+        "setting_not_modelled:compilation_config.custom_ops",
+        "setting_not_modelled:env.AITER_BF16_FP8_MOE_BOUND",
+        "setting_not_modelled:env.AITER_FLYDSL_SPARSE_MLA",
+        "setting_not_modelled:env.AITER_FLYDSL_STAGE2_FP8",
+        "setting_not_modelled:env.THP_MEM_ALLOC_ENABLE",
+        "setting_not_modelled:env.VLLM_FASTSAFETENSORS_QUEUE_SIZE",
+        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_ASM_PADDING",
+        "setting_not_modelled:env.VLLM_ROCM_AITER_MLA_DCP_VERIFY",
+        "setting_not_modelled:env.VLLM_ROCM_DCP_AITER_ALLGATHER",
+        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_GLOBAL_KEY_PREFILL",
+        "setting_not_modelled:env.VLLM_ROCM_DSA_DCP_ROWSHARD_PREFILL",
+        "setting_not_modelled:env.VLLM_ROCM_QUICK_REDUCE_QUANTIZATION",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_FLYDSL_SPARSE_MLA",
+        "setting_not_modelled:env.VLLM_ROCM_USE_AITER_MOE_SITUV2",
+        "setting_not_modelled:env.VLLM_USE_BREAKABLE_CUDAGRAPH",
+        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_A2A",
+        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_KV_GATHER",
+        "setting_not_modelled:env.VLLM_USE_DIRECT_DCP_Q_GATHER",
+        "setting_not_modelled:speculative_config.kv_cache_dtype",
+        "unclassified_arg:cp_kv_cache_interleave_size",
+        "unclassified_arg:prefix_match_unit"
       ]
     },
     {
