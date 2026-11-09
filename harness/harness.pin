@@ -6,4 +6,4 @@ GO_SHA256=ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5
 # The inference-sim commit the compatibility job builds and runs the real-simulator tests against
 # (checks.yml, job `simulator`). TEMPORARY: the head of inference-sim/inference-sim#2090 until it
 # is released; then the v0.16.0 tag's commit.
-SIM_COMMIT=0129f55134ceaf9021872c1db9380a6457afbf77
+SIM_COMMIT=3b84e0878e4c63f47d202de2ff0471ee7722a4cc
