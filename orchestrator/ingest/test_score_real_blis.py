@@ -43,8 +43,16 @@ def _real():
     return blis, Path(sub)
 
 
-def test_a_single_turn_point_is_scored_through_the_real_simulator():
+def test_a_single_turn_point_is_scored_through_the_real_simulator(monkeypatch):
     blis, sub = _real()
+    seen = []
+    real_run = sc.result.run
+
+    def capture(*a, **k):
+        out = real_run(*a, **k)
+        seen.append(out[0])
+        return out
+    monkeypatch.setattr(sc.result, "run", capture)
     tmp = Path(tempfile.mkdtemp())
     entry, env = e2e._setup(tmp, log=LOG, repo="openai/gpt-oss-120b", hardware="h100", conc=4, isl=1024, osl=128,
                             spec="none", chips={"h100": (8, 8)})
@@ -69,5 +77,16 @@ def test_a_single_turn_point_is_scored_through_the_real_simulator():
     assert len(pts) == 1
     ttft, tpot = float(pts[0]["pred_ttft_us"]), float(pts[0]["pred_tpot_us"])
     assert 0 < ttft < 60e6 and 0 < tpot < 1e6, (ttft, tpot)
-    # The figures are the simulator's own, not the fixture's measurement.
-    assert (ttft, tpot) != (200000.0, 10000.0)
+    # The scored figures are the means over the Result's own completed requests, derived here from
+    # its rows and not through the scorer's summarize: TTFT is the mean of ttft_us, and TPOT the mean
+    # of tpot_us over the requests of two or more output tokens (the client's definitions, DEV-8).
+    # A swap to another figure (a percentile, a pooled mean) or a unit slip fails these equalities.
+    (doc,) = seen
+    done = [r for r in doc["request_rows"] if r["fate"] == "completed" and r["id"].startswith("request_")]
+    assert len(done) == 40, len(done)     # the client sends 10 prompts per unit of concurrency (4)
+    want_ttft = sum(r["ttft_us"] for r in done) / len(done)
+    multi = [r["tpot_us"] for r in done if r["output_tokens"] > 1]
+    want_tpot = sum(multi) / len(multi)
+    assert ttft == pytest.approx(want_ttft, abs=5e-4) and tpot == pytest.approx(want_tpot, abs=5e-4)   # points.csv rounds to 3 places
+    assert max(r["ttft_us"] for r in done) != pytest.approx(want_ttft, rel=1e-6)   # not the maximum
+    assert (ttft, tpot) != (200000.0, 10000.0)                                    # not the measurement
