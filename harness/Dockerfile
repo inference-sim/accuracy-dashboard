@@ -2,7 +2,7 @@
 # with a measured end-to-end benchmark. Built and signed by .github/workflows/harness-release.yml
 # from a release tag, and named by its digest. Build context: the repository root.
 #
-#   docker build --platform linux/amd64 -f harness/Dockerfile .
+#   docker build --platform linux/amd64 -f harness/Dockerfile $(sed 's/^/--build-arg /' harness/harness.pin | grep -v '#') .
 #
 # The image holds the scorer (orchestrator/), the JSON Schemas it validates against (schemas/;
 # contract.py and validate_summary_v2.py read them from beside orchestrator/), and the tools to
@@ -13,9 +13,10 @@
 # python:3.13-slim-bookworm, by the digest of its multi-platform index on 2026-11-05.
 FROM --platform=linux/amd64 python:3.13-slim-bookworm@sha256:281d39ff02e3b389401586134ff9e6572954687822a58055ec07a60ded4e0b7f
 
-# The Go release inference-sim's go.mod states (go 1.27.2), checked against go.dev's sha256.
-ARG GO_VERSION=1.27.2
-ARG GO_SHA256=ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5
+# The Go release and its sha256 come from harness/harness.pin, passed as build arguments:
+#   docker build --build-arg GO_VERSION=... --build-arg GO_SHA256=... (harness-release.yml reads the file).
+ARG GO_VERSION
+ARG GO_SHA256
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl git \

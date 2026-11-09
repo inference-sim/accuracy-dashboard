@@ -82,9 +82,8 @@ npm run test                        # headless render tests (zero console errors
 python3 orchestrator/test_build_summary.py   # orchestrator arithmetic + self-consistency oracle
 ```
 
-The real numbers come from CI (`orchestrator/evaluate.sh`); both inputs are resolved live. The
-dump is ingested by `orchestrator/stream_restore.sh` — it streams the resolved weekly dump into a
-Postgres service container, restoring only the 3 tables the extractor reads.
+The real numbers come from CI; both inputs are resolved live. The nightly streams the resolved
+weekly dump into a Postgres service container, restoring only the 3 tables the extractor reads.
 
 ## Deployment (GitHub Pages via Actions — RFC §4.2)
 
@@ -120,7 +119,7 @@ upstream "zstd: Broken pipe" is the expected early-close, not an error — see `
 
 BLIS's prediction is a function of topology + engine-settings + concurrency; it is **independent of
 the vLLM version**. The dump measures each deployment on many vLLM builds. So before scoring,
-`orchestrator/filter_latest_vllm.py` reduces the corpus to the **latest N = 5 numbered vLLM
+the nightly reduces the corpus to the **latest N = 5 numbered vLLM
 versions present in the dump** (window moves with each dump; unnumbered/custom builds excluded),
 then — since BLIS predicts identically across versions — keeps only the **newest surviving version
 per BLIS-input identity**. Each prediction is scored once, against the latest build. This replaces

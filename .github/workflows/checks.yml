@@ -147,7 +147,7 @@ jobs:
                --include='*.mjs' --include='*.json' --include='*.css' --include='*.html' \
                orchestrator web/src web/browser_smoke.mjs web/smoke_v2.mjs web/package.json web/vite.config.ts \
                schemas state data 2>/dev/null \
-             | grep -v node_modules | grep -v package-lock || true)
+             | grep -v -e node_modules -e package-lock || [ "$?" -eq 1 ])
           if [ -n "$hits" ]; then
             echo "::error::forbidden term found in shipped surface (RFC C1)"
             echo "$hits"

@@ -49,7 +49,7 @@ TEMPORARY until `blis fields --engine vllm --json` exists (inference-sim m1/subs
 
 ## The node size of InferenceX's machines
 
-A launch configuration usually records `resources.gpus_per_node`. When one does not, the scorer reads the size from `inferencex_runners.json`, which `orchestrator/gen_inferencex_runners.py` writes from InferenceX's `runners.yaml` and `inferencex_runners.py` loads, refusing any key or value it does not define. InferenceX defines `gpus-per-node` per cluster and maps each hardware label to runners, and each runner to a cluster. The first InferenceX commit that records node sizes is 303669b0 (2026-07-02); the earlier `.github/configs/runners.yaml` lists runners only. The file records the commit, date and path of each version it was read from, and for each label and version the size, the clusters and the file:line of each `gpus-per-node`. `gen_inferencex_runners.py --ix <checkout> --version <commit>:<path> ... --check` regenerates the file and fails if it differs.
+A launch configuration usually records `resources.gpus_per_node`. When one does not, the scorer reads the size from `inferencex_runners.json`, which `orchestrator/gen_inferencex_runners.py` writes from InferenceX's `runners.yaml` and `inferencex_runners.py` loads, refusing any key or value it does not define. InferenceX defines `gpus-per-node` per cluster and maps each hardware label to runners, and each runner to a cluster. The first InferenceX commit that records node sizes is 303669b0 (2026-07-02); the earlier runners file lists runners only. The file records the commit, date and path of each version it was read from, and for each label and version the size, the clusters and the file:line of each `gpus-per-node`. `gen_inferencex_runners.py --ix <checkout> --version <commit>:<path> ... --check` regenerates the file and fails if it differs.
 
 Order of sources for a chip whose catalog entry does not fix its packaging: (i) the launch configuration; (ii) the table, for the row's hardware label; (iii) none, which is G5 `value_not_recorded` on `cluster.gpus_per_node`. A launch size and a table size that differ are G5 `value_conflict`. A chip whose entry fixes packaging (`gb200`, `gb300`) uses neither, and its scenario states no node size.
 
@@ -146,7 +146,7 @@ One line per G5 point, sorted by `point_id` (`schemas/fidelity.v3.json#/definiti
 ```json
 {"ingest": "api",
  "blis": {"release": "v0.12.0", "commit_sha": "…", "catalog": "…", "registry": "…", "extractor_version": "…"},
- "simulator": {"build": "v0.16.0", "engine": {"kind": "vllm", "version": "0.32.0"}},
+ "simulator": {"build": "<release tag>", "engine": {"kind": "vllm", "version": "0.32.0"}},
  "engine": {"kind": "vllm", "version": "0.32.0"}, "points": 2035, "left_out_records": 0,
  "vllm_ref": "v0.32.0", "vllm_max_distance": 2000,
  "fields_sha256": "…", "pulled_at": "<UTC ISO-8601>",
@@ -161,7 +161,7 @@ One line per G5 point, sorted by `point_id` (`schemas/fidelity.v3.json#/definiti
 
 `harness_digest` is the digest of the harness image that produced every figure (`sha256:<64 hex>`), or `unreleased` (design §11.7, X8); every point's `simulator` carries it too. `experimental` is true unless the simulator build is a release tag (the catalog and registry are required at release tags), and an experimental figure is never published as BLIS's accuracy. `units` records the `--units` file the run scored (its sha256, how many units it names, and those the pull did not hold), or null when the run scored every point of the pull. TEMPORARY until blis-substrate publishes the anchor list (COV-2): the nightly scores the whole window and passes no `--units`.
 
-`engine` is the engine release the scoring simulator runs, read from its stack.json (LIF-6); every point is scored on it, and graded against it. TEMPORARY until inference-sim v0.16.0 ships stack.json at its root: `cli.py score --stack FILE` names the file. A simulator checkout with no stack.json and no `--stack` is refused, because the build predates stack.json; the release is never read from installation.md.
+`engine` is the engine release the scoring simulator runs, read from its stack.json (LIF-6); every point is scored on it, and graded against it. TEMPORARY until the pinned inference-sim release ships stack.json at its root: `cli.py score --stack FILE` names the file. A simulator checkout with no stack.json and no `--stack` is refused, because the build predates stack.json; the release is never read from installation.md.
 
 `fields_sha256` is the sha256 of the fields.json the scorer read.
 
@@ -178,11 +178,11 @@ One line per G5 point, sorted by `point_id` (`schemas/fidelity.v3.json#/definiti
 - `backlog.top`: the ten most common reasons a point is not G1 (`backlog.top`).
 - `not_scored` and `failed`: the two lists, as the contract holds them.
 
-Beside `data/latest/summary.json` the nightly publishes `data/latest/backlog.json` (`build_summary_v2.backlog_of`, design §11.6): per engine, every G5 reason and every substitution, ranked by the points fixing it alone would grade (`alone`), then the points it blocks (G5) and demotes (graded below G1). The publish job fails when the summary has no coverage or the backlog is missing (COV-7).
+Beside `data/latest/summary.json` the nightly publishes the backlog (`build_summary_v2.backlog_of`, design §11.6): per engine, every G5 reason and every substitution, ranked by the points fixing it alone would grade (`alone`), then the points it blocks (G5) and demotes (graded below G1). The publish job fails when the summary has no coverage or the backlog is missing (COV-7).
 
 ## Releases scored
 
-Each simulator release is scored exactly once (COV-9). The nightly scores, in the order they were tagged, every stable inference-sim release from v0.16.0 on (`stack.FIRST_GRADED_RELEASE`) that has no published snapshot (`data/snapshots/*_blis-<tag>_*`), one after another (`resolve_blis.sh`, `stack.unscored_releases`). When none is left, it scores the newest release's IX-only delta. A release's snapshot, once published, never changes (COV-8).
+Each simulator release is scored exactly once (COV-9). The nightly scores, in the order they were tagged, every stable inference-sim release from `stack.FIRST_GRADED_RELEASE` on that has no published snapshot (`data/snapshots/*_blis-<tag>_*`), one after another (`resolve_blis.sh`, `stack.unscored_releases`). When none is left, it scores the newest release's IX-only delta. A release's snapshot, once published, never changes (COV-8).
 
 ## Frameworks
 

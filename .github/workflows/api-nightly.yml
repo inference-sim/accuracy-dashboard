@@ -64,9 +64,12 @@ jobs:
     timeout-minutes: 345
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Read the Go release from the pin file
+        id: pin
+        run: grep -E '^GO_VERSION=' harness/harness.pin >> "$GITHUB_OUTPUT"
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: "1.27"
+          go-version: ${{ steps.pin.outputs.GO_VERSION }}
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.13"
@@ -204,7 +207,18 @@ jobs:
       contents: write # commit data/ to main
       actions: write # dispatch the Pages deploy (the [skip ci] commit can't)
     steps:
+      # Check out with PUBLISH_PAT, a PAT on a human account (susiejojo) with contents:write. The
+      # push below must authenticate AS that account: main's ruleset (id 26705484) lists that user
+      # as its only bypass actor, and a ruleset User-bypass is matched by the *pusher's* identity
+      # (the token type -- classic or fine-grained -- does not matter; only the account does). The
+      # default GITHUB_TOKEN can't be used -- it pushes as the GitHub Actions app integration, which
+      # this org repo refuses as a bypass actor (422), so its push is rejected "due to repository
+      # rule violations" (verified run 42246296162). persist-credentials keeps this token wired into
+      # the git remote for the push step.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          token: ${{ secrets.PUBLISH_PAT }}
+          persist-credentials: true
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: night
@@ -305,8 +319,7 @@ jobs:
             # if all fail the step errors (never report pushed=true for data that didn't land).
             pushed=false
             for attempt in 1 2 3; do
-              git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
-              if git push; then pushed=true; break; fi
+              if git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && git push; then pushed=true; break; fi
               echo "push rejected (main advanced); retry $attempt"; sleep 5
             done
             if [ "$pushed" != true ]; then

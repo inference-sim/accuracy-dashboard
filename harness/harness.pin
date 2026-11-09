@@ -1,0 +1,4 @@
+# The Go release the harness image installs to build a simulator (the one inference-sim's go.mod
+# names), and the sha256 of its linux-amd64 tarball from go.dev. The only place the dashboard states it.
+GO_VERSION=1.27.2
+GO_SHA256=ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5
