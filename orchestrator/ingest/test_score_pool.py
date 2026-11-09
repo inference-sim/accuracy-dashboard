@@ -17,7 +17,7 @@ def _pt(pid, agentic):
 def _stub(monkeypatch):
     # deterministic outcome per point, independent of worker/process (so results must match
     # regardless of concurrency). Runs in-process, so no pickling/pool spin-up needed.
-    def fake(entry, pull_dir, work, env):
+    def fake(entry, pull_dir, work, env, simulate=True):
         return sc.Outcome(point_id=entry["point_id"], identity={}, row=entry["row"],
                           reasons=[f"r-{entry['point_id']}"])
     monkeypatch.setattr(sc, "_score_one", fake)

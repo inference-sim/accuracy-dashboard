@@ -47,9 +47,9 @@ export function validateSummary(raw: unknown): Summary {
     throw new SummaryLoadError('summary.json is not a JSON object')
   }
   const doc = raw as Record<string, unknown>
-  if (doc.schema_version !== 1 && doc.schema_version !== 2) {
+  if (doc.schema_version !== 1 && doc.schema_version !== 2 && doc.schema_version !== 3) {
     throw new SummaryLoadError(
-      `summary.json schema_version is ${JSON.stringify(doc.schema_version)}, this build renders versions 1 and 2`,
+      `summary.json schema_version is ${JSON.stringify(doc.schema_version)}, this build renders versions 1, 2 and 3`,
     )
   }
   for (const key of ['snapshot_id', 'provenance', 'coverage', 'totals', 'matrix']) {
@@ -76,17 +76,27 @@ export function validateSummary(raw: unknown): Summary {
   need(obj(prov.ground_truth, 'provenance.ground_truth'), ['source', 'release_tag', 'measurement_sha256'], 'provenance.ground_truth')
   const totals = obj(doc.totals, 'totals')
   for (const tier of ['measured_or_resolved', 'all']) obj(totals[tier], `totals.${tier}`)
-  need(obj(doc.coverage, 'coverage'), ['scored', 'not_scored'], 'coverage')
-  if (doc.schema_version === 2) {
+  need(obj(doc.coverage, 'coverage'), doc.schema_version === 3 ? ['points', 'graded', 'not_scored', 'failed'] : ['scored', 'not_scored'], 'coverage')
+  if (doc.schema_version === 2 || doc.schema_version === 3) {
     // v2 (#30): every point carries its identity and fidelity record, and the snapshot says it
-    // came from the API ingest. Checked here so a half-v2 file fails loud, not mid-render.
-    if (prov.ingest !== 'api') throw new SummaryLoadError('summary.json v2 "provenance.ingest" is not "api"')
-    if (!Array.isArray(doc.not_scored)) throw new SummaryLoadError('summary.json v2 "not_scored" is not an array')
+    // came from the API ingest. v3 adds a grade on every record and the headline over the graded
+    // points. Checked here so a half-v2 or half-v3 file fails loud, not mid-render.
+    const v = `v${doc.schema_version}`
+    if (prov.ingest !== 'api') throw new SummaryLoadError(`summary.json ${v} "provenance.ingest" is not "api"`)
+    if (!Array.isArray(doc.not_scored)) throw new SummaryLoadError(`summary.json ${v} "not_scored" is not an array`)
+    if (doc.schema_version === 3) {
+      const h = obj(doc.headline, 'headline')
+      need(h, ['points', 'graded', 'headline', 'grades'], 'headline')
+      for (const g of ['G1', 'G2', 'G3', 'G4']) obj((h.grades as Record<string, unknown>)[g], `headline.grades.${g}`)
+    }
     type Rows = { rows?: Rows[] } & Record<string, unknown>
     for (const m of doc.matrix as Rows[]) {
       for (const w of m.rows ?? []) for (const g of w.rows ?? []) for (const t of g.rows ?? []) for (const p of t.rows ?? []) {
         for (const k of ['point_id', 'identity', 'measured_date', 'fidelity']) {
-          if (!(k in p)) throw new SummaryLoadError(`summary.json v2 point is missing "${k}"`)
+          if (!(k in p)) throw new SummaryLoadError(`summary.json ${v} point is missing "${k}"`)
+        }
+        if (doc.schema_version === 3 && !('grade' in (p.fidelity as Record<string, unknown>))) {
+          throw new SummaryLoadError('summary.json v3 point is missing "fidelity.grade"')
         }
       }
     }

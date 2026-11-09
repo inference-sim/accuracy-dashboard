@@ -1,0 +1,507 @@
+{
+  "inferencex": {
+    "repository": "https://github.com/SemiAnalysisAI/InferenceX"
+  },
+  "versions": [
+    {
+      "commit": "303669b0e16aa6a0c600b8a68b4f91b973a34127",
+      "date": "2026-07-02",
+      "path": "configs/runners.yaml",
+      "records_node_sizes": true
+    },
+    {
+      "commit": "e9fc988078f46680c4f2010899f080448f1eddbd",
+      "date": "2026-07-02",
+      "path": "configs/runners.yaml",
+      "records_node_sizes": false
+    },
+    {
+      "commit": "5d06e10c975cb83e912a48913c6d7a6fe61a8e9e",
+      "date": "2026-09-27",
+      "path": "inferencex-e2e/configs/runners.yaml",
+      "records_node_sizes": true
+    },
+    {
+      "commit": "4a63bf50f2bde128b4e2c25d390b42d1223f94ef",
+      "date": "2026-11-06",
+      "path": "inferencex-e2e/configs/runners.yaml",
+      "records_node_sizes": true
+    }
+  ],
+  "labels": {
+    "h100": {
+      "stable": false,
+      "problems": [
+        "4a63bf50: 8 GPUs per node on h100-cw where 303669b0 has 8 GPUs per node on h100-cw,h100-dgxc"
+      ],
+      "first_recorded": {
+        "commit": "303669b0e16aa6a0c600b8a68b4f91b973a34127",
+        "date": "2026-07-02"
+      },
+      "records": {
+        "303669b0e16aa6a0c600b8a68b4f91b973a34127": {
+          "gpus_per_node": 8,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "h100-cw",
+              "gpus_per_node": 8,
+              "source": "configs/runners.yaml:293"
+            },
+            {
+              "id": "h100-dgxc",
+              "gpus_per_node": 8,
+              "source": "configs/runners.yaml:290"
+            }
+          ]
+        },
+        "5d06e10c975cb83e912a48913c6d7a6fe61a8e9e": {
+          "gpus_per_node": 8,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "h100-cw",
+              "gpus_per_node": 8,
+              "source": "inferencex-e2e/configs/runners.yaml:276"
+            },
+            {
+              "id": "h100-dgxc",
+              "gpus_per_node": 8,
+              "source": "inferencex-e2e/configs/runners.yaml:273"
+            }
+          ]
+        },
+        "4a63bf50f2bde128b4e2c25d390b42d1223f94ef": {
+          "gpus_per_node": 8,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "h100-cw",
+              "gpus_per_node": 8,
+              "source": "inferencex-e2e/configs/runners.yaml:333"
+            }
+          ]
+        }
+      }
+    },
+    "h200": {
+      "stable": false,
+      "problems": [
+        "303669b0: 1 runners belong to no cluster (first: h200-nb_1)",
+        "4a63bf50: 8 GPUs per node on h200-dgxc where 5d06e10c has 8 GPUs per node on h200-cw,h200-dgxc"
+      ],
+      "first_recorded": {
+        "commit": "5d06e10c975cb83e912a48913c6d7a6fe61a8e9e",
+        "date": "2026-09-27"
+      },
+      "records": {
+        "303669b0e16aa6a0c600b8a68b4f91b973a34127": {
+          "gpus_per_node": null,
+          "problem": "1 runners belong to no cluster (first: h200-nb_1)",
+          "clusters": [
+            {
+              "id": "h200-cw",
+              "gpus_per_node": 8,
+              "source": "configs/runners.yaml:299"
+            },
+            {
+              "id": "h200-dgxc",
+              "gpus_per_node": 8,
+              "source": "configs/runners.yaml:296"
+            },
+            {
+              "id": "h200-nb",
+              "gpus_per_node": 8,
+              "source": "configs/runners.yaml:302"
+            }
+          ]
+        },
+        "5d06e10c975cb83e912a48913c6d7a6fe61a8e9e": {
+          "gpus_per_node": 8,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "h200-cw",
+              "gpus_per_node": 8,
+              "source": "inferencex-e2e/configs/runners.yaml:282"
+            },
+            {
+              "id": "h200-dgxc",
+              "gpus_per_node": 8,
+              "source": "inferencex-e2e/configs/runners.yaml:279"
+            }
+          ]
+        },
+        "4a63bf50f2bde128b4e2c25d390b42d1223f94ef": {
+          "gpus_per_node": 8,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "h200-dgxc",
+              "gpus_per_node": 8,
+              "source": "inferencex-e2e/configs/runners.yaml:392"
+            }
+          ]
+        }
+      }
+    },
+    "b200": {
+      "stable": false,
+      "problems": [
+        "303669b0: 4 runners belong to no cluster (first: b200-cw_00)",
+        "5d06e10c: 4 runners belong to no cluster (first: b200-cw_00)",
+        "4a63bf50: label not in runners.yaml"
+      ],
+      "first_recorded": null,
+      "records": {
+        "303669b0e16aa6a0c600b8a68b4f91b973a34127": {
+          "gpus_per_node": null,
+          "problem": "4 runners belong to no cluster (first: b200-cw_00)",
+          "clusters": [
+            {
+              "id": "b200-dgxc",
+              "gpus_per_node": 8,
+              "source": "configs/runners.yaml:305"
+            }
+          ]
+        },
+        "5d06e10c975cb83e912a48913c6d7a6fe61a8e9e": {
+          "gpus_per_node": null,
+          "problem": "4 runners belong to no cluster (first: b200-cw_00)",
+          "clusters": [
+            {
+              "id": "b200-nscale",
+              "gpus_per_node": 8,
+              "source": "inferencex-e2e/configs/runners.yaml:285"
+            }
+          ]
+        },
+        "4a63bf50f2bde128b4e2c25d390b42d1223f94ef": {
+          "gpus_per_node": null,
+          "problem": "label not in runners.yaml",
+          "clusters": []
+        }
+      }
+    },
+    "b300": {
+      "stable": false,
+      "problems": [
+        "5d06e10c: 8 GPUs per node on b300-dsxe where 303669b0 has 8 GPUs per node on b300-nv",
+        "4a63bf50: 8 GPUs per node on b300-dsxe where 303669b0 has 8 GPUs per node on b300-nv"
+      ],
+      "first_recorded": {
+        "commit": "303669b0e16aa6a0c600b8a68b4f91b973a34127",
+        "date": "2026-07-02"
+      },
+      "records": {
+        "303669b0e16aa6a0c600b8a68b4f91b973a34127": {
+          "gpus_per_node": 8,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "b300-nv",
+              "gpus_per_node": 8,
+              "source": "configs/runners.yaml:308"
+            }
+          ]
+        },
+        "5d06e10c975cb83e912a48913c6d7a6fe61a8e9e": {
+          "gpus_per_node": 8,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "b300-dsxe",
+              "gpus_per_node": 8,
+              "source": "inferencex-e2e/configs/runners.yaml:288"
+            }
+          ]
+        },
+        "4a63bf50f2bde128b4e2c25d390b42d1223f94ef": {
+          "gpus_per_node": 8,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "b300-dsxe",
+              "gpus_per_node": 8,
+              "source": "inferencex-e2e/configs/runners.yaml:507"
+            }
+          ]
+        }
+      }
+    },
+    "gb200": {
+      "stable": true,
+      "problems": [],
+      "first_recorded": {
+        "commit": "303669b0e16aa6a0c600b8a68b4f91b973a34127",
+        "date": "2026-07-02"
+      },
+      "records": {
+        "303669b0e16aa6a0c600b8a68b4f91b973a34127": {
+          "gpus_per_node": 4,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "gb200-nv",
+              "gpus_per_node": 4,
+              "source": "configs/runners.yaml:311"
+            }
+          ]
+        },
+        "5d06e10c975cb83e912a48913c6d7a6fe61a8e9e": {
+          "gpus_per_node": 4,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "gb200-nv",
+              "gpus_per_node": 4,
+              "source": "inferencex-e2e/configs/runners.yaml:291"
+            }
+          ]
+        },
+        "4a63bf50f2bde128b4e2c25d390b42d1223f94ef": {
+          "gpus_per_node": 4,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "gb200-nv",
+              "gpus_per_node": 4,
+              "source": "inferencex-e2e/configs/runners.yaml:572"
+            }
+          ]
+        }
+      }
+    },
+    "gb300": {
+      "stable": false,
+      "problems": [
+        "303669b0: cluster gb300-nv records no gpus-per-node"
+      ],
+      "first_recorded": {
+        "commit": "5d06e10c975cb83e912a48913c6d7a6fe61a8e9e",
+        "date": "2026-09-27"
+      },
+      "records": {
+        "303669b0e16aa6a0c600b8a68b4f91b973a34127": {
+          "gpus_per_node": null,
+          "problem": "cluster gb300-nv records no gpus-per-node",
+          "clusters": [
+            {
+              "id": "gb300-nv",
+              "gpus_per_node": null,
+              "source": null
+            }
+          ]
+        },
+        "5d06e10c975cb83e912a48913c6d7a6fe61a8e9e": {
+          "gpus_per_node": 4,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "gb300-nv",
+              "gpus_per_node": 4,
+              "source": "inferencex-e2e/configs/runners.yaml:294"
+            }
+          ]
+        },
+        "4a63bf50f2bde128b4e2c25d390b42d1223f94ef": {
+          "gpus_per_node": 4,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "gb300-nv",
+              "gpus_per_node": 4,
+              "source": "inferencex-e2e/configs/runners.yaml:631"
+            }
+          ]
+        }
+      }
+    },
+    "mi300x": {
+      "stable": false,
+      "problems": [
+        "5d06e10c: 8 GPUs per node on mi300x-amd where 303669b0 has 8 GPUs per node on mi300x-amds",
+        "4a63bf50: 8 GPUs per node on mi300x-amd where 303669b0 has 8 GPUs per node on mi300x-amds"
+      ],
+      "first_recorded": {
+        "commit": "303669b0e16aa6a0c600b8a68b4f91b973a34127",
+        "date": "2026-07-02"
+      },
+      "records": {
+        "303669b0e16aa6a0c600b8a68b4f91b973a34127": {
+          "gpus_per_node": 8,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "mi300x-amds",
+              "gpus_per_node": 8,
+              "source": "configs/runners.yaml:314"
+            }
+          ]
+        },
+        "5d06e10c975cb83e912a48913c6d7a6fe61a8e9e": {
+          "gpus_per_node": 8,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "mi300x-amd",
+              "gpus_per_node": 8,
+              "source": "inferencex-e2e/configs/runners.yaml:297"
+            }
+          ]
+        },
+        "4a63bf50f2bde128b4e2c25d390b42d1223f94ef": {
+          "gpus_per_node": 8,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "mi300x-amd",
+              "gpus_per_node": 8,
+              "source": "inferencex-e2e/configs/runners.yaml:692"
+            }
+          ]
+        }
+      }
+    },
+    "mi325x": {
+      "stable": false,
+      "problems": [
+        "4a63bf50: 8 GPUs per node on mi325x-amd where 303669b0 has 8 GPUs per node on mi325x-amds"
+      ],
+      "first_recorded": {
+        "commit": "303669b0e16aa6a0c600b8a68b4f91b973a34127",
+        "date": "2026-07-02"
+      },
+      "records": {
+        "303669b0e16aa6a0c600b8a68b4f91b973a34127": {
+          "gpus_per_node": 8,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "mi325x-amds",
+              "gpus_per_node": 8,
+              "source": "configs/runners.yaml:320"
+            }
+          ]
+        },
+        "5d06e10c975cb83e912a48913c6d7a6fe61a8e9e": {
+          "gpus_per_node": 8,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "mi325x-amds",
+              "gpus_per_node": 8,
+              "source": "inferencex-e2e/configs/runners.yaml:300"
+            }
+          ]
+        },
+        "4a63bf50f2bde128b4e2c25d390b42d1223f94ef": {
+          "gpus_per_node": 8,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "mi325x-amd",
+              "gpus_per_node": 8,
+              "source": "inferencex-e2e/configs/runners.yaml:743"
+            }
+          ]
+        }
+      }
+    },
+    "mi355x": {
+      "stable": true,
+      "problems": [],
+      "first_recorded": {
+        "commit": "303669b0e16aa6a0c600b8a68b4f91b973a34127",
+        "date": "2026-07-02"
+      },
+      "records": {
+        "303669b0e16aa6a0c600b8a68b4f91b973a34127": {
+          "gpus_per_node": 8,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "mi355x-amds",
+              "gpus_per_node": 8,
+              "source": "configs/runners.yaml:326"
+            }
+          ]
+        },
+        "5d06e10c975cb83e912a48913c6d7a6fe61a8e9e": {
+          "gpus_per_node": 8,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "mi355x-amds",
+              "gpus_per_node": 8,
+              "source": "inferencex-e2e/configs/runners.yaml:303"
+            }
+          ]
+        },
+        "4a63bf50f2bde128b4e2c25d390b42d1223f94ef": {
+          "gpus_per_node": 8,
+          "problem": null,
+          "clusters": [
+            {
+              "id": "mi355x-amds",
+              "gpus_per_node": 8,
+              "source": "inferencex-e2e/configs/runners.yaml:778"
+            }
+          ]
+        }
+      }
+    },
+    "rtx6000pro": {
+      "stable": false,
+      "problems": [
+        "303669b0: label not in runners.yaml",
+        "5d06e10c: label not in runners.yaml",
+        "4a63bf50: label not in runners.yaml"
+      ],
+      "first_recorded": null,
+      "records": {
+        "303669b0e16aa6a0c600b8a68b4f91b973a34127": {
+          "gpus_per_node": null,
+          "problem": "label not in runners.yaml",
+          "clusters": []
+        },
+        "5d06e10c975cb83e912a48913c6d7a6fe61a8e9e": {
+          "gpus_per_node": null,
+          "problem": "label not in runners.yaml",
+          "clusters": []
+        },
+        "4a63bf50f2bde128b4e2c25d390b42d1223f94ef": {
+          "gpus_per_node": null,
+          "problem": "label not in runners.yaml",
+          "clusters": []
+        }
+      }
+    },
+    "vr200": {
+      "stable": false,
+      "problems": [
+        "303669b0: label not in runners.yaml",
+        "5d06e10c: label not in runners.yaml",
+        "4a63bf50: label not in runners.yaml"
+      ],
+      "first_recorded": null,
+      "records": {
+        "303669b0e16aa6a0c600b8a68b4f91b973a34127": {
+          "gpus_per_node": null,
+          "problem": "label not in runners.yaml",
+          "clusters": []
+        },
+        "5d06e10c975cb83e912a48913c6d7a6fe61a8e9e": {
+          "gpus_per_node": null,
+          "problem": "label not in runners.yaml",
+          "clusters": []
+        },
+        "4a63bf50f2bde128b4e2c25d390b42d1223f94ef": {
+          "gpus_per_node": null,
+          "problem": "label not in runners.yaml",
+          "clusters": []
+        }
+      }
+    }
+  }
+}

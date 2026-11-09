@@ -13,11 +13,11 @@
  * not for a visitor asking "how accurate is BLIS?".
  */
 import { useMemo, useState } from 'react'
-import { aggregate, flattenPoints, intersectByKey } from '../aggregate'
+import { aggregate, figureValue, flattenPoints, intersectByKey } from '../aggregate'
 import { buildRows, type RenderRow } from '../tree'
 import { formatSignedDelta, formatCount } from '../format'
 import { Term } from './Term'
-import type { Metric, Summary, TierKey } from '../types'
+import { TOO_FEW, type Metric, type Summary, type TierKey, type TooFew } from '../types'
 
 interface Props {
   a: Summary
@@ -25,8 +25,10 @@ interface Props {
   tier: TierKey
 }
 
-/** One signed, sign-coloured Δ (percentage points). Negative = improved (green), positive = red. */
-function DeltaCell({ v }: { v: number | null }) {
+/** One signed, sign-coloured Δ (percentage points). Negative = improved (green), positive = red.
+ *  "too few points" where a run's figure over the shared points is under the minimum (COV-11). */
+function DeltaCell({ v }: { v: number | null | TooFew }) {
+  if (v === TOO_FEW) return <span className="num d-zero">{TOO_FEW}</span>
   const cls = v == null ? 'd-zero' : v < 0 ? 'd-better' : v > 0 ? 'd-worse' : 'd-zero'
   const title = v == null || v === 0 ? undefined : v < 0 ? 'improved: lower error in the newer run' : 'regressed: higher error in the newer run'
   return <span className={`num ${cls}`} title={title}>{formatSignedDelta(v)}</span>
@@ -36,6 +38,13 @@ function DeltaCell({ v }: { v: number | null }) {
 function delta(aVal: number | null, bVal: number | null): number | null {
   if (aVal == null || bVal == null) return null
   return bVal - aVal
+}
+
+/** The overall Δ of one figure: "too few points" when either run's figure over the shared points
+ *  is under the minimum (COV-11), else newer − older. */
+function overallDelta(aVal: number | null | TooFew, bVal: number | null | TooFew): number | null | TooFew {
+  if (aVal === TOO_FEW || bVal === TOO_FEW) return TOO_FEW
+  return delta(aVal, bVal)
 }
 
 /** The two runs, older first: snapshot ids lead with their date, so they sort chronologically. */
@@ -71,21 +80,25 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
   const effectiveTier: TierKey = tierFellBack ? 'all' : tier
   const [aIn, bIn] = effectiveTier === 'measured_or_resolved' ? [strict.a, strict.b] : [aShared, bShared]
 
+  // The minimum point count (COV-11): the larger of the two runs' own, so a Δ is shown only where
+  // both figures would be. v1 and v2 summaries state none (0).
+  const minPoints = Math.max(a.min_points ?? 0, b.min_points ?? 0)
+
   // Overall Δ headline (issue #17): the net "did it change?" number, POOLED over every shared
   // point — aggregate() on the full shared set, NOT the mean of the per-model rows below. Pooling
   // weights each point once; a row-mean would give a 20-point model the same weight as a 200-point
   // one and can flip sign (Simpson's paradox). This also keeps the headline equal to
   // Overview(newer) − Overview(older) on the shared set, since the Overview uses the same aggregate().
   const overall = useMemo(() => {
-    const oa = aggregate(aIn, effectiveTier)
-    const ob = aggregate(bIn, effectiveTier)
+    const oa = aggregate(aIn, effectiveTier, minPoints)
+    const ob = aggregate(bIn, effectiveTier, minPoints)
     return {
-      mapeTtft: delta(oa.mape.ttft, ob.mape.ttft),
-      shapeTtft: delta(oa.shape.ttft, ob.shape.ttft),
-      mapeTpot: delta(oa.mape.tpot, ob.mape.tpot),
-      shapeTpot: delta(oa.shape.tpot, ob.shape.tpot),
+      mapeTtft: overallDelta(oa.mape.ttft, ob.mape.ttft),
+      shapeTtft: overallDelta(oa.shape.ttft, ob.shape.ttft),
+      mapeTpot: overallDelta(oa.mape.tpot, ob.mape.tpot),
+      shapeTpot: overallDelta(oa.shape.tpot, ob.shape.tpot),
     }
-  }, [aIn, bIn, effectiveTier])
+  }, [aIn, bIn, effectiveTier, minPoints])
 
   // Build both trees over the SAME shared point set → identical structure/ids, so we can zip by id.
   // Models start collapsed (#23): the verdict above answers "did it change?", and a reader opens
@@ -97,14 +110,14 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
     else next.add(id)
     setExpanded(next)
   }
-  const aRows = useMemo(() => buildRows(aIn, expanded), [aIn, expanded])
-  const bRows = useMemo(() => buildRows(bIn, expanded), [bIn, expanded])
+  const aRows = useMemo(() => buildRows(aIn, expanded, a.min_points ?? 0), [aIn, expanded, a.min_points])
+  const bRows = useMemo(() => buildRows(bIn, expanded, b.min_points ?? 0), [bIn, expanded, b.min_points])
   const bById = useMemo(() => new Map(bRows.map((r) => [r.id, r])), [bRows])
 
   const metricVal = (row: RenderRow | undefined, kind: 'mape' | 'shape', m: Metric): number | null => {
     if (!row) return null
     const blk = row.metrics[effectiveTier]
-    return blk[kind][m]
+    return figureValue(blk[kind][m])   // a figure under the minimum is missing from the Δ
   }
 
   const idA = a.snapshot_id
@@ -164,7 +177,7 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
                 {formatCount(onlyA + onlyB)} measurements only one run scored are left out.
               </>
             )}
-            {tierFellBack && <> Showing all measurements (none are {a.schema_version === 2 ? 'exact' : 'measured·resolved'} yet).</>}
+            {tierFellBack && <> Showing all measurements (none are {a.schema_version >= 2 ? 'exact' : 'measured·resolved'} yet).</>}
           </p>
         </div>
         <h2 className="sectitle">By model</h2>
@@ -234,14 +247,16 @@ export function Compare({ a: slotA, b: slotB, tier }: Props) {
 }
 
 /** The verdict for one metric, in words: how much the average error moved, and which way (#23). */
-function Verdict({ label, err, trend }: { label: string; err: number | null; trend: number | null }) {
-  const word = err == null || err === 0 ? 'no change' : err < 0 ? 'better' : 'worse'
+function Verdict({ label, err, trend }: { label: string; err: number | null | TooFew; trend: number | null | TooFew }) {
+  const flat = err == null || err === TOO_FEW || err === 0
+  const word = err === TOO_FEW ? '' : err == null || err === 0 ? 'no change' : err < 0 ? 'better' : 'worse'
   return (
     <div className="cmp-overall-cell">
       <span className="cmp-overall-lbl">{label}</span>
       <span>
-        <DeltaCell v={err} /> <span className="cmp-unit">points</span>{' '}
-        <span className={`cmp-word ${err == null || err === 0 ? 'd-zero' : err < 0 ? 'd-better' : 'd-worse'}`}>{word}</span>
+        <DeltaCell v={err} />
+        {err !== TOO_FEW && <> <span className="cmp-unit">points</span></>}{' '}
+        <span className={`cmp-word ${flat ? 'd-zero' : (err as number) < 0 ? 'd-better' : 'd-worse'}`}>{word}</span>
       </span>
       <span className="cmp-trend">
         trend error <DeltaCell v={trend} />

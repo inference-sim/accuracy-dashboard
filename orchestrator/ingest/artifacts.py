@@ -33,7 +33,13 @@ import urllib.request
 import zipfile
 from dataclasses import dataclass, field
 
+import sys
+from pathlib import Path
+
 import clients
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from _argv import command_after, flag  # noqa: E402
 
 RESULT_PREFIXES = ("bmk_agentic_", "bmk_")
 SERVER_LOGS_PREFIX = "server_logs_"
@@ -55,6 +61,12 @@ class Artifact:
     def from_api(a: dict) -> "Artifact":
         return Artifact(id=int(a["id"]), name=a["name"], created_at=a["created_at"],
                         expired=bool(a.get("expired")), size=int(a.get("size_in_bytes") or 0))
+
+
+def normal_result_name(name: str) -> str:
+    """A result file's name without its .json, so a command's --result-filename and an artifact's
+    name compare equal whichever of them carries the extension."""
+    return name[:-5] if name.endswith(".json") else name
 
 
 def result_filename(name: str) -> str | None:
@@ -280,7 +292,6 @@ class GitHubArtifacts:
     blob storage, which must not receive the GitHub token). Downloads are cached by artifact id."""
 
     def __init__(self, repo: str, token: str | None, cache_dir, sleep=None):
-        from pathlib import Path
         import threading
         self.repo, self.token, self.sleep = repo, token, sleep
         self.cache = Path(cache_dir)
@@ -290,6 +301,7 @@ class GitHubArtifacts:
         self._lists: dict = {}
         self._list_locks: dict = {}
         self._guard = threading.Lock()
+        self._job_logs: dict = {}
 
     def list_cached(self, run_id: str):
         """gh.list(run_id), memoized and thread-safe: one HTTP listing per run even under a pool."""
@@ -316,6 +328,69 @@ class GitHubArtifacts:
             if len(out) >= int(doc.get("total_count") or 0) or not arts:
                 return out
             page += 1
+
+    def run(self, run_id: str) -> dict:
+        """The run's commit: {"sha", "date"} (head_sha and the head commit's timestamp)."""
+        doc = clients._get_json(f"https://api.github.com/repos/{self.repo}/actions/runs/{run_id}",
+                                self._headers(), 120, sleep=self.sleep)
+        return {"sha": doc["head_sha"], "date": (doc.get("head_commit") or {}).get("timestamp")}
+
+    def _job_log(self, job_id: int) -> str | None:
+        """A job's log text, or None when GitHub no longer has it (404 or 410: expired)."""
+
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, *a, **k):
+                return None
+
+        url = f"https://api.github.com/repos/{self.repo}/actions/jobs/{job_id}/logs"
+        try:
+            try:
+                data = clients._get_bytes(url, self._headers(), 120, sleep=self.sleep,
+                                          opener=urllib.request.build_opener(NoRedirect))
+            except urllib.error.HTTPError as e:
+                if e.code not in (301, 302, 303, 307, 308):
+                    raise
+                data = clients._get_bytes(e.headers["Location"], {}, 600, sleep=self.sleep)
+        except urllib.error.HTTPError as e:
+            if e.code in (404, 410):
+                return None
+            raise
+        return data.decode("utf-8", "replace")
+
+    def job_logs_cached(self, run_id: str, attempt: int) -> tuple[dict, int]:
+        """({normalised --result-filename: (job id, job name, log text)}, jobs whose log has
+        expired) for one run attempt, memoized and thread-safe. A job is the one whose
+        benchmark_serving.py command names the result file the point's artifact is named for."""
+        key = (run_id, attempt)
+        with self._guard:
+            lock = self._list_locks.setdefault(("jobs",) + key, __import__("threading").Lock())
+        with lock:
+            if key not in self._job_logs:
+                self._job_logs[key] = self._index_job_logs(run_id, attempt)
+            return self._job_logs[key]
+
+    def _index_job_logs(self, run_id: str, attempt: int) -> tuple[dict, int]:
+        jobs, page = [], 1
+        while True:
+            url = (f"https://api.github.com/repos/{self.repo}/actions/runs/{run_id}/attempts/{attempt}"
+                   f"/jobs?per_page=100&page={page}")
+            doc = clients._get_json(url, self._headers(), 120, sleep=self.sleep)
+            got = doc.get("jobs") or []
+            jobs += got
+            if len(jobs) >= int(doc.get("total_count") or 0) or not got:
+                break
+            page += 1
+        index, expired = {}, 0
+        for j in jobs:
+            text = self._job_log(j["id"])
+            if text is None:
+                expired += 1
+                continue
+            argv = command_after(text, "benchmark_serving.py ")
+            name = flag(argv, "--result-filename") if argv else None
+            if name:
+                index.setdefault(normal_result_name(name), (j["id"], j.get("name"), text))
+        return index, expired
 
     def download(self, art: Artifact) -> bytes:
         path = self.cache / f"{art.id}.zip"

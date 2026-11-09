@@ -6,6 +6,11 @@
 
 export const EM_DASH = '—'
 
+/** A percent figure that may be "too few points" (v3, COV-11): shown as that text, with no number. */
+export function formatFigure(value: number | null | undefined | 'too few points', digits = 1): string {
+  return value === 'too few points' ? value : formatPct(value, digits)
+}
+
 /** Renders a 0..100 percent at fixed precision. null/non-finite → em dash. */
 export function formatPct(value: number | null | undefined, digits = 1): string {
   if (value == null || !Number.isFinite(value)) return EM_DASH

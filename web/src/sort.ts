@@ -4,6 +4,7 @@
  * drill-down children keep their natural (grouped) order so a sort never scrambles the tree.
  */
 import type { RenderRow } from './tree'
+import { figureValue } from './aggregate'
 import type { TierKey } from './types'
 
 export type SortKey = 'ttft_mape' | 'ttft_shape' | 'tpot_mape' | 'tpot_shape'
@@ -18,17 +19,19 @@ export function nextSort(current: SortSpec | null, key: SortKey): SortSpec | nul
   return null
 }
 
+/** A figure shown as "too few points" sorts as missing: it sinks to the bottom. */
+
 function valueOf(row: RenderRow, key: SortKey, tier: TierKey): number | null {
   const b = row.metrics[tier]
   switch (key) {
     case 'ttft_mape':
-      return b.mape.ttft
+      return figureValue(b.mape.ttft)
     case 'ttft_shape':
-      return b.shape.ttft
+      return figureValue(b.shape.ttft)
     case 'tpot_mape':
-      return b.mape.tpot
+      return figureValue(b.mape.tpot)
     case 'tpot_shape':
-      return b.shape.tpot
+      return figureValue(b.shape.tpot)
   }
 }
 

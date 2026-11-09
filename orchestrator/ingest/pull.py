@@ -23,6 +23,7 @@ import api  # noqa: E402
 import artifacts as art  # noqa: E402
 import build  # noqa: E402
 import contract  # noqa: E402
+import engines  # noqa: E402
 import recipes as rcp  # noqa: E402
 
 IX_REPO = "SemiAnalysisAI/InferenceX"
@@ -32,13 +33,6 @@ _RUN_REPO = __import__("re").compile(r"github\.com/([^/]+/[^/]+)/actions/runs/")
 def run_repo(row: dict) -> str | None:
     m = _RUN_REPO.search(str(row.get("run_url") or ""))
     return m.group(1) if m else None
-
-
-def identity(row: dict) -> dict:
-    return {"model": row["model"], "hardware": row["hardware"], "precision": row["precision"],
-            "framework": row["framework"], "benchmark_type": row["benchmark_type"],
-            "recipe": contract.recipe_key(row.get("recipe_fingerprint"), row.get("id")),
-            "conc": int(row["conc"]), "measured_date": str(row["date"])[:10]}
 
 
 @dataclass
@@ -51,14 +45,6 @@ class Frozen:
         name = f"{role}.gz"
         (self.dir / name).write_bytes(art.stable_gzip(data))
         self.files[role] = {"path": name, "sha256": art.sha256(data), "from": origin}
-
-
-def _row_reasons(row: dict) -> list[str]:
-    """Rows this extractor doesn't handle at all, by the row's own shape."""
-    out = []
-    if row.get("disagg") or row.get("is_multinode"):
-        out.append("blis_refused:disaggregated_or_multinode")
-    return out
 
 
 # What a point takes from its agentic upload, by file name -> role.
@@ -107,11 +93,49 @@ def recipe_checkpoint(row: dict, server_log: str | None, recipes) -> dict | None
     return {"repo": repo, "source": "inferencex_recipe", "commit": sha, "served_path": paths[0]} if repo else None
 
 
-def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts, fetch, out: Path,
-                 run_artifacts: dict = None, recipes=None) -> dict:
-    ident = identity(row)
+def client_release(entry: dict, frozen: "Frozen", gh, run_id: str, attempt: int, result_filename: str | None) -> None:
+    """Record the InferenceX commit of a single-turn run (`client_commit`: sha and date, or None with
+    `client_commit_reason`) and freeze the log of the job that ran the client (role job_log), whose
+    benchmark_serving.py command names the point's result file. GitHub expires logs (404 or 410):
+    `client_args` is then None with the reason, and the point is still scored, its flags assumed
+    (COV-12). A log that is not found among the run's jobs is recorded the same way."""
+    try:
+        run = gh.run(run_id)
+        entry["client_commit"] = {"repo": gh.repo, "sha": run["sha"], "date": run["date"]}
+    except urllib.error.HTTPError as e:
+        if e.code not in (404, 410):
+            raise
+        entry["client_commit"] = None
+        entry["client_commit_reason"] = f"run_unavailable:HTTP_{e.code}"
+    index, expired = gh.job_logs_cached(run_id, attempt)
+    hit = index.get(art.normal_result_name(result_filename or ""))
+    if hit is None:
+        entry["client_args"] = None
+        entry["client_args_reason"] = "job_log_expired" if expired else "job_not_found"
+        return
+    job_id, job_name, text = hit
+    frozen.put("job_log", text.encode(), f"{gh.repo}/actions/jobs/{job_id}")
+    entry["client_args"] = {"job_id": job_id, "job_name": job_name}
+
+
+def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArtifacts, fetch, out: Path,
+                 recipes=None) -> dict:
+    """Freeze one point's inputs. The point is one ledger unit; its inputs are the kept
+    record's (the smallest row id the window holds), and its measured values are each
+    measurement's, so the score is against their mean (design §10.2)."""
+    row = point.row
+    # The unit's identity, from the unit list: the measured date of a benchmark run is the
+    # earliest date among all its records, which one row does not show (design §10.2).
+    ident = dict(point.unit.identity)
     pid = contract.point_id(ident)
-    entry = {"point_id": pid, "identity": ident, "row": row, "reasons": _row_reasons(row), "files": {}}
+    entry = {"point_id": pid, "identity": ident, "row": row, "records": point.records,
+             "measurements": point.measurements, "reasons": [], "files": {}}
+    fw = engines.lookup(row["framework"])
+    if not engines.scored(fw):
+        # No BLIS engine scores this framework, so nothing is fetched: the point is G5 for the
+        # reasons the label gives (engines.py), plus its router at scoring time.
+        entry.update(reasons=sorted(engines.reasons(fw)), build=None)
+        return entry
     agentic = row["benchmark_type"] == "agentic_traces"
     run = api.run_of(row)
     frozen = Frozen(out / "points" / pid)
@@ -170,6 +194,8 @@ def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts
             if cfg is not None:
                 frozen.put("launch_config", json.dumps(cfg, sort_keys=True, default=str).encode(),
                            f"{j.server_logs.name}:{p}")
+        if not agentic:
+            client_release(entry, frozen, gh, run_id, attempt, j.result_filename)
         if agentic and j.agentic is not None:
             try:
                 files = read_needed(gh.download(j.agentic), entry,
@@ -187,12 +213,22 @@ def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts
                 elif role == "client_export":
                     entry["reasons"].append("artifact_unmatched:client_export")
     if not agentic and server_log is None:
-        text = api.server_log(fetch, row["id"])
-        if text and art.is_server_log(text.encode()):
-            frozen.put("server_log", text.encode(), "api:/server-log")
-            server_log = text
+        try:
+            text = api.server_log(fetch, row["id"])
+        except urllib.error.HTTPError as e:
+            # The API answers 413 for a row whose log it will not serve: a fact about the source's
+            # data, reported to it and listed in the backlog. Any other HTTP error is a fault of
+            # the run and stays an exception (cmd_pull records it as a pull error).
+            if e.code != 413:
+                raise
+            text = None
+            entry["reasons"].append("server_log_missing:api_413")
         else:
-            entry["reasons"].append("server_log_missing")
+            if text and art.is_server_log(text.encode()):
+                frozen.put("server_log", text.encode(), "api:/server-log")
+                server_log = text
+            else:
+                entry["reasons"].append("server_log_missing")
     b = resolver.resolve(row.get("image") or "", server_log)
     # The build never refuses a point; it makes it estimated unless it's the build BLIS models.
     entry["build"] = b.record()
@@ -208,11 +244,81 @@ def freeze_point(row: dict, *, resolver: build.Resolver, gh: art.GitHubArtifacts
     return entry
 
 
+def check_placed(rows: list[dict], placed: "Placed") -> None:
+    """Every row of the window is recorded: it is in a point's records or listed unlisted with
+    its reason. A row in neither would vanish from the counts (COV-1)."""
+    kept = sum(len(p.records) for p in placed.points)
+    if kept + len(placed.unlisted) != len(rows):
+        raise ValueError(f"{len(rows)} rows in the window, but the points hold {kept} and {len(placed.unlisted)} "
+                         f"are listed unlisted (COV-1)")
+
+
 def write_manifest(out: Path, meta: dict, points: list[dict]) -> str:
     doc = {**meta, "points": sorted(points, key=lambda p: p["point_id"])}
     text = contract.canonical_dumps(doc) + "\n"
     (out / "manifest.json").write_text(text)
     return art.sha256(text.encode())
+
+
+@dataclass
+class Point:
+    """One ledger unit the window holds: its kept row, every record of it the window holds, and
+    each measurement's measured values (the metrics of the measurement's kept record)."""
+    unit: object
+    row: dict
+    records: list
+    measurements: list
+
+    @property
+    def point_id(self) -> str:
+        return self.unit.unit_id
+
+
+@dataclass
+class Placed:
+    """The window's rows, placed in the ledger: the points, and every row that is no point,
+    with why (the ingest report's reason for a record it left out, or not_in_source_revision
+    for a record newer than the ledger's pinned source revision)."""
+    points: list = field(default_factory=list)
+    unlisted: list = field(default_factory=list)    # {"record", "reason", "model", "date", ...}
+
+
+def place(rows: list[dict], lg) -> Placed:
+    """Group the window's rows by ledger unit (records the ledger joins are one point) and list
+    the rows the ledger holds no unit for. A row whose identity disagrees with the unit list
+    raises ledger.LedgerError: it is not the record the ledger was generated from."""
+    import ledger as ldg
+    by_unit: dict = {}
+    out = Placed()
+    window_dates = contract.run_dates(rows)
+    for r in sorted(rows, key=lambda r: int(r["id"])):
+        rid = str(r["id"])
+        p = lg.by_record.get(rid)
+        if p is None:
+            why = lg.left_out.get(rid)
+            out.unlisted.append({"record": rid, "reason": f"left_out:{why}" if why else "not_in_source_revision",
+                                 "model": r["model"], "hardware": r["hardware"], "framework": r["framework"],
+                                 "benchmark_type": r["benchmark_type"], "conc": r["conc"],
+                                 "date": str(r["date"])[:10]})
+            continue
+        # The measured date of a kept or duplicate record is its unit's: the earliest date of
+        # its benchmark run over every record of the source, which only the ledger's ingest saw.
+        # A merged record's own identity is another unit's, which the list does not hold, so
+        # its run's earliest date is taken from the window's rows.
+        dates = dict(window_dates)
+        run = contract.benchmark_run(r.get("run_url"))
+        if run is not None and p.how != ldg.MERGED:
+            dates[run] = p.unit.identity["measured_date"]
+        lg.place(r, dates)
+        by_unit.setdefault(p.unit.unit_id, []).append(r)
+    for uid in sorted(by_unit):
+        unit = lg.units[uid]
+        have = {str(r["id"]): r for r in by_unit[uid]}
+        kept = next((have[x] for x in unit.records() if x in have), None)
+        meas = [{"record": m["record"], "metrics": have[m["record"]].get("metrics") or {}}
+                for m in unit.measurements if m["record"] in have]
+        out.points.append(Point(unit=unit, row=kept, records=sorted(have, key=int), measurements=meas))
+    return out
 
 
 @dataclass
@@ -222,32 +328,31 @@ class Incremental:
       reuse   point ids the prior pull already froze and this window still holds -- their files
               and manifest entries carry over untouched (a measurement is immutable, so a frozen
               point never needs re-freezing).
-      fresh   rows in this window the prior pull didn't hold -- freeze them now.
+      fresh   points in this window the prior pull didn't hold -- freeze them now.
       dropped point ids the prior pull froze that this window no longer holds -- their files and
               manifest entries leave the store (aged out of the 180 days).
     """
     reuse: dict = field(default_factory=dict)    # point_id -> prior manifest entry
-    fresh: list = field(default_factory=list)    # API rows to freeze
+    fresh: list = field(default_factory=list)    # Points to freeze
     dropped: set = field(default_factory=set)    # point_ids to remove
 
 
-def plan_incremental(rows: list[dict], prior_points: list[dict]) -> Incremental:
-    """Split this window's `rows` against a prior pull's manifest `points`. A point is reused iff
-    the prior pull holds its id; identity is immutable, so the id alone decides. The pull itself
-    never applies the window (api.pull already did) -- this only reconciles against what's frozen."""
-    want = {}
-    for r in rows:
-        want[contract.point_id(identity(r))] = r
+def plan_incremental(points: list, prior_points: list[dict]) -> Incremental:
+    """Split this window's points against a prior pull's manifest `points`. A point is reused iff
+    the prior pull holds its id with the same records; identity is immutable, so the id and its
+    records alone decide. The pull itself never applies the window (api.pull already did) --
+    this only reconciles against what's frozen."""
+    want = {p.point_id: p for p in points}
     prior = {e["point_id"]: e for e in prior_points}
     inc = Incremental()
-    for pid, row in want.items():
-        if pid in prior:
+    for pid, p in want.items():
+        if pid in prior and prior[pid].get("records") == p.records:
             inc.reuse[pid] = prior[pid]
         else:
-            inc.fresh.append(row)
+            inc.fresh.append(p)
     inc.dropped = set(prior) - set(want)
-    # Freeze fresh rows in the same order api.pull sorted them, so a pull is order-stable.
-    inc.fresh.sort(key=lambda r: int(r["id"]) if str(r["id"]).isdigit() else str(r["id"]))
+    # Freeze fresh points in point-id order, so a pull is order-stable.
+    inc.fresh.sort(key=lambda p: p.point_id)
     return inc
 
 

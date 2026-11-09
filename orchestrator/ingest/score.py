@@ -3,14 +3,17 @@
 
 Per point: settings (settings.py) -> support (support.py) -> replay inputs (replay.py, agentic)
 -> the scenario file -> `blis replay --agentic-scenario` -> the diff of what BLIS was given
-against what the run recorded -> one fidelity record, or a not-scored record with reasons.
+against what the run recorded -> the point's grade (grade_outcome): a fidelity record graded G1
+to G4, a G5 record with its reasons, or a failed record with its run faults.
 
-Single-turn points go through the same extraction and are scored with this repo's signedprobe
-(orchestrator/signedprobe), built against the same BLIS tag (score_single_turn).
+Single-turn points go through the same extraction and are replayed as the run's client sent
+them (inferencex_client, COV-12) by `blis replay` (score_single_turn). Every run's Result is read
+from blis's standard output and validated (result.py).
 """
 from __future__ import annotations
 
 import csv
+import dataclasses
 import gzip
 import hashlib
 import io
@@ -23,8 +26,17 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parent))
+import extract_single_turn_bench_args as sx  # noqa: E402
+import assess as asx  # noqa: E402
 import contract  # noqa: E402
+import engines  # noqa: E402
+import fields as fl  # noqa: E402
+import grade as gr  # noqa: E402
+import inferencex_client as ix  # noqa: E402
+import inferencex_runners as ir  # noqa: E402
 import replay as rp  # noqa: E402
+import result  # noqa: E402
 import settings as st  # noqa: E402
 import support as sp  # noqa: E402
 
@@ -46,7 +58,8 @@ def sweep_id(row: dict, scenario: str, label: str) -> str:
 
 @dataclass
 class Env:
-    """What scoring runs against: one BLIS release and its pinned repos."""
+    """What scoring runs against: one BLIS release and its pinned repos. blis is the path of
+    the blis binary; it runs with its working directory set to the binary's directory."""
     blis: str
     blis_release: str
     blis_commit: str
@@ -55,30 +68,70 @@ class Env:
     registry: Path
     registry_release: str
     kernel: str
-    defaults_helper: str
-    corpus: dict          # {"dataset", "revision", "sha256", "path", "file"}
+    # Every date-pinned AgentX corpus alias -> its catalog replay workload entry, with the path of a
+    # local file checked against the entry's full sha256 (resolve_agentic_corpus.checked_corpora):
+    # {"workload", "repo", "revision", "file", "split", "sha256", "path"}. A point is replayed with
+    # the entry of the alias its own client recorded (COV-12, D3).
+    corpora: dict
     corpus_cache: Path | None = None
     vllm_ref: str = "v0.32.0"
-    policy: dict = field(default_factory=dict)
-    policy_sha256: str = ""
+    # The engine's field list (fields.py) at the release the simulator runs, and its sha256.
+    field_list: object = None
+    fields_sha256: str = ""
     base_models: dict = field(default_factory=dict)   # HF repo -> base_model (frozen)
     timeout_s: int = 7200
+    # vLLM's own defaults for the fields of the config objects its log prints whole
+    # (vllm_defaults.json), so a field printed at its default is not taken as set by the run.
     vllm_defaults: dict = field(default_factory=dict)
-    vllm_defaults_sha256: str = ""
+    # The vLLM release the table was read at; it applies only to a run of that release.
+    vllm_defaults_release: str = ""
+    # The engine release the scoring simulator runs (stack.json, LIF-6), e.g. "0.32.0".
+    engine_release: str = ""
+    # The simulator build that scores the run: a release tag, or a commit (pointrecord Simulator).
+    sim_build: str = ""
+    # The harness image digest every point records (design §11.7, X8): sha256:<hex>, or unreleased.
+    harness_digest: str = "unreleased"
     catalog_obj: sp.Catalog | None = None
+    # InferenceX's GPUs per node by hardware label (inferencex_runners.json).
+    runner_table: ir.Table = field(default_factory=ir.load)
     parts: set = field(default_factory=set)
-    # Single-turn: this repo's signedprobe built against the same tag, and the benchmark
-    # workloads it replays (orchestrator/signedprobe/testdata/inferencex-workloads/seed0.json:
-    # InferenceX's request lengths per (isl, osl, concurrency)).
-    signedprobe: str = ""
-    blis_dir: str = ""            # the inference-sim checkout blis runs in (signedprobe -blis-dir)
-    single_turn_workloads: set = field(default_factory=set)   # {(isl, osl, conc)}
     # A per-replay resident-memory ceiling in MB (0 = none). An agentic replay whose RSS exceeds
     # it is killed individually and the point is not-scored with an insufficient_memory reason, so
     # one memory-heavy trace can't OOM the whole CI job. Peak RAM is trace-content-driven and
     # unpredictable per point (profiled: a c64 point used 11.5GB where a c128 used 6.9GB), so a
     # reactive RSS cap is the only reliable bound on a fixed-RAM runner; 0 locally scores everything.
     max_rss_mb: int = 0
+
+    def simulator(self) -> dict:
+        """The simulator block every point of this run records: its build and engine release."""
+        return {"build": self.sim_build, "engine": {"kind": "vllm", "version": self.engine_release},
+                "harness_digest": self.harness_digest}
+
+
+def corpora_provenance(corpora: dict) -> list[dict]:
+    """provenance.json's corpora: each AgentX corpus the run could replay, by alias, with the
+    catalog workload that pins it, sorted by alias."""
+    return [{"alias": a, "workload": e["workload"], "dataset": e["repo"], "revision": e["revision"],
+             "sha256": e["sha256"]} for a, e in sorted(corpora.items())]
+
+
+def corpus_reasons(r: "rp.Replay", corpora: dict) -> list[str]:
+    """Why a run's corpus cannot be replayed, from the alias its client recorded (the export's
+    dataset, cross-checked against benchmark_command.txt's --public-dataset).
+
+    No alias: from_export already names required_setting_missing:replay.corpus. An alias that is
+    not date-pinned (a rolling one) does not say which corpus was read, so the run did not record
+    it: design §11.4's value_not_recorded, with the alias in the subject. A dataset repository the
+    export records that is not the one the alias loads is a conflict between two records of the
+    run (value_conflict)."""
+    if not r.corpus:
+        return []
+    entry = corpora.get(r.corpus)
+    if entry is None:
+        return [f"value_not_recorded:replay.corpus={r.corpus}"]
+    if r.corpus_repo and r.corpus_repo != entry["repo"]:
+        return ["conflict:replay.corpus_repo"]
+    return []
 
 
 def _read(point_dir: Path, files: dict, role: str) -> bytes | None:
@@ -88,7 +141,7 @@ def _read(point_dir: Path, files: dict, role: str) -> bytes | None:
     return gzip.decompress((point_dir / f["path"]).read_bytes())
 
 
-def _checkpoints(c: st.Classified, launch_cfg: dict | None) -> list[str]:
+def _checkpoints(c: st.Decided, launch_cfg: dict | None) -> list[str]:
     """The served checkpoint's candidate HF repos, most authoritative first: the launch
     config's model path, then the served model name, then --model."""
     out = []
@@ -105,9 +158,19 @@ def _checkpoints(c: st.Classified, launch_cfg: dict | None) -> list[str]:
     return out
 
 
-def _metrics_us(m: dict) -> tuple[float, float]:
-    # TPOT is the per-token figure aiperf reports (request_itl_mean_ms), not the step interval.
-    return float(m["ttft_mean_ms"]) * 1e3, float(m["request_itl_mean_ms"]) * 1e3
+def measured(entry: dict) -> dict:
+    """The point's measured values: the mean, over the unit's measurements, of each metric
+    (design §10.2: a unit holding several measurements is scored against their mean, COV-10).
+    A metric a measurement lacks is left out of that metric's mean; a metric no measurement
+    has is absent."""
+    ms = entry.get("measurements") or [{"metrics": entry["row"].get("metrics") or {}}]
+    out = {}
+    for key in sorted({k for m in ms for k in (m.get("metrics") or {})}):
+        vals = [(m["metrics"] or {}).get(key) for m in ms]
+        vals = [float(v) for v in vals if isinstance(v, (int, float)) and not isinstance(v, bool)]
+        if vals:
+            out[key] = sum(vals) / len(vals)
+    return out
 
 
 def _blis_refusal(stderr: str, work: Path) -> str:
@@ -120,6 +183,31 @@ def _blis_refusal(stderr: str, work: Path) -> str:
     text = re.sub(r"\bp-[0-9a-f]{16}\b", "<scenario>", text)
     slug = re.sub(r"[^A-Za-z0-9_.:=-]+", "_", text)[:80].strip("_")
     return f"blis_refused:{slug}" if slug else "blis_refused"
+
+
+_STATES_NO = re.compile(r"\bstates no ([A-Za-z_][A-Za-z0-9_.]*)")
+
+
+def value_refusal(stderr: str, work: Path, field_list) -> str | None:
+    """The G5 reason for an engine refusal that says the scenario lacks a value ("states no
+    <field>"), else None. The field is parsed from the refusal's text. The field's estimation rule
+    (fields.estimate_missing) is applied to it: the engine has already refused to resolve it, so
+    a rule that would leave it unset or substitute another setting cannot help here, and the
+    reason is value_not_recorded in every case (design 11.4). A refusal that says "states no"
+    but names no parseable field takes the refusal's slug as the subject."""
+    slug = _blis_refusal(stderr, work)
+    text = slug.partition(":")[2]
+    if "states_no" not in text and "states no" not in stderr:
+        return None
+    m = _STATES_NO.search(re.sub(r"\s+", " ", stderr))
+    name = m.group(1) if m else None
+    if name is None:
+        return f"required_setting_missing:{text}"
+    if field_list is not None:
+        dec = fl.estimate_missing(field_list, name)
+        if dec.g5 and dec.g5["code"] != "value_not_recorded":
+            return f"{dec.g5['code']}:{name}"
+    return f"required_setting_missing:{name}"
 
 
 class MemoryExceeded(Exception):
@@ -178,15 +266,14 @@ def _proc_tree(root: int) -> list:
     return out
 
 
-def run_capped(argv, *, timeout, max_rss_mb=0, poll_s=2):
+def run_capped(argv, *, timeout, max_rss_mb=0, poll_s=2, cwd=None):
     """subprocess.run(capture_output, text) with an optional RSS ceiling. If max_rss_mb > 0 and the
     process tree's resident memory exceeds it, the process is killed and MemoryExceeded is raised --
     so one memory-heavy replay is killed alone, never taking down the whole job. With max_rss_mb==0
     this is a plain subprocess.run (local / big-runner scores everything)."""
     if not max_rss_mb:
-        return subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
-    import time
-    proc = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        return subprocess.run(argv, capture_output=True, text=True, timeout=timeout, cwd=cwd)
+    proc = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=cwd)
     start = 0.0
     while True:
         try:
@@ -205,8 +292,9 @@ def run_capped(argv, *, timeout, max_rss_mb=0, poll_s=2):
             raise subprocess.TimeoutExpired(argv, timeout)
 
 
-def resolved_kv(log: str, metrics: dict | None) -> list[dict]:
-    """The KV pool vLLM allocated vs BLIS's, per engine core. Never passed to BLIS."""
+def resolved_kv(log: str, doc: dict | None) -> list[dict]:
+    """The KV pool vLLM allocated vs BLIS's, per engine core, BLIS's from the engine's report in
+    the Result (kv_capacity_tokens_per_replica). Never passed to BLIS."""
     found = [int(x.replace(",", "")) for x in re.findall(r"GPU KV cache size: ([0-9,]+) tokens", log)]
     if not found:
         return []
@@ -216,7 +304,7 @@ def resolved_kv(log: str, metrics: dict | None) -> list[dict]:
     rec["measured"] = found[0]
     if len(found) > 1:
         rec["occurrences"] = len(found)
-    blis = (metrics or {}).get("kv_capacity_tokens_per_replica")
+    blis = result.engine_report(doc or {}, "kv_capacity_tokens_per_replica")
     # (No KV line at all returns [] above: the record then has no KV comparison, which the
     # fidelity record states by its absence; the line is printed by every v1 engine.)
     if not blis:
@@ -241,20 +329,23 @@ def _get(d: dict, dotted: str):
     return d
 
 
-def _blis_value(dep: dict, blis_field: str):
-    """The value at a policy blis_field in the Deployment as written."""
-    if blis_field == "offload.tiers.cpu_dram":
+def _blis_value(dep: dict, loc: str):
+    """The value at a scenario location in the Deployment as written."""
+    if loc == "offload.tiers.cpu_dram":
         tiers = (dep.get("offload") or {}).get("tiers") or []
         return next((t["bytes"] for t in tiers if t.get("tier") == "cpu_dram"), None)
-    if blis_field.startswith("offload."):
-        return _get(dep, blis_field)
-    return _get(dep["pools"][0], blis_field)
+    if loc.startswith("offload."):
+        return _get(dep, loc)
+    if loc.startswith("engine.env."):
+        return ((dep["pools"][0].get("engine") or {}).get("env") or {}).get(loc[len("engine.env."):])
+    return _get(dep["pools"][0], loc)
 
 
 def _diff_args(args: list, dep: dict, b: st.Built) -> list[str]:
-    """Fill each mapped arg's `blis` from the scenario as WRITTEN (parsed back), and its match:
-    exact when the BLIS field has the arg's own name, mapped when it's a renamed field (named
-    in blis_field), differs / absent_in_blis otherwise (a refusal: the writer lost it)."""
+    """Fill each copied arg's `blis` from the scenario as WRITTEN (parsed back), and its match:
+    exact when the scenario carries the recorded value under the upstream's own name, mapped when
+    under the engine block's renamed field (blis_field names it), differs or absent_in_blis
+    otherwise (a fault: the writer lost a recorded value, COV-3)."""
     reasons = []
     for a in args:
         if "_value" not in a:
@@ -276,6 +367,8 @@ def _diff_args(args: list, dep: dict, b: st.Built) -> list[str]:
             got = _blis_value(dep, f)
             if f == "engine.frontend":
                 want = st.FRONTEND[want]
+            elif f.startswith("engine.env."):
+                want = str(want)
         a["blis"] = json.dumps(got) if isinstance(got, list) else (repr(got) if isinstance(got, float) else got)
         if got is None:
             a["match"] = "absent_in_blis"
@@ -283,8 +376,6 @@ def _diff_args(args: list, dep: dict, b: st.Built) -> list[str]:
             a["match"] = "differs"
         else:
             a["match"] = "exact" if a["arg"].split(".")[-1] == f.split(".")[-1] else "mapped"
-        if a.pop("_approximated", False) and a["match"] in ("exact", "mapped"):
-            a["match"] = "approximated"
         if a["match"] in ("absent_in_blis", "differs"):
             reasons.append(f"setting_differs:{a['arg']}")
         if a["match"] != "mapped":
@@ -298,32 +389,53 @@ class Outcome:
     identity: dict
     row: dict
     reasons: list = field(default_factory=list)
+    measurements: list = field(default_factory=list)
     fidelity: dict | None = None
     facets: dict | None = None
     csv_row: list | None = None
+    banner: str | None = None       # the vLLM version the server log's banner prints
+    build: dict | None = None       # the run's recorded build (build.py), from the pull
+    # The substitutions the field list names (an estimate, an interim status), from settings.
+    subs: list = field(default_factory=list)
+    # Set by grade_outcome: the run's own engine release (None for a nightly or custom build);
+    # for a G5 point its reason and every reason found; for a failed point its run faults.
+    run_release: str | None = None
+    simulator: dict | None = None   # {"build", "engine": {"kind", "version"}, "harness_digest"}
+    g5: dict | None = None
+    g5_reasons: list = field(default_factory=list)
+    faults: list = field(default_factory=list)
+    # Set by score_point(simulate=False) when the scorer would now hand the point to the simulator:
+    # the point carries what its data gives so far and is not a scored point (no figures).
+    would_run_simulator: bool = False
 
 
-def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
+def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env, simulate: bool = True) -> Outcome:
     """score_point with the uniform error capture the driver used to do inline, so both the serial
-    and the parallel path record a point that raises as not-scored (never drop it)."""
+    and the parallel path record a point that raises as not-scored (never drop it). With
+    simulate=False the point is graded without a simulator (score_point) and carries no
+    simulator block."""
     try:
-        return score_point(entry, pull_dir, work, env)
+        o = score_point(entry, pull_dir, work, env, simulate=simulate)
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
-        return Outcome(point_id=entry["point_id"], identity=entry["identity"], row=entry["row"],
-                       reasons=sorted(set(entry["reasons"] + ["blis_refused:extractor_error"])))
+        o = Outcome(point_id=entry["point_id"], identity=entry["identity"], row=entry["row"],
+                    reasons=sorted(set(entry["reasons"] + ["blis_refused:extractor_error"])),
+                    measurements=entry.get("measurements") or [], build=entry.get("build"))
+    grade_outcome(o, env.engine_release, env.simulator() if simulate else None)
+    return o
 
 
 # A process-pool worker scores into its OWN work subdir, because score_point writes
 # work/scenarios/<scenario>.yaml keyed by scenario name, not point id -- two points that share a
 # scenario name would race that file across processes. Per-worker dirs isolate it; the per-point
-# metrics/<pid>.json cache stays correct either way (pid is unique). The worker's env and pull_dir
+# results/<pid>.json cache stays correct either way (pid is unique). The worker's env and pull_dir
 # are set once per process in the initializer, so each task ships only the small `entry`.
 _W: dict = {}
 
 
-def _worker_init(pull_dir: str, env: Env, work: str):
+def _worker_init(pull_dir: str, env: Env, work: str, simulate: bool):
     _W["pull_dir"] = Path(pull_dir)
     _W["env"] = env
+    _W["simulate"] = simulate
     # os.getpid() is stable for the life of a pool worker -> a fixed per-worker dir it reuses, so
     # the scenario cache within one worker still helps across its tasks.
     import os
@@ -332,7 +444,7 @@ def _worker_init(pull_dir: str, env: Env, work: str):
 
 
 def _worker_score(entry: dict) -> Outcome:
-    return _score_one(entry, _W["pull_dir"], _W["work"], _W["env"])
+    return _score_one(entry, _W["pull_dir"], _W["work"], _W["env"], _W["simulate"])
 
 
 def _is_agentic(entry: dict) -> bool:
@@ -340,13 +452,13 @@ def _is_agentic(entry: dict) -> bool:
 
 
 def score_points(points: list, pull_dir: Path, work: Path, env: Env, *, workers: int = 1,
-                 agentic_workers: int = 1, log=lambda m: None) -> list:
+                 agentic_workers: int = 1, log=lambda m: None, simulate: bool = True) -> list:
     """Score every point. The result is collected in input order regardless of completion order,
     and write_contract re-sorts by point_id, so the contract is identical whatever the worker
     count -- concurrency is a speed knob, never a correctness or determinism lever.
 
     Split by benchmark type, because the two kinds have opposite resource profiles:
-      * single-turn (signedprobe, no corpus): light RAM, safe to run `workers`-wide.
+      * single-turn (no corpus): light RAM, safe to run `workers`-wide.
       * agentic (blis replay + the 1.8GB corpus): each replay holds the parsed corpus in RAM, so
         two at once OOM a 16GB runner -- capped at `agentic_workers` (default 1, serial).
     So the light majority runs parallel while the heavy minority serializes, which keeps a
@@ -363,43 +475,110 @@ def score_points(points: list, pull_dir: Path, work: Path, env: Env, *, workers:
         done[0] += 1
         e = points[idx]
         log(f"  [{done[0]}/{n}] {e['row']['model']} {e['row']['hardware']} c{e['row']['conc']} "
-            f"{e['point_id'][:12]} -> {o.fidelity['status'] if o.fidelity else o.reasons}")
+            f"{e['point_id'][:12]} -> {o.fidelity['grade'] if o.fidelity else o.faults or o.reasons}")
 
     if single:
         log(f"score: {len(single)} single-turn on {max(workers, 1)} worker(s)")
-        _run_pool(single, pull_dir, work, env, max(workers, 1), record)
+        _run_pool(single, pull_dir, work, env, max(workers, 1), record, simulate)
     if agentic:
         log(f"score: {len(agentic)} agentic on {max(agentic_workers, 1)} worker(s) (corpus-heavy)")
-        _run_pool(agentic, pull_dir, work, env, max(agentic_workers, 1), record)
+        _run_pool(agentic, pull_dir, work, env, max(agentic_workers, 1), record, simulate)
     return [results[i] for i in range(n)]   # input order; write_contract re-sorts anyway
 
 
-def _run_pool(indexed: list, pull_dir: Path, work: Path, env: Env, workers: int, record) -> None:
+def unread_result_substitutions(b: st.Built) -> list[dict]:
+    """The substitutions only the simulator's Result can replace, named while it has not been read
+    (score_point with simulate=False): the selected-entry report, and the acceptance profile of a
+    drafter whose acceptance the run did not record."""
+    return result.coefficient_substitutions({}) + _acceptance_subs(b, None)
+
+
+def _acceptance_subs(b: st.Built, doc: dict | None) -> list[dict]:
+    """A drafter with no recorded acceptance is simulated with the substrate's profile (D8); the
+    scenario pins nothing and the point names the profile blis resolved."""
+    spec = b.deployment["pools"][0]["engine"].get("speculative")
+    if spec is None or b.acceptance_length is not None:
+        return []
+    return [result.acceptance_substitution(doc)]
+
+
+def check_all_scored(points: list, outcomes: list) -> list[str]:
+    """COV-1: every unit the window holds ends scored, G5 with a reason, or failed. The outcomes
+    are the points, one each, and each is one of those three."""
+    out = []
+    want = sorted(e["point_id"] for e in points)
+    got = sorted(o.point_id for o in outcomes)
+    if want != got:
+        out.append(f"{len(got)} outcomes for {len(want)} points: every unit must end scored or G5 (COV-1)")
+    for o in outcomes:
+        if o.fidelity is None and o.g5 is None and not o.faults:
+            out.append(f"{o.point_id[:12]}: neither scored, G5 nor failed (COV-1)")
+    return out
+
+
+def _run_pool(indexed: list, pull_dir: Path, work: Path, env: Env, workers: int, record,
+              simulate: bool = True) -> None:
     """Score a list of (index, entry) at the given concurrency, calling record(index, outcome) as
     each finishes. workers<=1 runs in-process (no pool), else a ProcessPoolExecutor."""
     if workers <= 1:
         for idx, e in indexed:
-            record(idx, _score_one(e, pull_dir, work, env))
+            record(idx, _score_one(e, pull_dir, work, env, simulate))
         return
     from concurrent.futures import ProcessPoolExecutor, as_completed
     with ProcessPoolExecutor(max_workers=workers, initializer=_worker_init,
-                             initargs=(str(pull_dir), env, str(work))) as ex:
+                             initargs=(str(pull_dir), env, str(work), simulate)) as ex:
         futs = {ex.submit(_worker_score, e): idx for idx, e in indexed}
         for fut in as_completed(futs):
             record(futs[fut], fut.result())
 
 
-def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
+def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: bool = True) -> Outcome:
+    """One frozen point, scored: the checks, the scenario, the simulator run, the figures.
+
+    With simulate=False the same code runs up to the simulator call (the checks, the scenario, the
+    simulator's command line) and a point the scorer would hand to the simulator is returned
+    there, with would_run_simulator true, no figures, and the substitutions its data gives so far:
+    those its settings named, the single-turn client's differences, the data-parallel balancer,
+    and "selected-entry report not read" (and, for a drafter with no recorded acceptance, the
+    profile not read), which only the Result can replace. Its grade (grade_outcome) is the grade
+    that data gives, so it is G2 at best, never G1. A point the scorer refuses before the
+    simulator is the same outcome with or without it. `blis` is not run, and a point from
+    simulate=False is never written to a contract (write_contract refuses it)."""
     row, ident, pid = entry["row"], entry["identity"], entry["point_id"]
-    o = Outcome(point_id=pid, identity=ident, row=row, reasons=list(entry["reasons"]))
+    # blis runs in its binary's directory, so every path it is given is absolute.
+    work = work.resolve()
+    o = Outcome(point_id=pid, identity=ident, row=row, reasons=list(entry["reasons"]),
+                measurements=entry.get("measurements") or [], build=entry.get("build"))
+    fw = engines.lookup(row["framework"])
+    if not engines.scored(fw):
+        # Nothing was fetched and BLIS is not asked: G5 for the label's reasons and its router.
+        o.reasons = sorted(set(o.reasons + engines.reasons(fw) + asx.router_reason(row, fw.router)))
+        return o
     pdir = pull_dir / "points" / pid
     log_b = _read(pdir, entry["files"], "server_log")
     if log_b is None:
-        o.reasons = sorted(set(o.reasons + ["server_log_missing"]))
+        # The pull may already have said why (the API answered 413): that reason stands alone.
+        bare = [] if "server_log_missing:api_413" in o.reasons else ["server_log_missing"]
+        o.reasons = sorted(set(o.reasons + bare + asx.router_reason(row, fw.router)))
         return o
     log = log_b.decode("utf-8", "replace")
+    o.banner = _banner_version(log)
     lc_b = _read(pdir, entry["files"], "launch_config")
     launch = json.loads(lc_b) if lc_b else None
+    # A run measured behind a router BLIS does not host is never scored as if llm-d had routed
+    # it (design §11.4, X4; inference-sim #2028), so BLIS is not asked about it.
+    o.reasons += asx.router_reason(row, _launch_router(launch) or fw.router)
+
+    if row.get("disagg") or row.get("is_multinode"):
+        # One colocated engine is not this run (design §11.4): decide its recorded topology
+        # fields by the engine's field list and stop; nothing is simulated.
+        topo = st.topology_reasons(launch, st.read_args(log), env.field_list)
+        o.reasons = sorted(set(o.reasons + topo))
+        if not o.reasons:
+            # Every recorded topology field is modelled, but the harness builds one colocated
+            # pool and cannot write several engines as a scenario (design §11.4).
+            o.reasons = ["topology_unsupported"]
+        return o
 
     readings, problems = st.read_all(log, launch)
     # The API row's router is its own source: it states the frontend, nothing about the engine.
@@ -413,13 +592,14 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     # stays what the row is shown and keyed by.
     part_name = (sp.catalog_part(env.catalog_obj, env.parts, row["hardware"]) if env.catalog_obj else None) \
         or row["hardware"]
-    c = st.classify(st.merge(readings, env.policy, env.vllm_defaults), env.policy, env.vllm_defaults,
-                    family=env.catalog_obj.capability.get(part_name) if env.catalog_obj else None)
+    defaults = st.defaults_for(o.banner, env.vllm_defaults, env.vllm_defaults_release)
+    c = st.decide(st.merge(readings, defaults), env.field_list)
     o.reasons += c.reasons
+    o.subs = list(c.substitutions)
     o.reasons += row_vs_run(row, c)
 
     cat = env.catalog_obj
-    spec = c.mapped.get("engine.speculative.method", (None, None, None))[1]
+    spec = c.mapped.get("engine.speculative.method", (None, None))[1]
     cks = _checkpoints(c, launch)
     if not cks and (entry.get("checkpoint") or {}).get("repo"):
         # The log served a local path; the run's own recipe names the checkpoint (pull.py).
@@ -439,69 +619,48 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
             cmd = _read(pdir, entry["files"], "client_command")
             rp.cross_check(r, cmd.decode("utf-8", "replace") if cmd else None, row.get("conc"))
             o.reasons += r.reasons
-            if not r.corpus_repo:
-                o.reasons.append("required_setting_missing:replay.corpus_repo")
-            elif r.corpus_repo != env.corpus["dataset"]:
-                o.reasons.append(f"corpus_changed:{r.corpus_repo}")
+            o.reasons += corpus_reasons(r, env.corpora)
     else:
-        o.reasons += single_turn_replayable(row, env)
+        for k in ("isl", "osl", "conc"):
+            v = row.get(k)
+            if not isinstance(v, int) or isinstance(v, bool) or v < 1:
+                o.reasons.append(f"required_setting_missing:replay.{k}")
 
-    if sup.model is None or part_name not in cat.hardware:
+    if sup.model is None or sup.chip is None:
         o.reasons = sorted(set(o.reasons))
         return o
-    part = st.Part(name=part_name, memory_gib=cat.hardware[part_name])
-    try:
-        defaults = st.blis_defaults(env.defaults_helper, part)
-    except subprocess.SubprocessError as ex:
-        # Kept with the point's own reasons, never replaced by a bare extractor error.
-        o.reasons = sorted(set(o.reasons + [_helper_failure(ex)]))
-        return o
+    part = st.Part(name=part_name)
     name = f"p-{pid[:16]}"
-    b = st.build(c, name=name, model=sup.model, part=part, engine_version=env.vllm_ref, defaults=defaults)
+    catalog_size = cat.packaging(sup.chip)["gpus_per_node"]
+    node = ir.resolve(env.runner_table, row["hardware"], run_date=ident["measured_date"],
+                      launch_size=st.recorded_node_size(launch), fixes_packaging=catalog_size is not None)
+    b = st.build(c, name=name, model=sup.model, part=part, engine_version=env.engine_release,
+                 field_list=env.field_list, catalog_node_size=catalog_size, node=node)
     o.reasons += b.reasons
+    o.subs += b.substitutions
     header = [f"point {pid}", f"InferenceX row {row['id']} ({row['run_url']})",
               "GENERATED by orchestrator/ingest/score.py from the run's own settings. Do not edit."]
+    if b.node_source:
+        header.append(b.node_source)
+    spec = b.deployment["pools"][0]["engine"].get("speculative") or {}
+    if b.acceptance_length is not None and spec.get("num_spec_tokens"):
+        # The run's own synthetic acceptance, pinned in the scenario so every replay runs it: the
+        # agentic one (which also takes --speculative-acceptance-length) and the single-turn one
+        # (which passes no flag).
+        b.scenario["acceptance"] = {"value": {"num_spec_tokens": int(spec["num_spec_tokens"]),
+                                              "acceptance_length": float(b.acceptance_length)}}
     text = st.to_yaml(b, header)
     sdir = work / "scenarios"
     sdir.mkdir(parents=True, exist_ok=True)
     (sdir / f"{name}.yaml").write_text(text)
     dep = _parse_back(text)
-    args = c.args + b.defaults_used
+    args = c.args
     if o.reasons:
         # Already not scored. BLIS is asked only about a point nothing else refused: its
         # verdict on a known gap (e.g. a drafter the catalog doesn't describe) would restate
         # that gap as a second reason and count the point twice.
         o.reasons = sorted(set(o.reasons))
         return o
-    o.reasons += kernel_defaults(args, b.kernel_resolves, env, sdir, f"{name}.yaml")
-    if b.acceptance_needed:
-        o.reasons += acceptance_default(args, b, env, log, part_name, sup.model)
-        if o.reasons:
-            o.reasons = sorted(set(o.reasons))
-            return o
-    if b.kernel_resolves or b.acceptance_needed or b.acceptance_length is not None:
-        # State what the kernel resolved, so every consumer (signedprobe's harness requires a
-        # stated block_size) runs the same value the kernel would have assumed.
-        eng = b.deployment["pools"][0]["engine"]
-        for a in args:
-            if a["arg"] in b.kernel_resolves and a["match"] == "blis_default":
-                eng[a["arg"]] = a["blis"]
-        spec = eng.get("speculative") or {}
-        if b.acceptance_needed:
-            al = float(next(a["blis"] for a in args if a["arg"] == ACCEPTANCE_ARG))
-        elif b.acceptance_length is not None:
-            al = float(b.acceptance_length)       # the run's own synthetic acceptance
-        else:
-            al = None
-        if al is not None and spec.get("num_spec_tokens"):
-            # Pinned in the scenario, so every consumer runs it: blis replay (which also takes
-            # --speculative-acceptance-length) and signedprobe (which passes no acceptance flag).
-            b.scenario["acceptance"] = {"value": {"num_spec_tokens": int(spec["num_spec_tokens"]),
-                                                  "acceptance_length": al}}
-        text = st.to_yaml(b, header)
-        (sdir / f"{name}.yaml").write_text(text)
-        dep = _parse_back(text)
-    o.reasons += fill_blis_side(args, env, sdir, f"{name}.yaml", sup.model)
     o.reasons += _diff_args(args, dep, b)
     args.sort(key=lambda a: a["arg"])
     o.reasons = sorted(set(o.reasons))
@@ -509,62 +668,52 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
         return o
 
     if not agentic:
-        return score_single_turn(o, entry, env, work, sdir, name, text, dep, args, log, _estimated(args))
+        return score_single_turn(o, entry, env, work, b, header, name, dep, args, log, sup, pdir, simulate=simulate)
 
     # ---- the replay
-    metrics_path = work / "metrics" / f"{pid}.json"
-    metrics_path.parent.mkdir(parents=True, exist_ok=True)
-    spec_doc = rp.workload_spec(r, env.corpus["sha256"], env.corpus["revision"], env.corpus["file"])
-    spec_path = work / "workloads" / f"{pid}.yaml"
+    corpus = env.corpora[r.corpus]
+    spec_doc = rp.workload_spec(r, corpus)
+    spec_path = work / "replay-specs" / f"{pid}.yaml"
     spec_path.parent.mkdir(parents=True, exist_ok=True)
     import yaml
     spec_path.write_text(yaml.safe_dump({"replay": spec_doc}, sort_keys=False))
     argv = [env.blis, "replay", "--agentic-scenario", r.replayed_as,
             "--workload-spec", str(spec_path), "--concurrency", str(r.concurrency),
-            "--seed", str(r.seed), "--corpus", env.corpus["path"], "--corpus-sha256", env.corpus["sha256"],
+            "--seed", str(r.seed), "--corpus", corpus["path"], "--corpus-sha256", corpus["sha256"],
             "--scenario", f"{name}.yaml", "--scenarios", str(sdir),
-            "--catalog", str(env.catalog), "--registry", str(env.registry),
-            "--metrics-path", str(metrics_path)]
+            "--catalog", str(env.catalog), "--registry", str(env.registry), "--format", "json"]
     if b.acceptance_length is not None:
         argv += ["--speculative-acceptance-length", b.acceptance_length]
     if env.corpus_cache:
         argv += ["--corpus-cache", str(env.corpus_cache)]
-    # The cached result is reused only for the exact same inputs: scenario, workload, argv.
+    if not simulate:
+        o.subs += unread_result_substitutions(b)
+        o.fidelity = {"build": entry["build"], "args": args, "resolved": []}
+        o.would_run_simulator = True
+        return o
+    # The cached Result is reused only for the exact same inputs: scenario, workload, argv.
     key = hashlib.sha256((text + spec_path.read_text() + "\0".join(argv[1:])).encode()).hexdigest()
-    key_path = metrics_path.with_suffix(".key")
-    if metrics_path.exists() and (not key_path.exists() or key_path.read_text() != key):
-        metrics_path.unlink()
-    if not metrics_path.exists():
-        try:
-            proc = run_capped(argv, timeout=env.timeout_s, max_rss_mb=env.max_rss_mb)
-        except subprocess.TimeoutExpired:
-            o.reasons = ["blis_refused:timeout"]
-            return o
-        except MemoryExceeded:
-            # This agentic replay's resident memory exceeded the runner's ceiling; it's killed
-            # alone and the point is not scored, so one heavy trace can't OOM the whole job. The
-            # score is unchanged for every other point -- this is a runner-capacity limit, not a
-            # fidelity choice, so a larger-RAM run can score it later.
-            o.reasons = ["blis_refused:insufficient_memory"]
-            return o
-        (work / "logs").mkdir(exist_ok=True)
-        (work / "logs" / f"{pid}.err").write_text(proc.stderr[-20000:])
-        if proc.returncode != 0 or not metrics_path.exists():
-            o.reasons = [_blis_refusal(proc.stderr, work)]
-            return o
-        key_path.write_text(key)
-    metrics = json.loads(metrics_path.read_text())
+    doc = _run_result(o, argv, key, work / "results" / f"{pid}.json", env, work,
+                      runner=lambda a, timeout, cwd: run_capped(a, timeout=timeout, max_rss_mb=env.max_rss_mb,
+                                                                cwd=cwd))
+    if doc is None:
+        return o
     try:
-        pttft, ptpot = _metrics_us(metrics)
-    except (KeyError, TypeError, ValueError):
-        o.reasons = ["blis_refused:metrics_incomplete"]
+        pttft, ptpot = (result.figure(doc, result.TTFT_MEAN_MS) * 1e3, result.figure(doc, result.TPOT_MEAN_MS) * 1e3)
+    except result.ResultError as e:
+        o.reasons = [f"blis_refused:{e.slug}"]
         return o
 
-    m = row.get("metrics") or {}
-    status = point_status(_estimated(args), entry["build"])
-    o.fidelity = {"status": status, "build": entry["build"], "args": args,
-                  "resolved": resolved_kv(log, metrics), "replay": r.record(env.corpus["sha256"]),
-                  "blis_kernel_provenance": metrics.get("kernel_provenance")}
+    try:
+        o.subs += result.coefficient_substitutions(doc)
+        o.subs += _acceptance_subs(b, doc)
+    except result.ResultError as e:
+        o.reasons = [f"blis_refused:{e.slug}"]
+        return o
+    m = measured(entry)
+    o.fidelity = {"build": entry["build"], "args": args,
+                  "resolved": resolved_kv(log, doc), "replay": r.record(corpus["sha256"]),
+                  "blis_kernel_provenance": result.kernel_report(doc)}
     par = dep["pools"][0]["parallel"]
     ep = (par["tp"] * par["dp"]) if par.get("enable_expert_parallel") else 1
     scen = f"{sup.model}-{row['hardware']}-{row['precision']}-vllm-tp{par['tp']}-dp{par['dp']}-ep{ep}-agentx"
@@ -577,135 +726,15 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env) -> Outcome:
     o.csv_row = [scen, sup.model, row["hardware"], AGENTIC_LABEL, ident["conc"],
                  round(float(m["mean_tpot"]) * 1e6, 3), round(ptpot, 3),
                  round(float(m["mean_ttft"]) * 1e6, 3), round(pttft, 3),
-                 contract.TIER_BY_STATUS[status], pid, ident["measured_date"]]
+                 None, pid, ident["measured_date"]]     # the grade column is filled by grade_outcome
     return o
 
 
-def blis_resolution(env, scenarios: Path, scenario: str) -> dict | str:
-    """What BLIS resolves for the scenario as written (orchestrator/blisdefaults -resolve):
-    the kernel's own resolution, including every requested value it overrode and why. If BLIS
-    refuses the scenario, its refusal as a blis_refused reason instead."""
-    out = subprocess.run([env.defaults_helper, "-resolve", "-scenarios", str(scenarios), "-scenario", scenario,
-                          "-catalog", str(env.catalog), "-registry", str(env.registry)],
-                         capture_output=True, text=True, timeout=600)
-    if out.returncode != 0:
-        return _blis_refusal(out.stderr.replace("blisdefaults: ", ""), scenarios.parent)
-    return json.loads(out.stdout)
-
-
-ACCEPTANCE_ARG = "speculative_config.acceptance_length"
-_REQUEST = re.compile(r'"POST (/v1/[\w/]+)')
-
-
-def _thinking(log: str) -> str | None:
-    """The thinking mode a run's requests ran in, when the log shows it unambiguously: raw
-    /v1/completions prompts go through no chat template, so no reasoning mode applies ("off").
-    Chat requests' mode depends on their template arguments, which the log doesn't state."""
-    paths = set(_REQUEST.findall(log or ""))
-    return "off" if paths == {"/v1/completions"} else None
-
-
-def acceptance_default(args: list, b, env, log: str, hardware: str, model: str) -> list[str]:
-    """The run drafted without recording its acceptance: take BLIS's own registry default for
-    the drafter (blisdefaults -acceptance, blis-schemas' resolver) and record it as estimated.
-    Refused when the thinking mode can't be read, or BLIS has no profile."""
-    method, k = b.acceptance_needed
-    thinking = _thinking(log)
-    if thinking is None:
-        return ["required_setting_missing:speculative_config.synthetic_acceptance_length"]
-    out = subprocess.run([env.defaults_helper, "-acceptance", "-registry", str(env.registry), "-model", model,
-                          "-method", method, "-k", str(k), "-thinking", thinking, "-device", hardware],
-                         capture_output=True, text=True, timeout=120)
-    if out.returncode != 0:
-        return ["required_setting_missing:speculative_config.synthetic_acceptance_length"]
-    res = json.loads(out.stdout)
-    where = f" (measured on {res['measured_on']})" if res.get("measured_on") else ""
-    fell = f"; the run's requests state no category, so BLIS's only one for this drafter was used" \
-        if res.get("fallback_from") else ""
-    # As a decimal string: fidelity records hold no floats (contract canonical JSON).
-    args.append({"arg": ACCEPTANCE_ARG, "measured": None, "source": "blis_default", "blis": repr(float(res["acceptance_length"])),
-                 "match": "approximated",
-                 "note": f"The run didn't record its draft acceptance; BLIS used its registry default "
-                         f"{res['profile']}{where}{fell}."})
-    return []
-
-
-def kernel_defaults(args: list, paths: list, env, scenarios: Path, scenario: str) -> list[str]:
-    """For each required setting no source recorded and the scenario leaves to BLIS, record the
-    value BLIS's kernel resolved, read from BLIS (blisdefaults -resolve). If BLIS reports none,
-    or refuses the scenario, the point isn't scored."""
-    if not paths:
-        return []
-    res = blis_resolution(env, scenarios, scenario)
-    if isinstance(res, str):
-        return [res]
-    got = {a["name"]: a for a in res.get("assumptions", [])}
-    reasons = []
-    for path in paths:
-        a = got.get(path)
-        if a is None:
-            reasons.append(f"required_setting_missing:{path}")
-            continue
-        v = int(a["value"]) if a["value"].isdigit() else a["value"]
-        args.append({"arg": path, "measured": None, "source": "blis_default", "blis": v,
-                     "match": "blis_default", "rule": f"BLIS kernel: {a['reason']}"[:300]})
-    return reasons
-
-
-def fill_blis_side(args: list, env, scenarios: Path, scenario: str, model: str) -> list[str]:
-    """For each approximated setting, record what BLIS actually used, read from BLIS -- never a
-    placeholder. A setting whose source BLIS can't report refuses the point."""
-    need = [a for a in args if a.get("_blis_from")]
-    if not need:
-        return []
-    reasons, res = [], None
-    for a in need:
-        src = a.pop("_blis_from")
-        if src.startswith("resolved."):
-            if res is None:
-                res = blis_resolution(env, scenarios, scenario)
-                if isinstance(res, str):
-                    # BLIS refuses the scenario itself: that is the point's reason, next to its others.
-                    reasons.append(res)
-            if isinstance(res, str):
-                continue
-            # The kernel's resolved value: reported whole for the fields blisdefaults states
-            # (cache_dtype), else the override it made of the requested one.
-            field = src.split(".", 1)[1]
-            hit = [o["resolved"] for o in res["overrides"] if o["field"] == field]
-            a["blis"] = res.get(field) or (hit[0] if hit else None)
-        elif src == "priced.index_cache":
-            # The indexer record the kernel prices on this chip, under the cache dtype it
-            # resolved, named by vLLM's layout for its head width. One record or none.
-            if res is None:
-                res = blis_resolution(env, scenarios, scenario)
-                if isinstance(res, str):
-                    reasons.append(res)
-            if isinstance(res, str):
-                continue
-            index = [c for c in res.get("caches", []) if c["kind"] == "index"]
-            if not index:
-                # The model has no sparse indexer (Kimi, Qwen ...): vLLM reads the setting
-                # nowhere, so it changes nothing BLIS prices. Recorded, not estimated.
-                a.update(blis=None, match="inert", note="The model has no sparse indexer, so this setting has no effect.")
-                continue
-            names = {sp.index_record_format(c["bytes_per_entry"], c.get("head_dim", 0)) for c in index}
-            a["blis"] = names.pop() if len(names) == 1 else None
-        if a["blis"] is None:
-            reasons.append(f"setting_differs:{a['arg']}")
-    return reasons
-
-
-def single_turn_replayable(row: dict, env) -> list[str]:
-    """signedprobe replays InferenceX's single-turn benchmark from its own request-length
-    fixture; a (isl, osl, concurrency) the fixture doesn't hold can't be replayed."""
-    try:
-        key = (int(row["isl"]), int(row["osl"]), int(row["conc"]))
-    except (KeyError, TypeError, ValueError):
-        return ["required_setting_missing:replay.isl_osl"]
-    if key not in env.single_turn_workloads:
-        return [f"client_scenario_not_replayable:single_turn_{key[0]}:{key[1]}_c{key[2]}"]
-    return []
+def _launch_router(launch: dict | None) -> str | None:
+    """The router a launch configuration's frontend names; vLLM's own API server is none."""
+    fe = (launch or {}).get("frontend") if isinstance(launch, dict) else None
+    t = fe.get("type") if isinstance(fe, dict) else None
+    return None if t in (None, "vllm") else str(t)
 
 
 def _single_turn_label(isl: int, osl: int) -> str:
@@ -713,150 +742,249 @@ def _single_turn_label(isl: int, osl: int) -> str:
     return f"{k(isl)}{k(osl)}"
 
 
-# The engine fields signedprobe sets on the scenario it runs (harness.applyPointConfig): each is
-# passed as the scenario we wrote states it, so signedprobe runs exactly that scenario and never
-# substitutes its own vLLM resolution for one of them.
-_PROBE_FIELDS = (("max_num_seqs", "max_num_seqs"), ("max_num_batched_tokens", "max_num_batched_tokens"),
-                 ("max_model_len", "max_model_len"), ("block_size", "block_size"),
-                 ("enable_prefix_caching", "enable_prefix_caching"),
-                 ("gpu_memory_utilization", "gpu_memory_utilization"),
-                 ("max_cudagraph_capture_size", "max_cudagraph_capture_size"))
+# The scenario seed every single-turn replay runs with (the old harness's Config.Seed). The
+# requests are the client's own (inferencex_client), so the seed draws only what they leave
+# open, such as a router's tie-breaks (COV-10).
+SINGLE_TURN_SEED = 42
 
 
-def single_turn_inputs(row: dict, dep: dict, scenario_file: str) -> tuple[dict, dict, dict] | list[str]:
-    """signedprobe's three inputs for one point: a one-sweep corpus, the measured means
-    (absolutes) and the engine settings, all keyed by the scenario file and workload label."""
+def _run_result(o: Outcome, argv: list[str], key: str, cache: Path, env: Env, work: Path,
+                runner=None) -> dict | None:
+    """The Result of one `blis replay`, read from its standard output and validated
+    (result.run), or None with the point's refusal set on `o`. blis runs in its binary's
+    directory. The validated document is cached at `cache` and reused only for the same `key`,
+    a hash of every input the run reads."""
+    key_path = cache.with_suffix(".key")
+    if cache.exists() and key_path.exists() and key_path.read_text() == key:
+        return json.loads(cache.read_text())
+    cache.unlink(missing_ok=True)
+    logs = work / "logs"
+    logs.mkdir(parents=True, exist_ok=True)
+    try:
+        doc, raw, stderr = result.run(argv, blis=env.blis, cwd=str(Path(env.blis).parent), timeout=env.timeout_s,
+                                      runner=runner)
+    except subprocess.TimeoutExpired:
+        o.reasons = ["blis_refused:timeout"]
+        return None
+    except MemoryExceeded:
+        # This replay's resident memory exceeded the runner's ceiling; it is killed alone and
+        # the point is not scored, so one heavy trace cannot OOM the whole job. This is a
+        # runner-capacity limit, not a fidelity choice, so a larger-RAM run can score it later.
+        o.reasons = ["blis_refused:insufficient_memory"]
+        return None
+    except result.RunFailed as e:
+        (logs / f"{o.point_id}.err").write_text(e.stderr[-20000:])
+        o.reasons = [value_refusal(e.stderr, work, env.field_list) or _blis_refusal(e.stderr, work)]
+        return None
+    except result.ResultError as e:
+        (logs / f"{o.point_id}.err").write_text(str(e)[-20000:])
+        o.reasons = [f"blis_refused:{e.slug}"]
+        return None
+    (logs / f"{o.point_id}.err").write_text(stderr[-20000:])
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_bytes(raw)
+    key_path.write_text(key)
+    return doc
+
+
+# A single-turn point with data-parallel ranks is simulated behind the llm-d endpoint picker
+# profile vllm-dp-lb (inferencex/vllm-dp-lb.epp.yaml), which stands in for vLLM's internal load
+# balancer; the point names it (design 11.3, an execution mode substituted).
+DP_BALANCER = {"kind": "execution_mode", "subject": "data-parallel balancer",
+               "detail": "llm-d endpoint picker profile vllm-dp-lb stands in for vLLM's internal load balancer"}
+
+
+def client_reasons(entry: dict, pdir: Path, client: dict) -> list[str]:
+    """What the run's job log says about the client it ran (COV-12). A flag the harness does not
+    reproduce makes the point G5 value_not_recorded, subject `client:<flag>`: the client drew other
+    requests. A job log that is gone (client_args null) leaves the flags assumed; a run whose
+    InferenceX commit is unknown leaves the release unrecorded. Both set `client` for the point's
+    named client differences."""
+    row = entry["row"]
+    log_b = _read(pdir, entry["files"], "job_log")
+    client["flags_assumed"] = log_b is None
+    client["release_unrecorded"] = not entry.get("client_commit")
+    if log_b is None:
+        return []
+    flags = sx.client_flag_differences(log_b.decode("utf-8", "replace"), int(row["isl"]), int(row["osl"]),
+                                       int(row["conc"]))
+    return [f"value_not_recorded:client:{f}" for f in flags]
+
+
+def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built, header: list[str],
+                      name: str, dep: dict, args: list, log: str, sup: sp.Support, pdir_in: Path, *,
+                      simulate: bool = True) -> Outcome:
+    """One single-turn point, replayed as the run's client sent it (COV-12).
+
+    The requests are the client's seed-0 draws for the row's (isl, osl, conc)
+    (inferencex_client.target_lengths). Where the scenario's engine states
+    enable_prefix_caching false, the warm-up leaves nothing the main phase reads, so the main
+    phase runs from an empty engine. Otherwise it runs primed by the client's own warm-up: the
+    2*CONC copies of request 0 it sends and drains before the main phase (inferencex_client.
+    WARMUPS_PER_CONCURRENCY), so the warm-up state is the client's and not an equivalent of it,
+    whatever the deployment's data-parallel width. The scenario gains the router block of every single-turn point (vLLM's data-parallel
+    balancer, which places by requests in flight), written beside it. The predicted means are
+    the client's own, computed from the Result's request rows (inferencex_client.summarize);
+    the fidelity record's `requests` names how the requests were replayed and every difference
+    from the run's client."""
+    row, pid, ident = entry["row"], entry["point_id"], entry["identity"]
+    model = b.scenario["model"]
     pool = dep["pools"][0]
     eng, par = pool["engine"], pool["parallel"]
-    if "speculative" in eng and "acceptance" not in (dep.get("_scenario") or {}):
-        # signedprobe passes no acceptance flag to blis replay: a drafter is priced only when
-        # the scenario pins its acceptance.
-        return ["client_scenario_not_replayable:single_turn_speculative"]
-    m = row.get("metrics") or {}
+    m = measured(entry)
     try:
-        ttft_us, tpot_us = float(m["mean_ttft"]) * 1e6, float(m["mean_tpot"]) * 1e6
+        meas_ttft_us, meas_tpot_us = float(m["mean_ttft"]) * 1e6, float(m["mean_tpot"]) * 1e6
     except (KeyError, TypeError, ValueError):
-        return ["required_setting_missing:measured.mean_ttft_or_tpot"]
-    isl, osl, conc = int(row["isl"]), int(row["osl"]), int(row["conc"])
-    label = _single_turn_label(isl, osl)
-    ep = par["tp"] * par["dp"] if par.get("enable_expert_parallel") else 1
-    sweep = {"scenario": scenario_file, "model": dep.get("_model", ""), "gpu": row["hardware"],
-             "workload": f"{isl}:{osl}", "label": label, "framework": "vllm", "precision": row["precision"],
-             "serving": "aggregated", "spec_method": "none",
-             "parallelism": {"tp": par["tp"], "pp": par["pp"], "dp": par["dp"], "ep": ep},
-             "points": [{"concurrency": conc}]}
-    corpus = {"source": "orchestrator/ingest (one InferenceX API row)", "measurement_source": "InferenceX API",
-              "sweeps": [sweep]}
-    absolutes = {"source": "InferenceX API", "anchors": [
-        {"scenario": scenario_file, "label": label, "framework": "vllm", "gpu": row["hardware"],
-         "absolute_tpot_us": {str(conc): round(tpot_us, 3)}, "absolute_ttft_us": {str(conc): round(ttft_us, 3)}}]}
-    passed = {k: eng[f] for k, f in _PROBE_FIELDS if f in eng}
-    # vLLM v0.31.0 caches prefixes unless told not to; stated so signedprobe never decides it.
-    passed.setdefault("enable_prefix_caching", True)
-    passed["enable_expert_parallel"] = bool(par.get("enable_expert_parallel"))
-    settings = {"source": "orchestrator/ingest (the run's server log)", "settings": [
-        {"scenario": scenario_file, "label": label, "framework": "vllm", "gpu": row["hardware"],
-         "by_concurrency": {str(conc): {"passed": passed, "resolved": {}}}}]}
-    return corpus, absolutes, settings
-
-
-def score_single_turn(o, entry, env, work: Path, sdir: Path, name: str, text: str, dep: dict,
-                      args: list, log: str, approximated: bool):
-    """One single-turn point through signedprobe (orchestrator/signedprobe, built at the BLIS tag)."""
-    row, pid, ident = entry["row"], entry["point_id"], entry["identity"]
-    scen_doc = next((d for d in __import__("yaml").safe_load_all(text) if d.get("kind") == "Scenario"), {})
-    dep = {**dep, "_model": scen_doc.get("model", ""), "_scenario": scen_doc}
-    got = single_turn_inputs(row, dep, f"{name}.yaml")
-    if isinstance(got, list):
-        o.reasons = sorted(set(got))
+        o.reasons = ["required_setting_missing:measured.mean_ttft_or_tpot"]
         return o
-    corpus, absolutes, settings = got
-    pdir = work / "single_turn" / pid
+    isl, osl, conc = int(row["isl"]), int(row["osl"]), int(row["conc"])
+    client: dict = {}
+    refused = client_reasons(entry, pdir_in, client)
+    if refused:
+        o.reasons = sorted(set(o.reasons + refused))
+        return o
+    ins, outs = ix.target_lengths(isl, osl, conc)
+    primed = eng.get("enable_prefix_caching") is not False
+    copies = ix.WARMUPS_PER_CONCURRENCY * conc if primed else 0
+    replay = ix.primed_phase(ins, outs, conc, copies) if primed else ix.main_phase(ins, outs, conc)
+
+    pdir = (work / "single_turn" / pid).resolve()
     pdir.mkdir(parents=True, exist_ok=True)
-    files = {}
-    for role, doc in (("corpus", corpus), ("absolutes", absolutes), ("settings", settings)):
-        files[role] = pdir / f"{role}.json"
-        files[role].write_text(contract.canonical_dumps(doc) + "\n")
-    argv = [env.signedprobe, "-blis", env.blis, "-corpus", str(files["corpus"]), "-scenarios", str(sdir),
-            "-absolutes", str(files["absolutes"]), "-engine-settings", str(files["settings"]),
-            "-catalog", str(env.catalog), "-registry", str(env.registry)]
-    if env.blis_dir:
-        argv += ["-blis-dir", env.blis_dir]
-    out_path = pdir / "signedprobe.csv"
-    key = hashlib.sha256((text + "".join(files[r].read_text() for r in sorted(files)) + "\0".join(argv[1:])).encode()).hexdigest()
-    key_path = pdir / "signedprobe.key"
-    if not (out_path.exists() and key_path.exists() and key_path.read_text() == key):
-        try:
-            proc = subprocess.run(argv, capture_output=True, text=True, timeout=env.timeout_s)
-        except subprocess.TimeoutExpired:
-            o.reasons = ["blis_refused:timeout"]
-            return o
-        (pdir / "signedprobe.err").write_text(proc.stderr[-20000:])
-        if proc.returncode != 0:
-            o.reasons = [_blis_refusal(_probe_error(proc.stderr), work)]
-            return o
-        out_path.write_text(proc.stdout)
-        key_path.write_text(key)
-    import csv as _csv
-    rows = list(_csv.DictReader(out_path.read_text().splitlines()))
-    if len(rows) != 1:
+    routed = dataclasses.replace(b, deployment={**b.deployment,
+                                                "router": {"endpoint_picker_config": ix.ROUTER_CONFIG_NAME}})
+    text = st.to_yaml(routed, header)
+    (pdir / f"{name}.yaml").write_text(text)
+    router = ix.router_config_bytes()
+    (pdir / ix.ROUTER_CONFIG_NAME).write_bytes(router)
+    header_path, data_path = ix.write_trace(replay, pdir)
+    argv = ix.replay_argv(env.blis, f"{name}.yaml", pdir, header_path, data_path, replay.sessions, replay.pool,
+                          SINGLE_TURN_SEED)
+    if env.catalog:
+        argv += ["--catalog", str(env.catalog)]
+    if env.registry:
+        argv += ["--registry", str(env.registry)]
+    verified, why = _prompt_lengths().verified(sup.checkpoint, row.get("date"), isl, osl, conc)
+    differences = ix.client_differences(verified, why, **client)
+    if int(par.get("dp") or 1) > 1:
+        o.subs.append(DP_BALANCER)
+    requests = {"client": ix.CLIENT_SUBJECT, "start": "primed" if primed else "cold",
+                "copies": copies, "count": len(ins), "differences": differences}
+    if not simulate:
+        o.subs += unread_result_substitutions(b)
+        o.fidelity = {"build": entry["build"], "args": args, "resolved": [], "requests": requests}
+        o.would_run_simulator = True
+        return o
+    key = hashlib.sha256(b"\0".join([text.encode(), router, header_path.read_bytes(), data_path.read_bytes(),
+                                      "\0".join(argv[1:]).encode()])).hexdigest()
+    doc = _run_result(o, argv, key, pdir / "result.json", env, work)
+    if doc is None:
+        return o
+    try:
+        result.requests_complete(doc, len(replay.records))
+        rows = result.rows(doc)
+    except result.ResultError as e:
+        o.reasons = [f"blis_refused:{e.slug}"]
+        return o
+    try:
+        if primed:
+            ix.check_primed(rows, len(ins))
+    except ValueError:
+        o.reasons = ["blis_refused:warmup_not_drained"]
+        return o
+    try:
+        s = ix.summarize(rows, ins, outs, ignore=ix.main_phase_only(len(ins)) if primed else None)
+    except ValueError:
+        o.reasons = ["blis_refused:requests_not_the_points"]
+        return o
+    if s["mean_tpot_us"] is None:
         o.reasons = ["blis_refused:metrics_incomplete"]
         return o
-    pr = rows[0]
-    status = point_status(approximated, entry["build"])
-    o.fidelity = {"status": status, "build": entry["build"], "args": args, "resolved": [],
-                  "blis_kernel_provenance": None}
-    pool = dep["pools"][0]
-    par = pool["parallel"]
+
+    try:
+        o.subs += result.coefficient_substitutions(doc)
+        o.subs += _acceptance_subs(b, doc)
+    except result.ResultError as e:
+        o.reasons = [f"blis_refused:{e.slug}"]
+        return o
+    o.fidelity = {"build": entry["build"], "args": args, "resolved": [],
+                  "blis_kernel_provenance": result.kernel_report(doc), "requests": requests}
     ep = (par["tp"] * par["dp"]) if par.get("enable_expert_parallel") else 1
-    label = corpus["sweeps"][0]["label"]
-    scen = f"{dep['_model']}-{row['hardware']}-{row['precision']}-vllm-tp{par['tp']}-dp{par['dp']}-ep{ep}"
+    label = _single_turn_label(isl, osl)
+    scen = f"{model}-{row['hardware']}-{row['precision']}-vllm-tp{par['tp']}-dp{par['dp']}-ep{ep}"
     o.facets = {"identity": ident, "sweep_id": sweep_id(row, scen, label),
-                "scenario": scen, "label": label, "workload": corpus["sweeps"][0]["workload"],
-                "model": dep["_model"], "gpu": row["hardware"], "precision": row["precision"], "framework": "vllm",
+                "scenario": scen, "label": label, "workload": f"{isl}:{osl}",
+                "model": model, "gpu": row["hardware"], "precision": row["precision"], "framework": "vllm",
                 "serving": "aggregated", "spec_method": row.get("spec_method") or "none",
                 "parallelism": {"tp": par["tp"], "pp": par["pp"], "dp": par["dp"], "ep": ep},
                 "image": row.get("image"), "vllm_version": _banner_version(log)}
-    o.csv_row = [scen, dep["_model"], row["hardware"], label, ident["conc"],
-                 float(pr["meas_tpot_us"]), float(pr["pred_tpot_us"]),
-                 float(pr["meas_ttft_us"]), float(pr["pred_ttft_us"]),
-                 contract.TIER_BY_STATUS[status], pid, ident["measured_date"]]
+    o.csv_row = [scen, model, row["hardware"], label, ident["conc"],
+                 round(meas_tpot_us, 3), round(s["mean_tpot_us"], 3),
+                 round(meas_ttft_us, 3), round(s["mean_ttft_us"], 3),
+                 None, pid, ident["measured_date"]]     # the grade column is filled by grade_outcome
     return o
 
 
-def _helper_failure(ex: Exception) -> str:
-    return "blis_refused:timeout" if isinstance(ex, subprocess.TimeoutExpired) else "blis_refused:defaults_helper_failed"
+_EVIDENCE: list = []
 
 
-def _probe_error(stderr: str) -> str:
-    """signedprobe's own failure line (first run error / no latency), else its last line."""
-    for line in stderr.splitlines():
-        if line.startswith("first run error") or line.startswith("no latency observed"):
-            return line.split(": ", 1)[-1]
-    return stderr
+def _prompt_lengths() -> ix.PromptLengthEvidence:
+    """The sent-prompt-length evidence (inferencex_client.PROMPT_LENGTHS), loaded once per
+    process."""
+    if not _EVIDENCE:
+        _EVIDENCE.append(ix.PromptLengthEvidence.load(ix.PROMPT_LENGTHS))
+    return _EVIDENCE[0]
 
 
-def _estimated(args: list) -> bool:
-    """Whether BLIS estimated any setting, from the final per-setting records (an estimate that
-    turned out to change nothing, e.g. an indexer setting on a model with no indexer, is inert)."""
-    return any(a.get("match") == "approximated" for a in args)
+def substitutions(o_subs: list[dict], fidelity: dict) -> list[dict]:
+    """Every G2 substitution a scored point names (design §11.3): each one its settings named
+    (an estimation rule applied, a field with a status allowed only during a release plan), and
+    each difference between the run's client and the simulated one (COV-12). It also names, on
+    every point, each G1 condition that is not graded yet (grade.UNCHECKED_KINDS), so the scorer
+    publishes a G1 only when every condition has been checked."""
+    return list(o_subs) + list((fidelity.get("requests") or {}).get("differences") or []) + gr.unchecked()
 
 
-def point_status(approximated: bool, build: dict) -> str:
-    """exact only when BLIS was given every setting as the run recorded it AND the run's build is
-    the one BLIS models; otherwise approximate (shown as "estimated"). A build never refuses."""
-    return "approximate" if approximated or build.get("match") != "exact" else "exact"
+def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None) -> None:
+    """Give one outcome its grade (design §11.3, §11.4; COV-4, COV-5), from data alone.
+
+    A scored point is G1 to G4, its record naming every substitution, and its points.csv row
+    carrying the grade. A point not scored is G5 with every reason found, each mapped onto
+    §11.4's list (assess.g5_of; any other reason raises). A point carrying a run fault (the
+    simulator refused the scenario, or the scenario lost a recorded value) is neither: it is
+    listed as failed (o.faults), never graded. The run's own release is recorded on every point
+    (§11.2), read from its recorded build and the server log's banner, and the simulator build and
+    engine release that scored it (pointrecord's Simulator), on every point."""
+    rel = gr.run_release(o.build or {"image": o.row.get("image")}, o.banner)
+    o.run_release = rel.version
+    o.simulator = simulator
+    faults = sorted({r for r in o.reasons if asx.is_fault(r)})
+    if faults:
+        o.fidelity, o.facets, o.csv_row, o.faults = None, None, None, faults
+        return
+    if o.fidelity is None:
+        g5 = sorted({tuple(sorted(asx.g5_of(r).items())) for r in o.reasons})
+        if not g5:
+            raise gr.GradeError(f"point {o.point_id[:12]} was not scored and names no reason")
+        g = gr.grade(engine_version=engine_release, release=rel, substitutions=[], g5=[dict(x) for x in g5])
+        o.g5 = g.g5
+        o.g5_reasons = sorted((dict(x) for x in g5), key=lambda r: (r["code"], r.get("subject", "")))
+        return
+    g = gr.grade(engine_version=engine_release, release=rel, substitutions=substitutions(o.subs, o.fidelity))
+    o.fidelity = {**o.fidelity, "grade": g.grade, "substitutions": g.substitutions, "run_release": rel.version,
+                  "simulator": simulator}
+    if not o.would_run_simulator:      # a point graded without the simulator has no points.csv row
+        o.csv_row[contract.POINTS_HEADER.index(contract.GRADE_COLUMN)] = g.grade
 
 
-def row_vs_run(row: dict, c: st.Classified) -> list[str]:
+def row_vs_run(row: dict, c: st.Decided) -> list[str]:
     """The API row's summary fields must agree with what the run's own logs say; the logs
     are what's scored, and a disagreement means the row and the artifacts aren't the same run."""
     out = []
-    spec = c.mapped.get("engine.speculative.method", (None, None, None))[1]
+    spec = c.mapped.get("engine.speculative.method", (None, None))[1]
     row_spec = row.get("spec_method")
     if row_spec and (row_spec == "none") != (spec is None):
         out.append("conflict:spec_method")
-    offload = c.mapped.get("offload.connector", (None, None, None))[1]
+    offload = c.mapped.get("offload.connector", (None, None))[1]
     row_off = row.get("offload_mode")
     if row_off in ("on", "off") and (row_off == "on") != (offload is not None):
         out.append("conflict:offload_mode")
@@ -865,7 +993,7 @@ def row_vs_run(row: dict, c: st.Classified) -> list[str]:
     return out
 
 
-def _row_topology_vs_run(row: dict, c: st.Classified) -> list[str]:
+def _row_topology_vs_run(row: dict, c: st.Decided) -> list[str]:
     """The row's parallel layout against the one the run's log states.
 
     InferenceX records a single-node point's layout in its own terms, which differ from vLLM's
@@ -875,7 +1003,7 @@ def _row_topology_vs_run(row: dict, c: st.Classified) -> list[str]:
     results/topology.py counts tp x pp x pcp). Either spelling of the same GPUs agrees; a row
     whose width or GPU count matches neither describes a different run."""
     def logged(field, default=1):
-        v = c.mapped.get(field, (None, None, None))[1]
+        v = c.mapped.get(field, (None, None))[1]
         return int(v) if v is not None else default
     tp, dp, pp, pcp = logged("parallel.tp", 0), logged("parallel.dp"), logged("parallel.pp"), logged("parallel.pcp")
     if not tp:
@@ -909,10 +1037,14 @@ def split_repeated_sweeps(scored: list[Outcome]) -> None:
         concs = [o.identity["conc"] for o in os_]
         if len(concs) != len(set(concs)):
             for o in os_:
-                o.facets["sweep_id"] = f"{sid}|{o.identity['recipe']}"
+                o.facets["sweep_id"] = f"{sid}|{o.point_id[:12]}"
 
 
 def write_contract(out: Path, outcomes: list[Outcome], provenance: dict) -> None:
+    unsimulated = [o.point_id[:12] for o in outcomes if o.would_run_simulator]
+    if unsimulated:
+        raise ValueError(f"{len(unsimulated)} point(s) were graded without the simulator and have no figures "
+                         f"({', '.join(unsimulated[:3])}); a contract holds only scored points")
     out.mkdir(parents=True, exist_ok=True)
     scored = [o for o in outcomes if o.fidelity is not None]
     split_repeated_sweeps(scored)
@@ -926,39 +1058,27 @@ def write_contract(out: Path, outcomes: list[Outcome], provenance: dict) -> None
     fid = sorted(({"point_id": o.point_id, **o.fidelity} for o in scored), key=lambda r: r["point_id"])
     (out / contract.FIDELITY_JSONL).write_text("".join(contract.canonical_dumps(r) + "\n" for r in fid))
     (out / contract.FACETS_JSON).write_text(contract.canonical_dumps({o.point_id: o.facets for o in scored}) + "\n")
-    ns = []
-    policy = provenance.get("_policy") or {}
+    ns, failed = [], []
     for o in outcomes:
         if o.fidelity is not None:
             continue
-        m = o.row.get("metrics") or {}
-        reasons = sorted(set(o.reasons)) or ["blis_refused"]
+        m = measured({"row": o.row, "measurements": o.measurements})
         rec = {"point_id": o.point_id, "identity": o.identity, "measured_date": o.identity["measured_date"],
                "model": o.row["model"], "hardware": o.row["hardware"], "precision": o.row["precision"],
                "framework": o.row["framework"], "benchmark_type": o.row["benchmark_type"],
-               "conc": o.identity["conc"], "image": o.row.get("image"),
-               "measured": {"ttft_ms": _ms(m.get("mean_ttft")), "tpot_ms": _ms(m.get("mean_tpot"))},
-               "reasons": reasons}
-        n = [{"reason": x, **nt} for x in reasons if (nt := note_for(policy, x))]
-        if n:
-            rec["notes"] = n
-        ns.append(rec)
-    ns.sort(key=lambda r: r["point_id"])
-    (out / contract.NOT_SCORED_JSONL).write_text("".join(contract.canonical_dumps(r) + "\n" for r in ns))
-    prov = {k: v for k, v in provenance.items() if not k.startswith("_")}
+               "conc": o.identity["conc"], "image": o.row.get("image"), "run_release": o.run_release,
+               "simulator": o.simulator,
+               "measured": {"ttft_ms": _ms(m.get("mean_ttft")), "tpot_ms": _ms(m.get("mean_tpot"))}}
+        if o.faults:
+            failed.append({**rec, "faults": o.faults})
+        else:
+            ns.append({**rec, "grade": gr.G5, "g5_reason": o.g5, "g5_reasons": o.g5_reasons})
+    for name, recs in ((contract.NOT_SCORED_JSONL, ns), (contract.FAILED_JSONL, failed)):
+        recs.sort(key=lambda r: r["point_id"])
+        (out / name).write_text("".join(contract.canonical_dumps(r) + "\n" for r in recs))
+    prov = {**provenance, "points": len(outcomes)}
     (out / contract.PROVENANCE_JSON).write_text(contract.canonical_dumps(prov) + "\n")
 
 
 def _ms(seconds):
     return None if seconds is None else round(float(seconds) * 1e3, 6)
-
-
-def note_for(policy: dict, reason: str) -> dict | None:
-    """The policy's fixed note for a setting_not_modelled:<path> reason, if it has one."""
-    code, _, path = reason.partition(":")
-    if code != "setting_not_modelled" or not policy:
-        return None
-    hit = st.lookup(policy, path)
-    if not hit or not hit[1].get("note"):
-        return None
-    return {"text": hit[1]["note"]}

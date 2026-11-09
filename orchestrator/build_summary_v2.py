@@ -1,17 +1,24 @@
 #!/usr/bin/env python3
-"""Build summary.json v2 from an extractor contract directory (Discussion #28, issue #30).
+"""Build summary.json v3 from a contract directory (orchestrator/ingest/CONTRACT.md).
 
-Input: a contract directory (orchestrator/ingest/CONTRACT.md) -- points.csv, fidelity.jsonl,
-facets.json, not_scored.jsonl, provenance.json. Output: summary.json v2 (schemas/summary.v2.json).
+Input: a contract directory -- points.csv, fidelity.jsonl, facets.json, not_scored.jsonl,
+failed.jsonl, provenance.json. Output: summary.json v3 (schemas/summary.v3.json).
 
-The arithmetic is v1's, imported from build_summary rather than copied: per-point error, sweep
-shape re-anchored at the lowest surviving concurrency, every level averaging |point errors|, and
-the self-consistency oracle. What v2 adds per point is its identity (point_id, measured_date)
-and its fidelity record; and at the top, the not-scored points (never rendered) with their
-reasons counted in coverage. Repeated InferenceX runs of one measurement (same deployment,
-concurrency, day and BLIS inputs) are folded into one point (merge_repeats).
+The tree's arithmetic is v1's, imported from build_summary rather than copied: per-point error,
+sweep shape re-anchored at the lowest surviving concurrency, every level averaging |point
+errors|, and the self-consistency oracle. Each point carries its identity, measured date and
+fidelity record with its grade; a G1 point is in the strict tier (measured_or_resolved), every
+other graded point in "all" only. Repeated InferenceX runs of one measurement (same deployment,
+concurrency, day and BLIS inputs) are shown as one point in the tree (merge_repeats).
 
-Nothing in the nightly pipeline calls this. v1 (build_summary.py) is unchanged.
+At the top (design §11.3, §11.6): the headline over every graded point, G1 to G4, with each
+grade's share and accuracy and every figure's point count (headline.headline, COV-11);
+coverage by engine, engine release, chip and grade (headline.coverage, COV-7); the G5 and
+failed points; and the ten most common reasons a point is not G1 (backlog.top). The headline
+and coverage count every point of the contract, repeats included: each is one anchor unit.
+
+A contract holding a failed point whose fault is not a runner limit is refused: such a run has
+not finished scoring, and publishes nothing (COV-8; CONTRACT.md, Failed points).
 
 Usage:
     python3 orchestrator/build_summary_v2.py --contract DIR --out summary.json \
@@ -30,24 +37,30 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE / "ingest"))
+import assess  # noqa: E402
+import backlog as bl  # noqa: E402
 import build_summary as v1  # noqa: E402
 import contract  # noqa: E402
+import grade as gr  # noqa: E402
+import headline as hl  # noqa: E402
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
+BACKLOG_TOP = 10
 
 
 class ContractError(RuntimeError):
     """The contract directory isn't valid; never build a summary from it."""
 
 
-# A point's tier comes from its fidelity record, not the harness's tier string: an exact point
-# (BLIS simulated exactly what the run used) is in the strict tier; an approximate one (a setting
-# BLIS can't state was estimated, or a vLLM build BLIS doesn't model) only in "all".
-TIER_BY_STATUS = {"exact": "measured_or_resolved", "approximate": "all"}
+def tier(grade: str) -> str:
+    """The tree's tier for a grade: G1 is the strict tier, every other graded point is in "all"."""
+    if grade not in gr.GRADED:
+        raise ContractError(f"a scored point is graded {grade!r}")
+    return "measured_or_resolved" if grade == gr.G1 else "all"
 
 
 def read_points(directory: Path, fidelity: dict) -> list[dict]:
-    """points.csv rows with numbers parsed, each tiered by its fidelity status."""
+    """points.csv rows with numbers parsed, each tiered by its grade."""
     with open(directory / contract.POINTS_CSV, newline="") as fh:
         reader = csv.DictReader(fh)
         if reader.fieldnames != contract.POINTS_HEADER:
@@ -57,10 +70,7 @@ def read_points(directory: Path, fidelity: dict) -> list[dict]:
             r["concurrency"] = int(r["concurrency"])
             for k in ("meas_tpot_us", "pred_tpot_us", "meas_ttft_us", "pred_ttft_us"):
                 r[k] = float(r[k])
-            status = fidelity[r["point_id"]]["status"]
-            if status not in TIER_BY_STATUS:
-                raise ContractError(f"point {r['point_id'][:12]} is scored with status {status!r}")
-            r["tier"] = TIER_BY_STATUS[status]
+            r["tier"] = tier(fidelity[r["point_id"]]["grade"])
             rows.append(r)
     return rows
 
@@ -171,6 +181,20 @@ def _group(points, keyfn):
     return g
 
 
+def metric_pair(points: list[dict]) -> dict:
+    """v1's metric blocks over `points`, with every error figure under hl.MIN_POINTS points shown as
+    "too few points" (COV-11). A figure's own count is the points that have its value; `n` stays
+    the larger of the two metrics' counts, as v1 states it."""
+    pair = v1.metric_block_pair(points)
+    for tier, block in pair.items():
+        pts = [p for p in points if tier == "all" or p["tier"] == "measured_or_resolved"]
+        for kind in ("mape", "shape"):
+            for m in ("ttft", "tpot"):
+                if sum(1 for p in pts if p[f"{kind}_{m}"] is not None) < hl.MIN_POINTS:
+                    block[kind][m] = hl.TOO_FEW
+    return pair
+
+
 def build_matrix(flat: list[dict], facets: dict, fidelity: dict) -> list[dict]:
     """model -> workload -> gpu -> topology -> point, as v1, with v2's point fields."""
     for p in flat:
@@ -181,20 +205,20 @@ def build_matrix(flat: list[dict], facets: dict, fidelity: dict) -> list[dict]:
         mnode = {"level": "model", "model": model, "source": "inferencex",
                  "vllm_version": versions[0] if len(versions) == 1 else None,
                  "coverage": {"scored": len(mpts), "total": len(mpts)},
-                 "metrics": v1.metric_block_pair(mpts), "rows": []}
+                 "metrics": metric_pair(mpts), "rows": []}
         for wl, wpts in sorted(_group(mpts, lambda p: p["_f"]["workload"]).items()):
             isl = osl = None
             if ":" in str(wl):
                 isl, osl = (int(x) for x in str(wl).split(":"))
             wnode = {"level": "workload", "label": str(wl), "isl": isl, "osl": osl,
                      "coverage": {"scored": len(wpts), "total": len(wpts)},
-                     "metrics": v1.metric_block_pair(wpts), "rows": []}
+                     "metrics": metric_pair(wpts), "rows": []}
             for gpu, gpts in sorted(_group(wpts, lambda p: p["_f"]["gpu"]).items()):
                 # A GPU's precision only when its rows agree; one GPU can serve fp4 and int4 runs.
                 precs = {p["_f"]["precision"] for p in gpts}
                 gnode = {"level": "gpu", "label": gpu, "precision": precs.pop() if len(precs) == 1 else None,
                          "coverage": {"scored": len(gpts), "total": len(gpts)},
-                         "metrics": v1.metric_block_pair(gpts), "rows": []}
+                         "metrics": metric_pair(gpts), "rows": []}
                 for _, tpts in sorted(_group(gpts, _deployment).items()):
                     gnode["rows"].append(topology_node(tpts, fidelity))
                 _unique_labels(gnode["rows"])
@@ -232,7 +256,7 @@ def topology_node(tpts: list[dict], fidelity: dict) -> dict:
             "serving": f0["serving"], "spec_method": f0["spec_method"],
             "label": f"{base} · {f0['precision']}" + (f" · {spec}" if spec else ""),
             "coverage": {"scored": len(tpts), "total": len(tpts)},
-            "metrics": v1.metric_block_pair(tpts),
+            "metrics": metric_pair(tpts),
             "rows": [point_node(p, fidelity[p["point_id"]])
                      for p in sorted(tpts, key=lambda p: (p["concurrency"], p["measured_date"], p["sweep_id"]))]}
 
@@ -267,15 +291,43 @@ def point_node(p: dict, fid: dict) -> dict:
     return node
 
 
+class PublishRefused(ContractError):
+    """The contract holds a failed point that is not a runner limit: nothing is published."""
+
+
+def refused_faults(failed: list[dict]) -> list[str]:
+    """The failed points that stop a publish (COV-8): every one whose faults are not all runner
+    limits (assess.RUNNER_LIMITS)."""
+    return [f"{f['point_id'][:12]}: {', '.join(f['faults'])}" for f in failed
+            if not set(f["faults"]) <= set(assess.RUNNER_LIMITS)]
+
+
 def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     problems = contract.validate_dir(directory)
     if problems:
         raise ContractError("contract directory is invalid:\n  " + "\n  ".join(problems))
+    failed = _lines(directory / contract.FAILED_JSONL)
+    stop = refused_faults(failed)
+    if stop:
+        raise PublishRefused(f"{len(stop)} point(s) failed for a reason that is not a runner limit; the run "
+                             "publishes nothing (COV-8):\n  " + "\n  ".join(stop))
     fidelity = {r["point_id"]: r for r in _lines(directory / contract.FIDELITY_JSONL)}
     rows = read_points(directory, fidelity)
     facets = json.loads((directory / contract.FACETS_JSON).read_text())
     not_scored = _lines(directory / contract.NOT_SCORED_JSONL)
     prov_in = json.loads((directory / contract.PROVENANCE_JSON).read_text())
+
+    # Every point of the contract, graded or not, in the shape headline and backlog read.
+    graded = [{**r, "grade": fidelity[r["point_id"]]["grade"], "framework": facets[r["point_id"]]["framework"],
+               "hardware": facets[r["point_id"]]["identity"]["hardware"],
+               "release": fidelity[r["point_id"]]["run_release"],
+               "substitutions": fidelity[r["point_id"]]["substitutions"]} for r in rows]
+    g5 = [{**n, "release": n["run_release"]} for n in not_scored]
+    head = hl.headline(graded + g5)
+    problems = hl.check(head)
+    if problems:
+        raise ContractError("headline: " + "; ".join(problems))
+    cov = hl.coverage(graded + g5, left_out_records=prov_in["left_out_records"])
 
     rows, runs = merge_repeats(rows, facets, fidelity)
     sweeps = enrich(rows, facets)
@@ -286,49 +338,57 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     matrix = build_matrix(flat, facets, fidelity)
     totals = v1.metric_block_pair(flat)
     v1.assert_self_consistent(flat, totals)
+    totals = metric_pair(flat)
 
-    # How many not-scored points carry each reason code (a point counts once per code, so a
-    # code's count is a number of points; a point with two codes counts under both).
-    reasons = Counter(code for ns in not_scored for code in sorted({r.split(":", 1)[0] for r in ns["reasons"]}))
     folded = sum(len(r) - 1 for r in runs.values())
-    coverage = {"scored": len(flat), "not_scored": len(not_scored), "multinode_hidden": 0, "failed": 0,
-                "repeat_runs_folded": folded, "not_scored_reasons": dict(sorted(reasons.items()))}
-    # The balance: every point the pull holds is scored (alone or as a repeat run of one shown
-    # measurement) or not scored, exactly once.
+    coverage = {"points": cov["points"] + len(failed), "graded": cov["graded"], "not_scored": len(not_scored),
+                "failed": len(failed), "share_graded": cov["share_graded"],
+                "left_out_records": cov["left_out_records"], "repeat_runs_folded": folded,
+                "by_engine": cov["by_engine"], "by_engine_release": cov["by_engine_release"],
+                "by_chip": cov["by_chip"], "by_grade": cov["by_grade"],
+                "g5_reasons": dict(sorted(Counter(n["g5_reason"]["code"] for n in not_scored).items()))}
+    if coverage["points"] != prov_in["points"]:
+        raise ContractError(f"coverage counts {coverage['points']} points, the contract {prov_in['points']} (COV-1)")
     ids = [p["point_id"] for p in flat if p["point_id"] not in runs] + \
-        [x["point_id"] for r in runs.values() for x in r] + [ns["point_id"] for ns in not_scored]
-    if len(ids) != len(rows) + folded + len(not_scored):
-        raise ContractError("repeat folding lost a point")
-    if len(ids) != len(set(ids)):
-        raise ContractError("a point is both scored and not scored")
+        [x["point_id"] for r in runs.values() for x in r]
+    if len(ids) != len(graded) or len(set(ids)) != len(ids):
+        raise ContractError("repeat folding lost or doubled a point")
 
     pull_date = prov_in["pulled_at"][:10]
     dates = sorted({p["measured_date"] for p in flat} | {ns["measured_date"] for ns in not_scored})
     provenance = {
         "blis": prov_in["blis"],
+        "simulator": prov_in["simulator"],
+        "harness_digest": prov_in["harness_digest"],
+        "experimental": prov_in["experimental"],
+        "units": prov_in["units"],
+        "engine": prov_in["engine"],
         # What the extractor pulled, as it recorded it (provenance.json's source).
         "ground_truth": {"source": prov_in["source"]["name"], "source_url": prov_in["source"]["url"],
                          "release_tag": f"api-{pull_date}",
                          "measurement_date_through": dates[-1] if dates else None,
                          "measurement_sha256": prov_in["pull_manifest_sha256"]},
-        "evaluator_commit": evaluator_commit, "scorer": "signedprobe", "ingest": "api",
+        "evaluator_commit": evaluator_commit, "scorer": "orchestrator/ingest/score.py", "ingest": "api",
         "vllm_ref": prov_in["vllm_ref"], "vllm_max_distance": prov_in["vllm_max_distance"],
-        "policy_sha256": prov_in["policy_sha256"], "pulled_at": prov_in["pulled_at"], "corpus": prov_in["corpus"],
+        "fields_sha256": prov_in["fields_sha256"], "pulled_at": prov_in["pulled_at"], "corpora": prov_in["corpora"],
     }
     return {
         "schema_version": SCHEMA_VERSION,
         "snapshot_id": f"{generated_at[:10]}_blis-{prov_in['blis']['release']}_ix-api-{pull_date}",
         "generated_at": generated_at,
         "provenance": provenance,
+        "min_points": hl.MIN_POINTS,
+        "headline": head,
         "coverage": coverage,
+        "backlog": {"top": [{"reason": r, "points": n} for r, n in bl.top(graded + g5, BACKLOG_TOP)]},
         "known_artefacts": [],
         "metrics": ["ttft", "tpot"],
         "metricscore_comparison": None,
         "totals": totals,
         "matrix": matrix,
-        "scope": {"multinode": "not scored by the API extractor (blis_refused:disaggregated_or_multinode)",
-                  "measured_exclusions": [], "vllm_version_filter": "all"},
+        "scope": {"measured_exclusions": [], "vllm_version_filter": "all"},
         "not_scored": not_scored,
+        "failed": failed,
     }
 
 
@@ -357,12 +417,9 @@ def summary_to_contract(summary: dict, out: Path) -> None:
     import csv as _csv
     import io as _io
     out.mkdir(parents=True, exist_ok=True)
-    tier_str = {v: k for k, v in TIER_BY_STATUS.items()}  # "measured_or_resolved" -> contract tier
     rows, fids, facets = [], [], {}
     for m, w, g, t, p in iter_scored(summary):
         fid = p["fidelity"]
-        status = fid["status"]
-        tier_unbracketed = contract.TIER_BY_STATUS[status]
         # sweep_id is "{run}|{scenario}|{label}|{hash}": the facet's scenario and label (the sweep's
         # own workload label, e.g. "1k1k" / "agentx", NOT the topology's deployment label) are its
         # 2nd and 3rd segments. Both were set wrong before; they come straight out of the sweep_id.
@@ -387,7 +444,7 @@ def summary_to_contract(summary: dict, out: Path) -> None:
                          "concurrency": p["concurrency"],
                          "meas_tpot_us": _us(meas.get("tpot_ms")), "pred_tpot_us": _us((p.get("predicted") or {}).get("tpot_ms")),
                          "meas_ttft_us": _us(meas.get("ttft_ms")), "pred_ttft_us": _us((p.get("predicted") or {}).get("ttft_ms")),
-                         "tier_unbracketed": tier_unbracketed, "point_id": pid, "measured_date": p["measured_date"]})
+                         contract.GRADE_COLUMN: fid["grade"], "point_id": pid, "measured_date": p["measured_date"]})
             fids.append({"point_id": pid, **fid})
             facets[pid] = {"framework": t["framework"], "gpu": g["label"], "identity": ident,
                            "model": m["model"], "parallelism": t["parallelism"], "precision": t["precision"],
@@ -404,17 +461,23 @@ def summary_to_contract(summary: dict, out: Path) -> None:
     fids.sort(key=lambda r: r["point_id"])
     (out / contract.FIDELITY_JSONL).write_text("".join(contract.canonical_dumps(r) + "\n" for r in fids))
     (out / contract.FACETS_JSON).write_text(contract.canonical_dumps(facets) + "\n")
-    ns = sorted(summary.get("not_scored", []), key=lambda n: n["point_id"])
-    (out / contract.NOT_SCORED_JSONL).write_text("".join(contract.canonical_dumps(n) + "\n" for n in ns))
-    (out / contract.PROVENANCE_JSON).write_text(contract.canonical_dumps(_prov_out_to_in(summary["provenance"])) + "\n")
+    for name, key in ((contract.NOT_SCORED_JSONL, "not_scored"), (contract.FAILED_JSONL, "failed")):
+        recs = sorted(summary.get(key, []), key=lambda n: n["point_id"])
+        (out / name).write_text("".join(contract.canonical_dumps(n) + "\n" for n in recs))
+    (out / contract.PROVENANCE_JSON).write_text(
+        contract.canonical_dumps(_prov_out_to_in(summary["provenance"], summary["coverage"])) + "\n")
 
 
-def _prov_out_to_in(prov: dict) -> dict:
+def _prov_out_to_in(prov: dict, coverage: dict) -> dict:
     """The summary's provenance back to the contract's provenance.json shape build() expects."""
     gt = prov.get("ground_truth", {})
-    return {"ingest": "api", "blis": prov["blis"], "vllm_ref": prov["vllm_ref"],
-            "vllm_max_distance": prov["vllm_max_distance"], "policy_sha256": prov["policy_sha256"],
-            "pulled_at": prov["pulled_at"], "corpus": prov["corpus"],
+    return {"ingest": "api", "blis": prov["blis"], "simulator": prov["simulator"],
+            "harness_digest": prov["harness_digest"], "experimental": prov["experimental"], "units": prov["units"],
+            "engine": prov["engine"],
+            "points": coverage["points"],
+            "left_out_records": coverage["left_out_records"], "vllm_ref": prov["vllm_ref"],
+            "vllm_max_distance": prov["vllm_max_distance"], "fields_sha256": prov["fields_sha256"],
+            "pulled_at": prov["pulled_at"], "corpora": prov["corpora"],
             "pull_manifest_sha256": gt.get("measurement_sha256", ""),
             "source": {"name": gt.get("source", ""), "url": gt.get("source_url", "")}}
 
@@ -432,7 +495,7 @@ def build_merged(prior_summary: dict, delta_dir: Path, window_ids: set, *, gener
 
     Reconstructs a full contract (prior inverted + delta overlaid − aged-out) in `work`, then runs
     the same build() as a fresh night, so the merged summary is produced by one code path. The
-    merged provenance keeps the prior run's BLIS/policy/corpus (nothing was re-scored) but takes the
+    merged provenance keeps the prior run's BLIS release, field list and corpus (nothing was re-scored) but takes the
     delta pull's `pulled_at` / `pull_manifest_sha256`, so the API pull date tracks the newest data
     (issue #35)."""
     merged = work / "merged-contract"
@@ -451,7 +514,8 @@ def _overlay_delta(base: Path, delta_dir: Path, window_ids: set) -> None:
     dfid = {r["point_id"]: r for r in _lines(delta_dir / contract.FIDELITY_JSONL)}
     dfacets = json.loads((delta_dir / contract.FACETS_JSON).read_text())
     dns = {n["point_id"]: n for n in _lines(delta_dir / contract.NOT_SCORED_JSONL)}
-    delta_ids = set(dpoints) | set(dns)
+    dfailed = {n["point_id"]: n for n in _lines(delta_dir / contract.FAILED_JSONL)}
+    delta_ids = set(dpoints) | set(dns) | set(dfailed)
 
     # points.csv: keep base rows in-window and not superseded by the delta, then append delta rows.
     base_rows = [r for r in _csv.DictReader(open(base / contract.POINTS_CSV))
@@ -476,14 +540,15 @@ def _overlay_delta(base: Path, delta_dir: Path, window_ids: set) -> None:
     bfac.update({pid: f for pid, f in dfacets.items() if pid in keep})
     (base / contract.FACETS_JSON).write_text(contract.canonical_dumps(bfac) + "\n")
 
-    bns = {n["point_id"]: n for n in _lines(base / contract.NOT_SCORED_JSONL)
-           if n["point_id"] in keep and n["point_id"] not in delta_ids}
-    bns.update({pid: n for pid, n in dns.items() if pid in keep})
-    (base / contract.NOT_SCORED_JSONL).write_text(
-        "".join(contract.canonical_dumps(bns[k]) + "\n" for k in sorted(bns)))
+    counts = len(rows)
+    for name, delta in ((contract.NOT_SCORED_JSONL, dns), (contract.FAILED_JSONL, dfailed)):
+        kept = {n["point_id"]: n for n in _lines(base / name) if n["point_id"] in keep and n["point_id"] not in delta_ids}
+        kept.update({pid: n for pid, n in delta.items() if pid in keep})
+        (base / name).write_text("".join(contract.canonical_dumps(kept[k]) + "\n" for k in sorted(kept)))
+        counts += len(kept)
 
     # Provenance stays the prior run's for everything that genuinely didn't change on an IX-only
-    # night -- BLIS release, policy, corpus, vllm_ref, source -- since nothing was re-scored. But a
+    # night -- BLIS release, field list, corpus, vllm_ref, source -- since nothing was re-scored. But a
     # NEW pull DID fetch the delta, so the two fields that describe the pull event itself must come
     # from the delta: `pulled_at` (the "API pull date" the UI shows, and what build() derives the
     # release_tag / snapshot_id from) and `pull_manifest_sha256` (the "pull sha256", which must
@@ -494,7 +559,29 @@ def _overlay_delta(base: Path, delta_dir: Path, window_ids: set) -> None:
     dprov = json.loads((delta_dir / contract.PROVENANCE_JSON).read_text())
     bprov["pulled_at"] = dprov["pulled_at"]
     bprov["pull_manifest_sha256"] = dprov["pull_manifest_sha256"]
+    # The merged window's own counts: its points, and the records the newest ledger left out.
+    bprov["points"] = counts
+    bprov["left_out_records"] = dprov["left_out_records"]
     (base / contract.PROVENANCE_JSON).write_text(contract.canonical_dumps(bprov) + "\n")
+
+
+BACKLOG_KIND = "Backlog"
+
+
+def backlog_of(summary: dict) -> dict:
+    """The blocker backlog published beside a v3 summary (design §11.6, COV-7): per engine, every
+    G5 reason and every substitution that holds a point below G1, ranked by the points it blocks
+    or demotes (backlog.build). Built from the summary's own points, repeats unfolded, so it is
+    the same whether the night scored the window or merged a delta into it."""
+    points = []
+    for m, w, g, t, p in iter_scored(summary):
+        for _ in p.get("repeats") or [p]:
+            points.append({"framework": t["framework"], "grade": p["fidelity"]["grade"],
+                           "substitutions": p["fidelity"]["substitutions"]})
+    points += [{"framework": n["framework"], "grade": "G5", "g5_reasons": n["g5_reasons"]}
+               for n in summary["not_scored"]]
+    return {"kind": BACKLOG_KIND, "snapshot_id": summary["snapshot_id"],
+            "simulator": summary["provenance"]["simulator"], "engines": bl.build(points)}
 
 
 def dumps(summary: dict) -> str:
@@ -512,8 +599,9 @@ def main(argv=None) -> int:
     summary = build(a.contract, generated_at=a.generated_at or prov["pulled_at"], evaluator_commit=a.evaluator_commit)
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(dumps(summary))
-    print(f"summary.json v2 written: {a.out} (scored {summary['coverage']['scored']}, "
-          f"not scored {summary['coverage']['not_scored']})", file=sys.stderr)
+    c = summary["coverage"]
+    print(f"summary.json v3 written: {a.out} (graded {c['graded']}, not scored {c['not_scored']}, "
+          f"failed {c['failed']})", file=sys.stderr)
     return 0
 
 

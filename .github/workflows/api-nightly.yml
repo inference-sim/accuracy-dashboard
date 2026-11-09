@@ -2,8 +2,8 @@ name: api-nightly
 
 # The API-ingest nightly pipeline (Discussion #15, revised 2026-10-25: the no-storage design).
 # Replaces the db-dump nightly (nightly.yml): instead of restoring a ~323 GB Postgres dump, it
-# pulls the live InferenceX API, scores the 180-day window with the resolved BLIS release, and
-# publishes v2 `api` snapshots. NOTHING RAW IS PERSISTED -- no ix-store branch, no committed logs;
+# pulls the live InferenceX API, scores the anchor units of the 180-day window (COV-2) with the
+# resolved BLIS release, and publishes summary v3 `api` snapshots. NOTHING RAW IS PERSISTED -- no ix-store branch, no committed logs;
 # the work dir is ephemeral and summary.json IS the score store (an IX-only night merges the delta
 # into the published summary). Only the agentic artifact downloads are cached, via actions/cache
 # (ephemeral, not committed), to keep a BLIS-release night fast.
@@ -14,6 +14,12 @@ name: api-nightly
 #     view; no snapshot/diff;
 #   * a BLIS release (a new stable inference-sim tag) -> re-fetch+rescore the whole window, freeze a
 #     snapshot, allow a diff. Agentic points whose artifacts expired (>90d) drop to not-scored.
+#     Every stable release from v0.16.0 on that state/scored-releases.json does not list is scored
+#     once, oldest first (COV-9; resolve_blis.sh). One release is scored and published per run,
+#     and the run dispatches itself again while more remain, so a failure in one release leaves
+#     the earlier ones published and listed and the next run starts at the one that failed. A
+#     release is listed when its scores are published, and the list never shrinks when old
+#     snapshots are pruned.
 # A no-op night (neither trigger) writes nothing and the last good view stands.
 on:
   schedule:
@@ -43,8 +49,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       blis_tag: ${{ steps.r.outputs.blis_tag }}
+      blis_tags: ${{ steps.r.outputs.blis_tags }}
+      more: ${{ steps.r.outputs.more }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - id: r
         env:
           GH_TOKEN: ${{ github.token }}
@@ -59,14 +67,17 @@ jobs:
     # #15's 6 h budget. An IX-only night fetches only the delta and is minutes.
     timeout-minutes: 345
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Read the Go release from the pin file
+        id: pin
+        run: grep -E '^GO_VERSION=' harness/harness.pin >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: "1.27"
-      - uses: actions/setup-python@v5
+          go-version: ${{ steps.pin.outputs.GO_VERSION }}
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.13"
-      - run: pip install --quiet jsonschema pyyaml
+      - run: pip install --quiet --require-hashes -r requirements-ci.txt
 
       # The ONLY thing cached across runs: the agentic artifact-download zips, keyed by artifact id
       # on disk (GitHubArtifacts.download). Ephemeral and NOT committed -- a cold cache just means a
@@ -74,107 +85,129 @@ jobs:
       # /server-log), so this holds only the agentic working set, well under the 10 GB cache limit.
       - name: Restore the artifact-download cache
         if: ${{ !inputs.ignore_cache }}
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ runner.temp }}/artifacts
           key: ix-artifacts-${{ github.run_id }}
           restore-keys: |
             ix-artifacts-
 
-      # Build blis FROM SOURCE at the resolved tag, and this repo's signedprobe and blisdefaults
-      # helper against that release's own inference-sim/kernel/schemas/blis-vllm (so a per-release
-      # score is sound; #15's seed rule). signedprobe lives here (orchestrator/signedprobe) since
-      # inference-sim v0.14.0, so a BLIS refactor no longer breaks the dashboard's scorer.
-      - name: Build BLIS, signedprobe and the per-release defaults helper
+      # The scoring runs in the harness image named by its digest in harness/image.pin (design
+      # §11.7, X8), so every figure records the digest of the image that produced it. While the pin
+      # says `unpublished` no image exists and this step FAILS: a gate that does not run is a
+      # failure (X16), and the scorer is never run from this source tree instead. A digest is
+      # verified against the signature harness-release.yml signs with before anything runs it.
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+      - name: Pin and verify the harness image
+        run: |
+          set -euo pipefail
+          IMAGE_REF="$(python3 orchestrator/ingest/harness_pin.py check harness/image.pin)"
+          cosign verify "$IMAGE_REF" \
+            --certificate-identity-regexp '^https://github\.com/inference-sim/accuracy-dashboard/\.github/workflows/harness-release\.yml@refs/(tags/v[0-9].*|heads/main)$' \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com > /dev/null
+          docker pull -q "$IMAGE_REF"
+          echo "HARNESS_IMAGE=${IMAGE_REF}" >> "$GITHUB_ENV"
+
+      # Score the release resolve_blis.sh named: the oldest unscored one, once (COV-9). Build blis
+      # FROM SOURCE at the tag (so a per-release score is sound; #15's seed rule), fetch what it
+      # pins, and run one night with it. Every point is scored by `blis replay` on requests the
+      # orchestrator writes (orchestrator/ingest/score.py); no other scorer is built. A release that
+      # fails publishes nothing and leaves the list as it was (COV-8), so the next run scores it
+      # again; the releases before it were published by their own runs.
+      - name: Score the release
         env:
-          BLIS_TAG: ${{ needs.resolve.outputs.blis_tag }}
+          BLIS_TAGS: ${{ needs.resolve.outputs.blis_tags }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          SIM="$RUNNER_TEMP/sim"
-          git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$SIM"
-          ( cd "$SIM" && GOFLAGS=-mod=mod go build -o blis main.go )
-          bash orchestrator/build_signedprobe.sh "$SIM" "$RUNNER_TEMP/signedprobe"
-          eval "$(bash orchestrator/resolve_versions.sh "$SIM")"
-          git clone -q --depth 1 --branch "$catalog"  https://github.com/inference-sim/blis-catalog.git  "$RUNNER_TEMP/catalog"
-          git clone -q --depth 1 --branch "$registry" https://github.com/inference-sim/blis-registry.git "$RUNNER_TEMP/registry"
-          bash orchestrator/build_blisdefaults.sh "$SIM" "$RUNNER_TEMP/blisdefaults"
-          echo "SIM=$SIM" >> "$GITHUB_ENV"
-          echo "CATALOG=$RUNNER_TEMP/catalog" >> "$GITHUB_ENV"
-          echo "REGISTRY=$RUNNER_TEMP/registry" >> "$GITHUB_ENV"
-          echo "DEFAULTS_HELPER=$RUNNER_TEMP/blisdefaults" >> "$GITHUB_ENV"
-          echo "SIGNEDPROBE=$RUNNER_TEMP/signedprobe" >> "$GITHUB_ENV"
-          # The vLLM ref the resolved BLIS release models (blis-vllm's Upstream), so cmd_pull stamps
-          # it into the manifest and anchors the build resolver on it -- no hardcoded VLLM_REF.
-          echo "VLLM_REF=$vllm" >> "$GITHUB_ENV"
-
-      # Fetch the pinned AgentX corpus once, by a RESOLVED HF revision (not a floating ref), so the
-      # sha256 recorded in provenance is reproducible and the corpus_changed guard is meaningful.
-      - name: Resolve the AgentX corpus (pinned HF revision + sha256)
-        run: |
-          set -euo pipefail
-          repo="semianalysisai/cc-traces-weka-062126"
-          file="traces.jsonl"
-          rev=$(curl -fsSL "https://huggingface.co/api/datasets/${repo}/revision/main" | python3 -c "import sys,json;print(json.load(sys.stdin)['sha'])")
-          curl -fsSL "https://huggingface.co/datasets/${repo}/resolve/${rev}/${file}" -o "$RUNNER_TEMP/corpus.json"
-          echo "CORPUS_REVISION=${rev}" >> "$GITHUB_ENV"
-          echo "fetched corpus ${repo}@${rev} ($(wc -c < "$RUNNER_TEMP/corpus.json") bytes)"
-
-      # One night: list the window, fetch+score the delta (or whole window on a BLIS release), merge
-      # into the published summary, and write data/ + state. The work dir is ephemeral ($RUNNER_TEMP),
-      # discarded with the runner -- nothing raw is persisted. state/last-run-api.json carries the
-      # window's point-id set, which is how the NEXT night detects the triggers (no raw store needed).
-      - name: Run the night
-        env:
-          BLIS_TAG: ${{ needs.resolve.outputs.blis_tag }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          # data/ is the checkout's own main tree, so the dump snapshots and any prior API snapshots
-          # (incl. the live view the merge reads) are present; cli.py nightly adds/prunes only API
-          # snapshots and never touches a dump one.
-          mkdir -p data state
-          # Always the full 180-day cumulative window ending the real UTC date -- never shrink it
-          # (that would prune the store).
-          TODAY="$(date -u +%F)"
-          # OOM fix (diagnosed by local profiling): a single agentic blis replay's peak RSS is
-          # trace-content-driven and unpredictable -- a c64 point used 11.5GB where a c128 used
-          # 6.9GB, up to ~14.6GB -- so NO pre-filter (concurrency/model/hw) reliably fits 16GB, and
-          # reducing concurrency or the window doesn't help (it's one replay's footprint, not
-          # accumulation). The reliable bound is reactive: --max-rss-mb caps each replay's resident
-          # memory; one that exceeds ~13GB is killed alone and recorded not_scored:insufficient_memory
-          # (counted, visible, no fidelity change -- a larger-RAM run can score it later), while the
-          # job survives and scores the rest. Scoring is also split by type: single-turn (light,
-          # no corpus) runs --workers-wide, agentic runs --agentic-workers=1. --corpus-cache stays
-          # for agentic parse-speed (blis: output identical with or without it).
-          # PULL-phase memory is a SEPARATE concern --max-rss-mb does NOT bound: that guard wraps
-          # each blis replay subprocess, but the pull holds artifact zips whole in the parent's RAM
-          # (download() -> bytes, decompressed in iter_files), one per download worker. On the cold
-          # full-rescore a BLIS bump forces (reuse 0 frozen, freeze 2030 fresh), 8 workers all held
-          # large agentic blobs from the b300/gb300/mi355x region at once and the 16GB runner was
-          # reclaimed mid-pull (run 40709558993: SIGTERM/exit 143 at point ~1759). 4 workers halves
-          # that peak; the pull is slower but far inside timeout-minutes. See PR notes.
-          python3 orchestrator/ingest/cli.py nightly \
-            --blis-tag "$BLIS_TAG" \
-            --work-dir "$RUNNER_TEMP/pull" --data-dir data --state state/last-run-api.json \
-            --window-days "$WINDOW_DAYS" --keep-api "$KEEP_API" \
-            --today "$TODAY" \
-            --workers 4 --agentic-workers 1 --download-workers 4 --max-rss-mb 13000 \
-            --cache "$RUNNER_TEMP/artifacts" --corpus-cache "$RUNNER_TEMP/corpus-cache" \
-            --work "$RUNNER_TEMP/contract" --score-work "$RUNNER_TEMP/scorework" \
-            --evaluator-commit "$GITHUB_SHA" \
-            --blis-dir "$SIM" --catalog "$CATALOG" --registry "$REGISTRY" \
-            --defaults-helper "$DEFAULTS_HELPER" --signedprobe "$SIGNEDPROBE" \
-            --corpus "$RUNNER_TEMP/corpus.json" --corpus-revision "$CORPUS_REVISION"
+          for BLIS_TAG in $BLIS_TAGS; do
+            echo "::group::score $BLIS_TAG"
+            rm -rf "$RUNNER_TEMP/sim" "$RUNNER_TEMP/substrate" \
+              "$RUNNER_TEMP/pull" "$RUNNER_TEMP/contract" "$RUNNER_TEMP/scorework"
+            SIM="$RUNNER_TEMP/sim"
+            git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$SIM"
+            ( cd "$SIM" && GOFLAGS=-mod=mod go build -o blis main.go )
+            # Everything else the release runs is named by its stack.json (SIM-3, X8), so a new
+            # release is scored with no change to this file: the blis-substrate commit (its
+            # catalog/, registry/ and catalog/ledger) and the vLLM tag of the engine release.
+            eval "$(python3 orchestrator/resolve_stack.py "$SIM")"
+            git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
+            git -C "$RUNNER_TEMP/substrate" checkout -q "$substrate_ref"
+            CATALOG="$RUNNER_TEMP/substrate/catalog"
+            REGISTRY="$RUNNER_TEMP/substrate/registry"
+            # The engine's field list: the pinned blis-vllm release's fields.json, at the commit
+            # stack.json names. TEMPORARY until the M2 substrate release lets the build print its
+            # own list (`blis fields`; inference-sim/accuracy-dashboard#52).
+            FIELDS="$RUNNER_TEMP/fields.json"
+            curl -fsSL --retry 3 -o "$FIELDS" \
+              "https://raw.githubusercontent.com/inference-sim/blis-vllm/${vllm_module_ref}/fields.json"
+            # The ledger at the same commit: every row of the window is placed in one of its
+            # units (design §10.2). The units scored are the anchor units in the substrate's
+            # published list, catalog/ledger/published/anchor.yaml (cli.py nightly). TEMPORARY until
+            # the M2 substrate release lets `blis ledger --list anchor` print it, and until a command
+            # prints the full unit list with identities (catalog/ledger/units) and the ingest report.
+            LEDGER="$RUNNER_TEMP/substrate/catalog/ledger"
+            # Every AgentX corpus, at the revision and full sha256 its replay workload in this
+            # release's catalog pins (agentx-mvp-uncapped, agentx-mvp; X12, D3). Each point is
+            # replayed with the corpus its own run's client loaded (COV-12). Nothing resolves a
+            # moving ref such as main. A file kept from an earlier release is reused only if it has
+            # the entry's hash.
+            python3 orchestrator/resolve_agentic_corpus.py --catalog "$CATALOG" --all -o "$RUNNER_TEMP/corpora"
+            # The vLLM tag of the engine release the simulator runs (stack.json engines), so
+            # cmd_pull stamps it into the manifest and anchors the build resolver on it.
+            export VLLM_REF="$vllm_ref"
+            # data/ is the checkout's own main tree, so the dump snapshots and any prior API snapshots
+            # (incl. the live view the merge reads) are present; cli.py nightly adds/prunes only API
+            # snapshots and never touches a dump one.
+            mkdir -p data state
+            # Always the full 180-day cumulative window ending the real UTC date -- never shrink it
+            # (that would prune the store).
+            TODAY="$(date -u +%F)"
+            # OOM fix (diagnosed by local profiling): a single agentic blis replay's peak RSS is
+            # trace-content-driven and unpredictable -- a c64 point used 11.5GB where a c128 used
+            # 6.9GB, up to ~14.6GB -- so NO pre-filter (concurrency/model/hw) reliably fits 16GB, and
+            # reducing concurrency or the window doesn't help (it's one replay's footprint, not
+            # accumulation). The reliable bound is reactive: --max-rss-mb caps each replay's resident
+            # memory; one that exceeds ~13GB is killed alone and recorded not_scored:insufficient_memory
+            # (counted, visible, no fidelity change -- a larger-RAM run can score it later), while the
+            # job survives and scores the rest. Scoring is also split by type: single-turn (light,
+            # no corpus) runs --workers-wide, agentic runs --agentic-workers=1. --corpus-cache stays
+            # for agentic parse-speed (blis: output identical with or without it).
+            # PULL-phase memory is a SEPARATE concern --max-rss-mb does NOT bound: that guard wraps
+            # each blis replay subprocess, but the pull holds artifact zips whole in the parent's RAM
+            # (download() -> bytes, decompressed in iter_files), one per download worker. On the cold
+            # full-rescore a BLIS bump forces (reuse 0 frozen, freeze 2030 fresh), 8 workers all held
+            # large agentic blobs from the b300/gb300/mi355x region at once and the 16GB runner was
+            # reclaimed mid-pull (run 40709558993: SIGTERM/exit 143 at point ~1759). 4 workers halves
+            # that peak; the pull is slower but far inside timeout-minutes. See PR notes.
+            python3 orchestrator/ingest/cli.py nightly \
+              --blis-tag "$BLIS_TAG" \
+              --work-dir "$RUNNER_TEMP/pull" --data-dir data --state state/last-run-api.json \
+              --scored state/scored-releases.json \
+              --window-days "$WINDOW_DAYS" --keep-api "$KEEP_API" \
+              --today "$TODAY" \
+              --workers 4 --agentic-workers 1 --download-workers 4 --max-rss-mb 13000 \
+              --cache "$RUNNER_TEMP/artifacts" --corpus-cache "$RUNNER_TEMP/corpus-cache" \
+              --work "$RUNNER_TEMP/contract" --score-work "$RUNNER_TEMP/scorework" \
+              --evaluator-commit "$GITHUB_SHA" \
+              --ledger "$LEDGER" \
+              --blis "$SIM/blis" --catalog "$CATALOG" --registry "$REGISTRY" \
+              --substrate-dir "$RUNNER_TEMP/substrate" \
+              --substrate-version "$substrate_version" --substrate-commit "$substrate_commit" \
+              --harness-image "$HARNESS_IMAGE" \
+              --corpus-dir "$RUNNER_TEMP/corpora" --fields "$FIELDS"
+            echo "::endgroup::"
+          done
 
       - name: Package the published data for the publish job
         run: tar -czf data.tgz -C data . 2>/dev/null || tar -czf data.tgz --files-from /dev/null
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: night
           path: |
             data.tgz
             state/last-run-api.json
+            state/scored-releases.json
           if-no-files-found: warn
 
   # ----------------------------------------------------------------- 3. publish (hosted-safe)
@@ -194,11 +227,11 @@ jobs:
       # this org repo refuses as a bypass actor (422), so its push is rejected "due to repository
       # rule violations" (verified run 42246296162). persist-credentials keeps this token wired into
       # the git remote for the push step.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           token: ${{ secrets.PUBLISH_PAT }}
           persist-credentials: true
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: night
           path: incoming
@@ -217,6 +250,28 @@ jobs:
           # on main must survive byte-for-byte in the incoming tree (this pipeline never touches a
           # dump snapshot; its absence or mutation means a bad artifact, so refuse the swap).
           python3 -c "import json,sys; json.load(open('newdata/index.json')); json.load(open('newdata/latest/summary.json'))"
+          # COV-7: coverage and the blocker backlog are published every night beside accuracy. A
+          # summary without its coverage, or a live view without backlog.json, is refused.
+          pip install --quiet --require-hashes -r requirements-ci.txt
+          python3 orchestrator/validate_summary_v2.py newdata/latest/summary.json
+          python3 - <<'PY'
+          import json, sys
+          s = json.load(open("newdata/latest/summary.json"))
+          try:
+              b = json.load(open("newdata/latest/backlog.json"))
+          except (OSError, ValueError) as e:
+              sys.exit(f"FATAL: data/latest/backlog.json is missing or unreadable ({e}); refusing to publish (COV-7)")
+          cov = s.get("coverage") or {}
+          missing = [k for k in ("points", "graded", "by_engine", "by_engine_release", "by_chip", "by_grade") if k not in cov]
+          if s.get("schema_version") != 3 or missing:
+              sys.exit(f"FATAL: the summary publishes no coverage {missing or ''} (schema_version {s.get('schema_version')}); "
+                       "refusing to publish (COV-7)")
+          if b.get("kind") != "Backlog" or b.get("snapshot_id") != s.get("snapshot_id") or not isinstance(b.get("engines"), dict):
+              sys.exit("FATAL: data/latest/backlog.json is not the backlog of the published summary; refusing to publish (COV-7)")
+          if s["provenance"].get("experimental") is not False:
+              sys.exit("FATAL: the summary is experimental (its simulator build is not a release); it is never "
+                       "published as BLIS's accuracy (design §11.7, X8)")
+          PY
           if [ -d data/snapshots ]; then
             for d in data/snapshots/*/; do
               name="$(basename "$d")"
@@ -257,10 +312,18 @@ jobs:
             echo "FATAL: run-night produced data but no state file at $STATE_IN — refusing to publish data without its state"
             exit 1
           fi
-          mkdir -p state; cp "$STATE_IN" state/last-run-api.json
+          # The list of releases with published scores is committed with the rest of state/. It
+          # is append-only and independent of the snapshots retained (COV-9), so it comes from
+          # the night as it is; a missing one is a hard error for the same reason.
+          SCORED_IN="incoming/state/scored-releases.json"
+          if [ ! -f "$SCORED_IN" ]; then
+            echo "FATAL: run-night produced data but no scored-releases list at $SCORED_IN — refusing to publish"
+            exit 1
+          fi
+          mkdir -p state; cp "$STATE_IN" state/last-run-api.json; cp "$SCORED_IN" state/scored-releases.json
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A data state/last-run-api.json
+          git add -A data state/last-run-api.json state/scored-releases.json
           if git commit -m "api-nightly: ${{ needs.resolve.outputs.blis_tag }} $(date -u +%F) [skip ci]"; then
             # A long rescore can finish after another commit landed on main; rebase onto it so the
             # push doesn't fail and lose the night. Our commit only touches data/ + state/, which no
@@ -268,8 +331,7 @@ jobs:
             # if all fail the step errors (never report pushed=true for data that didn't land).
             pushed=false
             for attempt in 1 2 3; do
-              git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
-              if git push; then pushed=true; break; fi
+              if git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && git push; then pushed=true; break; fi
               echo "push rejected (main advanced); retry $attempt"; sleep 5
             done
             if [ "$pushed" != true ]; then
@@ -286,3 +348,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run pages.yml --ref "${GITHUB_REF_NAME}"
+
+      # More unscored releases remain: this one is published and listed, so start the next run,
+      # which begins at the oldest still unlisted. Only after a successful publish, so a failed
+      # release is never skipped (COV-9).
+      - name: Score the next unscored release
+        if: ${{ steps.pub.outputs.pushed == 'true' && needs.resolve.outputs.more == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run api-nightly.yml --ref "${GITHUB_REF_NAME}"

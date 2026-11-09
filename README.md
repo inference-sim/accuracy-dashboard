@@ -6,8 +6,16 @@ How accurately BLIS predicts real inference latency, scored nightly against
 
 **BLIS only. End-to-end only. Tables only, no plots.** Every number is a full `blis replay`
 through the whole stack (router/admission → scheduler → batch → kernel), scored against the
-pinned weekly InferenceX dump. v0.1.0 reports **mean TTFT and TPOT, each MAPE + shape** — exactly
-what `cmd/signedprobe` emits. E2E, tail p99 and throughput are out of scope for v0.1.0.
+pinned weekly InferenceX dump. v0.1.0 reports **mean TTFT and TPOT, each MAPE + shape**. E2E,
+tail p99 and throughput are out of scope for v0.1.0.
+
+Points are scored by `orchestrator/ingest/score.py`. For a single-turn point it writes the
+requests the InferenceX client sent (`orchestrator/ingest/inferencex_client.py`), runs
+`blis replay` on them, and computes the client's mean TTFT and TPOT from the per-request rows of
+the Result document blis prints. For an agentic point it runs `blis replay --agentic-scenario`
+and reads `ttft_mean_ms` and `tpot_mean_ms` from the Result. The Go command `signedprobe`, which
+scored single-turn points before, has been removed; the pipeline sketch below predates the API
+ingest.
 
 ## How it fits together
 
@@ -32,6 +40,33 @@ and holds **no other scoring logic**, no copied extractors, no log parsing, and 
 reimplement the scorer's exclusions (RFC §4.3/§4.4). `signedprobe`, `metricscore`, `blis` and the
 extractors are all built/run from source at the CI-resolved release tag.
 
+## Scoring harness image
+
+The scoring harness is the one place a BLIS simulation is compared with a measured end-to-end
+benchmark (design §2.2, §11.7). It is released as a container image, built from each release
+tag by `.github/workflows/harness-release.yml`, published to
+`ghcr.io/inference-sim/accuracy-dashboard-harness`, and signed by digest with cosign keyless
+signing. The job summary and the `harness-digest` artifact give the digest.
+
+The image takes three inputs, as flags to its entrypoint `harness/run.sh`:
+
+- a simulator build: `--sim`, a release tag or a full 40-hex commit of inference-sim, which the
+  harness clones and builds (a branch name is refused, because it moves);
+- the data: `--catalog` and `--registry` (both required until the simulator can report the data it embeds);
+- a set of ledger units: `--units`, with `--pull`, the frozen recorded runs of those units.
+
+The nightly (`.github/workflows/api-nightly.yml`) scores through the image named in `harness/image.pin`: the
+image reference by digest, or the word `unpublished` while no image has been released. The nightly verifies
+the signature with `cosign verify`, then runs the image with `docker run`, `HARNESS_DIGEST` set from the pin
+and the data mounted. With `unpublished` or a malformed line the step fails; the scorer is not run from the
+source tree instead.
+
+A repository whose pull requests run the harness pins one digest in one pin file, as it pins
+any dependency, pulls the image by that digest, and passes it to the run as `HARNESS_DIGEST`.
+The release bot moves the pin. Every figure records the digest of the harness that produced it
+(X8). A run without `HARNESS_DIGEST` records `unreleased`, and its figures are labelled
+experimental: they may be posted on a pull request, never published as BLIS's accuracy.
+
 ## Layout
 
 | Path | What |
@@ -39,7 +74,7 @@ extractors are all built/run from source at the CI-resolved release tag.
 | `docs/RFC-0001.md` | The complete v0.1.0 design (the spec). |
 | `docs/mockups/` | The approved Overview mockup (`.png` + `.html`). |
 | `schemas/summary.v1.json` | Local JSON schema `summary.json` is validated against (RFC §4.4). |
-| `orchestrator/` | The glue: resolve inputs, build from source, run `signedprobe`, shape the CSV into `summary.json`, validate. No scoring logic. |
+| `orchestrator/` | The glue: resolve inputs, build from source, run `blis replay` per point (`ingest/score.py`), shape the CSV into `summary.json`, validate. |
 | `web/` | The static Overview SPA (two tables, no plots). |
 | `data/latest/summary.json` | The current snapshot (CI-produced; the site fetches it). |
 | `data/snapshots/<id>/` | Immutable history, one per run. |
@@ -53,9 +88,8 @@ npm run test                        # headless render tests (zero console errors
 python3 orchestrator/test_build_summary.py   # orchestrator arithmetic + self-consistency oracle
 ```
 
-The real numbers come from CI (`orchestrator/evaluate.sh`); both inputs are resolved live. The
-dump is ingested by `orchestrator/stream_restore.sh` — it streams the resolved weekly dump into a
-Postgres service container, restoring only the 3 tables the extractor reads.
+The real numbers come from CI; both inputs are resolved live. The nightly streams the resolved
+weekly dump into a Postgres service container, restoring only the 3 tables the extractor reads.
 
 ## Deployment (GitHub Pages via Actions — RFC §4.2)
 
@@ -91,7 +125,7 @@ upstream "zstd: Broken pipe" is the expected early-close, not an error — see `
 
 BLIS's prediction is a function of topology + engine-settings + concurrency; it is **independent of
 the vLLM version**. The dump measures each deployment on many vLLM builds. So before scoring,
-`orchestrator/filter_latest_vllm.py` reduces the corpus to the **latest N = 5 numbered vLLM
+the nightly reduces the corpus to the **latest N = 5 numbered vLLM
 versions present in the dump** (window moves with each dump; unnumbered/custom builds excluded),
 then — since BLIS predicts identically across versions — keeps only the **newest surviving version
 per BLIS-input identity**. Each prediction is scored once, against the latest build. This replaces

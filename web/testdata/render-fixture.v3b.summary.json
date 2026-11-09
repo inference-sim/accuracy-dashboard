@@ -1,0 +1,2336 @@
+{
+  "schema_version": 3,
+  "snapshot_id": "2026-10-22_blis-v0.11.0_ix-api-2026-10-23",
+  "generated_at": "2026-10-22T00:00:00Z",
+  "provenance": {
+    "blis": {
+      "catalog": "0.3.0",
+      "commit_sha": "8e344596c35272e6f505df65c0935aeb5e0000ec",
+      "extractor_version": "blis-latency-kernel@v0.3.0",
+      "registry": "v0.2.0",
+      "release": "v0.11.0"
+    },
+    "simulator": {
+      "build": "v0.11.0",
+      "engine": {
+        "kind": "vllm",
+        "version": "0.31.0"
+      },
+      "harness_digest": "unreleased"
+    },
+    "harness_digest": "unreleased",
+    "experimental": false,
+    "units": null,
+    "engine": {
+      "kind": "vllm",
+      "version": "0.31.0"
+    },
+    "ground_truth": {
+      "source": "SemiAnalysis InferenceX API",
+      "source_url": "https://inferencex.semianalysis.com/api/v1/",
+      "release_tag": "api-2026-10-23",
+      "measurement_date_through": "2026-10-21",
+      "measurement_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    "evaluator_commit": "local",
+    "scorer": "orchestrator/ingest/score.py",
+    "ingest": "api",
+    "vllm_ref": "v0.31.0",
+    "vllm_max_distance": 2000,
+    "fields_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "pulled_at": "2026-10-23T00:00:00Z",
+    "corpora": [
+      {
+        "alias": "semianalysis_cc_traces_weka_062126",
+        "dataset": "semianalysisai/cc-traces-weka-062126",
+        "revision": "23f152f6f0f9399a85901b89a6458def0ef16729",
+        "sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
+        "workload": "agentx-mvp-uncapped"
+      },
+      {
+        "alias": "semianalysis_cc_traces_weka_062126_256k",
+        "dataset": "semianalysisai/cc-traces-weka-062126-256k",
+        "revision": "8fecd2fc56694469f758f0afbbb6335ad3043740",
+        "sha256": "e39cd2ff3eba21d4a3664be51da743ac3d2149a1933898cafc7bfeac8147eeef",
+        "workload": "agentx-mvp"
+      }
+    ]
+  },
+  "min_points": 10,
+  "headline": {
+    "points": 13,
+    "graded": 8,
+    "not_scored": 5,
+    "headline": {
+      "ttft": {
+        "mape": "too few points",
+        "n": 8
+      },
+      "tpot": {
+        "mape": "too few points",
+        "n": 8
+      }
+    },
+    "grades": {
+      "G1": {
+        "points": 0,
+        "share": "too few points",
+        "ttft": {
+          "mape": "too few points",
+          "n": 0
+        },
+        "tpot": {
+          "mape": "too few points",
+          "n": 0
+        }
+      },
+      "G2": {
+        "points": 5,
+        "share": "too few points",
+        "ttft": {
+          "mape": "too few points",
+          "n": 5
+        },
+        "tpot": {
+          "mape": "too few points",
+          "n": 5
+        }
+      },
+      "G3": {
+        "points": 0,
+        "share": "too few points",
+        "ttft": {
+          "mape": "too few points",
+          "n": 0
+        },
+        "tpot": {
+          "mape": "too few points",
+          "n": 0
+        }
+      },
+      "G4": {
+        "points": 3,
+        "share": "too few points",
+        "ttft": {
+          "mape": "too few points",
+          "n": 3
+        },
+        "tpot": {
+          "mape": "too few points",
+          "n": 3
+        }
+      }
+    }
+  },
+  "coverage": {
+    "points": 14,
+    "graded": 8,
+    "not_scored": 5,
+    "failed": 1,
+    "share_graded": 0.6153846153846154,
+    "left_out_records": 3,
+    "repeat_runs_folded": 0,
+    "by_engine": {
+      "vllm": {
+        "points": 13,
+        "graded": 8,
+        "grades": {
+          "G1": 0,
+          "G2": 5,
+          "G3": 0,
+          "G4": 3,
+          "G5": 5
+        }
+      }
+    },
+    "by_engine_release": {
+      "vllm 0.25.0": {
+        "points": 1,
+        "graded": 1,
+        "grades": {
+          "G1": 0,
+          "G2": 0,
+          "G3": 0,
+          "G4": 1,
+          "G5": 0
+        }
+      },
+      "vllm 0.31.0": {
+        "points": 6,
+        "graded": 5,
+        "grades": {
+          "G1": 0,
+          "G2": 5,
+          "G3": 0,
+          "G4": 0,
+          "G5": 1
+        }
+      },
+      "vllm nightly or custom": {
+        "points": 6,
+        "graded": 2,
+        "grades": {
+          "G1": 0,
+          "G2": 0,
+          "G3": 0,
+          "G4": 2,
+          "G5": 4
+        }
+      }
+    },
+    "by_chip": {
+      "b200": {
+        "points": 6,
+        "graded": 4,
+        "grades": {
+          "G1": 0,
+          "G2": 3,
+          "G3": 0,
+          "G4": 1,
+          "G5": 2
+        }
+      },
+      "b300": {
+        "points": 1,
+        "graded": 0,
+        "grades": {
+          "G1": 0,
+          "G2": 0,
+          "G3": 0,
+          "G4": 0,
+          "G5": 1
+        }
+      },
+      "h100": {
+        "points": 1,
+        "graded": 0,
+        "grades": {
+          "G1": 0,
+          "G2": 0,
+          "G3": 0,
+          "G4": 0,
+          "G5": 1
+        }
+      },
+      "h200": {
+        "points": 5,
+        "graded": 4,
+        "grades": {
+          "G1": 0,
+          "G2": 2,
+          "G3": 0,
+          "G4": 2,
+          "G5": 1
+        }
+      }
+    },
+    "by_grade": {
+      "G1": 0,
+      "G2": 5,
+      "G3": 0,
+      "G4": 3,
+      "G5": 5
+    },
+    "g5_reasons": {
+      "field_not_modelled": 2,
+      "not_in_catalog": 2,
+      "router_unsupported": 1
+    }
+  },
+  "backlog": {
+    "top": [
+      {
+        "reason": "coefficient_range: not checked",
+        "points": 8
+      },
+      {
+        "reason": "kernel_hash: not checked",
+        "points": 8
+      },
+      {
+        "reason": "resolved_differs: not checked",
+        "points": 8
+      },
+      {
+        "reason": "value_class: not checked",
+        "points": 8
+      },
+      {
+        "reason": "client_difference: send_gap",
+        "points": 3
+      },
+      {
+        "reason": "G5 not_in_catalog: eagle3",
+        "points": 2
+      },
+      {
+        "reason": "nightly_or_custom: engine build",
+        "points": 2
+      },
+      {
+        "reason": "G5 field_not_modelled: kv_transfer_config.kv_connector",
+        "points": 1
+      },
+      {
+        "reason": "G5 field_not_modelled: prefill_schedule_interval",
+        "points": 1
+      },
+      {
+        "reason": "G5 not_in_catalog",
+        "points": 1
+      }
+    ]
+  },
+  "known_artefacts": [],
+  "metrics": [
+    "ttft",
+    "tpot"
+  ],
+  "metricscore_comparison": null,
+  "totals": {
+    "measured_or_resolved": {
+      "mape": {
+        "ttft": "too few points",
+        "tpot": "too few points",
+        "n": 0
+      },
+      "shape": {
+        "ttft": "too few points",
+        "tpot": "too few points",
+        "n": 0
+      },
+      "noise_floor_pct": 1.6
+    },
+    "all": {
+      "mape": {
+        "ttft": "too few points",
+        "tpot": "too few points",
+        "n": 8
+      },
+      "shape": {
+        "ttft": "too few points",
+        "tpot": "too few points",
+        "n": 2
+      },
+      "noise_floor_pct": 1.6
+    }
+  },
+  "matrix": [
+    {
+      "level": "model",
+      "model": "deepseek-v4-pro",
+      "source": "inferencex",
+      "vllm_version": "0.31.0",
+      "coverage": {
+        "scored": 3,
+        "total": 3
+      },
+      "metrics": {
+        "measured_or_resolved": {
+          "mape": {
+            "ttft": "too few points",
+            "tpot": "too few points",
+            "n": 0
+          },
+          "shape": {
+            "ttft": "too few points",
+            "tpot": "too few points",
+            "n": 0
+          },
+          "noise_floor_pct": 1.6
+        },
+        "all": {
+          "mape": {
+            "ttft": "too few points",
+            "tpot": "too few points",
+            "n": 3
+          },
+          "shape": {
+            "ttft": "too few points",
+            "tpot": "too few points",
+            "n": 2
+          },
+          "noise_floor_pct": 1.6
+        }
+      },
+      "rows": [
+        {
+          "level": "workload",
+          "label": "8192:1024",
+          "isl": 8192,
+          "osl": 1024,
+          "coverage": {
+            "scored": 3,
+            "total": 3
+          },
+          "metrics": {
+            "measured_or_resolved": {
+              "mape": {
+                "ttft": "too few points",
+                "tpot": "too few points",
+                "n": 0
+              },
+              "shape": {
+                "ttft": "too few points",
+                "tpot": "too few points",
+                "n": 0
+              },
+              "noise_floor_pct": 1.6
+            },
+            "all": {
+              "mape": {
+                "ttft": "too few points",
+                "tpot": "too few points",
+                "n": 3
+              },
+              "shape": {
+                "ttft": "too few points",
+                "tpot": "too few points",
+                "n": 2
+              },
+              "noise_floor_pct": 1.6
+            }
+          },
+          "rows": [
+            {
+              "level": "gpu",
+              "label": "b200",
+              "precision": "fp4",
+              "coverage": {
+                "scored": 3,
+                "total": 3
+              },
+              "metrics": {
+                "measured_or_resolved": {
+                  "mape": {
+                    "ttft": "too few points",
+                    "tpot": "too few points",
+                    "n": 0
+                  },
+                  "shape": {
+                    "ttft": "too few points",
+                    "tpot": "too few points",
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                },
+                "all": {
+                  "mape": {
+                    "ttft": "too few points",
+                    "tpot": "too few points",
+                    "n": 3
+                  },
+                  "shape": {
+                    "ttft": "too few points",
+                    "tpot": "too few points",
+                    "n": 2
+                  },
+                  "noise_floor_pct": 1.6
+                }
+              },
+              "rows": [
+                {
+                  "level": "topology",
+                  "framework": "vllm",
+                  "engine_version": "0.31.0",
+                  "precision": "fp4",
+                  "is_multinode": false,
+                  "parallelism": {
+                    "dp": 1,
+                    "ep": 1,
+                    "pp": 1,
+                    "tp": 8
+                  },
+                  "serving": "aggregated",
+                  "spec_method": "none",
+                  "label": "dp1 · ep1 · pp1 · tp8 · fp4",
+                  "coverage": {
+                    "scored": 3,
+                    "total": 3
+                  },
+                  "metrics": {
+                    "measured_or_resolved": {
+                      "mape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 0
+                      },
+                      "shape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    },
+                    "all": {
+                      "mape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 3
+                      },
+                      "shape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 2
+                      },
+                      "noise_floor_pct": 1.6
+                    }
+                  },
+                  "rows": [
+                    {
+                      "level": "point",
+                      "concurrency": 1,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 410.0,
+                        "tpot_ms": 21.5
+                      },
+                      "predicted": {
+                        "ttft_ms": 430.0,
+                        "tpot_ms": 19.4
+                      },
+                      "error_pct": {
+                        "ttft": 4.878,
+                        "tpot": -9.7674
+                      },
+                      "shape": {
+                        "ttft": null,
+                        "tpot": null
+                      },
+                      "point_id": "151265f6a3a9b4d5945acafa7a9b744d4a5bbae6a396d9d59b794d4ebadc431d",
+                      "identity": {
+                        "benchmark_run": 2301,
+                        "benchmark_type": "single_turn",
+                        "conc": 1,
+                        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
+                        "framework": "vllm",
+                        "hardware": "b200",
+                        "measured_date": "2026-09-03",
+                        "model": "dsv4",
+                        "precision": "fp4",
+                        "recipe_fingerprint": "d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1",
+                        "source": "inferencex"
+                      },
+                      "sweep_id": "2301|deepseek-v4-pro-b200-fp4-vllm-tp8.yaml|8k1k",
+                      "measured_date": "2026-09-03",
+                      "fidelity": {
+                        "args": [
+                          {
+                            "arg": "block_size",
+                            "blis": 256,
+                            "match": "exact",
+                            "measured": 256,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "enable_prefix_caching",
+                            "blis": false,
+                            "match": "exact",
+                            "measured": false,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "max_model_len",
+                            "blis": 9472,
+                            "match": "exact",
+                            "measured": 9472,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "max_num_batched_tokens",
+                            "blis": 8192,
+                            "match": "exact",
+                            "measured": 8192,
+                            "source": "args"
+                          }
+                        ],
+                        "blis_kernel_provenance": null,
+                        "build": {
+                          "commit": "3c0a1b2d4e5f60718293a4b5c6d7e8f901234567",
+                          "distance": 0,
+                          "image": "vllm/vllm-openai:v0.31.0",
+                          "match": "exact",
+                          "ref": "v0.31.0",
+                          "source": "release_tag"
+                        },
+                        "grade": "G2",
+                        "requests": {
+                          "client": "inferencex benchmark_serving.py",
+                          "copies": 0,
+                          "count": 10,
+                          "differences": [
+                            {
+                              "detail": "the simulator admits the next request at the step that emitted the previous request's last token; the client sends it after the response stream closes, an interval not modelled",
+                              "kind": "client_difference",
+                              "subject": "send_gap"
+                            }
+                          ],
+                          "start": "cold"
+                        },
+                        "resolved": [],
+                        "run_release": "0.31.0",
+                        "simulator": {
+                          "build": "v0.11.0",
+                          "engine": {
+                            "kind": "vllm",
+                            "version": "0.31.0"
+                          },
+                          "harness_digest": "unreleased"
+                        },
+                        "substitutions": [
+                          {
+                            "detail": "the simulator admits the next request at the step that emitted the previous request's last token; the client sends it after the response stream closes, an interval not modelled",
+                            "kind": "client_difference",
+                            "subject": "send_gap"
+                          },
+                          {
+                            "detail": "coefficient_range is not graded yet",
+                            "kind": "coefficient_range",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "kernel_hash is not graded yet",
+                            "kind": "kernel_hash",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "resolved_differs is not graded yet",
+                            "kind": "resolved_differs",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "value_class is not graded yet",
+                            "kind": "value_class",
+                            "subject": "not checked"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 4,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 620.0,
+                        "tpot_ms": 23.8
+                      },
+                      "predicted": {
+                        "ttft_ms": 700.0,
+                        "tpot_ms": 21.7
+                      },
+                      "error_pct": {
+                        "ttft": 12.9032,
+                        "tpot": -8.8235
+                      },
+                      "shape": {
+                        "ttft": 7.6519,
+                        "tpot": 1.0461
+                      },
+                      "point_id": "f0f7e62ad6ea9e09f53396e6aa452ca358b726b6e473ce26f67ed39a9a00f5ce",
+                      "identity": {
+                        "benchmark_run": 2301,
+                        "benchmark_type": "single_turn",
+                        "conc": 4,
+                        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
+                        "framework": "vllm",
+                        "hardware": "b200",
+                        "measured_date": "2026-09-03",
+                        "model": "dsv4",
+                        "precision": "fp4",
+                        "recipe_fingerprint": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+                        "source": "inferencex"
+                      },
+                      "sweep_id": "2301|deepseek-v4-pro-b200-fp4-vllm-tp8.yaml|8k1k",
+                      "measured_date": "2026-09-03",
+                      "fidelity": {
+                        "args": [
+                          {
+                            "arg": "block_size",
+                            "blis": 256,
+                            "match": "exact",
+                            "measured": 256,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "enable_prefix_caching",
+                            "blis": false,
+                            "match": "exact",
+                            "measured": false,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "max_model_len",
+                            "blis": 9472,
+                            "match": "exact",
+                            "measured": 9472,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "max_num_batched_tokens",
+                            "blis": 8192,
+                            "match": "exact",
+                            "measured": 8192,
+                            "source": "args"
+                          }
+                        ],
+                        "blis_kernel_provenance": null,
+                        "build": {
+                          "commit": "3c0a1b2d4e5f60718293a4b5c6d7e8f901234567",
+                          "distance": 0,
+                          "image": "vllm/vllm-openai:v0.31.0",
+                          "match": "exact",
+                          "ref": "v0.31.0",
+                          "source": "release_tag"
+                        },
+                        "grade": "G2",
+                        "requests": {
+                          "client": "inferencex benchmark_serving.py",
+                          "copies": 0,
+                          "count": 10,
+                          "differences": [
+                            {
+                              "detail": "the simulator admits the next request at the step that emitted the previous request's last token; the client sends it after the response stream closes, an interval not modelled",
+                              "kind": "client_difference",
+                              "subject": "send_gap"
+                            }
+                          ],
+                          "start": "cold"
+                        },
+                        "resolved": [],
+                        "run_release": "0.31.0",
+                        "simulator": {
+                          "build": "v0.11.0",
+                          "engine": {
+                            "kind": "vllm",
+                            "version": "0.31.0"
+                          },
+                          "harness_digest": "unreleased"
+                        },
+                        "substitutions": [
+                          {
+                            "detail": "the simulator admits the next request at the step that emitted the previous request's last token; the client sends it after the response stream closes, an interval not modelled",
+                            "kind": "client_difference",
+                            "subject": "send_gap"
+                          },
+                          {
+                            "detail": "coefficient_range is not graded yet",
+                            "kind": "coefficient_range",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "kernel_hash is not graded yet",
+                            "kind": "kernel_hash",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "resolved_differs is not graded yet",
+                            "kind": "resolved_differs",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "value_class is not graded yet",
+                            "kind": "value_class",
+                            "subject": "not checked"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 16,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 1340.0,
+                        "tpot_ms": 29.6
+                      },
+                      "predicted": {
+                        "ttft_ms": 1610.0,
+                        "tpot_ms": 28.9
+                      },
+                      "error_pct": {
+                        "ttft": 20.1493,
+                        "tpot": -2.3649
+                      },
+                      "shape": {
+                        "ttft": 14.5609,
+                        "tpot": 8.2039
+                      },
+                      "point_id": "43f2fa667be61739615a78e9229d367275169c2d269bf8424745df40d10ae47c",
+                      "identity": {
+                        "benchmark_run": 2301,
+                        "benchmark_type": "single_turn",
+                        "conc": 16,
+                        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
+                        "framework": "vllm",
+                        "hardware": "b200",
+                        "measured_date": "2026-09-03",
+                        "model": "dsv4",
+                        "precision": "fp4",
+                        "recipe_fingerprint": "dfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdf",
+                        "source": "inferencex"
+                      },
+                      "sweep_id": "2301|deepseek-v4-pro-b200-fp4-vllm-tp8.yaml|8k1k",
+                      "measured_date": "2026-09-03",
+                      "fidelity": {
+                        "args": [
+                          {
+                            "arg": "block_size",
+                            "blis": 256,
+                            "match": "exact",
+                            "measured": 256,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "enable_prefix_caching",
+                            "blis": false,
+                            "match": "exact",
+                            "measured": false,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "max_model_len",
+                            "blis": 9472,
+                            "match": "exact",
+                            "measured": 9472,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "max_num_batched_tokens",
+                            "blis": 8192,
+                            "match": "exact",
+                            "measured": 8192,
+                            "source": "args"
+                          }
+                        ],
+                        "blis_kernel_provenance": null,
+                        "build": {
+                          "commit": "3c0a1b2d4e5f60718293a4b5c6d7e8f901234567",
+                          "distance": 0,
+                          "image": "vllm/vllm-openai:v0.31.0",
+                          "match": "exact",
+                          "ref": "v0.31.0",
+                          "source": "release_tag"
+                        },
+                        "grade": "G2",
+                        "requests": {
+                          "client": "inferencex benchmark_serving.py",
+                          "copies": 0,
+                          "count": 10,
+                          "differences": [
+                            {
+                              "detail": "the simulator admits the next request at the step that emitted the previous request's last token; the client sends it after the response stream closes, an interval not modelled",
+                              "kind": "client_difference",
+                              "subject": "send_gap"
+                            }
+                          ],
+                          "start": "cold"
+                        },
+                        "resolved": [],
+                        "run_release": "0.31.0",
+                        "simulator": {
+                          "build": "v0.11.0",
+                          "engine": {
+                            "kind": "vllm",
+                            "version": "0.31.0"
+                          },
+                          "harness_digest": "unreleased"
+                        },
+                        "substitutions": [
+                          {
+                            "detail": "the simulator admits the next request at the step that emitted the previous request's last token; the client sends it after the response stream closes, an interval not modelled",
+                            "kind": "client_difference",
+                            "subject": "send_gap"
+                          },
+                          {
+                            "detail": "coefficient_range is not graded yet",
+                            "kind": "coefficient_range",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "kernel_hash is not graded yet",
+                            "kind": "kernel_hash",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "resolved_differs is not graded yet",
+                            "kind": "resolved_differs",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "value_class is not graded yet",
+                            "kind": "value_class",
+                            "subject": "not checked"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "level": "model",
+      "model": "deepseek-v4.1-flash",
+      "source": "inferencex",
+      "vllm_version": null,
+      "coverage": {
+        "scored": 4,
+        "total": 4
+      },
+      "metrics": {
+        "measured_or_resolved": {
+          "mape": {
+            "ttft": "too few points",
+            "tpot": "too few points",
+            "n": 0
+          },
+          "shape": {
+            "ttft": "too few points",
+            "tpot": "too few points",
+            "n": 0
+          },
+          "noise_floor_pct": 1.6
+        },
+        "all": {
+          "mape": {
+            "ttft": "too few points",
+            "tpot": "too few points",
+            "n": 4
+          },
+          "shape": {
+            "ttft": "too few points",
+            "tpot": "too few points",
+            "n": 0
+          },
+          "noise_floor_pct": 1.6
+        }
+      },
+      "rows": [
+        {
+          "level": "workload",
+          "label": "agentx",
+          "isl": null,
+          "osl": null,
+          "coverage": {
+            "scored": 4,
+            "total": 4
+          },
+          "metrics": {
+            "measured_or_resolved": {
+              "mape": {
+                "ttft": "too few points",
+                "tpot": "too few points",
+                "n": 0
+              },
+              "shape": {
+                "ttft": "too few points",
+                "tpot": "too few points",
+                "n": 0
+              },
+              "noise_floor_pct": 1.6
+            },
+            "all": {
+              "mape": {
+                "ttft": "too few points",
+                "tpot": "too few points",
+                "n": 4
+              },
+              "shape": {
+                "ttft": "too few points",
+                "tpot": "too few points",
+                "n": 0
+              },
+              "noise_floor_pct": 1.6
+            }
+          },
+          "rows": [
+            {
+              "level": "gpu",
+              "label": "b200",
+              "precision": "fp4",
+              "coverage": {
+                "scored": 1,
+                "total": 1
+              },
+              "metrics": {
+                "measured_or_resolved": {
+                  "mape": {
+                    "ttft": "too few points",
+                    "tpot": "too few points",
+                    "n": 0
+                  },
+                  "shape": {
+                    "ttft": "too few points",
+                    "tpot": "too few points",
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                },
+                "all": {
+                  "mape": {
+                    "ttft": "too few points",
+                    "tpot": "too few points",
+                    "n": 1
+                  },
+                  "shape": {
+                    "ttft": "too few points",
+                    "tpot": "too few points",
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                }
+              },
+              "rows": [
+                {
+                  "level": "topology",
+                  "framework": "vllm",
+                  "engine_version": "0.30.1rc1.dev493+gac9126e58",
+                  "precision": "fp4",
+                  "is_multinode": false,
+                  "parallelism": {
+                    "dp": 2,
+                    "ep": 2,
+                    "pp": 1,
+                    "tp": 1
+                  },
+                  "serving": "aggregated",
+                  "spec_method": "mtp",
+                  "label": "dp2 · ep2 · pp1 · tp1 · fp4 · mtp",
+                  "coverage": {
+                    "scored": 1,
+                    "total": 1
+                  },
+                  "metrics": {
+                    "measured_or_resolved": {
+                      "mape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 0
+                      },
+                      "shape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    },
+                    "all": {
+                      "mape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 1
+                      },
+                      "shape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    }
+                  },
+                  "rows": [
+                    {
+                      "level": "point",
+                      "concurrency": 8,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 1180.0,
+                        "tpot_ms": 5.1
+                      },
+                      "predicted": {
+                        "ttft_ms": 1210.0,
+                        "tpot_ms": 4.3
+                      },
+                      "error_pct": {
+                        "ttft": 2.5424,
+                        "tpot": -15.6863
+                      },
+                      "shape": null,
+                      "shape_reason": "< 3 concurrencies",
+                      "point_id": "a18bae6a72af5bd78b30d45e0ebff7119ba4f87dded309b7aa9d26e8aecc7492",
+                      "identity": {
+                        "benchmark_run": 2560,
+                        "benchmark_type": "agentic_traces",
+                        "conc": 8,
+                        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
+                        "framework": "vllm",
+                        "hardware": "b200",
+                        "measured_date": "2026-10-03",
+                        "model": "dsv41flash",
+                        "precision": "fp4",
+                        "recipe_fingerprint": "c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8",
+                        "source": "inferencex"
+                      },
+                      "sweep_id": "2560|deepseek-v4.1-flash-b200-fp4-vllm-tp1-ep2-dp2-dspark5-agentx.yaml|agentx",
+                      "measured_date": "2026-10-03",
+                      "fidelity": {
+                        "args": [
+                          {
+                            "arg": "attention_config.indexer_kv_dtype",
+                            "blis": null,
+                            "match": "approximated",
+                            "measured": "mxfp4",
+                            "note": "left unset; the engine resolves the upstream default",
+                            "source": "args"
+                          },
+                          {
+                            "arg": "attention_config.indexer_sparse_logits",
+                            "blis": null,
+                            "match": "approximated",
+                            "measured": true,
+                            "note": "left unset; the engine resolves the upstream default",
+                            "source": "args"
+                          },
+                          {
+                            "arg": "block_size",
+                            "blis": 128,
+                            "match": "exact",
+                            "measured": 128,
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "data_parallel_size",
+                            "blis": 2,
+                            "match": "exact",
+                            "measured": 2,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "enable_expert_parallel",
+                            "blis": true,
+                            "match": "exact",
+                            "measured": true,
+                            "source": "args"
+                          },
+                          {
+                            "arg": "gpu_memory_utilization",
+                            "blis": "0.97",
+                            "match": "exact",
+                            "measured": "0.97",
+                            "source": "args"
+                          },
+                          {
+                            "arg": "kernel_config.moe_backend",
+                            "blis": "deep_gemm_mega_moe",
+                            "blis_field": "engine.moe_backend",
+                            "match": "mapped",
+                            "measured": "deep_gemm_mega_moe",
+                            "source": "args"
+                          },
+                          {
+                            "arg": "max_num_seqs",
+                            "blis": 16,
+                            "match": "exact",
+                            "measured": 16,
+                            "source": "args"
+                          }
+                        ],
+                        "blis_kernel_provenance": {
+                          "method_counts": {
+                            "assumed": 50,
+                            "measured": 99
+                          }
+                        },
+                        "build": {
+                          "commit": "ac9126e58aa7bbab1856ba6593ba4d5003fea516",
+                          "distance": 207,
+                          "image": "vllm/vllm-openai:nightly-dev-x86_64-cu130-ac9126e58aa7",
+                          "match": "exact",
+                          "ref": "v0.31.0",
+                          "source": "label_by_tag"
+                        },
+                        "grade": "G4",
+                        "replay": {
+                          "client": "aiperf",
+                          "client_version": "1.0.11",
+                          "concurrency": 8,
+                          "corpus": "semianalysis_cc_traces_weka_062126",
+                          "corpus_sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
+                          "duration_s": 3600,
+                          "replayed_as": "inferencex-agentx-mvp",
+                          "scenario": "agentx",
+                          "seed": 42,
+                          "trajectory_start": {
+                            "max_ratio": 0.75,
+                            "min_ratio": 0.25
+                          }
+                        },
+                        "resolved": [
+                          {
+                            "blis": 9787503,
+                            "delta": 0,
+                            "match": "exact",
+                            "measured": 9787503,
+                            "occurrences": 2,
+                            "quantity": "kv_cache_tokens_per_replica",
+                            "ratio": "1.000"
+                          }
+                        ],
+                        "run_release": null,
+                        "simulator": {
+                          "build": "v0.11.0",
+                          "engine": {
+                            "kind": "vllm",
+                            "version": "0.31.0"
+                          },
+                          "harness_digest": "unreleased"
+                        },
+                        "substitutions": [
+                          {
+                            "detail": "coefficient_range is not graded yet",
+                            "kind": "coefficient_range",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "left unset; the engine resolves the upstream default",
+                            "kind": "estimated",
+                            "subject": "attention_config.indexer_kv_dtype"
+                          },
+                          {
+                            "detail": "left unset; the engine resolves the upstream default",
+                            "kind": "estimated",
+                            "subject": "attention_config.indexer_sparse_logits"
+                          },
+                          {
+                            "detail": "kernel_hash is not graded yet",
+                            "kind": "kernel_hash",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "vllm/vllm-openai:nightly-dev-x86_64-cu130-ac9126e58aa7 (banner 0.30.1rc1.dev493+gac9126e58)",
+                            "kind": "nightly_or_custom",
+                            "subject": "engine build"
+                          },
+                          {
+                            "detail": "resolved_differs is not graded yet",
+                            "kind": "resolved_differs",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "value_class is not graded yet",
+                            "kind": "value_class",
+                            "subject": "not checked"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": "gpu",
+              "label": "h200",
+              "precision": "fp4",
+              "coverage": {
+                "scored": 3,
+                "total": 3
+              },
+              "metrics": {
+                "measured_or_resolved": {
+                  "mape": {
+                    "ttft": "too few points",
+                    "tpot": "too few points",
+                    "n": 0
+                  },
+                  "shape": {
+                    "ttft": "too few points",
+                    "tpot": "too few points",
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                },
+                "all": {
+                  "mape": {
+                    "ttft": "too few points",
+                    "tpot": "too few points",
+                    "n": 3
+                  },
+                  "shape": {
+                    "ttft": "too few points",
+                    "tpot": "too few points",
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                }
+              },
+              "rows": [
+                {
+                  "level": "topology",
+                  "framework": "vllm",
+                  "engine_version": "0.31.0",
+                  "precision": "fp4",
+                  "is_multinode": false,
+                  "parallelism": {
+                    "dp": 1,
+                    "ep": 1,
+                    "pp": 1,
+                    "tp": 4
+                  },
+                  "serving": "aggregated",
+                  "spec_method": "mtp",
+                  "label": "dp1 · ep1 · pp1 · tp4 · fp4 · mtp",
+                  "coverage": {
+                    "scored": 2,
+                    "total": 2
+                  },
+                  "metrics": {
+                    "measured_or_resolved": {
+                      "mape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 0
+                      },
+                      "shape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    },
+                    "all": {
+                      "mape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 2
+                      },
+                      "shape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    }
+                  },
+                  "rows": [
+                    {
+                      "level": "point",
+                      "concurrency": 1,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 980.0,
+                        "tpot_ms": 8.1
+                      },
+                      "predicted": {
+                        "ttft_ms": 1120.0,
+                        "tpot_ms": 7.05
+                      },
+                      "error_pct": {
+                        "ttft": 14.2857,
+                        "tpot": -12.963
+                      },
+                      "shape": null,
+                      "shape_reason": "< 3 concurrencies",
+                      "point_id": "1bbb3ff5de3569ebf3687b780ac335e565bfa22acbb09ec37a0a120e3aa76357",
+                      "identity": {
+                        "benchmark_run": 2410,
+                        "benchmark_type": "agentic_traces",
+                        "conc": 1,
+                        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
+                        "framework": "vllm",
+                        "hardware": "h200",
+                        "measured_date": "2026-09-21",
+                        "model": "dsv41flash",
+                        "precision": "fp4",
+                        "recipe_fingerprint": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+                        "source": "inferencex"
+                      },
+                      "sweep_id": "2410|deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml|agentx",
+                      "measured_date": "2026-09-21",
+                      "fidelity": {
+                        "args": [
+                          {
+                            "arg": "block_size",
+                            "blis": 64,
+                            "match": "exact",
+                            "measured": 64,
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "gpu_memory_utilization",
+                            "blis": "0.92",
+                            "match": "exact",
+                            "measured": "0.92",
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "max_num_seqs",
+                            "blis": 16,
+                            "match": "exact",
+                            "measured": 16,
+                            "source": "args"
+                          }
+                        ],
+                        "blis_kernel_provenance": null,
+                        "build": {
+                          "commit": "3c0a1b2d4e5f60718293a4b5c6d7e8f901234567",
+                          "distance": 0,
+                          "image": "vllm/vllm-openai:v0.31.0",
+                          "match": "exact",
+                          "ref": "v0.31.0",
+                          "source": "release_tag"
+                        },
+                        "grade": "G2",
+                        "replay": {
+                          "client": "aiperf",
+                          "client_version": "0.12.0",
+                          "concurrency": 1,
+                          "corpus": "semianalysis_cc_traces_weka_062126",
+                          "corpus_sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
+                          "duration_s": 3600,
+                          "replayed_as": "inferencex-agentx-mvp",
+                          "scenario": "inferencex-agentx-mvp",
+                          "seed": 42,
+                          "trajectory_start": {
+                            "max_ratio": 0.75,
+                            "min_ratio": 0.25
+                          }
+                        },
+                        "resolved": [
+                          {
+                            "blis": 21002240,
+                            "delta": 962252,
+                            "match": "differs",
+                            "measured": 20039988,
+                            "quantity": "kv_cache_tokens_per_replica",
+                            "ratio": "1.048"
+                          }
+                        ],
+                        "run_release": "0.31.0",
+                        "simulator": {
+                          "build": "v0.11.0",
+                          "engine": {
+                            "kind": "vllm",
+                            "version": "0.31.0"
+                          },
+                          "harness_digest": "unreleased"
+                        },
+                        "substitutions": [
+                          {
+                            "detail": "coefficient_range is not graded yet",
+                            "kind": "coefficient_range",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "kernel_hash is not graded yet",
+                            "kind": "kernel_hash",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "resolved_differs is not graded yet",
+                            "kind": "resolved_differs",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "value_class is not graded yet",
+                            "kind": "value_class",
+                            "subject": "not checked"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "level": "point",
+                      "concurrency": 2,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 1210.0,
+                        "tpot_ms": 8.65
+                      },
+                      "predicted": {
+                        "ttft_ms": 1380.0,
+                        "tpot_ms": 7.55
+                      },
+                      "error_pct": {
+                        "ttft": 14.0496,
+                        "tpot": -12.7168
+                      },
+                      "shape": null,
+                      "shape_reason": "< 3 concurrencies",
+                      "point_id": "60ff4d8be33a50d998d6c44fc5843dd291b2353e5987bcc76a9896380bc71c15",
+                      "identity": {
+                        "benchmark_run": 2410,
+                        "benchmark_type": "agentic_traces",
+                        "conc": 2,
+                        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
+                        "framework": "vllm",
+                        "hardware": "h200",
+                        "measured_date": "2026-09-21",
+                        "model": "dsv41flash",
+                        "precision": "fp4",
+                        "recipe_fingerprint": "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2",
+                        "source": "inferencex"
+                      },
+                      "sweep_id": "2410|deepseek-v4.1-flash-h200-fp4-vllm-tp4-dspark5-agentx.yaml|agentx",
+                      "measured_date": "2026-09-21",
+                      "fidelity": {
+                        "args": [
+                          {
+                            "arg": "block_size",
+                            "blis": 64,
+                            "match": "exact",
+                            "measured": 64,
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "gpu_memory_utilization",
+                            "blis": "0.92",
+                            "match": "exact",
+                            "measured": "0.92",
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "max_num_seqs",
+                            "blis": 16,
+                            "match": "exact",
+                            "measured": 16,
+                            "source": "args"
+                          }
+                        ],
+                        "blis_kernel_provenance": null,
+                        "build": {
+                          "commit": "3c0a1b2d4e5f60718293a4b5c6d7e8f901234567",
+                          "distance": 0,
+                          "image": "vllm/vllm-openai:v0.31.0",
+                          "match": "exact",
+                          "ref": "v0.31.0",
+                          "source": "release_tag"
+                        },
+                        "grade": "G2",
+                        "replay": {
+                          "client": "aiperf",
+                          "client_version": "0.12.0",
+                          "concurrency": 2,
+                          "corpus": "semianalysis_cc_traces_weka_062126",
+                          "corpus_sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
+                          "duration_s": 3600,
+                          "replayed_as": "inferencex-agentx-mvp",
+                          "scenario": "inferencex-agentx-mvp",
+                          "seed": 42,
+                          "trajectory_start": {
+                            "max_ratio": 0.75,
+                            "min_ratio": 0.25
+                          }
+                        },
+                        "resolved": [
+                          {
+                            "blis": 21002240,
+                            "delta": 962252,
+                            "match": "differs",
+                            "measured": 20039988,
+                            "quantity": "kv_cache_tokens_per_replica",
+                            "ratio": "1.048"
+                          }
+                        ],
+                        "run_release": "0.31.0",
+                        "simulator": {
+                          "build": "v0.11.0",
+                          "engine": {
+                            "kind": "vllm",
+                            "version": "0.31.0"
+                          },
+                          "harness_digest": "unreleased"
+                        },
+                        "substitutions": [
+                          {
+                            "detail": "coefficient_range is not graded yet",
+                            "kind": "coefficient_range",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "kernel_hash is not graded yet",
+                            "kind": "kernel_hash",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "resolved_differs is not graded yet",
+                            "kind": "resolved_differs",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "value_class is not graded yet",
+                            "kind": "value_class",
+                            "subject": "not checked"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "level": "topology",
+                  "framework": "vllm",
+                  "engine_version": "0.25.0",
+                  "precision": "fp4",
+                  "is_multinode": false,
+                  "parallelism": {
+                    "dp": 1,
+                    "ep": 1,
+                    "pp": 1,
+                    "tp": 8
+                  },
+                  "serving": "aggregated",
+                  "spec_method": "mtp",
+                  "label": "dp1 · ep1 · pp1 · tp8 · fp4 · mtp",
+                  "coverage": {
+                    "scored": 1,
+                    "total": 1
+                  },
+                  "metrics": {
+                    "measured_or_resolved": {
+                      "mape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 0
+                      },
+                      "shape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    },
+                    "all": {
+                      "mape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 1
+                      },
+                      "shape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    }
+                  },
+                  "rows": [
+                    {
+                      "level": "point",
+                      "concurrency": 1,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 760.0,
+                        "tpot_ms": 6.9
+                      },
+                      "predicted": {
+                        "ttft_ms": 790.0,
+                        "tpot_ms": 5.95
+                      },
+                      "error_pct": {
+                        "ttft": 3.9474,
+                        "tpot": -13.7681
+                      },
+                      "shape": null,
+                      "shape_reason": "< 3 concurrencies",
+                      "point_id": "c82d02072bf078a7e9107ee4bc29c5a270038c72e6e76abcc6b0a91791816acc",
+                      "identity": {
+                        "benchmark_run": 2410,
+                        "benchmark_type": "agentic_traces",
+                        "conc": 1,
+                        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
+                        "framework": "vllm",
+                        "hardware": "h200",
+                        "measured_date": "2026-09-21",
+                        "model": "dsv41flash",
+                        "precision": "fp4",
+                        "recipe_fingerprint": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+                        "source": "inferencex"
+                      },
+                      "sweep_id": "2410|deepseek-v4.1-flash-h200-fp4-vllm-tp8-dspark5-agentx.yaml|agentx",
+                      "measured_date": "2026-09-21",
+                      "fidelity": {
+                        "args": [
+                          {
+                            "arg": "block_size",
+                            "blis": 64,
+                            "match": "exact",
+                            "measured": 64,
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "gpu_memory_utilization",
+                            "blis": "0.92",
+                            "match": "exact",
+                            "measured": "0.92",
+                            "source": "engine_line"
+                          }
+                        ],
+                        "blis_kernel_provenance": null,
+                        "build": {
+                          "commit": "799c3afa5d5b17b676d04e0b58a5628943bb4003",
+                          "distance": -4121,
+                          "image": "vllm/vllm-openai:v0.25.0",
+                          "match": "estimated",
+                          "ref": "v0.31.0",
+                          "source": "label_by_tag",
+                          "why": "outside_distance"
+                        },
+                        "grade": "G4",
+                        "replay": {
+                          "client": "aiperf",
+                          "client_version": "0.12.0",
+                          "concurrency": 1,
+                          "corpus": "semianalysis_cc_traces_weka_062126",
+                          "corpus_sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
+                          "duration_s": 3600,
+                          "replayed_as": "inferencex-agentx-mvp",
+                          "scenario": "inferencex-agentx-mvp",
+                          "seed": 42,
+                          "trajectory_start": {
+                            "max_ratio": 0.75,
+                            "min_ratio": 0.25
+                          }
+                        },
+                        "resolved": [
+                          {
+                            "blis": null,
+                            "match": "unreadable",
+                            "measured": 31006342,
+                            "quantity": "kv_cache_tokens_per_replica"
+                          }
+                        ],
+                        "run_release": "0.25.0",
+                        "simulator": {
+                          "build": "v0.11.0",
+                          "engine": {
+                            "kind": "vllm",
+                            "version": "0.31.0"
+                          },
+                          "harness_digest": "unreleased"
+                        },
+                        "substitutions": [
+                          {
+                            "detail": "coefficient_range is not graded yet",
+                            "kind": "coefficient_range",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "not recorded; left unset, so the engine resolves the upstream default",
+                            "kind": "estimated",
+                            "subject": "max_num_seqs"
+                          },
+                          {
+                            "detail": "kernel_hash is not graded yet",
+                            "kind": "kernel_hash",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "0.25.0, scored on 0.31.0",
+                            "kind": "other_release",
+                            "subject": "engine release"
+                          },
+                          {
+                            "detail": "ported-function list not published",
+                            "kind": "ported_functions_unpublished",
+                            "subject": "engine release"
+                          },
+                          {
+                            "detail": "resolved_differs is not graded yet",
+                            "kind": "resolved_differs",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "value_class is not graded yet",
+                            "kind": "value_class",
+                            "subject": "not checked"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "level": "model",
+      "model": "minimax-m3",
+      "source": "inferencex",
+      "vllm_version": "0.30.0rc2.dev44+g8b00f4123",
+      "coverage": {
+        "scored": 1,
+        "total": 1
+      },
+      "metrics": {
+        "measured_or_resolved": {
+          "mape": {
+            "ttft": "too few points",
+            "tpot": "too few points",
+            "n": 0
+          },
+          "shape": {
+            "ttft": "too few points",
+            "tpot": "too few points",
+            "n": 0
+          },
+          "noise_floor_pct": 1.6
+        },
+        "all": {
+          "mape": {
+            "ttft": "too few points",
+            "tpot": "too few points",
+            "n": 1
+          },
+          "shape": {
+            "ttft": "too few points",
+            "tpot": "too few points",
+            "n": 0
+          },
+          "noise_floor_pct": 1.6
+        }
+      },
+      "rows": [
+        {
+          "level": "workload",
+          "label": "agentx",
+          "isl": null,
+          "osl": null,
+          "coverage": {
+            "scored": 1,
+            "total": 1
+          },
+          "metrics": {
+            "measured_or_resolved": {
+              "mape": {
+                "ttft": "too few points",
+                "tpot": "too few points",
+                "n": 0
+              },
+              "shape": {
+                "ttft": "too few points",
+                "tpot": "too few points",
+                "n": 0
+              },
+              "noise_floor_pct": 1.6
+            },
+            "all": {
+              "mape": {
+                "ttft": "too few points",
+                "tpot": "too few points",
+                "n": 1
+              },
+              "shape": {
+                "ttft": "too few points",
+                "tpot": "too few points",
+                "n": 0
+              },
+              "noise_floor_pct": 1.6
+            }
+          },
+          "rows": [
+            {
+              "level": "gpu",
+              "label": "h200",
+              "precision": "fp8",
+              "coverage": {
+                "scored": 1,
+                "total": 1
+              },
+              "metrics": {
+                "measured_or_resolved": {
+                  "mape": {
+                    "ttft": "too few points",
+                    "tpot": "too few points",
+                    "n": 0
+                  },
+                  "shape": {
+                    "ttft": "too few points",
+                    "tpot": "too few points",
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                },
+                "all": {
+                  "mape": {
+                    "ttft": "too few points",
+                    "tpot": "too few points",
+                    "n": 1
+                  },
+                  "shape": {
+                    "ttft": "too few points",
+                    "tpot": "too few points",
+                    "n": 0
+                  },
+                  "noise_floor_pct": 1.6
+                }
+              },
+              "rows": [
+                {
+                  "level": "topology",
+                  "framework": "vllm",
+                  "engine_version": "0.30.0rc2.dev44+g8b00f4123",
+                  "precision": "fp8",
+                  "is_multinode": false,
+                  "parallelism": {
+                    "dp": 1,
+                    "ep": 1,
+                    "pp": 1,
+                    "tp": 8
+                  },
+                  "serving": "aggregated",
+                  "spec_method": "none",
+                  "label": "dp1 · ep1 · pp1 · tp8 · fp8",
+                  "coverage": {
+                    "scored": 1,
+                    "total": 1
+                  },
+                  "metrics": {
+                    "measured_or_resolved": {
+                      "mape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 0
+                      },
+                      "shape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    },
+                    "all": {
+                      "mape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 1
+                      },
+                      "shape": {
+                        "ttft": "too few points",
+                        "tpot": "too few points",
+                        "n": 0
+                      },
+                      "noise_floor_pct": 1.6
+                    }
+                  },
+                  "rows": [
+                    {
+                      "level": "point",
+                      "concurrency": 4,
+                      "tier": "all",
+                      "measured": {
+                        "ttft_ms": 1630.0,
+                        "tpot_ms": 11.8
+                      },
+                      "predicted": {
+                        "ttft_ms": 1720.0,
+                        "tpot_ms": 10.4
+                      },
+                      "error_pct": {
+                        "ttft": 5.5215,
+                        "tpot": -11.8644
+                      },
+                      "shape": null,
+                      "shape_reason": "< 3 concurrencies",
+                      "point_id": "0ee56f7de59e054844f8f2b013e2cdbf80e97745123e6fd10f1df3492175dc94",
+                      "identity": {
+                        "benchmark_run": 2610,
+                        "benchmark_type": "agentic_traces",
+                        "conc": 4,
+                        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
+                        "framework": "vllm",
+                        "hardware": "h200",
+                        "measured_date": "2026-10-11",
+                        "model": "minimaxm3",
+                        "precision": "fp8",
+                        "recipe_fingerprint": "e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4",
+                        "source": "inferencex"
+                      },
+                      "sweep_id": "2610|minimax-m3-h200-fp8-vllm-tp8-agentx.yaml|agentx",
+                      "measured_date": "2026-10-11",
+                      "fidelity": {
+                        "args": [
+                          {
+                            "arg": "block_size",
+                            "blis": 16,
+                            "match": "exact",
+                            "measured": 16,
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "gpu_memory_utilization",
+                            "blis": "0.9",
+                            "match": "exact",
+                            "measured": "0.9",
+                            "source": "engine_line"
+                          },
+                          {
+                            "arg": "max_num_seqs",
+                            "blis": 64,
+                            "match": "exact",
+                            "measured": 64,
+                            "source": "args"
+                          }
+                        ],
+                        "blis_kernel_provenance": null,
+                        "build": {
+                          "commit": null,
+                          "distance": null,
+                          "image": "vllm/vllm-openai:vllm-minimax-m3-perf-x86_64-13.0.1-8b00f41",
+                          "match": "estimated",
+                          "ref": "v0.31.0",
+                          "source": null,
+                          "why": "custom_build"
+                        },
+                        "grade": "G4",
+                        "replay": {
+                          "client": "aiperf",
+                          "client_version": "0.12.0",
+                          "concurrency": 4,
+                          "corpus": "semianalysis_cc_traces_weka_062126",
+                          "corpus_sha256": "29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276",
+                          "duration_s": 3600,
+                          "replayed_as": "inferencex-agentx-mvp",
+                          "scenario": "inferencex-agentx-mvp",
+                          "seed": 42,
+                          "trajectory_start": {
+                            "max_ratio": 0.75,
+                            "min_ratio": 0.25
+                          }
+                        },
+                        "resolved": [],
+                        "run_release": null,
+                        "simulator": {
+                          "build": "v0.11.0",
+                          "engine": {
+                            "kind": "vllm",
+                            "version": "0.31.0"
+                          },
+                          "harness_digest": "unreleased"
+                        },
+                        "substitutions": [
+                          {
+                            "detail": "coefficient_range is not graded yet",
+                            "kind": "coefficient_range",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "kernel_hash is not graded yet",
+                            "kind": "kernel_hash",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "vllm/vllm-openai:vllm-minimax-m3-perf-x86_64-13.0.1-8b00f41 (banner 0.30.0rc2.dev44+g8b00f4123)",
+                            "kind": "nightly_or_custom",
+                            "subject": "engine build"
+                          },
+                          {
+                            "detail": "resolved_differs is not graded yet",
+                            "kind": "resolved_differs",
+                            "subject": "not checked"
+                          },
+                          {
+                            "detail": "value_class is not graded yet",
+                            "kind": "value_class",
+                            "subject": "not checked"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scope": {
+    "measured_exclusions": [],
+    "vllm_version_filter": "all"
+  },
+  "not_scored": [
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 1,
+      "framework": "vllm",
+      "g5_reason": {
+        "code": "not_in_catalog"
+      },
+      "g5_reasons": [
+        {
+          "code": "not_in_catalog"
+        }
+      ],
+      "grade": "G5",
+      "hardware": "b200",
+      "identity": {
+        "benchmark_run": null,
+        "benchmark_type": "agentic_traces",
+        "conc": 1,
+        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
+        "framework": "vllm",
+        "hardware": "b200",
+        "measured_date": "2026-10-21",
+        "model": "dsv4",
+        "precision": "fp4",
+        "recipe_fingerprint": null,
+        "source": "inferencex"
+      },
+      "image": "vllm/vllm-openai:nightly-dev-x86_64-cu13.0.1-20ebb28",
+      "measured": {
+        "tpot_ms": 11.2,
+        "ttft_ms": 880.0
+      },
+      "measured_date": "2026-10-21",
+      "model": "dsv4",
+      "point_id": "3864b0c5e03abbf5949cb0ec48c31209c998db425f1c655c06dd4b5a1e1fc695",
+      "precision": "fp4",
+      "run_release": null,
+      "simulator": {
+        "build": "v0.11.0",
+        "engine": {
+          "kind": "vllm",
+          "version": "0.31.0"
+        },
+        "harness_digest": "unreleased"
+      }
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 8,
+      "framework": "vllm",
+      "g5_reason": {
+        "code": "field_not_modelled",
+        "subject": "prefill_schedule_interval"
+      },
+      "g5_reasons": [
+        {
+          "code": "field_not_modelled",
+          "subject": "prefill_schedule_interval"
+        }
+      ],
+      "grade": "G5",
+      "hardware": "b300",
+      "identity": {
+        "benchmark_run": null,
+        "benchmark_type": "agentic_traces",
+        "conc": 8,
+        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
+        "framework": "vllm",
+        "hardware": "b300",
+        "measured_date": "2026-10-20",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe_fingerprint": "f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8",
+        "source": "inferencex"
+      },
+      "image": "vllm/vllm-openai:cu134-nightly-x86_64-dev-20261019-mk",
+      "measured": {
+        "tpot_ms": 4.9,
+        "ttft_ms": 1490.0
+      },
+      "measured_date": "2026-10-20",
+      "model": "dsv41flash",
+      "point_id": "5f85d0c1291c407e491ea719a28110098979767db0e8d257b967c5d3355d844c",
+      "precision": "fp4",
+      "run_release": null,
+      "simulator": {
+        "build": "v0.11.0",
+        "engine": {
+          "kind": "vllm",
+          "version": "0.31.0"
+        },
+        "harness_digest": "unreleased"
+      }
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 6,
+      "framework": "vllm",
+      "g5_reason": {
+        "code": "field_not_modelled",
+        "subject": "kv_transfer_config.kv_connector"
+      },
+      "g5_reasons": [
+        {
+          "code": "field_not_modelled",
+          "subject": "kv_transfer_config.kv_connector"
+        },
+        {
+          "code": "not_in_catalog",
+          "subject": "eagle3"
+        }
+      ],
+      "grade": "G5",
+      "hardware": "h100",
+      "identity": {
+        "benchmark_run": null,
+        "benchmark_type": "agentic_traces",
+        "conc": 6,
+        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
+        "framework": "vllm",
+        "hardware": "h100",
+        "measured_date": "2026-09-27",
+        "model": "minimaxm3",
+        "precision": "fp8",
+        "recipe_fingerprint": "e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6",
+        "source": "inferencex"
+      },
+      "image": "vllm/vllm-openai:nightly-ddd6fbca148a867aad1fcab7ec72f582b9977db4",
+      "measured": {
+        "tpot_ms": 12.4,
+        "ttft_ms": 2050.0
+      },
+      "measured_date": "2026-09-27",
+      "model": "minimaxm3",
+      "point_id": "634e63c43addc8ab45920e16c06c0585686fc90f38530c4222da31531acd2bc2",
+      "precision": "fp8",
+      "run_release": null,
+      "simulator": {
+        "build": "v0.11.0",
+        "engine": {
+          "kind": "vllm",
+          "version": "0.31.0"
+        },
+        "harness_digest": "unreleased"
+      }
+    },
+    {
+      "benchmark_type": "single_turn",
+      "conc": 16,
+      "framework": "vllm",
+      "g5_reason": {
+        "code": "router_unsupported",
+        "subject": "vllm-router"
+      },
+      "g5_reasons": [
+        {
+          "code": "router_unsupported",
+          "subject": "vllm-router"
+        }
+      ],
+      "grade": "G5",
+      "hardware": "h200",
+      "identity": {
+        "benchmark_run": null,
+        "benchmark_type": "single_turn",
+        "conc": 16,
+        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
+        "framework": "vllm",
+        "hardware": "h200",
+        "measured_date": "2026-10-02",
+        "model": "dsv4",
+        "precision": "fp8",
+        "recipe_fingerprint": "a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9",
+        "source": "inferencex"
+      },
+      "image": "vllm/vllm-openai:v0.31.0",
+      "measured": {
+        "tpot_ms": 14.1,
+        "ttft_ms": 520.0
+      },
+      "measured_date": "2026-10-02",
+      "model": "dsv4",
+      "point_id": "66fe6912085b1c5a838dfdd3f8cc9c49132bfadf4a5b3585e84053700d8981ca",
+      "precision": "fp8",
+      "run_release": "0.31.0",
+      "simulator": {
+        "build": "v0.11.0",
+        "engine": {
+          "kind": "vllm",
+          "version": "0.31.0"
+        },
+        "harness_digest": "unreleased"
+      }
+    },
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 1,
+      "framework": "vllm",
+      "g5_reason": {
+        "code": "not_in_catalog",
+        "subject": "eagle3"
+      },
+      "g5_reasons": [
+        {
+          "code": "not_in_catalog",
+          "subject": "eagle3"
+        }
+      ],
+      "grade": "G5",
+      "hardware": "b200",
+      "identity": {
+        "benchmark_run": null,
+        "benchmark_type": "agentic_traces",
+        "conc": 1,
+        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
+        "framework": "vllm",
+        "hardware": "b200",
+        "measured_date": "2026-09-30",
+        "model": "minimaxm3",
+        "precision": "fp4",
+        "recipe_fingerprint": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
+        "source": "inferencex"
+      },
+      "image": "vllm/vllm-openai:nightly-af7f9488c2210d67e1033ecdc845b087ee7fe92b",
+      "measured": {
+        "tpot_ms": 9.8,
+        "ttft_ms": 2310.0
+      },
+      "measured_date": "2026-09-30",
+      "model": "minimaxm3",
+      "point_id": "a6d2a69f5e2d70c472bfe362577ebdda30796650a6c3a03323702e6ee3c84116",
+      "precision": "fp4",
+      "run_release": null,
+      "simulator": {
+        "build": "v0.11.0",
+        "engine": {
+          "kind": "vllm",
+          "version": "0.31.0"
+        },
+        "harness_digest": "unreleased"
+      }
+    }
+  ],
+  "failed": [
+    {
+      "benchmark_type": "agentic_traces",
+      "conc": 4,
+      "faults": [
+        "blis_refused:timeout"
+      ],
+      "framework": "vllm",
+      "hardware": "h200",
+      "identity": {
+        "benchmark_run": 2410,
+        "benchmark_type": "agentic_traces",
+        "conc": 4,
+        "configuration_hash": "c76f7af78430ef58c12310e44b3529d8af0dc45061af5125b494d0a7d9d94972",
+        "framework": "vllm",
+        "hardware": "h200",
+        "measured_date": "2026-09-21",
+        "model": "dsv41flash",
+        "precision": "fp4",
+        "recipe_fingerprint": "a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4",
+        "source": "inferencex"
+      },
+      "image": "vllm/vllm-openai:v0.31.0",
+      "measured": {
+        "tpot_ms": 9.4,
+        "ttft_ms": 1650.0
+      },
+      "measured_date": "2026-09-21",
+      "model": "dsv41flash",
+      "point_id": "aea1341d6f453f1a20aa98212edff007ce436fcd770a5da6e6754281fca4115f",
+      "precision": "fp4",
+      "run_release": "0.31.0",
+      "simulator": {
+        "build": "v0.11.0",
+        "engine": {
+          "kind": "vllm",
+          "version": "0.31.0"
+        },
+        "harness_digest": "unreleased"
+      }
+    }
+  ]
+}

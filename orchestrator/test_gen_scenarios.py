@@ -16,7 +16,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from gen_scenarios import emit  # noqa: E402
+from gen_scenarios import PackagingError, emit  # noqa: E402
+
+# What a chip's catalog entry fixes (`blis catalog resolve --chip` packaging): an 8-GPU HGX part
+# fixes nothing; GB200 NVL72 fixes 4 GPUs per node and 72 per rack.
+OPEN = {"gpus_per_node": None, "gpus_per_rack": None}
+GB200 = {"gpus_per_node": 4, "gpus_per_rack": 72}
 
 FAILURES = []
 
@@ -27,12 +32,13 @@ def ck(label, ok, detail=""):
         FAILURES.append(label)
 
 
-def sweep(model="minimax-m2.5", stated=None):
+def sweep(model="minimax-m2.5", stated=None, gpu="h200", node=8, tp=4):
     s = {
-        "scenario": f"{model}-h200-fp8-vllm-tp4.yaml", "model": model, "gpu": "h200",
+        "scenario": f"{model}-{gpu}-fp8-vllm-tp{tp}.yaml", "model": model, "gpu": gpu,
         "precision": "fp8", "framework": "vllm",
-        "parallelism": {"tp_size": 4, "pp_size": 1, "attention_dp_size": 1,
-                        "moe_ep_size": 1, "moe_tp_size": 4},
+        "parallelism": {"tp_size": tp, "pp_size": 1, "attention_dp_size": 1,
+                        "moe_ep_size": 1, "moe_tp_size": tp},
+        "gpus_per_node": node,
     }
     if stated is not None:
         s["stated_config"] = stated
@@ -40,12 +46,33 @@ def sweep(model="minimax-m2.5", stated=None):
 
 
 def engine(dep, field):
-    text = emit(dep, {"1024:1024"}, {"1k1k"})
+    text = emit(dep, {"1024:1024"}, {"1k1k"}, OPEN, "0.32.0")
     m = re.search(rf"^ +{field}: (\S+)$", text, re.M)
     return m.group(1) if m else None
 
 
+def cluster_of(dep, packaging):
+    text = emit(dep, {"1024:1024"}, {"1k1k"}, packaging, "0.32.0")
+    return dict(re.findall(r"^  (hardware|nodes|gpus_per_node|gpus_per_rack|fabric): (\S+)$", text, re.M))
+
+
 def main() -> int:
+    ck("a GB200 NVL72 deployment writes neither gpus_per_node nor gpus_per_rack",
+       cluster_of(sweep(gpu="gb200-nvl72", node=8), GB200) == {"hardware": "gb200-nvl72", "nodes": "1"},
+       str(cluster_of(sweep(gpu="gb200-nvl72", node=8), GB200)))
+    ck("a GB200 NVL72 deployment of 8 ranks spans two 4-GPU trays",
+       cluster_of(sweep(gpu="gb200-nvl72", tp=8), GB200).get("nodes") == "2")
+    ck("an H100 deployment writes the node size the run recorded",
+       cluster_of(sweep(gpu="h100", node=8), OPEN) == {"hardware": "h100", "nodes": "1", "gpus_per_node": "8"})
+    ck("a recorded node of 4 is written as 4, and 8 ranks span two of them",
+       cluster_of(sweep(gpu="h100", node=4, tp=8), OPEN) == {"hardware": "h100", "nodes": "2", "gpus_per_node": "4",
+                                                              "fabric": "ib-400g"})
+    try:
+        emit(sweep(gpu="h100", node=None), {"1024:1024"}, {"1k1k"}, OPEN, "0.32.0")
+        ck("no recorded node size on a chip that fixes none is refused", False)
+    except PackagingError as e:
+        ck("no recorded node size on a chip that fixes none is refused as value_not_recorded",
+           "value_not_recorded" in str(e) and "fixes no node size" in str(e), str(e))
     ck("a stated gpu_memory_utilization is written as stated",
        engine(sweep(stated={"gpu_memory_utilization": 0.85}),
               "gpu_memory_utilization") == "0.85")
@@ -53,12 +80,16 @@ def main() -> int:
        engine(sweep(stated={}), "gpu_memory_utilization") == "0.92")
     ck("a corpus with no stated_config also takes 0.92",
        engine(sweep(), "gpu_memory_utilization") == "0.92")
+    for rel in ("0.32.0", "0.33.0"):
+        t = emit(sweep(stated={}), {"1024:1024"}, {"1k1k"}, OPEN, rel)
+        ck(f"the engine is stated as engine: {{kind, version}} at the release given ({rel}), never engine_version",
+           "engine:\n  kind: vllm\n  version: \"%s\"" % rel in t and "engine_version" not in t.replace("never engine_version", ""))
     ck("a stated block_size is written as stated",
        engine(sweep(stated={"block_size": 128}), "block_size") == "128")
-    ck("an unstated block_size follows the rule (16 for a plain model)",
-       engine(sweep(stated={}), "block_size") == "16")
-    ck("an unstated block_size follows the rule (256 for DeepSeek-V4)",
-       engine(sweep("deepseek-v4-pro", stated={}), "block_size") == "256")
+    # X19, VLM-1: the engine repository owns engine defaults; a generator never writes one.
+    for model in ("qwen3-14b", "glm-5", "deepseek-v4-pro"):
+        ck(f"an unstated block_size is not written ({model})",
+           engine(sweep(model, stated={}), "block_size") is None)
     ck("a stated enable_prefix_caching is written as stated",
        engine(sweep(stated={"enable_prefix_caching": False}),
               "enable_prefix_caching") == "false")
@@ -68,11 +99,17 @@ def main() -> int:
                                            "num_speculative_tokens": 2})
     ck("a stated speculative config is written as stated",
        (engine(mtp, "method"), engine(mtp, "num_spec_tokens")) == ("mtp", "2"))
+    ck("a stated max_model_len is written as stated, not sized from the workload",
+       engine(sweep(stated={"max_model_len": 1048576}), "max_model_len") == "1048576")
+    ck("a max_model_len stated as None is left unset, so the engine resolves it",
+       engine(sweep(stated={"max_model_len": None}), "max_model_len") is None)
+    ck("an unstated max_model_len is still sized from the workload (32768 for 1k/1k)",
+       engine(sweep(stated={}), "max_model_len") == "32768")
     ck("an unstated speculative config is left out",
        engine(sweep("deepseek-v4-pro", stated={}), "method") is None)
 
     # The relocation reworded comments but must emit valid Scenario + Deployment docs.
-    text = emit(sweep(stated={}), {"1024:1024"}, {"1k1k"})
+    text = emit(sweep(stated={}), {"1024:1024"}, {"1k1k"}, OPEN, "0.32.0")
     ck("emits both a Scenario and a Deployment document",
        "kind: Scenario" in text and "kind: Deployment" in text)
 

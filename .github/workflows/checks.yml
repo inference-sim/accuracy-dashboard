@@ -23,11 +23,11 @@ jobs:
   orchestrator:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.13"
-      - run: pip install --quiet jsonschema
+      - run: pip install --quiet --require-hashes -r requirements-ci.txt
       - name: Orchestrator arithmetic + self-consistency oracle + column contract
         run: python3 orchestrator/test_build_summary.py
       - name: Agentic replay arguments read from a row's CI and server logs
@@ -42,32 +42,39 @@ jobs:
         run: python3 orchestrator/test_gen_direct_corpus.py
       - name: Agentic scoring driver (row -> replay args -> CSV; refusals not scored)
         run: python3 orchestrator/test_run_agentic.py
+      - name: Agentic corpus pinned by its catalog workload's revision and full sha256 (X12, D3, COV-12)
+        run: python3 -m pytest -q orchestrator/test_resolve_agentic_corpus.py
       - name: Schema validates the committed render fixture (RFC C3)
         run: python3 orchestrator/validate_summary.py --schema schemas/summary.v1.json web/testdata/render-fixture.summary.json
-      - name: Extractor-to-summary contract, fidelity schema and summary.v2 schema (#28; not used by the nightly)
+      - name: Contract, fidelity schemas, grades (COV-1, COV-4 to COV-6) and the summary schemas
         run: |
           python3 orchestrator/ingest/test_contract.py
           python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/run-a orchestrator/ingest/testdata/contract/run-b
-      - name: summary.json v2 builder + validator, and the committed v2 web fixtures rebuild byte-for-byte (#30; not used by the nightly)
+      - name: summary.json v3 builder + validator, the committed v3 web fixtures rebuild byte-for-byte, and the frozen v2 ones still validate (COV-8, COV-11)
         run: |
           python3 orchestrator/test_build_summary_v2.py
-          python3 orchestrator/build_summary_v2.py --contract orchestrator/ingest/testdata/contract/run-a --out /tmp/v2a.json
-          python3 orchestrator/build_summary_v2.py --contract orchestrator/ingest/testdata/contract/run-b --out /tmp/v2b.json --generated-at 2026-10-22T00:00:00Z
-          cmp /tmp/v2a.json web/testdata/render-fixture.v2.summary.json
-          cmp /tmp/v2b.json web/testdata/render-fixture.v2b.summary.json
+          python3 orchestrator/build_summary_v2.py --contract orchestrator/ingest/testdata/contract/run-a --out /tmp/v3a.json
+          python3 orchestrator/build_summary_v2.py --contract orchestrator/ingest/testdata/contract/run-b --out /tmp/v3b.json --generated-at 2026-10-22T00:00:00Z
+          cmp /tmp/v3a.json web/testdata/render-fixture.v3.summary.json
+          cmp /tmp/v3b.json web/testdata/render-fixture.v3b.summary.json
+          python3 orchestrator/validate_summary_v2.py web/testdata/render-fixture.v3.summary.json web/testdata/render-fixture.v3b.summary.json
           python3 orchestrator/validate_summary_v2.py web/testdata/render-fixture.v2.summary.json web/testdata/render-fixture.v2b.summary.json
+      - name: Scoring harness entrypoint flags and its release workflow (design §11.7)
+        run: |
+          pip install --quiet --require-hashes -r requirements-ci.txt
+          python3 -m pytest -q harness/test_run_sh.py harness/test_dockerfile_paths.py harness/test_image_pin.py
       - name: vLLM build resolution + commit-distance gate (#28; not used by the nightly)
         run: python3 orchestrator/ingest/test_build.py
-      - name: API ingest extractor - settings, policy table, replay inputs, support, artifacts (#29; not used by the nightly)
+      - name: API ingest extractor - settings decided by the field list (COV-3), replay inputs, support, artifacts
         run: |
-          pip install --quiet pyyaml
+          pip install --quiet --require-hashes -r requirements-ci.txt
           python3 orchestrator/ingest/test_extract.py
-          # a point through score_point and write_contract, fake BLIS binaries (CI has no BLIS build)
+          # points through score_point and write_contract, fake BLIS binaries (CI has no BLIS build)
           python3 orchestrator/ingest/test_score_e2e.py
       - name: API nightly pipeline - window, trigger table, no-storage merge, two-retention index, parallel pools, fabricated-release combos (#15)
         run: |
           # These use pytest fixtures (tmp_path, monkeypatch), unlike the older standalone scripts.
-          pip install --quiet pytest pyyaml
+          pip install --quiet --require-hashes -r requirements-ci.txt
           python3 -m pytest -q \
             orchestrator/ingest/test_nightly.py \
             orchestrator/ingest/test_incremental.py \
@@ -75,47 +82,64 @@ jobs:
             orchestrator/ingest/test_cli_nightly.py \
             orchestrator/ingest/test_parallel.py \
             orchestrator/ingest/test_score_pool.py \
+            orchestrator/ingest/test_ledger.py \
+            orchestrator/ingest/test_inferencex_client.py \
+            orchestrator/ingest/test_inferencex_runners.py \
+            orchestrator/ingest/test_result.py \
+            orchestrator/ingest/test_grade.py \
+            orchestrator/ingest/test_assess.py \
+            orchestrator/ingest/test_engines.py \
+            orchestrator/ingest/test_fields.py \
+            orchestrator/ingest/test_headline.py \
+            orchestrator/ingest/test_backlog.py \
+            orchestrator/ingest/test_coverage.py \
+            orchestrator/ingest/test_stack.py \
+            orchestrator/ingest/test_server_log.py \
             orchestrator/test_update_index.py
-
-  blisdefaults:
-    # The Go helper the extractor calls for BLIS's own batch defaults, built against the pinned
-    # inference-sim tag in its go.mod (#29; not used by the nightly).
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: orchestrator/blisdefaults
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: orchestrator/blisdefaults/go.mod
-          cache-dependency-path: orchestrator/blisdefaults/go.sum
-      - run: go test ./...
-      - run: go build -o /tmp/blisdefaults .
-
-  signedprobe:
-    # The dashboard's single-turn scorer and its harness, moved here from inference-sim's tools/
-    # at v0.14.0, built against the pinned inference-sim tag in its go.mod. The tests that run a
-    # real `blis replay` need an inference-sim checkout (BLIS_SIM_DIR), so it's cloned at the
-    # same tag the go.mod pins.
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: orchestrator/signedprobe
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: orchestrator/signedprobe/go.mod
-          cache-dependency-path: orchestrator/signedprobe/go.sum
-      - name: Clone inference-sim at the pinned tag (for the tests that run blis)
+      - name: Every point id of every published snapshot maps to a ledger unit (COV-8)
+        run: python3 orchestrator/ingest/legacy_ids.py check --map data/legacy/point-ids.json --data data
+      - name: BLIS is read only through the inference-sim commands, except the listed TEMPORARY sites (X7)
         run: |
-          tag=$(awk '$1=="github.com/inference-sim/inference-sim" {print $2; exit}' go.mod)
-          git clone -q --depth 1 --branch "$tag" https://github.com/inference-sim/inference-sim.git "$RUNNER_TEMP/sim"
-          echo "BLIS_SIM_DIR=$RUNNER_TEMP/sim" >> "$GITHUB_ENV"
-      - run: go vet ./...
-      - run: go test ./...
-      - run: go build -o /tmp/signedprobe .
+          python3 -m pytest -q orchestrator/test_lint_blis_boundary.py
+          python3 orchestrator/lint_blis_boundary.py
+
+  # The tests that simulate (X16): the primed-warm-up equivalence of the single-turn replay and the
+  # request_rows boundary, run through a real `blis replay` built at the pinned commit. They fail,
+  # not skip, without a binary, so this job is where they run. The commit is harness/harness.pin's
+  # SIM_COMMIT; the Go release is read from that checkout's go.mod.
+  simulator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+      - run: pip install --quiet --require-hashes -r requirements-ci.txt
+      - name: Check out inference-sim at the pinned commit
+        run: |
+          set -euo pipefail
+          sim_commit="$(sed -n 's/^SIM_COMMIT=//p' harness/harness.pin)"
+          git init -q "$RUNNER_TEMP/sim"
+          git -C "$RUNNER_TEMP/sim" remote add origin https://github.com/inference-sim/inference-sim.git
+          git -C "$RUNNER_TEMP/sim" fetch -q --depth 1 origin "$sim_commit"
+          git -C "$RUNNER_TEMP/sim" checkout -q FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/sim" rev-parse HEAD)" = "$sim_commit"
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: ${{ runner.temp }}/sim/go.mod
+          cache-dependency-path: ${{ runner.temp }}/sim/go.sum
+      - name: Check out the blis-substrate release the build pins
+        run: |
+          set -euo pipefail
+          tag="$(python3 -c 'import json,sys; print([m["version"] for m in json.load(open(sys.argv[1]))["modules"] if m["path"].endswith("/blis-substrate")][0])' "$RUNNER_TEMP/sim/stack.json")"
+          git clone -q --depth 1 --branch "$tag" https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
+      - name: Build blis
+        run: cd "$RUNNER_TEMP/sim" && GOFLAGS=-mod=mod go build -o blis main.go
+      - name: Tests that simulate
+        env:
+          BLIS_BIN: ${{ runner.temp }}/sim/blis
+          BLIS_SUBSTRATE: ${{ runner.temp }}/substrate
+        run: python3 -m pytest -q orchestrator/ingest/test_inferencex_client_sim.py orchestrator/ingest/test_score_real_blis.py
 
   web:
     runs-on: ubuntu-latest
@@ -123,26 +147,27 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
       - run: npm ci
       - run: npm run typecheck
       - run: npm run test
       - run: npm run build
-      - name: v2 browser smoke - real Chromium on the v2 fixture, zero console errors, provenance per point (#30)
+      - name: v2 and v3 browser smoke - real Chromium on each fixture, zero console errors, provenance per point
         run: |
-          rm -rf public/data dist
-          mkdir -p public/data/latest
-          cp testdata/render-fixture.v2.summary.json public/data/latest/summary.json
-          node -e "const s=require('./testdata/render-fixture.v2.summary.json');require('fs').writeFileSync('public/data/index.json',JSON.stringify({schema_version:1,latest:s.snapshot_id,keep_api:5,runs:[{snapshot_id:s.snapshot_id,generated_at:s.generated_at,blis_release:s.provenance.blis.release,ix_release:s.provenance.ground_truth.release_tag,ingest:'api',path:'latest/summary.json'}]}))"
-          npm run build
-          # Pin >=1.61: GitHub's ubuntu-latest runners moved to Ubuntu 26.04, which Playwright
-          # first supports in 1.61.0 (1.56.0 errors "does not support chromium on ubuntu26.04-x64").
-          npm install --no-save playwright@1.65.0
+          # Playwright is a locked devDependency (web/package.json, web/package-lock.json),
+          # installed by npm ci, so this step installs the browser for the locked version.
           npx playwright install --with-deps chromium
-          node smoke_v2.mjs
+          for v in v2 v3; do
+            rm -rf public/data dist
+            mkdir -p public/data/latest
+            cp testdata/render-fixture.$v.summary.json public/data/latest/summary.json
+            node -e "const s=require('./testdata/render-fixture.$v.summary.json');require('fs').writeFileSync('public/data/index.json',JSON.stringify({schema_version:1,latest:s.snapshot_id,keep_api:5,runs:[{snapshot_id:s.snapshot_id,generated_at:s.generated_at,blis_release:s.provenance.blis.release,ix_release:s.provenance.ground_truth.release_tag,ingest:'api',path:'latest/summary.json'}]}))"
+            npm run build
+            node smoke_v2.mjs
+          done
       - name: v1 browser smoke - the nightly's own smoke (browser_smoke.mjs) on the committed v1 snapshot
         run: |
           # The nightly runs browser_smoke.mjs on its fresh snapshot; run it here on the committed
@@ -156,7 +181,7 @@ jobs:
   grep-clean:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: No AISimulate / AIConfigurator / AIC in shipped code, config or data (RFC C1)
         run: |
           # The RFC + mockup legitimately reference the inspiration as prior art; the DASHBOARD's
@@ -167,7 +192,7 @@ jobs:
                --include='*.mjs' --include='*.json' --include='*.css' --include='*.html' \
                orchestrator web/src web/browser_smoke.mjs web/smoke_v2.mjs web/package.json web/vite.config.ts \
                schemas state data 2>/dev/null \
-             | grep -v node_modules | grep -v package-lock || true)
+             | grep -v -e node_modules -e package-lock || [ "$?" -eq 1 ])
           if [ -n "$hits" ]; then
             echo "::error::forbidden term found in shipped surface (RFC C1)"
             echo "$hits"
