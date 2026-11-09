@@ -334,14 +334,14 @@ def read_anchor_units(blis: Path, out: Path) -> set[str]:
 def read_stack(blis: Path, given: str | None) -> sk.Stack:
     """The scoring build's stack.json: the engine release it runs (LIF-6) and the modules it pins.
 
-    TEMPORARY until inference-sim v0.16.0, the first release that writes stack.json at its root
+    TEMPORARY until the pinned inference-sim release, the first release that writes stack.json at its root
     (inference-sim m1/substrate, task H): --stack names the file for a build that does not ship
     one. Without --stack the file is the simulator checkout's own. A build with neither predates
     stack.json and is refused; the engine release is never read from installation.md."""
     path = Path(given) if given else blis.parent / "stack.json"
     if not path.is_file():
         raise sk.StackError(f"{blis.parent} has no stack.json: this simulator build predates stack.json "
-                            f"(inference-sim v0.16.0 writes it), so the engine release it runs is not stated; "
+                            f"(the pinned release writes it), so the engine release it runs is not stated; "
                             f"pass --stack FILE")
     return sk.load(path)
 
@@ -632,7 +632,7 @@ def main(argv=None) -> int:
                    help="the release tag the catalog is at (the harness image mounts the data without "
                         "its git history, so it is named)")
     s.add_argument("--registry-release", required=True, help="the release tag the registry is at")
-    s.add_argument("--stack", help="TEMPORARY until inference-sim v0.16.0 ships stack.json: the scoring build's "
+    s.add_argument("--stack", help="TEMPORARY until the pinned inference-sim release ships stack.json: the scoring build's "
                                     "stack.json, when its checkout has none")
     s.add_argument("--sim-build", help="the simulator build: a release tag or a 40-hex commit; the checkout must be at it "
                                         "(default: the release tag the checkout is at)")
@@ -696,7 +696,7 @@ def main(argv=None) -> int:
     n.add_argument("--substrate-version", required=True,
                    help="the blis-substrate version in stack.json (resolve_stack.py substrate_version); a release tag names the release")
     n.add_argument("--substrate-commit", required=True, help="the blis-substrate commit in stack.json (resolve_stack.py substrate_commit)")
-    n.add_argument("--stack", help="TEMPORARY until inference-sim v0.16.0 (see score --stack)")
+    n.add_argument("--stack", help="TEMPORARY until the pinned inference-sim release (see score --stack)")
     n.add_argument("--corpus-dir", required=True, help="see score --corpus-dir")
     n.add_argument("--corpus-cache")
     n.add_argument("--timeout", type=int, default=7200)

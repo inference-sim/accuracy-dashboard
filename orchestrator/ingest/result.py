@@ -2,7 +2,7 @@
 
 `blis run` and `blis replay` write the Result, schema version 2 (blis-substrate
 contracts/spec/result), on standard output. The harness reads it there: no --metrics-path or
---results-path file, which inference-sim v0.16.0 removes. Every Result is validated with
+--results-path file, which the pinned inference-sim release removes. Every Result is validated with
 `blis schema validate result` before a figure is read from it, so the harness holds no schema
 of its own (SUB-19).
 
