@@ -128,12 +128,18 @@ jobs:
         with:
           go-version-file: ${{ runner.temp }}/sim/go.mod
           cache-dependency-path: ${{ runner.temp }}/sim/go.sum
+      - name: Check out the blis-substrate release the build pins
+        run: |
+          set -euo pipefail
+          tag="$(python3 -c 'import json,sys; print([m["version"] for m in json.load(open(sys.argv[1]))["modules"] if m["path"].endswith("/blis-substrate")][0])' "$RUNNER_TEMP/sim/stack.json")"
+          git clone -q --depth 1 --branch "$tag" https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
       - name: Build blis
         run: cd "$RUNNER_TEMP/sim" && GOFLAGS=-mod=mod go build -o blis main.go
       - name: Tests that simulate
         env:
           BLIS_BIN: ${{ runner.temp }}/sim/blis
-        run: python3 -m pytest -q orchestrator/ingest/test_inferencex_client_sim.py
+          BLIS_SUBSTRATE: ${{ runner.temp }}/substrate
+        run: python3 -m pytest -q orchestrator/ingest/test_inferencex_client_sim.py orchestrator/ingest/test_score_real_blis.py
 
   web:
     runs-on: ubuntu-latest

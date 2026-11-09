@@ -88,6 +88,10 @@ DATA_READS = {
 # Rule 4. (file, rule) pairs, and the command whose absence keeps each. Rules: clone, go_doc,
 # go_list, installation (shell and workflows), pins (Python).
 TEXT_READS = {
+    (".github/workflows/checks.yml", "clone"):
+        "TEMPORARY with the api-nightly.yml substrate checkout: the simulator job checks out the "
+        "blis-substrate release stack.json pins, for the catalog and registry the real-binary scoring "
+        "test reads, until the M2 substrate release lets the build print them",
     (".github/workflows/api-nightly.yml", "clone"):
         "TEMPORARY until an inference-sim command prints the full unit list with identities and the "
         "ingest report (`blis ledger --list` prints only the published unit ids): the job checks out "
