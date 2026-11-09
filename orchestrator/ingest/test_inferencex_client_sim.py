@@ -1,8 +1,9 @@
 """The warm-up tests that need a simulator (COV-12): run through a real `blis replay`.
 
-BLIS_BIN names the blis binary; BLIS_SCENARIO_DIR a directory holding the scenario file
-BLIS_SCENARIO (default gpt-oss-120b-h200-fp4-vllm-tp4.yaml, one replica with prefix caching
-on). The binary must read trace version 4 and write the Result document, schema version 2, with
+BLIS_BIN names the blis binary. The scenario is BLIS_SCENARIO (default
+gpt-oss-120b-h100-fp4-vllm-tp2.yaml, one replica with prefix caching on) in BLIS_SCENARIO_DIR
+(default testdata/sim, which holds that file, so the default needs only BLIS_BIN). The binary
+must read trace version 4 and write the Result document, schema version 2, with
 request_rows, on standard output. Without BLIS_BIN every test here fails: a skipped test is not
 a passing one (X16).
 """
@@ -21,16 +22,16 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import inferencex_client as ix  # noqa: E402
 
-SCENARIO = os.environ.get("BLIS_SCENARIO", "gpt-oss-120b-h200-fp4-vllm-tp4.yaml")
+SCENARIO = os.environ.get("BLIS_SCENARIO", "gpt-oss-120b-h100-fp4-vllm-tp2.yaml")
+SCENARIO_DIR = HERE / "testdata" / "sim"
 
 
 def _blis() -> tuple[str, Path]:
     blis = os.environ.get("BLIS_BIN")
-    scen = os.environ.get("BLIS_SCENARIO_DIR")
-    if not blis or not scen:
-        pytest.fail("set BLIS_BIN to a blis binary and BLIS_SCENARIO_DIR to a directory holding "
-                    f"{SCENARIO}; these tests simulate and are never skipped (X16)")
-    return blis, Path(scen)
+    if not blis:
+        pytest.fail(f"set BLIS_BIN to a blis binary (the scenario {SCENARIO} is in {SCENARIO_DIR}); "
+                    "these tests simulate and are never skipped (X16)")
+    return blis, Path(os.environ.get("BLIS_SCENARIO_DIR") or SCENARIO_DIR)
 
 
 def _run(tmp: Path, replay: ix.Replay) -> list[dict]:
@@ -80,3 +81,32 @@ def test_a_drained_copy_leaves_only_request_zeros_prompt_readable(tmp_path):
     for i, r in main.items():
         if i:
             assert r.get("cached_local_tokens", 0) == 0, f"main request {i} read the cache"
+
+
+def test_the_scenario_the_generator_writes_is_one_the_simulator_validates_and_runs(tmp_path):
+    """gen_scenarios.emit is the scenario writer of run_agentic.py. Its output must be the
+    current contract, engine: {kind, version}, at the release the scoring build runs: the real
+    `blis schema validate scenario` accepts it and `blis run` loads it (the legacy engine_version
+    at a release the build does not run is refused)."""
+    blis, _ = _blis()
+    sys.path.insert(0, str(HERE.parent))
+    import gen_scenarios as g
+    release = json.loads((Path(blis).parent / "stack.json").read_text())["engines"][0]["version"]
+    # gpt-oss-120b on H100 at nvfp4 weights and fp8 KV is a combination the engine resolves (the
+    # committed scenario runs it). A run states its block size when the engine cannot resolve it
+    # (blis-vllm #68); the generator never writes one it was not given.
+    dep = {"scenario": "gpt-oss-120b-h100-fp4-vllm-tp2-agentx.yaml", "model": "gpt-oss-120b", "gpu": "h100",
+           "framework": "vllm", "precision": "fp4", "serving": "aggregated", "spec_method": "none",
+           "parallelism": {"tp_size": 2, "pp_size": 1, "attention_dp_size": 1, "moe_ep_size": 1, "moe_tp_size": 2},
+           "stated_config": {"max_model_len": 32768, "block_size": 16}, "workload": "0:0", "gpus_per_node": 8}
+    text = g.emit(dep, {"0:0"}, {"agentx"}, {"gpus_per_node": None, "gpus_per_rack": None}, release)
+    path = tmp_path / dep["scenario"]
+    path.write_text(text)
+    v = subprocess.run([blis, "schema", "validate", "scenario", str(path)], capture_output=True, text=True)
+    assert v.returncode == 0, v.stderr[-2000:]
+    run = subprocess.run([blis, "run", "--scenarios", str(tmp_path), "--scenario", dep["scenario"],
+                          "--workload", "chatbot", "--num-requests", "8", "--seed", "1"],
+                         capture_output=True, text=True, timeout=600)
+    assert run.returncode == 0, run.stderr[-2000:]
+    assert json.loads(run.stdout)["engine"] == {"kind": "vllm", "version": release}
+

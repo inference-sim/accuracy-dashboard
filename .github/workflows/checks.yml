@@ -103,6 +103,38 @@ jobs:
           python3 -m pytest -q orchestrator/test_lint_blis_boundary.py
           python3 orchestrator/lint_blis_boundary.py
 
+  # The tests that simulate (X16): the primed-warm-up equivalence of the single-turn replay and the
+  # request_rows boundary, run through a real `blis replay` built at the pinned commit. They fail,
+  # not skip, without a binary, so this job is where they run. The commit is harness/harness.pin's
+  # SIM_COMMIT; the Go release is read from that checkout's go.mod.
+  simulator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+      - run: pip install --quiet --require-hashes -r requirements-ci.txt
+      - name: Check out inference-sim at the pinned commit
+        run: |
+          set -euo pipefail
+          sim_commit="$(sed -n 's/^SIM_COMMIT=//p' harness/harness.pin)"
+          git init -q "$RUNNER_TEMP/sim"
+          git -C "$RUNNER_TEMP/sim" remote add origin https://github.com/inference-sim/inference-sim.git
+          git -C "$RUNNER_TEMP/sim" fetch -q --depth 1 origin "$sim_commit"
+          git -C "$RUNNER_TEMP/sim" checkout -q FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/sim" rev-parse HEAD)" = "$sim_commit"
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: ${{ runner.temp }}/sim/go.mod
+          cache-dependency-path: ${{ runner.temp }}/sim/go.sum
+      - name: Build blis
+        run: cd "$RUNNER_TEMP/sim" && GOFLAGS=-mod=mod go build -o blis main.go
+      - name: Tests that simulate
+        env:
+          BLIS_BIN: ${{ runner.temp }}/sim/blis
+        run: python3 -m pytest -q orchestrator/ingest/test_inferencex_client_sim.py
+
   web:
     runs-on: ubuntu-latest
     defaults:
