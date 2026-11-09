@@ -85,9 +85,18 @@ def pins(stack: Stack) -> dict:
         m = stack.modules.get(path)
         if m is None:
             raise StackError(f"stack.json lists no module {path}")
-        if not re.fullmatch(r"[0-9a-f]{40}", m["commit"] or ""):
-            raise StackError(f"stack.json: module {path} has commit {m['commit']!r}, want 40 hex digits")
-        out[key] = m["commit"]
+        # A draft build names a full commit (a pseudo-version carries twelve hex digits). A release
+        # names none: its tag does (LIF-1), so the commit is empty and `<key>_ref` is the tag.
+        commit = m["commit"]
+        if commit is None and release_name(m) is not None:
+            out[key] = ""
+            out[key.replace("_commit", "_ref")] = m["version"]
+        elif re.fullmatch(r"[0-9a-f]{40}", commit or ""):
+            out[key] = commit
+            out[key.replace("_commit", "_ref")] = commit
+        else:
+            raise StackError(f"stack.json: module {path} has commit {commit!r}, want 40 hex digits "
+                             f"(or, for a release, no commit and a release tag as its version)")
         if key == "substrate_commit":
             version = m["version"]
             if not isinstance(version, str) or not re.fullmatch(r"[0-9A-Za-z._+-]+", version):
@@ -127,7 +136,7 @@ def verify_checkout(repo: Path, tag: str, commit: str) -> list[str]:
     out = []
     if head != tagged:
         out.append(f"{repo} is at {head}, but tag {tag} is commit {tagged}")
-    if tagged != commit:
+    if commit and tagged != commit:
         out.append(f"tag {tag} is commit {tagged}, but stack.json pins {commit}")
     return out
 

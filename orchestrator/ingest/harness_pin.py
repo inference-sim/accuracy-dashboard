@@ -51,7 +51,8 @@ def digest(reference: str) -> str:
 
 
 def docker_command(reference: str, *, sim: str, units, pull, out, catalog, registry,
-                   corpus_dir, catalog_release: str, registry_release: str, max_rss_mb: int = 0) -> list[str]:
+                   corpus_dir, fields, catalog_release: str, registry_release: str,
+                   max_rss_mb: int = 0) -> list[str]:
     """The `docker run` that scores through the image, with harness/run.sh's flags. The data is
     mounted under /data, and HARNESS_DIGEST is the pin's digest, so the figures record the image
     that produced them. The mounted data carries no git history, so the releases it is at are
@@ -63,10 +64,11 @@ def docker_command(reference: str, *, sim: str, units, pull, out, catalog, regis
            "-v", f"{Path(out).resolve()}:{MOUNT}/out",
            "-v", f"{Path(catalog).resolve()}:{MOUNT}/catalog:ro",
            "-v", f"{Path(registry).resolve()}:{MOUNT}/registry:ro",
-           "-v", f"{Path(corpus_dir).resolve()}:{MOUNT}/corpora:ro"]
+           "-v", f"{Path(corpus_dir).resolve()}:{MOUNT}/corpora:ro",
+           "-v", f"{Path(fields).resolve()}:{MOUNT}/fields.json:ro"]
     cmd += [reference, "--sim", sim, "--units", f"{MOUNT}/units.json", "--pull", f"{MOUNT}/pull",
             "--out", f"{MOUNT}/out", "--catalog", f"{MOUNT}/catalog", "--registry", f"{MOUNT}/registry",
-            "--corpus-dir", f"{MOUNT}/corpora",
+            "--corpus-dir", f"{MOUNT}/corpora", "--fields", f"{MOUNT}/fields.json",
             "--catalog-release", catalog_release, "--registry-release", registry_release]
     if max_rss_mb:
         cmd += ["--max-rss-mb", str(max_rss_mb)]

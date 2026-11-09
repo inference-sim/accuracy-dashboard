@@ -23,22 +23,6 @@ def _run(blis: str, args: list[str], timeout: int = 600) -> str:
     return out.stdout
 
 
-def fields(blis: str, engine: str) -> bytes:
-    """`blis fields --engine <engine> --json`: the engine's fields.json at the release this build
-    runs (COV-3), byte for byte."""
-    return _run(blis, ["fields", "--engine", engine, "--json"]).encode("utf-8")
-
-
-def ledger_list(blis: str, role: str) -> bytes:
-    """`blis ledger --list <role> --json`: the published unit list of that role (fit, anchor or
-    report) embedded in the substrate release this build pins, byte for byte. The dashboard reads
-    it as blis-substrate's ledger.Published: {"kind": "PublishedUnits", "role", "partition_version",
-    "seed_sha256", "units": [unit_id, ...]} (ledger.read_unit_set)."""
-    if role not in ("fit", "anchor", "report"):
-        raise CommandError(f"ledger --list {role!r}: the published lists are fit, anchor and report")
-    return _run(blis, ["ledger", "--list", role, "--json"]).encode("utf-8")
-
-
 def _catalog_resolve(blis: str, catalog: str, model: str | None, chip: str | None) -> dict:
     """`blis catalog resolve --catalog <catalog> --model|--chip <name> --json`, checked. The
     command prints {"query", "identity", "reason"}, with identity null when no entry exists, and
@@ -81,33 +65,3 @@ def chip_packaging(blis: str, catalog: str, chip: str) -> dict | None:
     "gpus_per_rack"}, each the value the chip's catalog entry fixes or None. None when the command
     reports no packaging (a build before inference-sim m1/packaging, or a chip with no entry)."""
     return _catalog_resolve(blis, catalog, None, chip).get("packaging")
-
-
-def metrics(blis: str) -> dict:
-    """`blis metrics --json`: the metric registry (blis-substrate contracts/metrics; DEV-8), as a
-    map from identifier to definition. The dashboard reads it as {"metrics": [definition, ...]},
-    each definition carrying the registry's fields under their JSON names: id, formula, statistic,
-    population, window, unit, percentile_method (percentiles only), unfinished, description and
-    follows (when set). A definition with any other key, or an identifier listed twice, is
-    refused."""
-    args = ["metrics", "--json"]
-    text = _run(blis, args)
-    try:
-        doc = json.loads(text)
-    except json.JSONDecodeError as e:
-        raise CommandError(f"blis {' '.join(args)} printed no JSON: {e}") from None
-    if not isinstance(doc, dict) or set(doc) != {"metrics"} or not isinstance(doc["metrics"], list):
-        raise CommandError(f"blis {' '.join(args)} printed {text.strip()[:200]!r}, not {{\"metrics\": [...]}}")
-    out = {}
-    for i, d in enumerate(doc["metrics"]):
-        if not isinstance(d, dict) or not _DEFINITION_REQUIRED <= set(d) or set(d) - _DEFINITION_KEYS:
-            raise CommandError(f"blis {' '.join(args)}: metrics[{i}] is {d!r}, not a definition with the keys "
-                               f"{sorted(_DEFINITION_REQUIRED)} and optionally {sorted(_DEFINITION_KEYS - _DEFINITION_REQUIRED)}")
-        if d["id"] in out:
-            raise CommandError(f"blis {' '.join(args)}: metric {d['id']!r} is defined twice")
-        out[d["id"]] = d
-    return out
-
-
-_DEFINITION_REQUIRED = {"id", "formula", "statistic", "population", "window", "unit", "unfinished", "description"}
-_DEFINITION_KEYS = _DEFINITION_REQUIRED | {"percentile_method", "follows"}

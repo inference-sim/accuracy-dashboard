@@ -303,31 +303,37 @@ def select_units(points: list[dict], units_path: str | None) -> tuple[list[dict]
              "not_in_pull": sorted(want - held)})
 
 
-def read_fields(blis: Path, engine_release: str) -> tuple["fl.FieldList", str]:
-    """The engine's field list at the release the scoring build runs, and its sha256: what
-    `blis fields --engine vllm --json` prints (COV-3). The list must be for the engine release
-    stack.json names; one for another release is refused (LIF-6)."""
-    raw = bc.fields(str(blis), "vllm")
+def read_fields(path: Path, engine_release: str) -> tuple["fl.FieldList", str]:
+    """The engine's field list and its sha256 (COV-3): the file --fields names, which is the pinned
+    blis-vllm release's fields.json (stack.json names the module). TEMPORARY until the M2 substrate
+    release lets the engine report its own list through `blis fields`, which the M1 simulator does
+    not have. The list must be for the engine release stack.json names; one for another release is
+    refused (LIF-6)."""
+    raw = Path(path).read_bytes()
     field_list = fl.parse(raw)
     if field_list.engine != {"kind": "vllm", "version": engine_release}:
-        raise fl.FieldsError(f"blis fields --engine vllm printed the field list of {field_list.engine}, but the "
-                             f"simulator runs vllm {engine_release} (stack.json)")
+        raise fl.FieldsError(f"{path} is the field list of {field_list.engine}, but the simulator "
+                             f"runs vllm {engine_release} (stack.json)")
     return field_list, art.sha256(raw)
 
 
-def read_anchor_units(blis: Path, out: Path) -> set[str]:
-    """The anchor units of the substrate release the scoring build pins (COV-2): the list
-    `blis ledger --list anchor --json` prints, written to `out` so the score step can name it as
-    --units. An empty list is refused: until the ledger's seed exists the release publishes no
+def read_anchor_units(substrate_dir: Path, out: Path) -> set[str]:
+    """The anchor units of the substrate release the scoring build pins (COV-2): the published list
+    at catalog/ledger/published/anchor.yaml in the blis-substrate checkout stack.json names,
+    copied to `out` so the score step can name it as --units. TEMPORARY until the M2 substrate
+    release lets `blis ledger --list anchor` print it, which the M1 simulator does not have.
+    A missing or empty list is refused: until the ledger's seed exists the release publishes no
     anchor unit, and a night that scored anything else would publish figures on units that may
     fit or select values (X8)."""
-    raw = bc.ledger_list(str(blis), "anchor")
-    out.write_bytes(raw)
+    src = Path(substrate_dir) / "catalog" / "ledger" / "published" / "anchor.yaml"
+    if not src.is_file():
+        raise ldg.LedgerError(f"{src} does not exist: the substrate release this build pins publishes no anchor "
+                              f"list yet (the ledger seed is not created), so there is no unit the nightly may "
+                              f"score (COV-2)")
+    out.write_bytes(src.read_bytes())
     units = ldg.read_unit_set(out, role="anchor")
     if not units:
-        raise ldg.LedgerError("blis ledger --list anchor printed no unit: the substrate release this build pins "
-                              "publishes no anchor list yet (the ledger seed is not created), so there is no unit "
-                              "the nightly may score (COV-2)")
+        raise ldg.LedgerError(f"{src} lists no unit: there is no unit the nightly may score (COV-2)")
     return units
 
 
@@ -355,9 +361,7 @@ def cmd_score(a) -> int:
     try:
         stack = read_stack(blis, getattr(a, "stack", None))
         engine_release = stack.engine("vllm")
-        field_list, fields_sha = read_fields(blis, engine_release)
-        # DEV-8: a predicted figure is compared with a measured one only under one definition.
-        bad += result.check_definitions(bc.metrics(str(blis)))
+        field_list, fields_sha = read_fields(Path(a.fields), engine_release)
     except (sk.StackError, fl.FieldsError, bc.CommandError, OSError, ValueError) as e:
         bad.append(str(e))
     # Every date-pinned AgentX corpus, by the catalog replay workload of its alias, checked against
@@ -509,7 +513,7 @@ def cmd_nightly(a) -> int:
     work_dir.mkdir(parents=True, exist_ok=True)
     anchor_path = work_dir / "anchor-units.json"
     try:
-        anchors = read_anchor_units(Path(a.blis), anchor_path)
+        anchors = read_anchor_units(Path(a.substrate_dir), anchor_path)
     except (bc.CommandError, ldg.LedgerError, OSError, ValueError) as e:
         _log(f"FATAL: {e}")
         return 2
@@ -573,7 +577,7 @@ def cmd_nightly(a) -> int:
         contract_dir.mkdir(parents=True, exist_ok=True)
         rc = run_image(hp.docker_command(
             a.harness_image, sim=blis_tag, units=anchor_path, pull=work, out=contract_dir,
-            catalog=a.catalog, registry=a.registry, corpus_dir=a.corpus_dir,
+            catalog=a.catalog, registry=a.registry, corpus_dir=a.corpus_dir, fields=a.fields,
             catalog_release=release, registry_release=release,
             max_rss_mb=a.max_rss_mb))
         if rc != 0:
@@ -632,6 +636,9 @@ def main(argv=None) -> int:
                    help="the release tag the catalog is at (the harness image mounts the data without "
                         "its git history, so it is named)")
     s.add_argument("--registry-release", required=True, help="the release tag the registry is at")
+    s.add_argument("--fields", required=True,
+                   help="the engine's fields.json for the release stack.json names: the pinned blis-vllm release's "
+                        "file (TEMPORARY until the M2 substrate release lets `blis fields` print it)")
     s.add_argument("--stack", help="TEMPORARY until the pinned inference-sim release ships stack.json: the scoring build's "
                                     "stack.json, when its checkout has none")
     s.add_argument("--sim-build", help="the simulator build: a release tag or a 40-hex commit; the checkout must be at it "
@@ -695,7 +702,9 @@ def main(argv=None) -> int:
     n.add_argument("--substrate-dir", required=True, help="the blis-substrate checkout --catalog, --registry and --ledger are in")
     n.add_argument("--substrate-version", required=True,
                    help="the blis-substrate version in stack.json (resolve_stack.py substrate_version); a release tag names the release")
-    n.add_argument("--substrate-commit", required=True, help="the blis-substrate commit in stack.json (resolve_stack.py substrate_commit)")
+    n.add_argument("--substrate-commit", default="",
+                   help="the blis-substrate commit in stack.json (resolve_stack.py substrate_commit); empty for a release, whose tag names it")
+    n.add_argument("--fields", required=True, help="see score --fields")
     n.add_argument("--stack", help="TEMPORARY until the pinned inference-sim release (see score --stack)")
     n.add_argument("--corpus-dir", required=True, help="see score --corpus-dir")
     n.add_argument("--corpus-cache")

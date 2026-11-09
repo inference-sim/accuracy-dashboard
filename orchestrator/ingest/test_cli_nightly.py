@@ -70,7 +70,7 @@ def _args(tmp, **over):
              corpus_dir=str(tmp / "corpora"), harness_image=IMAGE, corpus_cache=None,
              timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0, stack=None,
              ledger=str(tmp / "ledger"), substrate_dir=str(tmp / "substrate"), substrate_version="v1.0.0",
-             substrate_commit=_head(tmp / "substrate"))
+             substrate_commit=_head(tmp / "substrate"), fields=str(tmp / "fields.json"))
     a.update(over)
     if not Path(a["scored"]).exists():
         Path(a["scored"]).write_text(json.dumps({"kind": "ScoredReleases", "releases": []}))
@@ -82,6 +82,14 @@ def _row(model, conc, md):
             "benchmark_type": "agentic_traces", "recipe_fingerprint": f"rf-{model}-{conc}-{md}",
             "conc": conc, "date": md, "id": str(conc * 100000 + int(md.replace("-", "")[2:])),
             "run_url": f"https://github.com/o/r/actions/runs/{conc}{md.replace('-', '')}/attempts/1"}
+
+
+def write_anchor_list(substrate: Path, units, role="anchor"):
+    """The substrate release's published anchor list, where the night reads it (M1: the file, not
+    `blis ledger`, which the M1 simulator does not have)."""
+    d = substrate / "catalog" / "ledger" / "published"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "anchor.yaml").write_text(published(role, units))
 
 
 def published(role, units):
@@ -107,8 +115,9 @@ class Fakes:
         if not (tmp / "substrate" / ".git").exists():
             _tagged_repo(tmp / "substrate", "v1.0.0")
         cat = write_catalog(tmp / "cat", {"m": "org/m"})
-        fake_blis(tmp / "sim" / "blis", {"ledger --list anchor --json": [0, published("anchor", anchors), ""],
-                                         **resolves(cat, {"m": "org/m"})})
+        write_anchor_list(tmp / "substrate", anchors)
+        (tmp / "fields.json").write_text(json.dumps(FIELD_LIST))
+        fake_blis(tmp / "sim" / "blis", {**resolves(cat, {"m": "org/m"})})
 
     def run_image(self, cmd):
         # The harness image the night scores through: record its command, and write what the
@@ -282,26 +291,27 @@ def test_a_night_whose_build_publishes_no_anchor_unit_fails_and_scores_nothing(t
     msgs = []
     monkeypatch.setattr(cli, "_log", msgs.append)
     assert cli.cmd_nightly(_args(tmp_path)) == 2
-    assert any("printed no unit" in m and "anchor list" in m for m in msgs), msgs
+    assert any("lists no unit" in m and "anchor.yaml" in m for m in msgs), msgs
     assert not (tmp_path / "data" / "latest").exists()
 
 
-def test_a_night_whose_blis_has_no_ledger_command_fails(tmp_path, monkeypatch):
+def test_a_night_whose_substrate_publishes_no_anchor_list_fails(tmp_path, monkeypatch):
+    # The substrate release has no catalog/ledger/published/anchor.yaml until its seed job runs.
     fakes = Fakes([_row("m", 1, "2026-10-01")])
     _install(monkeypatch, fakes, [])
     fakes.ledger(tmp_path)
-    fake_blis(tmp_path / "sim" / "blis", {})
+    (tmp_path / "substrate" / "catalog" / "ledger" / "published" / "anchor.yaml").unlink()
     msgs = []
     monkeypatch.setattr(cli, "_log", msgs.append)
     assert cli.cmd_nightly(_args(tmp_path)) == 2
-    assert any("blis ledger --list anchor --json exited 2" in m for m in msgs), msgs
+    assert any("publishes no anchor list yet" in m for m in msgs), msgs
 
 
 def test_a_list_of_another_role_is_not_the_anchor_list(tmp_path):
     import ledger as ldg
-    blis = fake_blis(tmp_path / "sim" / "blis", {"ledger --list anchor --json": [0, published("fit", ["a" * 64]), ""]})
+    write_anchor_list(tmp_path / "substrate", ["a" * 64], role="fit")
     with pytest.raises(ldg.LedgerError, match="role 'fit', want 'anchor'"):
-        cli.read_anchor_units(blis, tmp_path / "anchor.json")
+        cli.read_anchor_units(tmp_path / "substrate", tmp_path / "anchor.json")
 
 
 def test_nightly_stops_when_the_pull_fails(tmp_path, monkeypatch):
@@ -405,23 +415,22 @@ def test_the_data_releases_are_named_by_the_caller_and_need_no_git_history(tmp_p
 FIELD_LIST = {"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": []}
 
 
-def test_the_field_list_is_what_blis_fields_prints_for_the_release_the_simulator_runs(tmp_path):
+def test_the_field_list_is_the_file_for_the_release_the_simulator_runs(tmp_path):
     text = json.dumps(FIELD_LIST)
-    blis = fake_blis(tmp_path / "sim" / "blis", {"fields --engine vllm --json": [0, text, ""]})
-    fl_, sha = cli.read_fields(blis, "0.32.0")
+    f = tmp_path / "fields.json"
+    f.write_text(text)
+    fl_, sha = cli.read_fields(f, "0.32.0")
     assert fl_.engine == {"kind": "vllm", "version": "0.32.0"}
     import hashlib
     assert sha == hashlib.sha256(text.encode()).hexdigest()
     import fields
     with pytest.raises(fields.FieldsError, match="the simulator runs vllm 0.31.0"):
-        cli.read_fields(blis, "0.31.0")
+        cli.read_fields(f, "0.31.0")
 
 
-def test_a_blis_without_the_fields_command_is_refused_naming_the_command(tmp_path):
-    import blis_commands
-    blis = fake_blis(tmp_path / "sim" / "blis", {})
-    with pytest.raises(blis_commands.CommandError, match="blis fields --engine vllm --json exited 2: unknown command"):
-        cli.read_fields(blis, "0.32.0")
+def test_a_missing_field_list_file_is_refused(tmp_path):
+    with pytest.raises(OSError):
+        cli.read_fields(tmp_path / "absent.json", "0.32.0")
 
 
 def test_a_build_with_no_stack_json_is_refused_with_why(tmp_path):
@@ -471,9 +480,35 @@ def test_resolve_blis_names_every_unscored_release_oldest_first_else_the_newest(
     listed("v0.15.0")
     import sys as _sys
     (bin_ / "python3").symlink_to(_sys.executable)
-    assert run() == {"blis_tags": "v0.16.0 v0.17.0", "blis_tag": "v0.17.0"}
+    # One release per run, the oldest unscored, and `more` says the run must start another: each
+    # release is published before the next begins (COV-9), so a later failure cannot lose it.
+    assert run() == {"blis_tags": "v0.16.0", "blis_tag": "v0.17.0", "more": "true"}
+    # v0.16.0 published and listed; the next run starts at v0.17.0, the last, so nothing follows it.
+    listed("v0.15.0", "v0.16.0")
+    assert run() == {"blis_tags": "v0.17.0", "blis_tag": "v0.17.0", "more": "false"}
+    # v0.17.0 FAILED: nothing was listed for it, so the next run starts at it again, not at v0.16.0.
+    assert run() == {"blis_tags": "v0.17.0", "blis_tag": "v0.17.0", "more": "false"}
     listed("v0.15.0", "v0.16.0", "v0.17.0")
-    assert run() == {"blis_tags": "v0.17.0", "blis_tag": "v0.17.0"}
+    assert run() == {"blis_tags": "v0.17.0", "blis_tag": "v0.17.0", "more": "false"}
+
+
+def test_the_workflow_scores_one_release_and_starts_the_next_only_after_publishing_it():
+    import yaml
+    wf = yaml.safe_load((Path(__file__).resolve().parent.parent.parent / ".github" / "workflows" / "api-nightly.yml").read_text())
+    jobs = wf["jobs"]
+    assert "more" in jobs["resolve"]["outputs"]
+    steps = jobs["publish"]["steps"]
+    names = [s.get("name", "") for s in steps]
+    nxt = steps[names.index("Score the next unscored release")]
+    # Dispatched by the publish job, after its publish step, and only when that step pushed.
+    assert names.index("Score the next unscored release") > names.index(
+        "Publish data/ to main (index + latest + API snapshots; dump snapshots untouched)")
+    assert "steps.pub.outputs.pushed == 'true'" in nxt["if"] and "outputs.more == 'true'" in nxt["if"]
+    assert "gh workflow run api-nightly.yml" in nxt["run"]
+    assert jobs["publish"]["permissions"]["actions"] == "write"
+    # The scoring step builds one release: its loop runs over the one tag the resolver named.
+    score = next(s for s in jobs["run-night"]["steps"] if s.get("name") == "Score the release")
+    assert score["env"]["BLIS_TAGS"] == "${{ needs.resolve.outputs.blis_tags }}"
 
 
 def test_sim_build_must_be_the_checkouts_tag_or_commit(tmp_path):
@@ -553,9 +588,8 @@ def _score_inputs(tmp_path, commands: dict):
     _tagged_repo(sim, "v0.16.0")
     (sim / "go.mod").write_text("module x\n")
     (sim / "stack.json").write_text(json.dumps({"kind": "Stack", "engines": [{"kind": "vllm", "version": "0.32.0"}]}))
-    blis = fake_blis(sim / "blis", {"fields --engine vllm --json": [0, json.dumps(FIELD_LIST), ""],
-                                    "metrics --json": [0, json.dumps({"metrics": list(REGISTRY.values())}), ""],
-                                    **commands})
+    blis = fake_blis(sim / "blis", {**commands})
+    (tmp_path / "fields.json").write_text(json.dumps(FIELD_LIST))
     (tmp_path / "cat").mkdir()
     (tmp_path / "reg").mkdir()
     assert not (tmp_path / "cat" / ".git").exists() and not (tmp_path / "reg" / ".git").exists()
@@ -565,7 +599,7 @@ def _score_inputs(tmp_path, commands: dict):
                                           "vllm_ref": "v0.32.0", "vllm_max_distance": 0}, [])
     return types.SimpleNamespace(
         pull=str(tmp_path / "pull"), out=str(tmp_path / "contract"), blis=str(blis), catalog=str(tmp_path / "cat"),
-        registry=str(tmp_path / "reg"), catalog_release="v1.0.0", registry_release="v1.0.0", stack=None, sim_build=None, harness_digest="unreleased", units=None,
+        registry=str(tmp_path / "reg"), fields=str(tmp_path / "fields.json"), catalog_release="v1.0.0", registry_release="v1.0.0", stack=None, sim_build=None, harness_digest="unreleased", units=None,
         corpus_dir=str(tmp_path / "corpora"),
         corpus_cache=None, work=str(tmp_path / "work"), timeout=60, only=None, workers=1, agentic_workers=1,
         max_rss_mb=0)
@@ -595,8 +629,7 @@ def test_an_ambiguous_catalog_repository_stops_the_night_before_any_fetch(tmp_pa
     models = {"a": "org/m", "b": "org/m"}
     cat = write_catalog(tmp_path / "cat", models)
     refusal = "model 'org/m' is the source repository of 2 catalog entries: a, b"
-    answers = {"ledger --list anchor --json": [0, published("anchor", [ledger_fake.point_id(fakes.rows[0])]), ""],
-               **resolves(cat, models),
+    answers = {**resolves(cat, models),
                f"catalog resolve --catalog {cat} --model org/m --json": [1, "", refusal]}
     fake_blis(tmp_path / "sim" / "blis", answers)
     monkeypatch.setattr(cli, "cmd_pull", lambda a: (_ for _ in ()).throw(AssertionError("pulled")))
@@ -605,20 +638,6 @@ def test_an_ambiguous_catalog_repository_stops_the_night_before_any_fetch(tmp_pa
     assert cli.cmd_nightly(_args(tmp_path)) == 2
     assert any("FATAL" in m and "a, b" in m and "--model org/m" in m for m in msgs), msgs
     assert not (tmp_path / "data" / "latest").exists()
-
-
-def test_a_score_run_whose_blis_defines_tpot_otherwise_is_refused_before_scoring(tmp_path, monkeypatch):
-    # DEV-8: the measured mean TPOT is over requests; a simulator whose tpot_mean_ms pools over
-    # tokens is not compared with it.
-    pooled = dict(REGISTRY["tpot_mean_ms"], population="tokens")
-    a = _score_inputs(tmp_path, {"metrics --json": [0, json.dumps({"metrics": [REGISTRY["ttft_mean_ms"], pooled]}), ""]})
-    import score
-    monkeypatch.setattr(score, "score_points", lambda *x, **k: (_ for _ in ()).throw(AssertionError("scored")))
-    msgs = []
-    monkeypatch.setattr(cli, "_log", msgs.append)
-    assert cli.cmd_score(a) == 2
-    assert "FATAL: the simulator's tpot_mean_ms has population 'tokens'; the InferenceX client's has " \
-           "'requests_min_2_output_tokens'" in msgs, msgs
 
 
 def test_a_score_run_replays_every_agentx_corpus_by_its_catalog_entry(tmp_path, monkeypatch):
@@ -665,15 +684,7 @@ def test_a_score_run_without_every_pinned_corpus_is_refused(tmp_path, monkeypatc
     assert any(match in m for m in msgs), msgs
 
 
-def test_a_score_run_whose_blis_has_no_metrics_command_is_refused(tmp_path, monkeypatch):
-    a = _score_inputs(tmp_path, {"metrics --json": [2, "", "unknown command \"metrics\""]})
-    msgs = []
-    monkeypatch.setattr(cli, "_log", msgs.append)
-    assert cli.cmd_score(a) == 2
-    assert any("blis metrics --json exited 2" in m for m in msgs), msgs
-
-
-def test_a_score_run_with_the_clients_definitions_scores(tmp_path, monkeypatch):
+def test_a_score_run_reads_the_field_list_file_and_scores(tmp_path, monkeypatch):
     a = _score_inputs(tmp_path, {})
     import score
     seen = []
@@ -682,16 +693,3 @@ def test_a_score_run_with_the_clients_definitions_scores(tmp_path, monkeypatch):
     import contract
     monkeypatch.setattr(contract, "validate_dir", lambda d: [])
     assert cli.cmd_score(a) == 0 and seen == [[]]
-
-
-@pytest.mark.parametrize("printed,match", [
-    ({"metrics": [{"id": "x"}]}, "not a definition"),
-    ({"metrics": [dict(REGISTRY["ttft_mean_ms"], extra=1)]}, "not a definition"),
-    ({"metrics": [REGISTRY["ttft_mean_ms"], REGISTRY["ttft_mean_ms"]]}, "defined twice"),
-    ([REGISTRY["ttft_mean_ms"]], "not {\"metrics\""),
-])
-def test_the_metric_registry_client_refuses_another_shape(tmp_path, printed, match):
-    import blis_commands
-    blis = fake_blis(tmp_path / "blis", {"metrics --json": [0, json.dumps(printed), ""]})
-    with pytest.raises(blis_commands.CommandError, match=match):
-        blis_commands.metrics(str(blis))

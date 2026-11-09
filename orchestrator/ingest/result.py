@@ -41,7 +41,8 @@ CLIENT_DEFINITIONS = {
 
 
 def check_definitions(registry: dict) -> list[str]:
-    """Why the simulator's metric registry (blis_commands.metrics) cannot be compared with the
+    """Why the simulator's metric registry (`blis metrics`, an M2 command: the M1 simulator has
+    none, so nothing calls this in M1; inference-sim/accuracy-dashboard#52) cannot be compared with the
     client, or [] when it can: each metric the harness reads must exist and have the client's
     definition, field for field (DEV-8)."""
     out = []

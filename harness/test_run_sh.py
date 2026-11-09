@@ -21,7 +21,7 @@ RUN = HERE / "run.sh"
 WORKFLOW = HERE.parent / ".github" / "workflows" / "harness-release.yml"
 COMMIT = "0123456789abcdef0123456789abcdef01234567"
 GOOD = ["--units", "units.txt", "--pull", "pull", "--out", "out", "--catalog", "c", "--registry", "r",
-        "--corpus-dir", "k", "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0"]
+        "--corpus-dir", "k", "--fields", "/dev/null", "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0"]
 
 
 def check(*args, env=None):
@@ -55,11 +55,17 @@ def test_an_unknown_flag_is_refused():
     assert "unknown flag --metrics-path" in p.stderr
 
 
-def test_the_field_list_is_not_a_flag():
-    # The scorer asks the blis it built for the field list (COV-3); no file stands in for it.
-    p = check("--sim", "v0.16.0", *GOOD, "--fields", "fields.json")
-    assert p.returncode == 2
-    assert "unknown flag --fields" in p.stderr
+def test_the_field_list_is_a_required_file():
+    # The scorer reads the engine's field list (COV-3) from the pinned blis-vllm release's file;
+    # the M1 simulator has no `blis fields` to print it.
+    without = [x for i, x in enumerate(GOOD) if x != "--fields" and GOOD[i - 1] != "--fields"]
+    p = check("--sim", "v0.16.0", *without)
+    assert p.returncode == 2 and "--fields is required" in p.stderr
+    # A named file that does not exist is refused when the run starts, before anything is built.
+    p = subprocess.run(["bash", str(RUN), "--sim", "v0.16.0", *[("/no/such/file" if GOOD[i - 1] == "--fields" else x)
+                                                               for i, x in enumerate(GOOD)]],
+                       capture_output=True, text=True)
+    assert p.returncode == 2 and "--fields /no/such/file is not a file" in p.stderr or "--units" in p.stderr
 
 
 def test_the_data_releases_are_required_and_passed_to_the_scorer():
@@ -181,7 +187,7 @@ def real_setup(tmp: Path, tag: str = "v0.16.0"):
     go = bin_ / "go"
     go.write_text('#!/bin/sh\n'
                   'if [ "$1 $2" = "mod download" ]; then exit 0; fi\n'
-                  'if [ "$1 $2" = "build -o" ]; then printf "#!/bin/sh\\ncase \\"\\$1\\" in fields) cat \\"\\$FAKE_FIELDS\\";; metrics) cat \\"\\$FAKE_FIELDS.metrics\\";; esac\\nexit 0\\n" > "$3"; chmod +x "$3"; exit 0; fi\n'
+                  'if [ "$1 $2" = "build -o" ]; then printf "#!/bin/sh\\nexit 0\\n" > "$3"; chmod +x "$3"; exit 0; fi\n'
                   'echo "fake go: unexpected $*" >&2; exit 9\n')
     py = bin_ / "python3"
     log = tmp / "python-args.txt"
@@ -200,10 +206,6 @@ def real_setup(tmp: Path, tag: str = "v0.16.0"):
     units.write_text("")
     fields = tmp / "fields.json"
     fields.write_text(json.dumps(FIELDS))
-    # `blis metrics --json`: the client's two definitions (DEV-8).
-    sys.path.insert(0, str(HERE.parent / "orchestrator" / "ingest"))
-    from test_result import REGISTRY
-    (tmp / "fields.json.metrics").write_text(json.dumps({"metrics": list(REGISTRY.values())}))
     cat = mounted_dir(tmp / "cat")
     (cat / "models").mkdir()
     (cat / "hardware").mkdir()
@@ -238,7 +240,7 @@ def run_real(tmp: Path, sim_of, extra=(), tag="v0.16.0"):
            "FAKE_FIELDS": str(fields)}
     p = subprocess.run(["bash", str(RUN), "--sim", sim_of(commit), "--sim-repo", str(bare), "--units", str(units),
                         "--pull", str(pull), "--out", str(out), "--catalog", str(cat), "--registry", str(reg),
-                        "--corpus-dir", str(tmp / "corpora"),
+                        "--corpus-dir", str(tmp / "corpora"), "--fields", str(fields),
                         "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0", *extra], capture_output=True, text=True, env=env)
     return p, out, log, commit
 
@@ -282,7 +284,7 @@ def test_the_real_path_refuses_a_corpus_that_is_not_the_catalog_entrys(tmp_path)
     p = subprocess.run(["bash", str(RUN), "--sim", "v0.16.0", "--sim-repo", str(bare), "--units", str(units),
                         "--pull", str(pull), "--out", str(tmp_path / "out"), "--catalog", str(cat),
                         "--registry", str(reg), "--corpus-dir", str(tmp_path / "corpora"),
-                        "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0"],
+                        "--fields", str(fields), "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0"],
                        capture_output=True, text=True, env=env)
     assert p.returncode == 2
     assert "mismatch" in p.stderr

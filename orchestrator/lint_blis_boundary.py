@@ -61,6 +61,9 @@ DATA_READS = {
         "TEMPORARY with ledger.load: writes, for tests, the ledger layout ledger.load reads",
     ("orchestrator/ingest/support.py", "Catalog.check_unambiguous"):
         "TEMPORARY until a command lists the catalog's models with their source repositories",
+    ("orchestrator/ingest/cli.py", "read_anchor_units"):
+        "TEMPORARY until the M2 substrate release lets `blis ledger --list anchor` print the published "
+        "anchor list, which the M1 simulator does not have (inference-sim/accuracy-dashboard#52)",
     ("orchestrator/ingest/cli.py", "cmd_score"):
         "TEMPORARY until a command prints the blis-latency-kernel version a build pins (go.mod)",
     ("orchestrator/ingest/support.py", "Catalog.packaging"):

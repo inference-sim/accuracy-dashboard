@@ -56,26 +56,31 @@ def test_a_good_digest_is_read_and_builds_the_docker_command(tmp_path):
     assert hp.read(pin(tmp_path, GOOD + "\n")) == GOOD
     cmd = hp.docker_command(GOOD, sim="v0.16.0", units=tmp_path / "u.json", pull=tmp_path / "p",
                             out=tmp_path / "o", catalog=tmp_path / "c", registry=tmp_path / "r",
-                            corpus_dir=tmp_path / "k", catalog_release="v0.3.0", registry_release="v0.2.0", max_rss_mb=13000)
+                            corpus_dir=tmp_path / "k", fields=tmp_path / "f.json", catalog_release="v0.3.0",
+                            registry_release="v0.2.0", max_rss_mb=13000)
     assert cmd[:3] == ["docker", "run", "--rm"]
     assert f"HARNESS_DIGEST=sha256:{'c' * 64}" in cmd
     i = cmd.index(GOOD)
     assert cmd[i + 1:] == ["--sim", "v0.16.0", "--units", "/data/units.json", "--pull", "/data/pull",
                            "--out", "/data/out", "--catalog", "/data/catalog", "--registry", "/data/registry",
-                           "--corpus-dir", "/data/corpora", "--catalog-release", "v0.3.0",
+                           "--corpus-dir", "/data/corpora", "--fields", "/data/fields.json",
+                           "--catalog-release", "v0.3.0",
                            "--registry-release", "v0.2.0", "--max-rss-mb", "13000"]
     mounts = [cmd[j + 1] for j, v in enumerate(cmd[:i]) if v == "-v"]
     assert f"{(tmp_path / 'u.json').resolve()}:/data/units.json:ro" in mounts
     assert f"{(tmp_path / 'o').resolve()}:/data/out" in mounts          # the output is writable
     assert f"{(tmp_path / 'k').resolve()}:/data/corpora:ro" in mounts   # the corpora are read-only
-    assert len(mounts) == 6
+    assert f"{(tmp_path / 'f.json').resolve()}:/data/fields.json:ro" in mounts   # so is the field list
+    assert len(mounts) == 7
 
 
 def test_every_flag_of_the_command_is_one_run_sh_accepts(tmp_path):
+    (tmp_path / "f.json").write_text("{}")
     cmd = hp.docker_command(GOOD, sim="v0.16.0", units="u", pull="p", out="o", catalog="c", registry="r",
-                            corpus_dir="k", catalog_release="v1", registry_release="v1", max_rss_mb=1)
+                            corpus_dir="k", fields=str(tmp_path / "f.json"), catalog_release="v1",
+                            registry_release="v1", max_rss_mb=1)
     flags = cmd[cmd.index(GOOD) + 1:]
-    (tmp_path / "x").write_text("")
+    flags = [str(tmp_path / "f.json") if f == "/data/fields.json" else f for f in flags]
     p = subprocess.run(["bash", str(HERE / "run.sh"), "--check-args", *flags], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr
 
@@ -99,7 +104,7 @@ def steps():
 def test_the_nightly_verifies_the_pinned_image_before_it_scores():
     st = steps()
     names = [s.get("name", "") for s in st]
-    i, j = names.index("Pin and verify the harness image"), names.index("Score each release, oldest first")
+    i, j = names.index("Pin and verify the harness image"), names.index("Score the release")
     assert i < j
     assert any("cosign-installer" in s.get("uses", "") for s in st[:j])
     run = st[i]["run"]
@@ -110,7 +115,7 @@ def test_the_nightly_verifies_the_pinned_image_before_it_scores():
 
 
 def test_the_nightly_scores_through_the_image_and_not_the_source_tree():
-    score = next(s for s in steps() if s.get("name") == "Score each release, oldest first")["run"]
+    score = next(s for s in steps() if s.get("name") == "Score the release")["run"]
     assert '--harness-image "$HARNESS_IMAGE"' in score
 
 

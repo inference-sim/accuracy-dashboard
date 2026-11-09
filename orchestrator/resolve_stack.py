@@ -3,9 +3,12 @@
 key=value lines for `eval` (design §11: a new release is scored with no change to the
 dashboard's code):
 
-    substrate_commit      the blis-substrate commit; its catalog/ and registry/ are the data
+    substrate_ref         what to check out of blis-substrate: its release tag, or in a draft build
+                          its commit; its catalog/ and registry/ are the data
+    substrate_commit      the commit stack.json names for it: empty for a release, whose tag names it
     substrate_version     its version: a release tag, or a pseudo-version in a draft build
-    vllm_module_commit    the blis-vllm commit; fields.json is at its root
+    vllm_module_ref       what to fetch of blis-vllm, likewise; fields.json is at its root
+    vllm_module_commit    the commit stack.json names for it: empty for a release
     vllm_ref              the vLLM tag of the engine release (v + engines[kind=vllm].version)
 
     python3 orchestrator/resolve_stack.py <inference-sim checkout or stack.json>

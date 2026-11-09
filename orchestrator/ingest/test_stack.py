@@ -105,8 +105,9 @@ VLLM_COMMIT = "a8bf6ee4fca6d019c98b369be10b5ea044033159"
 
 def test_the_pins_come_from_stack_json_modules_and_engines():
     assert sk.pins(sk.load(SUBSTRATE_STACK)) == {
-        "substrate_commit": SUBSTRATE_COMMIT, "substrate_version": "v0.0.0-20261105035832-817e83e0018b",
-        "vllm_module_commit": VLLM_COMMIT, "vllm_ref": "v0.32.0"}
+        "substrate_commit": SUBSTRATE_COMMIT, "substrate_ref": SUBSTRATE_COMMIT,
+        "substrate_version": "v0.0.0-20261105035832-817e83e0018b",
+        "vllm_module_commit": VLLM_COMMIT, "vllm_module_ref": VLLM_COMMIT, "vllm_ref": "v0.32.0"}
 
 
 def test_the_vllm_ref_follows_the_engine_release_with_no_code_change():
@@ -126,8 +127,21 @@ def test_a_stack_without_the_substrate_or_blis_vllm_module_or_a_commit_is_refuse
     with pytest.raises(sk.StackError, match="want 40 hex digits"):
         sk.pins(sk.parse(json.dumps(bad)))
     bad["modules"][0].pop("commit")
-    with pytest.raises(sk.StackError, match="want 40 hex digits"):
+    with pytest.raises(sk.StackError, match="want 40 hex digits"):      # a pseudo-version needs its commit
         sk.pins(sk.parse(json.dumps(bad)))
+
+
+def test_a_release_names_no_commit_and_the_pins_are_its_tags():
+    # inference-sim's stack.json for a release lists each BLIS module by its tag and no commit
+    # (LIF-1: a tag names its commit); the pins are the tags to fetch.
+    doc = {"kind": "Stack", "toolchain": "go1.27.2",
+           "modules": [{"path": sk.SUBSTRATE, "version": "v0.13.0"},
+                       {"path": sk.VLLM_MODULE, "version": "v0.32.0-blis.2"}],
+           "engines": [{"kind": "vllm", "version": "0.32.0", "commit": "5df63a7203cdb9328d824a27b682e77c7b9928be"}]}
+    assert sk.pins(sk.parse(json.dumps(doc))) == {
+        "substrate_commit": "", "substrate_ref": "v0.13.0", "substrate_version": "v0.13.0",
+        "vllm_module_commit": "", "vllm_module_ref": "v0.32.0-blis.2", "vllm_ref": "v0.32.0"}
+
 
 
 @pytest.mark.parametrize("version,name", [
@@ -180,8 +194,9 @@ def test_resolve_stack_prints_the_pins_for_a_checkout_and_fails_without_a_stack(
     (tmp_path / "stack.json").write_bytes(SUBSTRATE_STACK.read_bytes())
     r = subprocess.run([sys.executable, str(script), str(tmp_path)], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
-    assert r.stdout.splitlines() == [f"substrate_commit={SUBSTRATE_COMMIT}",
-                                     "substrate_version=v0.0.0-20261105035832-817e83e0018b", f"vllm_module_commit={VLLM_COMMIT}",
+    assert r.stdout.splitlines() == [f"substrate_commit={SUBSTRATE_COMMIT}", f"substrate_ref={SUBSTRATE_COMMIT}",
+                                     "substrate_version=v0.0.0-20261105035832-817e83e0018b",
+                                     f"vllm_module_commit={VLLM_COMMIT}", f"vllm_module_ref={VLLM_COMMIT}",
                                      "vllm_ref=v0.32.0"]
     empty = tmp_path / "empty"
     empty.mkdir()
