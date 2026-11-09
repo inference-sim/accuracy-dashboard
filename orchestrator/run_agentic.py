@@ -70,6 +70,7 @@ from extract_agentic_replay_args import (AGENTX_SCENARIO, parse_job_log,  # noqa
                                          parse_server_log)
 from gen_scenarios import PackagingError, emit  # noqa: E402
 import blis_commands as bc  # noqa: E402
+import stack as sk  # noqa: E402
 import support as sp  # noqa: E402
 from resolve_agentic_corpus import CorpusError, catalog_entry, check  # noqa: E402
 from settings import recorded_node_size  # noqa: E402
@@ -464,6 +465,9 @@ def main() -> int:
     ap.add_argument("--blis", required=True, help="the blis binary; it runs in its own directory")
     ap.add_argument("--catalog", required=True)
     ap.add_argument("--registry", required=True)
+    ap.add_argument("--stack", default=None,
+                    help="the scoring build's stack.json, for the engine release the scenario runs "
+                         "(default: the one beside the blis binary)")
     ap.add_argument("--launch-config", default=None,
                     help="the run's launch_config JSON; its resources.gpus_per_node is the node size, "
                          "needed for a chip whose catalog entry fixes none")
@@ -541,7 +545,9 @@ def main() -> int:
     blis = str(Path(args.blis).resolve())
     try:
         packaging = sp.Catalog(blis=blis, root=Path(args.catalog).resolve()).packaging(sweep["gpu"])
-        text = emit(sweep, {sweep["workload"]}, {AGENTIC_LABEL}, packaging)
+        stack_path = Path(args.stack) if args.stack else Path(blis).parent / "stack.json"
+        engine_release = sk.load(stack_path).engine("vllm")
+        text = emit(sweep, {sweep["workload"]}, {AGENTIC_LABEL}, packaging, engine_release)
     except PackagingError as e:
         # The chip's entry fixes no node size and the row records none: the point is not scored
         # (G5 value_not_recorded), and no size is assumed.

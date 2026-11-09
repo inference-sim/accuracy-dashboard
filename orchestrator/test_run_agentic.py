@@ -207,6 +207,8 @@ def run_driver(td: Path, row: dict, blis_stub: str, alias: str | None = UNCAPPED
     blis = td / "blis_stub.sh"
     blis.write_text(blis_stub)
     blis.chmod(0o755)
+    # The scoring build's stack.json, beside the binary: the engine release the scenario runs.
+    (td / "stack.json").write_text(json.dumps({"kind": "Stack", "engines": [{"kind": "vllm", "version": "0.32.0"}]}))
     argv = [sys.executable, str(HERE / "run_agentic.py"),
             "--row", str(td / "row.json"), "--server-log", str(td / "server.log"),
             "--corpus", str(td / "traces.jsonl"), "--blis", str(blis),
@@ -404,6 +406,8 @@ def test_driver_scores_a_supported_row():
             y = scen[0].read_text()
             ck("the scenario drafts (has a speculative: block so the accept flag applies)",
                "speculative:" in y and "num_spec_tokens:" in y, y[-200:])
+            ck("the scenario states engine: {kind: vllm, version: 0.32.0} from the stack, not engine_version",
+               'engine:\n  kind: vllm\n  version: "0.32.0"' in y and "engine_version" not in y.replace("never engine_version", ""), y[:600])
         corpus = td / "out" / "agentic_corpus.json"
         ck("a facets corpus is written", corpus.exists())
         if corpus.exists():

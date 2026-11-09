@@ -373,10 +373,11 @@ def test_prefix_caching_on_replays_the_main_phase_primed():
         assert o.fidelity is not None, o.reasons
         tr = _trace(work, entry["point_id"])
         warm = [r for r in tr if r["session_id"].startswith("warmup-")]
-        assert len(warm) == 2 and len(tr) == 42           # dp 1: one copy and its holder round
+        # The client's own warm-up (conc 4): 2*CONC = 8 copies of request 0, each with its holder round.
+        assert len(warm) == 16 and len(tr) == 56
         assert all(r["arrival_time_us"] == str(ix.PRIME_MAIN_START_US) for r in tr if r["session_id"].startswith("main-"))
         req = o.fidelity["requests"]
-        assert (req["start"], req["copies"]) == ("primed", 1)
+        assert (req["start"], req["copies"]) == ("primed", 8)
         pts = list(csv.DictReader((tmp / "c1" / c.POINTS_CSV).open()))
         assert float(pts[0]["pred_ttft_us"]) == 180000.0      # the warm-up rows are not in the mean
         assert c.validate_dir(tmp / "c1") == []

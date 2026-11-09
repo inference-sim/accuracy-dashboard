@@ -29,20 +29,19 @@ STATED, and written here: tp_size, pp_size, attention_dp_size, moe_ep_size, moe_
 framework, precision, serving, gpu, model.
 
 NOT stated by the artifact corpus, and therefore set here: max_num_seqs, max_model_len,
-block_size, gpu_memory_utilization, cudagraph_mode. A sweep carrying `stated_config` (the
+gpu_memory_utilization, cudagraph_mode. block_size is never set here: the engine repository owns
+engine defaults and a generator never writes one (X19, VLM-1), so it is written only when the run
+stated it, and otherwise left out for the engine to resolve or refuse (blis-vllm #68). A sweep carrying `stated_config` (the
 InferenceX direct corpus: what the run's own args line passed) supplies
 gpu_memory_utilization, block_size, enable_prefix_caching and the speculative config, which
 are then written as stated. gpu_memory_utilization not stated is vLLM v0.31.0's default,
 0.92 (vllm/config/cache.py:103); prefix caching and speculation not stated are left out, so
 v0.31.0's defaults apply (caching on, no drafting). A stated drafter the catalog graph does
 not describe is not written (see UNPRICED_SPECULATORS), and the file's header says so.
-The rest are NOT vLLM's defaults, and the written header says how each differs: block_size
-16 is only the nominal default, which a backend may raise (vllm/platforms/interface.py),
-and a DSA sparse-MLA model is stated at 64, the size vLLM picks for it and a multiple of the
-only kernel block its indexer runs (see DSA_MODELS);
+The rest are NOT vLLM's defaults, and the written header says how each differs:
 max_num_seqs 256 is the default only below 70 GiB or on an A100
 (EngineArgs.get_batch_defaults, vllm/engine/arg_utils.py); cudagraph_mode's default is
-FULL_AND_PIECEWISE (vllm/config/compilation.py) -- all at v0.29.0 and v0.31.0. They are held fixed so committed scores stay comparable,
+FULL_AND_PIECEWISE (vllm/config/compilation.py). They are held fixed so committed scores stay comparable,
 and the comparison scores the RATIO of step times across concurrency at a fixed deployment,
 which is what a setting held constant affects least. Where a value could NOT be held it is
 derived from the workload instead -- max_model_len must admit the longest sequence the
@@ -72,6 +71,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "ingest"))
 import blis_commands as bc  # noqa: E402
+import stack as sk  # noqa: E402
 import support as sp  # noqa: E402
 
 COEFFICIENTS = (
@@ -87,23 +87,6 @@ COEFFICIENTS = (
 # nothing and risk disagreeing with the graph. Kimi-K2.5 is the case in hand --
 # compressed-tensors at group_size 32, which the catalog derives as weight_dtype int4.
 QUANT = {"fp4": "nvfp4", "fp8": "fp8", "bf16": None, "int4": None}
-
-# The DSA sparse-MLA models in the corpus. Their indexer runs on 64-token kernel blocks
-# (vllm/v1/attention/backends/mla/indexer.py:203-204 at v0.31.0), so vLLM picks block_size 64
-# for them when none is stated and refuses a stated size that is not a multiple of 64. They
-# are stated at 64; every other model at 16.
-DSA_MODELS = {"glm-5"}
-
-# The DeepSeek-V4 models in the corpus. Their sparse attention and indexer backends accept
-# exactly one kernel block, 256 on every part (vllm/models/deepseek_v4/sparse_mla.py:59-61,
-# vllm/v1/attention/backends/mla/indexer.py:259-262 at v0.31.0), so vLLM picks it when none
-# is stated and refuses a stated size it does not accept. They are stated at it.
-V4_MODELS = {"deepseek-v4-pro"}
-
-
-def v4_block_size(gpu: str) -> int:
-    return 256
-
 
 # vLLM v0.31.0's CacheConfig.gpu_memory_utilization default (vllm/config/cache.py:103).
 GPU_MEMORY_UTILIZATION_DEFAULT = 0.92
@@ -153,7 +136,7 @@ def context_length(workloads: set[str]) -> int:
     return window
 
 
-def emit(dep: dict, workloads: set[str], labels: set[str], packaging: dict) -> str:
+def emit(dep: dict, workloads: set[str], labels: set[str], packaging: dict, engine_release: str) -> str:
     """The scenario+deployment file. `packaging` is what the chip's catalog entry fixes:
     {"gpus_per_node", "gpus_per_rack"}, each the entry's value or None (Catalog.packaging).
     The cluster states gpus_per_node only for a chip whose entry fixes none, and never states
@@ -172,10 +155,7 @@ def emit(dep: dict, workloads: set[str], labels: set[str], packaging: dict) -> s
     # otherwise it is sized to the longest isl+osl the deployment's workloads run.
     max_len = stated["max_model_len"] if "max_model_len" in stated else context_length(workloads)
     name = dep["scenario"][: -len(".yaml")]
-    block_size = 64 if dep["model"] in DSA_MODELS else 16
-    if dep["model"] in V4_MODELS:
-        block_size = v4_block_size(dep["gpu"])
-    block_size = stated.get("block_size", block_size)
+    block_size = stated.get("block_size")        # None: not stated, so left to the engine (X19)
     gmu = stated.get("gpu_memory_utilization", GPU_MEMORY_UTILIZATION_DEFAULT)
     spec = stated.get("speculative_method")
     unpriced_spec = (dep["model"], spec) in UNPRICED_SPECULATORS
@@ -194,8 +174,8 @@ def emit(dep: dict, workloads: set[str], labels: set[str], packaging: dict) -> s
         f"# gpu_memory_utilization {gmu}: "
         + ("stated by the run." if "gpu_memory_utilization" in stated else
            "not stated, so vLLM v0.31.0's default (vllm/config/cache.py:103)."),
-        f"# block_size {block_size}: "
-        + ("stated by the run." if "block_size" in stated else "not stated; see below."),
+        "# block_size: " + (f"{block_size}, stated by the run." if block_size is not None else
+                           "not stated by the run, so not written; the engine resolves it or refuses the file."),
     ]
     if "enable_prefix_caching" in stated:
         lines.append("# enable_prefix_caching: stated by the run.")
@@ -210,39 +190,24 @@ def emit(dep: dict, workloads: set[str], labels: set[str], packaging: dict) -> s
         lines.append("# speculative: stated by the run.")
     lines += [
         "#",
-        "# max_num_seqs and cudagraph_mode are not in the corpus, nor is an unstated",
-        "# block_size, so they are set here -- and not to vLLM's defaults. block_size 16 is its",
-        "# nominal default, which a backend may raise;",
-        "# max_num_seqs 256 is its default only below 70 GiB or on an A100; and its cudagraph_mode",
-        "# default is FULL_AND_PIECEWISE, not PIECEWISE (all at v0.29.0 and v0.31.0). They are held",
+        "# max_num_seqs and cudagraph_mode are not in the corpus, so they are set here -- and not",
+        "# to vLLM's defaults. max_num_seqs 256 is its default only below 70 GiB or on an A100;",
+        "# and its cudagraph_mode",
+        "# default is FULL_AND_PIECEWISE, not PIECEWISE. They are held",
         "# fixed so committed scores stay comparable; moving them to the engine's defaults is a",
         "# re-scoring decision. The comparison scores a ratio across concurrency at a fixed",
         "# deployment, which is what a setting held constant affects least. max_model_len is",
         "# derived from the workload instead, since a window shorter than isl+osl would describe a",
         "# deployment that cannot serve its own points.",
     ]
-    if "block_size" in stated:
-        pass  # stated by the run; the rule notes below do not apply
-    elif dep["model"] in V4_MODELS:
-        lines += [
-            "#",
-            f"# block_size is {block_size} here, not 16: this is a DeepSeek-V4 model, whose sparse",
-            f"# attention and indexer accept only {block_size}-token kernel blocks: vLLM v0.31.0",
-            "# picks that size when none is stated and refuses a stated size it does not accept",
-            "# (vllm/models/deepseek_v4/sparse_mla.py:59-61).",
-        ]
-    elif block_size != 16:
-        lines += [
-            "#",
-            f"# block_size is {block_size} here, not 16: this is a DSA sparse-MLA model, whose indexer",
-            "# runs on 64-token kernel blocks: vLLM v0.31.0 picks 64 for it when none is stated and",
-            "# refuses a stated size that is not a multiple of 64",
-            "# (vllm/v1/attention/backends/mla/indexer.py:203-204).",
-        ]
     lines += [
         "kind: Scenario",
         f"name: {name}",
-        'engine_version: "0.29.0"',
+        # The engine the scenario runs, in the form the simulator reads: engine: {kind, version}. The
+        # release is the one the scoring simulator's stack.json names (LIF-6), never a constant here.
+        "engine:",
+        "  kind: vllm",
+        f'  version: "{engine_release}"',
         "",
         f"model: {dep['model']}",
         f"coefficients: {COEFFICIENTS}",
@@ -279,12 +244,13 @@ def emit(dep: dict, workloads: set[str], labels: set[str], packaging: dict) -> s
         lines.append(f"      quantization: {quant}")
     lines += [
         f"      cache_dtype: {CACHE_DTYPE[dep['precision']]}",
-        f"      block_size: {block_size}",
         "      max_num_batched_tokens: 8192",
         "      max_num_seqs: 256",
     ]
     if max_len is not None:
         lines.append(f"      max_model_len: {max_len}")
+    if block_size is not None:
+        lines.append(f"      block_size: {block_size}")
     lines += [
         "      cudagraph_mode: PIECEWISE",
         f"      gpu_memory_utilization: {gmu}",
@@ -308,6 +274,7 @@ def main() -> int:
     ap.add_argument("-o", "--out", required=True, help="scenario directory")
     ap.add_argument("--blis", required=True, help="the blis binary; it reports each chip's packaging")
     ap.add_argument("--catalog", required=True)
+    ap.add_argument("--stack", required=True, help="the scoring build's stack.json: the engine release the scenarios run")
     ap.add_argument("--check", action="store_true",
                     help="verify the files on disk match what would be generated")
     args = ap.parse_args()
@@ -346,11 +313,12 @@ def main() -> int:
         labels[name].add(s["label"])
 
     os.makedirs(args.out, exist_ok=True)
+    engine_release = sk.load(args.stack).engine("vllm")
     stale = []
     cat = sp.Catalog(blis=str(Path(args.blis).resolve()), root=Path(args.catalog))
     for name, dep in sorted(deps.items()):
         try:
-            text = emit(dep, workloads[name], labels[name], cat.packaging(dep["gpu"]))
+            text = emit(dep, workloads[name], labels[name], cat.packaging(dep["gpu"]), engine_release)
         except (PackagingError, bc.CommandError) as e:
             return fail(str(e))
         path = os.path.join(args.out, name)

@@ -819,9 +819,10 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     The requests are the client's seed-0 draws for the row's (isl, osl, conc)
     (inferencex_client.target_lengths). Where the scenario's engine states
     enable_prefix_caching false, the warm-up leaves nothing the main phase reads, so the main
-    phase runs from an empty engine. Otherwise it runs primed: request 0's prompt cached on each
-    of the deployment's dp replicas by dp warm-up copies, as the client's drained warm-up leaves
-    it. The scenario gains the router block of every single-turn point (vLLM's data-parallel
+    phase runs from an empty engine. Otherwise it runs primed by the client's own warm-up: the
+    2*CONC copies of request 0 it sends and drains before the main phase (inferencex_client.
+    WARMUPS_PER_CONCURRENCY), so the warm-up state is the client's and not an equivalent of it,
+    whatever the deployment's data-parallel width. The scenario gains the router block of every single-turn point (vLLM's data-parallel
     balancer, which places by requests in flight), written beside it. The predicted means are
     the client's own, computed from the Result's request rows (inferencex_client.summarize);
     the fidelity record's `requests` names how the requests were replayed and every difference
@@ -844,7 +845,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
         return o
     ins, outs = ix.target_lengths(isl, osl, conc)
     primed = eng.get("enable_prefix_caching") is not False
-    copies = max(int(par.get("dp") or 1), 1) if primed else 0
+    copies = ix.WARMUPS_PER_CONCURRENCY * conc if primed else 0
     replay = ix.primed_phase(ins, outs, conc, copies) if primed else ix.main_phase(ins, outs, conc)
 
     pdir = (work / "single_turn" / pid).resolve()

@@ -46,13 +46,13 @@ def sweep(model="minimax-m2.5", stated=None, gpu="h200", node=8, tp=4):
 
 
 def engine(dep, field):
-    text = emit(dep, {"1024:1024"}, {"1k1k"}, OPEN)
+    text = emit(dep, {"1024:1024"}, {"1k1k"}, OPEN, "0.32.0")
     m = re.search(rf"^ +{field}: (\S+)$", text, re.M)
     return m.group(1) if m else None
 
 
 def cluster_of(dep, packaging):
-    text = emit(dep, {"1024:1024"}, {"1k1k"}, packaging)
+    text = emit(dep, {"1024:1024"}, {"1k1k"}, packaging, "0.32.0")
     return dict(re.findall(r"^  (hardware|nodes|gpus_per_node|gpus_per_rack|fabric): (\S+)$", text, re.M))
 
 
@@ -68,7 +68,7 @@ def main() -> int:
        cluster_of(sweep(gpu="h100", node=4, tp=8), OPEN) == {"hardware": "h100", "nodes": "2", "gpus_per_node": "4",
                                                               "fabric": "ib-400g"})
     try:
-        emit(sweep(gpu="h100", node=None), {"1024:1024"}, {"1k1k"}, OPEN)
+        emit(sweep(gpu="h100", node=None), {"1024:1024"}, {"1k1k"}, OPEN, "0.32.0")
         ck("no recorded node size on a chip that fixes none is refused", False)
     except PackagingError as e:
         ck("no recorded node size on a chip that fixes none is refused as value_not_recorded",
@@ -80,12 +80,16 @@ def main() -> int:
        engine(sweep(stated={}), "gpu_memory_utilization") == "0.92")
     ck("a corpus with no stated_config also takes 0.92",
        engine(sweep(), "gpu_memory_utilization") == "0.92")
+    for rel in ("0.32.0", "0.33.0"):
+        t = emit(sweep(stated={}), {"1024:1024"}, {"1k1k"}, OPEN, rel)
+        ck(f"the engine is stated as engine: {{kind, version}} at the release given ({rel}), never engine_version",
+           "engine:\n  kind: vllm\n  version: \"%s\"" % rel in t and "engine_version" not in t.replace("never engine_version", ""))
     ck("a stated block_size is written as stated",
        engine(sweep(stated={"block_size": 128}), "block_size") == "128")
-    ck("an unstated block_size follows the rule (16 for a plain model)",
-       engine(sweep(stated={}), "block_size") == "16")
-    ck("an unstated block_size follows the rule (256 for DeepSeek-V4)",
-       engine(sweep("deepseek-v4-pro", stated={}), "block_size") == "256")
+    # X19, VLM-1: the engine repository owns engine defaults; a generator never writes one.
+    for model in ("qwen3-14b", "glm-5", "deepseek-v4-pro"):
+        ck(f"an unstated block_size is not written ({model})",
+           engine(sweep(model, stated={}), "block_size") is None)
     ck("a stated enable_prefix_caching is written as stated",
        engine(sweep(stated={"enable_prefix_caching": False}),
               "enable_prefix_caching") == "false")
@@ -105,7 +109,7 @@ def main() -> int:
        engine(sweep("deepseek-v4-pro", stated={}), "method") is None)
 
     # The relocation reworded comments but must emit valid Scenario + Deployment docs.
-    text = emit(sweep(stated={}), {"1024:1024"}, {"1k1k"}, OPEN)
+    text = emit(sweep(stated={}), {"1024:1024"}, {"1k1k"}, OPEN, "0.32.0")
     ck("emits both a Scenario and a Deployment document",
        "kind: Scenario" in text and "kind: Deployment" in text)
 
