@@ -7,9 +7,14 @@
 # its scores, the night scores the newest stable release's IX-only delta (a new point id), as
 # before. There is no IX_TAG to resolve: the InferenceX data is pulled live from the API.
 #
+# One release is scored per run, so that each is published before the next begins: a failure in
+# release N+1 leaves release N published and listed, and the next run starts at N+1 (COV-9). The
+# workflow dispatches itself again while more remain.
+#
 # Emits key=value to $GITHUB_OUTPUT (or stdout when run locally):
-#   blis_tags  the releases to score tonight, oldest first, space-separated (never empty)
+#   blis_tags  the release to score in this run: the oldest unscored one, else the newest (never empty)
 #   blis_tag   the newest stable inference-sim release (never main, never a pre-release)
+#   more       true when releases remain after the one in blis_tags
 set -euo pipefail
 
 out="${GITHUB_OUTPUT:-/dev/stdout}"
@@ -27,8 +32,15 @@ if [[ -z "${NEWEST}" ]]; then
 fi
 
 UNSCORED=$(python3 "$here/ingest/stack.py" --tags "$tags" --scored "$here/../state/scored-releases.json" | tr '\n' ' ' | sed 's/ *$//')
-TONIGHT="${UNSCORED:-$NEWEST}"
+if [[ -n "$UNSCORED" ]]; then
+  TONIGHT="${UNSCORED%% *}"
+  if [[ "$UNSCORED" == *" "* ]]; then MORE=true; else MORE=false; fi
+else
+  TONIGHT="$NEWEST"
+  MORE=false
+fi
 
 echo "blis_tags=${TONIGHT}" | tee -a "$out"
 echo "blis_tag=${NEWEST}" | tee -a "$out"
-echo "resolved BLIS: score ${TONIGHT} (newest stable ${NEWEST})" >&2
+echo "more=${MORE}" | tee -a "$out"
+echo "resolved BLIS: score ${TONIGHT} (newest stable ${NEWEST}; more after it: ${MORE})" >&2

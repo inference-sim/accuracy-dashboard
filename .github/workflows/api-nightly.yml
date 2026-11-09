@@ -15,8 +15,11 @@ name: api-nightly
 #   * a BLIS release (a new stable inference-sim tag) -> re-fetch+rescore the whole window, freeze a
 #     snapshot, allow a diff. Agentic points whose artifacts expired (>90d) drop to not-scored.
 #     Every stable release from v0.16.0 on that state/scored-releases.json does not list is scored
-#     once, oldest first, one after another in one run (COV-9; resolve_blis.sh). A release is
-#     listed when its scores are published, and the list never shrinks when old snapshots are pruned.
+#     once, oldest first (COV-9; resolve_blis.sh). One release is scored and published per run,
+#     and the run dispatches itself again while more remain, so a failure in one release leaves
+#     the earlier ones published and listed and the next run starts at the one that failed. A
+#     release is listed when its scores are published, and the list never shrinks when old
+#     snapshots are pruned.
 # A no-op night (neither trigger) writes nothing and the last good view stands.
 on:
   schedule:
@@ -47,6 +50,7 @@ jobs:
     outputs:
       blis_tag: ${{ steps.r.outputs.blis_tag }}
       blis_tags: ${{ steps.r.outputs.blis_tags }}
+      more: ${{ steps.r.outputs.more }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - id: r
@@ -104,13 +108,13 @@ jobs:
           docker pull -q "$IMAGE_REF"
           echo "HARNESS_IMAGE=${IMAGE_REF}" >> "$GITHUB_ENV"
 
-      # Score every release resolve_blis.sh named, oldest first, one after another, each once
-      # (COV-9). For each: build blis FROM SOURCE at the tag (so a per-release score is sound; #15's
-      # seed rule), fetch what it pins, and run one night with it. Every point is scored by
-      # `blis replay` on requests the orchestrator writes (orchestrator/ingest/score.py); no other
-      # scorer is built. A release that fails stops the run: the releases after it are not scored
-      # out of order, and nothing is published (COV-8).
-      - name: Score each release, oldest first
+      # Score the release resolve_blis.sh named: the oldest unscored one, once (COV-9). Build blis
+      # FROM SOURCE at the tag (so a per-release score is sound; #15's seed rule), fetch what it
+      # pins, and run one night with it. Every point is scored by `blis replay` on requests the
+      # orchestrator writes (orchestrator/ingest/score.py); no other scorer is built. A release that
+      # fails publishes nothing and leaves the list as it was (COV-8), so the next run scores it
+      # again; the releases before it were published by their own runs.
+      - name: Score the release
         env:
           BLIS_TAGS: ${{ needs.resolve.outputs.blis_tags }}
           GH_TOKEN: ${{ github.token }}
@@ -128,14 +132,20 @@ jobs:
             # catalog/, registry/ and catalog/ledger) and the vLLM tag of the engine release.
             eval "$(python3 orchestrator/resolve_stack.py "$SIM")"
             git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
-            git -C "$RUNNER_TEMP/substrate" checkout -q "$substrate_commit"
+            git -C "$RUNNER_TEMP/substrate" checkout -q "$substrate_ref"
             CATALOG="$RUNNER_TEMP/substrate/catalog"
             REGISTRY="$RUNNER_TEMP/substrate/registry"
+            # The engine's field list: the pinned blis-vllm release's fields.json, at the commit
+            # stack.json names. TEMPORARY until the M2 substrate release lets the build print its
+            # own list (`blis fields`; inference-sim/accuracy-dashboard#52).
+            FIELDS="$RUNNER_TEMP/fields.json"
+            curl -fsSL --retry 3 -o "$FIELDS" \
+              "https://raw.githubusercontent.com/inference-sim/blis-vllm/${vllm_module_ref}/fields.json"
             # The ledger at the same commit: every row of the window is placed in one of its
-            # units (design §10.2). The units scored are the anchor units `blis ledger --list
-            # anchor` prints (cli.py nightly). TEMPORARY until an inference-sim command prints
-            # the full unit list with identities (catalog/ledger/units) and the ingest report:
-            # `blis ledger --list` prints only the published unit ids.
+            # units (design §10.2). The units scored are the anchor units in the substrate's
+            # published list, catalog/ledger/published/anchor.yaml (cli.py nightly). TEMPORARY until
+            # the M2 substrate release lets `blis ledger --list anchor` print it, and until a command
+            # prints the full unit list with identities (catalog/ledger/units) and the ingest report.
             LEDGER="$RUNNER_TEMP/substrate/catalog/ledger"
             # Every AgentX corpus, at the revision and full sha256 its replay workload in this
             # release's catalog pins (agentx-mvp-uncapped, agentx-mvp; X12, D3). Each point is
@@ -185,7 +195,7 @@ jobs:
               --substrate-dir "$RUNNER_TEMP/substrate" \
               --substrate-version "$substrate_version" --substrate-commit "$substrate_commit" \
               --harness-image "$HARNESS_IMAGE" \
-              --corpus-dir "$RUNNER_TEMP/corpora"
+              --corpus-dir "$RUNNER_TEMP/corpora" --fields "$FIELDS"
             echo "::endgroup::"
           done
 
@@ -338,3 +348,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run pages.yml --ref "${GITHUB_REF_NAME}"
+
+      # More unscored releases remain: this one is published and listed, so start the next run,
+      # which begins at the oldest still unlisted. Only after a successful publish, so a failed
+      # release is never skipped (COV-9).
+      - name: Score the next unscored release
+        if: ${{ steps.pub.outputs.pushed == 'true' && needs.resolve.outputs.more == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run api-nightly.yml --ref "${GITHUB_REF_NAME}"
