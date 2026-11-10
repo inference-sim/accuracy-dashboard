@@ -37,4 +37,4 @@ The text speaks of the same runner. It is silent on a label whose runner is not 
 
 ## Question for the maintainer
 
-May the facts of a label's clusters stand for a runner of that label that no record places in a cluster, when every cluster of the label states the same size? If yes for h200 only (complete in its later records), 239 points gain a `later_record` substitution and 10 more are scored. If yes for both, 645 minus the points blocked by other reasons: 20 more are scored in all (10 per label). If no, both labels stay `value_not_recorded` and the fix is an InferenceX `runners.yaml` that places every runner in a cluster.
+May the facts of a label's clusters stand for a runner of that label that no record places in a cluster, when every cluster of the label states the same size? If yes for h200 only (complete in its later records), 239 points gain a `later_record` substitution and 10 more are scored. If yes for both, 645 points gain a `later_record` substitution and 20 more are scored in all (10 per label). If no, both labels stay `value_not_recorded` and the fix is an InferenceX `runners.yaml` that places every runner in a cluster.
