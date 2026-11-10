@@ -46,14 +46,53 @@ def sweep(model="minimax-m2.5", stated=None, gpu="h200", node=8, tp=4):
 
 
 def engine(dep, field):
-    text = emit(dep, {"1024:1024"}, {"1k1k"}, OPEN, "0.32.0")
+    text = emit(dep, {"1k1k"}, OPEN, "0.32.0")
     m = re.search(rf"^ +{field}: (\S+)$", text, re.M)
     return m.group(1) if m else None
 
 
 def cluster_of(dep, packaging):
-    text = emit(dep, {"1024:1024"}, {"1k1k"}, packaging, "0.32.0")
+    text = emit(dep, {"1k1k"}, packaging, "0.32.0")
     return dict(re.findall(r"^  (hardware|nodes|gpus_per_node|gpus_per_rack|fabric): (\S+)$", text, re.M))
+
+
+# Everything the generator may put in the engine block, with the stated_config key that supplies it.
+STATED_KEYS = {"max_model_len": 4096, "block_size": 64, "gpu_memory_utilization": 0.88,
+               "enable_prefix_caching": False}
+# The engine settings a generator once wrote itself, and vLLM or the cost model defaults for each:
+# none may appear unless the run stated it (X19). quantization is the deployment's own precision.
+ONCE_WRITTEN = ("max_num_batched_tokens", "max_num_seqs", "cudagraph_mode", "cache_dtype")
+
+
+def engine_block(text):
+    """The key: value lines of the Deployment's engine block."""
+    dep = text.split("\n---\n", 1)[1]
+    block = dep.split("    engine:\n", 1)[1]
+    return dict(re.findall(r"^      (\w+): (\S+)$", block, re.M))
+
+
+def stated_values_only():
+    """X19, COV-3: a generated scenario holds only values the run stated (or the deployment's own
+    precision as quantization). Over every subset of the statable keys, the engine block's keys are
+    exactly the stated ones; no setting that was once written by default appears."""
+    import itertools
+    keys = list(STATED_KEYS)
+    bad = []
+    for r in range(len(keys) + 1):
+        for subset in itertools.combinations(keys, r):
+            stated = {k: STATED_KEYS[k] for k in subset}
+            for precision, quant in (("fp8", "fp8"), ("bf16", None)):
+                dep = sweep(stated=stated)
+                dep["precision"] = precision
+                got = engine_block(emit(dep, {"1k1k"}, OPEN, "0.32.0"))
+                want = set(subset) | ({"quantization"} if quant else set())
+                if set(got) != want or any(k in got for k in ONCE_WRITTEN):
+                    bad.append((subset, precision, sorted(got)))
+    ck("over every subset of stated settings the engine block holds exactly the stated ones (X19)",
+       not bad, str(bad[:2]))
+    ck("the generator source writes no engine default: no default constant is left",
+       not re.search(r"GPU_MEMORY_UTILIZATION_DEFAULT|CACHE_DTYPE|max_num_seqs: 256|PIECEWISE|max_num_batched_tokens: 8192",
+                     Path(sys.modules["gen_scenarios"].__file__).read_text().split('"""', 2)[2]))
 
 
 def main() -> int:
@@ -68,7 +107,7 @@ def main() -> int:
        cluster_of(sweep(gpu="h100", node=4, tp=8), OPEN) == {"hardware": "h100", "nodes": "2", "gpus_per_node": "4",
                                                               "fabric": "ib-400g"})
     try:
-        emit(sweep(gpu="h100", node=None), {"1024:1024"}, {"1k1k"}, OPEN, "0.32.0")
+        emit(sweep(gpu="h100", node=None), {"1k1k"}, OPEN, "0.32.0")
         ck("no recorded node size on a chip that fixes none is refused", False)
     except PackagingError as e:
         ck("no recorded node size on a chip that fixes none is refused as value_not_recorded",
@@ -76,12 +115,12 @@ def main() -> int:
     ck("a stated gpu_memory_utilization is written as stated",
        engine(sweep(stated={"gpu_memory_utilization": 0.85}),
               "gpu_memory_utilization") == "0.85")
-    ck("an unstated gpu_memory_utilization is vLLM v0.31.0's default, 0.92",
-       engine(sweep(stated={}), "gpu_memory_utilization") == "0.92")
-    ck("a corpus with no stated_config also takes 0.92",
-       engine(sweep(), "gpu_memory_utilization") == "0.92")
+    ck("an unstated gpu_memory_utilization is not written (X19)",
+       engine(sweep(stated={}), "gpu_memory_utilization") is None)
+    ck("a corpus with no stated_config writes none either",
+       engine(sweep(), "gpu_memory_utilization") is None)
     for rel in ("0.32.0", "0.33.0"):
-        t = emit(sweep(stated={}), {"1024:1024"}, {"1k1k"}, OPEN, rel)
+        t = emit(sweep(stated={}), {"1k1k"}, OPEN, rel)
         ck(f"the engine is stated as engine: {{kind, version}} at the release given ({rel}), never engine_version",
            "engine:\n  kind: vllm\n  version: \"%s\"" % rel in t and "engine_version" not in t.replace("never engine_version", ""))
     ck("a stated block_size is written as stated",
@@ -103,13 +142,15 @@ def main() -> int:
        engine(sweep(stated={"max_model_len": 1048576}), "max_model_len") == "1048576")
     ck("a max_model_len stated as None is left unset, so the engine resolves it",
        engine(sweep(stated={"max_model_len": None}), "max_model_len") is None)
-    ck("an unstated max_model_len is still sized from the workload (32768 for 1k/1k)",
-       engine(sweep(stated={}), "max_model_len") == "32768")
+    ck("an unstated max_model_len is not sized from the workload and not written (X19)",
+       engine(sweep(stated={}), "max_model_len") is None)
     ck("an unstated speculative config is left out",
        engine(sweep("deepseek-v4-pro", stated={}), "method") is None)
 
+    stated_values_only()
+
     # The relocation reworded comments but must emit valid Scenario + Deployment docs.
-    text = emit(sweep(stated={}), {"1024:1024"}, {"1k1k"}, OPEN, "0.32.0")
+    text = emit(sweep(stated={}), {"1k1k"}, OPEN, "0.32.0")
     ck("emits both a Scenario and a Deployment document",
        "kind: Scenario" in text and "kind: Deployment" in text)
 
