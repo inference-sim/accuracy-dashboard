@@ -76,10 +76,13 @@ def test_the_stability_check_flags_a_changed_size():
     assert not ok and first == a and len(problems) == 1 and "4 GPUs per node" in problems[0]
 
 
-def test_the_stability_check_flags_a_changed_cluster_and_a_missing_or_ambiguous_label():
+def test_the_stability_check_accepts_other_clusters_of_the_same_size_and_flags_a_missing_or_ambiguous_label():
     a, b = _v("a", "2026-07-02"), _v("b", "2026-09-27")
     ok, problems, _ = ir.stability([a, b], {a.commit: _rec(8, "x"), b.commit: _rec(8, "y")})
-    assert not ok and "on y where" in problems[0]
+    assert ok and problems == []
+    # the same clusters with another size is still refused
+    ok, problems, _ = ir.stability([a, b], {a.commit: _rec(8, "x"), b.commit: _rec(4, "x")})
+    assert not ok and "4 GPUs per node" in problems[0]
     gone = ir.Record(None, "label not in runners.yaml", ())
     ok, problems, first = ir.stability([a, b], {a.commit: _rec(8, "x"), b.commit: gone})
     assert not ok and "label not in runners.yaml" in problems[0]
@@ -87,9 +90,19 @@ def test_the_stability_check_flags_a_changed_cluster_and_a_missing_or_ambiguous_
     assert not ok and first is None
 
 
+def test_a_label_whose_sizes_differ_gets_no_later_record_for_an_earlier_row():
+    a, b = _v("a", "2026-07-02"), _v("b", "2026-09-27")
+    recs = {a.commit: _rec(8, "x"), b.commit: _rec(4, "x")}
+    ok, problems, first = ir.stability([a, b], recs)
+    lab = ir.Label(ok, tuple(problems), first, recs)
+    t = ir.Table((a, b), {"l": lab})
+    r = ir.resolve(t, "l", run_date="2026-06-01", launch_size=None, fixes_packaging=False)
+    assert r.gpus_per_node is None and r.reason == {"code": "value_not_recorded", "subject": ir.SUBJECT}
+
+
 def test_the_stability_result_for_the_committed_table():
     stable = sorted(n for n, lab in T.labels.items() if lab.stable)
-    assert stable == ["gb200", "mi355x"]
+    assert stable == ["b300", "gb200", "h100", "mi300x", "mi325x", "mi355x"]
     assert T.labels["gb300"].first_recorded.commit.startswith("5d06e10c") and not T.labels["gb300"].stable
     assert T.labels["b200"].first_recorded is None
     for n in ("rtx6000pro", "vr200"):

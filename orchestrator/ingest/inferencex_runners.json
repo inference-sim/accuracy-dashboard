@@ -30,10 +30,8 @@
   ],
   "labels": {
     "h100": {
-      "stable": false,
-      "problems": [
-        "4a63bf50: 8 GPUs per node on h100-cw where 303669b0 has 8 GPUs per node on h100-cw,h100-dgxc"
-      ],
+      "stable": true,
+      "problems": [],
       "first_recorded": {
         "commit": "303669b0e16aa6a0c600b8a68b4f91b973a34127",
         "date": "2026-07-02"
@@ -87,8 +85,7 @@
     "h200": {
       "stable": false,
       "problems": [
-        "303669b0: 1 runners belong to no cluster (first: h200-nb_1)",
-        "4a63bf50: 8 GPUs per node on h200-dgxc where 5d06e10c has 8 GPUs per node on h200-cw,h200-dgxc"
+        "303669b0: 1 runners belong to no cluster (first: h200-nb_1)"
       ],
       "first_recorded": {
         "commit": "5d06e10c975cb83e912a48913c6d7a6fe61a8e9e",
@@ -184,11 +181,8 @@
       }
     },
     "b300": {
-      "stable": false,
-      "problems": [
-        "5d06e10c: 8 GPUs per node on b300-dsxe where 303669b0 has 8 GPUs per node on b300-nv",
-        "4a63bf50: 8 GPUs per node on b300-dsxe where 303669b0 has 8 GPUs per node on b300-nv"
-      ],
+      "stable": true,
+      "problems": [],
       "first_recorded": {
         "commit": "303669b0e16aa6a0c600b8a68b4f91b973a34127",
         "date": "2026-07-02"
@@ -318,11 +312,8 @@
       }
     },
     "mi300x": {
-      "stable": false,
-      "problems": [
-        "5d06e10c: 8 GPUs per node on mi300x-amd where 303669b0 has 8 GPUs per node on mi300x-amds",
-        "4a63bf50: 8 GPUs per node on mi300x-amd where 303669b0 has 8 GPUs per node on mi300x-amds"
-      ],
+      "stable": true,
+      "problems": [],
       "first_recorded": {
         "commit": "303669b0e16aa6a0c600b8a68b4f91b973a34127",
         "date": "2026-07-02"
@@ -364,10 +355,8 @@
       }
     },
     "mi325x": {
-      "stable": false,
-      "problems": [
-        "4a63bf50: 8 GPUs per node on mi325x-amd where 303669b0 has 8 GPUs per node on mi325x-amds"
-      ],
+      "stable": true,
+      "problems": [],
       "first_recorded": {
         "commit": "303669b0e16aa6a0c600b8a68b4f91b973a34127",
         "date": "2026-07-02"

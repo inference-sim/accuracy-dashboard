@@ -72,7 +72,9 @@ def stability(versions: list[Version], records: dict) -> tuple[bool, list[str], 
     """(stable, problems, first_recorded) for one label.
 
     The label is stable when every version that records node sizes gives it a single size, and
-    the size and the clusters it maps to are the same in all of them. first_recorded is the
+    the size is the same in all of them. The clusters it maps to may differ between versions: the
+    node size is a fact of the label's machines, and a record that names other clusters of the
+    same size contradicts nothing. first_recorded is the
     first such version that gives it a single size."""
     problems = []
     first = None
@@ -87,9 +89,10 @@ def stability(versions: list[Version], records: dict) -> tuple[bool, list[str], 
         if first is None:
             first = v
         key = (r.gpus_per_node, tuple(c.id for c in r.clusters))
+        size = r.gpus_per_node
         if seen is None:
             seen = (v, key)
-        elif key != seen[1]:
+        elif size != seen[1][0]:
             problems.append(f"{v.commit[:8]}: {_describe(key)} where {seen[0].commit[:8]} has {_describe(seen[1])}")
     return not problems and first is not None, problems, first
 

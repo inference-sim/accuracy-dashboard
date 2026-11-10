@@ -57,7 +57,7 @@ Order of sources for a chip whose catalog entry does not fix its packaging: (i) 
 
 A row dated on or after the label's first record uses the record in force on the row's date. That is not a substitution; the scenario's header names the source as `cluster.gpus_per_node: InferenceX runners.yaml at <commit>`. A row dated before it takes the first record as a `later_record` G2 substitution. This applies only to a stable label.
 
-The stability check, printed by the generator and enforced when the table is loaded: a label is stable when, in every version that records node sizes, it maps to a single size, the size is the same, and the clusters it maps to are the same. A label that is absent from a version, has a runner outside every cluster, maps to clusters of different sizes, or changes size or cluster is `stable: false`. It is not used for a row dated before its first record; such a row stays `value_not_recorded`.
+The stability check, printed by the generator and enforced when the table is loaded: a label is stable when, in every version that records node sizes, it maps to a single size and the size is the same. The clusters it maps to may differ between versions. A label that is absent from a version, has a runner outside every cluster, maps to clusters of different sizes, or changes size is `stable: false`. It is not used for a row dated before its first record; such a row stays `value_not_recorded`.
 
 ## Failed points
 
