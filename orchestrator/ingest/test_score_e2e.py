@@ -995,6 +995,9 @@ def test_an_expired_job_log_keeps_the_point_scored_and_names_client_flags_assume
         o, _ = _score(tmp, entry, env, tmp / "c1")
         diffs = o.fidelity["requests"]["differences"]
         assert "client_flags" in [d["subject"] for d in diffs] and o.fidelity["grade"] == "G2"
+        # the record the scorer writes obeys the schema (the enum once lacked client_flags, so a
+        # run with an expired job log failed validation after it was scored)
+        assert c.validate_dir(tmp / "c1") == []
         d = next(d for d in diffs if d["subject"] == "client_flags")
         assert d["kind"] == "client_difference" and \
             d["detail"] == "job log expired; the client's flags are assumed to be the launcher's defaults"
@@ -1013,6 +1016,7 @@ def test_a_run_with_no_recorded_inferencex_commit_names_client_release_unrecorde
         o, _ = _score(tmp, entry, env, tmp / "c1")
         diffs = o.fidelity["requests"]["differences"]
         assert "client_release" in [d["subject"] for d in diffs] and o.fidelity["grade"] == "G2"
+        assert c.validate_dir(tmp / "c1") == []
         tmp = Path(tempfile.mkdtemp())
         entry, env = _setup(tmp)
         o, _ = _score(tmp, entry, env, tmp / "c2")

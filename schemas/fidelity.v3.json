@@ -480,8 +480,10 @@
                 "const": "client_difference"
               },
               "subject": {
-                "description": "send_gap: the client's interval between one response ending and the next request, which the simulator does not model. sent_prompt_lengths: the sent prompt lengths are not verified equal to the replayed targets.",
+                "description": "send_gap: the client's interval between one response ending and the next request, which the simulator does not model. sent_prompt_lengths: the sent prompt lengths are not verified equal to the replayed targets. client_flags: the run's job log is gone, so the client's flags are taken to be the launcher's defaults. client_release: the InferenceX commit of the run is not recorded.",
                 "enum": [
+                  "client_flags",
+                  "client_release",
                   "send_gap",
                   "sent_prompt_lengths"
                 ]

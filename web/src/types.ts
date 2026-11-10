@@ -114,7 +114,7 @@ export interface Fidelity {
     start: 'cold' | 'primed'
     copies: number
     count: number
-    differences: { kind: 'client_difference'; subject: 'send_gap' | 'sent_prompt_lengths'; detail: string }[]
+    differences: { kind: 'client_difference'; subject: 'client_flags' | 'client_release' | 'send_gap' | 'sent_prompt_lengths'; detail: string }[]
   }
   blis_kernel_provenance?: unknown
 }
