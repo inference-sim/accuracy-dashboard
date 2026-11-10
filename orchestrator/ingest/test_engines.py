@@ -20,7 +20,7 @@ import pull as pl  # noqa: E402
 import score as sc  # noqa: E402
 
 LABELS = ["vllm", "llmd-vllm", "vllm-disagg", "dynamo-vllm", "sglang", "dynamo-sglang", "mori-sglang", "trt",
-          "dynamo-trt", "atom", "atom-disagg", "mooncake-atom", "tilert"]
+          "dynamo-trt", "atom", "atom-disagg", "mooncake-atom", "teacup", "rubin-july", "tokenspeed", "tilert"]
 
 
 def _row(framework, router=None, **kw):
@@ -180,3 +180,11 @@ def test_a_disaggregated_run_whose_topology_is_all_modelled_is_g5_topology_unsup
 
 def test_the_fabric_reason_is_gone():
     assert not hasattr(pl, "_row_reasons") and not hasattr(pl, "MULTI_NODE_FABRIC")
+
+
+def test_teacup_rubin_july_and_tokenspeed_are_named_engineless_and_no_longer_stop_the_pull():
+    for label in ("teacup", "rubin-july", "tokenspeed"):
+        fw = engines.lookup(label)
+        assert fw.engine is None and fw.router is None and fw.topology == engines.AGGREGATED
+    assert engines.unknown_labels([{"framework": "teacup"}, {"framework": "rubin-july"}, {"framework": "tokenspeed"}]) == []
+    assert engines.unknown_labels([{"framework": "nonesuch"}]) == ["nonesuch"]
