@@ -7,10 +7,22 @@
    "entry": "not_in_catalog"
   },
   {
-   "alone": 31,
-   "blocks": 858,
+   "alone": 28,
+   "blocks": 996,
+   "demotes": 0,
+   "entry": "field_not_modelled:max_cudagraph_capture_size"
+  },
+  {
+   "alone": 20,
+   "blocks": 645,
    "demotes": 0,
    "entry": "value_not_recorded:cluster.gpus_per_node"
+  },
+  {
+   "alone": 12,
+   "blocks": 513,
+   "demotes": 0,
+   "entry": "field_not_modelled:enable_expert_parallel"
   },
   {
    "alone": 10,
@@ -32,12 +44,6 @@
   },
   {
    "alone": 0,
-   "blocks": 996,
-   "demotes": 0,
-   "entry": "field_not_modelled:max_cudagraph_capture_size"
-  },
-  {
-   "alone": 0,
    "blocks": 834,
    "demotes": 0,
    "entry": "field_not_modelled:language_model_only"
@@ -47,12 +53,6 @@
    "blocks": 771,
    "demotes": 0,
    "entry": "field_not_modelled:stream_interval"
-  },
-  {
-   "alone": 0,
-   "blocks": 513,
-   "demotes": 0,
-   "entry": "field_not_modelled:enable_expert_parallel"
   },
   {
    "alone": 0,
@@ -219,14 +219,176 @@
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 20,
+   "demotes": 31,
    "entry": "client_difference:client_flags"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 20,
+   "demotes": 31,
    "entry": "client_difference:send_gap"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-attention/attention_decode_floor_mla"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-host-overheads/host_admission_per_request"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-host-overheads/host_admission_per_token"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-host-overheads/host_completion"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-host-overheads/host_launch_eager_per_layer"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-host-overheads/host_launch_per_kernel"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-host-overheads/host_output_token"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-host-overheads/host_replay_graph_per_step"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-memory/activation_scratch_floor_bytes"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-memory/cudagraph_capture_bytes_full_and_piecewise"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-primitives/engine_workspace_bytes"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-primitives/hbm_derate"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_range:unevaluated"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "estimated:gpu_memory_utilization"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "interim_status:host"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "interim_status:model"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "interim_status:model_tag"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "interim_status:port"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "interim_status:reasoning_parser"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "interim_status:served_model_name"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "interim_status:tool_call_parser"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "interim_status:trust_remote_code"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "kernel_hash:unevaluated"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "other_release:engine release"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "ported_functions_unpublished:engine release"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "resolved_differs:unevaluated"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "value_class:unevaluated"
   },
   {
    "alone": 0,
@@ -237,203 +399,47 @@
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 20,
-   "entry": "coefficient_method:cost-model-attention/attention_decode_floor_mla"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "coefficient_method:cost-model-host-overheads/host_admission_per_request"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "coefficient_method:cost-model-host-overheads/host_admission_per_token"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "coefficient_method:cost-model-host-overheads/host_completion"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "coefficient_method:cost-model-host-overheads/host_launch_eager_per_layer"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "coefficient_method:cost-model-host-overheads/host_launch_per_kernel"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "coefficient_method:cost-model-host-overheads/host_output_token"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "coefficient_method:cost-model-host-overheads/host_replay_graph_per_step"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "coefficient_method:cost-model-memory/activation_scratch_floor_bytes"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "coefficient_method:cost-model-memory/cudagraph_capture_bytes_full_and_piecewise"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "coefficient_method:cost-model-primitives/engine_workspace_bytes"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "coefficient_method:cost-model-primitives/hbm_derate"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "coefficient_range:unevaluated"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "estimated:gpu_memory_utilization"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "interim_status:host"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "interim_status:model"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "interim_status:model_tag"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "interim_status:port"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "interim_status:reasoning_parser"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "interim_status:served_model_name"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "interim_status:tool_call_parser"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "interim_status:trust_remote_code"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "kernel_hash:unevaluated"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "other_release:engine release"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "ported_functions_unpublished:engine release"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "resolved_differs:unevaluated"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 20,
-   "entry": "value_class:unevaluated"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 10,
+   "demotes": 18,
    "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_4rank"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 10,
-   "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_8rank"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 10,
+   "demotes": 18,
    "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_4rank"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 10,
+   "demotes": 13,
+   "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_8rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 13,
    "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_8rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 11,
+   "entry": "later_record:cluster.gpus_per_node"
   }
  ],
  "coverage": {
   "all": {
    "by_grade": {
-    "G4": 20,
-    "G5": 1714
+    "G4": 31,
+    "G5": 1703
    },
    "failed": 0,
-   "not_scored": 1714,
+   "not_scored": 1703,
    "points": 1734,
    "primary_reason": {
-    "field_not_modelled": 723,
+    "field_not_modelled": 925,
     "not_in_catalog": 82,
-    "value_not_recorded": 909
+    "value_not_recorded": 696
    },
    "reasons": {
     "field_not_in_release:env.MC_ENABLE_DEST_DEVICE_AFFINITY": {
@@ -489,7 +495,7 @@
      "blocks": 4
     },
     "field_not_modelled:enable_expert_parallel": {
-     "alone": 0,
+     "alone": 12,
      "blocks": 513
     },
     "field_not_modelled:env.PYTHONHASHSEED": {
@@ -517,7 +523,7 @@
      "blocks": 90
     },
     "field_not_modelled:max_cudagraph_capture_size": {
-     "alone": 0,
+     "alone": 28,
      "blocks": 996
     },
     "field_not_modelled:mm_encoder_tp_mode": {
@@ -569,8 +575,8 @@
      "blocks": 9
     },
     "value_not_recorded:cluster.gpus_per_node": {
-     "alone": 31,
-     "blocks": 858
+     "alone": 20,
+     "blocks": 645
     },
     "value_not_recorded:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use": {
      "alone": 0,
@@ -581,20 +587,20 @@
      "blocks": 25
     }
    },
-   "scored": 20,
-   "share_scored": 0.011534025374855825
+   "scored": 31,
+   "share_scored": 0.01787773933102653
   },
   "in_scope": {
    "by_grade": {
-    "G4": 20,
-    "G5": 1168
+    "G4": 31,
+    "G5": 1157
    },
    "failed": 0,
-   "not_scored": 1168,
+   "not_scored": 1157,
    "points": 1188,
    "primary_reason": {
-    "field_not_modelled": 267,
-    "value_not_recorded": 901
+    "field_not_modelled": 469,
+    "value_not_recorded": 688
    },
    "reasons": {
     "field_not_in_release:env.MC_ENABLE_DEST_DEVICE_AFFINITY": {
@@ -650,7 +656,7 @@
      "blocks": 4
     },
     "field_not_modelled:enable_expert_parallel": {
-     "alone": 0,
+     "alone": 12,
      "blocks": 422
     },
     "field_not_modelled:env.PYTHONHASHSEED": {
@@ -674,7 +680,7 @@
      "blocks": 67
     },
     "field_not_modelled:max_cudagraph_capture_size": {
-     "alone": 0,
+     "alone": 28,
      "blocks": 996
     },
     "field_not_modelled:moe_backend": {
@@ -722,8 +728,8 @@
      "blocks": 1
     },
     "value_not_recorded:cluster.gpus_per_node": {
-     "alone": 31,
-     "blocks": 858
+     "alone": 20,
+     "blocks": 645
     },
     "value_not_recorded:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use": {
      "alone": 0,
@@ -734,8 +740,8 @@
      "blocks": 25
     }
    },
-   "scored": 20,
-   "share_scored": 0.016835016835016835
+   "scored": 31,
+   "share_scored": 0.026094276094276093
   },
   "out_of_scope": {
    "by_grade": {
@@ -904,35 +910,35 @@
    "accuracy": {
     "noise_floor_pct": 1.6,
     "noise_floor_source": "fallback; none measured per point",
-    "points": 20,
+    "points": 31,
     "tpot": {
      "mape": {
-      "n": 20,
-      "value": 12.883246944520948
+      "n": 31,
+      "value": 17.302592794078805
      },
      "shape": {
-      "n": 16,
-      "value": 9.463302337306677
+      "n": 25,
+      "value": 10.660419937110554
      }
     },
     "ttft": {
      "mape": {
-      "n": 20,
-      "value": 32.266492609839716
+      "n": 31,
+      "value": 30.204950199986843
      },
      "shape": {
-      "n": 16,
-      "value": 23.798202271424536
+      "n": 25,
+      "value": 17.72683899748134
      }
     }
    },
-   "points": 20,
-   "share_of_all": 0.011534025374855825,
+   "points": 31,
+   "share_of_all": 0.01787773933102653,
    "share_of_graded": 1.0
   },
   "G5": {
-   "points": 1714,
-   "share_of_all": 0.9884659746251442,
+   "points": 1703,
+   "share_of_all": 0.9821222606689735,
    "share_of_graded": null
   },
   "failed": {
@@ -942,30 +948,30 @@
  "headline": {
   "noise_floor_pct": 1.6,
   "noise_floor_source": "fallback; none measured per point",
-  "points": 20,
+  "points": 31,
   "tpot": {
    "mape": {
-    "n": 20,
-    "value": 12.883246944520948
+    "n": 31,
+    "value": 17.302592794078805
    },
    "shape": {
-    "n": 16,
-    "value": 9.463302337306677
+    "n": 25,
+    "value": 10.660419937110554
    }
   },
   "ttft": {
    "mape": {
-    "n": 20,
-    "value": 32.266492609839716
+    "n": 31,
+    "value": 30.204950199986843
    },
    "shape": {
-    "n": 16,
-    "value": 23.798202271424536
+    "n": 25,
+    "value": 17.72683899748134
    }
   }
  },
  "identity": {
-  "harness_commit": "0206f24408db418acd551d7245673dcdb230614a",
+  "harness_commit": "9d32d8e328b37891fdb6de73a0fdc62714cc5eb3",
   "point_set_sha256": "6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60",
   "points": 1734,
   "pull_manifest_sha256": "6b37908b08dfbb51af35977dbbd0afd2f764ea564443022a07858b186630a816",
@@ -993,7 +999,7 @@
     "kind": "vllm",
     "version": "0.32.0"
    },
-   "harness_commit": "0206f24408db418acd551d7245673dcdb230614a"
+   "harness_commit": "9d32d8e328b37891fdb6de73a0fdc62714cc5eb3"
   }
  },
  "kind": "run",
@@ -1079,25 +1085,25 @@
    "G4": {
     "noise_floor_pct": 1.6,
     "noise_floor_source": "fallback; none measured per point",
-    "points": 20,
+    "points": 31,
     "tpot": {
      "mape": {
-      "n": 20,
-      "value": 12.883246944520948
+      "n": 31,
+      "value": 17.302592794078805
      },
      "shape": {
-      "n": 16,
-      "value": 9.463302337306677
+      "n": 25,
+      "value": 10.660419937110554
      }
     },
     "ttft": {
      "mape": {
-      "n": 20,
-      "value": 32.266492609839716
+      "n": 31,
+      "value": 30.204950199986843
      },
      "shape": {
-      "n": 16,
-      "value": 23.798202271424536
+      "n": 25,
+      "value": 17.72683899748134
      }
     }
    }
@@ -1105,9 +1111,19 @@
  },
  "unlock": [
   {
-   "alone": 31,
+   "alone": 28,
+   "blocker": "field_not_modelled:max_cudagraph_capture_size",
+   "blocks": 996
+  },
+  {
+   "alone": 20,
    "blocker": "value_not_recorded:cluster.gpus_per_node",
-   "blocks": 858
+   "blocks": 645
+  },
+  {
+   "alone": 12,
+   "blocker": "field_not_modelled:enable_expert_parallel",
+   "blocks": 422
   },
   {
    "alone": 10,
@@ -1118,11 +1134,6 @@
    "alone": 1,
    "blocker": "value_not_recorded:api_413",
    "blocks": 1
-  },
-  {
-   "alone": 0,
-   "blocker": "field_not_modelled:max_cudagraph_capture_size",
-   "blocks": 996
   },
   {
    "alone": 0,
@@ -1138,11 +1149,6 @@
    "alone": 0,
    "blocker": "field_not_modelled:language_model_only",
    "blocks": 607
-  },
-  {
-   "alone": 0,
-   "blocker": "field_not_modelled:enable_expert_parallel",
-   "blocks": 422
   },
   {
    "alone": 0,

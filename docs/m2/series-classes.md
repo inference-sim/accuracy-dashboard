@@ -1,12 +1,12 @@
 # InferenceX series classes and what the harness does with each
 
-Measured on 2026-11-10 from the live API: `/api/v1/availability` (7185 series, 2025-09-29 to 2026-11-10) and `/api/v1/benchmarks` for the 180-day window the nightly pulls (6306 rows, 2026-05-15 to 2026-11-10). A series is one deployment shape for one model and chip; a row is one concurrency of it. The treatment columns come from `engines.py` and `assess.py`; the scored and G5 columns come from the baseline run in `baseline-v0.16.0/` (v0.16.0, harness `0206f24`), which covers only the units of the published snapshot, so they are 0 for every class the snapshot did not hold. Regenerate the table with `series_classes.py` (this directory).
+Measured on 2026-11-10 from the live API: `/api/v1/availability` (7185 series, 2025-09-29 to 2026-11-10) and `/api/v1/benchmarks` for the 180-day window the nightly pulls (6306 rows, 2026-05-15 to 2026-11-10). A series is one deployment shape for one model and chip; a row is one concurrency of it. The treatment columns come from `engines.py` and `assess.py`; the scored and G5 columns come from the baseline run in `baseline-v0.16.0/` (v0.16.0, harness `9d32d8e`), which covers only the units of the published snapshot, so they are 0 for every class the snapshot did not hold. Regenerate the table with `series_classes.py` (this directory).
 
 ## The table
 
 | Framework | Topology | Type | Series | Window rows | AMD or TPU rows | Rows with no ledger unit | Units | In the baseline set: scored | G5 | Treatment |
 |---|---|---|---|---|---|---|---|---|---|---|
-| vllm | agg | single_turn | 2393 | 1696 | 555 | 9 | 1687 | 20 | 1667 | fetched; scored by the harness |
+| vllm | agg | single_turn | 2393 | 1696 | 555 | 9 | 1687 | 31 | 1656 | fetched; scored by the harness |
 | sglang | agg | single_turn | 2037 | 994 | 361 | 144 | 850 | 0 | 0 | G5 field_unclassified (no fetch) |
 | sglang | agg | agentic_traces | 207 | 739 | 195 | 624 | 115 | 0 | 0 | G5 field_unclassified (no fetch) |
 | dynamo-vllm | disagg | single_turn | 68 | 496 | 0 | 0 | 496 | 0 | 0 | G5 router_unsupported (no fetch) |
@@ -25,11 +25,11 @@ Measured on 2026-11-10 from the live API: `/api/v1/availability` (7185 series, 2
 | mooncake-atom | disagg | single_turn | 9 | 54 | 54 | 0 | 54 | 0 | 0 | G5 engine_unsupported (no fetch) |
 | dynamo-trt | disagg | agentic_traces | 10 | 42 | 0 | 36 | 6 | 0 | 0 | G5 router_unsupported, engine_unsupported (no fetch) |
 | trt | agg | agentic_traces | 7 | 29 | 0 | 7 | 22 | 0 | 0 | G5 engine_unsupported (no fetch) |
-| teacup | agg | single_turn | 4 | 28 | 0 | 28 | 0 | 0 | 0 | framework not in engines.FRAMEWORKS: the pull stops |
+| teacup | agg | single_turn | 4 | 28 | 0 | 28 | 0 | 0 | 0 | G5 engine_unsupported (no fetch) |
 | atom-disagg | disagg | single_turn | 2 | 20 | 20 | 0 | 20 | 0 | 0 | G5 engine_unsupported (no fetch) |
-| rubin-july | agg | single_turn | 1 | 14 | 0 | 14 | 0 | 0 | 0 | framework not in engines.FRAMEWORKS: the pull stops |
+| rubin-july | agg | single_turn | 1 | 14 | 0 | 14 | 0 | 0 | 0 | G5 engine_unsupported (no fetch) |
 | vllm | disagg | agentic_traces | 4 | 12 | 9 | 12 | 0 | 0 | 0 | fetched; disaggregated: topology reasons, else topology_unsupported |
-| tokenspeed | agg | agentic_traces | 2 | 9 | 0 | 9 | 0 | 0 | 0 | framework not in engines.FRAMEWORKS: the pull stops |
+| tokenspeed | agg | agentic_traces | 2 | 9 | 0 | 9 | 0 | 0 | 0 | G5 engine_unsupported (no fetch) |
 | mori-sglang | disagg | agentic_traces | 7 | 8 | 8 | 8 | 0 | 0 | 0 | G5 field_unclassified (no fetch) |
 | dynamo-trt | agg | agentic_traces | 2 | 7 | 0 | 7 | 0 | 0 | 0 | G5 router_unsupported, engine_unsupported (no fetch) |
 | trt | disagg | agentic_traces | 2 | 6 | 0 | 0 | 6 | 0 | 0 | G5 engine_unsupported (no fetch) |
@@ -41,12 +41,11 @@ Measured on 2026-11-10 from the live API: `/api/v1/availability` (7185 series, 2
 
 Series in availability: 7185. Window rows: 6306. Rows with a ledger unit: 4580.
 
-
 Reading the columns. "AMD or TPU rows" are out of scope for M2 to M4 (plan v64); they are counted in every row total and listed here apart from the in-scope ones. "Rows with no ledger unit" are rows the ledger's source revision (`db-dump/2026-09-28`) does not hold: newer than that dump, or recorded after it. The harness scores a row only through its ledger unit, so those rows are not in any coverage count until a ledger release holds them (1720 of 6306 rows today). "Units" is the number of rows that have a unit.
 
 ## Findings
 
-**(a) Engines other than vLLM are G5, not absent.** `engines.py` names 13 labels. Only the vLLM labels fetch artifacts and are scored. Every other label's points are G5 without a fetch, with every reason true of them: `engine_unsupported` (trt, atom, tilert, mooncake-atom, atom-disagg), `field_unclassified` (sglang, mori-sglang, until blis-sglang publishes a field list), and `router_unsupported` (dynamo-*, tilert). The published snapshot and the baseline above hold none of them, because they hold only the snapshot's units, which are all vLLM. The nightly's pull lists them. Two labels in the window, `teacup` (28 rows) and `rubin-july` (14), and `tokenspeed` (9 rows, no unit yet) are not in `engines.FRAMEWORKS`; the pull stops on them (`engines.unknown_labels`) until someone names their engine, router and topology. The 2026-11-09 pull aborted on `rubin-july` and `teacup` for that reason; `freeze.py` drops them and records it.
+**(a) Engines other than vLLM are G5, not absent.** `engines.py` names 16 labels. Only the vLLM labels fetch artifacts and are scored. Every other label's points are G5 without a fetch, with every reason true of them: `engine_unsupported` (trt, atom, tilert, mooncake-atom, atom-disagg), `field_unclassified` (sglang, mori-sglang, until blis-sglang publishes a field list), and `router_unsupported` (dynamo-*, tilert). The published snapshot and the baseline above hold none of them, because they hold only the snapshot's units, which are all vLLM. The nightly's pull lists them. Three labels, `teacup`, `rubin-july` and `tokenspeed`, were not named in the table and stopped the pull; they are now named, with no BLIS engine, and are `engine_unsupported`. The 2026-11-09 pull had aborted on `rubin-july` and `teacup` for that reason.
 
 **(b) vllm-disagg and llmd-vllm.** All 74 `vllm-disagg` rows are on mi355x: out of scope, not a candidate in M2 to M4. `llmd-vllm` has 10 rows: 5 gb200 single-turn dsv4 (in scope, August to October) and 5 tpuv7 agentic qwen3.5 (out of scope). Each in-scope `llmd-vllm` row records one prefill and one decode pool: `prefill_num_workers`, `decode_num_workers`, `prefill_tp`/`ep`/`dp_attention`, `decode_tp`/`ep`/`dp_attention`, and the GPU counts of each pool (for example 1 prefill worker of 1 GPU, ep 8 with data-parallel attention, against 1 decode worker of the same shape; or 5 decode workers of tp 8, ep 8). The row's `metrics.router_name` is `llm-d-router` on all 5. The image is `quay.io/rh-ee-imarkov/llm-d-nokube-vllm:vllm0.26@sha256:...`, a private build. What is missing is the run's own record: none of the 5 gb200 runs has a server log or launch configuration in the pull (`files: {}`), so the engine settings (batch limits, memory fraction, connector options) are unrecorded. Under X19 the scenario would state only the topology and the model, and leave every engine setting to the engine; the point would be `server_log_missing`, a G5 `value_not_recorded`, before it was ever graded, under the harness's rule that a run without its log is not scored.
 
@@ -75,7 +74,7 @@ The 65 multinode `vllm` rows are the 65 points the published snapshot lists as `
 
 **(f) Fixes for the other reasons.** From the baseline's 1714 G5 points (546 AMD, out of scope):
 
-- `value_not_recorded:cluster.gpus_per_node` (858 points: b200 406, h200 239, b300 122, h100 91): `inferencex_runners.json` marks these four labels `stable: false`, because the clusters a label maps to differ between InferenceX commits (`h100-cw` against `h100-cw,h100-dgxc`), not because the size differs. Every version records 8 GPUs per node. The stability rule in `CONTRACT.md` ("the clusters it maps to are the same") is what blocks them. This is a ruling, not a bug: relaxing it to "the size is the same in every version" would state a node size no source recorded for the run. Alone it unlocks 31 points, because most of these also carry `field_not_modelled`.
+- `value_not_recorded:cluster.gpus_per_node` (858 points in the first baseline, 645 after the stability rule was relaxed to "the same size in every recorded version"): b200 (406) and h200 (239) stay unstable because a record has runners outside every cluster and, for b200, the label is absent from the newest runners file. Fixing the table needs InferenceX's `runners.yaml` to cover those runners; 20 points are blocked by this alone.
 - `field_not_modelled:*` (723 primary): blis-vllm models the field, or gives it a rule. The largest: `max_cudagraph_capture_size` 996 points, `stream_interval` 771, `kv_cache_dtype` 752, `language_model_only` 607, `enable_expert_parallel` 422, `api_server_count` 131.
 - `not_in_catalog` (82 primary, 561 with others): `eagle3` drafter (296 in scope), `dspark` (5), models.
 - `server_log_missing` and `artifact_unmatched` (here `value_not_recorded`, 35 plus 25 `no_recipe_fingerprint`): the run's record is not in the API; nothing in the harness fixes it.
@@ -84,4 +83,4 @@ The 65 multinode `vllm` rows are the 65 points the published snapshot lists as `
 
 ## Proposed scope
 
-M2: (1) the unevaluated G1 conditions (#53), when inference-sim's builder says what the Result carries; (2) the `field_not_modelled` list above, in blis-vllm, ranked by the unlock table in `baseline-v0.16.0/table.md`; (3) a ruling on the node-size stability rule; (4) name `teacup`, `rubin-july` and `tokenspeed` in `engines.FRAMEWORKS`, so the pull does not stop. M2 or the next release, once inference-sim PR 2 and blis-vllm PR 5 are pinned: the disaggregated scenario writer for `llmd-vllm` gb200 (5 rows) and the multinode `vllm` rows. M3: sglang (blis-sglang), which is 2037 + 207 series and 1733 window rows. Not planned: AMD, TPU, vr200 (no catalog entry), trt, atom, tilert (no BLIS engine), dynamo-* (router; the substitution is the maintainer's call).
+M2: (1) the unevaluated G1 conditions (#53), when inference-sim's builder says what the Result carries; (2) the `field_not_modelled` list above, in blis-vllm, ranked by the unlock table in `baseline-v0.16.0/table.md`; (3) done: the node-size stability rule is relaxed; (4) done: `teacup`, `rubin-july` and `tokenspeed` are named in `engines.FRAMEWORKS`. M2 or the next release, once inference-sim PR 2 and blis-vllm PR 5 are pinned: the disaggregated scenario writer for `llmd-vllm` gb200 (5 rows) and the multinode `vllm` rows. M3: sglang (blis-sglang), which is 2037 + 207 series and 1733 window rows. Not planned: AMD, TPU, vr200 (no catalog entry), trt, atom, tilert (no BLIS engine), dynamo-* (router; the substitution is the maintainer's call).

@@ -2,7 +2,7 @@
 
 IN-SAMPLE: the points are the ones the model was calibrated on or tuned against; there is no anchor list yet, so no point is held out. These figures say how well the simulator reproduces data it has seen, not how well it predicts new data.
 
-- harness commit `0206f24408db418acd551d7245673dcdb230614a`
+- harness commit `9d32d8e328b37891fdb6de73a0fdc62714cc5eb3`
 - units sha256 `d89f860a46c0470a22543dc7fb77b8d1b10e508ce4f5ef5073e96f359f08597e` (1740 units)
 - pull manifest sha256 `6b37908b08dfbb51af35977dbbd0afd2f764ea564443022a07858b186630a816`
 - point set sha256 `6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60` (1734 points)
@@ -13,7 +13,7 @@ Simulator `v0.16.0`, engine {'kind': 'vllm', 'version': '0.32.0'}, fields sha256
 
 | Points | TTFT MAPE % | TTFT shape % | TPOT MAPE % | TPOT shape % | Noise floor % |
 |---|---|---|---|---|---|
-| 20 | 32.3 (n=20) | 23.8 (n=16) | 12.9 (n=20) | 9.5 (n=16) | 1.6 (fallback; none measured per point) |
+| 31 | 30.2 (n=31) | 17.7 (n=25) | 17.3 (n=31) | 10.7 (n=25) | 1.6 (fallback; none measured per point) |
 
 ## By grade
 
@@ -24,8 +24,8 @@ Simulator `v0.16.0`, engine {'kind': 'vllm', 'version': '0.32.0'}, fields sha256
 | G1 | 0 | too few points | too few points | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
 | G2 | 0 | too few points | too few points | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
 | G3 | 0 | too few points | too few points | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
-| G4 | 20 | 1.2% | 100.0% | 32.3 (n=20) | 23.8 (n=16) | 12.9 (n=20) | 9.5 (n=16) |
-| G5 | 1714 | 98.8% | - | - | - | - | - |
+| G4 | 31 | 1.8% | 100.0% | 30.2 (n=31) | 17.7 (n=25) | 17.3 (n=31) | 10.7 (n=25) |
+| G5 | 1703 | 98.2% | - | - | - | - | - |
 
 **All scored points: each grade on its own, by serving (aggregated or disaggregated)**
 
@@ -34,14 +34,14 @@ Simulator `v0.16.0`, engine {'kind': 'vllm', 'version': '0.32.0'}, fields sha256
 | aggregated | G1 | 0 | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
 | aggregated | G2 | 0 | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
 | aggregated | G3 | 0 | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
-| aggregated | G4 | 20 | 32.3 (n=20) | 23.8 (n=16) | 12.9 (n=20) | 9.5 (n=16) |
+| aggregated | G4 | 31 | 30.2 (n=31) | 17.7 (n=25) | 17.3 (n=31) | 10.7 (n=25) |
 
 ## Coverage
 
 | Set | Points | Scored | Not scored | Failed | Share scored |
 |---|---|---|---|---|---|
-| all points | 1734 | 20 | 1714 | 0 | 1.2% |
-| in scope | 1188 | 20 | 1168 | 0 | 1.7% |
+| all points | 1734 | 31 | 1703 | 0 | 1.8% |
+| in scope | 1188 | 31 | 1157 | 0 | 2.6% |
 | out of scope (AMD, TPU) | 546 | 0 | 546 | 0 | 0.0% |
 
 Out-of-scope points by chip: mi300x 95, mi325x 171, mi355x 280.
@@ -52,14 +52,14 @@ Blocks: in-scope points held at G5 by the blocker. Alone: points that would be s
 
 | Blocker | Blocks | Alone |
 |---|---|---|
-| value_not_recorded:cluster.gpus_per_node | 858 | 31 |
+| field_not_modelled:max_cudagraph_capture_size | 996 | 28 |
+| value_not_recorded:cluster.gpus_per_node | 645 | 20 |
+| field_not_modelled:enable_expert_parallel | 422 | 12 |
 | value_not_recorded | 35 | 10 |
 | value_not_recorded:api_413 | 1 | 1 |
-| field_not_modelled:max_cudagraph_capture_size | 996 | 0 |
 | field_not_modelled:stream_interval | 771 | 0 |
 | field_not_modelled:kv_cache_dtype | 752 | 0 |
 | field_not_modelled:language_model_only | 607 | 0 |
-| field_not_modelled:enable_expert_parallel | 422 | 0 |
 | not_in_catalog:eagle3 | 296 | 0 |
 | field_not_modelled:api_server_count | 131 | 0 |
 | field_not_modelled:quantization | 71 | 0 |
@@ -93,14 +93,14 @@ Blocks: in-scope points held at G5 by the blocker. Alone: points that would be s
 | Entry | Blocks | Alone | Demotes |
 |---|---|---|---|
 | `not_in_catalog` | 561 | 82 | 0 |
-| `value_not_recorded:cluster.gpus_per_node` | 858 | 31 | 0 |
+| `field_not_modelled:max_cudagraph_capture_size` | 996 | 28 | 0 |
+| `value_not_recorded:cluster.gpus_per_node` | 645 | 20 | 0 |
+| `field_not_modelled:enable_expert_parallel` | 513 | 12 | 0 |
 | `value_not_recorded` | 35 | 10 | 0 |
 | `value_not_recorded:api_413` | 9 | 9 | 0 |
 | `field_not_modelled:kv_cache_dtype` | 997 | 0 | 0 |
-| `field_not_modelled:max_cudagraph_capture_size` | 996 | 0 | 0 |
 | `field_not_modelled:language_model_only` | 834 | 0 | 0 |
 | `field_not_modelled:stream_interval` | 771 | 0 | 0 |
-| `field_not_modelled:enable_expert_parallel` | 513 | 0 | 0 |
 | `not_in_catalog:eagle3` | 419 | 0 | 0 |
 | `field_not_modelled:moe_backend` | 226 | 0 | 0 |
 | `field_not_modelled:api_server_count` | 171 | 0 | 0 |
@@ -128,37 +128,38 @@ Blocks: in-scope points held at G5 by the blocker. Alone: points that would be s
 | `field_not_modelled:env.PYTHONHASHSEED` | 2 | 0 | 0 |
 | `field_not_modelled:kv_transfer_config.kv_connector_extra_config.load_async` | 2 | 0 | 0 |
 | `value_conflict:kv_transfer_config.engine_id` | 1 | 0 | 0 |
-| `client_difference:client_flags` | 0 | 0 | 20 |
-| `client_difference:send_gap` | 0 | 0 | 20 |
+| `client_difference:client_flags` | 0 | 0 | 31 |
+| `client_difference:send_gap` | 0 | 0 | 31 |
+| `coefficient_method:cost-model-attention/attention_decode_floor_mla` | 0 | 0 | 31 |
+| `coefficient_method:cost-model-host-overheads/host_admission_per_request` | 0 | 0 | 31 |
+| `coefficient_method:cost-model-host-overheads/host_admission_per_token` | 0 | 0 | 31 |
+| `coefficient_method:cost-model-host-overheads/host_completion` | 0 | 0 | 31 |
+| `coefficient_method:cost-model-host-overheads/host_launch_eager_per_layer` | 0 | 0 | 31 |
+| `coefficient_method:cost-model-host-overheads/host_launch_per_kernel` | 0 | 0 | 31 |
+| `coefficient_method:cost-model-host-overheads/host_output_token` | 0 | 0 | 31 |
+| `coefficient_method:cost-model-host-overheads/host_replay_graph_per_step` | 0 | 0 | 31 |
+| `coefficient_method:cost-model-memory/activation_scratch_floor_bytes` | 0 | 0 | 31 |
+| `coefficient_method:cost-model-memory/cudagraph_capture_bytes_full_and_piecewise` | 0 | 0 | 31 |
+| `coefficient_method:cost-model-primitives/engine_workspace_bytes` | 0 | 0 | 31 |
+| `coefficient_method:cost-model-primitives/hbm_derate` | 0 | 0 | 31 |
+| `coefficient_range:unevaluated` | 0 | 0 | 31 |
+| `estimated:gpu_memory_utilization` | 0 | 0 | 31 |
+| `interim_status:host` | 0 | 0 | 31 |
+| `interim_status:model` | 0 | 0 | 31 |
+| `interim_status:model_tag` | 0 | 0 | 31 |
+| `interim_status:port` | 0 | 0 | 31 |
+| `interim_status:reasoning_parser` | 0 | 0 | 31 |
+| `interim_status:served_model_name` | 0 | 0 | 31 |
+| `interim_status:tool_call_parser` | 0 | 0 | 31 |
+| `interim_status:trust_remote_code` | 0 | 0 | 31 |
+| `kernel_hash:unevaluated` | 0 | 0 | 31 |
+| `other_release:engine release` | 0 | 0 | 31 |
+| `ported_functions_unpublished:engine release` | 0 | 0 | 31 |
+| `resolved_differs:unevaluated` | 0 | 0 | 31 |
+| `value_class:unevaluated` | 0 | 0 | 31 |
 | `client_difference:sent_prompt_lengths` | 0 | 0 | 20 |
-| `coefficient_method:cost-model-attention/attention_decode_floor_mla` | 0 | 0 | 20 |
-| `coefficient_method:cost-model-host-overheads/host_admission_per_request` | 0 | 0 | 20 |
-| `coefficient_method:cost-model-host-overheads/host_admission_per_token` | 0 | 0 | 20 |
-| `coefficient_method:cost-model-host-overheads/host_completion` | 0 | 0 | 20 |
-| `coefficient_method:cost-model-host-overheads/host_launch_eager_per_layer` | 0 | 0 | 20 |
-| `coefficient_method:cost-model-host-overheads/host_launch_per_kernel` | 0 | 0 | 20 |
-| `coefficient_method:cost-model-host-overheads/host_output_token` | 0 | 0 | 20 |
-| `coefficient_method:cost-model-host-overheads/host_replay_graph_per_step` | 0 | 0 | 20 |
-| `coefficient_method:cost-model-memory/activation_scratch_floor_bytes` | 0 | 0 | 20 |
-| `coefficient_method:cost-model-memory/cudagraph_capture_bytes_full_and_piecewise` | 0 | 0 | 20 |
-| `coefficient_method:cost-model-primitives/engine_workspace_bytes` | 0 | 0 | 20 |
-| `coefficient_method:cost-model-primitives/hbm_derate` | 0 | 0 | 20 |
-| `coefficient_range:unevaluated` | 0 | 0 | 20 |
-| `estimated:gpu_memory_utilization` | 0 | 0 | 20 |
-| `interim_status:host` | 0 | 0 | 20 |
-| `interim_status:model` | 0 | 0 | 20 |
-| `interim_status:model_tag` | 0 | 0 | 20 |
-| `interim_status:port` | 0 | 0 | 20 |
-| `interim_status:reasoning_parser` | 0 | 0 | 20 |
-| `interim_status:served_model_name` | 0 | 0 | 20 |
-| `interim_status:tool_call_parser` | 0 | 0 | 20 |
-| `interim_status:trust_remote_code` | 0 | 0 | 20 |
-| `kernel_hash:unevaluated` | 0 | 0 | 20 |
-| `other_release:engine release` | 0 | 0 | 20 |
-| `ported_functions_unpublished:engine release` | 0 | 0 | 20 |
-| `resolved_differs:unevaluated` | 0 | 0 | 20 |
-| `value_class:unevaluated` | 0 | 0 | 20 |
-| `coefficient_method:cost-model-memory/activation_buffer_count_moe_4rank` | 0 | 0 | 10 |
-| `coefficient_method:cost-model-memory/activation_buffer_count_moe_8rank` | 0 | 0 | 10 |
-| `coefficient_method:cost-model-primitives/nccl_communicator_bytes_4rank` | 0 | 0 | 10 |
-| `coefficient_method:cost-model-primitives/nccl_communicator_bytes_8rank` | 0 | 0 | 10 |
+| `coefficient_method:cost-model-memory/activation_buffer_count_moe_4rank` | 0 | 0 | 18 |
+| `coefficient_method:cost-model-primitives/nccl_communicator_bytes_4rank` | 0 | 0 | 18 |
+| `coefficient_method:cost-model-memory/activation_buffer_count_moe_8rank` | 0 | 0 | 13 |
+| `coefficient_method:cost-model-primitives/nccl_communicator_bytes_8rank` | 0 | 0 | 13 |
+| `later_record:cluster.gpus_per_node` | 0 | 0 | 11 |
