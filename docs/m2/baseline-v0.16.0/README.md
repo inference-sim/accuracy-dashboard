@@ -6,7 +6,7 @@ This is the "before" of the M2 before/after. It is a labelled in-sample run (no 
 
 | Input | Value |
 |---|---|
-| Harness | accuracy-dashboard commit `0206f24408db418acd551d7245673dcdb230614a` (branch m2/2-rescore-and-repin). `harness/run.sh` records it as `harness_commit`. |
+| Harness | accuracy-dashboard commit `9d32d8e328b37891fdb6de73a0fdc62714cc5eb3` (branch m2/2-rescore-and-repin). `harness/run.sh` records it as `harness_commit`. |
 | Simulator | inference-sim `v0.16.0` = `3f4998e28f922611a2d21d5c7ffe18a5272fe114`, built by run.sh with Go 1.27.2 (its go.mod) |
 | Substrate, registry, catalog | blis-substrate `v0.13.0` = `fe6eab10b9795933de38122ba55e5299dcb20b5e` (the release v0.16.0's stack.json pins); `--catalog <checkout>/catalog`, `--registry <checkout>/registry`, both released as `v0.13.0` |
 | Ledger | the ledger in that substrate checkout, source revision `db-dump/2026-09-28` |
@@ -31,7 +31,7 @@ python3 orchestrator/baseline/freeze.py --snapshot-state state/last-run-api.json
 # 2. fetch the corpora
 python3 orchestrator/resolve_agentic_corpus.py --all --catalog SUBSTRATE/catalog -o CORPUS
 
-# 3. score, from a clean checkout of the harness commit (git worktree add --detach DIR 0206f24...)
+# 3. score, from a clean checkout of the harness commit (git worktree add --detach DIR 9d32d8e...)
 cd DIR && bash harness/run.sh --sim v0.16.0 --units units.txt --pull PULL --out OUT \
   --catalog SUBSTRATE/catalog --registry SUBSTRATE/registry --corpus-dir CORPUS \
   --fields FIELDS.json --catalog-release v0.13.0 --registry-release v0.13.0
@@ -60,4 +60,8 @@ python3 orchestrator/baseline/compare.py run --dir OUT --sample in_sample --out 
 
 ## Result
 
-20 of the 1734 points are scored, all G4 (no point can be G1 or G3 while four G1 conditions are unevaluated, and every point is measured on another release or build). The other 1714 are G5. Of those, 546 are AMD points (out of scope). The leading blockers, over in-scope points, are in `table.md`; `table.json` holds every count.
+31 of the 1734 points are scored, all G4 (no point can be G1 or G3 while four G1 conditions are unevaluated, and every point is measured on another release or build): TTFT MAPE 30.2 (n=31), TPOT 17.3 (n=31). The other 1703 are G5; 546 of those are AMD points (out of scope). The leading blockers over in-scope points are in `table.md`; `table.json` holds every count.
+
+### Change since the first baseline of this directory
+
+The first baseline (harness `0206f24`) scored 20 points. Two harness changes moved it: the node-size stability rule (a label is stable when its size is the same in every recorded version, whatever clusters it maps to) and the naming of `teacup`, `rubin-july` and `tokenspeed`. `value_not_recorded:cluster.gpus_per_node` went from 858 points to 645: h100 (91) and b300 (122) are now stable, and 11 points that had no other blocker are scored (20 to 31). b200 (406) and h200 (239) stay unstable, not because their sizes disagree but because one record has runners outside every cluster and, for b200, the label is absent from the newest runners file. The three named labels hold no unit in the baseline set, so the point set is unchanged.
