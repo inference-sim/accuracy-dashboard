@@ -965,7 +965,7 @@
   }
  },
  "identity": {
-  "harness_commit": "a2ddd723d5c2f75b8f9d5e0b31e7923ed91ff409",
+  "harness_commit": "0206f24408db418acd551d7245673dcdb230614a",
   "point_set_sha256": "6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60",
   "points": 1734,
   "pull_manifest_sha256": "6b37908b08dfbb51af35977dbbd0afd2f764ea564443022a07858b186630a816",
@@ -993,12 +993,116 @@
     "kind": "vllm",
     "version": "0.32.0"
    },
-   "harness_commit": "a2ddd723d5c2f75b8f9d5e0b31e7923ed91ff409"
+   "harness_commit": "0206f24408db418acd551d7245673dcdb230614a"
   }
  },
  "kind": "run",
  "sample": "in_sample",
  "sample_text": "IN-SAMPLE: the points are the ones the model was calibrated on or tuned against; there is no anchor list yet, so no point is held out. These figures say how well the simulator reproduces data it has seen, not how well it predicts new data.",
+ "serving_by_grade": {
+  "aggregated": {
+   "G1": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    }
+   },
+   "G2": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    }
+   },
+   "G3": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    }
+   },
+   "G4": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 20,
+    "tpot": {
+     "mape": {
+      "n": 20,
+      "value": 12.883246944520948
+     },
+     "shape": {
+      "n": 16,
+      "value": 9.463302337306677
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 20,
+      "value": 32.266492609839716
+     },
+     "shape": {
+      "n": 16,
+      "value": 23.798202271424536
+     }
+    }
+   }
+  }
+ },
  "unlock": [
   {
    "alone": 31,

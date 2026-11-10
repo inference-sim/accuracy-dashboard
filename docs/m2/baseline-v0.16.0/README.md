@@ -6,7 +6,7 @@ This is the "before" of the M2 before/after. It is a labelled in-sample run (no 
 
 | Input | Value |
 |---|---|
-| Harness | accuracy-dashboard commit `a2ddd723d5c2f75b8f9d5e0b31e7923ed91ff409` (branch m2/2-rescore-and-repin). `harness/run.sh` records it as `harness_commit`. |
+| Harness | accuracy-dashboard commit `0206f24408db418acd551d7245673dcdb230614a` (branch m2/2-rescore-and-repin). `harness/run.sh` records it as `harness_commit`. |
 | Simulator | inference-sim `v0.16.0` = `3f4998e28f922611a2d21d5c7ffe18a5272fe114`, built by run.sh with Go 1.27.2 (its go.mod) |
 | Substrate, registry, catalog | blis-substrate `v0.13.0` = `fe6eab10b9795933de38122ba55e5299dcb20b5e` (the release v0.16.0's stack.json pins); `--catalog <checkout>/catalog`, `--registry <checkout>/registry`, both released as `v0.13.0` |
 | Ledger | the ledger in that substrate checkout, source revision `db-dump/2026-09-28` |
@@ -31,7 +31,7 @@ python3 orchestrator/baseline/freeze.py --snapshot-state state/last-run-api.json
 # 2. fetch the corpora
 python3 orchestrator/resolve_agentic_corpus.py --all --catalog SUBSTRATE/catalog -o CORPUS
 
-# 3. score, from a clean checkout of the harness commit (git worktree add --detach DIR a2ddd72...)
+# 3. score, from a clean checkout of the harness commit (git worktree add --detach DIR 0206f24...)
 cd DIR && bash harness/run.sh --sim v0.16.0 --units units.txt --pull PULL --out OUT \
   --catalog SUBSTRATE/catalog --registry SUBSTRATE/registry --corpus-dir CORPUS \
   --fields FIELDS.json --catalog-release v0.13.0 --registry-release v0.13.0
@@ -48,7 +48,7 @@ python3 orchestrator/baseline/compare.py run --dir OUT --sample in_sample --out 
 |---|---|---|
 | Freeze the pull (1734 points, 4 download workers, 60 MB of artifacts) | 752 s | 2.5 GB |
 | Fetch the corpora (2.3 GB) | 39 s | 18 MB |
-| Score (build blis, 1687 single-turn on 4 workers, 47 agentic on 1) | 33 to 55 s over four runs | 1.8 to 1.9 GB |
+| Score (build blis, 1687 single-turn on 4 workers, 47 agentic on 1) | 33 to 55 s over five runs | 1.8 to 1.9 GB |
 
 ## Where it cannot be reproduced
 
