@@ -28,7 +28,8 @@ LEAVE_UNSET, SUBSTITUTE, NONE = "leave_unset", "substitute", "none"
 
 _LIST_KEYS = {"kind", "engine", "fields"}
 _ENGINE_KEYS = {"kind", "version"}
-_FIELD_KEYS = {"name", "source", "status", "evidence", "estimation"}
+_FIELD_KEYS = {"name", "source", "status", "evidence", "estimation", "value_classes"}
+_CLASS_KEYS = {"name", "values", "min", "max"}
 _EVIDENCE_KEYS = {"traces", "proof", "issue", "note"}
 _ESTIMATION_KEYS = {"rule", "setting", "reason"}
 
@@ -44,6 +45,9 @@ class Field:
     status: str
     evidence: dict
     estimation: dict
+    # The value classes the field's evidence covers (VLM-3, blis-vllm#102): a tuple of classes,
+    # each {"name", and "values" or "min"/"max"}; None when the list states none for the field.
+    value_classes: tuple | None = None
 
     @property
     def path(self) -> str:
@@ -124,7 +128,20 @@ def parse(data: bytes | str) -> FieldList:
         if prev is not None and not prev < key:
             raise FieldsError(f"{where}: out of order or repeated: {key} must sort after {prev}")
         prev = key
-        fld = Field(name, source, status, ev, est)
+        classes = None
+        if "value_classes" in f:
+            if not isinstance(f["value_classes"], list) or not f["value_classes"]:
+                raise FieldsError(f"{where}.value_classes: must be a non-empty list")
+            if status != MODELLED:
+                raise FieldsError(f"{where}.value_classes: only a modelled field has value classes")
+            cl = []
+            for j, c in enumerate(f["value_classes"]):
+                c = _keys(c, _CLASS_KEYS, f"{where}.value_classes[{j}]")
+                if not c.get("name") or ("values" in c) == ("min" in c or "max" in c):
+                    raise FieldsError(f"{where}.value_classes[{j}]: a name and either values or min/max")
+                cl.append(c)
+            classes = tuple(cl)
+        fld = Field(name, source, status, ev, est, classes)
         fl.fields[fld.path] = fld
     return fl
 
