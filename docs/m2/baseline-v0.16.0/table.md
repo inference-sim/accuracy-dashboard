@@ -2,7 +2,7 @@
 
 IN-SAMPLE: the points are the ones the model was calibrated on or tuned against; there is no anchor list yet, so no point is held out. These figures say how well the simulator reproduces data it has seen, not how well it predicts new data.
 
-- harness commit `a2ddd723d5c2f75b8f9d5e0b31e7923ed91ff409`
+- harness commit `0206f24408db418acd551d7245673dcdb230614a`
 - units sha256 `d89f860a46c0470a22543dc7fb77b8d1b10e508ce4f5ef5073e96f359f08597e` (1740 units)
 - pull manifest sha256 `6b37908b08dfbb51af35977dbbd0afd2f764ea564443022a07858b186630a816`
 - point set sha256 `6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60` (1734 points)
@@ -26,6 +26,15 @@ Simulator `v0.16.0`, engine {'kind': 'vllm', 'version': '0.32.0'}, fields sha256
 | G3 | 0 | too few points | too few points | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
 | G4 | 20 | 1.2% | 100.0% | 32.3 (n=20) | 23.8 (n=16) | 12.9 (n=20) | 9.5 (n=16) |
 | G5 | 1714 | 98.8% | - | - | - | - | - |
+
+**All scored points: each grade on its own, by serving (aggregated or disaggregated)**
+
+| Serving | Grade | Points | TTFT MAPE % | TTFT shape % | TPOT MAPE % | TPOT shape % |
+|---|---|---|---|---|---|---|
+| aggregated | G1 | 0 | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
+| aggregated | G2 | 0 | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
+| aggregated | G3 | 0 | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
+| aggregated | G4 | 20 | 32.3 (n=20) | 23.8 (n=16) | 12.9 (n=20) | 9.5 (n=16) |
 
 ## Coverage
 
