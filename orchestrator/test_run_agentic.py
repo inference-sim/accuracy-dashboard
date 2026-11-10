@@ -133,7 +133,7 @@ def test_pure_functions():
     _, ref3 = ra.agentic_replay_args({k: v for k, v in ROW.items() if k != "conc"}, {})
     ck("a row with no concurrency is refused", any("concurrency" in x for x in ref3), str(ref3))
 
-    # The silent-speculation case (PR #21 re-review, #24c): the API row says spec_method=mtp
+    # The silent-speculation case (PR #21 re-review): the API row says spec_method=mtp
     # but the server log states no speculative_config (empty server dict -- most agentic logs
     # have no args line). Scoring it would price a drafting deployment as PLAIN decoding, so
     # it must be REFUSED, not scored. A wrong number is worse than a missing one.

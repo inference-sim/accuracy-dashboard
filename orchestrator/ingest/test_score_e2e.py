@@ -662,7 +662,7 @@ def test_the_scenario_engine_block_holds_the_runs_values_under_the_engines_own_n
              "enable_prefix_caching": False, "quantization": "fp8", "cache_dtype": "auto"}
         assert eng["gpu_memory_utilization"] == 0.9 and eng["speculative"] == {
             "method": "mtp", "num_spec_tokens": 2, "rejection_sample_method": "synthetic"}
-        assert dep["pools"][0]["parallel"] == {"tp": 1, "pp": 1, "dp": 1, "enable_expert_parallel": False}
+        assert dep["pools"][0]["parallel"] == {"tp": 1, "pp": 1, "dp": 1}   # expert parallelism unstated: left to the engine (X19)
         assert o.fidelity["run_release"] == "0.31.0"
         # Every point records the simulator build and engine release that scored it (COV-6).
         assert o.fidelity["simulator"] == {"build": "v0.12.0", "engine": {"kind": "vllm", "version": "0.31.0"},

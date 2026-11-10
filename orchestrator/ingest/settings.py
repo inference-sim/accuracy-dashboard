@@ -708,7 +708,8 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
         if k not in par:
             b.reasons.append(f"required_setting_missing:parallel.{k}")
             par[k] = 1
-    par.setdefault("enable_expert_parallel", False)
+    # enable_expert_parallel is written only when the run recorded it (X19): vLLM prints it only
+    # when it differs from the default, so an unrecorded one is left to the engine.
     eng = pool["engine"]
     spec = eng.get("speculative")
     if spec is not None and set(spec) >= {"method"} and "num_spec_tokens" not in spec:
