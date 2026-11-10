@@ -197,9 +197,16 @@ def test_check_table_rejects_a_mixed_table(runs):
 def test_committed_tables():
     """Every comparison table committed under docs/m2 (and its baseline) obeys the rules above."""
     root = HERE.parent.parent / "docs" / "m2"
-    tables = sorted(root.rglob("*.json")) if root.is_dir() else []
+    tables = sorted(p for p in root.rglob("*.json") if p.name == "table.json" or p.name.startswith("pair")) if root.is_dir() else []
     bad = [f"{p}: {pr}" for p in tables for pr in c.check_table(json.loads(p.read_text()))]
     assert not bad, bad
+    for p in tables:
+        data = p.parent / "contract"
+        if p.name == "table.json" and data.is_dir():
+            stored = json.loads(p.read_text())
+            fresh = c.run_report(c.Run(data), stored["sample"])
+            assert json.loads(json.dumps(fresh)) == stored, f"{p} is not what compare.py makes of {data}"
+            assert (p.parent / "table.md").read_text() == c.run_markdown(fresh), f"{p.parent}/table.md is stale"
 
 
 def test_scope_is_amd_and_tpu_only():
