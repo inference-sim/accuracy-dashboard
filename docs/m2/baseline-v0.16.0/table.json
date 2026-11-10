@@ -1,0 +1,1180 @@
+{
+ "backlog": [
+  {
+   "alone": 82,
+   "blocks": 561,
+   "demotes": 0,
+   "entry": "not_in_catalog"
+  },
+  {
+   "alone": 31,
+   "blocks": 858,
+   "demotes": 0,
+   "entry": "value_not_recorded:cluster.gpus_per_node"
+  },
+  {
+   "alone": 10,
+   "blocks": 35,
+   "demotes": 0,
+   "entry": "value_not_recorded"
+  },
+  {
+   "alone": 9,
+   "blocks": 9,
+   "demotes": 0,
+   "entry": "value_not_recorded:api_413"
+  },
+  {
+   "alone": 0,
+   "blocks": 997,
+   "demotes": 0,
+   "entry": "field_not_modelled:kv_cache_dtype"
+  },
+  {
+   "alone": 0,
+   "blocks": 996,
+   "demotes": 0,
+   "entry": "field_not_modelled:max_cudagraph_capture_size"
+  },
+  {
+   "alone": 0,
+   "blocks": 834,
+   "demotes": 0,
+   "entry": "field_not_modelled:language_model_only"
+  },
+  {
+   "alone": 0,
+   "blocks": 771,
+   "demotes": 0,
+   "entry": "field_not_modelled:stream_interval"
+  },
+  {
+   "alone": 0,
+   "blocks": 513,
+   "demotes": 0,
+   "entry": "field_not_modelled:enable_expert_parallel"
+  },
+  {
+   "alone": 0,
+   "blocks": 419,
+   "demotes": 0,
+   "entry": "not_in_catalog:eagle3"
+  },
+  {
+   "alone": 0,
+   "blocks": 226,
+   "demotes": 0,
+   "entry": "field_not_modelled:moe_backend"
+  },
+  {
+   "alone": 0,
+   "blocks": 171,
+   "demotes": 0,
+   "entry": "field_not_modelled:api_server_count"
+  },
+  {
+   "alone": 0,
+   "blocks": 127,
+   "demotes": 0,
+   "entry": "field_not_modelled:quantization"
+  },
+  {
+   "alone": 0,
+   "blocks": 90,
+   "demotes": 0,
+   "entry": "field_not_modelled:linear_backend"
+  },
+  {
+   "alone": 0,
+   "blocks": 65,
+   "demotes": 0,
+   "entry": "field_not_modelled:mm_encoder_tp_mode"
+  },
+  {
+   "alone": 0,
+   "blocks": 37,
+   "demotes": 0,
+   "entry": "field_not_in_release:env.VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8"
+  },
+  {
+   "alone": 0,
+   "blocks": 35,
+   "demotes": 0,
+   "entry": "field_not_in_release:env.VLLM_MXFP4_USE_MARLIN"
+  },
+  {
+   "alone": 0,
+   "blocks": 28,
+   "demotes": 0,
+   "entry": "field_not_modelled:env.VLLM_USE_RUST_FRONTEND"
+  },
+  {
+   "alone": 0,
+   "blocks": 25,
+   "demotes": 0,
+   "entry": "value_not_recorded:no_recipe_fingerprint"
+  },
+  {
+   "alone": 0,
+   "blocks": 20,
+   "demotes": 0,
+   "entry": "field_not_modelled:enable_chunked_prefill"
+  },
+  {
+   "alone": 0,
+   "blocks": 12,
+   "demotes": 0,
+   "entry": "field_not_modelled:speculative_config.rejection_sample_method"
+  },
+  {
+   "alone": 0,
+   "blocks": 7,
+   "demotes": 0,
+   "entry": "field_not_in_release:env.PYTHONNOUSERSITE"
+  },
+  {
+   "alone": 0,
+   "blocks": 7,
+   "demotes": 0,
+   "entry": "field_not_modelled:cpu_offload_gb"
+  },
+  {
+   "alone": 0,
+   "blocks": 7,
+   "demotes": 0,
+   "entry": "field_not_modelled:default_chat_template_kwargs.thinking_mode"
+  },
+  {
+   "alone": 0,
+   "blocks": 7,
+   "demotes": 0,
+   "entry": "value_not_recorded:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use"
+  },
+  {
+   "alone": 0,
+   "blocks": 5,
+   "demotes": 0,
+   "entry": "field_not_modelled:dcp_comm_backend"
+  },
+  {
+   "alone": 0,
+   "blocks": 5,
+   "demotes": 0,
+   "entry": "field_not_modelled:decode_context_parallel_size"
+  },
+  {
+   "alone": 0,
+   "blocks": 5,
+   "demotes": 0,
+   "entry": "field_not_modelled:prefix_match_unit"
+  },
+  {
+   "alone": 0,
+   "blocks": 5,
+   "demotes": 0,
+   "entry": "not_in_catalog:dspark"
+  },
+  {
+   "alone": 0,
+   "blocks": 4,
+   "demotes": 0,
+   "entry": "field_not_modelled:enable_eplb"
+  },
+  {
+   "alone": 0,
+   "blocks": 2,
+   "demotes": 0,
+   "entry": "field_not_in_release:env.MC_ENABLE_DEST_DEVICE_AFFINITY"
+  },
+  {
+   "alone": 0,
+   "blocks": 2,
+   "demotes": 0,
+   "entry": "field_not_in_release:env.MC_SLICE_SIZE"
+  },
+  {
+   "alone": 0,
+   "blocks": 2,
+   "demotes": 0,
+   "entry": "field_not_in_release:env.MC_WORKERS_PER_CTX"
+  },
+  {
+   "alone": 0,
+   "blocks": 2,
+   "demotes": 0,
+   "entry": "field_not_modelled:env.PYTHONHASHSEED"
+  },
+  {
+   "alone": 0,
+   "blocks": 2,
+   "demotes": 0,
+   "entry": "field_not_modelled:kv_transfer_config.kv_connector_extra_config.load_async"
+  },
+  {
+   "alone": 0,
+   "blocks": 1,
+   "demotes": 0,
+   "entry": "value_conflict:kv_transfer_config.engine_id"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "client_difference:client_flags"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "client_difference:send_gap"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "client_difference:sent_prompt_lengths"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "coefficient_method:cost-model-attention/attention_decode_floor_mla"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "coefficient_method:cost-model-host-overheads/host_admission_per_request"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "coefficient_method:cost-model-host-overheads/host_admission_per_token"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "coefficient_method:cost-model-host-overheads/host_completion"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "coefficient_method:cost-model-host-overheads/host_launch_eager_per_layer"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "coefficient_method:cost-model-host-overheads/host_launch_per_kernel"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "coefficient_method:cost-model-host-overheads/host_output_token"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "coefficient_method:cost-model-host-overheads/host_replay_graph_per_step"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "coefficient_method:cost-model-memory/activation_scratch_floor_bytes"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "coefficient_method:cost-model-memory/cudagraph_capture_bytes_full_and_piecewise"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "coefficient_method:cost-model-primitives/engine_workspace_bytes"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "coefficient_method:cost-model-primitives/hbm_derate"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "coefficient_range:unevaluated"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "estimated:gpu_memory_utilization"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "interim_status:host"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "interim_status:model"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "interim_status:model_tag"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "interim_status:port"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "interim_status:reasoning_parser"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "interim_status:served_model_name"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "interim_status:tool_call_parser"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "interim_status:trust_remote_code"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "kernel_hash:unevaluated"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "other_release:engine release"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "ported_functions_unpublished:engine release"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "resolved_differs:unevaluated"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "value_class:unevaluated"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 10,
+   "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_4rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 10,
+   "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_8rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 10,
+   "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_4rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 10,
+   "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_8rank"
+  }
+ ],
+ "coverage": {
+  "all": {
+   "by_grade": {
+    "G4": 20,
+    "G5": 1714
+   },
+   "failed": 0,
+   "not_scored": 1714,
+   "points": 1734,
+   "primary_reason": {
+    "field_not_modelled": 723,
+    "not_in_catalog": 82,
+    "value_not_recorded": 909
+   },
+   "reasons": {
+    "field_not_in_release:env.MC_ENABLE_DEST_DEVICE_AFFINITY": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_in_release:env.MC_SLICE_SIZE": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_in_release:env.MC_WORKERS_PER_CTX": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_in_release:env.PYTHONNOUSERSITE": {
+     "alone": 0,
+     "blocks": 7
+    },
+    "field_not_in_release:env.VLLM_MXFP4_USE_MARLIN": {
+     "alone": 0,
+     "blocks": 35
+    },
+    "field_not_in_release:env.VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8": {
+     "alone": 0,
+     "blocks": 37
+    },
+    "field_not_modelled:api_server_count": {
+     "alone": 0,
+     "blocks": 171
+    },
+    "field_not_modelled:cpu_offload_gb": {
+     "alone": 0,
+     "blocks": 7
+    },
+    "field_not_modelled:dcp_comm_backend": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "field_not_modelled:decode_context_parallel_size": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "field_not_modelled:default_chat_template_kwargs.thinking_mode": {
+     "alone": 0,
+     "blocks": 7
+    },
+    "field_not_modelled:enable_chunked_prefill": {
+     "alone": 0,
+     "blocks": 20
+    },
+    "field_not_modelled:enable_eplb": {
+     "alone": 0,
+     "blocks": 4
+    },
+    "field_not_modelled:enable_expert_parallel": {
+     "alone": 0,
+     "blocks": 513
+    },
+    "field_not_modelled:env.PYTHONHASHSEED": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_modelled:env.VLLM_USE_RUST_FRONTEND": {
+     "alone": 0,
+     "blocks": 28
+    },
+    "field_not_modelled:kv_cache_dtype": {
+     "alone": 0,
+     "blocks": 997
+    },
+    "field_not_modelled:kv_transfer_config.kv_connector_extra_config.load_async": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_modelled:language_model_only": {
+     "alone": 0,
+     "blocks": 834
+    },
+    "field_not_modelled:linear_backend": {
+     "alone": 0,
+     "blocks": 90
+    },
+    "field_not_modelled:max_cudagraph_capture_size": {
+     "alone": 0,
+     "blocks": 996
+    },
+    "field_not_modelled:mm_encoder_tp_mode": {
+     "alone": 0,
+     "blocks": 65
+    },
+    "field_not_modelled:moe_backend": {
+     "alone": 0,
+     "blocks": 226
+    },
+    "field_not_modelled:prefix_match_unit": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "field_not_modelled:quantization": {
+     "alone": 0,
+     "blocks": 127
+    },
+    "field_not_modelled:speculative_config.rejection_sample_method": {
+     "alone": 0,
+     "blocks": 12
+    },
+    "field_not_modelled:stream_interval": {
+     "alone": 0,
+     "blocks": 771
+    },
+    "not_in_catalog": {
+     "alone": 82,
+     "blocks": 561
+    },
+    "not_in_catalog:dspark": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "not_in_catalog:eagle3": {
+     "alone": 0,
+     "blocks": 419
+    },
+    "value_conflict:kv_transfer_config.engine_id": {
+     "alone": 0,
+     "blocks": 1
+    },
+    "value_not_recorded": {
+     "alone": 10,
+     "blocks": 35
+    },
+    "value_not_recorded:api_413": {
+     "alone": 9,
+     "blocks": 9
+    },
+    "value_not_recorded:cluster.gpus_per_node": {
+     "alone": 31,
+     "blocks": 858
+    },
+    "value_not_recorded:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use": {
+     "alone": 0,
+     "blocks": 7
+    },
+    "value_not_recorded:no_recipe_fingerprint": {
+     "alone": 0,
+     "blocks": 25
+    }
+   },
+   "scored": 20,
+   "share_scored": 0.011534025374855825
+  },
+  "in_scope": {
+   "by_grade": {
+    "G4": 20,
+    "G5": 1168
+   },
+   "failed": 0,
+   "not_scored": 1168,
+   "points": 1188,
+   "primary_reason": {
+    "field_not_modelled": 267,
+    "value_not_recorded": 901
+   },
+   "reasons": {
+    "field_not_in_release:env.MC_ENABLE_DEST_DEVICE_AFFINITY": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_in_release:env.MC_SLICE_SIZE": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_in_release:env.MC_WORKERS_PER_CTX": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_in_release:env.PYTHONNOUSERSITE": {
+     "alone": 0,
+     "blocks": 7
+    },
+    "field_not_in_release:env.VLLM_MXFP4_USE_MARLIN": {
+     "alone": 0,
+     "blocks": 35
+    },
+    "field_not_in_release:env.VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8": {
+     "alone": 0,
+     "blocks": 37
+    },
+    "field_not_modelled:api_server_count": {
+     "alone": 0,
+     "blocks": 131
+    },
+    "field_not_modelled:cpu_offload_gb": {
+     "alone": 0,
+     "blocks": 7
+    },
+    "field_not_modelled:dcp_comm_backend": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "field_not_modelled:decode_context_parallel_size": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "field_not_modelled:default_chat_template_kwargs.thinking_mode": {
+     "alone": 0,
+     "blocks": 7
+    },
+    "field_not_modelled:enable_chunked_prefill": {
+     "alone": 0,
+     "blocks": 20
+    },
+    "field_not_modelled:enable_eplb": {
+     "alone": 0,
+     "blocks": 4
+    },
+    "field_not_modelled:enable_expert_parallel": {
+     "alone": 0,
+     "blocks": 422
+    },
+    "field_not_modelled:env.PYTHONHASHSEED": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_modelled:kv_cache_dtype": {
+     "alone": 0,
+     "blocks": 752
+    },
+    "field_not_modelled:kv_transfer_config.kv_connector_extra_config.load_async": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_modelled:language_model_only": {
+     "alone": 0,
+     "blocks": 607
+    },
+    "field_not_modelled:linear_backend": {
+     "alone": 0,
+     "blocks": 67
+    },
+    "field_not_modelled:max_cudagraph_capture_size": {
+     "alone": 0,
+     "blocks": 996
+    },
+    "field_not_modelled:moe_backend": {
+     "alone": 0,
+     "blocks": 56
+    },
+    "field_not_modelled:prefix_match_unit": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "field_not_modelled:quantization": {
+     "alone": 0,
+     "blocks": 71
+    },
+    "field_not_modelled:speculative_config.rejection_sample_method": {
+     "alone": 0,
+     "blocks": 12
+    },
+    "field_not_modelled:stream_interval": {
+     "alone": 0,
+     "blocks": 771
+    },
+    "not_in_catalog": {
+     "alone": 0,
+     "blocks": 23
+    },
+    "not_in_catalog:dspark": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "not_in_catalog:eagle3": {
+     "alone": 0,
+     "blocks": 296
+    },
+    "value_conflict:kv_transfer_config.engine_id": {
+     "alone": 0,
+     "blocks": 1
+    },
+    "value_not_recorded": {
+     "alone": 10,
+     "blocks": 35
+    },
+    "value_not_recorded:api_413": {
+     "alone": 1,
+     "blocks": 1
+    },
+    "value_not_recorded:cluster.gpus_per_node": {
+     "alone": 31,
+     "blocks": 858
+    },
+    "value_not_recorded:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use": {
+     "alone": 0,
+     "blocks": 7
+    },
+    "value_not_recorded:no_recipe_fingerprint": {
+     "alone": 0,
+     "blocks": 25
+    }
+   },
+   "scored": 20,
+   "share_scored": 0.016835016835016835
+  },
+  "out_of_scope": {
+   "by_grade": {
+    "G5": 546
+   },
+   "failed": 0,
+   "not_scored": 546,
+   "points": 546,
+   "primary_reason": {
+    "field_not_modelled": 456,
+    "not_in_catalog": 82,
+    "value_not_recorded": 8
+   },
+   "reasons": {
+    "field_not_modelled:api_server_count": {
+     "alone": 0,
+     "blocks": 40
+    },
+    "field_not_modelled:enable_expert_parallel": {
+     "alone": 0,
+     "blocks": 91
+    },
+    "field_not_modelled:env.VLLM_USE_RUST_FRONTEND": {
+     "alone": 0,
+     "blocks": 28
+    },
+    "field_not_modelled:kv_cache_dtype": {
+     "alone": 0,
+     "blocks": 245
+    },
+    "field_not_modelled:language_model_only": {
+     "alone": 0,
+     "blocks": 227
+    },
+    "field_not_modelled:linear_backend": {
+     "alone": 0,
+     "blocks": 23
+    },
+    "field_not_modelled:mm_encoder_tp_mode": {
+     "alone": 0,
+     "blocks": 65
+    },
+    "field_not_modelled:moe_backend": {
+     "alone": 0,
+     "blocks": 170
+    },
+    "field_not_modelled:quantization": {
+     "alone": 0,
+     "blocks": 56
+    },
+    "not_in_catalog": {
+     "alone": 82,
+     "blocks": 538
+    },
+    "not_in_catalog:eagle3": {
+     "alone": 0,
+     "blocks": 123
+    },
+    "value_not_recorded:api_413": {
+     "alone": 8,
+     "blocks": 8
+    }
+   },
+   "scored": 0,
+   "share_scored": 0.0
+  },
+  "out_of_scope_by_chip": {
+   "mi300x": 95,
+   "mi325x": 171,
+   "mi355x": 280
+  }
+ },
+ "format": "baseline-compare-1",
+ "grades": {
+  "G1": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    }
+   },
+   "points": 0,
+   "share_of_all": "too few points",
+   "share_of_graded": "too few points"
+  },
+  "G2": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    }
+   },
+   "points": 0,
+   "share_of_all": "too few points",
+   "share_of_graded": "too few points"
+  },
+  "G3": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    }
+   },
+   "points": 0,
+   "share_of_all": "too few points",
+   "share_of_graded": "too few points"
+  },
+  "G4": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 20,
+    "tpot": {
+     "mape": {
+      "n": 20,
+      "value": 12.883246944520948
+     },
+     "shape": {
+      "n": 16,
+      "value": 9.463302337306677
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 20,
+      "value": 32.266492609839716
+     },
+     "shape": {
+      "n": 16,
+      "value": 23.798202271424536
+     }
+    }
+   },
+   "points": 20,
+   "share_of_all": 0.011534025374855825,
+   "share_of_graded": 1.0
+  },
+  "G5": {
+   "points": 1714,
+   "share_of_all": 0.9884659746251442,
+   "share_of_graded": null
+  },
+  "failed": {
+   "points": 0
+  }
+ },
+ "headline": {
+  "noise_floor_pct": 1.6,
+  "noise_floor_source": "fallback; none measured per point",
+  "points": 20,
+  "tpot": {
+   "mape": {
+    "n": 20,
+    "value": 12.883246944520948
+   },
+   "shape": {
+    "n": 16,
+    "value": 9.463302337306677
+   }
+  },
+  "ttft": {
+   "mape": {
+    "n": 20,
+    "value": 32.266492609839716
+   },
+   "shape": {
+    "n": 16,
+    "value": 23.798202271424536
+   }
+  }
+ },
+ "identity": {
+  "harness_commit": "a2ddd723d5c2f75b8f9d5e0b31e7923ed91ff409",
+  "point_set_sha256": "6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60",
+  "points": 1734,
+  "pull_manifest_sha256": "6b37908b08dfbb51af35977dbbd0afd2f764ea564443022a07858b186630a816",
+  "sample": "in_sample",
+  "units_count": 1740,
+  "units_sha256": "d89f860a46c0470a22543dc7fb77b8d1b10e508ce4f5ef5073e96f359f08597e"
+ },
+ "inputs": {
+  "blis": {
+   "catalog": "v0.13.0",
+   "commit_sha": "3f4998e28f922611a2d21d5c7ffe18a5272fe114",
+   "extractor_version": "blis-latency-kernel@unknown",
+   "registry": "v0.13.0",
+   "release": "v0.16.0"
+  },
+  "engine": {
+   "kind": "vllm",
+   "version": "0.32.0"
+  },
+  "experimental": false,
+  "fields_sha256": "d32342c4f9ae5c578ba578fd5e6575aa8db8bce099e0708480d55f7e8de5a6fc",
+  "simulator": {
+   "build": "v0.16.0",
+   "engine": {
+    "kind": "vllm",
+    "version": "0.32.0"
+   },
+   "harness_commit": "a2ddd723d5c2f75b8f9d5e0b31e7923ed91ff409"
+  }
+ },
+ "kind": "run",
+ "sample": "in_sample",
+ "sample_text": "IN-SAMPLE: the points are the ones the model was calibrated on or tuned against; there is no anchor list yet, so no point is held out. These figures say how well the simulator reproduces data it has seen, not how well it predicts new data.",
+ "unlock": [
+  {
+   "alone": 31,
+   "blocker": "value_not_recorded:cluster.gpus_per_node",
+   "blocks": 858
+  },
+  {
+   "alone": 10,
+   "blocker": "value_not_recorded",
+   "blocks": 35
+  },
+  {
+   "alone": 1,
+   "blocker": "value_not_recorded:api_413",
+   "blocks": 1
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:max_cudagraph_capture_size",
+   "blocks": 996
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:stream_interval",
+   "blocks": 771
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:kv_cache_dtype",
+   "blocks": 752
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:language_model_only",
+   "blocks": 607
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:enable_expert_parallel",
+   "blocks": 422
+  },
+  {
+   "alone": 0,
+   "blocker": "not_in_catalog:eagle3",
+   "blocks": 296
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:api_server_count",
+   "blocks": 131
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:quantization",
+   "blocks": 71
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:linear_backend",
+   "blocks": 67
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:moe_backend",
+   "blocks": 56
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_in_release:env.VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8",
+   "blocks": 37
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_in_release:env.VLLM_MXFP4_USE_MARLIN",
+   "blocks": 35
+  },
+  {
+   "alone": 0,
+   "blocker": "value_not_recorded:no_recipe_fingerprint",
+   "blocks": 25
+  },
+  {
+   "alone": 0,
+   "blocker": "not_in_catalog",
+   "blocks": 23
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:enable_chunked_prefill",
+   "blocks": 20
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:speculative_config.rejection_sample_method",
+   "blocks": 12
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_in_release:env.PYTHONNOUSERSITE",
+   "blocks": 7
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:cpu_offload_gb",
+   "blocks": 7
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:default_chat_template_kwargs.thinking_mode",
+   "blocks": 7
+  },
+  {
+   "alone": 0,
+   "blocker": "value_not_recorded:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use",
+   "blocks": 7
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:dcp_comm_backend",
+   "blocks": 5
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:decode_context_parallel_size",
+   "blocks": 5
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:prefix_match_unit",
+   "blocks": 5
+  },
+  {
+   "alone": 0,
+   "blocker": "not_in_catalog:dspark",
+   "blocks": 5
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:enable_eplb",
+   "blocks": 4
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_in_release:env.MC_ENABLE_DEST_DEVICE_AFFINITY",
+   "blocks": 2
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_in_release:env.MC_SLICE_SIZE",
+   "blocks": 2
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_in_release:env.MC_WORKERS_PER_CTX",
+   "blocks": 2
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:env.PYTHONHASHSEED",
+   "blocks": 2
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:kv_transfer_config.kv_connector_extra_config.load_async",
+   "blocks": 2
+  },
+  {
+   "alone": 0,
+   "blocker": "value_conflict:kv_transfer_config.engine_id",
+   "blocks": 1
+  },
+  {
+   "alone": 546,
+   "blocker": "out of scope (AMD, TPU)",
+   "blocks": 546,
+   "out_of_scope": true
+  }
+ ]
+}
