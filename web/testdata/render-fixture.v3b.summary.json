@@ -16,9 +16,9 @@
         "kind": "vllm",
         "version": "0.31.0"
       },
-      "harness_digest": "unreleased"
+      "harness_commit": "0123456789abcdef0123456789abcdef01234567"
     },
-    "harness_digest": "unreleased",
+    "harness_commit": "0123456789abcdef0123456789abcdef01234567",
     "experimental": false,
     "units": null,
     "engine": {
@@ -575,7 +575,7 @@
                             "kind": "vllm",
                             "version": "0.31.0"
                           },
-                          "harness_digest": "unreleased"
+                          "harness_commit": "0123456789abcdef0123456789abcdef01234567"
                         },
                         "substitutions": [
                           {
@@ -704,7 +704,7 @@
                             "kind": "vllm",
                             "version": "0.31.0"
                           },
-                          "harness_digest": "unreleased"
+                          "harness_commit": "0123456789abcdef0123456789abcdef01234567"
                         },
                         "substitutions": [
                           {
@@ -833,7 +833,7 @@
                             "kind": "vllm",
                             "version": "0.31.0"
                           },
-                          "harness_digest": "unreleased"
+                          "harness_commit": "0123456789abcdef0123456789abcdef01234567"
                         },
                         "substitutions": [
                           {
@@ -1177,7 +1177,7 @@
                             "kind": "vllm",
                             "version": "0.31.0"
                           },
-                          "harness_digest": "unreleased"
+                          "harness_commit": "0123456789abcdef0123456789abcdef01234567"
                         },
                         "substitutions": [
                           {
@@ -1407,7 +1407,7 @@
                             "kind": "vllm",
                             "version": "0.31.0"
                           },
-                          "harness_digest": "unreleased"
+                          "harness_commit": "0123456789abcdef0123456789abcdef01234567"
                         },
                         "substitutions": [
                           {
@@ -1533,7 +1533,7 @@
                             "kind": "vllm",
                             "version": "0.31.0"
                           },
-                          "harness_digest": "unreleased"
+                          "harness_commit": "0123456789abcdef0123456789abcdef01234567"
                         },
                         "substitutions": [
                           {
@@ -1701,7 +1701,7 @@
                             "kind": "vllm",
                             "version": "0.31.0"
                           },
-                          "harness_digest": "unreleased"
+                          "harness_commit": "0123456789abcdef0123456789abcdef01234567"
                         },
                         "substitutions": [
                           {
@@ -2003,7 +2003,7 @@
                             "kind": "vllm",
                             "version": "0.31.0"
                           },
-                          "harness_digest": "unreleased"
+                          "harness_commit": "0123456789abcdef0123456789abcdef01234567"
                         },
                         "substitutions": [
                           {
@@ -2091,7 +2091,7 @@
           "kind": "vllm",
           "version": "0.31.0"
         },
-        "harness_digest": "unreleased"
+        "harness_commit": "0123456789abcdef0123456789abcdef01234567"
       }
     },
     {
@@ -2139,7 +2139,7 @@
           "kind": "vllm",
           "version": "0.31.0"
         },
-        "harness_digest": "unreleased"
+        "harness_commit": "0123456789abcdef0123456789abcdef01234567"
       }
     },
     {
@@ -2191,7 +2191,7 @@
           "kind": "vllm",
           "version": "0.31.0"
         },
-        "harness_digest": "unreleased"
+        "harness_commit": "0123456789abcdef0123456789abcdef01234567"
       }
     },
     {
@@ -2239,7 +2239,7 @@
           "kind": "vllm",
           "version": "0.31.0"
         },
-        "harness_digest": "unreleased"
+        "harness_commit": "0123456789abcdef0123456789abcdef01234567"
       }
     },
     {
@@ -2287,7 +2287,7 @@
           "kind": "vllm",
           "version": "0.31.0"
         },
-        "harness_digest": "unreleased"
+        "harness_commit": "0123456789abcdef0123456789abcdef01234567"
       }
     }
   ],
@@ -2329,7 +2329,7 @@
           "kind": "vllm",
           "version": "0.31.0"
         },
-        "harness_digest": "unreleased"
+        "harness_commit": "0123456789abcdef0123456789abcdef01234567"
       }
     }
   ]

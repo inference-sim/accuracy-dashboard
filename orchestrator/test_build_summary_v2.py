@@ -255,7 +255,7 @@ def test_a_pull_date_earlier_than_its_newest_measurement_is_refused():
 def test_the_validator_requires_one_simulator_for_every_point_of_a_summary():
     doc = _build()
     _points(doc)[0]["fidelity"]["simulator"] = {"build": "v0.99.0", "engine": {"kind": "vllm", "version": "0.31.0"},
-                                                 "harness_digest": "unreleased"}
+                                                 "harness_commit": "0123456789abcdef0123456789abcdef01234567"}
     assert any("COV-6" in p for p in vs2.problems(doc))
     # Every point names one build, but not the provenance's.
     doc = _build()

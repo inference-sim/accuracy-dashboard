@@ -267,7 +267,7 @@ def write_run(name: str, run: dict, base: Path) -> Path:
     out.mkdir(parents=True, exist_ok=True)
     rows, fidelity, facets, not_scored, failed = [], [], {}, [], []
     sim = {"build": run["blis"]["release"], "engine": {"kind": "vllm", "version": ENGINE},
-           "harness_digest": "unreleased"}
+           "harness_commit": "0123456789abcdef0123456789abcdef01234567"}
     for p in POINTS:
         ident = identity(p["row"])
         pid = point_id(ident)
@@ -315,7 +315,7 @@ def write_run(name: str, run: dict, base: Path) -> Path:
     for fname, recs in ((NOT_SCORED_JSONL, not_scored), (FAILED_JSONL, failed)):
         recs.sort(key=lambda r: r["point_id"])
         (out / fname).write_text("".join(canonical_dumps(r) + "\n" for r in recs))
-    prov = {"ingest": "api", "blis": run["blis"], "simulator": sim, "harness_digest": "unreleased",
+    prov = {"ingest": "api", "blis": run["blis"], "simulator": sim, "harness_commit": "0123456789abcdef0123456789abcdef01234567",
             "experimental": False, "units": None, "engine": {"kind": "vllm", "version": ENGINE},
             "points": len(POINTS) + len(NOT_SCORED), "left_out_records": 3,
             "vllm_ref": VLLM_REF, "vllm_max_distance": 2000,

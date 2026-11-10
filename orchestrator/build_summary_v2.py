@@ -359,7 +359,7 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     provenance = {
         "blis": prov_in["blis"],
         "simulator": prov_in["simulator"],
-        "harness_digest": prov_in["harness_digest"],
+        "harness_commit": prov_in["harness_commit"],
         "experimental": prov_in["experimental"],
         "units": prov_in["units"],
         "engine": prov_in["engine"],
@@ -472,7 +472,7 @@ def _prov_out_to_in(prov: dict, coverage: dict) -> dict:
     """The summary's provenance back to the contract's provenance.json shape build() expects."""
     gt = prov.get("ground_truth", {})
     return {"ingest": "api", "blis": prov["blis"], "simulator": prov["simulator"],
-            "harness_digest": prov["harness_digest"], "experimental": prov["experimental"], "units": prov["units"],
+            "harness_commit": prov["harness_commit"], "experimental": prov["experimental"], "units": prov["units"],
             "engine": prov["engine"],
             "points": coverage["points"],
             "left_out_records": coverage["left_out_records"], "vllm_ref": prov["vllm_ref"],

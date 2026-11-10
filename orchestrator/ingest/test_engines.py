@@ -47,7 +47,7 @@ def _score(tmp, entry):
                  registry=tmp, registry_release="r", kernel="k", corpora={})
     o = sc.score_point(entry, tmp / "pull", tmp / "w", env)
     sc.grade_outcome(o, "0.32.0", {"build": "v0.16.0", "engine": {"kind": "vllm", "version": "0.32.0"},
-                                   "harness_digest": "unreleased"})
+                                   "harness_commit": "0123456789abcdef0123456789abcdef01234567"})
     return o
 
 

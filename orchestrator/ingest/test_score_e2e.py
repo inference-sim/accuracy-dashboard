@@ -211,7 +211,7 @@ def _setup(tmp: Path, *, log: str = LOG, job_log: str | None = "default", client
         entry["client_args"] = {"job_id": 5, "job_name": "j"}
     else:
         entry["client_args"] = None
-    env = sc.Env(blis=_fake_blis(tmp), blis_release="v0.12.0", blis_commit="b" * 40, catalog=tmp,
+    env = sc.Env(blis=_fake_blis(tmp), blis_release="v0.12.0", blis_commit="b" * 40, harness_commit="c" * 40, catalog=tmp,
                  catalog_release="0.3.0", registry=tmp, registry_release="v0.2.0", kernel="v0.3.0",
                  corpora={}, field_list=FIELDS, vllm_defaults=st.load_vllm_defaults()[0],
                  engine_release="0.31.0", sim_build="v0.12.0")
@@ -225,7 +225,7 @@ def _score(tmp: Path, entry, env, out: Path):
     o = sc._score_one(entry, tmp / "pull", work, env)
     prov = {"ingest": "api", "blis": {"release": "v0.12.0", "commit_sha": "b" * 40, "catalog": "0.3.0",
                                       "registry": "v0.2.0", "extractor_version": "blis-latency-kernel@v0.3.0"},
-            "simulator": env.simulator(), "harness_digest": env.harness_digest, "experimental": False, "units": None,
+            "simulator": env.simulator(), "harness_commit": env.harness_commit, "experimental": False, "units": None,
             "engine": {"kind": "vllm", "version": "0.31.0"}, "left_out_records": 0,
             "vllm_ref": "v0.31.0", "vllm_max_distance": 2000, "fields_sha256": "d" * 64,
             "pulled_at": "2026-10-23T00:00:00Z", "corpora": [], "pull_manifest_sha256": "e" * 64,
@@ -666,7 +666,7 @@ def test_the_scenario_engine_block_holds_the_runs_values_under_the_engines_own_n
         assert o.fidelity["run_release"] == "0.31.0"
         # Every point records the simulator build and engine release that scored it (COV-6).
         assert o.fidelity["simulator"] == {"build": "v0.12.0", "engine": {"kind": "vllm", "version": "0.31.0"},
-                                           "harness_digest": "unreleased"}
+                                           "harness_commit": "c" * 40}
     finally:
         shutil.rmtree(tmp)
 
