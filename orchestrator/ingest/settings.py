@@ -663,7 +663,7 @@ def recorded_node_size(launch: dict | None) -> int | None:
 
 
 def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str, field_list,
-          catalog_node_size: int | None, node: ir.NodeSize) -> Built:
+          catalog_node_size: int | None, node: ir.NodeSize, draft_model: str | None = None) -> Built:
     """The Scenario + Deployment for one point, from the decided settings.
 
     Only what the run recorded is written, under the engine's own names (LOCATIONS), and the
@@ -712,6 +712,10 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
     # when it differs from the default, so an unrecorded one is left to the engine.
     eng = pool["engine"]
     spec = eng.get("speculative")
+    if spec is not None and draft_model is not None:
+        # The run named a draft checkpoint (speculative_config.model); the engine block names it by
+        # its catalog entry (blis-vllm testdata/scenarios/muse-h100-pp2tp8-dspark.yaml: draft_model).
+        spec["draft_model"] = draft_model
     if spec is not None and set(spec) >= {"method"} and "num_spec_tokens" not in spec:
         b.reasons.append("required_setting_missing:speculative_config.num_speculative_tokens")
     if offload:

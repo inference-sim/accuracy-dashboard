@@ -605,7 +605,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
         # The log served a local path; the run's own recipe names the checkpoint (pull.py).
         cks = [entry["checkpoint"]["repo"]]
     sup = sp.check(cat, env.parts, checkpoints=cks, base_models=env.base_models,
-                   hardware=part_name, spec_method=spec)
+                   hardware=part_name, spec_method=spec, draft_checkpoint=sp.hf_repo(c.roles.get("drafter")))
     o.reasons += sup.reasons
 
     agentic = row["benchmark_type"] == "agentic_traces"
@@ -635,7 +635,8 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     node = ir.resolve(env.runner_table, row["hardware"], run_date=ident["measured_date"],
                       launch_size=st.recorded_node_size(launch), fixes_packaging=catalog_size is not None)
     b = st.build(c, name=name, model=sup.model, part=part, engine_version=env.engine_release,
-                 field_list=env.field_list, catalog_node_size=catalog_size, node=node)
+                 field_list=env.field_list, catalog_node_size=catalog_size, node=node,
+                 draft_model=sup.drafter)
     o.reasons += b.reasons
     o.subs += b.substitutions
     header = [f"point {pid}", f"InferenceX row {row['id']} ({row['run_url']})",
