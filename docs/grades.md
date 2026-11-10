@@ -66,7 +66,7 @@ The list is closed (design §11.4). The scorer's own reason codes map onto it (`
 
 | Reason | Meaning | How it is removed |
 |---|---|---|
-| `code_not_visible` | The engine code the build runs cannot be seen (a private image). | Publish the build's commit, or run the point on a visible build. |
+| `code_not_visible` | The engine code the build runs cannot be seen (a private image). The scorer emits no such reason today: a build it cannot resolve is G4 (nightly or custom). | Not applicable until the scorer tells a private build from a nightly one. |
 | `router_unsupported` | The run was measured behind a router BLIS does not host. BLIS hosts llm-d's router only. | Host the router in BLIS (a router in inference-sim, then the scenario names it). |
 | `topology_unsupported` | The deployment is a shape the scenario cannot state (a disaggregated or multinode layout the engine block cannot express). | Add the topology to the engine's deployment block and to the scorer's scenario writer. |
 | `value_not_recorded` | A value the simulation needs was recorded by no source: the server log is missing, the launch artifact does not match the row, a required setting is absent, or the client's scenario cannot be replayed. | Record the value (InferenceX uploads the log or artifact), or give the field an estimation rule in fields.json. |
@@ -76,7 +76,7 @@ The list is closed (design §11.4). The scorer's own reason codes map onto it (`
 | `not_in_catalog` | The model, the chip's coefficients or the speculative drafter is not in the catalog or registry the simulator reads. | Add the model or drafter to the catalog, or measure the chip's coefficients, and release them. |
 | `field_not_in_release` | The run set a field the engine release does not list. | Add the field to the release's fields.json, or score the point on a release that lists it. |
 | `value_conflict` | Two sources of one stage record different values for a field (launch configuration against the logged arguments, or a launch node size against the runners table). | Correct the source; the harness never picks one. |
-| `build_unparseable` | The run's image or log banner does not name an engine build. | Name the build in the row, or record the banner. |
+| `build_unparseable` | The run's image and log banner name no engine build at all. The scorer emits no such reason today: a build it cannot resolve is G4 (nightly or custom). | Not applicable until the scorer tells an unnamed build from a nightly one. |
 
 The scorer's reasons and the G5 reason each becomes:
 

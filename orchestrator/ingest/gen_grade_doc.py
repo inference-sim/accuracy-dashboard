@@ -43,8 +43,8 @@ G1_CONDITIONS = (
 )
 
 G5_TEXT = {
-    "code_not_visible": ("The engine code the build runs cannot be seen (a private image).",
-                         "Publish the build's commit, or run the point on a visible build."),
+    "code_not_visible": ("The engine code the build runs cannot be seen (a private image). The scorer emits no such reason today: a build it cannot resolve is G4 (nightly or custom).",
+                         "Not applicable until the scorer tells a private build from a nightly one."),
     "router_unsupported": ("The run was measured behind a router BLIS does not host. BLIS hosts llm-d's router only.",
                            "Host the router in BLIS (a router in inference-sim, then the scenario names it)."),
     "topology_unsupported": ("The deployment is a shape the scenario cannot state (a disaggregated or multinode layout the engine block cannot express).",
@@ -64,8 +64,8 @@ G5_TEXT = {
                              "Add the field to the release's fields.json, or score the point on a release that lists it."),
     "value_conflict": ("Two sources of one stage record different values for a field (launch configuration against the logged arguments, or a launch node size against the runners table).",
                        "Correct the source; the harness never picks one."),
-    "build_unparseable": ("The run's image or log banner does not name an engine build.",
-                          "Name the build in the row, or record the banner."),
+    "build_unparseable": ("The run's image and log banner name no engine build at all. The scorer emits no such reason today: a build it cannot resolve is G4 (nightly or custom).",
+                          "Not applicable until the scorer tells an unnamed build from a nightly one."),
 }
 
 KIND_TEXT = {
