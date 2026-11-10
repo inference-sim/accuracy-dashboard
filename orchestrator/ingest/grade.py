@@ -60,7 +60,8 @@ G2_KINDS = ("coefficient_method", "coefficient_range", "execution_mode", "kernel
 # file only), a coefficient lookup's extrapolated or unidentified range, a modelled field's value
 # class, and the resolved values the engine would choose. Each is named on every scored point as
 # a G2 substitution of its own kind, so no G1 and no G3 is published for a condition nobody
-# graded. A kind leaves this table when its condition is graded from data.
+# graded. A condition is evaluated from data by g1.py; the point names its kind only when the data
+# is absent for that point (score.evaluate_g1), or when the condition is false.
 NOT_CHECKED_SUBJECT = "unevaluated"
 UNCHECKED_KINDS = ("coefficient_range", "kernel_hash", "resolved_differs", "value_class")
 G34_KINDS = ("other_release", "changed_functions", "nightly_or_custom", "ported_functions_unpublished")
@@ -108,10 +109,11 @@ class Graded:
     g5: dict | None = None                               # {"code", "subject"} when G5
 
 
-def unchecked() -> list[dict]:
-    """The substitutions naming the G1 conditions that are unevaluated (UNCHECKED_KINDS)."""
-    return [{"kind": k, "subject": NOT_CHECKED_SUBJECT, "detail": f"{k} is unevaluated"}
-            for k in UNCHECKED_KINDS]
+def unchecked(kinds=None) -> list[dict]:
+    """The substitutions naming the G1 conditions that are unevaluated: all of UNCHECKED_KINDS, or
+    the given ones, the conditions whose data is not present for the point (g1.evaluate)."""
+    kinds = UNCHECKED_KINDS if kinds is None else tuple(k for k in UNCHECKED_KINDS if k in kinds)
+    return [{"kind": k, "subject": NOT_CHECKED_SUBJECT, "detail": f"{k} is unevaluated"} for k in kinds]
 
 
 def _sorted(subs: list[dict]) -> list[dict]:

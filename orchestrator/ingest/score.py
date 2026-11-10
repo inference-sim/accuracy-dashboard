@@ -32,6 +32,7 @@ import assess as asx  # noqa: E402
 import contract  # noqa: E402
 import engines  # noqa: E402
 import fields as fl  # noqa: E402
+import g1  # noqa: E402
 import grade as gr  # noqa: E402
 import inferencex_client as ix  # noqa: E402
 import inferencex_runners as ir  # noqa: E402
@@ -407,6 +408,10 @@ class Outcome:
     # Set by score_point(simulate=False) when the scorer would now hand the point to the simulator:
     # the point carries what its data gives so far and is not a scored point (no figures).
     would_run_simulator: bool = False
+    # What the G1 evaluations read (g1.py): the settings the run set, the values its log resolved, the
+    # library versions it recorded; and, set once the Result is read, the conditions still unevaluated.
+    g1_inputs: dict | None = None
+    unevaluated: list = field(default_factory=lambda: list(gr.UNCHECKED_KINDS))
 
 
 def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env, simulate: bool = True) -> Outcome:
@@ -598,6 +603,9 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     o.subs = list(c.substitutions)
     o.reasons += row_vs_run(row, c)
 
+    o.g1_inputs = {"requested": {p: s.value for p, s in c.settings.items() if s.requested and s.value is not None},
+                   "resolved": {p: v[0] for p, v in readings["resolved_config"].values.items() if v},
+                   "libraries": {}}      # no source of the run's library versions is read yet
     cat = env.catalog_obj
     spec = c.mapped.get("engine.speculative.method", (None, None))[1]
     cks = _checkpoints(c, launch)
@@ -711,6 +719,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     except result.ResultError as e:
         o.reasons = [f"blis_refused:{e.slug}"]
         return o
+    evaluate_g1(o, doc, env)
     m = measured(entry)
     o.fidelity = {"build": entry["build"], "args": args,
                   "resolved": resolved_kv(log, doc), "replay": r.record(corpus["sha256"]),
@@ -907,6 +916,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     except result.ResultError as e:
         o.reasons = [f"blis_refused:{e.slug}"]
         return o
+    evaluate_g1(o, doc, env)
     o.fidelity = {"build": entry["build"], "args": args, "resolved": [],
                   "blis_kernel_provenance": result.kernel_report(doc), "requests": requests}
     ep = (par["tp"] * par["dp"]) if par.get("enable_expert_parallel") else 1
@@ -936,13 +946,23 @@ def _prompt_lengths() -> ix.PromptLengthEvidence:
     return _EVIDENCE[0]
 
 
-def substitutions(o_subs: list[dict], fidelity: dict) -> list[dict]:
+def evaluate_g1(o: Outcome, doc: dict, env: "Env") -> None:
+    """Evaluate the four G1 conditions from the Result and the run's recorded settings; a condition
+    whose data is absent stays unevaluated and the point keeps naming it (grade.unchecked)."""
+    inputs = o.g1_inputs or {}
+    subs, o.unevaluated = g1.split(g1.evaluate(doc, field_list=env.field_list, requested=inputs.get("requested"),
+                                               resolved=inputs.get("resolved"), libraries=inputs.get("libraries")))
+    o.subs += subs
+
+
+def substitutions(o_subs: list[dict], fidelity: dict, unevaluated=None) -> list[dict]:
     """Every G2 substitution a scored point names (design §11.3): each one its settings named
     (an estimation rule applied, a field with a status allowed only during a release plan), and
     each difference between the run's client and the simulated one (COV-12). It also names, on
     every point, each G1 condition that is unevaluated (grade.UNCHECKED_KINDS), so the scorer
     publishes a G1 only when every condition has been checked."""
-    return list(o_subs) + list((fidelity.get("requests") or {}).get("differences") or []) + gr.unchecked()
+    return list(o_subs) + list((fidelity.get("requests") or {}).get("differences") or []) \
+        + gr.unchecked(unevaluated)
 
 
 def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None) -> None:
@@ -970,7 +990,7 @@ def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None
         o.g5 = g.g5
         o.g5_reasons = sorted((dict(x) for x in g5), key=lambda r: (r["code"], r.get("subject", "")))
         return
-    g = gr.grade(engine_version=engine_release, release=rel, substitutions=substitutions(o.subs, o.fidelity))
+    g = gr.grade(engine_version=engine_release, release=rel, substitutions=substitutions(o.subs, o.fidelity, o.unevaluated))
     o.fidelity = {**o.fidelity, "grade": g.grade, "substitutions": g.substitutions, "run_release": rel.version,
                   "simulator": simulator}
     if not o.would_run_simulator:      # a point graded without the simulator has no points.csv row

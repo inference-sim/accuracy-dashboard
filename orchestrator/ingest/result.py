@@ -185,8 +185,8 @@ def coefficient_substitutions(doc: dict) -> list[dict]:
     (an older build) names the single substitution `coefficient_method` on the report itself, so
     no G1 is published for coefficients nobody read.
 
-    The design's `coefficient_range` (an extrapolated or unidentified lookup) cannot be named
-    yet: the Result carries no range field. When it does, it is read here."""
+    The design's `coefficient_range` (an extrapolated or unidentified lookup) is read from the
+    Result's flags by g1.coefficient_range."""
     report = doc.get("selected_entries")
     if not isinstance(report, dict):
         return [{"kind": "coefficient_method", "subject": REPORT_SUBJECT, "detail": "not read"}]
