@@ -153,6 +153,7 @@ def _install(monkeypatch, fakes, scored_ids):
         return {"schema_version": 3, "snapshot_id": "2026-10-23_blis-v0.12.0_ix-api-2026-10-23",
                 "generated_at": generated_at,
                 "provenance": {"ingest": "api", "blis": {"release": "v0.12.0"},
+                               "harness_commit": cli.harness_commit_now(),
                                "simulator": {"build": "v0.12.0", "engine": {"kind": "vllm", "version": "0.32.0"}},
                                "ground_truth": {"release_tag": "api-2026-10-23"}},
                 "coverage": {"graded": len(scored_ids), "not_scored": 0}, "matrix": [], "not_scored": []}
@@ -196,6 +197,36 @@ def test_nightly_ix_only_fetches_only_the_delta(tmp_path, monkeypatch):
                         lambda prior, delta, window_ids, **k: {**prior, "coverage": {"graded": 2, "not_scored": 0}})
     cli.cmd_nightly(_args(tmp_path, today="2026-10-24"))
     assert fakes.pulled_only == [ledger_fake.point_id(new)]   # delta only
+
+
+def test_a_night_scored_by_another_harness_commit_rescores_the_whole_window_and_does_not_merge(tmp_path, monkeypatch):
+    # A summary names one harness commit (X8) and validation refuses a point from another, so a
+    # delta scored by a newer checkout cannot be merged into it: the whole window is rescored.
+    rows = [_row("m", 1, "2026-10-01")]
+    fakes = Fakes(rows)
+    _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
+    fakes.ledger(tmp_path)
+    cli.cmd_nightly(_args(tmp_path))                       # seed, at the checkout's commit
+    latest = tmp_path / "data" / "latest" / "summary.json"
+    doc = json.loads(latest.read_text())
+    doc["provenance"]["harness_commit"] = "f" * 40          # last night was scored by another commit
+    latest.write_text(json.dumps(doc))
+    new = _row("m", 2, "2026-10-02")
+    fakes.rows = rows + [new]
+    fakes.ledger(tmp_path)
+    import build_summary_v2
+    monkeypatch.setattr(build_summary_v2, "build_merged", lambda *a, **k: (_ for _ in ()).throw(AssertionError("merged")))
+    cli.cmd_nightly(_args(tmp_path, today="2026-10-24"))
+    assert sorted(fakes.pulled_only) == sorted(ledger_fake.point_id(r) for r in fakes.rows)   # the whole window
+
+
+def test_same_harness_commit_is_the_only_one_a_summary_can_be_merged_with():
+    here = cli.harness_commit_now()
+    assert len(here) == 40
+    assert cli.same_harness({"provenance": {"harness_commit": here}}, here)
+    assert not cli.same_harness({"provenance": {"harness_commit": "e" * 40}}, here)
+    assert not cli.same_harness({"provenance": {}}, here)
+    assert not cli.same_harness(None, here)
 
 
 def test_a_night_after_a_v2_summary_fetches_and_scores_the_whole_window(tmp_path, monkeypatch):
@@ -398,7 +429,7 @@ def test_check_blis_inputs_refuses_a_checkout_not_at_a_tag(tmp_path):
 
 
 def test_the_data_releases_are_named_by_the_caller_and_need_no_git_history(tmp_path):
-    # The harness image mounts the catalog and registry without .git (harness_pin.docker_command),
+    # A copy of the catalog and registry may carry no .git,
     # so check_blis_inputs takes the release names.
     sim = tmp_path / "sim"
     _tagged_repo(sim, "v0.16.0")
@@ -581,7 +612,7 @@ def _agentx_corpora(catalog, corpus_dir):
 
 def _score_inputs(tmp_path, commands: dict):
     """What cmd_score needs, with a fake blis answering `commands` beside a stack.json for vLLM
-    0.32.0, in a checkout at v0.16.0; the catalog and registry as the harness image mounts them,
+    0.32.0, in a checkout at v0.16.0; the catalog and registry as a copy without .git has them,
     plain directories with no .git, named by --catalog-release and --registry-release; and a pull
     of no points."""
     sim = tmp_path / "sim"

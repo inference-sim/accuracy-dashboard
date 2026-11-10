@@ -479,6 +479,18 @@ def _has_legacy_ids(summary: dict) -> bool:
         '"recipe":' in json.dumps(summary.get("matrix", []))
 
 
+def harness_commit_now() -> str:
+    """The commit of the checkout the night's harness runs from (run.sh records the same one)."""
+    return _git(HARNESS_RUN.parent.parent, "rev-parse", "HEAD")
+
+
+def same_harness(prior: dict | None, commit: str) -> bool:
+    """Whether last night's summary was scored by this checkout's harness commit. A figure records
+    the commit that produced it (X8) and a summary names one, so a delta scored by another commit
+    cannot be merged into it: the night rescores the whole window, as for a new BLIS release."""
+    return prior is not None and (prior.get("provenance") or {}).get("harness_commit") == commit
+
+
 def mergeable(prior: dict | None, schema_version: int) -> bool:
     """Whether tonight's delta can be merged into last night's published summary. A summary of
     another schema version (v2, before grades) or one published before point ids were unit ids
@@ -519,6 +531,7 @@ def cmd_nightly(a) -> int:
     import build_summary_v2 as bsv2  # noqa: E402
 
     today = date.fromisoformat(a.today) if a.today else date.today()
+    harness_now = harness_commit_now()
     work_dir, data_dir, state_path = Path(a.work_dir), Path(a.data_dir), Path(a.state)
     contract_dir = Path(a.work or data_dir.parent / "_contract")
     latest_path = data_dir / "latest" / "summary.json"
@@ -561,7 +574,8 @@ def cmd_nightly(a) -> int:
                                f"rather than publish counts that omit them (COV-1)")
         window_ids = set(anchors)
         prior = json.loads(latest_path.read_text()) if latest_path.is_file() else None
-        whole = blis_changed or not last_ids or not mergeable(prior, bsv2.SCHEMA_VERSION)
+        whole = (blis_changed or not last_ids or not mergeable(prior, bsv2.SCHEMA_VERSION)
+                 or not same_harness(prior, harness_now))
         to_fetch = window_ids if whole else (window_ids - set(last_ids))
         _log(f"nightly: window {len(listed)} units, {len(window_ids)} of them anchor units; "
              f"fetch {'every one' if whole else f'{len(to_fetch)} new'}")
@@ -604,7 +618,8 @@ def cmd_nightly(a) -> int:
         # IX-only night: merge the delta contract into last night's published summary (summary.json
         # IS the store). A BLIS release (or the seed) rebuilds the whole window from the contract.
         # A prior that is not mergeable was never merged into: pull_fn fetched the whole window.
-        if mergeable(prior, bsv2.SCHEMA_VERSION) and prior["provenance"]["blis"]["release"] == blis_tag:
+        if (mergeable(prior, bsv2.SCHEMA_VERSION) and prior["provenance"]["blis"]["release"] == blis_tag
+                and same_harness(prior, harness_now)):
             summary = bsv2.build_merged(prior, contract_dir, window_ids, generated_at=gen_at,
                                         evaluator_commit=a.evaluator_commit or "local",
                                         work=Path(a.score_work or contract_dir.parent) / "merge")
