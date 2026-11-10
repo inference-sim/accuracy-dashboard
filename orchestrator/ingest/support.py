@@ -106,6 +106,26 @@ class Catalog:
         spec = graph.get("speculator") if isinstance(graph, dict) else None
         return spec.get("method") if isinstance(spec, dict) else None
 
+    def drafter_links(self, target: str, drafter: str) -> bool:
+        """Whether catalog entry `drafter` and catalog entry `target` name each other: the drafter
+        lists the target among its `targets`, and the target lists the drafter among its
+        `drafters` (blis-substrate layer 8: a drafter names a list of targets, and the check is two-way).
+        TEMPORARY until a command prints it, and written against the schema as the layer 8 author
+        described it (a `targets` list on the drafter's model.yaml, a `drafters` list on the
+        target's; either may sit under `identity`). Re-check against the layer 8 tip."""
+        return (target in self._listed(drafter, "targets")) and (drafter in self._listed(target, "drafters"))
+
+    def _listed(self, entry: str, key: str) -> list:
+        import yaml
+        f = Path(self.root) / "models" / entry / "model.yaml"
+        doc = (yaml.safe_load(f.read_text()) or {}) if f.is_file() else {}
+        if not isinstance(doc, dict):
+            return []
+        v = doc.get(key)
+        if v is None and isinstance(doc.get("identity"), dict):
+            v = doc["identity"].get(key)
+        return [x for x in (v if isinstance(v, list) else []) if isinstance(x, str)]
+
 
 @dataclass
 class CheckoutCatalog(Catalog):
@@ -194,12 +214,18 @@ class Support:
     matched_by: str | None = None       # checkpoint | base_model
     checkpoint: str | None = None
     chip: str | None = None             # the catalog chip, or None when the catalog has none
+    drafter: str | None = None          # the catalog entry of the run's draft checkpoint, when it named one
     reasons: list = field(default_factory=list)
 
 
 def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models: dict,
-          hardware: str, spec_method: str | None) -> Support:
+          hardware: str, spec_method: str | None,
+          draft_checkpoint: str | None = None) -> Support:
     """checkpoints: candidate HF repos for the served model, most authoritative first.
+    draft_checkpoint: the HF repo the run named as its draft model (speculative_config.model), if any.
+    When it names one, that checkpoint must be a catalog entry that lists the served model among
+    its targets and is listed by it, and its graph's speculator method must be the run's; otherwise
+    the served model's own graph decides.
     base_models: repo -> its HF base_model (frozen at pull time). A repository two catalog
     entries claim is refused by `blis catalog resolve`, and raises its CommandError."""
     s = Support()
@@ -225,7 +251,12 @@ def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models:
     if s.chip is None or hardware not in parts:
         s.reasons.append("hardware_no_coefficients")
     if s.model and spec_method:
-        have = cat.speculator(s.model)
-        if have != spec_method:
+        if draft_checkpoint:
+            d = cat.model(draft_checkpoint)
+            if d is not None and cat.drafter_links(s.model, d) and cat.speculator(d) == spec_method:
+                s.drafter = d
+            else:
+                s.reasons.append(f"drafter_not_in_catalog:{spec_method}")
+        elif cat.speculator(s.model) != spec_method:
             s.reasons.append(f"drafter_not_in_catalog:{spec_method}")
     return s
