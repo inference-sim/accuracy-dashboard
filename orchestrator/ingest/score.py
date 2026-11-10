@@ -89,8 +89,8 @@ class Env:
     engine_release: str = ""
     # The simulator build that scores the run: a release tag, or a commit (pointrecord Simulator).
     sim_build: str = ""
-    # The harness image digest every point records (design §11.7, X8): sha256:<hex>, or unreleased.
-    harness_digest: str = "unreleased"
+    # The harness commit every point records (design §11.7, X8): the 40-hex commit of the dashboard checkout.
+    harness_commit: str = ""
     catalog_obj: sp.Catalog | None = None
     # InferenceX's GPUs per node by hardware label (inferencex_runners.json).
     runner_table: ir.Table = field(default_factory=ir.load)
@@ -105,7 +105,7 @@ class Env:
     def simulator(self) -> dict:
         """The simulator block every point of this run records: its build and engine release."""
         return {"build": self.sim_build, "engine": {"kind": "vllm", "version": self.engine_release},
-                "harness_digest": self.harness_digest}
+                "harness_commit": self.harness_commit}
 
 
 def corpora_provenance(corpora: dict) -> list[dict]:
@@ -400,7 +400,7 @@ class Outcome:
     # Set by grade_outcome: the run's own engine release (None for a nightly or custom build);
     # for a G5 point its reason and every reason found; for a failed point its run faults.
     run_release: str | None = None
-    simulator: dict | None = None   # {"build", "engine": {"kind", "version"}, "harness_digest"}
+    simulator: dict | None = None   # {"build", "engine": {"kind", "version"}, "harness_commit"}
     g5: dict | None = None
     g5_reasons: list = field(default_factory=list)
     faults: list = field(default_factory=list)

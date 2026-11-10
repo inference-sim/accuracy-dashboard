@@ -161,7 +161,7 @@ def points_sort_key(row: dict) -> tuple:
 
 # A row the pull itself failed to read. Never a valid reason in a published contract.
 PULL_ERROR = "artifact_unmatched:pull_error"
-PROVENANCE_KEYS = ("ingest", "blis", "simulator", "harness_digest", "experimental", "units", "engine", "points", "left_out_records", "vllm_ref", "vllm_max_distance",
+PROVENANCE_KEYS = ("ingest", "blis", "simulator", "harness_commit", "experimental", "units", "engine", "points", "left_out_records", "vllm_ref", "vllm_max_distance",
                    "fields_sha256", "pulled_at", "corpora", "pull_manifest_sha256", "source")
 
 

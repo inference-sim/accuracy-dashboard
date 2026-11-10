@@ -256,7 +256,7 @@ def test_validator_requires_one_simulator_build_for_every_point():
     d = _copy("run-b")
     rows = _lines(d / c.FAILED_JSONL)
     rows[0]["simulator"] = {"build": "v0.11.0", "engine": {"kind": "vllm", "version": "0.32.0"},
-                            "harness_digest": "unreleased"}
+                            "harness_commit": "0123456789abcdef0123456789abcdef01234567"}
     _write_lines(d / c.FAILED_JSONL, rows)
     assert any("COV-6" in p for p in c.validate_dir(d))
     d = _copy("run-b")

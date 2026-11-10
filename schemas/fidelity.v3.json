@@ -804,13 +804,13 @@
       }
     },
     "simulator": {
-      "description": "The simulator build that scored the point, the engine release it runs (blis-substrate contracts/spec/pointrecord Simulator), and the harness image digest that produced it (pointrecord harness_digest; design §11.7, X8). Every point of one run names the same one (COV-6).",
+      "description": "The simulator build that scored the point, the engine release it runs (blis-substrate contracts/spec/pointrecord Simulator), and the commit of the harness script that produced it (pointrecord harness_commit; design §11.7, X8). Every point of one run names the same one (COV-6).",
       "type": "object",
       "additionalProperties": false,
       "required": [
         "build",
         "engine",
-        "harness_digest"
+        "harness_commit"
       ],
       "properties": {
         "build": {
@@ -835,9 +835,9 @@
             }
           }
         },
-        "harness_digest": {
+        "harness_commit": {
           "type": "string",
-          "pattern": "^(sha256:[0-9a-f]{64}|unreleased)$"
+          "pattern": "^[0-9a-f]{40}$"
         }
       }
     }

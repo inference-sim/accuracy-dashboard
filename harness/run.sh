@@ -22,12 +22,12 @@
 # release the build runs. TEMPORARY until the M2 substrate release lets the build print its own
 # list through `blis fields`.
 #
-# The harness digest. Every figure records the digest of the harness that produced it (X8). An
-# image cannot hold its own digest, since the digest is known only after the image is built.
-# So the caller states it: a repository that runs the harness pulls it by the digest in its pin
-# file and passes that digest as the environment variable HARNESS_DIGEST (sha256:<64 hex>). When
-# HARNESS_DIGEST is unset the run records "unreleased", and its figures are labelled
-# experimental: they may be posted on a pull request, never published as BLIS's accuracy.
+# The harness commit. Every figure records the commit of the harness that produced it (X8). The
+# harness is this script and the scorer beside it, run from a checkout, so the commit is the
+# checkout's HEAD. A checkout whose harness files (harness/, orchestrator/, schemas/) differ from
+# HEAD is refused: its figures could not be regenerated from any commit. A copy of the tree with
+# no git history (an exported archive) names its commit in the environment variable HARNESS_COMMIT
+# (40 hex); when both exist the variable is checked against HEAD, and a mismatch is refused.
 #
 # Usage:
 #   run.sh --sim <tag|commit> [--sim-repo URL] --units FILE --pull DIR --out DIR
@@ -93,11 +93,10 @@ fi
 [ -n "$catalog_release" ] || refuse "--catalog-release is required: the release tag the catalog is at"
 [ -n "$registry_release" ] || refuse "--registry-release is required: the release tag the registry is at"
 
-digest="${HARNESS_DIGEST:-unreleased}"
-if [ "$digest" != unreleased ] && ! [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-  refuse "HARNESS_DIGEST $digest is not sha256:<64 hex>"
+harness_commit="${HARNESS_COMMIT:-}"
+if [ -n "$harness_commit" ] && ! [[ "$harness_commit" =~ ^[0-9a-f]{40}$ ]]; then
+  refuse "HARNESS_COMMIT $harness_commit is not a full 40-hex commit"
 fi
-
 if [ "$check_only" = 1 ]; then
   echo "run.sh: flags valid (--sim $sim is a $sim_kind)"
   exit 0
@@ -107,6 +106,20 @@ fi
 [ -d "$pull" ] || refuse "--pull $pull is not a directory"
 [ -d "$corpus_dir" ] || refuse "--corpus-dir $corpus_dir is not a directory"
 [ -f "$fields" ] || refuse "--fields $fields is not a file"
+
+if git -C "$root" rev-parse --git-dir >/dev/null 2>&1; then
+  head_commit="$(git -C "$root" rev-parse HEAD)"
+  if [ -n "$harness_commit" ] && [ "$harness_commit" != "$head_commit" ]; then
+    refuse "HARNESS_COMMIT $harness_commit is not the checkout's HEAD $head_commit"
+  fi
+  # Only the files that make the figures: the published data beside them changes during a night.
+  if [ -n "$(git -C "$root" status --porcelain --untracked-files=no -- harness orchestrator schemas requirements-ci.txt)" ]; then
+    refuse "the harness files of $root differ from its commit $head_commit; its figures could not be regenerated from a commit (X8)"
+  fi
+  harness_commit="$head_commit"
+elif [ -z "$harness_commit" ]; then
+  refuse "the harness at $root is not a git checkout and HARNESS_COMMIT is not set; every figure records the harness commit (X8)"
+fi
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -131,7 +144,7 @@ echo "run.sh: inference-sim $sim at $got" >&2
 ( cd "$src" && go mod download && go build -o "$src/blis" main.go )
 
 args=(score --pull "$pull" --out "$out" --blis "$src/blis" --units "$units"
-      --sim-build "$sim" --harness-digest "$digest" --catalog "$catalog" --registry "$registry"
+      --sim-build "$sim" --harness-commit "$harness_commit" --catalog "$catalog" --registry "$registry"
       --corpus-dir "$corpus_dir" --fields "$fields"
       --catalog-release "$catalog_release" --registry-release "$registry_release")
 # The replay memory ceiling is passed on only when given.
