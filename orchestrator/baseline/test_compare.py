@@ -112,6 +112,18 @@ def test_grade_table_shares_and_too_few(runs):
     assert g["G5"]["share_of_all"] == "too few points"      # 8 points, under the schema minimum of 10
 
 
+def test_each_grade_is_reported_by_serving(tmp_path):
+    scored = sweep(0, "m1", "b200", "G2", 1.1) * 1
+    run = make_run(tmp_path, "r", scored)
+    facets = json.loads((run / "facets.json").read_text())
+    for i, k in enumerate(facets):
+        facets[k]["serving"] = "disaggregated" if i >= 2 else "aggregated"
+    (run / "facets.json").write_text(json.dumps(facets))
+    sg = c.run_report(c.Run(run), "in_sample")["serving_by_grade"]
+    assert {s: v["G2"]["points"] for s, v in sg.items()} == {"aggregated": 2, "disaggregated": 2}
+    assert "by serving" in c.run_markdown(c.run_report(c.Run(run), "in_sample"))
+
+
 def test_markdown_names_the_label_and_the_lists(runs):
     t = c.pair_report(c.Run(runs[0]), c.Run(runs[1]), "in_sample")
     md = c.pair_markdown(t)
