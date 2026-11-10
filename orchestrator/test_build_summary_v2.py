@@ -7,6 +7,7 @@ Expectations are worked by hand from the committed contract fixture
 Run: python3 orchestrator/test_build_summary_v2.py
 """
 import json
+import pytest
 import shutil
 from collections import Counter
 import sys
@@ -652,6 +653,42 @@ def test_ix_only_merge_of_delta_reproduces_the_full_summary():
         assert merged["coverage"] == full["coverage"] and merged["headline"] == full["headline"]
         assert merged["totals"] == full["totals"]
         assert c.validate_dir(delta_c) == []
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_delta_scored_by_another_harness_commit_cannot_be_merged():
+    # build_merged keeps the prior's provenance, so a delta whose points name another harness
+    # commit would give a summary with two. The contract is refused; cli.cmd_nightly rescores the
+    # whole window instead (test_cli_nightly).
+    import contract as c
+    full = _build()
+    ids = [p["point_id"] for p in _points(full)]
+    d = set(ids[:2])
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        prior_c = tmp / "prior"
+        b2.summary_to_contract(full, prior_c)
+        _strip_points(prior_c, d)
+        prior = b2.build(prior_c, generated_at="2026-10-22T00:00:00Z", evaluator_commit="test")
+        delta_c = tmp / "delta"
+        _subset_contract(FIXTURE / "run-a", delta_c, d)
+        other = "b" * 40
+        prov = json.loads((delta_c / c.PROVENANCE_JSON).read_text())
+        prov["harness_commit"] = other
+        prov["simulator"] = {**prov["simulator"], "harness_commit": other}
+        (delta_c / c.PROVENANCE_JSON).write_text(c.canonical_dumps(prov) + "\n")
+        for name in (c.FIDELITY_JSONL, c.NOT_SCORED_JSONL, c.FAILED_JSONL):
+            f = delta_c / name
+            if f.exists():
+                rows = [json.loads(l) for l in f.read_text().splitlines() if l]
+                for r in rows:
+                    if "simulator" in r:
+                        r["simulator"] = {**r["simulator"], "harness_commit": other}
+                f.write_text("".join(c.canonical_dumps(r) + "\n" for r in rows))
+        window = set(ids) | {n["point_id"] for n in full["not_scored"]}
+        with pytest.raises(b2.ContractError, match="COV-6"):
+            b2.build_merged(prior, delta_c, window, generated_at=STAMP, evaluator_commit="test", work=tmp / "wk")
     finally:
         shutil.rmtree(tmp)
 
