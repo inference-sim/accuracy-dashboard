@@ -23,7 +23,7 @@ order decides which is the point's g5_reason):
                        exists" is false for SGLang, and the only true reason is that the engine
                        has classified no field.
   engine_unsupported   no BLIS engine repository exists for the engine (TensorRT-LLM, ATOM,
-                       TileRT): engine = None.
+                       TileRT, teacup, rubin-july, tokenspeed): engine = None.
 """
 from __future__ import annotations
 
@@ -70,6 +70,12 @@ FRAMEWORKS = dict([
     _f("atom-disagg", None, None, DISAGGREGATED),
     _f("mooncake-atom", None, None, DISAGGREGATED),
     _f("tilert", None, "tilert-pd-router", DISAGGREGATED),
+    # Labels InferenceX added after the table was written. Each runs an engine BLIS has no repository
+    # for, as far as the rows say (all aggregated): G5 engine_unsupported, so the pull names them
+    # instead of stopping on them.
+    _f("teacup", None, None, AGGREGATED),
+    _f("rubin-july", None, None, AGGREGATED),
+    _f("tokenspeed", None, None, AGGREGATED),
 ])
 
 
