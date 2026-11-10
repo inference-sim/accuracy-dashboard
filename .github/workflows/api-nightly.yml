@@ -113,7 +113,7 @@ jobs:
               "$RUNNER_TEMP/pull" "$RUNNER_TEMP/contract" "$RUNNER_TEMP/scorework"
             SIM="$RUNNER_TEMP/sim"
             git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$SIM"
-            ( cd "$SIM" && GOFLAGS=-mod=mod go build -o blis main.go )
+            ( cd "$SIM" && go build -o blis main.go )
             # Everything else the release runs is named by its stack.json (SIM-3, X8), so a new
             # release is scored with no change to this file: the blis-substrate commit (its
             # catalog/, registry/ and catalog/ledger) and the vLLM tag of the engine release.

@@ -14,6 +14,7 @@ metricscore
 
 # python cache
 __pycache__/
+.pytest_cache/
 *.pyc
 
 # local scratch notes (never commit)

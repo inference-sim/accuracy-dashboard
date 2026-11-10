@@ -57,7 +57,9 @@ The script takes three inputs, as flags:
 Every figure records the harness commit that produced it (X8): the HEAD of the checkout `run.sh`
 runs from. `run.sh` refuses a checkout whose files under `harness/`, `orchestrator/` or `schemas/`
 differ from HEAD, because figures from such a tree could not be regenerated. A copy of the tree
-without git history states its commit in `HARNESS_COMMIT`.
+without git history states its commit in `HARNESS_COMMIT`; such a figure is labelled by assertion, not checked, so the
+accuracy gate must refuse it unless that commit is released from main. A directory unpacked inside another repository
+is not a checkout: only a git top level equal to the harness directory counts.
 
 The nightly (`.github/workflows/api-nightly.yml`) checks out this repository, builds nothing
 but the simulator, and calls `harness/run.sh`. A repository whose pull requests run the harness

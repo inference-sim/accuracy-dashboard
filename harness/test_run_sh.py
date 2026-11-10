@@ -106,9 +106,9 @@ def test_no_container_or_signing_path_is_left():
     for gone in ("harness/Dockerfile", "harness/image.pin", ".github/workflows/harness-release.yml",
                  "orchestrator/ingest/harness_pin.py"):
         assert not (HERE.parent / gone).exists(), gone
-    for f in [*WORKFLOWS, RUN, HERE.parent / "orchestrator" / "ingest" / "cli.py"]:
+    for f in [*WORKFLOWS, RUN, HERE.parent / "orchestrator" / "ingest" / "cli.py", HERE.parent / "README.md"]:
         text = f.read_text()
-        for word in ("docker run", "docker pull", "docker build", "cosign", "HARNESS_DIGEST", "harness_pin"):
+        for word in ("docker", "cosign", "HARNESS_DIGEST", "harness_pin"):
             assert word not in text, f"{f.name} mentions {word}"
 
 
@@ -121,7 +121,7 @@ def git(*args, cwd=None):
 
 
 def mounted_dir(path: Path) -> Path:
-    """A data directory as the harness image receives it: mounted, with no .git."""
+    """A data directory as a copy of the data has it, with no .git."""
     path.mkdir(parents=True)
     assert not (path / ".git").exists()
     return path
@@ -291,6 +291,46 @@ def test_a_checkout_whose_harness_files_differ_from_its_commit_is_refused(tmp_pa
                        capture_output=True, text=True, env=env)
     assert p.returncode == 2 and "differ from its commit" in p.stderr and head in p.stderr
     assert not (tmp_path / "out").exists()
+
+
+def test_an_untracked_file_in_a_script_directory_is_refused(tmp_path):
+    # A new module under orchestrator/ingest changes the figures but is not in the commit.
+    bare, commit, bin_, log, pull, units, fields, cat, reg = real_setup(tmp_path)
+    run_sh, head = harness_checkout(tmp_path)
+    (run_sh.parent.parent / "orchestrator" / "ingest" / "shadow.py").write_text("x = 1\n")
+    env = {k: v for k, v in os.environ.items() if k != "HARNESS_COMMIT"}
+    env.update({"PATH": f"{bin_}:{os.environ['PATH']}", "FAKE_FIELDS": str(fields)})
+    p = subprocess.run(["bash", str(run_sh), "--sim", "v0.16.0", "--sim-repo", str(bare), "--units", str(units),
+                        "--pull", str(pull), "--out", str(tmp_path / "out"), "--catalog", str(cat),
+                        "--registry", str(reg), "--corpus-dir", str(tmp_path / "corpora"),
+                        "--fields", str(fields), "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0"],
+                       capture_output=True, text=True, env=env)
+    assert p.returncode == 2 and "differ from its commit" in p.stderr and not (tmp_path / "out").exists()
+
+
+def test_a_copy_unpacked_inside_another_repository_does_not_record_that_repositorys_commit(tmp_path):
+    outer = tmp_path / "outer"
+    outer.mkdir()
+    git("init", "-q", cwd=outer)
+    (outer / "f").write_text("x")
+    git("add", ".", cwd=outer)
+    git("commit", "-q", "-m", "outer", cwd=outer)
+    outer_head = git("rev-parse", "HEAD", cwd=outer)
+    inner = outer / "unpacked"
+    inner.mkdir()
+    run_sh, _ = harness_checkout(inner, git_history=False)       # no .git of its own
+    assert git("rev-parse", "--show-toplevel", cwd=run_sh.parent) == str(outer.resolve())
+    (tmp_path / "w").mkdir()
+    bare, commit, bin_, log, pull, units, fields, cat, reg = real_setup(tmp_path / "w")
+    env = {k: v for k, v in os.environ.items() if k != "HARNESS_COMMIT"}
+    env.update({"PATH": f"{bin_}:{os.environ['PATH']}", "FAKE_FIELDS": str(fields)})
+    p = subprocess.run(["bash", str(run_sh), "--sim", "v0.16.0", "--sim-repo", str(bare), "--units", str(units),
+                        "--pull", str(pull), "--out", str(tmp_path / "out"), "--catalog", str(cat),
+                        "--registry", str(reg), "--corpus-dir", str(tmp_path / "w" / "corpora"),
+                        "--fields", str(fields), "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0"],
+                       capture_output=True, text=True, env=env)
+    assert p.returncode == 2 and "HARNESS_COMMIT is not set" in p.stderr, p.stderr
+    assert outer_head not in p.stderr
 
 
 def test_a_tree_without_history_names_its_commit_in_the_environment(tmp_path):

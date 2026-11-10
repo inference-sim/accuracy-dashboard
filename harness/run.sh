@@ -10,8 +10,8 @@
 #                       the graph's speculator method and the registry's coefficient scopes
 #                       (orchestrator/ingest/support.py, TEMPORARY).
 #                       --catalog-release TAG and --registry-release TAG name the releases the two
-#                       directories are at. The directories may carry no git history (a container
-#                       mount), so the scorer is told the names, not left to read them.
+#                       directories are at. The directories may carry no git history (a copy
+#                       of the data), so the scorer is told the names, not left to read them.
 #   a set of units      --units FILE, the ledger units to score, and --pull DIR, their frozen
 #                       recorded runs.
 #
@@ -107,15 +107,28 @@ fi
 [ -d "$corpus_dir" ] || refuse "--corpus-dir $corpus_dir is not a directory"
 [ -f "$fields" ] || refuse "--fields $fields is not a file"
 
-if git -C "$root" rev-parse --git-dir >/dev/null 2>&1; then
+# The checkout is this repository only when git's top level is $root itself: a copy unpacked
+# inside some other repository would otherwise record that repository's commit.
+is_checkout() {
+  local top
+  top="$(git -C "$root" rev-parse --show-toplevel 2>/dev/null)" || return 1
+  [ "$(cd "$top" && pwd -P)" = "$(cd "$root" && pwd -P)" ]
+}
+
+# The files that make the figures: the published data beside them changes during a night. An
+# untracked file counts, since a new module in a script directory changes the figures too.
+check_clean() {
+  if [ -n "$(git -C "$root" status --porcelain --untracked-files=normal -- harness orchestrator schemas requirements-ci.txt)" ]; then
+    refuse "the harness files of $root differ from its commit $head_commit; its figures could not be regenerated from a commit (X8)"
+  fi
+}
+
+if is_checkout; then
   head_commit="$(git -C "$root" rev-parse HEAD)"
   if [ -n "$harness_commit" ] && [ "$harness_commit" != "$head_commit" ]; then
     refuse "HARNESS_COMMIT $harness_commit is not the checkout's HEAD $head_commit"
   fi
-  # Only the files that make the figures: the published data beside them changes during a night.
-  if [ -n "$(git -C "$root" status --porcelain --untracked-files=no -- harness orchestrator schemas requirements-ci.txt)" ]; then
-    refuse "the harness files of $root differ from its commit $head_commit; its figures could not be regenerated from a commit (X8)"
-  fi
+  check_clean
   harness_commit="$head_commit"
 elif [ -z "$harness_commit" ]; then
   refuse "the harness at $root is not a git checkout and HARNESS_COMMIT is not set; every figure records the harness commit (X8)"
@@ -149,4 +162,9 @@ args=(score --pull "$pull" --out "$out" --blis "$src/blis" --units "$units"
       --catalog-release "$catalog_release" --registry-release "$registry_release")
 # The replay memory ceiling is passed on only when given.
 [ -z "$max_rss_mb" ] || args+=(--max-rss-mb "$max_rss_mb")
+# The clone and the build take minutes: look at the harness again just before it runs.
+if is_checkout; then
+  [ "$(git -C "$root" rev-parse HEAD)" = "$head_commit" ] || refuse "the harness checkout moved from $head_commit while the simulator was built"
+  check_clean
+fi
 python3 "$root/orchestrator/ingest/cli.py" "${args[@]}"
