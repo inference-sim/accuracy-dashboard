@@ -92,7 +92,7 @@ class Run:
                 self.points[pid] = {
                     "id": pid, "status": "scored", "grade": r["grade"], "hardware": f["gpu"],
                     "model": f["model"], "framework": f["framework"], "precision": f["precision"],
-                    "spec": f.get("spec_method") or "none", "sweep": (r["scenario"], r["label"]),
+                    "spec": f.get("spec_method") or "none", "serving": f.get("serving") or "aggregated", "sweep": (r["scenario"], r["label"]),
                     "concurrency": int(r["concurrency"]), "date": r["measured_date"],
                     **{k: float(r[k]) for k in ("meas_ttft_us", "pred_ttft_us", "meas_tpot_us", "pred_tpot_us")},
                     "substitutions": fid["substitutions"], "g5_reasons": [],
@@ -305,11 +305,21 @@ def backlog_for(points: list[dict]) -> list[dict]:
 def attribution(points: list[dict]) -> dict:
     """MAPE by model, chip, precision, spec method and engine, for the given scored points."""
     out = {}
-    for key in ("model", "hardware", "precision", "spec", "framework"):
+    for key in ("model", "hardware", "precision", "spec", "framework", "serving"):
         groups = defaultdict(list)
         for p in points:
             groups[p[key]].append(p)
         out[key] = {k: accuracy(v) for k, v in sorted(groups.items())}
+    return out
+
+
+def serving_by_grade(points: list[dict]) -> dict:
+    """Accuracy of each grade on its own, apart for aggregated and disaggregated points, so a change
+    in prefill/decode modelling shows. The facets name each scored point's serving."""
+    out = {}
+    for serving in sorted({p["serving"] for p in points if p["status"] == "scored"}):
+        pts = [p for p in points if p["status"] == "scored" and p["serving"] == serving]
+        out[serving] = {g: accuracy([p for p in pts if p["grade"] == g]) for g in gr.GRADED}
     return out
 
 
@@ -333,7 +343,8 @@ def run_report(run: Run, sample: str) -> dict:
     return {"format": FORMAT, "kind": "run", "sample": sample, "sample_text": SAMPLE_TEXT[sample],
             "identity": run.identity(sample), "inputs": run.inputs(),
             "headline": accuracy([p for p in pts if p["grade"] in gr.GRADED]),
-            "grades": by_grade(pts), "coverage": coverage(pts), "backlog": backlog_for(pts),
+            "grades": by_grade(pts), "serving_by_grade": serving_by_grade(pts),
+            "coverage": coverage(pts), "backlog": backlog_for(pts),
             "unlock": unlock_table(pts)}
 
 
@@ -362,11 +373,13 @@ def pair_report(before: Run, after: Run, sample: str) -> dict:
     return {"format": FORMAT, "kind": "pair", "sample": sample, "sample_text": SAMPLE_TEXT[sample],
             "before": {"identity": before.identity(sample), "inputs": before.inputs(),
                        "headline": accuracy([p for p in b.values() if p["grade"] in gr.GRADED]),
-                       "grades": by_grade(list(b.values())), "coverage": cov_b,
+                       "grades": by_grade(list(b.values())), "serving_by_grade": serving_by_grade(list(b.values())),
+                       "coverage": cov_b,
                        "backlog": backlog_for(list(b.values()))},
             "after": {"identity": after.identity(sample), "inputs": after.inputs(),
                       "headline": accuracy([p for p in a.values() if p["grade"] in gr.GRADED]),
-                      "grades": by_grade(list(a.values())), "coverage": cov_a,
+                      "grades": by_grade(list(a.values())), "serving_by_grade": serving_by_grade(list(a.values())),
+                      "coverage": cov_a,
                       "backlog": backlog_for(list(a.values()))},
             "scored_in_both": {"points": len(both), "before": accuracy(bpts), "after": accuracy(apts),
                                "grade_moves": dict(sorted(Counter(f"{b[i]['grade']}->{a[i]['grade']}" for i in both).items())),
@@ -419,6 +432,17 @@ def _grades_md(title: str, g: dict) -> list[str]:
     return lines + [""]
 
 
+def _serving_md(title: str, sg: dict) -> list[str]:
+    L = [f"**{title}: each grade on its own, by serving (aggregated or disaggregated)**", "",
+         "| Serving | Grade | Points | TTFT MAPE % | TTFT shape % | TPOT MAPE % | TPOT shape % |", "|---|---|---|---|---|---|---|"]
+    for serving, grades in sg.items():
+        for g, acc in grades.items():
+            L.append(f"| {serving} | {g} | {acc['points']} | {_acc_cells(acc)} |")
+    if not sg:
+        L.append("| none scored | | | | | | |")
+    return L + [""]
+
+
 def run_markdown(t: dict) -> str:
     ident = t["identity"]
     L = [f"# Scored run ({t['sample'].replace('_', '-')})", "", t["sample_text"], "", *_identity_md(ident), ""]
@@ -427,7 +451,7 @@ def run_markdown(t: dict) -> str:
     h = t["headline"]
     L += ["## Headline (G1 to G4)", "", "| Points | TTFT MAPE % | TTFT shape % | TPOT MAPE % | TPOT shape % | Noise floor % |", "|---|---|---|---|---|---|",
           f"| {h['points']} | {_acc_cells(h)} | {h['noise_floor_pct']} ({h['noise_floor_source']}) |", ""]
-    L += ["## By grade", ""] + _grades_md("All points", t["grades"])
+    L += ["## By grade", ""] + _grades_md("All points", t["grades"]) + _serving_md("All scored points", t["serving_by_grade"])
     L += _coverage_md({"": t["coverage"]}) + _unlock_md(t["unlock"], "What would unlock the rest")
     L += ["## Why points are below G1 or at G5 (design §11.6)", "", "| Entry | Blocks | Alone | Demotes |", "|---|---|---|---|"]
     L += [f"| `{e['entry']}` | {e['blocks']} | {e['alone']} | {e['demotes']} |" for e in t["backlog"]]
@@ -472,6 +496,7 @@ def pair_markdown(t: dict) -> str:
     if both["grade_moves"]:
         L += ["Grade moves of the points scored in both: " + ", ".join(f"{k} {v}" for k, v in both["grade_moves"].items()) + ".", ""]
     L += ["## By grade", ""] + _grades_md("Before", b["grades"]) + _grades_md("After", a["grades"])
+    L += _serving_md("Before", b["serving_by_grade"]) + _serving_md("After", a["serving_by_grade"])
     L += _coverage_md({"before": b["coverage"], "after": a["coverage"]})
     L += ["## Coverage movement by reason", "", "Blocks: points carrying the reason. Alone: points whose only reason it is.", ""]
     for name, title in (("all", "All points"), (SCOPE_IN, "In scope"), (SCOPE_OUT, "Out of scope (AMD, TPU)")):
@@ -481,7 +506,7 @@ def pair_markdown(t: dict) -> str:
                      f"{m['before']['alone']} | {m['after']['alone']} | {m['delta_alone']:+d} |")
         L.append("")
     L += ["## Attribution (points scored in both)", ""]
-    for key in ("model", "hardware", "precision", "spec", "framework"):
+    for key in ("model", "hardware", "precision", "spec", "framework", "serving"):
         L += [f"**By {key}**", "", "| Value | Points | TTFT MAPE % before | after | TPOT MAPE % before | after |", "|---|---|---|---|---|---|"]
         for k, ab in both["attribution"]["before"][key].items():
             aa = both["attribution"]["after"][key][k]
