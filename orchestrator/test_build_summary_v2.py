@@ -130,8 +130,8 @@ def test_coverage_splits_by_engine_release_chip_and_grade_and_balances():
 
 def test_the_backlog_top_ranks_the_reasons_points_are_not_g1():
     top = _build()["backlog"]["top"]
-    # All nine graded points name the four conditions that are not graded yet, so those rank first.
-    assert top[:4] == [{"reason": f"{k}: not checked", "points": 9}
+    # All nine graded points name the four conditions that are unevaluated, so those rank first.
+    assert top[:4] == [{"reason": f"{k}: unevaluated", "points": 9}
                        for k in ("coefficient_range", "kernel_hash", "resolved_differs", "value_class")]
     assert top[4] == {"reason": "client_difference: send_gap", "points": 3}
     assert {"reason": "G5 not_in_catalog: eagle3", "points": 2} in top and len(top) == 10

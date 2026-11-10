@@ -743,7 +743,7 @@ APPROX = {"kind": "estimated", "subject": "quantization", "detail": "left unset"
 DEFAULTED = {"kind": "estimated", "subject": "max_num_seqs", "detail": "not recorded; left unset"}
 
 
-UNCHECKED = [{"kind": k, "subject": "not checked", "detail": f"{k} is not graded yet"}
+UNCHECKED = [{"kind": k, "subject": "unevaluated", "detail": f"{k} is unevaluated"}
              for k in ("coefficient_range", "kernel_hash", "resolved_differs", "value_class")]
 
 
@@ -764,9 +764,9 @@ def test_every_estimate_and_client_difference_is_named_and_makes_the_point_g2():
     o = _graded(subs=[APPROX, DEFAULTED], requests={"differences": [gap]})
     assert o.fidelity["grade"] == "G2"
     assert [(s["kind"], s["subject"]) for s in o.fidelity["substitutions"]] == [
-        ("client_difference", "send_gap"), ("coefficient_range", "not checked"), ("estimated", "max_num_seqs"),
-        ("estimated", "quantization"), ("kernel_hash", "not checked"), ("resolved_differs", "not checked"),
-        ("value_class", "not checked")]
+        ("client_difference", "send_gap"), ("coefficient_range", "unevaluated"), ("estimated", "max_num_seqs"),
+        ("estimated", "quantization"), ("kernel_hash", "unevaluated"), ("resolved_differs", "unevaluated"),
+        ("value_class", "unevaluated")]
     assert next(s for s in o.fidelity["substitutions"] if s["subject"] == "quantization")["detail"] == "left unset"
 
 
