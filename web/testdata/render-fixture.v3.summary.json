@@ -240,19 +240,19 @@
   "backlog": {
     "top": [
       {
-        "reason": "coefficient_range: not checked",
+        "reason": "coefficient_range: unevaluated",
         "points": 9
       },
       {
-        "reason": "kernel_hash: not checked",
+        "reason": "kernel_hash: unevaluated",
         "points": 9
       },
       {
-        "reason": "resolved_differs: not checked",
+        "reason": "resolved_differs: unevaluated",
         "points": 9
       },
       {
-        "reason": "value_class: not checked",
+        "reason": "value_class: unevaluated",
         "points": 9
       },
       {
@@ -584,24 +584,24 @@
                             "subject": "send_gap"
                           },
                           {
-                            "detail": "coefficient_range is not graded yet",
+                            "detail": "coefficient_range is unevaluated",
                             "kind": "coefficient_range",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "kernel_hash is not graded yet",
+                            "detail": "kernel_hash is unevaluated",
                             "kind": "kernel_hash",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "resolved_differs is not graded yet",
+                            "detail": "resolved_differs is unevaluated",
                             "kind": "resolved_differs",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "value_class is not graded yet",
+                            "detail": "value_class is unevaluated",
                             "kind": "value_class",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           }
                         ]
                       }
@@ -713,24 +713,24 @@
                             "subject": "send_gap"
                           },
                           {
-                            "detail": "coefficient_range is not graded yet",
+                            "detail": "coefficient_range is unevaluated",
                             "kind": "coefficient_range",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "kernel_hash is not graded yet",
+                            "detail": "kernel_hash is unevaluated",
                             "kind": "kernel_hash",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "resolved_differs is not graded yet",
+                            "detail": "resolved_differs is unevaluated",
                             "kind": "resolved_differs",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "value_class is not graded yet",
+                            "detail": "value_class is unevaluated",
                             "kind": "value_class",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           }
                         ]
                       }
@@ -842,24 +842,24 @@
                             "subject": "send_gap"
                           },
                           {
-                            "detail": "coefficient_range is not graded yet",
+                            "detail": "coefficient_range is unevaluated",
                             "kind": "coefficient_range",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "kernel_hash is not graded yet",
+                            "detail": "kernel_hash is unevaluated",
                             "kind": "kernel_hash",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "resolved_differs is not graded yet",
+                            "detail": "resolved_differs is unevaluated",
                             "kind": "resolved_differs",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "value_class is not graded yet",
+                            "detail": "value_class is unevaluated",
                             "kind": "value_class",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           }
                         ]
                       }
@@ -1181,9 +1181,9 @@
                         },
                         "substitutions": [
                           {
-                            "detail": "coefficient_range is not graded yet",
+                            "detail": "coefficient_range is unevaluated",
                             "kind": "coefficient_range",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
                             "detail": "left unset; the engine resolves the upstream default",
@@ -1196,9 +1196,9 @@
                             "subject": "attention_config.indexer_sparse_logits"
                           },
                           {
-                            "detail": "kernel_hash is not graded yet",
+                            "detail": "kernel_hash is unevaluated",
                             "kind": "kernel_hash",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
                             "detail": "vllm/vllm-openai:nightly-dev-x86_64-cu130-ac9126e58aa7 (banner 0.30.1rc1.dev493+gac9126e58)",
@@ -1206,14 +1206,14 @@
                             "subject": "engine build"
                           },
                           {
-                            "detail": "resolved_differs is not graded yet",
+                            "detail": "resolved_differs is unevaluated",
                             "kind": "resolved_differs",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "value_class is not graded yet",
+                            "detail": "value_class is unevaluated",
                             "kind": "value_class",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           }
                         ]
                       }
@@ -1413,24 +1413,24 @@
                         },
                         "substitutions": [
                           {
-                            "detail": "coefficient_range is not graded yet",
+                            "detail": "coefficient_range is unevaluated",
                             "kind": "coefficient_range",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "kernel_hash is not graded yet",
+                            "detail": "kernel_hash is unevaluated",
                             "kind": "kernel_hash",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "resolved_differs is not graded yet",
+                            "detail": "resolved_differs is unevaluated",
                             "kind": "resolved_differs",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "value_class is not graded yet",
+                            "detail": "value_class is unevaluated",
                             "kind": "value_class",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           }
                         ]
                       }
@@ -1541,24 +1541,24 @@
                         },
                         "substitutions": [
                           {
-                            "detail": "coefficient_range is not graded yet",
+                            "detail": "coefficient_range is unevaluated",
                             "kind": "coefficient_range",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "kernel_hash is not graded yet",
+                            "detail": "kernel_hash is unevaluated",
                             "kind": "kernel_hash",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "resolved_differs is not graded yet",
+                            "detail": "resolved_differs is unevaluated",
                             "kind": "resolved_differs",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "value_class is not graded yet",
+                            "detail": "value_class is unevaluated",
                             "kind": "value_class",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           }
                         ]
                       }
@@ -1669,24 +1669,24 @@
                         },
                         "substitutions": [
                           {
-                            "detail": "coefficient_range is not graded yet",
+                            "detail": "coefficient_range is unevaluated",
                             "kind": "coefficient_range",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "kernel_hash is not graded yet",
+                            "detail": "kernel_hash is unevaluated",
                             "kind": "kernel_hash",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "resolved_differs is not graded yet",
+                            "detail": "resolved_differs is unevaluated",
                             "kind": "resolved_differs",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "value_class is not graded yet",
+                            "detail": "value_class is unevaluated",
                             "kind": "value_class",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           }
                         ]
                       }
@@ -1837,9 +1837,9 @@
                         },
                         "substitutions": [
                           {
-                            "detail": "coefficient_range is not graded yet",
+                            "detail": "coefficient_range is unevaluated",
                             "kind": "coefficient_range",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
                             "detail": "not recorded; left unset, so the engine resolves the upstream default",
@@ -1847,9 +1847,9 @@
                             "subject": "max_num_seqs"
                           },
                           {
-                            "detail": "kernel_hash is not graded yet",
+                            "detail": "kernel_hash is unevaluated",
                             "kind": "kernel_hash",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
                             "detail": "0.25.0, scored on 0.31.0",
@@ -1862,14 +1862,14 @@
                             "subject": "engine release"
                           },
                           {
-                            "detail": "resolved_differs is not graded yet",
+                            "detail": "resolved_differs is unevaluated",
                             "kind": "resolved_differs",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "value_class is not graded yet",
+                            "detail": "value_class is unevaluated",
                             "kind": "value_class",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           }
                         ]
                       }
@@ -2139,14 +2139,14 @@
                         },
                         "substitutions": [
                           {
-                            "detail": "coefficient_range is not graded yet",
+                            "detail": "coefficient_range is unevaluated",
                             "kind": "coefficient_range",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "kernel_hash is not graded yet",
+                            "detail": "kernel_hash is unevaluated",
                             "kind": "kernel_hash",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
                             "detail": "vllm/vllm-openai:vllm-minimax-m3-perf-x86_64-13.0.1-8b00f41 (banner 0.30.0rc2.dev44+g8b00f4123)",
@@ -2154,14 +2154,14 @@
                             "subject": "engine build"
                           },
                           {
-                            "detail": "resolved_differs is not graded yet",
+                            "detail": "resolved_differs is unevaluated",
                             "kind": "resolved_differs",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           },
                           {
-                            "detail": "value_class is not graded yet",
+                            "detail": "value_class is unevaluated",
                             "kind": "value_class",
-                            "subject": "not checked"
+                            "subject": "unevaluated"
                           }
                         ]
                       }

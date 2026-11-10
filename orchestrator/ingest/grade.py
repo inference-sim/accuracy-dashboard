@@ -61,7 +61,7 @@ G2_KINDS = ("coefficient_method", "coefficient_range", "execution_mode", "kernel
 # class, and the resolved values the engine would choose. Each is named on every scored point as
 # a G2 substitution of its own kind, so no G1 and no G3 is published for a condition nobody
 # graded. A kind leaves this table when its condition is graded from data.
-NOT_CHECKED_SUBJECT = "not checked"
+NOT_CHECKED_SUBJECT = "unevaluated"
 UNCHECKED_KINDS = ("coefficient_range", "kernel_hash", "resolved_differs", "value_class")
 G34_KINDS = ("other_release", "changed_functions", "nightly_or_custom", "ported_functions_unpublished")
 
@@ -109,8 +109,8 @@ class Graded:
 
 
 def unchecked() -> list[dict]:
-    """The substitutions naming the G1 conditions that are not graded yet (UNCHECKED_KINDS)."""
-    return [{"kind": k, "subject": NOT_CHECKED_SUBJECT, "detail": f"{k} is not graded yet"}
+    """The substitutions naming the G1 conditions that are unevaluated (UNCHECKED_KINDS)."""
+    return [{"kind": k, "subject": NOT_CHECKED_SUBJECT, "detail": f"{k} is unevaluated"}
             for k in UNCHECKED_KINDS]
 
 
