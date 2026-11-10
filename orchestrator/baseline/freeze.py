@@ -48,17 +48,23 @@ def units_of(state: dict, legacy: dict) -> tuple[list[str], dict]:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--snapshot-state", required=True)
-    ap.add_argument("--legacy-map", required=True)
+    ap.add_argument("--snapshot-state")
+    ap.add_argument("--legacy-map")
+    ap.add_argument("--units-file", help="freeze these ledger units (one per line) instead of a snapshot's")
     ap.add_argument("--ledger", required=True)
     ap.add_argument("--today", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--cache", required=True)
     ap.add_argument("--download-workers", type=int, default=4)
     a = ap.parse_args(argv)
-    state = json.loads(Path(a.snapshot_state).read_text())
-    legacy = json.loads(Path(a.legacy_map).read_text())
-    units, no_unit = units_of(state, legacy)
+    if a.units_file:
+        units = sorted(x.strip() for x in Path(a.units_file).read_text().split() if x.strip())
+        state, no_unit = {"snapshot_id": None, "point_ids": []}, {}
+    elif a.snapshot_state and a.legacy_map:
+        state = json.loads(Path(a.snapshot_state).read_text())
+        units, no_unit = units_of(state, json.loads(Path(a.legacy_map).read_text()))
+    else:
+        ap.error("name --units-file, or --snapshot-state with --legacy-map")
     lg = ldg.load(Path(a.ledger))
     real_pull = api.pull
     drift = {"snapshot_id": state["snapshot_id"], "snapshot_points": len(state["point_ids"]),
