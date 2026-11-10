@@ -99,7 +99,7 @@ def test_the_scenario_the_generator_writes_is_one_the_simulator_validates_and_ru
            "framework": "vllm", "precision": "fp4", "serving": "aggregated", "spec_method": "none",
            "parallelism": {"tp_size": 2, "pp_size": 1, "attention_dp_size": 1, "moe_ep_size": 1, "moe_tp_size": 2},
            "stated_config": {"max_model_len": 32768, "block_size": 16}, "workload": "0:0", "gpus_per_node": 8}
-    text = g.emit(dep, {"0:0"}, {"agentx"}, {"gpus_per_node": None, "gpus_per_rack": None}, release)
+    text = g.emit(dep, {"agentx"}, {"gpus_per_node": None, "gpus_per_rack": None}, release)
     path = tmp_path / dep["scenario"]
     path.write_text(text)
     v = subprocess.run([blis, "schema", "validate", "scenario", str(path)], capture_output=True, text=True)
