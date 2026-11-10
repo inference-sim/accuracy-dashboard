@@ -2,7 +2,7 @@
 
 IN-SAMPLE: the points are the ones the model was calibrated on or tuned against; there is no anchor list yet, so no point is held out. These figures say how well the simulator reproduces data it has seen, not how well it predicts new data.
 
-- harness commit `9d32d8e328b37891fdb6de73a0fdc62714cc5eb3`
+- harness commit `41fec06cea6d7a28706e0e6039d559ac732c32c4`
 - units sha256 `d89f860a46c0470a22543dc7fb77b8d1b10e508ce4f5ef5073e96f359f08597e` (1740 units)
 - pull manifest sha256 `6b37908b08dfbb51af35977dbbd0afd2f764ea564443022a07858b186630a816`
 - point set sha256 `6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60` (1734 points)
@@ -67,6 +67,7 @@ Blocks: in-scope points held at G5 by the blocker. Alone: points that would be s
 | field_not_modelled:moe_backend | 56 | 0 |
 | field_not_in_release:env.VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8 | 37 | 0 |
 | field_not_in_release:env.VLLM_MXFP4_USE_MARLIN | 35 | 0 |
+| not_in_catalog:mtp | 35 | 0 |
 | value_not_recorded:no_recipe_fingerprint | 25 | 0 |
 | not_in_catalog | 23 | 0 |
 | field_not_modelled:enable_chunked_prefill | 20 | 0 |
@@ -106,6 +107,7 @@ Blocks: in-scope points held at G5 by the blocker. Alone: points that would be s
 | `field_not_modelled:api_server_count` | 171 | 0 | 0 |
 | `field_not_modelled:quantization` | 127 | 0 | 0 |
 | `field_not_modelled:linear_backend` | 90 | 0 | 0 |
+| `not_in_catalog:mtp` | 76 | 0 | 0 |
 | `field_not_modelled:mm_encoder_tp_mode` | 65 | 0 | 0 |
 | `field_not_in_release:env.VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8` | 37 | 0 | 0 |
 | `field_not_in_release:env.VLLM_MXFP4_USE_MARLIN` | 35 | 0 | 0 |
