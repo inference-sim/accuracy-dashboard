@@ -71,6 +71,34 @@ def test_the_reproducing_page_states_the_committed_baselines_hashes():
     assert str(table["identity"]["points"]) in text
 
 
+def test_every_harness_commit_a_run_page_states_is_the_one_its_contract_records():
+    """G11. The README and table of a committed run name the harness commit that scored it; the
+    machine record is its contract/provenance.json."""
+    for run in sorted((DOCS / "m2").iterdir()):
+        prov_path = run / "contract" / "provenance.json"
+        if not prov_path.exists():
+            continue
+        commit = json.loads(prov_path.read_text())["harness_commit"]
+        for name in ("README.md", "table.md", "table.json", "preliminary-after-run.md"):
+            path = run / name
+            if not path.exists():
+                continue
+            text = path.read_text()
+            stated = set(re.findall(r'"harness_commit": "([0-9a-f]{40})"', text))
+            for line in text.splitlines():
+                if re.search(r"harness commit|^\| Harness \|", line, re.I):
+                    stated |= set(re.findall(r"`([0-9a-f]{7,40})`", line))
+            assert all(commit.startswith(s) for s in stated), (path, stated, commit)
+
+
+def test_the_series_classes_page_does_not_call_a_fetched_label_unfetched():
+    """dynamo-vllm's engine is vLLM, so engines.scored() fetches it; only its router makes it G5."""
+    text = (DOCS / "m2" / "series-classes.md").read_text()
+    for line in text.splitlines():
+        if line.startswith("| dynamo-vllm |") or line.startswith("| vllm"):
+            assert "(no fetch)" not in line, line
+
+
 def test_the_evaluation_protocol_states_the_constants_and_the_split_sizes():
     sys.path.insert(0, str(HERE))
     import split as sp

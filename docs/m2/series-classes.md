@@ -9,7 +9,7 @@ Measured on 2026-11-10 from the live API: `/api/v1/availability` (7185 series, 2
 | vllm | agg | single_turn | 2393 | 1696 | 555 | 9 | 1687 | 31 | 1656 | fetched; scored by the harness |
 | sglang | agg | single_turn | 2037 | 994 | 361 | 144 | 850 | 0 | 0 | G5 field_unclassified (no fetch) |
 | sglang | agg | agentic_traces | 207 | 739 | 195 | 624 | 115 | 0 | 0 | G5 field_unclassified (no fetch) |
-| dynamo-vllm | disagg | single_turn | 68 | 496 | 0 | 0 | 496 | 0 | 0 | G5 router_unsupported (no fetch) |
+| dynamo-vllm | disagg | single_turn | 68 | 496 | 0 | 0 | 496 | 0 | 0 | fetched; G5 router_unsupported at scoring; else disaggregated: topology reasons, else topology_unsupported |
 | vllm | agg | agentic_traces | 158 | 367 | 120 | 314 | 47 | 0 | 47 | fetched; scored by the harness |
 | dynamo-sglang | disagg | single_turn | 230 | 318 | 0 | 53 | 265 | 0 | 0 | G5 router_unsupported, field_unclassified (no fetch) |
 | trt | agg | single_turn | 1338 | 315 | 0 | 12 | 303 | 0 | 0 | G5 engine_unsupported (no fetch) |
@@ -20,8 +20,8 @@ Measured on 2026-11-10 from the live API: `/api/v1/availability` (7185 series, 2
 | dynamo-sglang | disagg | agentic_traces | 53 | 100 | 0 | 95 | 5 | 0 | 0 | G5 router_unsupported, field_unclassified (no fetch) |
 | atom | agg | agentic_traces | 31 | 72 | 72 | 72 | 0 | 0 | 0 | G5 engine_unsupported (no fetch) |
 | vllm-disagg | disagg | single_turn | 14 | 68 | 68 | 0 | 68 | 0 | 0 | fetched; disaggregated: topology reasons, else topology_unsupported |
-| dynamo-vllm | disagg | agentic_traces | 29 | 60 | 0 | 54 | 6 | 0 | 0 | G5 router_unsupported (no fetch) |
-| dynamo-vllm | agg | agentic_traces | 47 | 56 | 0 | 56 | 0 | 0 | 0 | G5 router_unsupported (no fetch) |
+| dynamo-vllm | disagg | agentic_traces | 29 | 60 | 0 | 54 | 6 | 0 | 0 | fetched; G5 router_unsupported at scoring; else disaggregated: topology reasons, else topology_unsupported |
+| dynamo-vllm | agg | agentic_traces | 47 | 56 | 0 | 56 | 0 | 0 | 0 | fetched; G5 router_unsupported at scoring; else scored by the harness |
 | mooncake-atom | disagg | single_turn | 9 | 54 | 54 | 0 | 54 | 0 | 0 | G5 engine_unsupported (no fetch) |
 | dynamo-trt | disagg | agentic_traces | 10 | 42 | 0 | 36 | 6 | 0 | 0 | G5 router_unsupported, engine_unsupported (no fetch) |
 | trt | agg | agentic_traces | 7 | 29 | 0 | 7 | 22 | 0 | 0 | G5 engine_unsupported (no fetch) |
@@ -72,13 +72,13 @@ The 65 multinode `vllm` rows are the 65 points the published snapshot lists as `
 
 **(e) Newer data and builds.** The nightly pulls rows by `date` (the run's date), not `curve_date`, in a 180-day window ending today (`api.in_window`); it places each row through the ledger. A row newer than the ledger's source revision has no unit, is listed as `unlisted` and counted in `left_out_records` (1643 in the baseline's pull, 1720 today). So new measurements are not scored until a ledger release holds them. New rows that the ledger holds are picked up automatically. The 45 rows dated 2026-11-10 (38 when first checked) are all past the ledger revision. Builds: 1035 of the baseline's 1734 points run a nightly or custom image (599 outside the commit-distance bound with a banner, 456 labelled by tag, 291 custom, 35 with a commit that does not resolve); they are G4 `nightly_or_custom` once scored, not lost. `build_unparseable` and `code_not_visible` are in design §11.4's list but the scorer emits neither today, so no share is lost to them.
 
-**(f) Fixes for the other reasons.** From the baseline's 1714 G5 points (546 AMD, out of scope):
+**(f) Fixes for the other reasons.** From the committed baseline's 1683 `not_scored` points (546 AMD, out of scope, leaving 1137; 10 more points failed and 41 were scored). Counts are of in-scope points carrying the reason, with the others it may sit beside:
 
-- `value_not_recorded:cluster.gpus_per_node` (858 points in the first baseline, 645 after the stability rule was relaxed to "the same size in every recorded version"): b200 (406) and h200 (239) stay unstable because a record has runners outside every cluster and, for b200, the label is absent from the newest runners file. Fixing the table needs InferenceX's `runners.yaml` to cover those runners; 20 points are blocked by this alone.
-- `field_not_modelled:*` (723 primary): blis-vllm models the field, or gives it a rule. The largest: `max_cudagraph_capture_size` 996 points, `stream_interval` 771, `kv_cache_dtype` 752, `language_model_only` 607, `enable_expert_parallel` 422, `api_server_count` 131.
-- `not_in_catalog` (82 primary, 561 with others): `eagle3` drafter (296 in scope), `dspark` (5), models.
-- `server_log_missing` and `artifact_unmatched` (here `value_not_recorded`, 35 plus 25 `no_recipe_fingerprint`): the run's record is not in the API; nothing in the harness fixes it.
-- `value_conflict:kv_transfer_config.engine_id` (1): two sources disagree.
+- `value_not_recorded:cluster.gpus_per_node`: no point in the committed baseline carries it. The 858 and 645 that earlier versions of this page gave come from the field gate's dry runs (`dry-run-field-gate.md`, `gate-real-fields.md`), which ran on a later fields file and a later runner table than the baseline; the node-size question they raised is in `node-size-b200-h200.md`.
+- `field_not_modelled:*` (1022 as the first reason of a point, 1101 in all): blis-vllm models the field, or gives it a rule. The largest: `max_cudagraph_capture_size` 996 points, `stream_interval` 771, `kv_cache_dtype` 752, `language_model_only` 607, `enable_expert_parallel` 422, `api_server_count` 131.
+- `not_in_catalog`: the `eagle3` drafter, 296 in-scope points; none is first.
+- `server_log_missing` and `artifact_unmatched` (here `value_not_recorded`: 35 without a subject, 25 `no_recipe_fingerprint`, 7 `cpu_bytes_to_use`): the run's record is not in the API; nothing in the harness fixes it.
+- `value_conflict:model` (23): the log serves a local NVFP4 path of DeepSeek-V4-Pro, the recipe names `deepseek-ai/DeepSeek-V4-Pro`; two sources disagree.
 - `unclassified_arg`, `setting_not_modelled`, `hardware_no_coefficients` and the other schema-2 names no longer exist: the v3 scorer reports `field_not_modelled`, `field_not_in_release`, `not_in_catalog` and `value_not_recorded`.
 
 ## Proposed scope

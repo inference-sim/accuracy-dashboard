@@ -52,6 +52,18 @@ LOG = (
     "INFO [kv_cache_utils.py:1] GPU KV cache size: 100,000 tokens\n"
     '"POST /v1/completions HTTP/1.1" 200\n')
 
+# Two periodic spec-decode lines of vLLM's metrics logger, and an idle one that drafted nothing.
+SPEC_LINES = (
+    "(APIServer pid=1) INFO 07-05 02:05:14 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 2.00, "
+    "Accepted throughput: 10.00 tokens/s, Drafted throughput: 20.00 tokens/s, Accepted: 50 tokens, "
+    "Drafted: 100 tokens, Per-position acceptance rate: 0.500\n"
+    "(APIServer pid=1) INFO 07-05 02:05:24 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 3.00, "
+    "Accepted throughput: 30.00 tokens/s, Drafted throughput: 30.00 tokens/s, Accepted: 300 tokens, "
+    "Drafted: 300 tokens, Per-position acceptance rate: 1.000\n"
+    "(APIServer pid=1) INFO 07-05 02:05:34 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 1.00, "
+    "Accepted throughput: 0.00 tokens/s, Drafted throughput: 0.00 tokens/s, Accepted: 0 tokens, "
+    "Drafted: 0 tokens, Per-position acceptance rate: 0.000\n")
+
 # The fake blis. `schema validate result FILE` exits VALIDATE. `replay` records its argv and
 # working directory beside itself, then prints a Result. For a single-turn trace (--trace-data)
 # it writes one request row per trace record: a round-0 record is "request_<request_id>", a
@@ -322,7 +334,7 @@ def test_a_drafter_with_no_recorded_acceptance_is_replayed_with_the_profile_and_
     # substrate's profile, and the point names the profile as an estimate.
     tmp = Path(tempfile.mkdtemp())
     try:
-        log = LOG.replace(", 'synthetic_acceptance_length': 2.4", "")
+        log = LOG.replace(", 'synthetic_acceptance_length': 2.4", "") + SPEC_LINES
         entry, env = _setup(tmp, log=log)
         env.blis = _fake_blis(tmp, workload_properties=[
             {"name": "speculative_acceptance", "values": {"acceptance_length": 3.1}, "source": "profile",
@@ -332,12 +344,19 @@ def test_a_drafter_with_no_recorded_acceptance_is_replayed_with_the_profile_and_
         scen = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
         assert "acceptance" not in scen.replace("rejection_sample_method", "")
         sub = next(s for s in o.fidelity["substitutions"] if s["subject"] == "speculative_config.acceptance_length")
+        # The run's own realised acceptance is named beside the profile: (2.0 x 100 + 3.0 x 300) / 400.
         assert sub == {"kind": "estimated", "subject": "speculative_config.acceptance_length",
-                       "detail": "profile mtp/deepseek from the registry"}
+                       "detail": "profile mtp/deepseek from the registry; the server log reports mean acceptance "
+                                 "length 2.75 over 2 interval(s), 400 drafted tokens"}
+        assert o.fidelity["acceptance"] == {"realised": {"mean_acceptance_length": 2.75, "log_lines": 2,
+                                                         "drafted_tokens": 400}, "simulated": "profile"}
+        assert c.validate_dir(tmp / "c1") == []
         env.blis = _fake_blis(tmp)
         o, _ = _score(tmp, entry, env, tmp / "c2")
         assert [s["detail"] for s in o.fidelity["substitutions"]
-                if s["subject"] == "speculative_config.acceptance_length"] == ["profile not reported"]
+                if s["subject"] == "speculative_config.acceptance_length"] == \
+            ["profile not reported; the server log reports mean acceptance length 2.75 over 2 interval(s), "
+             "400 drafted tokens"]
         # A recorded acceptance is passed, pinned, and names no substitution.
         tmp2 = Path(tempfile.mkdtemp())
         try:

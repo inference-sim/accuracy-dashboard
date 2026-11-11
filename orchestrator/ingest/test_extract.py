@@ -591,6 +591,16 @@ def test_the_cap_and_warmup_are_not_invented_when_the_export_lacks_them():
     assert "trace_idle_gap_cap_s" not in r.record("a" * 64)
 
 
+def test_the_realised_acceptance_is_the_drafted_token_weighted_mean_of_the_logged_lengths():
+    import settings as st
+    line = ("INFO [metrics.py:120] SpecDecoding metrics: Mean acceptance length: {al}, Accepted throughput: 1 tokens/s, "
+            "Drafted throughput: 1 tokens/s, Accepted: {a} tokens, Drafted: {d} tokens, Per-position acceptance rate: 0.5\n")
+    log = line.format(al="1.50", a=50, d=100) + line.format(al="2.50", a=300, d=300) + line.format(al="1.00", a=0, d=0)
+    assert st.realised_acceptance(log) == {"mean_acceptance_length": 2.25, "log_lines": 2, "drafted_tokens": 400}
+    assert st.realised_acceptance("INFO nothing about speculation\n") is None
+    assert st.realised_acceptance(line.format(al="1.00", a=0, d=0)) is None
+
+
 def test_a_non_positive_or_fractional_cap_or_warmup_refuses_the_point():
     r = rp.from_export(_export(phase={"warmup_requests_per_lane": 2.5}))
     assert "client_scenario_not_replayable:warmup_requests_per_lane" in r.reasons

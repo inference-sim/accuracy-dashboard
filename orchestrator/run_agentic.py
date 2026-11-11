@@ -28,6 +28,13 @@ CSV, so `build_summary.py` scores it with no new scoring code:
                      output, validated (orchestrator/ingest/result.py); its metrics
                      ttft_mean_ms / tpot_mean_ms (the PREDICTED side, DEV-8).
 
+LEGACY. The scored pipeline is ingest/score.py with ingest/replay.py, which reads every replay
+input from the run's own aiperf export and passes it: the seed, the duration, the 300 s
+per-trajectory idle cap (trace_idle_gap_cap_s), the per-lane warm-up (warmup requests per
+lane), the trajectory window, the grace period and the corpus filter. This driver passes none
+of the last four, so its numbers are not comparable with the scored points'. BLIS can state
+the cap and the warm-up (inference-sim #1971, closed); this driver has not been updated to.
+
 A row with a refusal (unsupported model/hardware, or a speculative run with no stated
 synthetic acceptance) is emitted as NOT scored, never run with a guessed value.
 

@@ -1,6 +1,6 @@
 # GPUs per node for b200 and h200: what the records say and what the design permits
 
-Read from `orchestrator/ingest/inferencex_runners.json` (InferenceX `runners.yaml` at four commits) and the baseline's 645 points blocked by `value_not_recorded:cluster.gpus_per_node`. Nothing was changed.
+Read from `orchestrator/ingest/inferencex_runners.json` (InferenceX `runners.yaml` at four commits) and the 645 points the field gate's dry run found blocked by `value_not_recorded:cluster.gpus_per_node` (`gate-real-fields.md`; the committed baseline has none). Nothing was changed.
 
 ## The records
 

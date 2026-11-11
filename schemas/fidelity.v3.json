@@ -38,6 +38,53 @@
     "requests": {
       "$ref": "#/definitions/requests"
     },
+    "acceptance": {
+      "description": "Speculative deployments only: the mean acceptance length the run's server logged (realised; null when its log has none) beside what the simulation used. The log covers the server's whole life, so the figure rests on log_lines intervals and drafted_tokens drafts.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "realised",
+        "simulated"
+      ],
+      "properties": {
+        "realised": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "mean_acceptance_length",
+            "log_lines",
+            "drafted_tokens"
+          ],
+          "properties": {
+            "mean_acceptance_length": {
+              "type": "number",
+              "minimum": 1
+            },
+            "log_lines": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "drafted_tokens": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "simulated": {
+          "description": "recorded: the run's own synthetic acceptance length was pinned in the scenario. profile: the registry profile BLIS resolved (a named estimated substitution).",
+          "enum": [
+            "recorded",
+            "profile"
+          ]
+        },
+        "simulated_length": {
+          "type": "number"
+        }
+      }
+    },
     "blis_kernel_provenance": {
       "description": "The kernel's own report from BLIS's Result (reports.kernel), verbatim, or null when the Result has none. Informational only.",
       "type": [
@@ -511,7 +558,7 @@
           ]
         },
         "copies": {
-          "description": "The warm-up copies of request 0 replayed before the main phase: the deployment's dp width when primed, 0 when cold.",
+          "description": "The warm-up copies of request 0 replayed before the main phase: the client's own warm-up, 2 x concurrency, when primed; 0 when cold.",
           "type": "integer",
           "minimum": 0
         },

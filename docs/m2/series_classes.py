@@ -32,6 +32,11 @@ def treatment(label: str, disagg: bool) -> str:
         reasons.append("engine_unsupported")
     elif fw.engine == engines.SGLANG:
         reasons.append("field_unclassified")
+    if engines.scored(fw):
+        # The engine is vLLM, so the artifacts are fetched and the point is scored by the harness;
+        # a router the harness does not model makes it G5 when it is scored (pull.py).
+        what = "disaggregated: topology reasons, else topology_unsupported" if disagg else "scored by the harness"
+        return "fetched; " + (f"G5 {', '.join(reasons)} at scoring; else " if reasons else "") + what
     if reasons:
         return "G5 " + ", ".join(reasons) + " (no fetch)"
     return "fetched; " + ("disaggregated: topology reasons, else topology_unsupported" if disagg else "scored by the harness")

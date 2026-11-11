@@ -264,8 +264,9 @@ def primed_phase(input_lens: list[int], output_lens: list[int], conc: int, copie
     session's pool slot. Main request 0 is in the same prefix group, so its prompt is the
     copy's token for token. Every main request arrives at PRIME_MAIN_START_US. The pool is
     conc + copies, so the first `conc` main requests start together, in order. `copies` is the
-    deployment's dp width: the router places by requests in flight, so each copy lands on its
-    own replica."""
+    client's own warm-up count, WARMUPS_PER_CONCURRENCY x conc: the client sends and drains
+    that many copies of request 0, whatever the deployment's data-parallel width (a data-parallel
+    deployment is one instance whose engine holds the balancer)."""
     _check_lengths(input_lens, output_lens, conc)
     if not isinstance(copies, int) or copies < 1:
         raise ValueError(f"copies {copies!r} is not a positive integer")
