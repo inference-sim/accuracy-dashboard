@@ -30,9 +30,11 @@ FACETS_JSON = "facets.json"
 FACET_KEYS = ("framework", "gpu", "identity", "model", "parallelism", "precision", "scenario", "serving",
               "spec_method", "sweep_id", "workload")
 NOT_SCORED_JSONL = "not_scored.jsonl"
+POINTRECORDS_JSONL = "pointrecords.jsonl"
 FAILED_JSONL = "failed.jsonl"
 PROVENANCE_JSON = "provenance.json"
-CONTRACT_FILES = (POINTS_CSV, FIDELITY_JSONL, FACETS_JSON, NOT_SCORED_JSONL, FAILED_JSONL, PROVENANCE_JSON)
+CONTRACT_FILES = (POINTS_CSV, FIDELITY_JSONL, FACETS_JSON, NOT_SCORED_JSONL, FAILED_JSONL, POINTRECORDS_JSONL,
+                  PROVENANCE_JSON)
 
 # The per-point CSV columns build_summary.py reads, with its tier column replaced by the point's
 # grade, then the two the contract adds.
@@ -378,6 +380,13 @@ def validate_dir(directory: str | Path) -> list[str]:
             problems.append(f"{NOT_SCORED_JSONL}:{n}: g5_reasons must be sorted by code, subject")
         if isinstance(rs, list) and ns.get("g5_reason") not in rs:
             problems.append(f"{NOT_SCORED_JSONL}:{n}: g5_reason is not one of its g5_reasons")
+    # ---- pointrecords.jsonl: the substrate's record (pointrecord.py), one per scored or G5 point, or none
+    # when no Result gave the run's data block. Its shape is the substrate validator's to check (test_pointrecord.py).
+    pr_lines = _read_jsonl(d / POINTRECORDS_JSONL, problems)
+    pr_ids = [str(x.get("point_id")) for _, x in pr_lines]
+    if pr_ids and (pr_ids != sorted(pr_ids) or set(pr_ids) != scored | {str(x.get("point_id")) for _, x in ns_lines}
+                   or len(pr_ids) != len(set(pr_ids))):
+        problems.append(f"{POINTRECORDS_JSONL}: not one sorted record per scored and per G5 point")
     failed_lines = records(FAILED_JSONL, failed_validator, "failed")
     for n, x in failed_lines:
         fs = x.get("faults")

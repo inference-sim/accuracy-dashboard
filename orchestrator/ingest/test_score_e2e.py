@@ -91,6 +91,9 @@ def arg(k): return a[a.index(k) + 1]
 counts = {{"generated": 0, "completed": 0, "timed_out": 0, "in_flight_at_horizon": 0,
           "queued_at_horizon": 0, "not_started": 0, "length_capped": 0}}
 doc = {{"kind": "Result", "schema_version": 2, "name": "fake", "requests": counts,
+       "data": {{"catalog": {{"source": "embedded", "hash": "a" * 64, "combined_hash": "a" * 64}},
+                "registry": {{"source": "embedded", "hash": "b" * 64, "combined_hash": "b" * 64}},
+                "released_data": True, "build": "v0.16.0"}},
        "metrics": {{"ttft_mean_ms": {{"value": 1500.0, "samples": 10}}, "tpot_mean_ms": {{"value": 4.5, "samples": 10}},
                    "itl_mean_ms": {{"value": 17.0, "samples": 10}}}},
        "reports": {{"engine": {{"cluster": {{"kv_capacity_tokens_per_replica": 100000}}}}, "kernel": {{"pool": "fake"}}}}}}

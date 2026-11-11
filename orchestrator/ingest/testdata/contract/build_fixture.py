@@ -312,6 +312,7 @@ def write_run(name: str, run: dict, base: Path) -> Path:
     fidelity.sort(key=lambda r: r["point_id"])
     (out / FIDELITY_JSONL).write_text("".join(canonical_dumps(r) + "\n" for r in fidelity))
     (out / FACETS_JSON).write_text(canonical_dumps(facets) + "\n")
+    (out / "pointrecords.jsonl").write_text("")      # the fixture's Results carry no data block
     for fname, recs in ((NOT_SCORED_JSONL, not_scored), (FAILED_JSONL, failed)):
         recs.sort(key=lambda r: r["point_id"])
         (out / fname).write_text("".join(canonical_dumps(r) + "\n" for r in recs))
