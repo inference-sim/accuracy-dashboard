@@ -236,9 +236,21 @@ def test_a_disaggregated_pointss_pools_are_compared_each_with_the_runs_value_for
 
 def test_a_setting_the_run_did_not_log_is_not_compared_and_no_resolutions_is_unevaluated():
     d = doc(resolutions=[{"setting": "expert_parallel_width", "engine": "8"}])
-    assert g1.resolved_value(d, {"block_size": 16}).evaluated and g1.resolved_value(d, {"block_size": 16}).subs == []
+    # Nothing the Result resolves was logged by the run: nothing was compared, so the condition is
+    # not evaluated (design 11.3: a condition the data cannot decide is never assumed to hold).
+    assert not g1.resolved_value(d, {"block_size": 16}).evaluated
+    assert not g1.resolved_value(d, {}).evaluated
+    two = doc(resolutions=[{"setting": "expert_parallel_width", "engine": "8"},
+                           {"setting": "block_size", "engine": "16"}])
+    assert g1.resolved_value(two, {"block_size": 16}).evaluated      # one setting compared is enough
     assert not g1.resolved_value(doc(), {"block_size": 16}).evaluated
     assert not g1.resolved_value(doc(resolutions=[]), {"block_size": 16}).evaluated
+
+
+def test_a_value_class_check_with_no_supplied_settings_is_unevaluated_and_an_empty_set_is_not():
+    f = field_list(NUMERIC)
+    assert not g1.value_class(None, f).evaluated
+    assert g1.value_class({}, f).evaluated
 
 
 # ---- the point

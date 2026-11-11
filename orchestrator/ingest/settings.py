@@ -682,10 +682,15 @@ def decide(settings: dict[str, Setting], field_list) -> Decided:
             continue    # None is "let the engine decide": nothing to copy
         if loc is None:
             f = field_list.lookup(path)
-            if st.requested and f is not None and f.status == fl.MODELLED and path not in ROLES:
+            if (st.requested or _stated_by_resolution(field_list, path)) and f is not None \
+                    and f.status == fl.MODELLED and path not in ROLES:
+                # The engine models it, so the scenario must state it, whether the run passed it or
+                # the engine only resolved it (design 11.2): a scenario with no place for it lost a setting.
                 d.reasons.append(f"setting_differs:{path}")
-            elif st.requested:
+            elif st.requested or _stated_by_resolution(field_list, path):
                 d.args.append({**rec, "blis": None, "match": "inert"})
+            else:
+                d.args.append({**rec, "blis": None, "match": "resolved_not_stated"})
             continue
         if not st.requested and not _stated_by_resolution(field_list, path):
             # The engine printed this value as its own resolution (a default, an architecture's

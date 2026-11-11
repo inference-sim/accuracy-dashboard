@@ -150,8 +150,10 @@ def value_class(requested: dict | None, field_list) -> Evaluation:
     """requested: path -> the value the run set, for the settings it set (not the engine's own
     resolution). A modelled or proven-inert field carries value classes (VLM-3)."""
     kind = "value_class"
+    if requested is None:
+        return _unevaluated(kind, "the run's set settings were not supplied")
     subs = []
-    for path, value in sorted((requested or {}).items()):
+    for path, value in sorted(requested.items()):
         f = field_list.lookup(path)
         if f is None or f.status not in (fl.MODELLED, fl.PROVEN_INERT):
             continue
@@ -209,16 +211,22 @@ def resolved_value(doc, resolved: dict | None, resolved_by_pool: dict | None = N
     if not isinstance(rs, list) or not rs:
         return _unevaluated(kind, "the Result records no engine resolution")
     subs = []
+    compared = 0
     for r in rs:
         pool = r.get("pool") or "colocated"
         values = resolved if pool == "colocated" else (resolved_by_pool or {}).get(pool)
         if values is None:
             continue
         have = run_value(r.get("setting"), values)
+        if have is not None:
+            compared += 1
         if have is not None and not _same(have, r.get("engine")):
             where = "" if pool == "colocated" else f" in the {pool} pool"
             subs.append({"kind": kind, "subject": r["setting"] if pool == "colocated" else f"{r['setting']} ({pool})",
                          "detail": f"the run resolved {have!r}{where}, the engine resolves {r.get('engine')!r}"})
+    if not compared:
+        # A condition the data cannot decide is never assumed to hold (design 11.3).
+        return _unevaluated(kind, "the run's log resolves none of the settings the Result records")
     return Evaluation(kind, True, sorted(subs, key=lambda s: s["subject"]))
 
 
