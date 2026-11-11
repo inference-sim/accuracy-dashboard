@@ -22,7 +22,7 @@ AMD parts (mi300x, mi325x, mi355x) and TPUs are out of scope for the M2 to M4 re
 
 ## The field-list gate
 
-The engine repository classifies every configuration field and environment variable its release reads (`fields.json`, design VLM-3). A field the run *set* (a value it passed, or a resolved value that is not the release's default) is looked up there:
+The engine repository classifies every configuration field and environment variable its release reads (`fields.json`, design VLM-3). A field the run *set* (a value it passed: the launch configuration or the arguments the log prints as passed) is looked up there. A value the engine only *resolved* (printed in the resolved configuration, a default or the engine's own choice for the architecture) is not a setting the run made; see "Resolved-only values" below:
 
 | Status | Effect on a point |
 |---|---|
@@ -33,6 +33,14 @@ The engine repository classifies every configuration field and environment varia
 | not listed | G5 `field_not_in_release` |
 
 A field with no place in the engine block cannot be `modelled`: the scorer would report that it lost a recorded value (`setting_differs`). The scorer holds no table of settings; the only table is the engine's `fields.json`, passed as `--fields`. `docs/m2/gate-real-fields.md` measures how many points pass the gate with blis-vllm's classification.
+
+## Resolved-only values (the "only what the run set" rule)
+
+The merged design (§11.2, State) says a field the run records only as resolved "is copied as resolved", for every field. The scorer does that for a field the engine models or proves inert. For any other field (not modelled, inert but unproven, or unknown to the release) it does not: the value is recorded on the point (a `resolved_not_stated` row in the fidelity `args`, with the value) and not stated in the scenario. The reason is the kernel's: it cannot tell a stated value from a resolved one, and refuses a stated value for a field it does not price. The case that mattered was `compilation_config.custom_ops`, which the engine fills with `all`, `none` or `+quant_fp8` by architecture and quantisation in every log; copied, it made the simulator refuse 434 points, 340 of which a dry run at the preliminary pins scored once it was left unstated (a dry run, not a committed result). A value the run *set* for such a field is unchanged: it is `field_not_modelled` (or takes the field's estimation rule). A modelled field resolved-only that the scenario has no place for is `setting_differs`, as for a value the run passed.
+
+**Pending.** This reads "is copied as resolved" more narrowly than the design as merged. The sentence that makes the design say so is in draft pull request [blis-design#3](https://github.com/inference-sim/blis-design/pull/3), which is open: *"This applies to a field the engine models or proves inert; for any other field the resolved value is the engine's own choice, not a setting the run made, so it is recorded on the point and not stated in the scenario, and the field's estimation rule applies only to a value the run passed."* Until it merges, this rule is the dashboard's reading, not the design's.
+
+**Not graded.** A `resolved_not_stated` value is not compared with what BLIS ran, and is not a G2 substitution: when `resolved_differs` is evaluated (G1), it compares the Result's engine resolutions, which are other fields. A resolved-only value that differs from what the engine would choose in BLIS therefore stays unnamed on the point. Naming it is a decision the design has not made.
 
 ## Estimation rules (design §11.2)
 

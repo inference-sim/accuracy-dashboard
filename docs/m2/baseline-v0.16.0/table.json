@@ -226,6 +226,12 @@
    "alone": 0,
    "blocks": 0,
    "demotes": 41,
+   "entry": "client_difference:failed_requests"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
    "entry": "client_difference:send_gap"
   },
   {
@@ -825,7 +831,7 @@
  "development_split": {
   "constants": {
    "freeze_date": "2026-11-09",
-   "salt": "blis-dev-split-1",
+   "salt": "blis-dev-split-2",
    "train_pct": 60,
    "validation_pct": 20
   },
@@ -835,45 +841,44 @@
     "withheld": true
    },
    "test": {
-    "points": 332,
+    "points": 446,
     "withheld": true
    },
    "train": {
     "accuracy": {
      "noise_floor_pct": 1.6,
      "noise_floor_source": "fallback; none measured per point",
-     "points": 26,
+     "points": 0,
      "tpot": {
       "mape": {
-       "n": 26,
-       "value": 21.297093702320517
+       "n": 0,
+       "value": "too few points"
       },
       "shape": {
-       "n": 21,
-       "value": 8.563206133570725
+       "n": 0,
+       "value": "too few points"
       }
      },
      "ttft": {
       "mape": {
-       "n": 26,
-       "value": 43.05984397497094
+       "n": 0,
+       "value": "too few points"
       },
       "shape": {
-       "n": 21,
-       "value": 23.967922740906097
+       "n": 0,
+       "value": "too few points"
       }
-     }
+     },
+     "withheld": 0
     },
     "grades": {
-     "G4": 26,
-     "G5": 1084,
-     "failed": 10
+     "G5": 956
     },
-    "in_scope": 792,
-    "points": 1120,
+    "in_scope": 626,
+    "points": 956,
     "ranking": {
      "throughput_per_gpu": {
-      "groups": 3,
+      "groups": 0,
       "kendall": "too few groups",
       "left_out": 0,
       "regret": "too few groups",
@@ -883,8 +888,8 @@
       "value": "throughput_per_gpu"
      }
     },
-    "scored": 26,
-    "series": 72
+    "scored": 0,
+    "series": 33
    },
    "unassigned": {
     "accuracy": {
@@ -910,7 +915,8 @@
        "n": 0,
        "value": "too few points"
       }
-     }
+     },
+     "withheld": 0
     },
     "grades": {},
     "in_scope": 0,
@@ -934,37 +940,38 @@
     "accuracy": {
      "noise_floor_pct": 1.6,
      "noise_floor_source": "fallback; none measured per point",
-     "points": 15,
+     "points": 11,
      "tpot": {
       "mape": {
-       "n": 15,
-       "value": 8.639267827199633
+       "n": 11,
+       "value": 58.02881797130001
       },
       "shape": {
-       "n": 12,
-       "value": 14.884194367022898
+       "n": 9,
+       "value": "too few points"
       }
      },
      "ttft": {
       "mape": {
-       "n": 15,
-       "value": 10.231162193774518
+       "n": 11,
+       "value": 47.10028557982242
       },
       "shape": {
-       "n": 12,
-       "value": 9.112935696373627
+       "n": 9,
+       "value": "too few points"
       }
-     }
+     },
+     "withheld": 0
     },
     "grades": {
-     "G4": 15,
-     "G5": 267
+     "G4": 11,
+     "G5": 321
     },
-    "in_scope": 196,
-    "points": 282,
+    "in_scope": 220,
+    "points": 332,
     "ranking": {
      "throughput_per_gpu": {
-      "groups": 2,
+      "groups": 1,
       "kendall": "too few groups",
       "left_out": 0,
       "regret": "too few groups",
@@ -974,8 +981,8 @@
       "value": "throughput_per_gpu"
      }
     },
-    "scored": 15,
-    "series": 21
+    "scored": 11,
+    "series": 9
    }
   },
   "test_evaluated": false,
@@ -1007,7 +1014,8 @@
       "n": 0,
       "value": "too few points"
      }
-    }
+    },
+    "withheld": 0
    },
    "points": 0,
    "share_of_all": "too few points",
@@ -1037,7 +1045,8 @@
       "n": 0,
       "value": "too few points"
      }
-    }
+    },
+    "withheld": 0
    },
    "points": 0,
    "share_of_all": "too few points",
@@ -1067,7 +1076,8 @@
       "n": 0,
       "value": "too few points"
      }
-    }
+    },
+    "withheld": 0
    },
    "points": 0,
    "share_of_all": "too few points",
@@ -1077,27 +1087,28 @@
    "accuracy": {
     "noise_floor_pct": 1.6,
     "noise_floor_source": "fallback; none measured per point",
-    "points": 41,
+    "points": 11,
     "tpot": {
      "mape": {
-      "n": 41,
-      "value": 16.666181796788486
+      "n": 11,
+      "value": 58.02881797130001
      },
      "shape": {
-      "n": 33,
-      "value": 10.861747309371514
+      "n": 9,
+      "value": "too few points"
      }
     },
     "ttft": {
      "mape": {
-      "n": 41,
-      "value": 31.04935064038688
+      "n": 11,
+      "value": 47.10028557982242
      },
      "shape": {
-      "n": 33,
-      "value": 18.56610927016702
+      "n": 9,
+      "value": "too few points"
      }
-    }
+    },
+    "withheld": 30
    },
    "points": 41,
    "share_of_all": 0.02364475201845444,
@@ -1115,30 +1126,31 @@
  "headline": {
   "noise_floor_pct": 1.6,
   "noise_floor_source": "fallback; none measured per point",
-  "points": 41,
+  "points": 11,
   "tpot": {
    "mape": {
-    "n": 41,
-    "value": 16.666181796788486
+    "n": 11,
+    "value": 58.02881797130001
    },
    "shape": {
-    "n": 33,
-    "value": 10.861747309371514
+    "n": 9,
+    "value": "too few points"
    }
   },
   "ttft": {
    "mape": {
-    "n": 41,
-    "value": 31.04935064038688
+    "n": 11,
+    "value": 47.10028557982242
    },
    "shape": {
-    "n": 33,
-    "value": 18.56610927016702
+    "n": 9,
+    "value": "too few points"
    }
-  }
+  },
+  "withheld": 30
  },
  "identity": {
-  "harness_commit": "10b2a36cb91d4c65dd9096d5f4689f3e80ec93b0",
+  "harness_commit": "a0e899b9c1f433ea99fee80d78ac6f5a54241962",
   "point_set_sha256": "6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60",
   "points": 1734,
   "pull_manifest_sha256": "c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166",
@@ -1166,7 +1178,7 @@
     "kind": "vllm",
     "version": "0.32.0"
    },
-   "harness_commit": "10b2a36cb91d4c65dd9096d5f4689f3e80ec93b0"
+   "harness_commit": "a0e899b9c1f433ea99fee80d78ac6f5a54241962"
   }
  },
  "kind": "run",
@@ -1198,7 +1210,8 @@
       "n": 0,
       "value": "too few points"
      }
-    }
+    },
+    "withheld": 0
    },
    "G2": {
     "noise_floor_pct": 1.6,
@@ -1223,7 +1236,8 @@
       "n": 0,
       "value": "too few points"
      }
-    }
+    },
+    "withheld": 0
    },
    "G3": {
     "noise_floor_pct": 1.6,
@@ -1248,32 +1262,34 @@
       "n": 0,
       "value": "too few points"
      }
-    }
+    },
+    "withheld": 0
    },
    "G4": {
     "noise_floor_pct": 1.6,
     "noise_floor_source": "fallback; none measured per point",
-    "points": 41,
+    "points": 11,
     "tpot": {
      "mape": {
-      "n": 41,
-      "value": 16.666181796788486
+      "n": 11,
+      "value": 58.02881797130001
      },
      "shape": {
-      "n": 33,
-      "value": 10.861747309371514
+      "n": 9,
+      "value": "too few points"
      }
     },
     "ttft": {
      "mape": {
-      "n": 41,
-      "value": 31.04935064038688
+      "n": 11,
+      "value": 47.10028557982242
      },
      "shape": {
-      "n": 33,
-      "value": 18.56610927016702
+      "n": 9,
+      "value": "too few points"
      }
-    }
+    },
+    "withheld": 30
    }
   }
  },

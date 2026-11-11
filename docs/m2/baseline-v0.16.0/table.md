@@ -2,7 +2,9 @@
 
 IN-SAMPLE: the points are the ones the model was calibrated on or tuned against; there is no anchor list yet, so no point is held out. These figures say how well the simulator reproduces data it has seen, not how well it predicts new data.
 
-- harness commit `10b2a36cb91d4c65dd9096d5f4689f3e80ec93b0`
+**Accuracy figures leave out the 30 scored test and prospective points** (they are withheld from every figure, so none can be derived by subtraction; docs/m2/evaluation-protocol.md section 6). Every count of points includes them.
+
+- harness commit `a0e899b9c1f433ea99fee80d78ac6f5a54241962`
 - units sha256 `d89f860a46c0470a22543dc7fb77b8d1b10e508ce4f5ef5073e96f359f08597e` (1740 units)
 - pull manifest sha256 `c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166`
 - point set sha256 `6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60` (1734 points)
@@ -13,7 +15,7 @@ Simulator `v0.16.0`, engine {'kind': 'vllm', 'version': '0.32.0'}, fields sha256
 
 | Points | TTFT MAPE % | TTFT shape % | TPOT MAPE % | TPOT shape % | Noise floor % |
 |---|---|---|---|---|---|
-| 41 | 31.0 (n=41) | 18.6 (n=33) | 16.7 (n=41) | 10.9 (n=33) | 1.6 (fallback; none measured per point) |
+| 11 | 47.1 (n=11) | too few points (n=9) | 58.0 (n=11) | too few points (n=9) | 1.6 (fallback; none measured per point) |
 
 ## By grade
 
@@ -24,7 +26,7 @@ Simulator `v0.16.0`, engine {'kind': 'vllm', 'version': '0.32.0'}, fields sha256
 | G1 | 0 | too few points | too few points | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
 | G2 | 0 | too few points | too few points | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
 | G3 | 0 | too few points | too few points | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
-| G4 | 41 | 2.4% | 100.0% | 31.0 (n=41) | 18.6 (n=33) | 16.7 (n=41) | 10.9 (n=33) |
+| G4 | 41 | 2.4% | 100.0% | 47.1 (n=11) | too few points (n=9) | 58.0 (n=11) | too few points (n=9) |
 | G5 | 1683 | 97.1% | - | - | - | - | - |
 | failed | 10 | | | | | | |
 
@@ -35,19 +37,19 @@ Simulator `v0.16.0`, engine {'kind': 'vllm', 'version': '0.32.0'}, fields sha256
 | aggregated | G1 | 0 | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
 | aggregated | G2 | 0 | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
 | aggregated | G3 | 0 | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
-| aggregated | G4 | 41 | 31.0 (n=41) | 18.6 (n=33) | 16.7 (n=41) | 10.9 (n=33) |
+| aggregated | G4 | 11 | 47.1 (n=11) | too few points (n=9) | 58.0 (n=11) | too few points (n=9) |
 
 ## Development split
 
 Per-split figures use the DEVELOPMENT split of docs/m2/evaluation-protocol.md, not the ledger's held-out: its test set is 'development split, not the ledger's held-out'.
 
-Assignment: sha256 of the salt `blis-dev-split-1` and the series, mod 100; train below 60, validation below 80, test above; a point measured after 2026-11-09 is prospective (test).
+Assignment: sha256 of the salt `blis-dev-split-2` and the series, mod 100; train below 60, validation below 80, test above; a point measured after 2026-11-09 is prospective (test).
 
 | Split | Points | In scope | Scored | Series | Grades | TTFT MAPE % | TTFT shape % | TPOT MAPE % | TPOT shape % | Ranking (groups; Spearman, top-1, regret) |
 |---|---|---|---|---|---|---|---|---|---|---|
-| train | 1120 | 792 | 26 | 72 | G4 26, G5 1084, failed 10 | 43.1 (n=26) | 24.0 (n=21) | 21.3 (n=26) | 8.6 (n=21) | 3; too few groups, too few groups, too few groups |
-| validation | 282 | 196 | 15 | 21 | G4 15, G5 267 | 10.2 (n=15) | 9.1 (n=12) | 8.6 (n=15) | 14.9 (n=12) | 2; too few groups, too few groups, too few groups |
-| test | 332 | | | | withheld: evaluate with `--evaluate-test`, which logs the evaluation | | | | | |
+| train | 956 | 626 | 0 | 33 | G5 956 | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) | 0; too few groups, too few groups, too few groups |
+| validation | 332 | 220 | 11 | 9 | G4 11, G5 321 | 47.1 (n=11) | too few points (n=9) | 58.0 (n=11) | too few points (n=9) | 1; too few groups, too few groups, too few groups |
+| test | 446 | | | | withheld: evaluate with `--evaluate-test`, which logs the evaluation | | | | | |
 | prospective | 0 | | | | withheld: evaluate with `--evaluate-test`, which logs the evaluation | | | | | |
 | unassigned | 0 | 0 | 0 | 0 |  | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) | 0; too few groups, too few groups, too few groups |
 
@@ -144,6 +146,7 @@ Blocks: in-scope points held at G5 by the blocker. Alone: points that would be s
 | `field_not_modelled:kv_transfer_config.kv_connector_extra_config.load_async` | 2 | 0 | 0 |
 | `value_conflict:kv_transfer_config.engine_id` | 1 | 0 | 0 |
 | `client_difference:client_flags` | 0 | 0 | 41 |
+| `client_difference:failed_requests` | 0 | 0 | 41 |
 | `client_difference:send_gap` | 0 | 0 | 41 |
 | `coefficient_method:cost-model-attention/attention_decode_floor_mla` | 0 | 0 | 41 |
 | `coefficient_method:cost-model-host-overheads/host_admission_per_request` | 0 | 0 | 41 |
