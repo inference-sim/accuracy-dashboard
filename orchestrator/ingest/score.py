@@ -613,8 +613,10 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
         # The log served a local path; the run's own recipe names the checkpoint (pull.py).
         cks = [entry["checkpoint"]["repo"]]
     sup = sp.check(cat, env.parts, checkpoints=cks, base_models=env.base_models,
-                   hardware=part_name, spec_method=spec, draft_checkpoint=sp.hf_repo(c.roles.get("drafter")))
+                   hardware=part_name, spec_method=spec, draft_checkpoint=sp.hf_repo(c.roles.get("drafter")),
+                   num_spec_tokens=c.mapped.get("engine.speculative.num_spec_tokens", (None, None))[1])
     o.reasons += sup.reasons
+    o.subs += sup.substitutions
 
     agentic = row["benchmark_type"] == "agentic_traces"
     r = None
