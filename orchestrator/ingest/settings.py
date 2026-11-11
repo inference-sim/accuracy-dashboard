@@ -460,6 +460,16 @@ def names_are_vllms(field_list) -> bool:
     return any(f.value_classes is not None for f in field_list.fields.values())
 
 
+def vllm_location(loc: str) -> str:
+    """A scenario location in the earlier engine-block names, in vLLM's (engine.cache_dtype is
+    engine.kv_cache_dtype); any other location unchanged."""
+    if loc.startswith("engine."):
+        for internal, external in VLLM_BLOCK_MOVES:
+            if loc[len("engine."):] == internal:
+                return "engine." + external
+    return loc
+
+
 def to_vllm_block(eng: dict) -> dict:
     """The engine block with its keys in vLLM's names (VLLM_BLOCK_MOVES); a copy."""
     out = {k: (dict(v) if isinstance(v, dict) else v) for k, v in eng.items()}
@@ -710,6 +720,7 @@ class Built:
     reasons: list = field(default_factory=list)
     substitutions: list = field(default_factory=list)  # estimates of values the run did not record
     node_source: str | None = None                    # where the scenario's gpus_per_node came from
+    vllm_names: bool = False                          # the engine block is written in vLLM's own names
 
 
 FRONTEND = {True: "rust", False: "python"}   # VLLM_USE_RUST_FRONTEND, parsed as a bool
@@ -801,6 +812,7 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
                   "model": model, "coefficients": COEFFICIENTS, "cluster": cluster}
     if names_are_vllms(field_list):
         pool["engine"] = to_vllm_block(pool["engine"])
+        b.vllm_names = True
     b.deployment = dep
     return b
 

@@ -352,7 +352,8 @@ def _diff_args(args: list, dep: dict, b: st.Built) -> list[str]:
         if "_value" not in a:
             continue
         want = a.pop("_value")
-        f = a["blis_field"]
+        f = st.vllm_location(a["blis_field"]) if b.vllm_names else a["blis_field"]
+        a["blis_field"] = f
         if f == "replay.acceptance_length":
             got, want = b.acceptance_length, str(want)
         elif f.startswith("offload."):
