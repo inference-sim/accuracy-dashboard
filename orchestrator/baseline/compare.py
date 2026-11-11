@@ -663,7 +663,7 @@ def refusals_from_logs(work: Path) -> dict:
     return out
 
 
-def refusal_classes(errors: list[str]) -> list[tuple[str, int]]:
+def refusal_classes(errors: list) -> list[tuple[str, int]]:
     """The refusals grouped by the first 110 characters of their text, most frequent first."""
     return Counter(e[:110] for e in errors if e).most_common()
 
