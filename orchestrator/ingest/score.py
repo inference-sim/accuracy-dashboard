@@ -1034,7 +1034,10 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
         o.reasons = sorted(set(o.reasons + refused))
         return o
     ins, outs = ix.target_lengths(isl, osl, conc)
-    primed = any((p["engine"] or {}).get("enable_prefix_caching") is not False for p in dep["pools"])
+    # sa-bench (a prefill/decode run's client) sends its warm-up as a separate process whose prompts the main phase
+    # never reads, so a prefill/decode point starts cold whatever its prefix-caching setting; the InferenceX client
+    # primes with copies of request 0 and a single-turn point is primed unless prefix caching is off.
+    primed = pd_run is None and any((p["engine"] or {}).get("enable_prefix_caching") is not False for p in dep["pools"])
     copies = ix.WARMUPS_PER_CONCURRENCY * conc if primed else 0
     replay = ix.primed_phase(ins, outs, conc, copies) if primed else ix.main_phase(ins, outs, conc)
 
@@ -1063,8 +1066,10 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
         o.subs += pd_run.subs
     verified, why = _prompt_lengths().verified(sup.checkpoint, row.get("date"), isl, osl, conc)
     bound = ix.client_bound(conc, meas_tpot_us)
+    speculative = st.speculative_block(dep["pools"][0]["engine"])[0] is not None
     differences = ix.client_differences(verified, why, client_bound=bound,
-                                        benchmark_client=pd_run.client_note if pd_run else None, **client)
+                                        benchmark_client=pd_run.client_note if pd_run else None,
+                                        chat_template_assumed=speculative, **client)
     if int(par.get("dp") or 1) > 1 and pd_run is None:
         o.subs.append(DP_BALANCER)
     requests = {"client": ix.CLIENT_SUBJECT, "start": "primed" if primed else "cold",

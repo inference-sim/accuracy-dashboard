@@ -791,3 +791,18 @@ def test_the_router_experiment_does_not_replace_any_other_router_reason():
         assert e2e._saw(env) == []
     finally:
         shutil.rmtree(tmp)
+
+
+def test_a_prefill_decode_point_starts_cold_even_with_prefix_caching_on():
+    """sa-bench's warm-up primes nothing the main phase reads, so a two-pool point is never primed with copies of
+    request 0 (the InferenceX client's warm-up)."""
+    on = RECIPE_FABRIC.replace("      no-enable-prefix-caching: true\n", "")
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _pd_point(tmp, log=False, recipe_text=on)
+        env.router_policy_experiment = "round-robin"
+        o, _ = e2e._score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        assert o.fidelity["requests"]["start"] == "cold"
+    finally:
+        shutil.rmtree(tmp)
