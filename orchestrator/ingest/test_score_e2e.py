@@ -336,6 +336,7 @@ def test_a_drafter_with_no_recorded_acceptance_is_replayed_with_the_profile_and_
     try:
         log = LOG.replace(", 'synthetic_acceptance_length': 2.4", "") + SPEC_LINES
         entry, env = _setup(tmp, log=log)
+        env.field_list = _fields_without_acceptance()
         env.blis = _fake_blis(tmp, workload_properties=[
             {"name": "speculative_acceptance", "values": {"acceptance_length": 3.1}, "source": "profile",
              "profile": "mtp/deepseek"}])
@@ -501,6 +502,88 @@ def _with_counts(entry, **counts):
     entry["row"].update(counts)
     for m in entry.get("measurements") or []:
         m.setdefault("metrics", {}).update(counts)
+
+
+def _fields_without_acceptance():
+    """The fixture's field list with the acceptance field not modelled, as at the preliminary pins."""
+    doc = json.loads((HERE / "testdata" / "fields" / "fields.json").read_bytes())
+    for f in doc["fields"]:
+        if f["name"] == "speculative_config.synthetic_acceptance_length":
+            f.update(status="not_modelled", estimation={"rule": "leave_unset"})
+            f.pop("evidence", None)
+            f["evidence"] = {"issue": "inference-sim/blis-vllm#1"}
+    return fl.parse(json.dumps(doc).encode())
+
+
+def _vllm_names_fields():
+    """The fixture's field list with value classes on one modelled field: the M2 list, which makes the
+    engine block take vLLM's own names (settings.names_are_vllms)."""
+    doc = json.loads((HERE / "testdata" / "fields" / "fields.json").read_bytes())
+    for f in doc["fields"]:
+        if f["name"] == "enable_prefix_caching":
+            f["value_classes"] = {"type": "boolean", "covered": ["true", "false"]}
+    return fl.parse(json.dumps(doc).encode())
+
+
+def test_the_logged_acceptance_replaces_the_profile_only_when_the_engine_models_the_field():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        log = LOG.replace(", 'synthetic_acceptance_length': 2.4", "") + SPEC_LINES
+        entry, env = _setup(tmp, log=log)                 # the fixture's list models the acceptance field
+        o, work = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        scen = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
+        assert "acceptance_length: 2.75" in scen
+        sub = next(s for s in o.fidelity["substitutions"] if s["subject"] == "speculative_config.acceptance_length")
+        assert sub["kind"] == "estimated" and "logged, 2.75 over 2 interval(s)" in sub["detail"]
+        assert o.fidelity["acceptance"]["simulated"] == "log" and o.fidelity["acceptance"]["simulated_length"] == 2.75
+        assert c.validate_dir(tmp / "c1") == []
+        # A log with no acceptance line pins nothing.
+        tmp2 = Path(tempfile.mkdtemp())
+        entry, env = _setup(tmp2, log=LOG.replace(", 'synthetic_acceptance_length': 2.4", ""))
+        o, work = _score(tmp2, entry, env, tmp2 / "c2")
+        scen = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
+        assert "acceptance:" not in scen.replace("rejection_sample_method", "")
+        assert o.fidelity["acceptance"] == {"realised": None, "simulated": "profile"}
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_the_thinking_mode_is_stated_only_where_the_run_recorded_it():
+    S = st.Setting
+    ok = {"default_chat_template_kwargs.thinking_mode": S("default_chat_template_kwargs.thinking_mode", "enabled")}
+    assert st.recorded_thinking(ok) == "on"
+    off = {"default_chat_template_kwargs.enable_thinking": S("default_chat_template_kwargs.enable_thinking", False)}
+    assert st.recorded_thinking(off) == "off"
+    assert st.recorded_thinking({}) is None
+    assert st.recorded_thinking({"reasoning_parser": S("reasoning_parser", "deepseek_v4")}) is None   # never inferred
+    assert st.recorded_thinking({"default_chat_template_kwargs.thinking_mode": S("x", "auto")}) is None
+    spec = {"pools": [{"engine": {"speculative_config": {"method": "mtp"}}}]}
+    plain = {"pools": [{"engine": {}}]}
+    assert sc.thinking_argv(st.Built(deployment=spec, thinking="on")) == ["--speculative-thinking", "on"]
+    assert sc.thinking_argv(st.Built(deployment=spec)) == []                  # unrecorded: not guessed
+    assert sc.thinking_argv(st.Built(deployment=plain, thinking="on")) == []  # no speculation: nothing to select
+
+
+def test_speculation_is_found_under_vllms_names_so_the_pin_and_the_profile_are_both_stated():
+    # The M2 block is speculative_config / num_speculative_tokens; reading only the earlier
+    # names left the pin never written and the profile never named (score.py read engine["speculative"]).
+    for pinned, log in ((True, LOG), (False, LOG.replace(", 'synthetic_acceptance_length': 2.4", ""))):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            entry, env = _setup(tmp, log=log)
+            env.field_list = _vllm_names_fields()
+            o, work = _score(tmp, entry, env, tmp / "c1")
+            assert o.fidelity is not None, o.reasons
+            scen = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
+            assert "speculative_config:" in scen and "num_speculative_tokens: 2" in scen
+            subs = [s for s in o.fidelity["substitutions"] if s["subject"] == "speculative_config.acceptance_length"]
+            if pinned:
+                assert "acceptance:" in scen and "acceptance_length: 2.4" in scen and subs == []
+            else:
+                assert "acceptance:" not in scen.replace("rejection_sample_method", "") and len(subs) == 1
+        finally:
+            shutil.rmtree(tmp)
 
 
 def test_a_run_that_recorded_all_its_requests_names_no_failed_requests_difference():
@@ -768,9 +851,10 @@ def test_the_scenario_engine_block_holds_the_runs_values_under_the_engines_own_n
         assert scen["engine_version"] == "0.31.0"
         eng = dep["pools"][0]["engine"]
         assert {k: eng[k] for k in ("max_num_seqs", "max_num_batched_tokens", "block_size", "max_model_len",
-                                    "enable_prefix_caching", "quantization", "cache_dtype")} == \
+                                    "enable_prefix_caching", "cache_dtype")} == \
             {"max_num_seqs": 16, "max_num_batched_tokens": 8192, "block_size": 16, "max_model_len": 2304,
-             "enable_prefix_caching": False, "quantization": "fp8", "cache_dtype": "auto"}
+             "enable_prefix_caching": False, "cache_dtype": "auto"}
+        assert "quantization" not in eng       # the engine printed fp8; the fixture's list does not model it
         assert eng["gpu_memory_utilization"] == 0.9 and eng["speculative"] == {
             "method": "mtp", "num_spec_tokens": 2, "rejection_sample_method": "synthetic"}
         assert dep["pools"][0]["parallel"] == {"tp": 1, "pp": 1, "dp": 1}   # expert parallelism unstated: left to the engine (X19)

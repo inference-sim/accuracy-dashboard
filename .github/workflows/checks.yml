@@ -84,6 +84,7 @@ jobs:
             orchestrator/ingest/test_score_pool.py \
             orchestrator/ingest/test_ledger.py \
             orchestrator/ingest/test_inferencex_client.py \
+            orchestrator/ingest/test_comparability.py \
             orchestrator/ingest/test_inferencex_runners.py \
             orchestrator/ingest/test_result.py \
             orchestrator/ingest/test_grade.py \

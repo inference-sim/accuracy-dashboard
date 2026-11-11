@@ -455,6 +455,16 @@ VLLM_BLOCK_MOVES = (
 )
 
 
+def speculative_block(engine: dict) -> tuple[dict | None, str]:
+    """The engine block's speculation settings and the key that holds the draft length, whichever
+    names the block takes: `speculative` / `num_spec_tokens` (the earlier block) or vLLM's
+    `speculative_config` / `num_speculative_tokens` (the M2 field list, to_vllm_block)."""
+    for key, tokens in (("speculative_config", "num_speculative_tokens"), ("speculative", "num_spec_tokens")):
+        if isinstance(engine.get(key), dict):
+            return engine[key], tokens
+    return None, "num_spec_tokens"
+
+
 def names_are_vllms(field_list) -> bool:
     """Whether the engine block takes vLLM's own names: the field list is the M2 one."""
     return any(f.value_classes is not None for f in field_list.fields.values())
@@ -604,6 +614,15 @@ class Decided:
     roles: dict = field(default_factory=dict)          # role -> value (model, served_model)
 
 
+def _stated_by_resolution(field_list, path: str) -> bool:
+    """Whether a value the engine only resolved may still be written to the scenario: the engine
+    models the field, or proves it has no effect. Any other field (not modelled, inert but
+    unproven, or unknown to the release) takes only what the run set."""
+    import fields as fl
+    f = field_list.lookup(path)
+    return f is not None and f.status in (fl.MODELLED, fl.PROVEN_INERT)
+
+
 def decide(settings: dict[str, Setting], field_list) -> Decided:
     """Decide every recorded setting by the engine's fields.json (design §11.2, State and Decide).
 
@@ -668,6 +687,13 @@ def decide(settings: dict[str, Setting], field_list) -> Decided:
             elif st.requested:
                 d.args.append({**rec, "blis": None, "match": "inert"})
             continue
+        if not st.requested and not _stated_by_resolution(field_list, path):
+            # The engine printed this value as its own resolution (a default, an architecture's
+            # choice), and the run did not set it. The scenario states only what the run set for a
+            # field the engine does not model: copying the printed default would hand the kernel a
+            # stated value it must refuse or price (design 11.2). The point records the value.
+            d.args.append({**rec, "blis": None, "match": "resolved_not_stated"})
+            continue
         if loc.startswith("engine.env.") and isinstance(st.value, bool):
             # vLLM's deprecation warning shows the variable was set, not its value.
             d.reasons.append(f"required_setting_missing:{path}")
@@ -721,6 +747,8 @@ class Built:
     substitutions: list = field(default_factory=list)  # estimates of values the run did not record
     node_source: str | None = None                    # where the scenario's gpus_per_node came from
     vllm_names: bool = False                          # the engine block is written in vLLM's own names
+    thinking: str | None = None                       # the workload's thinking mode where the run recorded it
+    acceptance_from_log: bool = False                 # acceptance_length is the server log's realised mean, not a run setting
 
 
 FRONTEND = {True: "rust", False: "python"}   # VLLM_USE_RUST_FRONTEND, parsed as a bool
@@ -944,3 +972,34 @@ def realised_acceptance(log: str) -> dict | None:
     if not lines:
         return None
     return {"mean_acceptance_length": round(weighted / total, 3), "log_lines": lines, "drafted_tokens": int(total)}
+
+
+ACCEPTANCE_FIELD = "speculative_config.synthetic_acceptance_length"
+_THINKING_PATHS = ("default_chat_template_kwargs.thinking_mode", "default_chat_template_kwargs.enable_thinking",
+                   "default_chat_template_kwargs.thinking")
+_THINKING_ON = {"enabled", "enable", "on", "true", "high", "medium", "low"}
+_THINKING_OFF = {"disabled", "disable", "off", "false", "none"}
+
+
+def engine_takes_acceptance(field_list) -> bool:
+    """Whether the engine models the field that states a speculative run's acceptance length, so the
+    log's realised mean may be pinned in its place (dashboard #59). A list that does not model it
+    leaves the acceptance to the registry's profile, and the log's figure is only recorded."""
+    import fields as fl
+    f = field_list.lookup(ACCEPTANCE_FIELD)
+    return f is not None and f.status == fl.MODELLED
+
+
+def recorded_thinking(settings: dict) -> str | None:
+    """"on" or "off" when the run's server recorded the workload's thinking mode (the chat template
+    kwargs it was started with), else None. Never inferred from a reasoning parser or a model name."""
+    for path in _THINKING_PATHS:
+        st = settings.get(path)
+        if st is None or st.value is None or st.conflict is not None:
+            continue
+        v = str(st.value).strip().lower()
+        if v in _THINKING_ON:
+            return "on"
+        if v in _THINKING_OFF:
+            return "off"
+    return None

@@ -167,6 +167,31 @@ def test_a_not_modelled_field_with_a_leave_unset_rule_is_left_unset_and_named():
     assert "engine.indexer_kv_dtype" not in c.mapped                 # left to the engine (X19)
 
 
+def test_a_value_the_engine_only_resolved_is_not_stated_for_a_field_it_does_not_model():
+    # custom_ops "all" and the printed indexer default are the engine's own resolution (the
+    # architecture's breakable-capture default; AttentionConfig printed whole), not run settings.
+    # Stated, the kernel cannot tell them from a request and refuses them (design 11.2, X19).
+    resolved = (RESOLVED[:-1] + ", 'custom_ops': ['all']}, "
+                "attention_config=AttentionConfig(backend=None, indexer_kv_dtype='bf16')")
+    c = _classify(_log("'max_num_seqs': 16", resolved=resolved))
+    assert c.reasons == []
+    assert not {"engine.custom_ops", "engine.indexer_kv_dtype"} & set(c.mapped)
+    rec = {a["arg"]: a for a in c.args}
+    assert rec["compilation_config.custom_ops"]["match"] == "resolved_not_stated"
+    assert rec["compilation_config.custom_ops"]["measured"] == '["all"]'
+
+    assert rec["attention_config.indexer_kv_dtype"]["match"] == "resolved_not_stated"
+    assert "engine.quantization" not in c.mapped and rec["quantization"]["match"] == "resolved_not_stated"
+    assert "match" not in rec["kv_cache_dtype"] and "match" not in rec["enable_prefix_caching"]    # copied: judged later
+    # A modelled field the engine only resolved is still written, as before.
+    assert c.mapped["engine.cache_dtype"][1] == "auto" and c.mapped["engine.enable_prefix_caching"][1] is True
+
+
+def test_a_custom_ops_list_the_run_set_is_still_refused_as_not_modelled():
+    c = _classify(_log("'compilation_config': {'custom_ops': ['+rms_norm']}"))
+    assert c.reasons == ["field_not_modelled:compilation_config.custom_ops"]
+
+
 def test_an_inert_unproven_field_the_run_set_is_named_as_an_interim_status():
     c = _classify(_log("'attention_config': AttentionConfig(backend='FLASHINFER')"))
     assert c.reasons == [] and [(x["kind"], x["subject"]) for x in c.substitutions] == \
@@ -179,7 +204,7 @@ def test_every_recorded_value_is_copied_verbatim_under_the_engines_own_names():
                        "'compilation_config': {'max_cudagraph_capture_size': 512}, "
                        "'speculative_config': {'method': 'mtp', 'num_speculative_tokens': 2}"))
     assert {k: v[1] for k, v in c.mapped.items() if k.startswith("engine.")} == {
-        "engine.max_num_seqs": 16, "engine.cache_dtype": "fp8", "engine.quantization": "fp8",
+        "engine.max_num_seqs": 16, "engine.cache_dtype": "fp8",
         "engine.enable_prefix_caching": True, "engine.cudagraph_mode": "FULL_AND_PIECEWISE",
         "engine.max_cudagraph_capture_size": 512,
         "engine.speculative.method": "mtp", "engine.speculative.num_spec_tokens": 2}
