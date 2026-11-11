@@ -6,7 +6,7 @@ This is the "before" of the M2 before/after. It is a labelled in-sample run (no 
 
 | Input | Value |
 |---|---|
-| Harness | accuracy-dashboard commit `73a01afdef586519c4ee551cd7245a0fb386aed1` (branch m2/2-rescore-and-repin). `harness/run.sh` records it as `harness_commit`. |
+| Harness | accuracy-dashboard commit `a4da0dedef586519c4ee551cd7245a0fb386aed1` (branch m2/2-rescore-and-repin). `harness/run.sh` records it as `harness_commit`. |
 | Simulator | inference-sim `v0.16.0` = `3f4998e28f922611a2d21d5c7ffe18a5272fe114`, built by run.sh with Go 1.27.2 (its go.mod) |
 | Substrate, registry, catalog | blis-substrate `v0.13.0` = `fe6eab10b9795933de38122ba55e5299dcb20b5e` (the release v0.16.0's stack.json pins); `--catalog <checkout>/catalog`, `--registry <checkout>/registry`, both released as `v0.13.0` |
 | Ledger | the ledger in that substrate checkout, source revision `db-dump/2026-09-28` |
@@ -31,7 +31,7 @@ python3 orchestrator/baseline/freeze.py --snapshot-state state/last-run-api.json
 # 2. fetch the corpora
 python3 orchestrator/resolve_agentic_corpus.py --all --catalog SUBSTRATE/catalog -o CORPUS
 
-# 3. score, from a clean checkout of the harness commit (git worktree add --detach DIR 73a01af...)
+# 3. score, from a clean checkout of the harness commit (git worktree add --detach DIR a4da0de...)
 cd DIR && bash harness/run.sh --sim v0.16.0 --units units.txt --pull PULL --out OUT \
   --catalog SUBSTRATE/catalog --registry SUBSTRATE/registry --corpus-dir CORPUS \
   --fields FIELDS.json --catalog-release v0.13.0 --registry-release v0.13.0
@@ -60,7 +60,7 @@ python3 orchestrator/baseline/compare.py run --dir OUT --sample in_sample --out 
 
 ## Result
 
-31 of the 1734 points are scored, all G4 (no point can be G1 or G3 while four G1 conditions are unevaluated, and every point is measured on another release or build): TTFT MAPE 30.2 (n=31), TPOT 17.3 (n=31). The other 1703 are G5; 546 of those are AMD points (out of scope). The leading blockers over in-scope points are in `table.md`; `table.json` holds every count.
+41 of the 1734 points are scored, all G4 (no point can be G1 or G3 while four G1 conditions are unevaluated, and every point is measured on another release or build): TTFT MAPE 31.0 (n=41), TPOT 16.7. 10 more points (Kimi-K2.5 on h200) pass the scorer and are refused by the simulator (`blis_refused:scenario`: v0.16.0 will not state `block_size` for that model on that chip), so they are listed as failed. The other 1683 are G5; 546 of those are AMD points (out of scope). The leading blockers over in-scope points are in `table.md`; `table.json` holds every count.
 
 ### Change since the first baseline of this directory
 
@@ -69,3 +69,7 @@ The first baseline (harness `0206f24`) scored 20 points. Two harness changes mov
 ### Second freeze
 
 The pull was frozen a second time, with the same command, after the freezer began to record the run's recipe draft model (`draft_checkpoint`: 235 points) and a served-path conflict with the recipe (`checkpoint_conflict`: 23 points). The point set is the same 1734 points; the manifest hash changed (`c8f2ea92...`), so the baseline was scored again against it. Scored points: 31, as before. The 235 eagle3 points still read `not_in_catalog:eagle3` here, because this baseline's catalog is blis-substrate v0.13.0, which holds no eagle3 drafter; against the layer 10 catalog all 235 resolve to `minimax-m3-eagle3` (179) or `minimax-m3-eagle3-gqa` (56). The 23 DeepSeek-V4-Pro NVFP4 points read `value_conflict:model` naming the path and the recipe's checkpoint. The 5 Kimi-K3 DSpark points read `value_not_recorded:speculative_config.model` (no recipe names their draft).
+
+### Node size of b200 and h200
+
+The harness now takes a label's node size from the records of its label when no record lists the runner and every record that lists the label states the same size (design 11.3, wording in blis-design PR #2). b200 and h200 take 8 as a G2 `later_record` substitution naming the label and the records relied on. That moved `value_not_recorded:cluster.gpus_per_node` from 645 points to none, and the scored points from 31 to 41 (the rest of the 645 still carry field reasons in this baseline, whose field list is v0.32.0-blis.2).
