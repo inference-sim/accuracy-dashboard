@@ -186,7 +186,7 @@ def test_every_recorded_value_is_copied_verbatim_under_the_engines_own_names():
 
 
 def test_every_location_is_a_field_blis_vllm_engine_block_or_the_deployment_names():
-    # The names blis-vllm rules/engineconfig/fieldnames_test.go (origin/m1/vllm) pins, and the
+    # The names blis-vllm rules/engineconfig/fieldnames_test.go (branch m2/7-refusals-and-engine-block-names, which adds enable_chunked_prefill and language_model_only) pins, and the
     # Deployment's parallel and offload fields (blis-substrate contracts/spec/deployment).
     engine = {"all2all_backend", "disable_custom_all_reduce", "cudagraph_mode", "max_cudagraph_capture_size",
               "cudagraph_capture_sizes", "async_scheduling", "frontend", "disable_cascade_attn",
@@ -199,7 +199,7 @@ def test_every_location_is_a_field_blis_vllm_engine_block_or_the_deployment_name
               "disable_hybrid_kv_cache_manager", "kv_cache_memory_bytes", "prefix_match_unit",
               "prefix_cache_retention_interval", "kv_events", "max_loras", "max_cpu_loras",
               "decoder_replay_cudagraph_capture_sizes", "custom_ops", "use_trtllm_attention", "mla_prefill_backend",
-              "indexer_kv_dtype", "linear_backend", "env"}
+              "indexer_kv_dtype", "linear_backend", "enable_chunked_prefill", "language_model_only", "env"}
     parallel = {"tp", "pp", "dp", "dp_local", "enable_expert_parallel", "pcp", "dcp"}
     for path, loc in st.LOCATIONS.items():
         top, _, rest = loc.partition(".")

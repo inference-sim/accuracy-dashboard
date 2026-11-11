@@ -130,6 +130,12 @@ def test_a_numeric_class_counts_the_thresholds_below_the_value_and_a_closed_abov
     assert not fl.covers(True, NUMERIC) and not fl.covers("64", NUMERIC)
 
 
+def test_a_numeric_field_with_no_thresholds_has_one_class():
+    one = {"type": "numeric", "covered_classes": [0]}
+    assert fl.class_of(5, one) == 0 and fl.covers(5, one) and not fl.covers(5, {"type": "numeric", "covered_classes": [1], "thresholds": [{"value": 9, "closed": "above"}]})
+    field_list(one)                                              # the loader accepts it
+
+
 def test_an_enumerated_or_boolean_value_is_covered_when_it_is_listed():
     assert fl.covers("fp8", ENUM) and not fl.covers("bf16", ENUM)
     assert fl.covers(True, BOOL) and not fl.covers(False, BOOL)
@@ -153,7 +159,8 @@ def test_a_setting_that_is_not_a_modelled_or_inert_field_is_not_asked():
 
 
 def test_the_field_list_loader_checks_value_classes():
-    bad = [{"type": "numeric", "covered_classes": [0]},                                         # no thresholds
+    bad = [{"type": "numeric"},                                                                 # no covered classes
+           {"type": "numeric", "thresholds": [{"value": 2, "closed": "above"}, {"value": 1, "closed": "above"}], "covered_classes": [0]},
            {"type": "numeric", "thresholds": [{"value": 1, "closed": "up"}], "covered_classes": [0]},
            {"type": "numeric", "thresholds": [{"value": 1, "closed": "above"}], "covered_classes": [2]},
            {"type": "enumerated"}, {"type": "enumerated", "covered": ["x"], "thresholds": []},
