@@ -106,6 +106,16 @@ class Catalog:
         spec = graph.get("speculator") if isinstance(graph, dict) else None
         return spec.get("method") if isinstance(spec, dict) else None
 
+    def speculator_tokens(self, model: str) -> int | None:
+        """The speculative tokens per step of a catalog model's graph (its speculator's
+        num_spec_tokens), or None when it has none. TEMPORARY, like speculator()."""
+        import yaml
+        g = Path(self.root) / "models" / model / "graph.yaml"
+        graph = (yaml.safe_load(g.read_text()) or {}) if g.is_file() else {}
+        spec = graph.get("speculator") if isinstance(graph, dict) else None
+        n = spec.get("num_spec_tokens") if isinstance(spec, dict) else None
+        return n if isinstance(n, int) and not isinstance(n, bool) else None
+
     def drafter_links(self, target: str, drafter: str) -> bool:
         """Whether catalog entry `drafter` and catalog entry `target` name each other: the drafter
         lists the target among its `targets`, and the target lists the drafter among its
@@ -216,11 +226,21 @@ class Support:
     chip: str | None = None             # the catalog chip, or None when the catalog has none
     drafter: str | None = None          # the catalog entry of the run's draft checkpoint, when it named one
     reasons: list = field(default_factory=list)
+    substitutions: list = field(default_factory=list)   # G2 substitutions the catalog check names
+
+
+def engine_method(graph_method: str | None) -> str | None:
+    """The method a deployment states for a catalog speculator method. vLLM rewrites every
+    model-specific MTP name to `mtp` (vllm/config/speculative.py:1141-1145), and the catalog's
+    derive_graph.vllm_speculative_method states the same rule; eagle3, dflash and dspark keep their
+    names. TEMPORARY: a copy of that rule until a substrate command prints the method as a
+    deployment states it (X7)."""
+    return "mtp" if graph_method and graph_method.endswith("_mtp") else graph_method
 
 
 def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models: dict,
           hardware: str, spec_method: str | None,
-          draft_checkpoint: str | None = None) -> Support:
+          draft_checkpoint: str | None = None, num_spec_tokens: int | None = None) -> Support:
     """checkpoints: candidate HF repos for the served model, most authoritative first.
     draft_checkpoint: the HF repo the run named as its draft model (speculative_config.model), if any.
     When it names one, that checkpoint must be a catalog entry that lists the served model among
@@ -251,12 +271,24 @@ def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models:
     if s.chip is None or hardware not in parts:
         s.reasons.append("hardware_no_coefficients")
     if s.model and spec_method:
-        if draft_checkpoint:
-            d = cat.model(draft_checkpoint)
-            if d is not None and cat.drafter_links(s.model, d) and cat.speculator(d) == spec_method:
+        d = cat.model(draft_checkpoint) if draft_checkpoint else None
+        if d is not None and d != s.model:
+            # A separate drafter checkpoint (eagle3, dspark): a catalog entry the served model and
+            # it name each other, whose graph speculates by the run's method.
+            if cat.drafter_links(s.model, d) and engine_method(cat.speculator(d)) == spec_method:
                 s.drafter = d
             else:
                 s.reasons.append(f"drafter_not_in_catalog:{spec_method}")
-        elif cat.speculator(s.model) != spec_method:
+        elif draft_checkpoint and d is None:
             s.reasons.append(f"drafter_not_in_catalog:{spec_method}")
+        elif engine_method(cat.speculator(s.model)) != spec_method:
+            # No separate checkpoint, or vLLM named the served model itself as its drafter (MTP):
+            # the served model's own graph decides.
+            s.reasons.append(f"drafter_not_in_catalog:{spec_method}")
+        else:
+            have = cat.speculator_tokens(s.model)
+            if num_spec_tokens is not None and have is not None and num_spec_tokens != have:
+                s.substitutions.append({
+                    "kind": "value_class", "subject": "speculative_config.num_speculative_tokens",
+                    "detail": f"the run states {num_spec_tokens}, the catalog graph of {s.model} derives {have}"})
     return s
