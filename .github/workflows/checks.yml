@@ -102,6 +102,7 @@ jobs:
             orchestrator/ingest/test_g1.py \
             orchestrator/baseline/test_compare.py \
             orchestrator/baseline/test_split.py \
+            orchestrator/baseline/test_residuals.py \
             orchestrator/test_update_index.py
       - name: Every point id of every published snapshot maps to a ledger unit (COV-8)
         run: python3 orchestrator/ingest/legacy_ids.py check --map data/legacy/point-ids.json --data data

@@ -1138,7 +1138,7 @@
   }
  },
  "identity": {
-  "harness_commit": "bb56fd78f1342a1b2942b23b57626af89bb59924",
+  "harness_commit": "10b2a36cb91d4c65dd9096d5f4689f3e80ec93b0",
   "point_set_sha256": "6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60",
   "points": 1734,
   "pull_manifest_sha256": "c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166",
@@ -1166,10 +1166,11 @@
     "kind": "vllm",
     "version": "0.32.0"
    },
-   "harness_commit": "bb56fd78f1342a1b2942b23b57626af89bb59924"
+   "harness_commit": "10b2a36cb91d4c65dd9096d5f4689f3e80ec93b0"
   }
  },
  "kind": "run",
+ "refusals": [],
  "sample": "in_sample",
  "sample_text": "IN-SAMPLE: the points are the ones the model was calibrated on or tuned against; there is no anchor list yet, so no point is held out. These figures say how well the simulator reproduces data it has seen, not how well it predicts new data.",
  "serving_by_grade": {

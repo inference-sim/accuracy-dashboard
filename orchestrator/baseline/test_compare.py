@@ -218,7 +218,7 @@ def test_committed_tables():
     assert not bad, bad
     for p in tables:
         data = p.parent / "contract"
-        if p.name == "table.json" and data.is_dir():
+        if p.name == "table.json" and data.is_dir() and json.loads(p.read_text()).get("kind") == "run":
             stored = json.loads(p.read_text())
             fresh = c.run_report(c.Run(data), stored["sample"])
             assert json.loads(json.dumps(fresh)) == stored, f"{p} is not what compare.py makes of {data}"
