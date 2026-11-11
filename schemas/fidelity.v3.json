@@ -74,9 +74,10 @@
           }
         },
         "simulated": {
-          "description": "recorded: the run's own synthetic acceptance length was pinned in the scenario. profile: the registry profile BLIS resolved (a named estimated substitution).",
+          "description": "recorded: the run's own synthetic acceptance length was pinned in the scenario. log: the server log's realised mean, pinned because the engine models the acceptance field (a named estimated substitution). profile: the registry profile BLIS resolved (a named estimated substitution).",
           "enum": [
             "recorded",
+            "log",
             "profile"
           ]
         },
@@ -277,6 +278,7 @@
             "mapped",
             "inert",
             "approximated",
+            "resolved_not_stated",
             "differs",
             "absent_in_blis",
             "unreadable",
