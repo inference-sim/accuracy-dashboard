@@ -172,3 +172,39 @@ def test_mutation_comparing_the_length_for_equality_would_refuse_valid_runs(monk
     # expectation) would refuse 3 against 7. The test above passes only with the rule.
     monkeypatch.setattr(sp, "draft_length_conflict", lambda m, k, n: None if k == n else "differs")
     assert _mtp(tokens=3).reasons != []
+
+
+# ---- a drafter that shares its target's repository (layer 8: told apart by source.path)
+
+def _flash_catalog():
+    root = Path(tempfile.mkdtemp())
+    for name, extra in (("flash", {"drafters": ["flash-dspark"]}),
+                        ("flash-dspark", {"targets": ["flash"]})):
+        d = root / "models" / name
+        d.mkdir(parents=True)
+        src = {"provider": "huggingface", "repo": "MiniMaxAI/MiniMax-M3.1-Flash", "revision": "r"}
+        if name.endswith("dspark"):
+            src["path"] = "dspark/config.json"
+        import yaml
+        (d / "model.yaml").write_text(yaml.safe_dump({"name": name, "source": src, **extra}))
+        (d / "graph.yaml").write_text("global: {}\n" + ("speculator:\n  method: dspark\n  num_spec_tokens: 7\n" if name.endswith("dspark") else ""))
+    (root / "hardware").mkdir()
+    (root / "hardware" / "h200.yaml").write_text("GPUsPerNode: 8\n")
+    return sp.CheckoutCatalog(blis="", root=root)
+
+
+def test_the_served_model_lookup_skips_a_drafter_that_shares_its_repository():
+    cat = _flash_catalog()
+    assert cat.model("MiniMaxAI/MiniMax-M3.1-Flash") == "flash"        # not ambiguous
+    assert cat.drafters_of("minimaxai/minimax-m3.1-flash") == ["flash-dspark"]
+    cat.check_unambiguous()
+
+
+def test_a_dspark_run_naming_the_served_repo_as_its_draft_model_finds_the_drafter_entry():
+    cat = _flash_catalog()
+    s = sp.check(cat, {"h200"}, checkpoints=["MiniMaxAI/MiniMax-M3.1-Flash"], base_models={}, hardware="h200",
+                 spec_method="dspark", draft_checkpoint="MiniMaxAI/MiniMax-M3.1-Flash", num_spec_tokens=5)
+    assert s.reasons == [] and s.drafter == "flash-dspark"
+    s = sp.check(cat, {"h200"}, checkpoints=["MiniMaxAI/MiniMax-M3.1-Flash"], base_models={}, hardware="h200",
+                 spec_method="eagle3", draft_checkpoint="MiniMaxAI/MiniMax-M3.1-Flash")
+    assert s.reasons == ["drafter_not_in_catalog:eagle3"]
