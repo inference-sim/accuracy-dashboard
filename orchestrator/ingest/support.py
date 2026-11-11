@@ -252,6 +252,38 @@ class Support:
     reasons: list = field(default_factory=list)
 
 
+def _leaf(path: str) -> str:
+    return path.rstrip("/").rsplit("/", 1)[-1]
+
+
+def resolve_draft(drafter, served: list, entry: dict) -> tuple[str | None, str | None]:
+    """(the draft checkpoint's HF repo, a G5 reason) for the draft model the run's log names.
+
+    A repo the log names is used as it is. A local path is the recipe's: the pull records the
+    DRAFT_MODEL the run's benchmark script set at the commit it ran (entry["draft_checkpoint"]),
+    taken when the path's last component is that repo's name, a value_conflict when it is not, and
+    value_not_recorded when no recipe names one. A path that is the served model's own (MTP names
+    the target) is no draft. Nothing is matched by a file name alone."""
+    repo = hf_repo(drafter)
+    if repo or not isinstance(drafter, str) or not drafter.startswith("/") or drafter in served:
+        return repo, None
+    dc = entry.get("draft_checkpoint") or {}
+    if not dc.get("repo"):
+        return None, "value_not_recorded:speculative_config.model"
+    if _leaf(drafter) != _leaf(dc["repo"]):
+        return None, f"value_conflict:speculative_config.model: the log names {drafter}, the recipe {dc['repo']}"
+    return dc["repo"], None
+
+
+def served_conflict(entry: dict) -> str | None:
+    """The G5 reason when the run's served path and its recipe's checkpoint disagree (the pull
+    records the recipe's one checkpoint as checkpoint_conflict), naming both."""
+    c = entry.get("checkpoint_conflict")
+    if not c:
+        return None
+    return f"value_conflict:model: the log serves {c['served_path']}, the recipe {c['repo']}"
+
+
 def engine_method(graph_method: str | None) -> str | None:
     """The method a deployment states for a catalog speculator method. vLLM rewrites every
     model-specific MTP name to `mtp` (vllm/config/speculative.py:1141-1145), and the catalog's
