@@ -200,6 +200,25 @@ def test_a_real_deepseek_log_states_no_custom_ops_the_engine_chose():
     assert "field_not_modelled:compilation_config.custom_ops" not in c.reasons
 
 
+def test_a_resolved_only_value_with_no_scenario_location_is_never_dropped_silently():
+    def lst(status):
+        ev = {"modelled": {"traces": ["t"]}, "proven_inert": {"proof": "TestInert"}}.get(
+            status, {"issue": "inference-sim/blis-vllm#1"})
+        return fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.31.0"}, "fields": [
+            {"name": "no_such_scenario_key", "source": "config", "status": status, "evidence": ev,
+             "estimation": {"rule": "none"}}]}))
+    def decide(status, requested):
+        s = st.Setting("no_such_scenario_key", 3, "resolved_config", requested=requested)
+        return st.decide({"no_such_scenario_key": s}, lst(status))
+    # The engine models it: the scenario must state it, passed or resolved; with no place for it, a lost setting.
+    assert decide("modelled", False).reasons == ["setting_differs:no_such_scenario_key"]
+    assert decide("modelled", True).reasons == ["setting_differs:no_such_scenario_key"]
+    assert [a["match"] for a in decide("proven_inert", False).args] == ["inert"]
+    # Not modelled and only resolved: recorded on the point, not stated.
+    r = decide("not_modelled", False)
+    assert r.reasons == [] and [a["match"] for a in r.args] == ["resolved_not_stated"]
+
+
 def test_a_custom_ops_list_the_run_set_is_still_refused_as_not_modelled():
     c = _classify(_log("'compilation_config': {'custom_ops': ['+rms_norm']}"))
     assert c.reasons == ["field_not_modelled:compilation_config.custom_ops"]
