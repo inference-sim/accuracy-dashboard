@@ -5,9 +5,12 @@ official anchor list (design D7, COV-2: roles drawn from a seed no candidate job
 stays the ledger owners'. A figure on this split's test set is "development split, not the ledger's
 held-out". See docs/m2/evaluation-protocol.md.
 
-  GROUP     the InferenceX series: model, hardware, framework, precision, spec_method, disagg,
-            benchmark_type, ISL, OSL and image. Rows of one series are never split: adjacent
-            concurrency points are near-duplicates and would leak.
+  GROUP     the deployment shape: model, hardware, precision, framework, spec_method and disagg
+            (the code calls a group's id a "series id"). A group's points are never split: the same
+            model on the same chip with the same engine, precision, speculation and serving mode,
+            at another concurrency, ISL, OSL or image, is a near-duplicate and would leak. (An
+            earlier rule also keyed on benchmark_type, ISL, OSL and image, and 127 of the 278
+            model/hardware/precision/framework groups then spanned splits.)
   ASSIGN    sha256(SALT, "\0", series id), first 8 bytes as an integer, mod 100: below TRAIN_PCT
             train, below TRAIN_PCT + VALIDATION_PCT validation, else test.
   PROSPECTIVE  a point measured after FREEZE_DATE is test whatever its series hashes to, is never
@@ -25,11 +28,10 @@ import re
 import sys
 from pathlib import Path
 
-SALT = "blis-dev-split-1"
+SALT = "blis-dev-split-2"
 TRAIN_PCT, VALIDATION_PCT = 60, 20            # the rest, 20, is test
 FREEZE_DATE = "2026-11-09"                    # the date of the frozen pull; later points are prospective
-SERIES_FIELDS = ("model", "hardware", "framework", "precision", "spec_method", "disagg", "benchmark_type",
-                 "isl", "osl", "image")
+SERIES_FIELDS = ("model", "hardware", "precision", "framework", "spec_method", "disagg")
 SPLITS = ("train", "validation", "test")
 KINDS = ("train", "validation", "test", "prospective")     # prospective is a subset of test
 
@@ -38,32 +40,20 @@ class SplitError(ValueError):
     pass
 
 
-def _image(ref) -> str:
-    return str(ref or "").split("@", 1)[0]
-
-
-def _int(x):
-    return None if x is None else int(x)
-
-
 def from_row(row: dict) -> dict:
     """The series of an InferenceX API row."""
     return {"model": row["model"], "hardware": row["hardware"], "framework": row["framework"],
             "precision": row["precision"], "spec_method": row.get("spec_method") or "none",
-            "disagg": bool(row.get("disagg")), "benchmark_type": row["benchmark_type"],
-            "isl": _int(row.get("isl")), "osl": _int(row.get("osl")), "image": _image(row.get("image"))}
+            "disagg": bool(row.get("disagg"))}
 
 
 def from_contract(facets: dict) -> dict:
     """The series of a scored point of a contract directory: its facets and identity carry the same
     fields as the row (the facet `model` is the catalog's name, so the identity's slug is used)."""
     ident = facets["identity"]
-    w = str(facets["workload"]).split(":")
-    isl, osl = (int(w[0]), int(w[1])) if len(w) == 2 and all(x.isdigit() for x in w) else (None, None)
     return {"model": ident["model"], "hardware": ident["hardware"], "framework": ident["framework"],
             "precision": ident["precision"], "spec_method": facets.get("spec_method") or "none",
-            "disagg": facets.get("serving") == "disaggregated", "benchmark_type": ident["benchmark_type"],
-            "isl": isl, "osl": osl, "image": _image(facets.get("image"))}
+            "disagg": facets.get("serving") == "disaggregated"}
 
 
 def series_id(series: dict) -> str:

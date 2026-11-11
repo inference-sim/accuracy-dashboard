@@ -11,50 +11,64 @@ import ranking as rk  # noqa: E402
 import split as sp  # noqa: E402
 
 SERIES = {"model": "minimaxm3", "hardware": "b200", "framework": "vllm", "precision": "fp8", "spec_method": "none",
-          "disagg": False, "benchmark_type": "single_turn", "isl": 8192, "osl": 1024, "image": "vllm/vllm-openai:v0.32.0"}
+          "disagg": False}
+# An InferenceX API row of that group: the workload and the image are on the row and not in the group.
+ROW = {**SERIES, "benchmark_type": "single_turn", "isl": 8192, "osl": 1024, "image": "vllm/vllm-openai:v0.32.0"}
 
 
 # ---- the constants and the rule are pinned
 
 def test_the_constants_are_pinned():
-    assert (sp.SALT, sp.TRAIN_PCT, sp.VALIDATION_PCT, sp.FREEZE_DATE) == ("blis-dev-split-1", 60, 20, "2026-11-09")
-    assert sp.SERIES_FIELDS == ("model", "hardware", "framework", "precision", "spec_method", "disagg",
-                                "benchmark_type", "isl", "osl", "image")
+    assert (sp.SALT, sp.TRAIN_PCT, sp.VALIDATION_PCT, sp.FREEZE_DATE) == ("blis-dev-split-2", 60, 20, "2026-11-09")
+    assert sp.SERIES_FIELDS == ("model", "hardware", "precision", "framework", "spec_method", "disagg")
 
 
 def test_the_assignment_of_known_series_is_pinned():
     sid = sp.series_id(SERIES)
-    assert sid == '["minimaxm3","b200","vllm","fp8","none",false,"single_turn",8192,1024,"vllm/vllm-openai:v0.32.0"]'
-    assert (sp.bucket(sid), sp.split_of(sid)) == (88, "test")
-    assert (sp.bucket(sp.series_id({**SERIES, "hardware": "h200"})), sp.split_of({**SERIES, "hardware": "h200"})) == (28, "train")
-    assert sp.split_of({**SERIES, "model": "dsv4"}) == "test"
+    assert sid == '["minimaxm3","b200","fp8","vllm","none",false]'
+    assert (sp.bucket(sid), sp.split_of(sid)) == (74, "validation")
+    assert (sp.bucket(sp.series_id({**SERIES, "hardware": "h200"})), sp.split_of({**SERIES, "hardware": "h200"})) == (7, "train")
+    assert sp.split_of({**SERIES, "model": "gptoss120b"}) == "test"
+
 
 
 def test_the_split_has_the_stated_proportions_over_many_series():
     counts = {"train": 0, "validation": 0, "test": 0}
     for i in range(20000):
-        counts[sp.split_of(sp.series_id({**SERIES, "isl": i}))] += 1
+        counts[sp.split_of(sp.series_id({**SERIES, "model": f"m{i}"}))] += 1
     assert abs(counts["train"] / 20000 - 0.60) < 0.02 and abs(counts["validation"] / 20000 - 0.20) < 0.02
     assert abs(counts["test"] / 20000 - 0.20) < 0.02
 
 
 def test_every_row_of_a_series_has_one_split_whatever_its_concurrency():
-    rows = [{"id": str(i), "conc": c, **{k: v for k, v in SERIES.items()}, "date": "2026-10-01"} for i, c in enumerate((1, 2, 4, 8, 64))]
+    rows = [{"id": str(i), "conc": c, **ROW, "date": "2026-10-01"} for i, c in enumerate((1, 2, 4, 8, 64))]
     assert len({sp.split_of(sp.from_row(r)) for r in rows}) == 1
 
 
+def test_a_group_is_not_split_by_workload_image_or_benchmark_type():
+    """The audit's finding: keyed on ISL, OSL and image, 127 of 278 model/hardware/precision/framework
+    groups spanned splits, so a test point was often the same deployment at another workload."""
+    base = sp.from_row(ROW)
+    for change in ({"isl": 1024, "osl": 8192}, {"image": "vllm/vllm-openai:nightly"}, {"benchmark_type": "agentic_traces"}):
+        assert sp.from_row({**ROW, **change}) == base
+        assert sp.split_of(sp.from_row({**ROW, **change})) == sp.split_of(base)
+    for change in ({"model": "dsv4"}, {"hardware": "h200"}, {"precision": "fp4"}, {"framework": "sglang"},
+                   {"spec_method": "mtp"}, {"disagg": True}):
+        assert sp.from_row({**ROW, **change}) != base
+
+
 def test_a_digest_in_the_image_does_not_make_a_new_series():
-    a = sp.from_row({**SERIES, "image": "vllm/vllm-openai:v0.32.0@sha256:" + "a" * 64})
-    assert a == sp.from_row(SERIES)
+    a = sp.from_row({**ROW, "image": "vllm/vllm-openai:v0.32.0@sha256:" + "a" * 64})
+    assert a == sp.from_row(ROW)
 
 
 def test_the_series_of_a_row_and_of_a_contract_point_agree():
     facets = {"identity": {"model": "minimaxm3", "hardware": "b200", "framework": "vllm", "precision": "fp8",
                            "benchmark_type": "single_turn"}, "workload": "8192:1024", "serving": "aggregated",
               "spec_method": None, "image": "vllm/vllm-openai:v0.32.0"}
-    assert sp.from_contract(facets) == sp.from_row({**SERIES, "disagg": False})
+    assert sp.from_contract(facets) == sp.from_row(ROW)
     assert sp.from_contract({**facets, "serving": "disaggregated"})["disagg"] is True
-    assert sp.from_contract({**facets, "workload": "agentx"})["isl"] is None        # an agentic point has no ISL/OSL
+    assert sp.from_contract({**facets, "workload": "agentx"}) == sp.from_contract(facets)   # the workload is not in the group
 
 
 # ---- prospective, fit and selection
@@ -67,10 +81,9 @@ def test_a_point_after_the_freeze_is_prospective_whatever_its_series_hashes_to()
 
 
 def test_only_train_feeds_a_fit_and_train_with_validation_a_selection():
-    tr, va, te = [s for s in (({**SERIES, "isl": i}) for i in range(60)) ][:0] or (None, None, None)
     by = {}
     for i in range(200):
-        s = {**SERIES, "isl": i}
+        s = {**SERIES, "model": f"m{i}"}
         by.setdefault(sp.split_of(s), s)
     assert sp.usable_for_fit(by["train"], "2026-10-01") and not sp.usable_for_fit(by["validation"], "2026-10-01")
     assert not sp.usable_for_fit(by["test"], "2026-10-01") and not sp.usable_for_fit(by["train"], "2026-11-10")
@@ -94,7 +107,7 @@ def rows_of():
     out = []
     for i, hw in enumerate(("b200", "h200", "b300", "h100", "gb200", "mi300x")):
         for j in range(3):
-            out.append({"id": f"{1000 + i * 10 + j}", **SERIES, "hardware": hw, "run_url": f"https://github.com/o/r/actions/runs/{500 + i}/attempts/1"})
+            out.append({"id": f"{1000 + i * 10 + j}", **ROW, "hardware": hw, "run_url": f"https://github.com/o/r/actions/runs/{500 + i}/attempts/1"})
     return out
 
 
@@ -141,7 +154,7 @@ def test_the_splits_of_a_manifest():
     m = {"points": [{"point_id": "p1", "row": row, "identity": {"measured_date": "2026-10-01"}},
                     {"point_id": "p2", "row": row, "identity": {"measured_date": "2026-11-10"}}]}
     a = sp.assign_manifest(m)
-    assert a["p1"]["kind"] == "test" and a["p2"]["kind"] == "prospective" and a["p1"]["series"] == a["p2"]["series"]
+    assert a["p1"]["kind"] == "validation" and a["p2"]["kind"] == "prospective" and a["p1"]["series"] == a["p2"]["series"]
 
 
 # ---- ranking

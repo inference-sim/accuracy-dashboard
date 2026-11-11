@@ -56,6 +56,12 @@ def make_run(tmp, name, scored, not_scored=(), failed=(), harness=H1, units="u" 
         "units": {"sha256": units, "count": len(scored) + len(ns) + len(failed), "not_in_pull": []},
         "pull_manifest_sha256": pull, "fields_sha256": "f" * 64, "engine": {"kind": "vllm", "version": "0.32.0"},
         "blis": {"release": name}, "experimental": False}))
+    # The splits file beside the contract directories (compare.py requires it when a point is unscored).
+    sp = Path(tmp) / "splits.json"
+    known = json.loads(sp.read_text()) if sp.exists() else {}
+    for n in [n for n, _, _ in not_scored] + list(failed):
+        known[pid(n)] = {"series": "s", "kind": "train"}
+    sp.write_text(json.dumps(known))
     return d
 
 
@@ -277,3 +283,37 @@ def test_the_committed_splits_file_matches_the_rule():
     for pid, e in json.loads(root.read_text()).items():
         assert e["kind"] in sp.KINDS
         assert e["kind"] == "prospective" or e["kind"] == sp.split_of(e["series"])
+
+
+# ----------------------------------------------------------------- the test split is withheld from every figure
+
+def _with_test_points(tmp_path, monkeypatch):
+    """Twelve train points of model mA at scale 1.1 and twelve test points of model mT at scale 2.0."""
+    monkeypatch.setattr(c.dsplit, "split_of", lambda s: "test" if '"mT"' in (s if isinstance(s, str) else repr(s)) else "train")
+    pts = sweep(0, "mA", "b200", "G2", 1.1, (1, 2, 4, 8)) * 1 + sweep(10, "mA", "b200", "G2", 1.1, (1, 2, 4, 8)) \
+        + sweep(20, "mA", "b200", "G2", 1.1, (1, 2, 4, 8)) + sweep(30, "mT", "b200", "G2", 2.0, (1, 2, 4, 8)) \
+        + sweep(40, "mT", "b200", "G2", 2.0, (1, 2, 4, 8)) + sweep(50, "mT", "b200", "G2", 2.0, (1, 2, 4, 8))
+    return make_run(tmp_path, "r", pts, [(100, "b200", [("field_not_modelled", "x")])])
+
+
+def test_no_aggregate_of_a_report_includes_a_test_point_so_the_test_figure_cannot_be_derived(tmp_path, monkeypatch):
+    run = c.Run(_with_test_points(tmp_path, monkeypatch))
+    t = c.run_report(run, "in_sample")
+    assert t["headline"]["points"] == 12 and t["headline"]["withheld"] == 12
+    assert t["headline"]["ttft"]["mape"]["value"] == pytest.approx(10.0)         # train only: scale 1.1
+    g2 = t["grades"]["G2"]
+    assert g2["points"] == 24 and g2["accuracy"]["points"] == 12                  # the count is public, the figure is not
+    assert g2["accuracy"]["ttft"]["mape"]["value"] == pytest.approx(10.0)
+    ds = t["development_split"]["kinds"]
+    assert ds["test"] == {"points": 12, "withheld": True}
+    # With a logged evaluation the figures include them.
+    t2 = c.run_report(c.Run(run.dir), "in_sample", evaluate_test=True)
+    assert t2["headline"]["points"] == 24 and t2["headline"]["withheld"] == 0
+    assert t2["headline"]["ttft"]["mape"]["value"] == pytest.approx(55.0)
+
+
+def test_a_contract_with_unscored_points_and_no_splits_file_is_refused(tmp_path):
+    d = make_run(tmp_path, "r", sweep(0, "m1", "b200", "G2", 1.1), [(100, "b200", [("field_not_modelled", "x")])])
+    (Path(tmp_path) / "splits.json").unlink()
+    with pytest.raises(c.CompareError, match="no splits file"):
+        c.Run(d)

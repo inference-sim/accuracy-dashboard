@@ -91,6 +91,7 @@ class Run:
         if sp.is_file():
             self._splits = json.loads(sp.read_text())
         rf = d.parent / "refusals.json"
+        self._splits_path = sp
         self._refusals = json.loads(rf.read_text()) if rf.is_file() else {}
         self.prov = json.loads((d / "provenance.json").read_text())
         facets = json.loads((d / "facets.json").read_text())
@@ -122,6 +123,9 @@ class Run:
                 "precision": ident.get("precision", ""),
                 "g5_reasons": [tuple(f.split(":", 1)) if ":" in f else (f, "") for f in n.get("faults") or []],
                 "substitutions": [], "harness_commit": None}
+        if self._splits is None and any(p["status"] != "scored" for p in self.points.values()):
+            raise CompareError(f"{d}: no splits file at {sp}: without it every point that was not scored has no "
+                               f"split and is 'unassigned'; pass --splits (docs/reproducing.md)")
         if len(self.points) != self.prov["points"]:
             raise CompareError(f"{d}: {len(self.points)} points in the files, {self.prov['points']} in provenance.json")
         for pid, p in self.points.items():
@@ -140,6 +144,14 @@ class Run:
             elif self._splits and pid in self._splits:
                 e = self._splits[pid]
                 p["series"], p["kind"] = e["series"], e["kind"]
+
+    def withhold(self, evaluate_test: bool) -> None:
+        """Mark the test and prospective points withheld unless a logged test evaluation was asked
+        for: every accuracy figure of a report (headline, grades, attribution, movement) leaves them
+        out, so no published aggregate lets the test figure be derived by subtraction. Counts of
+        points are unaffected."""
+        for p in self.points.values():
+            p["withheld"] = (not evaluate_test) and p.get("kind") in ("test", "prospective")
 
     def identity(self, sample: str) -> dict:
         p = self.prov
@@ -256,8 +268,9 @@ def _fig(vals):
 
 def accuracy(points: list[dict]) -> dict:
     """MAPE (absolute percent) and shape, TTFT and TPOT, over scored points; each with its n."""
-    pts = [p for p in points if p["status"] == "scored"]
-    return {"points": len(pts),
+    scored = [p for p in points if p["status"] == "scored"]
+    pts = [p for p in scored if not p.get("withheld")]
+    return {"points": len(pts), "withheld": len(scored) - len(pts),
             **{m: {"mape": _fig(_errs(pts, m)), "shape": _fig(_shape(pts, m))} for m in ("ttft", "tpot")},
             "noise_floor_pct": bs.FALLBACK_NOISE_FLOOR_PCT, "noise_floor_source": "fallback; none measured per point"}
 
@@ -401,6 +414,7 @@ def held_out_figure(points: list[dict]) -> dict:
 
 
 def run_report(run: Run, sample: str, evaluate_test: bool = False) -> dict:
+    run.withhold(evaluate_test)
     problems = check_run(run, sample)
     if problems:
         raise CompareError("; ".join(problems))
@@ -430,6 +444,8 @@ def _brief(p):
 
 
 def pair_report(before: Run, after: Run, sample: str, evaluate_test: bool = False) -> dict:
+    before.withhold(evaluate_test)
+    after.withhold(evaluate_test)
     check_pair(before, after, sample, sample)
     b, a = before.points, after.points
     sb = {i for i, p in b.items() if p["status"] == "scored"}
