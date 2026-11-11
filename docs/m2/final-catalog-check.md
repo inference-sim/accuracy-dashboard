@@ -1,6 +1,6 @@
-# The dashboard against the final substrate stack (layer 10 tip e1a1d97d491b8907f9ffd7f4697b1b1f6cde2c02)
+# The dashboard against the final substrate stack
 
-Checked 2026-11-10 against a checkout of that commit (`catalog/`, `registry/`, `docs/contracts/`). No simulator ran on the new catalog (below).
+Checked 2026-11-10 against a checkout of the layer 10 tip as first pushed (short hash e1a1d97); layers 8 to 10 were then rebased with identical code, and the final pin target is `799dd5af9151eb46b2ef1e3a10c7435adfec8b38` (branch `m2/10-router-table-and-closeness-record`). The hash is a parameter everywhere else (`docs/m2/after-run.sh` takes `SUBSTRATE`), and the files checked were `catalog/`, `registry/` and `docs/contracts/`. No simulator ran on the new catalog (below).
 
 ## Names the dashboard reads
 
@@ -37,4 +37,4 @@ Why 235 eagle3 points stay: 235 name their draft model by a local path (`/scratc
 
 ## The after run
 
-`docs/m2/after-run.sh` is the command, with the pins it needs: the simulator commit (PR 4 and PR 5), the substrate commit and its release tag, the blis-vllm commit whose `fields.json` the simulator's engine carries, the baseline's frozen pull (not committed) and the corpora. `run.sh` accepts a catalog and registry named by a release tag only, so until the substrate is tagged the script stops.
+`docs/m2/after-run.sh` is the command, with the pins it needs: the simulator commit (PR 4 and PR 5), the substrate commit, the blis-vllm commit whose `fields.json` the simulator's engine carries, the baseline's frozen pull (not committed) and the corpora. `run.sh` accepts the catalog and registry pins as a release tag or a full 40-hex commit, so the script passes the substrate commit; a figure whose data is pinned by commit is experimental.

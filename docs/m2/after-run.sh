@@ -2,17 +2,16 @@
 # The after run of the M2 before/after, in one command once the pins exist.
 #
 #   SIM=<inference-sim commit or release tag>        the simulator with PR 4 (fields, ledger, metrics) and PR 5
-#   SUBSTRATE=<blis-substrate commit>                 catalog, registry and ledger: the stack's layer 10 tip or later
-#   SUBSTRATE_TAG=<vX.Y.Z>                            the release tag run.sh requires for --catalog-release and
-#                                                     --registry-release; until the substrate is tagged the run is
-#                                                     not one run.sh accepts, and this script stops
+#   SUBSTRATE=<blis-substrate commit>                 catalog, registry and ledger; also the --catalog-release and
+#                                                     --registry-release the run records (a commit is accepted while
+#                                                     the stack is open)
 #   BLIS_VLLM=<blis-vllm commit>                      the commit whose fields.json the simulator's engine release carries
 #   BASELINE=docs/m2/baseline-v0.16.0                 the baseline's directory (README, units.txt, contract/)
 #   PULL=<dir>                                        the baseline's frozen pull (not committed; see its README)
 #   CORPUS=<dir>                                      the corpora (resolve_agentic_corpus.py --all fetches them)
 #   WORK=<dir>                                        scratch space
 #
-#   SIM=... SUBSTRATE=... SUBSTRATE_TAG=... BLIS_VLLM=... PULL=... CORPUS=... WORK=... bash docs/m2/after-run.sh
+#   SIM=... SUBSTRATE=... BLIS_VLLM=... PULL=... CORPUS=... WORK=... bash docs/m2/after-run.sh
 #
 # It scores the same units over the same pull from a checkout of the harness commit the baseline
 # records, then writes the before/after table (compare.py refuses two harness commits, unit sets,
@@ -23,11 +22,10 @@
 set -euo pipefail
 
 need() { [ -n "${!1:-}" ] || { echo "after-run.sh: $1 is required" >&2; exit 2; }; }
-for v in SIM SUBSTRATE SUBSTRATE_TAG BLIS_VLLM PULL CORPUS WORK; do need "$v"; done
+for v in SIM SUBSTRATE BLIS_VLLM PULL CORPUS WORK; do need "$v"; done
 BASELINE="${BASELINE:-docs/m2/baseline-v0.16.0}"
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 [[ "$SUBSTRATE" =~ ^[0-9a-f]{40}$ && "$BLIS_VLLM" =~ ^[0-9a-f]{40}$ ]] || { echo "after-run.sh: SUBSTRATE and BLIS_VLLM are full 40-hex commits" >&2; exit 2; }
-[[ "$SUBSTRATE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "after-run.sh: SUBSTRATE_TAG is a release tag vX.Y.Z" >&2; exit 2; }
 [ -f "$PULL/manifest.json" ] || { echo "after-run.sh: $PULL holds no frozen pull; the baseline's pull is not persisted, so freeze it again with orchestrator/baseline/freeze.py (a new pull is a new point set: rescore the baseline too)" >&2; exit 2; }
 
 mkdir -p "$WORK"
@@ -50,7 +48,7 @@ run() {   # run SIM CATALOG REGISTRY CATALOG_TAG FIELDS OUT
 
 before="$repo/$BASELINE/contract"
 after="$WORK/after"
-rm -rf "$after"; run "$SIM" "$WORK/substrate" "$WORK/substrate" "$SUBSTRATE_TAG" "$WORK/fields.json" "$after"
+rm -rf "$after"; run "$SIM" "$WORK/substrate" "$WORK/substrate" "$SUBSTRATE" "$WORK/fields.json" "$after"
 
 # The table: refuses two harness commits, unit sets, pull sets, point sets, or in-sample against held-out.
 python3 "$repo/orchestrator/baseline/compare.py" pair --before "$before" --after "$after" --sample in_sample \
