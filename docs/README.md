@@ -12,6 +12,7 @@ The dashboard asks one question of every InferenceX benchmark point it can read:
 | [The evaluation protocol](m2/evaluation-protocol.md) | The development split, selection, the evaluation log, ranking metrics. |
 | [The evaluation log](m2/evaluation-log.md) | Every evaluation of a test set. |
 | [Reproducing the baseline and the after run](reproducing.md) | Every pin by hash, the commands, environment, expected counts, cost, and what cannot be reproduced. |
+| [Does the dashboard compare like with like?](comparability.md) | Dimension by dimension: how InferenceX measured, how the dashboard and BLIS rebuild it, whether they agree, which differences a point names and which it does not, how to reproduce the checks. |
 | [Reading the before/after report](before-after.md) | How to read `table.md`; the baseline and the preliminary after-run. |
 | [Disaggregated serving and routers](disaggregation.md) | How prefill/decode points are expressed, why they are not scored yet, the router substitution rule and table. |
 | [Coefficients](coefficients.md) | How the cost model's coefficients are produced and graded, with links to the substrate's pages. |
