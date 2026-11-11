@@ -183,7 +183,7 @@ def emit(dep: dict, labels: set[str], packaging: dict, engine_release: str) -> s
         f"  hardware: {dep['gpu']}",
     ]
     if nodes > 1:
-        # No InferenceX record names a cluster's fabric class: ib-400g is ASSUMED (accuracy-dashboard#66).
+        # No InferenceX record names a cluster's fabric class: ib-400g is ASSUMED.
         lines.append("  # fabric: ASSUMED. No record names this cluster's fabric class; ib-400g is the catalog's class.")
         lines.append("  fabric: ib-400g")
     lines.append(f"  nodes: {nodes}")

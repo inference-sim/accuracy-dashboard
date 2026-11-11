@@ -420,7 +420,10 @@ def cmd_score(a) -> int:
         vllm_ref=manifest["vllm_ref"], field_list=field_list, fields_sha256=fields_sha,
         base_models=manifest.get("base_models") or {}, timeout_s=a.timeout, vllm_defaults=vdefaults,
         vllm_defaults_release=st.vllm_defaults_release(),
-        max_rss_mb=getattr(a, "max_rss_mb", 0) or 0, engine_release=engine_release)
+        max_rss_mb=getattr(a, "max_rss_mb", 0) or 0, engine_release=engine_release,
+        routers_dir=Path(a.router_table).resolve() if getattr(a, "router_table", None) else None,
+        assumed_router_revision=getattr(a, "assume_router_revision", None),
+        router_policy_experiment=getattr(a, "router_policy_experiment", None))
     # The build every point records: --sim-build, else the release tag the checkout is at
     # (check_blis_inputs required one), with the engine release its stack.json names (COV-6).
     env.sim_build = sim_build or env.blis_release
@@ -457,8 +460,8 @@ def cmd_score(a) -> int:
             # Design §11.7, X8: a figure is experimental unless its build and its data are both
             # released. The build is released when it is a release tag, and the data when the
             # catalog and the registry are named by release tags, not by commits.
-            "experimental": not all(_RELEASE_TAG.match(x) for x in (env.sim_build, env.catalog_release,
-                                                                     env.registry_release)),
+            "experimental": env.routers_dir is not None or env.assumed_router_revision is not None or env.router_policy_experiment is not None or not all(
+                _RELEASE_TAG.match(x) for x in (env.sim_build, env.catalog_release, env.registry_release)),
             "left_out_records": len((manifest.get("ledger") or {}).get("unlisted") or []),
             "vllm_ref": manifest["vllm_ref"], "vllm_max_distance": manifest["vllm_max_distance"],
             "fields_sha256": fields_sha, "pulled_at": manifest["pulled_at"],
@@ -700,6 +703,13 @@ def main(argv=None) -> int:
                    help="each AgentX corpus at <dir>/<workload>/<file>, as resolve_agentic_corpus.py --all "
                         "fetched it at the revision its catalog replay workload pins")
     s.add_argument("--corpus-cache")
+    s.add_argument("--router-table", help="a directory of router table entries to read in place of <catalog>/routers: for an "
+                                          "experiment with a candidate entry. The run is then experimental.")
+    s.add_argument("--assume-router-revision", help="a 40-hex commit of the router build to assume where a run records only "
+                                                    "a wheel version (an experiment; the point says it was assumed, and the run is experimental)")
+    s.add_argument("--router-policy-experiment", choices=["round-robin", "random-picker", "least-active-requests", "default"],
+                   help="an llm-d policy to stand in for a router the table does not map, to measure the prefill/decode writer "
+                        "apart from the router question (an experiment: each such point names it, and the run is experimental)")
     s.add_argument("--work")
     s.add_argument("--timeout", type=int, default=7200)
     s.add_argument("--only", nargs="*")

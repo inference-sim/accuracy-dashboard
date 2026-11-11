@@ -699,6 +699,14 @@ def decide(settings: dict[str, Setting], field_list) -> Decided:
             # stated value it must refuse or price (design 11.2). The point records the value.
             d.args.append({**rec, "blis": None, "match": "resolved_not_stated"})
             continue
+        if loc.startswith("engine.env."):
+            f = field_list.lookup(path)
+            if f is not None and f.status in (fl.PROVEN_INERT, fl.INERT_UNPROVEN):
+                # The engine reads only the environment variables it models and refuses any other key
+                # of the block (blis-vllm: "is not read by this engine"), so a variable the field list
+                # calls inert is recorded on the point and not stated in the scenario.
+                d.args.append({**rec, "blis": None, "match": "inert"})
+                continue
         if loc.startswith("engine.env.") and isinstance(st.value, bool):
             # vLLM's deprecation warning shows the variable was set, not its value.
             d.reasons.append(f"required_setting_missing:{path}")
@@ -727,7 +735,7 @@ def decide(settings: dict[str, Setting], field_list) -> Decided:
 
 # A scenario of more than one node needs a fabric class (the cluster states it) and the registry's
 # fabric efficiency: without cost-model-fabric the kernel prices a handoff or cross-node collective at
-# the catalog's nominal rate, 23% fast on ib-400g (accuracy-dashboard#66). No InferenceX record names the
+# the catalog's nominal rate, 23% fast on ib-400g. No InferenceX record names the
 # fabric class of a cluster (runners.yaml and the launch configuration hold none), so the class is
 # assumed and the point names it.
 FABRIC_COEFFICIENT = "cost-model-fabric"

@@ -120,10 +120,14 @@ def _g(subs, version="0.32.0"):
     return g.grade(engine_version="0.32.0", release=g.Release(version=version, nightly_or_custom=False), substitutions=subs)
 
 
+RD = {"difference": [{"aspect": "counter", "text": "the counters differ"}], "bound": {"ratios": []}, "revision": "1" * 40}
+
+
 def test_g1_g2_still_grade_correctly_for_a_run_on_the_simulators_release():
     # No in-scope InferenceX point runs v0.32.0 today; when one does, the grade must be right.
     assert _g([]).grade == "G1"
-    sub = {"kind": "router_differs", "subject": "dynamo", "entry": "dynamo-round-robin", "policy": "round-robin", "evidence": "table row 3"}
+    sub = {"kind": "router_differs", "subject": "dynamo", "entry": "dynamo-round-robin", "policy": "round-robin", "evidence": "table row 3",
+           **RD}
     assert _g([sub]).grade == "G2"
     assert _g([], version="0.31.0").grade == "G4"           # another release, no published diff
 
@@ -133,12 +137,14 @@ def test_a_substitution_names_the_keys_of_its_kind_and_no_others():
     assert _g([ok]).grade == "G2"
     for bad in ({**ok, "date": "2026-7-2"}, {k: v for k, v in ok.items() if k != "record"},
                 {k: v for k, v in ok.items() if k != "date"}, {**ok, "policy": "x"},
-                {"kind": "router_differs", "subject": "r", "policy": "round-robin", "entry": "r-x"},
-                {"kind": "router_differs", "subject": "r", "evidence": "e", "entry": "r-x"},
-                {"kind": "router_differs", "subject": "r", "evidence": "e", "policy": "round-robin"},
-                {"kind": "router_differs", "subject": "dynamo", "entry": "dynamo-round-robin", "policy": "none", "evidence": "e"},
-                {"kind": "router_differs", "subject": "dynamo", "entry": "other-round-robin", "policy": "round-robin", "evidence": "e"},
-                {"kind": "router_differs", "subject": "dynamo", "entry": "dynamo-x", "policy": "least-loaded", "evidence": "e"},
+                {"kind": "router_differs", "subject": "r", "policy": "round-robin", "entry": "r-x", **RD},
+                {"kind": "router_differs", "subject": "r", "evidence": "e", "entry": "r-x", **RD},
+                {"kind": "router_differs", "subject": "r", "evidence": "e", "policy": "round-robin", **RD},
+                {"kind": "router_differs", "subject": "r", "evidence": "e", "policy": "round-robin", "entry": "r-x", "bound": RD["bound"]},
+                {"kind": "router_differs", "subject": "r", "evidence": "e", "policy": "round-robin", "entry": "r-x", "difference": RD["difference"]},
+                {"kind": "router_differs", "subject": "dynamo", "entry": "dynamo-round-robin", "policy": "none", "evidence": "e", **RD},
+                {"kind": "router_differs", "subject": "dynamo", "entry": "other-round-robin", "policy": "round-robin", "evidence": "e", **RD},
+                {"kind": "router_differs", "subject": "dynamo", "entry": "dynamo-x", "policy": "least-loaded", "evidence": "e", **RD},
                 {"kind": "estimated", "subject": "f", "detail": "d", "record": "x"},
                 {"kind": "client_difference", "subject": "send_gap"}, {"kind": "resolved_differs", "subject": "block_size"}):
         with pytest.raises(g.GradeError):

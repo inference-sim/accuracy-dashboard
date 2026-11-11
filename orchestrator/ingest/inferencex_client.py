@@ -526,7 +526,7 @@ SEND_GAP_DETAIL = (f"BLIS releases the next request at the previous one's comple
 
 def client_differences(verified: bool, why: str, *, flags_assumed: bool = False,
                        release_unrecorded: bool = False, population_unrecorded: bool = False,
-                       client_bound: bool = False) -> list[dict]:
+                       client_bound: bool = False, benchmark_client: str | None = None) -> list[dict]:
     """Every remaining difference between the run's client and the simulated one, each named on
     the point; any of them makes the point G2 (COV-12). Kind "client_difference" is the
     dashboard's name for design §11.3's G2 condition "the simulated requests differ from the
@@ -540,8 +540,12 @@ def client_differences(verified: bool, why: str, *, flags_assumed: bool = False,
     equal to the replayed targets, for the reason `why`. When `flags_assumed`, the run's job log
     is gone and its client flags are taken to be the launcher's defaults. When `release_unrecorded`,
     the InferenceX commit of the run is not known. When `population_unrecorded`, the run's completed
-    and num_prompts are in no pulled file, so requests the client lost cannot be ruled out."""
+    and num_prompts are in no pulled file, so requests the client lost cannot be ruled out. When
+    `benchmark_client` is given, the run's benchmark was not InferenceX's client but the one it
+    names (a prefill/decode run's srt-slurm benchmark), and the text says what is assumed equal."""
     out = [{"kind": "client_difference", "subject": "send_gap", "detail": SEND_GAP_DETAIL}]
+    if benchmark_client:
+        out.append({"kind": "client_difference", "subject": "benchmark_client", "detail": benchmark_client})
     if not verified:
         out.append({"kind": "client_difference", "subject": "sent_prompt_lengths",
                     "detail": f"sent prompt lengths not verified equal to the replayed targets: {why}"})
