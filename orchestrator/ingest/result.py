@@ -197,6 +197,14 @@ def figure(doc: dict, metric: str) -> float:
     return float(m["value"])
 
 
+def data_block(doc: dict) -> dict | None:
+    """The Result's `data` block: the catalog and registry the run read, with their content hashes,
+    whether the data is a released one, and the simulator build (contracts/spec/result Data). The point
+    record states it as `simulator.data`. None when the Result carries none."""
+    d = doc.get("data")
+    return d if isinstance(d, dict) and isinstance(d.get("catalog"), dict) and isinstance(d.get("registry"), dict) else None
+
+
 def rows(doc: dict) -> list[dict]:
     """The Result's per-request rows. The harness asks for them, so their absence is an error."""
     r = doc.get("request_rows")

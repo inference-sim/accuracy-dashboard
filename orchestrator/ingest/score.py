@@ -454,6 +454,10 @@ class Outcome:
     # library versions it recorded; and, set once the Result is read, the conditions still unevaluated.
     g1_inputs: dict | None = None
     unevaluated: list = field(default_factory=lambda: list(gr.UNCHECKED_KINDS))
+    # What the point record (pointrecord.py) needs of the Result and the run: the Result's data block, and
+    # the number of requests behind the predicted and the measured mean.
+    result_data: dict | None = None
+    samples: tuple | None = None
 
 
 def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env, simulate: bool = True) -> Outcome:
@@ -813,6 +817,11 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
                   "resolved": resolved_kv(log, doc), "replay": {**r.record(corpus["sha256"]), "differences": rp.client_differences(r)},
                   "blis_kernel_provenance": result.kernel_report(doc)}
     note_realised_acceptance(o.fidelity, b, log)
+    o.result_data = result.data_block(doc)
+    # The pulled data does not hold the number of requests the client averaged over; the simulated count
+    # stands for both sides and pointrecord.py says so.
+    n_agentic = int((doc.get("metrics") or {}).get(result.TTFT_MEAN_MS, {}).get("samples") or 0)
+    o.samples = (n_agentic, n_agentic)
     par = dep["pools"][0]["parallel"]
     ep = (par["tp"] * par["dp"]) if par.get("enable_expert_parallel") else 1
     scen = f"{sup.model}-{row['hardware']}-{row['precision']}-vllm-tp{par['tp']}-dp{par['dp']}-ep{ep}-agentx"
@@ -1024,6 +1033,8 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     o.fidelity = {"build": entry["build"], "args": args, "resolved": [],
                   "blis_kernel_provenance": result.kernel_report(doc), "requests": requests}
     note_realised_acceptance(o.fidelity, b, log)
+    o.result_data = result.data_block(doc)
+    o.samples = (len(ins), len(ins))       # the client's num-prompts: 10 x concurrency requests
     ep = (par["tp"] * par["dp"]) if par.get("enable_expert_parallel") else 1
     label = _single_turn_label(isl, osl)
     scen = f"{model}-{row['hardware']}-{row['precision']}-vllm-tp{par['tp']}-dp{par['dp']}-ep{ep}"
@@ -1203,6 +1214,9 @@ def write_contract(out: Path, outcomes: list[Outcome], provenance: dict) -> None
     for name, recs in ((contract.NOT_SCORED_JSONL, ns), (contract.FAILED_JSONL, failed)):
         recs.sort(key=lambda r: r["point_id"])
         (out / name).write_text("".join(contract.canonical_dumps(r) + "\n" for r in recs))
+    import pointrecord
+    csv_rows = {r["point_id"]: r for r in csv.DictReader(io.StringIO(buf.getvalue()))}
+    (out / contract.POINTRECORDS_JSONL).write_text(pointrecord.dumps(pointrecord.assemble(outcomes, provenance, csv_rows)))
     prov = {**provenance, "points": len(outcomes)}
     (out / contract.PROVENANCE_JSON).write_text(contract.canonical_dumps(prov) + "\n")
 
