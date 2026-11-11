@@ -209,7 +209,7 @@ def check_registry(registry: Path, doc: dict) -> list[str]:
 
 def main(argv=None) -> int:
     import argparse
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
     l = sub.add_parser("list", help="write the published series list from API rows (a JSON list)")
     l.add_argument("--rows", required=True)
