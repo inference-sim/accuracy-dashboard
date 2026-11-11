@@ -822,6 +822,165 @@
    "mi355x": 280
   }
  },
+ "development_split": {
+  "constants": {
+   "freeze_date": "2026-11-09",
+   "salt": "blis-dev-split-1",
+   "train_pct": 60,
+   "validation_pct": 20
+  },
+  "kinds": {
+   "prospective": {
+    "points": 0,
+    "withheld": true
+   },
+   "test": {
+    "points": 332,
+    "withheld": true
+   },
+   "train": {
+    "accuracy": {
+     "noise_floor_pct": 1.6,
+     "noise_floor_source": "fallback; none measured per point",
+     "points": 26,
+     "tpot": {
+      "mape": {
+       "n": 26,
+       "value": 21.297093702320517
+      },
+      "shape": {
+       "n": 21,
+       "value": 8.563206133570725
+      }
+     },
+     "ttft": {
+      "mape": {
+       "n": 26,
+       "value": 43.05984397497094
+      },
+      "shape": {
+       "n": 21,
+       "value": 23.967922740906097
+      }
+     }
+    },
+    "grades": {
+     "G4": 26,
+     "G5": 1084,
+     "failed": 10
+    },
+    "in_scope": 792,
+    "points": 1120,
+    "ranking": {
+     "throughput_per_gpu": {
+      "groups": 3,
+      "kendall": "too few groups",
+      "left_out": 0,
+      "regret": "too few groups",
+      "spearman": "too few groups",
+      "top1": "too few groups",
+      "top3": "too few groups",
+      "value": "throughput_per_gpu"
+     }
+    },
+    "scored": 26,
+    "series": 72
+   },
+   "unassigned": {
+    "accuracy": {
+     "noise_floor_pct": 1.6,
+     "noise_floor_source": "fallback; none measured per point",
+     "points": 0,
+     "tpot": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "ttft": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     }
+    },
+    "grades": {},
+    "in_scope": 0,
+    "points": 0,
+    "ranking": {
+     "throughput_per_gpu": {
+      "groups": 0,
+      "kendall": "too few groups",
+      "left_out": 0,
+      "regret": "too few groups",
+      "spearman": "too few groups",
+      "top1": "too few groups",
+      "top3": "too few groups",
+      "value": "throughput_per_gpu"
+     }
+    },
+    "scored": 0,
+    "series": 0
+   },
+   "validation": {
+    "accuracy": {
+     "noise_floor_pct": 1.6,
+     "noise_floor_source": "fallback; none measured per point",
+     "points": 15,
+     "tpot": {
+      "mape": {
+       "n": 15,
+       "value": 8.639267827199633
+      },
+      "shape": {
+       "n": 12,
+       "value": 14.884194367022898
+      }
+     },
+     "ttft": {
+      "mape": {
+       "n": 15,
+       "value": 10.231162193774518
+      },
+      "shape": {
+       "n": 12,
+       "value": 9.112935696373627
+      }
+     }
+    },
+    "grades": {
+     "G4": 15,
+     "G5": 267
+    },
+    "in_scope": 196,
+    "points": 282,
+    "ranking": {
+     "throughput_per_gpu": {
+      "groups": 2,
+      "kendall": "too few groups",
+      "left_out": 0,
+      "regret": "too few groups",
+      "spearman": "too few groups",
+      "top1": "too few groups",
+      "top3": "too few groups",
+      "value": "throughput_per_gpu"
+     }
+    },
+    "scored": 15,
+    "series": 21
+   }
+  },
+  "test_evaluated": false,
+  "text": "Per-split figures use the DEVELOPMENT split of docs/m2/evaluation-protocol.md, not the ledger's held-out: its test set is 'development split, not the ledger's held-out'."
+ },
  "format": "baseline-compare-1",
  "grades": {
   "G1": {

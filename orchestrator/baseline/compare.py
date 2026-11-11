@@ -44,6 +44,8 @@ import build_summary as bs  # noqa: E402
 import backlog as bl  # noqa: E402
 import grade as gr  # noqa: E402
 import headline as hl  # noqa: E402
+import ranking as rk  # noqa: E402
+import split as dsplit  # noqa: E402
 
 SAMPLES = ("in_sample", "held_out")
 SAMPLE_TEXT = {
@@ -52,6 +54,8 @@ SAMPLE_TEXT = {
                  "the simulator reproduces data it has seen, not how well it predicts new data.",
     "held_out": "HELD-OUT: every point is on the published anchor list's held-out side.",
 }
+DEV_TEXT = ("Per-split figures use the DEVELOPMENT split of docs/m2/evaluation-protocol.md, not the ledger's "
+            "held-out: its test set is 'development split, not the ledger's held-out'.")
 OUT_OF_SCOPE_CHIPS = ("mi300x", "mi325x", "mi355x")
 OUT_OF_SCOPE_PREFIXES = ("tpu",)
 SCOPE_IN, SCOPE_OUT = "in_scope", "out_of_scope"
@@ -78,9 +82,13 @@ def id_set_sha256(ids) -> str:
 class Run:
     """One contract directory, read into per-point records."""
 
-    def __init__(self, directory):
+    def __init__(self, directory, splits=None):
         import csv
         d = self.dir = Path(directory)
+        self._splits = None
+        sp = Path(splits) if splits else d.parent / "splits.json"
+        if sp.is_file():
+            self._splits = json.loads(sp.read_text())
         self.prov = json.loads((d / "provenance.json").read_text())
         facets = json.loads((d / "facets.json").read_text())
         fidelity = {r["point_id"]: r for r in _lines(d / "fidelity.jsonl")}
@@ -113,6 +121,20 @@ class Run:
                 "substitutions": [], "harness_commit": None}
         if len(self.points) != self.prov["points"]:
             raise CompareError(f"{d}: {len(self.points)} points in the files, {self.prov['points']} in provenance.json")
+        for pid, p in self.points.items():
+            p["series"], p["kind"] = None, None
+            if p["status"] == "scored":
+                fc = facets[pid]
+                p["series"] = dsplit.series_id(dsplit.from_contract(fc))
+                p["kind"] = dsplit.kind_of(p["series"], p["date"])
+                w = str(fc["workload"]).split(":")
+                isl, osl = (int(w[0]), int(w[1])) if len(w) == 2 and all(x.isdigit() for x in w) else (None, None)
+                par = fc.get("parallelism") or {}
+                p.update(isl=isl, osl=osl, gpus=int(par.get("tp", 1)) * int(par.get("pp", 1)) * int(par.get("dp", 1)),
+                         key=f"{p['sweep'][0]}|{p['sweep'][1]}|c{p['concurrency']}")
+            elif self._splits and pid in self._splits:
+                e = self._splits[pid]
+                p["series"], p["kind"] = e["series"], e["kind"]
 
     def identity(self, sample: str) -> dict:
         p = self.prov
@@ -142,6 +164,11 @@ def check_run(run: Run, sample: str) -> list[str]:
         out.append(f"{run.dir}: provenance.json names no units file (run.sh --units records its sha256)")
     if not ident["pull_manifest_sha256"]:
         out.append(f"{run.dir}: provenance.json names no pull_manifest_sha256")
+    if sample == "held_out":
+        not_held = sorted({p["kind"] or "unassigned" for p in run.points.values()} - {"test", "prospective"})
+        if not_held:
+            out.append(f"{run.dir}: a held-out figure includes {not_held} points; only test and prospective points "
+                       f"may be called held-out, and only the ledger's anchor list is the held-out (design D7)")
     commits = {p["harness_commit"] for p in run.points.values() if p["status"] == "scored"}
     if hc and commits - {hc}:
         out.append(f"{run.dir}: points were scored by harness commit(s) {sorted(c or 'none' for c in commits)}, "
@@ -335,7 +362,40 @@ def unlock_table(points: list[dict]) -> list[dict]:
     return rows
 
 
-def run_report(run: Run, sample: str) -> dict:
+def development_split(run: Run, evaluate_test: bool = False) -> dict:
+    """Every figure per split of the development split (docs/m2/evaluation-protocol.md): train,
+    validation, and, only when asked for (and logged), test and prospective. A point of no known
+    series is "unassigned". The test figures are withheld unless evaluate_test, so a report cannot
+    look at them by accident."""
+    out = {"text": DEV_TEXT, "constants": {"salt": dsplit.SALT, "train_pct": dsplit.TRAIN_PCT,
+                                           "validation_pct": dsplit.VALIDATION_PCT, "freeze_date": dsplit.FREEZE_DATE},
+           "kinds": {}, "test_evaluated": evaluate_test}
+    pts = list(run.points.values())
+    for kind in (*dsplit.KINDS, "unassigned"):
+        ps = [p for p in pts if (p["kind"] or "unassigned") == kind]
+        if kind in ("test", "prospective") and not evaluate_test:
+            out["kinds"][kind] = {"points": len(ps), "withheld": True}
+            continue
+        scored = [p for p in ps if p["status"] == "scored"]
+        out["kinds"][kind] = {"points": len(ps), "scored": len(scored),
+                              "series": len({p["series"] for p in ps if p["series"]}),
+                              "grades": dict(sorted(Counter(p["grade"] for p in ps).items())),
+                              "in_scope": sum(1 for p in ps if scope(p["hardware"]) == SCOPE_IN),
+                              "accuracy": accuracy([p for p in scored if p["grade"] in gr.GRADED]),
+                              "ranking": {"throughput_per_gpu": rk.evaluate(scored)}}
+    return out
+
+
+def held_out_figure(points: list[dict]) -> dict:
+    """A figure that may be called held-out on the development split: refused if it includes a train
+    (or validation, or unassigned) point."""
+    bad = sorted({p.get("kind") or "unassigned" for p in points} - {"test", "prospective"})
+    if bad:
+        raise CompareError(f"a held-out figure may not include {bad} points")
+    return accuracy([p for p in points if p["status"] == "scored"])
+
+
+def run_report(run: Run, sample: str, evaluate_test: bool = False) -> dict:
     problems = check_run(run, sample)
     if problems:
         raise CompareError("; ".join(problems))
@@ -344,6 +404,7 @@ def run_report(run: Run, sample: str) -> dict:
             "identity": run.identity(sample), "inputs": run.inputs(),
             "headline": accuracy([p for p in pts if p["grade"] in gr.GRADED]),
             "grades": by_grade(pts), "serving_by_grade": serving_by_grade(pts),
+            "development_split": development_split(run, evaluate_test),
             "coverage": coverage(pts), "backlog": backlog_for(pts),
             "unlock": unlock_table(pts)}
 
@@ -362,7 +423,7 @@ def _brief(p):
             "reasons": [f"{c}:{s}" if s else c for c, s in p["g5_reasons"]]}
 
 
-def pair_report(before: Run, after: Run, sample: str) -> dict:
+def pair_report(before: Run, after: Run, sample: str, evaluate_test: bool = False) -> dict:
     check_pair(before, after, sample, sample)
     b, a = before.points, after.points
     sb = {i for i, p in b.items() if p["status"] == "scored"}
@@ -374,11 +435,13 @@ def pair_report(before: Run, after: Run, sample: str) -> dict:
             "before": {"identity": before.identity(sample), "inputs": before.inputs(),
                        "headline": accuracy([p for p in b.values() if p["grade"] in gr.GRADED]),
                        "grades": by_grade(list(b.values())), "serving_by_grade": serving_by_grade(list(b.values())),
+                       "development_split": development_split(before, evaluate_test),
                        "coverage": cov_b,
                        "backlog": backlog_for(list(b.values()))},
             "after": {"identity": after.identity(sample), "inputs": after.inputs(),
                       "headline": accuracy([p for p in a.values() if p["grade"] in gr.GRADED]),
                       "grades": by_grade(list(a.values())), "serving_by_grade": serving_by_grade(list(a.values())),
+                      "development_split": development_split(after, evaluate_test),
                       "coverage": cov_a,
                       "backlog": backlog_for(list(a.values()))},
             "scored_in_both": {"points": len(both), "before": accuracy(bpts), "after": accuracy(apts),
@@ -443,6 +506,25 @@ def _serving_md(title: str, sg: dict) -> list[str]:
     return L + [""]
 
 
+def _dev_md(ds: dict, title: str = "Development split") -> list[str]:
+    L = [f"## {title}", "", ds["text"], "",
+         f"Assignment: sha256 of the salt `{ds['constants']['salt']}` and the series, mod 100; train below "
+         f"{ds['constants']['train_pct']}, validation below {ds['constants']['train_pct'] + ds['constants']['validation_pct']}, "
+         f"test above; a point measured after {ds['constants']['freeze_date']} is prospective (test).", "",
+         "| Split | Points | In scope | Scored | Series | Grades | TTFT MAPE % | TTFT shape % | TPOT MAPE % | TPOT shape % | Ranking (groups; Spearman, top-1, regret) |",
+         "|---|---|---|---|---|---|---|---|---|---|---|"]
+    for kind, k in ds["kinds"].items():
+        if k.get("withheld"):
+            L.append(f"| {kind} | {k['points']} | | | | withheld: evaluate with `--evaluate-test`, which logs the evaluation | | | | | |")
+            continue
+        r = k["ranking"]["throughput_per_gpu"]
+        fm = lambda v: v if isinstance(v, str) else ("-" if v is None else f"{v:.2f}")  # noqa: E731
+        L.append(f"| {kind} | {k['points']} | {k['in_scope']} | {k['scored']} | {k['series']} | "
+                 f"{', '.join(f'{g} {n}' for g, n in k['grades'].items())} | {_acc_cells(k['accuracy'])} | "
+                 f"{r['groups']}; {fm(r['spearman'])}, {fm(r['top1'])}, {fm(r['regret'])} |")
+    return L + [""]
+
+
 def run_markdown(t: dict) -> str:
     ident = t["identity"]
     L = [f"# Scored run ({t['sample'].replace('_', '-')})", "", t["sample_text"], "", *_identity_md(ident), ""]
@@ -452,6 +534,7 @@ def run_markdown(t: dict) -> str:
     L += ["## Headline (G1 to G4)", "", "| Points | TTFT MAPE % | TTFT shape % | TPOT MAPE % | TPOT shape % | Noise floor % |", "|---|---|---|---|---|---|",
           f"| {h['points']} | {_acc_cells(h)} | {h['noise_floor_pct']} ({h['noise_floor_source']}) |", ""]
     L += ["## By grade", ""] + _grades_md("All points", t["grades"]) + _serving_md("All scored points", t["serving_by_grade"])
+    L += _dev_md(t["development_split"])
     L += _coverage_md({"": t["coverage"]}) + _unlock_md(t["unlock"], "What would unlock the rest")
     L += ["## Why points are below G1 or at G5 (design §11.6)", "", "| Entry | Blocks | Alone | Demotes |", "|---|---|---|---|"]
     L += [f"| `{e['entry']}` | {e['blocks']} | {e['alone']} | {e['demotes']} |" for e in t["backlog"]]
@@ -497,6 +580,7 @@ def pair_markdown(t: dict) -> str:
         L += ["Grade moves of the points scored in both: " + ", ".join(f"{k} {v}" for k, v in both["grade_moves"].items()) + ".", ""]
     L += ["## By grade", ""] + _grades_md("Before", b["grades"]) + _grades_md("After", a["grades"])
     L += _serving_md("Before", b["serving_by_grade"]) + _serving_md("After", a["serving_by_grade"])
+    L += _dev_md(b["development_split"], "Development split, before") + _dev_md(a["development_split"], "Development split, after")
     L += _coverage_md({"before": b["coverage"], "after": a["coverage"]})
     L += ["## Coverage movement by reason", "", "Blocks: points carrying the reason. Alone: points whose only reason it is.", ""]
     for name, title in (("all", "All points"), (SCOPE_IN, "In scope"), (SCOPE_OUT, "Out of scope (AMD, TPU)")):
@@ -543,6 +627,29 @@ def _write(table: dict, md: str, prefix: str | None):
         print(md)
 
 
+LOG_HEADER = """# Evaluation log
+
+Every evaluation of the development split's test set (and the prospective set) is one row, so repeated peeking is visible. A candidate release is evaluated once. See evaluation-protocol.md.
+
+| Date | Commit | Estimator | Split | Points | Scored |
+|---|---|---|---|---|---|
+"""
+
+
+def evaluation_log(path, commit, estimator, ds: dict, today: str | None = None) -> None:
+    """Append one row per evaluated split (test, prospective) to the log: date, harness commit,
+    estimator, split, points and scored points."""
+    import datetime
+    p = Path(path)
+    if not p.is_file():
+        p.write_text(LOG_HEADER)
+    day = today or datetime.date.today().isoformat()
+    rows = "".join(f"| {day} | {commit} | {estimator} | {k} | {v['points']} | {v['scored']} |\n"
+                   for k, v in ds["kinds"].items() if k in ("test", "prospective") and not v.get("withheld"))
+    with p.open("a") as fh:
+        fh.write(rows)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -550,20 +657,34 @@ def main(argv=None) -> int:
     r.add_argument("--dir", required=True)
     r.add_argument("--sample", required=True, choices=SAMPLES)
     r.add_argument("--out")
+    r.add_argument("--splits", help="point id to series and split (default: splits.json beside the contract directory)")
+    r.add_argument("--evaluate-test", action="store_true", help="include test and prospective figures; requires --log and --estimator")
+    r.add_argument("--log"); r.add_argument("--estimator")
     p = sub.add_parser("pair")
     p.add_argument("--before", required=True)
     p.add_argument("--after", required=True)
     p.add_argument("--sample", required=True, choices=SAMPLES)
     p.add_argument("--out")
+    p.add_argument("--before-splits"); p.add_argument("--after-splits")
+    p.add_argument("--evaluate-test", action="store_true"); p.add_argument("--log"); p.add_argument("--estimator")
     c = sub.add_parser("check")
     c.add_argument("tables", nargs="+")
     a = ap.parse_args(argv)
     try:
+        if a.cmd in ("run", "pair") and a.evaluate_test:
+            if not a.log or not a.estimator:
+                raise CompareError("--evaluate-test needs --log and --estimator: a test evaluation is logged (date, commit, estimator, split)")
         if a.cmd == "run":
-            t = run_report(Run(a.dir), a.sample)
+            run = Run(a.dir, a.splits)
+            t = run_report(run, a.sample, a.evaluate_test)
+            if a.evaluate_test:
+                evaluation_log(a.log, run.prov.get("harness_commit"), a.estimator, t["development_split"])
             _write(t, run_markdown(t), a.out)
         elif a.cmd == "pair":
-            t = pair_report(Run(a.before), Run(a.after), a.sample)
+            before, after = Run(a.before, a.before_splits), Run(a.after, a.after_splits)
+            t = pair_report(before, after, a.sample, a.evaluate_test)
+            if a.evaluate_test:
+                evaluation_log(a.log, after.prov.get("harness_commit"), a.estimator, t["after"]["development_split"])
             _write(t, pair_markdown(t), a.out)
         else:
             bad = 0

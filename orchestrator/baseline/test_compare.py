@@ -32,7 +32,11 @@ def make_run(tmp, name, scored, not_scored=(), failed=(), harness=H1, units="u" 
         meas_t, meas_f = 10000.0 * (1 + conc / 10), 400000.0 * (1 + conc / 10)
         rows.append([f"{model}-{gpu}.yaml", model, gpu, "8k1k", conc, meas_t, meas_t * scale, meas_f, meas_f * scale,
                      grade, pid(n), "2026-11-01"])
-        facets[pid(n)] = {"framework": "vllm", "gpu": gpu, "model": model, "precision": "fp8", "spec_method": None}
+        facets[pid(n)] = {"framework": "vllm", "gpu": gpu, "model": model, "precision": "fp8", "spec_method": None,
+                          "workload": "1024:128", "image": "vllm/vllm-openai:v0.32.0", "serving": "aggregated",
+                          "parallelism": {"tp": 4, "pp": 1, "dp": 1, "ep": 1},
+                          "identity": {"model": model, "hardware": gpu, "framework": "vllm", "precision": "fp8",
+                                       "benchmark_type": "single_turn"}}
         fid.append({"point_id": pid(n), "grade": grade, "substitutions": [], "simulator": sim})
     with open(d / "points.csv", "w", newline="") as fh:
         w = csv.writer(fh)
@@ -224,3 +228,52 @@ def test_committed_tables():
 def test_scope_is_amd_and_tpu_only():
     assert [c.scope(x) for x in ("mi300x", "mi325x", "mi355x", "tpuv7", "b200", "h100", "gb200")] == \
         ["out_of_scope"] * 4 + ["in_scope"] * 3
+
+
+# ---- the development split in the report
+
+def _split_run(tmp_path):
+    scored = [(n, "m1", "b200", k, "G2", 1.1) for n, k in zip(range(40), (1, 2, 4, 8) * 10)]
+    return c.Run(make_run(tmp_path, "r", scored))
+
+
+def test_the_report_shows_train_and_validation_and_withholds_test_and_prospective(tmp_path):
+    run = _split_run(tmp_path)
+    ds = c.development_split(run)
+    assert set(ds["kinds"]) == {"train", "validation", "test", "prospective", "unassigned"}
+    for k in ("test", "prospective"):
+        assert ds["kinds"][k]["withheld"] is True and "accuracy" not in ds["kinds"][k]
+    assert "development" in c.DEV_TEXT.lower() and "not the ledger's held-out" in c.DEV_TEXT
+    full = c.development_split(run, evaluate_test=True)
+    assert "accuracy" in full["kinds"]["test"]
+    assert sum(k["points"] for k in full["kinds"].values()) == 40
+
+
+def test_evaluating_the_test_set_needs_a_log_and_appends_to_it(tmp_path, capsys):
+    run = _split_run(tmp_path)
+    log = tmp_path / "evaluation-log.md"
+    t = c.run_report(run, "in_sample", evaluate_test=True)
+    c.evaluation_log(log, "abc", "analytical-v1", t["development_split"], today="2026-11-11")
+    c.evaluation_log(log, "def", "analytical-v2", t["development_split"], today="2026-11-12")
+    text = log.read_text()
+    assert text.startswith("# Evaluation log") and text.count("| analytical-v") == 4   # a test and a prospective row per evaluation
+    assert "| 2026-11-11 | abc | analytical-v1 | test |" in text
+    d = tmp_path / "r"
+    assert c.main(["run", "--dir", str(d), "--sample", "in_sample", "--evaluate-test"]) == 2
+    assert "needs --log and --estimator" in capsys.readouterr().err
+
+
+def test_a_held_out_report_refuses_a_run_with_train_points(tmp_path, capsys):
+    run = _split_run(tmp_path)
+    with pytest.raises(c.CompareError, match="held-out figure includes"):
+        c.run_report(run, "held_out")
+
+
+def test_the_committed_splits_file_matches_the_rule():
+    root = HERE.parent.parent / "docs" / "m2" / "baseline-v0.16.0" / "splits.json"
+    if not root.is_file():
+        pytest.skip("no committed splits")
+    import split as sp
+    for pid, e in json.loads(root.read_text()).items():
+        assert e["kind"] in sp.KINDS
+        assert e["kind"] == "prospective" or e["kind"] == sp.split_of(e["series"])
