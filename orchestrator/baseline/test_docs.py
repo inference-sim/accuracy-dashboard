@@ -48,7 +48,7 @@ def test_every_page_is_reachable_from_the_readme():
 
 def test_the_pages_the_readme_promises_exist():
     for name in ("overview", "scoring-pipeline", "closeness-grades", "grades", "coverage-accounting", "reproducing",
-                 "before-after", "disaggregation", "limits", "coefficients"):
+                 "before-after", "disaggregation", "limits", "coefficients", "comparability"):
         assert (DOCS / f"{name}.md").is_file(), name
     for name in ("evaluation-protocol", "evaluation-log"):
         assert (DOCS / "m2" / f"{name}.md").is_file(), name
@@ -97,6 +97,15 @@ def test_the_series_classes_page_does_not_call_a_fetched_label_unfetched():
     for line in text.splitlines():
         if line.startswith("| dynamo-vllm |") or line.startswith("| vllm"):
             assert "(no fetch)" not in line, line
+
+
+def test_the_comparability_page_names_every_difference_the_scorer_can_name():
+    """The subjects of the client differences in the fidelity schema are the ones the page explains."""
+    schema = json.loads((ROOT / "schemas" / "fidelity.v3.json").read_text())
+    subjects = schema["definitions"]["client_differences"]["items"]["properties"]["subject"]["enum"]
+    text = (DOCS / "comparability.md").read_text()
+    for s in subjects:
+        assert f"`{s}`" in text, s
 
 
 def test_the_evaluation_protocol_states_the_constants_and_the_split_sizes():
