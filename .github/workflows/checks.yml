@@ -151,7 +151,7 @@ jobs:
       - name: Check out the blis-substrate commit that defines the point record, with harness_commit and router_differs (blis-substrate layer 12, on origin)
         run: |
           set -euo pipefail
-          sha=e3f3c0ee84cf65f8df053b0327773e81bea6803c
+          sha=d04770803b00df6aa37b275739115a855e815154
           git init -q "$RUNNER_TEMP/substrate-pointrecord"
           git -C "$RUNNER_TEMP/substrate-pointrecord" remote add origin https://github.com/inference-sim/blis-substrate.git
           git -C "$RUNNER_TEMP/substrate-pointrecord" fetch -q --depth 1 origin "$sha"
