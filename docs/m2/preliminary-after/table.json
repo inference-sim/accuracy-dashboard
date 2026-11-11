@@ -1065,7 +1065,7 @@
    "withheld": 89
   },
   "identity": {
-   "harness_commit": "3bbff9b1a4f1e191cba2b32645d27162b4210d3f",
+   "harness_commit": "54fbe017a4b2ea698abd7f8c9ceea19bf2a2ed9c",
    "point_set_sha256": "6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60",
    "points": 1734,
    "pull_manifest_sha256": "c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166",
@@ -1093,7 +1093,7 @@
      "kind": "vllm",
      "version": "0.32.0"
     },
-    "harness_commit": "3bbff9b1a4f1e191cba2b32645d27162b4210d3f"
+    "harness_commit": "54fbe017a4b2ea698abd7f8c9ceea19bf2a2ed9c"
    }
   },
   "refusals": [
@@ -2382,7 +2382,7 @@
    "withheld": 30
   },
   "identity": {
-   "harness_commit": "3bbff9b1a4f1e191cba2b32645d27162b4210d3f",
+   "harness_commit": "54fbe017a4b2ea698abd7f8c9ceea19bf2a2ed9c",
    "point_set_sha256": "6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60",
    "points": 1734,
    "pull_manifest_sha256": "c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166",
@@ -2410,7 +2410,7 @@
      "kind": "vllm",
      "version": "0.32.0"
     },
-    "harness_commit": "3bbff9b1a4f1e191cba2b32645d27162b4210d3f"
+    "harness_commit": "54fbe017a4b2ea698abd7f8c9ceea19bf2a2ed9c"
    }
   },
   "refusals": [],
