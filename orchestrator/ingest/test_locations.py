@@ -39,3 +39,13 @@ def test_a_requested_value_of_such_a_field_is_still_the_field_lists_to_refuse():
     c = decided("not_modelled", requested=True)
     assert sorted(c.reasons) == ["field_not_modelled:enable_chunked_prefill", "field_not_modelled:language_model_only"]
     assert not any(k.startswith("engine.") for k in c.mapped)
+
+
+def test_the_kv_cache_dtype_block_key_follows_the_field_lists_classification():
+    def mapped(status):
+        ev = {"traces": ["t"]} if status == "modelled" else {"issue": "x/y#1"}
+        f = [{"name": "kv_cache_dtype", "source": "config", "status": status, "evidence": ev, "estimation": {"rule": "none"}}]
+        fls = fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": f}))
+        return st.decide({"kv_cache_dtype": st.Setting(path="kv_cache_dtype", value="fp8", source="resolved_config")}, fls).mapped
+    assert "engine.cache_dtype" in mapped("not_modelled") and "engine.kv_cache_dtype" not in mapped("not_modelled")
+    assert "engine.kv_cache_dtype" in mapped("modelled") and "engine.cache_dtype" not in mapped("modelled")
