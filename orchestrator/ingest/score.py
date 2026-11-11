@@ -609,12 +609,21 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     cat = env.catalog_obj
     spec = c.mapped.get("engine.speculative.method", (None, None))[1]
     cks = _checkpoints(c, launch)
+    served = [x for k in ("served_model", "model") for x in ([c.roles.get(k)] if not isinstance(c.roles.get(k), list) else c.roles.get(k))]
+    draft_ck, draft_reason = sp.resolve_draft(c.roles.get("drafter"), served, entry)
+    if draft_reason:
+        o.reasons.append(draft_reason)
+        spec = None         # the drafter cannot be judged without its checkpoint; one reason, not two
+    conflict = None if cks else sp.served_conflict(entry)
     if not cks and (entry.get("checkpoint") or {}).get("repo"):
         # The log served a local path; the run's own recipe names the checkpoint (pull.py).
         cks = [entry["checkpoint"]["repo"]]
     sup = sp.check(cat, env.parts, checkpoints=cks, base_models=env.base_models,
-                   hardware=part_name, spec_method=spec, draft_checkpoint=sp.hf_repo(c.roles.get("drafter")),
+                   hardware=part_name, spec_method=spec, draft_checkpoint=draft_ck,
                    num_spec_tokens=c.mapped.get("engine.speculative.num_spec_tokens", (None, None))[1])
+    if conflict:
+        o.reasons.append(conflict)
+        sup.reasons = [r for r in sup.reasons if r != "model_not_in_catalog"]
     o.reasons += sup.reasons
 
     agentic = row["benchmark_type"] == "agentic_traces"

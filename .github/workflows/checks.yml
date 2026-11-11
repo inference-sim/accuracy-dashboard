@@ -97,6 +97,7 @@ jobs:
             orchestrator/ingest/test_server_log.py \
             orchestrator/ingest/test_gen_grade_doc.py \
             orchestrator/ingest/test_drafter.py \
+            orchestrator/ingest/test_recipe_checkpoints.py \
             orchestrator/ingest/test_g1.py \
             orchestrator/baseline/test_compare.py \
             orchestrator/test_update_index.py

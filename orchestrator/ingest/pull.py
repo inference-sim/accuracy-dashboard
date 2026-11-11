@@ -93,6 +93,62 @@ def recipe_checkpoint(row: dict, server_log: str | None, recipes) -> dict | None
     return {"repo": repo, "source": "inferencex_recipe", "commit": sha, "served_path": paths[0]} if repo else None
 
 
+def _local_paths(row: dict, server_log: str | None, recipes, setting_keys) -> tuple[list, str | None] | None:
+    """The local paths the log names for the given settings with no HF repo among them, and the
+    commit the run executed; None when the log names a repo or the run's recipes are not readable."""
+    if recipes is None or not server_log:
+        return None
+    import settings as st
+    import support as sp
+    vals = st.read_args(server_log).values
+    named = [x for k in setting_keys for v in vals.get(k, []) for x in (v if isinstance(v, list) else [v])]
+    if any(sp.hf_repo(x) for x in named):
+        return None
+    paths = [x for x in named if isinstance(x, str) and x.startswith("/")]
+    run = api.run_of(row)
+    if not paths or run is None or run_repo(row) != recipes.repo:
+        return None
+    try:
+        return paths, recipes.run_commit(run[0])
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise
+
+
+def recipe_checkpoint_conflict(row: dict, server_log: str | None, recipes) -> dict | None:
+    """The recipe's one checkpoint where the log's served path names another (no checkpoint is
+    taken, and the scorer refuses the point as a value_conflict naming both)."""
+    got = _local_paths(row, server_log, recipes, ("served_model_name", "model"))
+    if got is None:
+        return None
+    paths, sha = got
+    repo = rcp.conflicting_checkpoint(recipes.at(sha), row, paths[0])
+    return {"repo": repo, "source": "inferencex_recipe", "commit": sha, "served_path": paths[0]} if repo else None
+
+
+def recipe_draft_checkpoint(row: dict, server_log: str | None, recipes) -> dict | None:
+    """When the log names the draft model by a local path, the DRAFT_MODEL the run's benchmark
+    script set at the commit it ran (script and line recorded), whatever the path's name: the
+    scorer compares the two. The draft path that is the served model's own (MTP) is not a draft."""
+    got = _local_paths(row, server_log, recipes, ("speculative_config.model",))
+    if got is None:
+        return None
+    paths, sha = got
+    import settings as st
+    vals = st.read_args(server_log).values
+    served = {x for k in ("served_model_name", "model") for v in vals.get(k, []) for x in (v if isinstance(v, list) else [v])}
+    if paths[0] in served:
+        return None
+    rc = recipes.at(sha)
+    script = rcp.draft_script(rc, row)
+    found = rcp.draft_model(recipes.script(rc, script)) if script else None
+    if found is None:
+        return None
+    return {"repo": found[0], "source": "inferencex_recipe", "commit": sha, "script": script, "line": found[1],
+            "logged_path": paths[0]}
+
+
 def client_release(entry: dict, frozen: "Frozen", gh, run_id: str, attempt: int, result_filename: str | None) -> None:
     """Record the InferenceX commit of a single-turn run (`client_commit`: sha and date, or None with
     `client_commit_reason`) and freeze the log of the job that ran the client (role job_log), whose
@@ -235,6 +291,13 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
     ck = recipe_checkpoint(row, server_log, recipes)
     if ck:
         entry["checkpoint"] = ck
+    else:
+        conflict = recipe_checkpoint_conflict(row, server_log, recipes)
+        if conflict:
+            entry["checkpoint_conflict"] = conflict
+    draft = recipe_draft_checkpoint(row, server_log, recipes)
+    if draft:
+        entry["draft_checkpoint"] = draft
     entry["files"] = frozen.files
     entry["reasons"] = sorted(set(entry["reasons"]))
     if entry.get("artifact_notes") is not None:
