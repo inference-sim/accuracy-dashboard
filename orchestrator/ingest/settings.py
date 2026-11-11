@@ -774,6 +774,7 @@ class Built:
     node_source: str | None = None                    # where the scenario's gpus_per_node came from
     vllm_names: bool = False                          # the engine block is written in vLLM's own names
     thinking: str | None = None                       # the workload's thinking mode where the run recorded it
+    fallback_category: str | None = None              # the acceptance profile's category taken in place of the workload's
     acceptance_from_log: bool = False                 # acceptance_length is the server log's realised mean, not a run setting
 
 
@@ -1022,6 +1023,19 @@ def engine_takes_acceptance(field_list) -> bool:
     import fields as fl
     f = field_list.lookup(ACCEPTANCE_FIELD)
     return f is not None and f.status == fl.MODELLED
+
+
+_REASONING_PARSER_PATHS = ("reasoning_parser", "structured_outputs_config.reasoning_parser")
+
+
+def recorded_reasoning_parser(settings: dict) -> str | None:
+    """The reasoning parser the run's server was started with, or None. Only a value the run passed
+    counts: the resolved configuration prints an empty one for a server that runs none."""
+    for path in _REASONING_PARSER_PATHS:
+        st = settings.get(path)
+        if st is not None and st.requested and st.conflict is None and isinstance(st.value, str) and st.value:
+            return st.value
+    return None
 
 
 def recorded_thinking(settings: dict) -> str | None:
