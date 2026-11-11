@@ -23,7 +23,10 @@ jobs:
   orchestrator:
     runs-on: ubuntu-latest
     steps:
+      # Full history: test_contracts_current.py needs the commit each committed contract was scored at.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.13"
@@ -106,6 +109,7 @@ jobs:
             orchestrator/baseline/test_split.py \
             orchestrator/baseline/test_residuals.py \
             orchestrator/baseline/test_docs.py \
+            orchestrator/baseline/test_contracts_current.py \
             orchestrator/test_update_index.py
       - name: Every point id of every published snapshot maps to a ledger unit (COV-8)
         run: python3 orchestrator/ingest/legacy_ids.py check --map data/legacy/point-ids.json --data data

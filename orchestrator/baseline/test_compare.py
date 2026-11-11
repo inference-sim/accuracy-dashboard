@@ -79,6 +79,14 @@ AFTER = [(n, m, g, k, gd, 1.1) for n, m, g, k, gd, _ in BEFORE[:-1]] + sweep(100
 NS_A = NS_B[3:]
 
 
+@pytest.fixture(autouse=True)
+def _everything_is_train(monkeypatch):
+    """The fixtures' made-up models land in whichever split their name hashes to, and the test split is
+    withheld from every figure; these tests are about the figures, so every group is train unless a test
+    says otherwise (it patches split_of itself)."""
+    monkeypatch.setattr(c.dsplit, "split_of", lambda s: "train")
+
+
 @pytest.fixture
 def runs(tmp_path):
     b = make_run(tmp_path, "before", BEFORE, NS_B, failed=[999])
@@ -275,7 +283,8 @@ def test_a_held_out_report_refuses_a_run_with_train_points(tmp_path, capsys):
         c.run_report(run, "held_out")
 
 
-def test_the_committed_splits_file_matches_the_rule():
+def test_the_committed_splits_file_matches_the_rule(monkeypatch):
+    monkeypatch.undo()                      # the real rule, not the fixture's all-train
     root = HERE.parent.parent / "docs" / "m2" / "baseline-v0.16.0" / "splits.json"
     if not root.is_file():
         pytest.skip("no committed splits")
