@@ -725,6 +725,27 @@ def decide(settings: dict[str, Setting], field_list) -> Decided:
 
 # ------------------------------------------------------------------ the scenario BLIS is handed
 
+# A scenario of more than one node needs a fabric class (the cluster states it) and the registry's
+# fabric efficiency: without cost-model-fabric the kernel prices a handoff or cross-node collective at
+# the catalog's nominal rate, 23% fast on ib-400g (accuracy-dashboard#66). No InferenceX record names the
+# fabric class of a cluster (runners.yaml and the launch configuration hold none), so the class is
+# assumed and the point names it.
+FABRIC_COEFFICIENT = "cost-model-fabric"
+ASSUMED_FABRIC = "ib-400g"
+ASSUMED_FABRIC_SUBSTITUTION = {
+    "kind": "estimated", "subject": "cluster.fabric",
+    "detail": f"the run's inter-node fabric class is recorded by no source; {ASSUMED_FABRIC} is assumed, so a "
+              f"cross-node transfer is priced at that class's nominal rate times the registry's fabric efficiency"}
+
+
+def recorded_fabric(launch: dict | None) -> str | None:
+    """The fabric class a run's launch configuration records (resources.fabric), or None. No
+    InferenceX launch configuration records one today; the reader is here so that a record, when
+    one exists, is used and not overwritten by the assumed class."""
+    f = ((launch or {}).get("resources") or {}).get("fabric") if isinstance(launch, dict) else None
+    return f if isinstance(f, str) and f else None
+
+
 COEFFICIENTS = ["cost-model-primitives", "cost-model-collectives", "cost-model-host-overheads",
                 "cost-model-attention", "cost-model-recurrent", "cost-model-memory"]
 
@@ -768,7 +789,8 @@ def recorded_node_size(launch: dict | None) -> int | None:
 
 
 def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str, field_list,
-          catalog_node_size: int | None, node: ir.NodeSize, draft_model: str | None = None) -> Built:
+          catalog_node_size: int | None, node: ir.NodeSize, draft_model: str | None = None,
+          launch_config: dict | None = None) -> Built:
     """The Scenario + Deployment for one point, from the decided settings.
 
     Only what the run recorded is written, under the engine's own names (LOCATIONS), and the
@@ -841,8 +863,15 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
                 b.substitutions.append(node.substitution)
     cluster["nodes"] = max(1, -(-ranks // per_node))
     pool["nodes"] = cluster["nodes"]
+    coefficients = list(COEFFICIENTS)
+    if cluster["nodes"] > 1:
+        recorded = recorded_fabric(launch_config)
+        cluster["fabric"] = recorded or ASSUMED_FABRIC
+        coefficients.append(FABRIC_COEFFICIENT)
+        if recorded is None:
+            b.substitutions.append(ASSUMED_FABRIC_SUBSTITUTION)
     b.scenario = {"kind": "Scenario", "name": name, "engine_version": engine_version.lstrip("v"),
-                  "model": model, "coefficients": COEFFICIENTS, "cluster": cluster}
+                  "model": model, "coefficients": coefficients, "cluster": cluster}
     if names_are_vllms(field_list):
         pool["engine"] = to_vllm_block(pool["engine"])
         b.vllm_names = True
