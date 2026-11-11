@@ -743,7 +743,7 @@ def test_the_router_experiment_does_not_replace_any_other_router_reason():
     tmp = Path(tempfile.mkdtemp())
     try:
         entry, env = _pd_point(tmp, table=False, log=False)
-        entry["row"]["metrics"]["router_name"] = "llm-d-router"
+        entry["row"]["metrics"] = {**entry["row"]["metrics"], "router_name": "llm-d-router"}   # ROW is shared: copy
         env.router_policy_experiment = "round-robin"
         o, _ = e2e._score(tmp, entry, env, tmp / "c1")
         assert o.fidelity is None and "required_setting_missing:router.endpoint_picker_config" in o.reasons
