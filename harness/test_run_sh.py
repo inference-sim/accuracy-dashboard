@@ -171,7 +171,7 @@ def real_setup(tmp: Path, tag: str = "v0.16.0"):
     go = bin_ / "go"
     go.write_text('#!/bin/sh\n'
                   'if [ "$1 $2" = "mod download" ]; then exit 0; fi\n'
-                  'if [ "$1 $2" = "build -o" ]; then printf "#!/bin/sh\\nexit 0\\n" > "$3"; chmod +x "$3"; exit 0; fi\n'
+                  'if [ "$1 $2" = "build -o" ]; then printf "#!/bin/sh\\n[ \\"\\$1\\" = metrics ] \\&\\& { echo unknown command metrics >\\&2; exit 1; }\\nexit 0\\n" > "$3"; chmod +x "$3"; exit 0; fi\n'
                   'echo "fake go: unexpected $*" >&2; exit 9\n')
     py = bin_ / "python3"
     log = tmp / "python-args.txt"
