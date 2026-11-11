@@ -657,9 +657,9 @@ def test_the_scenario_engine_block_holds_the_runs_values_under_the_engines_own_n
         assert scen["engine_version"] == "0.31.0"
         eng = dep["pools"][0]["engine"]
         assert {k: eng[k] for k in ("max_num_seqs", "max_num_batched_tokens", "block_size", "max_model_len",
-                                    "enable_prefix_caching", "quantization", "kv_cache_dtype")} == \
+                                    "enable_prefix_caching", "quantization", "cache_dtype")} == \
             {"max_num_seqs": 16, "max_num_batched_tokens": 8192, "block_size": 16, "max_model_len": 2304,
-             "enable_prefix_caching": False, "quantization": "fp8", "kv_cache_dtype": "auto"}
+             "enable_prefix_caching": False, "quantization": "fp8", "cache_dtype": "auto"}
         assert eng["gpu_memory_utilization"] == 0.9 and eng["speculative"] == {
             "method": "mtp", "num_spec_tokens": 2, "rejection_sample_method": "synthetic"}
         assert dep["pools"][0]["parallel"] == {"tp": 1, "pp": 1, "dp": 1}   # expert parallelism unstated: left to the engine (X19)
