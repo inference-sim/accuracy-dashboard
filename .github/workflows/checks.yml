@@ -166,6 +166,7 @@ jobs:
           BLIS_BIN: ${{ runner.temp }}/sim/blis
           BLIS_SUBSTRATE: ${{ runner.temp }}/substrate
           BLIS_SUBSTRATE_LAYER10: ${{ runner.temp }}/substrate-pointrecord
+          BLIS_SUBSTRATE_ROUTER_BOUNDS: ${{ runner.temp }}/substrate-pointrecord
         run: python3 -m pytest -q orchestrator/ingest/test_inferencex_client_sim.py orchestrator/ingest/test_score_real_blis.py orchestrator/ingest/test_pointrecord.py orchestrator/ingest/test_pointrecord_pd.py
 
   web:
