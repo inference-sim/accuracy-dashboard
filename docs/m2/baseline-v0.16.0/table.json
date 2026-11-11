@@ -86,12 +86,6 @@
   },
   {
    "alone": 0,
-   "blocks": 76,
-   "demotes": 0,
-   "entry": "not_in_catalog:mtp"
-  },
-  {
-   "alone": 0,
    "blocks": 65,
    "demotes": 0,
    "entry": "field_not_modelled:mm_encoder_tp_mode"
@@ -568,10 +562,6 @@
      "alone": 0,
      "blocks": 419
     },
-    "not_in_catalog:mtp": {
-     "alone": 0,
-     "blocks": 76
-    },
     "value_conflict:kv_transfer_config.engine_id": {
      "alone": 0,
      "blocks": 1
@@ -725,10 +715,6 @@
      "alone": 0,
      "blocks": 296
     },
-    "not_in_catalog:mtp": {
-     "alone": 0,
-     "blocks": 35
-    },
     "value_conflict:kv_transfer_config.engine_id": {
      "alone": 0,
      "blocks": 1
@@ -813,10 +799,6 @@
     "not_in_catalog:eagle3": {
      "alone": 0,
      "blocks": 123
-    },
-    "not_in_catalog:mtp": {
-     "alone": 0,
-     "blocks": 41
     },
     "value_not_recorded:api_413": {
      "alone": 8,
@@ -989,7 +971,7 @@
   }
  },
  "identity": {
-  "harness_commit": "29e8ce49cfe7df2c968a39d0ef2541e658f8dcf2",
+  "harness_commit": "11a062ed2fd31ea405b6a16d1aad92483fbf936b",
   "point_set_sha256": "6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60",
   "points": 1734,
   "pull_manifest_sha256": "6b37908b08dfbb51af35977dbbd0afd2f764ea564443022a07858b186630a816",
@@ -1017,7 +999,7 @@
     "kind": "vllm",
     "version": "0.32.0"
    },
-   "harness_commit": "29e8ce49cfe7df2c968a39d0ef2541e658f8dcf2"
+   "harness_commit": "11a062ed2fd31ea405b6a16d1aad92483fbf936b"
   }
  },
  "kind": "run",
@@ -1201,11 +1183,6 @@
   {
    "alone": 0,
    "blocker": "field_not_in_release:env.VLLM_MXFP4_USE_MARLIN",
-   "blocks": 35
-  },
-  {
-   "alone": 0,
-   "blocker": "not_in_catalog:mtp",
    "blocks": 35
   },
   {
