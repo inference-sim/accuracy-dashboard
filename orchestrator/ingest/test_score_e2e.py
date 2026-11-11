@@ -843,7 +843,8 @@ def test_an_unstable_label_before_its_first_record_stays_g5_value_not_recorded()
         entry, env = _setup(tmp, date="2026-06-15")
         env.runner_table = ir.Table(env.runner_table.versions, {
             **env.runner_table.labels,
-            "mi355x": dataclasses.replace(env.runner_table.labels["mi355x"], stable=False, problems=("x: changed",))})
+            "mi355x": dataclasses.replace(env.runner_table.labels["mi355x"], stable=False, problems=("x: changed",),
+                                          label_size=None, relied_on=())})
         o, _ = _score(tmp, entry, env, tmp / "c1")
         assert o.g5 == {"code": "value_not_recorded", "subject": "cluster.gpus_per_node"}
     finally:

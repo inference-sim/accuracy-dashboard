@@ -10,7 +10,15 @@ InferenceX records node sizes only from 2026-07-02 (`first_recorded`). A row dat
 a label's first record takes the record in force at the row's date, and that is not a
 substitution. A row dated before it takes the first record as a G2 substitution of kind
 `later_record`, but only for a label whose size and clusters are the same in every version
-that records it (`stable`). For any other label such a row has no size (G5 value_not_recorded).
+that records it (`stable`).
+
+A runner that no record lists (a runner in no cluster, or a label the newest file omits) may take
+the fact from the records of its label when every record that lists the label states the same
+size (design 11.3, the label-record rule). The row's runner is not known, so this applies when no
+single-size record is in force for the row. The point is G2, kind `later_record`, naming the
+field, the label and the records relied on (file and commit) in `record` and the latest record's
+date in `date`. A label whose records state two sizes, or none, has no size (G5
+value_not_recorded).
 """
 from __future__ import annotations
 
@@ -60,6 +68,8 @@ class Label:
     problems: tuple[str, ...]     # why the label is not stable
     first_recorded: Version | None
     records: dict                 # commit -> Record, for the versions that record node sizes
+    label_size: int | None = None  # the one size every record that lists the label states, else None
+    relied_on: tuple = ()          # those records' Versions, oldest first
 
 
 @dataclass(frozen=True)
@@ -95,6 +105,24 @@ def stability(versions: list[Version], records: dict) -> tuple[bool, list[str], 
         elif size != seen[1][0]:
             problems.append(f"{v.commit[:8]}: {_describe(key)} where {seen[0].commit[:8]} has {_describe(seen[1])}")
     return not problems and first is not None, problems, first
+
+
+def label_size(versions: list[Version], records: dict) -> tuple[int | None, list[Version]]:
+    """(the size every record that lists the label states, those records). A record lists the label
+    when it has a cluster or a single size for it; it states the sizes of its clusters that have one.
+    None when the records state two sizes or none."""
+    sizes, relied = set(), []
+    for v in versions:
+        if not v.records_node_sizes:
+            continue
+        r = records[v.commit]
+        stated = {c.gpus_per_node for c in r.clusters if c.gpus_per_node is not None}
+        if r.gpus_per_node is not None:
+            stated.add(r.gpus_per_node)
+        if stated:
+            sizes |= stated
+            relied.append(v)
+    return (next(iter(sizes)) if len(sizes) == 1 else None), relied
 
 
 def _describe(key) -> str:
@@ -178,7 +206,8 @@ def parse(doc) -> Table:
         want_first = None if first is None else {"commit": first.commit, "date": first.date}
         if d["first_recorded"] != want_first:
             raise TableError(f"{what}.first_recorded: {d['first_recorded']!r} does not match the records ({want_first!r})")
-        labels[name] = Label(stable, tuple(problems), first, records)
+        size, relied = label_size(versions, records)
+        labels[name] = Label(stable, tuple(problems), first, records, size, tuple(relied))
     return Table(tuple(versions), labels)
 
 
@@ -232,4 +261,12 @@ def resolve(table: Table, label: str, *, run_date: str, launch_size: int | None,
                          f"({_short(f.commit)} of {f.date})"}
         return NodeSize(lab.records[f.commit].gpus_per_node,
                         f"{SUBJECT}: InferenceX runners.yaml at {_short(f.commit)}", sub)
+    if lab is not None and lab.label_size is not None and lab.relied_on:
+        last = lab.relied_on[-1]
+        record = f"label {label} in " + "; ".join(f"{v.path} at {v.commit}" for v in lab.relied_on)
+        sub = {"kind": "later_record", "subject": SUBJECT, "record": record, "date": last.date,
+               "detail": f"taken from the records of label {label} in InferenceX runners.yaml "
+                         f"({', '.join(f'{_short(v.commit)} of {v.date}' for v in lab.relied_on)}), which all state "
+                         f"{lab.label_size}; no record lists the runner"}
+        return NodeSize(lab.label_size, f"{SUBJECT}: InferenceX runners.yaml, label {label}", sub)
     return NodeSize(reason={"code": "value_not_recorded", "subject": SUBJECT})
