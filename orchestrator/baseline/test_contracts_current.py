@@ -4,7 +4,7 @@ The contract names the harness commit that scored it (provenance.json `harness_c
 harness/run.sh records as the commit of the checkout it ran from). The results are committed after
 that commit, so the commit cannot be HEAD; what must hold is that nothing that scores changed in
 between. The files that score are harness/, schemas/, requirements-ci.txt and every non-test file
-under orchestrator/ except orchestrator/baseline/ (the table, split and residual tools read a
+under orchestrator/ except orchestrator/baseline/ and the boundary lint (the table, split and residual tools read a
 contract; none writes one). A change to any of them means the contract describes another scorer's output,
 and the run is made again (docs/m2/after-run.md).
 
@@ -17,7 +17,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent.parent
 SCORER_PATHS = ["harness", "orchestrator", "schemas", "requirements-ci.txt"]
 NOT_THE_SCORER = [":(exclude,glob)orchestrator/**/test_*.py", ":(exclude,glob)orchestrator/**/testdata/**",
-                  ":(exclude,glob)orchestrator/**/test_*", ":(exclude,glob)harness/test_*", ":(exclude)orchestrator/baseline"]
+                  ":(exclude,glob)orchestrator/**/test_*", ":(exclude,glob)harness/test_*", ":(exclude)orchestrator/baseline",
+                  ":(exclude)orchestrator/lint_blis_boundary.py"]  # a lint of the source tree; it writes no contract
 
 
 def git(repo, *args):
