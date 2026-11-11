@@ -92,9 +92,10 @@ class Catalog:
             m = d / "model.yaml"
             if not m.is_file():
                 continue
+            doc = yaml.safe_load(m.read_text()) or {}
             self.model(d.name)
-            repo = (((yaml.safe_load(m.read_text()) or {}).get("source")) or {}).get("repo")
-            if repo:
+            repo = ((doc.get("source")) or {}).get("repo")
+            if repo and not _is_drafter(doc):
                 self.model(repo)
 
     def speculator(self, model: str) -> str | None:
@@ -105,6 +106,19 @@ class Catalog:
         graph = (yaml.safe_load(g.read_text()) or {}) if g.is_file() else {}
         spec = graph.get("speculator") if isinstance(graph, dict) else None
         return spec.get("method") if isinstance(spec, dict) else None
+
+    def drafters_of(self, repo: str) -> list[str]:
+        """The catalog entries that are drafters (they name `targets`) whose source repository is
+        `repo`, sorted. A drafter may share its repository with its target (a DSpark head in the
+        model's own repository, told apart by source.path), so the served-model lookup skips
+        drafters and this one finds them. TEMPORARY until a command prints it."""
+        import yaml
+        out = []
+        for m in sorted((Path(self.root) / "models").glob("*/model.yaml")):
+            doc = yaml.safe_load(m.read_text()) or {}
+            if _is_drafter(doc) and (((doc.get("source")) or {}).get("repo") or "").casefold() == repo.casefold():
+                out.append(m.parent.name)
+        return out
 
     def speculator_tokens(self, model: str) -> int | None:
         """The speculative tokens per step of a catalog model's graph (its speculator's
@@ -138,6 +152,14 @@ class Catalog:
         return [x for x in (v if isinstance(v, list) else []) if isinstance(x, str)]
 
 
+def _is_drafter(doc) -> bool:
+    """Whether a model.yaml is a drafter entry: it names its target or targets (layer 8)."""
+    if not isinstance(doc, dict):
+        return False
+    ident = doc.get("identity") if isinstance(doc.get("identity"), dict) else {}
+    return any(k in doc or k in ident for k in ("targets", "target"))
+
+
 @dataclass
 class CheckoutCatalog(Catalog):
     """The catalog read from a checkout, with no blis binary: the answers `blis catalog resolve`
@@ -157,8 +179,9 @@ class CheckoutCatalog(Catalog):
             root = Path(self.root)
             repos: dict = {}
             for m in sorted(root.glob("models/*/model.yaml")):
-                repo = (((yaml.safe_load(m.read_text()) or {}).get("source")) or {}).get("repo")
-                if repo:
+                doc = yaml.safe_load(m.read_text()) or {}
+                repo = ((doc.get("source")) or {}).get("repo")
+                if repo and not _is_drafter(doc):
                     repos.setdefault(repo.casefold(), []).append(m.parent.name)
             chips = {}
             for h in sorted(root.glob("hardware/*.yaml")):
@@ -292,7 +315,19 @@ def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models:
         s.reasons.append("hardware_no_coefficients")
     if s.model and spec_method:
         d = cat.model(draft_checkpoint) if draft_checkpoint else None
-        if d is not None and d != s.model:
+        named = cat.drafters_of(draft_checkpoint) if draft_checkpoint else []
+        if named:
+            # The checkpoint is a drafter entry's repository (maybe the served model's own, told
+            # apart by the entry): one the served model and it name each other, speculating by the run's method.
+            linked = [n for n in named if cat.drafter_links(s.model, n) and engine_method(cat.speculator(n)) == spec_method]
+            if linked:
+                s.drafter = linked[0]
+                why = draft_length_conflict(spec_method, num_spec_tokens, None) if num_spec_tokens is not None else None
+                if why:
+                    s.reasons.append(f"value_conflict:speculative_config.num_speculative_tokens: vLLM refuses {why}")
+            else:
+                s.reasons.append(f"drafter_not_in_catalog:{spec_method}")
+        elif d is not None and d != s.model:
             # A separate drafter checkpoint (eagle3, dspark): a catalog entry the served model and
             # it name each other, whose graph speculates by the run's method.
             if cat.drafter_links(s.model, d) and engine_method(cat.speculator(d)) == spec_method:
