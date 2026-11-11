@@ -6,13 +6,13 @@ This is the "before" of the M2 before/after. It is a labelled in-sample run (no 
 
 | Input | Value |
 |---|---|
-| Harness | accuracy-dashboard commit `9c7dba87c2645c752b94e2a798ca0113582ec284` (branch m2/2-rescore-and-repin). `harness/run.sh` records it as `harness_commit`. |
+| Harness | accuracy-dashboard commit `2190ec73ea107b40d5e50fae08815533968efbd8` (branch m2/2-rescore-and-repin). `harness/run.sh` records it as `harness_commit`. |
 | Simulator | inference-sim `v0.16.0` = `3f4998e28f922611a2d21d5c7ffe18a5272fe114`, built by run.sh with Go 1.27.2 (its go.mod) |
 | Substrate, registry, catalog | blis-substrate `v0.13.0` = `fe6eab10b9795933de38122ba55e5299dcb20b5e` (the release v0.16.0's stack.json pins); `--catalog <checkout>/catalog`, `--registry <checkout>/registry`, both released as `v0.13.0` |
 | Ledger | the ledger in that substrate checkout, source revision `db-dump/2026-09-28` |
 | Engine | vLLM 0.32.0 (stack.json), field list `fields.json` of blis-vllm `v0.32.0-blis.2` = `1cf030eb888270c114308c3ae3102d02994f015c`, sha256 `d32342c4f9ae5c578ba578fd5e6575aa8db8bce099e0708480d55f7e8de5a6fc` |
 | Router | llm-d-router `v1.0.0-blis.3` (stack.json), tag object `c86ebd581a77a1090aed0d2a9f2532a9f90e53c2` |
-| Frozen pull | `pull_manifest_sha256` `6b37908b08dfbb51af35977dbbd0afd2f764ea564443022a07858b186630a816`, 1734 points, frozen from the live InferenceX API with `--today 2026-11-09` (window 2026-05-14 to 2026-11-09) between 2026-11-10T22:44Z and 22:57Z |
+| Frozen pull | `pull_manifest_sha256` `c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166`, 1734 points, frozen from the live InferenceX API with `--today 2026-11-09` (window 2026-05-14 to 2026-11-09) between 2026-11-10T22:44Z and 22:57Z |
 | Units | `units.txt` (1740 ledger units), sha256 `d89f860a46c0470a22543dc7fb77b8d1b10e508ce4f5ef5073e96f359f08597e` |
 | Point set | the 1734 of those units the pull holds; sha256 of their sorted ids `6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60` |
 | Corpora | HuggingFace `semianalysisai/cc-traces-weka-062126` at `23f152f6f0f9399a85901b89a6458def0ef16729` (sha256 `29b6a19e...`) and `...-256k` at `8fecd2fc56694469f758f0afbbb6335ad3043740` (sha256 `e39cd2ff...`), fetched by `orchestrator/resolve_agentic_corpus.py --all --catalog <substrate>/catalog -o DIR`, which checks the hashes |
@@ -31,7 +31,7 @@ python3 orchestrator/baseline/freeze.py --snapshot-state state/last-run-api.json
 # 2. fetch the corpora
 python3 orchestrator/resolve_agentic_corpus.py --all --catalog SUBSTRATE/catalog -o CORPUS
 
-# 3. score, from a clean checkout of the harness commit (git worktree add --detach DIR 9c7dba8...)
+# 3. score, from a clean checkout of the harness commit (git worktree add --detach DIR 2190ec7...)
 cd DIR && bash harness/run.sh --sim v0.16.0 --units units.txt --pull PULL --out OUT \
   --catalog SUBSTRATE/catalog --registry SUBSTRATE/registry --corpus-dir CORPUS \
   --fields FIELDS.json --catalog-release v0.13.0 --registry-release v0.13.0
@@ -46,7 +46,7 @@ python3 orchestrator/baseline/compare.py run --dir OUT --sample in_sample --out 
 
 | Step | Wall time | Peak RSS |
 |---|---|---|
-| Freeze the pull (1734 points, 4 download workers, 60 MB of artifacts) | 752 s | 2.5 GB |
+| Freeze the pull (1734 points, 4 download workers, 60 MB of artifacts) | 752 s (first freeze), 1522 s (second, with the recipe lookups) | 2.5 GB |
 | Fetch the corpora (2.3 GB) | 39 s | 18 MB |
 | Score (build blis, 1687 single-turn on 4 workers, 47 agentic on 1) | 33 to 55 s over five runs | 1.8 to 1.9 GB |
 
@@ -65,3 +65,7 @@ python3 orchestrator/baseline/compare.py run --dir OUT --sample in_sample --out 
 ### Change since the first baseline of this directory
 
 The first baseline (harness `0206f24`) scored 20 points. Two harness changes moved it: the node-size stability rule (a label is stable when its size is the same in every recorded version, whatever clusters it maps to) and the naming of `teacup`, `rubin-july` and `tokenspeed`. `value_not_recorded:cluster.gpus_per_node` went from 858 points to 645: h100 (91) and b300 (122) are now stable, and 11 points that had no other blocker are scored (20 to 31). b200 (406) and h200 (239) stay unstable, not because their sizes disagree but because one record has runners outside every cluster and, for b200, the label is absent from the newest runners file. The three named labels hold no unit in the baseline set, so the point set is unchanged.
+
+### Second freeze
+
+The pull was frozen a second time, with the same command, after the freezer began to record the run's recipe draft model (`draft_checkpoint`: 235 points) and a served-path conflict with the recipe (`checkpoint_conflict`: 23 points). The point set is the same 1734 points; the manifest hash changed (`c8f2ea92...`), so the baseline was scored again against it. Scored points: 31, as before. The 235 eagle3 points still read `not_in_catalog:eagle3` here, because this baseline's catalog is blis-substrate v0.13.0, which holds no eagle3 drafter; against the layer 10 catalog all 235 resolve to `minimax-m3-eagle3` (179) or `minimax-m3-eagle3-gqa` (56). The 23 DeepSeek-V4-Pro NVFP4 points read `value_conflict:model` naming the path and the recipe's checkpoint. The 5 Kimi-K3 DSpark points read `value_not_recorded:speculative_config.model` (no recipe names their draft).
