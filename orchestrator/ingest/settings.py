@@ -419,6 +419,10 @@ _SAME_NAME = (
     "prefill_schedule_interval", "prefix_cache_retention_interval", "prefix_match_unit", "quantization",
     "scheduling_policy", "stream_interval", "swa_bounded_replay", "watermark",
 )
+# Block keys that only a blis-vllm release which models the field has (M2 added them). The value is
+# written only when the engine's field list calls the field modelled; an older engine's block
+# refuses the key, and its field list does not model the field.
+MODELLED_ONLY = ("engine.enable_chunked_prefill", "engine.language_model_only")
 LOCATIONS = {
     **{f: f"engine.{f}" for f in _SAME_NAME},
     "kv_cache_dtype": "engine.cache_dtype",
@@ -576,6 +580,8 @@ def decide(settings: dict[str, Setting], field_list) -> Decided:
                 if dec.substitution["kind"] == "estimated":
                     estimated = field_list.lookup(path).estimation
         loc = location(path)
+        if loc in MODELLED_ONLY and not ((field_list.lookup(path) or fl.Field("", "", "", {}, {})).status == fl.MODELLED):
+            loc = None      # the engine block of an older release has no such key
         if estimated is not None:
             # The field's estimation rule decides what the scenario states for it, not the run.
             d.args.append({**rec, "blis": None, "match": "approximated",
