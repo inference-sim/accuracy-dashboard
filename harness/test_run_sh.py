@@ -167,11 +167,21 @@ def real_setup(tmp: Path, tag: str = "v0.16.0"):
     git("clone", "-q", "--bare", str(work), str(bare))
     bin_ = tmp / "bin"
     bin_.mkdir()
-    # `go mod download` does nothing; `go build -o OUT main.go` writes a fake blis script at OUT.
+    # `go mod download` does nothing; `go build -o OUT main.go` copies a fake blis script to OUT.
+    # The stand-in `blis` is an ordinary file the fake go copies to the output path, so no quoting layer
+    # sits between this test and the shell it runs: like v0.16.0 it answers `metrics` with the
+    # unknown-command error and exits 1, and anything else with success.
+    fake_blis = bin_ / "fake-blis.sh"
+    fake_blis.write_text('#!/bin/sh\n'
+                         'if [ "$1" = metrics ]; then\n'
+                         '  echo "Error: unknown command \\"metrics\\" for \\"blis\\"" >&2\n'
+                         '  exit 1\n'
+                         'fi\n'
+                         'exit 0\n')
     go = bin_ / "go"
     go.write_text('#!/bin/sh\n'
                   'if [ "$1 $2" = "mod download" ]; then exit 0; fi\n'
-                  'if [ "$1 $2" = "build -o" ]; then printf "#!/bin/sh\\n[ \\"\\$1\\" = metrics ] \\&\\& { echo unknown command metrics >\\&2; exit 1; }\\nexit 0\\n" > "$3"; chmod +x "$3"; exit 0; fi\n'
+                  f'if [ "$1 $2" = "build -o" ]; then cp "{fake_blis}" "$3"; chmod +x "$3"; exit 0; fi\n'
                   'echo "fake go: unexpected $*" >&2; exit 9\n')
     py = bin_ / "python3"
     log = tmp / "python-args.txt"
@@ -250,6 +260,9 @@ def run_real(tmp: Path, sim_of, extra=(), tag="v0.16.0", env_extra=None, history
 def test_the_real_path_builds_into_the_checkout_and_scores_with_it(tmp_path):
     p, out, log, commit, head, _ = run_real(tmp_path, lambda c: "v0.16.0")
     assert p.returncode == 0, p.stderr
+    # The stand-in answers `blis metrics` as v0.16.0 does, so the scorer's definitions check takes its
+    # fallback, says so, and goes on.
+    assert "this build has no `blis metrics`" in p.stderr, p.stderr
     argv = log.read_text().splitlines()
     assert "score" in argv, argv
     blis = Path(argv[argv.index("--blis") + 1])

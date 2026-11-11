@@ -192,14 +192,16 @@ def test_an_unknown_coefficient_method_is_refused():
 
 # ttft_mean_ms and tpot_mean_ms as blis-substrate contracts/metrics (800ae263) defines them,
 # under the JSON names of its Definition.
+SCOPES = {"scopes": ["cluster", "pool", "instance"], "aggregates": ["max", "min"]}
 REGISTRY = {
     "ttft_mean_ms": {"id": "ttft_mean_ms", "formula": "ttft", "statistic": "mean", "population": "requests",
-                     "window": "measured", "unit": "ms", "unfinished": "excluded",
+                     "window": "measured", "unit": "ms", "unfinished": "excluded", **SCOPES,
+                     "better": "lower_is_better",
                      "description": "Time to first token, mean, over the measured window.",
                      "follows": "vllm v0.32.0 vllm/benchmarks/serve.py:624-634"},
     "tpot_mean_ms": {"id": "tpot_mean_ms", "formula": "tpot", "statistic": "mean",
                      "population": "requests_min_2_output_tokens", "window": "measured", "unit": "ms",
-                     "unfinished": "excluded",
+                     "unfinished": "excluded", **SCOPES, "better": "lower_is_better",
                      "description": "Time per output token, excluding the first, computed per request, mean, "
                                     "over the measured window.",
                      "follows": "vllm v0.32.0 vllm/benchmarks/serve.py:624-634"},
@@ -237,6 +239,7 @@ def test_a_registry_without_a_metric_the_harness_reads_is_refused():
 
 def _registry_with(metric, **over):
     base = dict(result.CLIENT_RATE_DEFINITIONS[metric])
+    base.update(SCOPES)
     base.update(over)
     return {metric: {"id": metric, **base}}
 
@@ -316,3 +319,60 @@ def test_cmd_score_runs_the_definition_check():
     fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "cmd_score")
     calls = {getattr(c.func, "id", None) for c in ast.walk(fn) if isinstance(c, ast.Call)}
     assert "check_metric_definitions" in calls
+
+
+# ---- the exact comparison: every meaning field, and the scope the figure is defined at
+
+def test_ttft_and_tpot_are_compared_in_every_meaning_field_including_the_empty_ones():
+    assert set(result.MEANING_FIELDS) == {"formula", "statistic", "population", "window", "unit",
+                                          "percentile_method", "unfinished", "denominator"}
+    for metric in (result.TTFT_MEAN_MS, result.TPOT_MEAN_MS):
+        assert set(result.CLIENT_DEFINITIONS[metric]) == set(result.MEANING_FIELDS)
+    for metric in sorted(result.CLIENT_RATE_DEFINITIONS):
+        assert set(result.CLIENT_RATE_DEFINITIONS[metric]) == set(result.MEANING_FIELDS)
+    assert result.CLIENT_CONTEXT == {"scope": "cluster", "member": "", "aggregate": "", "over": ""}
+
+
+@pytest.mark.parametrize("metric", ["ttft_mean_ms", "tpot_mean_ms"])
+@pytest.mark.parametrize("key,value", [("denominator", "window"), ("denominator", "window_and_gpus"),
+                                        ("percentile_method", "numpy_linear")])
+def test_an_unexpected_denominator_or_percentile_method_is_refused_though_the_client_states_none(metric, key, value):
+    reg = {k: dict(v) for k, v in REGISTRY.items()}
+    reg[metric][key] = value
+    assert result.check_definitions(reg) == [
+        f"the simulator's {metric} has {key} {value!r}; the InferenceX client's has ''"]
+
+
+@pytest.mark.parametrize("scopes", [["instance"], ["pool", "instance"], [], None])
+def test_a_definition_not_defined_at_the_cluster_scope_is_refused(scopes):
+    reg = {k: dict(v) for k, v in REGISTRY.items()}
+    reg["ttft_mean_ms"]["scopes"] = scopes
+    got = result.check_definitions(reg)
+    assert len(got) == 1 and got[0].startswith("the simulator's ttft_mean_ms is not defined at the cluster scope")
+
+
+def test_the_registrys_scopes_and_aggregates_are_in_the_records_the_tests_use():
+    # The tests compare records shaped as `blis metrics --json` writes them, scopes and aggregates included.
+    assert all(r["scopes"] and r["aggregates"] for r in REGISTRY.values())
+
+
+def _doc_with(entry):
+    return {"metrics": {"ttft_mean_ms": entry}}
+
+
+def test_a_direct_cluster_figure_is_read_with_or_without_the_version_3_context():
+    assert result.figure(_doc_with({"value": 12.5, "samples": 3}), "ttft_mean_ms") == 12.5          # version 2
+    assert result.figure(_doc_with({"value": 12.5, "scope": "cluster"}), "ttft_mean_ms") == 12.5    # version 3
+
+
+@pytest.mark.parametrize("extra,text", [
+    ({"scope": "instance", "member": "instance_0"}, "ttft_mean_ms is at the 'instance' scope, not the cluster"),
+    ({"scope": "pool", "member": "decode"}, "ttft_mean_ms is at the 'pool' scope, not the cluster"),
+    # the largest p99 over the instances: cluster scope, but an aggregate of narrower figures
+    ({"scope": "cluster", "aggregate": "max", "over": "instance"}, "ttft_mean_ms states aggregate 'max'"),
+    ({"scope": "cluster", "member": "decode"}, "ttft_mean_ms states member 'decode'"),
+])
+def test_a_figure_that_is_not_the_direct_cluster_figure_is_refused(extra, text):
+    with pytest.raises(result.ResultError) as e:
+        result.figure(_doc_with({"value": 12.5, **extra}), "ttft_mean_ms")
+    assert text in str(e.value) and e.value.slug == "figure_not_cluster_direct"
