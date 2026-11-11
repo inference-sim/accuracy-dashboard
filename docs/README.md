@@ -14,6 +14,7 @@ The dashboard asks one question of every InferenceX benchmark point it can read:
 | [Reproducing the baseline and the after run](reproducing.md) | Every pin by hash, the commands, environment, expected counts, cost, and what cannot be reproduced. |
 | [Does the dashboard compare like with like?](comparability.md) | Dimension by dimension: how InferenceX measured, how the dashboard and BLIS rebuild it, whether they agree, which differences a point names and which it does not, how to reproduce the checks. |
 | [Reading the before/after report](before-after.md) | How to read `table.md`; the baseline and the preliminary after-run. |
+| [The substrate point record](pointrecord.md) | `pointrecords.jsonl`: how each point is written under the substrate's names, what it cannot yet say, how it is tested. |
 | [Disaggregated serving and routers](disaggregation.md) | How prefill/decode points are expressed, why they are not scored yet, the router substitution rule and table. |
 | [Coefficients](coefficients.md) | How the cost model's coefficients are produced and graded, with links to the substrate's pages. |
 | [Limits and known gaps](limits.md) | What the numbers do not show. |

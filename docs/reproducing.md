@@ -15,7 +15,7 @@ Everything here was run on one machine (macOS, Apple silicon) on 2026-11-10 and 
 
 | Input | Baseline | Preliminary after-run |
 |---|---|---|
-| Harness | accuracy-dashboard commit recorded in `docs/m2/baseline-v0.16.0/contract/provenance.json` (`54fbe017a4b2ea698abd7f8c9ceea19bf2a2ed9c`) | the same commit |
+| Harness | accuracy-dashboard commit recorded in `docs/m2/baseline-v0.16.0/contract/provenance.json` (`e8c18cbede75ce50cf2be12ed3dacd5ac816f925`) | the same commit |
 | inference-sim | `v0.16.0` = `3f4998e28f922611a2d21d5c7ffe18a5272fe114` | `ece61af0eccb863ba527d9e1a6dd2ffc97d0c5cf` (branch `m2/5-closeness-data-in-the-result`) |
 | blis-substrate (catalog, registry, ledger) | `v0.13.0` = `fe6eab10b9795933de38122ba55e5299dcb20b5e` | `f70c6c7503a47442c4c5d989f8f17b093c14e069` |
 | blis-vllm `fields.json` | `v0.32.0-blis.2` = `1cf030eb888270c114308c3ae3102d02994f015c`, sha256 `d32342c4f9ae5c578ba578fd5e6575aa8db8bce099e0708480d55f7e8de5a6fc` | `5de11f598bf78017429355b368bbb7a93e312ef1`, sha256 `9a3a88857a9462caf7b09433cfb53ac377d042aea10e7da2af3a8f9fd1ecccaa` |
