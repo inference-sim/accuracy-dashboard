@@ -423,9 +423,61 @@ _SAME_NAME = (
 # written only when the engine's field list calls the field modelled; an older engine's block
 # refuses the key, and its field list does not model the field.
 MODELLED_ONLY = ("engine.enable_chunked_prefill", "engine.language_model_only")
-# Block keys that blis-vllm renamed to vLLM's own name when it modelled the field: the old key for a
-# field list that does not model the field (the older engine block), the new one for a list that does.
-RENAMED_WHEN_MODELLED = {"engine.cache_dtype": "engine.kv_cache_dtype"}
+# blis-vllm's engine block takes vLLM's own setting names from the M2 classification on (rules/
+# engineconfig/names.go "moves"): a nested config object under its class's name, the rest flat. The
+# scorer builds the block in the earlier names and translates it once, when the field list is the
+# M2 one (it carries value_classes, which arrive with the rename). TEMPORARY copy of the table.
+VLLM_BLOCK_MOVES = (
+    ("cudagraph_mode", "compilation_config.cudagraph_mode"),
+    ("decoder_replay_cudagraph_capture_sizes", "compilation_config.decoder_replay_cudagraph_capture_sizes"),
+    ("custom_ops", "compilation_config.custom_ops"),
+    ("use_trtllm_attention", "attention_config.use_trtllm_attention"),
+    ("mla_prefill_backend", "attention_config.mla_prefill_backend"),
+    ("indexer_kv_dtype", "attention_config.indexer_kv_dtype"),
+    ("cache_dtype", "kv_cache_dtype"),
+    ("dbo.enable_dbo", "enable_dbo"),
+    ("dbo.dbo_decode_token_threshold", "dbo_decode_token_threshold"),
+    ("dbo.dbo_prefill_token_threshold", "dbo_prefill_token_threshold"),
+    ("eplb.enable_eplb", "enable_eplb"),
+    ("eplb.num_redundant_experts", "eplb_config.num_redundant_experts"),
+    ("eplb.window_size", "eplb_config.window_size"),
+    ("eplb.step_interval", "eplb_config.step_interval"),
+    ("kv_events.enable_kv_cache_events", "kv_events_config.enable_kv_cache_events"),
+    ("kv_events.publisher", "kv_events_config.publisher"),
+    ("kv_events.topic", "kv_events_config.topic"),
+    ("speculative.method", "speculative_config.method"),
+    ("speculative.num_spec_tokens", "speculative_config.num_speculative_tokens"),
+    ("speculative.draft_model", "speculative_config.model"),
+    ("speculative.kv_cache_dtype", "speculative_config.kv_cache_dtype"),
+    ("speculative.draft_sample_method", "speculative_config.draft_sample_method"),
+    ("speculative.rejection_sample_method", "speculative_config.rejection_sample_method"),
+    ("speculative.enable_adaptive_verification", "speculative_config.enable_adaptive_verification"),
+)
+
+
+def names_are_vllms(field_list) -> bool:
+    """Whether the engine block takes vLLM's own names: the field list is the M2 one."""
+    return any(f.value_classes is not None for f in field_list.fields.values())
+
+
+def to_vllm_block(eng: dict) -> dict:
+    """The engine block with its keys in vLLM's names (VLLM_BLOCK_MOVES); a copy."""
+    out = {k: (dict(v) if isinstance(v, dict) else v) for k, v in eng.items()}
+    for internal, external in VLLM_BLOCK_MOVES:
+        grp, _, leaf = internal.partition(".")
+        src = out.get(grp) if leaf else out
+        key = leaf or grp
+        if not isinstance(src, dict) or key not in src:
+            continue
+        value = src.pop(key)
+        if leaf and not src:
+            out.pop(grp, None)
+        dgrp, _, dleaf = external.partition(".")
+        if dleaf:
+            out.setdefault(dgrp, {})[dleaf] = value
+        else:
+            out[dgrp] = value
+    return out
 LOCATIONS = {
     **{f: f"engine.{f}" for f in _SAME_NAME},
     "kv_cache_dtype": "engine.cache_dtype",
@@ -585,8 +637,6 @@ def decide(settings: dict[str, Setting], field_list) -> Decided:
         loc = location(path)
         if loc in MODELLED_ONLY and not ((field_list.lookup(path) or fl.Field("", "", "", {}, {})).status == fl.MODELLED):
             loc = None      # the engine block of an older release has no such key
-        if loc in RENAMED_WHEN_MODELLED and (field_list.lookup(path) or fl.Field("", "", "", {}, {})).status == fl.MODELLED:
-            loc = RENAMED_WHEN_MODELLED[loc]
         if estimated is not None:
             # The field's estimation rule decides what the scenario states for it, not the run.
             d.args.append({**rec, "blis": None, "match": "approximated",
@@ -749,6 +799,8 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
     pool["nodes"] = cluster["nodes"]
     b.scenario = {"kind": "Scenario", "name": name, "engine_version": engine_version.lstrip("v"),
                   "model": model, "coefficients": COEFFICIENTS, "cluster": cluster}
+    if names_are_vllms(field_list):
+        pool["engine"] = to_vllm_block(pool["engine"])
     b.deployment = dep
     return b
 

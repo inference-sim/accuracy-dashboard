@@ -41,11 +41,22 @@ def test_a_requested_value_of_such_a_field_is_still_the_field_lists_to_refuse():
     assert not any(k.startswith("engine.") for k in c.mapped)
 
 
-def test_the_kv_cache_dtype_block_key_follows_the_field_lists_classification():
-    def mapped(status):
-        ev = {"traces": ["t"]} if status == "modelled" else {"issue": "x/y#1"}
-        f = [{"name": "kv_cache_dtype", "source": "config", "status": status, "evidence": ev, "estimation": {"rule": "none"}}]
-        fls = fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": f}))
-        return st.decide({"kv_cache_dtype": st.Setting(path="kv_cache_dtype", value="fp8", source="resolved_config")}, fls).mapped
-    assert "engine.cache_dtype" in mapped("not_modelled") and "engine.kv_cache_dtype" not in mapped("not_modelled")
-    assert "engine.kv_cache_dtype" in mapped("modelled") and "engine.cache_dtype" not in mapped("modelled")
+def test_the_engine_block_takes_vllms_names_when_the_field_list_is_the_m2_one():
+    eng = {"max_num_seqs": 8, "cache_dtype": "fp8", "cudagraph_mode": "FULL", "max_cudagraph_capture_size": 512,
+           "speculative": {"method": "eagle3", "num_spec_tokens": 3, "draft_model": "d"}, "eplb": {"enable_eplb": True, "window_size": 5},
+           "dbo": {"enable_dbo": True}, "indexer_kv_dtype": "fp8", "env": {"X": "1"}}
+    out = st.to_vllm_block(eng)
+    assert out == {"max_num_seqs": 8, "kv_cache_dtype": "fp8", "max_cudagraph_capture_size": 512,
+                   "compilation_config": {"cudagraph_mode": "FULL"},
+                   "speculative_config": {"method": "eagle3", "num_speculative_tokens": 3, "model": "d"},
+                   "enable_eplb": True, "eplb_config": {"window_size": 5}, "enable_dbo": True,
+                   "attention_config": {"indexer_kv_dtype": "fp8"}, "env": {"X": "1"}}
+    assert "cache_dtype" in eng                                  # the argument is not changed
+
+
+def test_the_m2_field_list_is_told_by_its_value_classes():
+    assert st.names_are_vllms(fields_with("modelled")) is False          # no classes: the earlier block
+    f = fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": [
+        {"name": "language_model_only", "source": "config", "status": "modelled", "evidence": {"traces": ["t"]},
+         "value_classes": {"type": "boolean", "covered": ["true"]}, "estimation": {"rule": "none"}}]}))
+    assert st.names_are_vllms(f) is True
