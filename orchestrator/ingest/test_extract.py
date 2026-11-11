@@ -187,6 +187,19 @@ def test_a_value_the_engine_only_resolved_is_not_stated_for_a_field_it_does_not_
     assert c.mapped["engine.cache_dtype"][1] == "auto" and c.mapped["engine.enable_prefix_caching"][1] is True
 
 
+def test_a_real_deepseek_log_states_no_custom_ops_the_engine_chose():
+    name = "dsv4-b200-8-1-False-off"            # a real InferenceX server log; custom_ops printed only as resolved
+    launch_path = LOGS / f"{name}.launch.json"
+    launch = json.loads(launch_path.read_text()) if launch_path.exists() else None
+    readings, problems = st.read_all((LOGS / f"{name}.server-log.txt").read_text(), launch)
+    assert problems == []
+    c = st.decide(st.merge(readings, DEFAULTS), FIELDS)
+    rec = {a["arg"]: a for a in c.args}
+    assert rec["compilation_config.custom_ops"]["match"] == "resolved_not_stated"
+    assert "engine.custom_ops" not in c.mapped
+    assert "field_not_modelled:compilation_config.custom_ops" not in c.reasons
+
+
 def test_a_custom_ops_list_the_run_set_is_still_refused_as_not_modelled():
     c = _classify(_log("'compilation_config': {'custom_ops': ['+rms_norm']}"))
     assert c.reasons == ["field_not_modelled:compilation_config.custom_ops"]
