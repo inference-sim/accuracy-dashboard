@@ -140,7 +140,10 @@ def test_a_label_with_no_runner_entry_stays_value_not_recorded():
 def test_a_row_before_the_first_record_takes_it_as_a_later_record():
     r = _res("mi355x", "2026-06-15")
     assert r.gpus_per_node == 8 and r.reason is None
-    assert r.substitution == {"kind": "later_record", "subject": "cluster.gpus_per_node",
+    sub = r.substitution
+    assert sub["record"].startswith("configs/runners.yaml at 303669b0") and sub["date"] == "2026-07-02"
+    assert {k: v for k, v in sub.items() if k not in ("record", "date")} == {
+                              "kind": "later_record", "subject": "cluster.gpus_per_node",
                               "detail": "taken from InferenceX runners.yaml at 303669b0, recorded after the run "
                                         "(303669b0 of 2026-07-02)"}
     assert r.provenance == "cluster.gpus_per_node: InferenceX runners.yaml at 303669b0"

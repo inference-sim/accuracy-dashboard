@@ -78,6 +78,7 @@ KIND_TEXT = {
     "interim_status": "The run set a field whose status is `inert_unproven`, allowed only during a release plan.",
     "resolved_differs": "The value the engine resolves differs from the one the run used.",
     "client_difference": "The simulated requests differ from the ones the run's client sent.",
+    "router_differs": "The run's router, which BLIS does not host, was replaced by an llm-d router policy from the substrate's router table. The subject is the router the run used; the point names the policy and the table's evidence.",
     "later_record": "A fact of the cluster the run's own record lacks was taken from the benchmark's later record of the same runner.",
 }
 G34_TEXT = {

@@ -826,6 +826,8 @@ def test_a_row_before_the_first_record_is_g2_with_the_later_record_substitution(
         o, work = _score(tmp, entry, env, tmp / "c1")
         assert o.fidelity is not None, o.reasons
         later = [s for s in o.fidelity["substitutions"] if s["kind"] == "later_record"]
+        assert len(later) == 1 and later[0].pop("record").startswith("configs/runners.yaml at 303669b0") \
+            and later[0].pop("date") == "2026-07-02"
         assert later == [{"kind": "later_record", "subject": "cluster.gpus_per_node",
                           "detail": "taken from InferenceX runners.yaml at 303669b0, recorded after the run "
                                     "(303669b0 of 2026-07-02)"}]

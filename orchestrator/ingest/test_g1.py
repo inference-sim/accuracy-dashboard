@@ -25,7 +25,7 @@ def coeff(name="host_launch_per_kernel", **kw):
 
 
 def doc(*cs, resolutions=None):
-    d = {"selected_entries": {"coefficients": list(cs) or [coeff()]}}
+    d = {"selected_entries": {"closeness_version": 1, "coefficients": list(cs) or [coeff()]}}
     if resolutions is not None:
         d["resolutions"] = resolutions
     return d
@@ -56,10 +56,17 @@ def test_an_extrapolated_or_unidentified_coefficient_is_named_with_its_fit_range
                       {"kind": "coefficient_range", "subject": "cost-model-host-overheads/b", "detail": "unidentified"}]
 
 
-def test_a_report_that_carries_none_of_the_new_keys_leaves_the_range_unevaluated():
-    old = {"set": "s", "name": "n", "method": "measured", "scope": "h200", "file": "f.yaml"}
-    assert not g1.coefficient_range(doc(old)).evaluated
-    assert g1.coefficient_range(doc(old, coeff())).evaluated      # one entry shows the build writes them
+def test_a_report_without_the_closeness_marker_leaves_the_range_and_the_hash_unevaluated():
+    d = doc()
+    del d["selected_entries"]["closeness_version"]
+    assert not g1.coefficient_range(d).evaluated and not g1.kernel_hash(d, {"flashinfer": "0.4.1"}, VERSIONS).evaluated
+    d["selected_entries"]["closeness_version"] = 2
+    assert not g1.coefficient_range(d).evaluated        # only version 1 is read
+
+
+def test_under_the_marker_an_entry_with_no_keys_is_clean_not_unknown():
+    bare = {"set": "s", "name": "n", "method": "assumed", "scope": "h200", "file": "f.yaml"}
+    assert g1.coefficient_range(doc(bare)).evaluated
 
 
 @pytest.mark.parametrize("d", [{}, {"selected_entries": {}}, {"selected_entries": {"coefficients": []}}])
@@ -93,6 +100,14 @@ def test_a_missing_run_version_or_library_or_kernel_impl_leaves_it_unevaluated()
     c = coeff()
     del c["kernel_impls"]
     assert not g1.kernel_hash(doc(c), {"flashinfer": "0.4.1"}, VERSIONS).evaluated
+
+
+def test_a_fitted_coefficient_with_no_kernel_implementation_leaves_the_hash_unevaluated_not_skipped():
+    fitted = coeff("b")
+    del fitted["kernel_impls"]                     # a fit range, no kernel
+    assert not g1.kernel_hash(doc(coeff(), fitted), {"flashinfer": "0.4.1"}, VERSIONS).evaluated
+    constant = {"set": "s", "name": "c", "method": "assumed", "scope": "h200", "file": "f.yaml"}
+    assert g1.kernel_hash(doc(coeff(), constant), {"flashinfer": "0.4.1"}, VERSIONS).evaluated   # tied to no kernel
 
 
 def test_an_entry_listing_several_implementations_of_a_library_accepts_any_priced_hash():
@@ -152,21 +167,51 @@ def test_the_field_list_loader_checks_value_classes():
 
 # ---- resolved_value
 
+RUN = {"tensor_parallel_size": 8, "data_parallel_size": 1, "enable_expert_parallel": False, "async_scheduling": True,
+       "disable_custom_all_reduce": False, "disable_cascade_attn": True, "block_size": 16}
+
+
+def test_each_resolution_setting_is_read_from_the_vllm_setting_it_answers():
+    assert g1.run_value("tensor_parallel_width", RUN) == 8
+    assert g1.run_value("data_parallel_width", RUN) == 1
+    assert g1.run_value("expert_parallel_width", RUN) == 1                                 # expert parallel off
+    assert g1.run_value("expert_parallel_width", {**RUN, "enable_expert_parallel": True, "data_parallel_size": 2,
+                                                  "prefill_context_parallel_size": 2}) == 32
+    assert g1.run_value("expert_parallel_width", {k: v for k, v in RUN.items() if k != "enable_expert_parallel"}) is None
+    assert g1.run_value("all_reduce_backend", RUN) == "custom"
+    assert g1.run_value("all_reduce_backend", {**RUN, "disable_custom_all_reduce": True}) == "nccl"
+    assert g1.run_value("async_scheduling", RUN) == "true"
+    assert g1.run_value("cascade_attention", RUN) == "false"                               # inverse of disable_cascade_attn
+    assert g1.run_value("cascade_attention", {**RUN, "disable_cascade_attn": False}) == "true"
+    assert g1.run_value("sequence_parallel_moe", RUN) is None                              # no single vLLM name
+    assert g1.run_value("block_size", RUN) == 16                                           # a declined request: its own name
+
+
 def test_a_resolved_value_equal_to_the_engines_is_true_and_a_different_one_is_named():
-    d = doc(resolutions=[{"setting": "tensor_parallel_width", "host": "8", "engine": "8"},
-                         {"setting": "async_scheduling", "engine": "true"},
-                         {"setting": "block_size", "host": "32", "engine": "16", "reason": "the backend needs 16"}])
-    run = {"tensor_parallel_size": 8, "async_scheduling": True, "block_size": 16}
-    assert g1.resolved_value(d, run).subs == []
-    e = g1.resolved_value(d, {**run, "tensor_parallel_size": 4, "block_size": 32})
+    d = doc(resolutions=[{"setting": "tensor_parallel_width", "pool": "colocated", "host": "8", "engine": "8"},
+                         {"setting": "all_reduce_backend", "pool": "colocated", "engine": "custom"},
+                         {"setting": "block_size", "pool": "colocated", "host": "32", "engine": "16", "reason": "the backend needs 16"}])
+    assert g1.resolved_value(d, RUN).subs == []
+    e = g1.resolved_value(d, {**RUN, "tensor_parallel_size": 4, "block_size": 32, "disable_custom_all_reduce": True})
     assert e.evaluated and [(s["subject"], s["detail"]) for s in e.subs] == [
+        ("all_reduce_backend", "the run resolved 'nccl', the engine resolves 'custom'"),
         ("block_size", "the run resolved 32, the engine resolves '16'"),
-        ("tensor_parallel_size", "the run resolved 4, the engine resolves '8'")]
+        ("tensor_parallel_width", "the run resolved 4, the engine resolves '8'")]
+
+
+def test_a_disaggregated_pointss_pools_are_compared_each_with_the_runs_value_for_that_pool():
+    d = doc(resolutions=[{"setting": "tensor_parallel_width", "pool": "decode", "engine": "8"},
+                         {"setting": "tensor_parallel_width", "pool": "prefill", "engine": "4"}])
+    by_pool = {"prefill": {"tensor_parallel_size": 4}, "decode": {"tensor_parallel_size": 4}}
+    e = g1.resolved_value(d, None, by_pool)
+    assert e.evaluated and e.subs == [{"kind": "resolved_differs", "subject": "tensor_parallel_width (decode)",
+                                       "detail": "the run resolved 4 in the decode pool, the engine resolves '8'"}]
+    assert g1.resolved_value(d, None, {"prefill": {"tensor_parallel_size": 4}}).subs == []   # no values for decode: not compared
 
 
 def test_a_setting_the_run_did_not_log_is_not_compared_and_no_resolutions_is_unevaluated():
     d = doc(resolutions=[{"setting": "expert_parallel_width", "engine": "8"}])
-    assert g1.resolved_value(d, {"block_size": 16}).evaluated
+    assert g1.resolved_value(d, {"block_size": 16}).evaluated and g1.resolved_value(d, {"block_size": 16}).subs == []
     assert not g1.resolved_value(doc(), {"block_size": 16}).evaluated
     assert not g1.resolved_value(doc(resolutions=[]), {"block_size": 16}).evaluated
 
@@ -174,7 +219,7 @@ def test_a_setting_the_run_did_not_log_is_not_compared_and_no_resolutions_is_une
 # ---- the point
 
 def full_doc():
-    return doc(resolutions=[{"setting": "block_size", "engine": "16", "host": "16"}])
+    return doc(resolutions=[{"setting": "block_size", "pool": "colocated", "engine": "16", "host": "16"}])
 
 
 def all_true(**kw):
@@ -201,7 +246,7 @@ def test_a_condition_is_unevaluated_only_when_its_data_is_absent():
                      resolved={"block_size": 16}, libraries={}, version_hashes=VERSIONS)
     assert g1.split(ev) == ([], ["kernel_hash", "value_class"])
     # the Result of an older build carries none of it: all four stay unevaluated, as before
-    old = {"selected_entries": {"coefficients": [{"set": "s", "name": "n", "method": "measured"}]}}
+    old = {"selected_entries": {"coefficients": [{"set": "s", "name": "n", "method": "measured"}]}}   # no marker
     _, unevaluated = g1.split(g1.evaluate(old, field_list=field_list(None), requested={"max_num_seqs": 32}))
     assert sorted(unevaluated) == sorted(gr.UNCHECKED_KINDS)
 

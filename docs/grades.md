@@ -50,6 +50,7 @@ A condition leaves this table when it is evaluated from data; the point then nam
 | `resolved_differs` | The value the engine resolves differs from the one the run used. |
 | `client_difference` | The simulated requests differ from the ones the run's client sent. |
 | `later_record` | A fact of the cluster the run's own record lacks was taken from the benchmark's later record of the same runner. |
+| `router_differs` | The run's router, which BLIS does not host, was replaced by an llm-d router policy from the substrate's router table. The subject is the router the run used; the point names the policy and the table's evidence. |
 
 ## Other release or build (G3, G4)
 
