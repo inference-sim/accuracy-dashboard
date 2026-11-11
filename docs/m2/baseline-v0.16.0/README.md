@@ -72,4 +72,4 @@ The pull was frozen a second time, with the same command, after the freezer bega
 
 ### Node size of b200 and h200
 
-The harness now takes a label's node size from the records of its label when no record lists the runner and every record that lists the label states the same size (design 11.3, wording in blis-design PR #2). b200 and h200 take 8 as a G2 `later_record` substitution naming the label and the records relied on. That moved `value_not_recorded:cluster.gpus_per_node` from 645 points to none, and the scored points from 31 to 41 (the rest of the 645 still carry field reasons in this baseline, whose field list is v0.32.0-blis.2).
+The harness now takes a label's node size from the records of its label when no record lists the runner and every record that lists the label states the same size (design §11.3 as merged). b200 and h200 take 8 as a G2 `later_record` substitution naming the label and the records relied on. That moved `value_not_recorded:cluster.gpus_per_node` from 645 points to none, and the scored points from 31 to 41 (the rest of the 645 still carry field reasons in this baseline, whose field list is v0.32.0-blis.2).

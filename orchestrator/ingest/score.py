@@ -187,6 +187,10 @@ def _blis_refusal(stderr: str, work: Path) -> str:
 
 
 _STATES_NO = re.compile(r"\bstates no ([A-Za-z_][A-Za-z0-9_.]*)")
+# "the workload states no thinking mode": the simulator wants a statement about the WORKLOAD (it
+# selects the acceptance profile), not a field of the engine's list. The reason names the workload
+# statement, so it is not looked up in fields.json (where it would read as a missing field).
+_WORKLOAD_STATES_NO = re.compile(r"\bthe workload states no ([A-Za-z_][A-Za-z0-9_ ]*?)(?: mode)?\s*[,;.:]")
 
 
 def value_refusal(stderr: str, work: Path, field_list) -> str | None:
@@ -200,7 +204,11 @@ def value_refusal(stderr: str, work: Path, field_list) -> str | None:
     text = slug.partition(":")[2]
     if "states_no" not in text and "states no" not in stderr:
         return None
-    m = _STATES_NO.search(re.sub(r"\s+", " ", stderr))
+    flat = re.sub(r"\s+", " ", stderr)
+    w = _WORKLOAD_STATES_NO.search(flat)
+    if w:
+        return f"required_setting_missing:workload.{w.group(1).strip().replace(' ', '_')}_mode"
+    m = _STATES_NO.search(flat)
     name = m.group(1) if m else None
     if name is None:
         return f"required_setting_missing:{text}"
