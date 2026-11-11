@@ -32,7 +32,7 @@ Two numbers per point: mean time to first token (TTFT) and mean time per output 
 | | InferenceX reports over | BLIS reports over | Can the dashboard select the same window? |
 |---|---|---|---|
 | Single-turn | The whole main phase: first main send to last completion, no ramp or tail cut. The warm-up is outside it. | Requests that arrived after the warm-up and completed before the window closes. A primed trace carries no phase labels, so the Result's own aggregate would include the warm-up copies. | Yes, by not using the aggregate: `summarize` averages the main-phase rows. Selecting the window inside the Result needs phases (inference-sim 1926, blis-schemas 56). |
-| Agentic | aiperf's profiling phase, no trimming of ramp or tail. | From the end of warm-up to the end of the profiling phase. | Yes; the rule is the same and the dashboard reads the Result's aggregate. A run of the simulator with the warm-up passed moves the window start (44.2 s without it, 66.9 s with ten requests per lane, one 900 s run at concurrency 4), so the input is honoured. |
+| Agentic | aiperf's profiling phase, no trimming of ramp or tail. | From the end of warm-up to the end of the profiling phase. | Yes; the rule is the same and the dashboard reads the Result's aggregate. A run of the simulator with the warm-up passed moves the window start (44.2 s without it, 66.9 s with ten requests per lane, at concurrency 4), so the input is honoured; the run is recorded in [the agentic replay check](m2/agentic-replay-check.md). |
 
 ## Differences a point names
 

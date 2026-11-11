@@ -1,5 +1,7 @@
 # Dry run: what BLIS says once the field-list gate is open
 
+> **Historical figures.** The "baseline" in this page is the run these measurements were made against: 31 points scored and 1703 G5. It is not the committed baseline. The committed `baseline-v0.16.0/` scores 41 and has 1683 `not_scored` (and 10 failed); the difference is the node-size and label-record rules that came after this page. The figures below are kept as the record of that measurement and are not updated.
+
 Evidence only. It changes no repository: the scratch `fields.json` and the scratch dashboard checkout are not committed.
 
 ## What was run

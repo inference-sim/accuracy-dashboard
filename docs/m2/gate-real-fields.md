@@ -1,5 +1,7 @@
 # The field-list gate with blis-vllm's real classification
 
+> **Historical figures.** The "baseline" in this page is the run these measurements were made against: 31 points scored and 1703 G5. It is not the committed baseline. The committed `baseline-v0.16.0/` scores 41 and has 1683 `not_scored` (and 10 failed); the difference is the node-size and label-record rules that came after this page. The figures below are kept as the record of that measurement and are not updated.
+
 Measured 2026-11-10 with the dashboard's coverage command (no simulator), over the baseline's frozen pull (1734 points, second freeze), the layer 10 catalog and registry as a checkout, and blis-vllm's `fields.json` at commit `067bf657de39fe21d0d24cbe361c0faba5047268` of branch `m2/7-refusals-and-engine-block-names` (sha256 `b02574ad6aeb6027d9268de782c9a8edf4bc2dd9c48deb446faf0fcabe0ed65b`; the branch's rebased tip has the same file). Nothing here ran BLIS: v0.16.0 cannot load the layer 10 catalog, and its engine block does not know `enable_chunked_prefill` or `language_model_only`, so the M2 simulator build is needed to see what BLIS says.
 
 | | Points that reach the simulator | Still G5 |

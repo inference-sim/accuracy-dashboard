@@ -26,6 +26,7 @@ The dashboard asks one question of every InferenceX benchmark point it can read:
 | [The baseline, v0.16.0](m2/baseline-v0.16.0/README.md) | Inputs by commit, commands, cost, result, and the committed [table](m2/baseline-v0.16.0/table.md). |
 | [The preliminary after-run](m2/preliminary-after/preliminary-after-run.md) | The after-run at commit pins, its [table](m2/preliminary-after/table.md), the simulator's refusals and the [train-split residuals](m2/preliminary-after/residuals.md). |
 | [After-run command](m2/after-run.md) | The command and pins for the final after-run ([script](m2/after-run.sh)). |
+| [An agentic replay, end to end](m2/agentic-replay-check.md) | The idle cap and the warm-up reach the M2 simulator and change its window and request count; the run's output. |
 | [InferenceX series classes](m2/series-classes.md) | What the harness does with each series class. |
 | [Gate with blis-vllm's classification](m2/gate-real-fields.md), [dry run](m2/dry-run-field-gate.md) | How many points reach the simulator when the field list is opened. |
 | [Local-path checkpoints](m2/local-path-checkpoints.md), [node size of b200/h200](m2/node-size-b200-h200.md) | Two decisions with their evidence. |
