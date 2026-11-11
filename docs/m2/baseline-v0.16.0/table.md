@@ -2,9 +2,9 @@
 
 IN-SAMPLE: the points are the ones the model was calibrated on or tuned against; there is no anchor list yet, so no point is held out. These figures say how well the simulator reproduces data it has seen, not how well it predicts new data.
 
-- harness commit `9c7dba87c2645c752b94e2a798ca0113582ec284`
+- harness commit `2190ec73ea107b40d5e50fae08815533968efbd8`
 - units sha256 `d89f860a46c0470a22543dc7fb77b8d1b10e508ce4f5ef5073e96f359f08597e` (1740 units)
-- pull manifest sha256 `6b37908b08dfbb51af35977dbbd0afd2f764ea564443022a07858b186630a816`
+- pull manifest sha256 `c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166`
 - point set sha256 `6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60` (1734 points)
 
 Simulator `v0.16.0`, engine {'kind': 'vllm', 'version': '0.32.0'}, fields sha256 `d32342c4f9ae5c578ba578fd5e6575aa8db8bce099e0708480d55f7e8de5a6fc`.
@@ -68,7 +68,7 @@ Blocks: in-scope points held at G5 by the blocker. Alone: points that would be s
 | field_not_in_release:env.VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8 | 37 | 0 |
 | field_not_in_release:env.VLLM_MXFP4_USE_MARLIN | 35 | 0 |
 | value_not_recorded:no_recipe_fingerprint | 25 | 0 |
-| not_in_catalog | 23 | 0 |
+| value_conflict:model: the log serves /scratch/models/DeepSeek-V4-Pro-NVFP4, the recipe deepseek-ai/DeepSeek-V4-Pro | 23 | 0 |
 | field_not_modelled:enable_chunked_prefill | 20 | 0 |
 | field_not_modelled:speculative_config.rejection_sample_method | 12 | 0 |
 | field_not_in_release:env.PYTHONNOUSERSITE | 7 | 0 |
@@ -78,7 +78,7 @@ Blocks: in-scope points held at G5 by the blocker. Alone: points that would be s
 | field_not_modelled:dcp_comm_backend | 5 | 0 |
 | field_not_modelled:decode_context_parallel_size | 5 | 0 |
 | field_not_modelled:prefix_match_unit | 5 | 0 |
-| not_in_catalog:dspark | 5 | 0 |
+| value_not_recorded:speculative_config.model | 5 | 0 |
 | field_not_modelled:enable_eplb | 4 | 0 |
 | field_not_in_release:env.MC_ENABLE_DEST_DEVICE_AFFINITY | 2 | 0 |
 | field_not_in_release:env.MC_SLICE_SIZE | 2 | 0 |
@@ -92,7 +92,7 @@ Blocks: in-scope points held at G5 by the blocker. Alone: points that would be s
 
 | Entry | Blocks | Alone | Demotes |
 |---|---|---|---|
-| `not_in_catalog` | 561 | 82 | 0 |
+| `not_in_catalog` | 538 | 82 | 0 |
 | `field_not_modelled:max_cudagraph_capture_size` | 996 | 28 | 0 |
 | `value_not_recorded:cluster.gpus_per_node` | 645 | 20 | 0 |
 | `field_not_modelled:enable_expert_parallel` | 513 | 12 | 0 |
@@ -111,6 +111,7 @@ Blocks: in-scope points held at G5 by the blocker. Alone: points that would be s
 | `field_not_in_release:env.VLLM_MXFP4_USE_MARLIN` | 35 | 0 | 0 |
 | `field_not_modelled:env.VLLM_USE_RUST_FRONTEND` | 28 | 0 | 0 |
 | `value_not_recorded:no_recipe_fingerprint` | 25 | 0 | 0 |
+| `value_conflict:model: the log serves /scratch/models/DeepSeek-V4-Pro-NVFP4, the recipe deepseek-ai/DeepSeek-V4-Pro` | 23 | 0 | 0 |
 | `field_not_modelled:enable_chunked_prefill` | 20 | 0 | 0 |
 | `field_not_modelled:speculative_config.rejection_sample_method` | 12 | 0 | 0 |
 | `field_not_in_release:env.PYTHONNOUSERSITE` | 7 | 0 | 0 |
@@ -120,7 +121,7 @@ Blocks: in-scope points held at G5 by the blocker. Alone: points that would be s
 | `field_not_modelled:dcp_comm_backend` | 5 | 0 | 0 |
 | `field_not_modelled:decode_context_parallel_size` | 5 | 0 | 0 |
 | `field_not_modelled:prefix_match_unit` | 5 | 0 | 0 |
-| `not_in_catalog:dspark` | 5 | 0 | 0 |
+| `value_not_recorded:speculative_config.model` | 5 | 0 | 0 |
 | `field_not_modelled:enable_eplb` | 4 | 0 | 0 |
 | `field_not_in_release:env.MC_ENABLE_DEST_DEVICE_AFFINITY` | 2 | 0 | 0 |
 | `field_not_in_release:env.MC_SLICE_SIZE` | 2 | 0 | 0 |

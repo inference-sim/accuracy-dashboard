@@ -1,14 +1,11 @@
 {
-  "frameworks_dropped": [
-    "rubin-july",
-    "teacup"
-  ],
+  "frameworks_dropped": [],
   "points_with_no_unit": {
     "no_api_row": 95,
     "not_in_source_revision": 241
   },
-  "rows_of_those_frameworks": 42,
-  "rows_returned": 6271,
+  "rows_of_those_frameworks": 0,
+  "rows_returned": 6203,
   "rows_that_differ_from_the_ledger": [
     "439933",
     "439934",

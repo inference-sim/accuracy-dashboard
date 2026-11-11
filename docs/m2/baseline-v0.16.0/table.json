@@ -2,7 +2,7 @@
  "backlog": [
   {
    "alone": 82,
-   "blocks": 561,
+   "blocks": 538,
    "demotes": 0,
    "entry": "not_in_catalog"
   },
@@ -116,6 +116,12 @@
   },
   {
    "alone": 0,
+   "blocks": 23,
+   "demotes": 0,
+   "entry": "value_conflict:model: the log serves /scratch/models/DeepSeek-V4-Pro-NVFP4, the recipe deepseek-ai/DeepSeek-V4-Pro"
+  },
+  {
+   "alone": 0,
    "blocks": 20,
    "demotes": 0,
    "entry": "field_not_modelled:enable_chunked_prefill"
@@ -172,7 +178,7 @@
    "alone": 0,
    "blocks": 5,
    "demotes": 0,
-   "entry": "not_in_catalog:dspark"
+   "entry": "value_not_recorded:speculative_config.model"
   },
   {
    "alone": 0,
@@ -552,11 +558,7 @@
     },
     "not_in_catalog": {
      "alone": 82,
-     "blocks": 561
-    },
-    "not_in_catalog:dspark": {
-     "alone": 0,
-     "blocks": 5
+     "blocks": 538
     },
     "not_in_catalog:eagle3": {
      "alone": 0,
@@ -565,6 +567,10 @@
     "value_conflict:kv_transfer_config.engine_id": {
      "alone": 0,
      "blocks": 1
+    },
+    "value_conflict:model: the log serves /scratch/models/DeepSeek-V4-Pro-NVFP4, the recipe deepseek-ai/DeepSeek-V4-Pro": {
+     "alone": 0,
+     "blocks": 23
     },
     "value_not_recorded": {
      "alone": 10,
@@ -585,6 +591,10 @@
     "value_not_recorded:no_recipe_fingerprint": {
      "alone": 0,
      "blocks": 25
+    },
+    "value_not_recorded:speculative_config.model": {
+     "alone": 0,
+     "blocks": 5
     }
    },
    "scored": 31,
@@ -703,14 +713,6 @@
      "alone": 0,
      "blocks": 771
     },
-    "not_in_catalog": {
-     "alone": 0,
-     "blocks": 23
-    },
-    "not_in_catalog:dspark": {
-     "alone": 0,
-     "blocks": 5
-    },
     "not_in_catalog:eagle3": {
      "alone": 0,
      "blocks": 296
@@ -718,6 +720,10 @@
     "value_conflict:kv_transfer_config.engine_id": {
      "alone": 0,
      "blocks": 1
+    },
+    "value_conflict:model: the log serves /scratch/models/DeepSeek-V4-Pro-NVFP4, the recipe deepseek-ai/DeepSeek-V4-Pro": {
+     "alone": 0,
+     "blocks": 23
     },
     "value_not_recorded": {
      "alone": 10,
@@ -738,6 +744,10 @@
     "value_not_recorded:no_recipe_fingerprint": {
      "alone": 0,
      "blocks": 25
+    },
+    "value_not_recorded:speculative_config.model": {
+     "alone": 0,
+     "blocks": 5
     }
    },
    "scored": 31,
@@ -971,10 +981,10 @@
   }
  },
  "identity": {
-  "harness_commit": "9c7dba87c2645c752b94e2a798ca0113582ec284",
+  "harness_commit": "2190ec73ea107b40d5e50fae08815533968efbd8",
   "point_set_sha256": "6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60",
   "points": 1734,
-  "pull_manifest_sha256": "6b37908b08dfbb51af35977dbbd0afd2f764ea564443022a07858b186630a816",
+  "pull_manifest_sha256": "c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166",
   "sample": "in_sample",
   "units_count": 1740,
   "units_sha256": "d89f860a46c0470a22543dc7fb77b8d1b10e508ce4f5ef5073e96f359f08597e"
@@ -999,7 +1009,7 @@
     "kind": "vllm",
     "version": "0.32.0"
    },
-   "harness_commit": "9c7dba87c2645c752b94e2a798ca0113582ec284"
+   "harness_commit": "2190ec73ea107b40d5e50fae08815533968efbd8"
   }
  },
  "kind": "run",
@@ -1192,7 +1202,7 @@
   },
   {
    "alone": 0,
-   "blocker": "not_in_catalog",
+   "blocker": "value_conflict:model: the log serves /scratch/models/DeepSeek-V4-Pro-NVFP4, the recipe deepseek-ai/DeepSeek-V4-Pro",
    "blocks": 23
   },
   {
@@ -1242,7 +1252,7 @@
   },
   {
    "alone": 0,
-   "blocker": "not_in_catalog:dspark",
+   "blocker": "value_not_recorded:speculative_config.model",
    "blocks": 5
   },
   {
