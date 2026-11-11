@@ -15,7 +15,7 @@ Everything here was run on one machine (macOS, Apple silicon) on 2026-11-10 and 
 
 | Input | Baseline | Preliminary after-run |
 |---|---|---|
-| Harness | accuracy-dashboard commit recorded in `docs/m2/baseline-v0.16.0/contract/provenance.json` (`e8c18cbede75ce50cf2be12ed3dacd5ac816f925`) | the same commit |
+| Harness | accuracy-dashboard commit recorded in `docs/m2/baseline-v0.16.0/contract/provenance.json` (`338a5760895ddfcc69db40e862e7b3fcab1741c1`) | the same commit |
 | inference-sim | `v0.16.0` = `3f4998e28f922611a2d21d5c7ffe18a5272fe114` | `ece61af0eccb863ba527d9e1a6dd2ffc97d0c5cf` (branch `m2/5-closeness-data-in-the-result`) |
 | blis-substrate (catalog, registry, ledger) | `v0.13.0` = `fe6eab10b9795933de38122ba55e5299dcb20b5e` | `f70c6c7503a47442c4c5d989f8f17b093c14e069` |
 | blis-vllm `fields.json` | `v0.32.0-blis.2` = `1cf030eb888270c114308c3ae3102d02994f015c`, sha256 `d32342c4f9ae5c578ba578fd5e6575aa8db8bce099e0708480d55f7e8de5a6fc` | `5de11f598bf78017429355b368bbb7a93e312ef1`, sha256 `9a3a88857a9462caf7b09433cfb53ac377d042aea10e7da2af3a8f9fd1ecccaa` |
@@ -68,9 +68,9 @@ The units file for step 3 is committed; `split.py splits --pull PULL --out split
 | | Baseline | Preliminary after-run |
 |---|---|---|
 | Points | 1734 (in scope 1188, AMD 546) | 1734 |
-| Scored | 41, all G4 (TTFT MAPE 47.1, TPOT 58.0, over the 11 train and validation points) | 450, all G4 (TTFT 34.0, TPOT 17.7, over the 361 train and validation points) |
+| Scored | 41, all G4 (TTFT MAPE 47.1, TPOT 58.0, over the 11 train and validation points) | 530, all G4 (TTFT 32.6, TPOT 17.9, over the 441 train and validation points) |
 | Refused by the simulator | 10 | 406 |
-| Not scored (G5) | 1683 | 878 |
+| Not scored (G5) | 1683 | 798 |
 
 The committed tables and contract directories are `docs/m2/baseline-v0.16.0/` and `docs/m2/preliminary-after/`; `test_compare.py::test_committed_tables` regenerates each table from its contract directory and fails on any difference.
 
@@ -81,7 +81,11 @@ The committed tables and contract directories are `docs/m2/baseline-v0.16.0/` an
 | Freeze (1734 points, 4 download workers, 60 MB of artifacts) | 752 s (first), 1522 s (second, with the recipe lookups) | 2.5 GB |
 | Corpora | 39 s | 18 MB |
 | Baseline | 33 to 184 s | 1.8 GB |
-| Preliminary after-run | 110 s to about 20 min (the 450 scored points run longer replays; several heavy jobs shared the machine) | 1.8 GB |
+| Preliminary after-run | 110 s to about 20 min (the 530 scored points run longer replays; several heavy jobs shared the machine) | 1.8 GB |
+
+## The prefill/decode and agentic runs
+
+The runs of [prefill/decode coverage](m2/pd-coverage.md) (188 units, `docs/m2/pd-table-as-published/` and `docs/m2/pd-writer-experiment/`) and the 47 points of [agentic coverage](m2/agentic-coverage.md) are scored with the inputs that page lists, by the commands it gives. They use their own frozen pulls, which are not committed. A prefill/decode freeze also reads each row's recipe at the run's commit (the repository's REST API: a tree and a few blobs per run).
 
 ## What cannot be reproduced
 

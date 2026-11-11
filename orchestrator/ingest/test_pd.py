@@ -725,3 +725,28 @@ def test_a_router_policy_experiment_scores_the_writer_and_says_it_is_not_a_grade
         assert o2.fidelity is None and "topology_unsupported:pd_pool_data_parallel" in o2.reasons
     finally:
         shutil.rmtree(tmp)
+
+
+def test_a_size_the_aggregated_recipe_leaves_at_default_is_written_only_when_the_gpus_add_up():
+    r = pdr.parse(AGG_RECIPE.replace("data-parallel-size: 2\n      ", ""))          # tp 8, no data-parallel size, 16 GPUs
+    cfg, derived = pdm.aggregated_launch(r, {"model": "org/m"})
+    args = cfg["roles"]["aggregated"]["args"]
+    assert "data-parallel-size" not in args and "pipeline-parallel-size" not in args and derived == []   # 8 x 1 x 1 is not 16
+    full = pdr.parse(AGG_RECIPE.replace("      data-parallel-size: 2\n", "").replace("tensor-parallel-size: 8", "tensor-parallel-size: 16"))
+    cfg, derived = pdm.aggregated_launch(full, {"model": "org/m"})
+    assert cfg["roles"]["aggregated"]["args"]["data-parallel-size"] == 1 and derived == ["pipeline_parallel_size", "data_parallel_size"]
+    assert cfg["model"] == {"path": "org/m"} and cfg["resources"] == {"gpus_per_node": 8}
+
+
+def test_the_router_experiment_does_not_replace_any_other_router_reason():
+    # llm-d's own router has no recorded endpoint picker configuration: that is not a router the table could map.
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _pd_point(tmp, table=False, log=False)
+        entry["row"]["metrics"]["router_name"] = "llm-d-router"
+        env.router_policy_experiment = "round-robin"
+        o, _ = e2e._score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is None and "required_setting_missing:router.endpoint_picker_config" in o.reasons
+        assert e2e._saw(env) == []
+    finally:
+        shutil.rmtree(tmp)

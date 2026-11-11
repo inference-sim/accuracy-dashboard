@@ -9,7 +9,7 @@ Measured on 2026-11-10 from the live API: `/api/v1/availability` (7185 series, 2
 | vllm | agg | single_turn | 2393 | 1696 | 555 | 9 | 1687 | 41 | 1636 | fetched; scored by the harness |
 | sglang | agg | single_turn | 2037 | 994 | 361 | 144 | 850 | 0 | 0 | G5 field_unclassified (no fetch) |
 | sglang | agg | agentic_traces | 207 | 739 | 195 | 624 | 115 | 0 | 0 | G5 field_unclassified (no fetch) |
-| dynamo-vllm | disagg | single_turn | 68 | 496 | 0 | 0 | 496 | 0 | 0 | fetched; G5 router_unsupported at scoring; else disaggregated: topology reasons, else topology_unsupported |
+| dynamo-vllm | disagg | single_turn | 68 | 496 | 0 | 0 | 496 | 0 | 0 | fetched; G5 router_unsupported at scoring; else disaggregated: two pools from the run's recipe, else a named topology_unsupported or recipe_unresolved reason |
 | vllm | agg | agentic_traces | 158 | 367 | 120 | 314 | 47 | 0 | 47 | fetched; scored by the harness |
 | dynamo-sglang | disagg | single_turn | 230 | 318 | 0 | 53 | 265 | 0 | 0 | G5 router_unsupported, field_unclassified (no fetch) |
 | trt | agg | single_turn | 1338 | 315 | 0 | 12 | 303 | 0 | 0 | G5 engine_unsupported (no fetch) |
@@ -19,8 +19,8 @@ Measured on 2026-11-10 from the live API: `/api/v1/availability` (7185 series, 2
 | dynamo-sglang | agg | agentic_traces | 58 | 103 | 0 | 87 | 16 | 0 | 0 | G5 router_unsupported, field_unclassified (no fetch) |
 | dynamo-sglang | disagg | agentic_traces | 53 | 100 | 0 | 95 | 5 | 0 | 0 | G5 router_unsupported, field_unclassified (no fetch) |
 | atom | agg | agentic_traces | 31 | 72 | 72 | 72 | 0 | 0 | 0 | G5 engine_unsupported (no fetch) |
-| vllm-disagg | disagg | single_turn | 14 | 68 | 68 | 0 | 68 | 0 | 0 | fetched; disaggregated: topology reasons, else topology_unsupported |
-| dynamo-vllm | disagg | agentic_traces | 29 | 60 | 0 | 54 | 6 | 0 | 0 | fetched; G5 router_unsupported at scoring; else disaggregated: topology reasons, else topology_unsupported |
+| vllm-disagg | disagg | single_turn | 14 | 68 | 68 | 0 | 68 | 0 | 0 | fetched; disaggregated: two pools from the run's recipe, else a named topology_unsupported or recipe_unresolved reason |
+| dynamo-vllm | disagg | agentic_traces | 29 | 60 | 0 | 54 | 6 | 0 | 0 | fetched; G5 router_unsupported at scoring; else disaggregated: two pools from the run's recipe, else a named topology_unsupported or recipe_unresolved reason |
 | dynamo-vllm | agg | agentic_traces | 47 | 56 | 0 | 56 | 0 | 0 | 0 | fetched; G5 router_unsupported at scoring; else scored by the harness |
 | mooncake-atom | disagg | single_turn | 9 | 54 | 54 | 0 | 54 | 0 | 0 | G5 engine_unsupported (no fetch) |
 | dynamo-trt | disagg | agentic_traces | 10 | 42 | 0 | 36 | 6 | 0 | 0 | G5 router_unsupported, engine_unsupported (no fetch) |
@@ -28,14 +28,14 @@ Measured on 2026-11-10 from the live API: `/api/v1/availability` (7185 series, 2
 | teacup | agg | single_turn | 4 | 28 | 0 | 28 | 0 | 0 | 0 | G5 engine_unsupported (no fetch) |
 | atom-disagg | disagg | single_turn | 2 | 20 | 20 | 0 | 20 | 0 | 0 | G5 engine_unsupported (no fetch) |
 | rubin-july | agg | single_turn | 1 | 14 | 0 | 14 | 0 | 0 | 0 | G5 engine_unsupported (no fetch) |
-| vllm | disagg | agentic_traces | 4 | 12 | 9 | 12 | 0 | 0 | 0 | fetched; disaggregated: topology reasons, else topology_unsupported |
+| vllm | disagg | agentic_traces | 4 | 12 | 9 | 12 | 0 | 0 | 0 | fetched; disaggregated: two pools from the run's recipe, else a named topology_unsupported or recipe_unresolved reason |
 | tokenspeed | agg | agentic_traces | 2 | 9 | 0 | 9 | 0 | 0 | 0 | G5 engine_unsupported (no fetch) |
 | mori-sglang | disagg | agentic_traces | 7 | 8 | 8 | 8 | 0 | 0 | 0 | G5 field_unclassified (no fetch) |
 | dynamo-trt | agg | agentic_traces | 2 | 7 | 0 | 7 | 0 | 0 | 0 | G5 router_unsupported, engine_unsupported (no fetch) |
 | trt | disagg | agentic_traces | 2 | 6 | 0 | 0 | 6 | 0 | 0 | G5 engine_unsupported (no fetch) |
-| vllm-disagg | disagg | agentic_traces | 1 | 6 | 6 | 6 | 0 | 0 | 0 | fetched; disaggregated: topology reasons, else topology_unsupported |
-| llmd-vllm | disagg | agentic_traces | 1 | 5 | 5 | 5 | 0 | 0 | 0 | fetched; disaggregated: topology reasons, else topology_unsupported |
-| llmd-vllm | disagg | single_turn | 2 | 5 | 0 | 0 | 5 | 0 | 0 | fetched; disaggregated: topology reasons, else topology_unsupported |
+| vllm-disagg | disagg | agentic_traces | 1 | 6 | 6 | 6 | 0 | 0 | 0 | fetched; disaggregated: two pools from the run's recipe, else a named topology_unsupported or recipe_unresolved reason |
+| llmd-vllm | disagg | agentic_traces | 1 | 5 | 5 | 5 | 0 | 0 | 0 | fetched; disaggregated: two pools from the run's recipe, else a named topology_unsupported or recipe_unresolved reason |
+| llmd-vllm | disagg | single_turn | 2 | 5 | 0 | 0 | 5 | 0 | 0 | fetched; disaggregated: two pools from the run's recipe, else a named topology_unsupported or recipe_unresolved reason |
 | tilert | disagg | agentic_traces | 6 | 3 | 2 | 2 | 1 | 0 | 0 | G5 router_unsupported, engine_unsupported (no fetch) |
 | tilert | disagg | single_turn | 7 | 3 | 1 | 0 | 3 | 0 | 0 | G5 router_unsupported, engine_unsupported (no fetch) |
 
