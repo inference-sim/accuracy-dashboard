@@ -247,7 +247,8 @@ _HARNESS_COMMIT = re.compile(r"^[0-9a-f]{40}$")
 HARNESS_RUN = HERE.parent.parent / "harness" / "run.sh"
 
 
-_DATA_RELEASE = re.compile(r"^[0-9A-Za-z][0-9A-Za-z._+-]*$")
+# What the catalog and the registry are at: a release tag, or a full commit while a stack is open.
+_DATA_PIN = re.compile(r"^(v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?|[0-9a-f]{40})$")
 
 
 def check_blis_inputs(blis: Path, catalog_release: str | None, registry_release: str | None,
@@ -276,9 +277,9 @@ def check_blis_inputs(blis: Path, catalog_release: str | None, registry_release:
         out.append(f"--sim-build {sim_build!r} is neither a tag vX.Y.Z[-suffix] nor a 40-hex commit")
     for release, flag in ((catalog_release, "--catalog-release"), (registry_release, "--registry-release")):
         if release is None:
-            out.append(f"{flag} is required: the release tag the data is at")
-        elif not _DATA_RELEASE.match(release):
-            out.append(f"{flag} {release!r} is not a release tag")
+            out.append(f"{flag} is required: the release tag or full 40-hex commit the data is at")
+        elif not _DATA_PIN.match(release):
+            out.append(f"{flag} {release!r} is neither a release tag nor a full 40-hex commit")
     return out
 
 
@@ -437,9 +438,10 @@ def cmd_score(a) -> int:
             "simulator": env.simulator(), "engine": {"kind": "vllm", "version": engine_release},
             "harness_commit": a.harness_commit, "units": units,
             # Design §11.7, X8: a figure is experimental unless its build and its data are both
-            # released. check_blis_inputs requires the catalog and registry to be named by release
-            # tags, so the data is released, and the build is released when it is a release tag.
-            "experimental": not _RELEASE_TAG.match(env.sim_build),
+            # released. The build is released when it is a release tag, and the data when the
+            # catalog and the registry are named by release tags, not by commits.
+            "experimental": not all(_RELEASE_TAG.match(x) for x in (env.sim_build, env.catalog_release,
+                                                                     env.registry_release)),
             "left_out_records": len((manifest.get("ledger") or {}).get("unlisted") or []),
             "vllm_ref": manifest["vllm_ref"], "vllm_max_distance": manifest["vllm_max_distance"],
             "fields_sha256": fields_sha, "pulled_at": manifest["pulled_at"],
