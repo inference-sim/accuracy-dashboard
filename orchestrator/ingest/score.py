@@ -554,10 +554,40 @@ def _acceptance_subs(b: st.Built, doc: dict | None, log: str | None = None) -> l
 
 
 def thinking_argv(b: st.Built) -> list[str]:
-    """The workload's thinking mode, stated to `blis replay` only where the run recorded it. A
-    speculative run that recorded none is not given one (the profile it would select is a guess);
-    the simulator then refuses and the point is G5 value_not_recorded."""
-    return ["--speculative-thinking", b.thinking] if b.thinking and spec_of(b) else []
+    """The workload's thinking mode, stated to `blis replay` where the run recorded it or the
+    reasoning-parser rule gave it (default_thinking), with the fallback category that rule names. A
+    speculative run with neither is not given one (the profile it would select is a guess); the
+    simulator then refuses and the point is G5 value_not_recorded."""
+    if not (b.thinking and spec_of(b)):
+        return []
+    argv = ["--speculative-thinking", b.thinking]
+    if b.fallback_category:
+        argv += ["--speculative-fallback-category", b.fallback_category]
+    return argv
+
+
+# Design §11.2: a workload-dependent value the run did not record is taken from a substrate profile,
+# which for a speculative run needs the workload's thinking mode and a category. Decision on dashboard
+# Decision: where the server runs a reasoning parser, the workload is a reasoning one, so the mode is "on"
+# and the category the one whose profile the run's agentic and fixed-length clients draw most like,
+# "coding"; a logged acceptance length takes precedence over any profile, and a server with no parser
+# is given neither.
+DEFAULT_THINKING, DEFAULT_CATEGORY = "on", "coding"
+
+
+def default_thinking(o: "Outcome", b: st.Built, settings: dict) -> None:
+    """Apply the reasoning-parser rule to a speculative point that recorded no thinking mode and pins no acceptance
+    length, naming it as an `estimated` substitution on workload.thinking_mode."""
+    if spec_of(b) is None or b.thinking is not None or b.acceptance_length is not None:
+        return
+    parser = st.recorded_reasoning_parser(settings)
+    if parser is None:
+        return
+    b.thinking, b.fallback_category = DEFAULT_THINKING, DEFAULT_CATEGORY
+    o.subs.append({"kind": "estimated", "subject": "workload.thinking_mode",
+                   "detail": f"the run recorded no thinking mode and no acceptance length; its server runs the "
+                             f"reasoning parser {parser}, so thinking {DEFAULT_THINKING} and the fallback category "
+                             f"{DEFAULT_CATEGORY} select the substrate's acceptance profile"})
 
 
 def spec_of(b: st.Built):
@@ -743,6 +773,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
                        "detail": f"the mean acceptance length the run's server logged, "
                                  f"{realised['mean_acceptance_length']} over {realised['log_lines']} interval(s), "
                                  f"{realised['drafted_tokens']} drafted tokens; the run set none"})
+    default_thinking(o, b, c.settings)
     if b.acceptance_length is not None and spec.get(tokens_key):
         # The run's own synthetic acceptance, pinned in the scenario so every replay runs it: the
         # agentic one (which also takes --speculative-acceptance-length) and the single-turn one
