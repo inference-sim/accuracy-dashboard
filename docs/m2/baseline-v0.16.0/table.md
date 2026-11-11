@@ -37,6 +37,20 @@ Simulator `v0.16.0`, engine {'kind': 'vllm', 'version': '0.32.0'}, fields sha256
 | aggregated | G3 | 0 | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
 | aggregated | G4 | 41 | 31.0 (n=41) | 18.6 (n=33) | 16.7 (n=41) | 10.9 (n=33) |
 
+## Development split
+
+Per-split figures use the DEVELOPMENT split of docs/m2/evaluation-protocol.md, not the ledger's held-out: its test set is 'development split, not the ledger's held-out'.
+
+Assignment: sha256 of the salt `blis-dev-split-1` and the series, mod 100; train below 60, validation below 80, test above; a point measured after 2026-11-09 is prospective (test).
+
+| Split | Points | In scope | Scored | Series | Grades | TTFT MAPE % | TTFT shape % | TPOT MAPE % | TPOT shape % | Ranking (groups; Spearman, top-1, regret) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| train | 1120 | 792 | 26 | 72 | G4 26, G5 1084, failed 10 | 43.1 (n=26) | 24.0 (n=21) | 21.3 (n=26) | 8.6 (n=21) | 3; too few groups, too few groups, too few groups |
+| validation | 282 | 196 | 15 | 21 | G4 15, G5 267 | 10.2 (n=15) | 9.1 (n=12) | 8.6 (n=15) | 14.9 (n=12) | 2; too few groups, too few groups, too few groups |
+| test | 332 | | | | withheld: evaluate with `--evaluate-test`, which logs the evaluation | | | | | |
+| prospective | 0 | | | | withheld: evaluate with `--evaluate-test`, which logs the evaluation | | | | | |
+| unassigned | 0 | 0 | 0 | 0 |  | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) | 0; too few groups, too few groups, too few groups |
+
 ## Coverage
 
 | Set | Points | Scored | Not scored | Failed | Share scored |
