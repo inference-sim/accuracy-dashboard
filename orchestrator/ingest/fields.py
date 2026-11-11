@@ -131,11 +131,16 @@ def class_of(x, classes: dict) -> int:
 def covers(value, classes: dict) -> bool:
     """Whether the field's evidence covers `value` (the reimplementation of the substrate's
     ValueClasses.Covers, pinned by test_g1.py). Unlike the substrate it returns False, not an error,
-    for a value of the wrong type, and accepts a number for an enumerated field by its text, because
+    for a value of the wrong type or a NaN or infinite number (a number written as a string is read as the substrate reads it), and accepts a number for an enumerated field by its text, because
     a value read from a log is parsed."""
     if classes["type"] == "numeric":
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            return False
+        if isinstance(value, str):
+            try:
+                value = float(value.strip())
+            except ValueError:
+                return False
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value or value in (float("inf"), float("-inf")):
+            return False       # not a finite number (the substrate refuses NaN and infinity)
         return class_of(value, classes) in classes["covered_classes"]
     text = str(value).lower() if isinstance(value, bool) else str(value)
     return text in classes["covered"]

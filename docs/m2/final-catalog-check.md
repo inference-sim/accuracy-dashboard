@@ -1,6 +1,6 @@
 # The dashboard against the final substrate stack
 
-Checked 2026-11-10 against a checkout of the layer 10 tip as first pushed (short hash e1a1d97); layers 8 to 10 were then rebased with identical code, and the final pin target is `799dd5af9151eb46b2ef1e3a10c7435adfec8b38` (branch `m2/10-router-table-and-closeness-record`). The hash is a parameter everywhere else (`docs/m2/after-run.sh` takes `SUBSTRATE`), and the files checked were `catalog/`, `registry/` and `docs/contracts/`. No simulator ran on the new catalog (below).
+Checked 2026-11-10 against a checkout of the layer 10 tip as first pushed (short hash e1a1d97); layers 8 to 10 were then rebased and audited, and the final pin target is `0182c0ef42b08ef5a0b196b3e413c21c16b6d28d` (branch `m2/10-router-table-and-closeness-record`). The hash is a parameter everywhere else (`docs/m2/after-run.sh` takes `SUBSTRATE`), and the files checked were `catalog/`, `registry/` and `docs/contracts/`. No simulator ran on the new catalog (below).
 
 ## Names the dashboard reads
 
@@ -38,3 +38,7 @@ Why 235 eagle3 points stay: 235 name their draft model by a local path (`/scratc
 ## The after run
 
 `docs/m2/after-run.sh` is the command, with the pins it needs: the simulator commit (PR 4 and PR 5), the substrate commit, the blis-vllm commit whose `fields.json` the simulator's engine carries, the baseline's frozen pull (not committed) and the corpora. `run.sh` accepts the catalog and registry pins as a release tag or a full 40-hex commit, so the script passes the substrate commit; a figure whose data is pinned by commit is experimental.
+
+## Re-check at the audited tip
+
+Checked again at `0182c0ef42b08ef5a0b196b3e413c21c16b6d28d`. Changes the code now follows: `closeness_version: 1` says the recorder passed on what each entry states, not that a condition was decided, so extrapolated is evaluated only for a coefficient with a `fit_range`, unidentified only for one with a `ci95`, and the kernel hash only for one with `kernel_impls`, and an entry stating none leaves its flag unevaluated (a true flag is still evidence); a `router_differs` substitution names the router table `entry` and a policy llm-d offers (the table's only entry, `dynamo-round-robin`, has policy `none`, so the Dynamo rows stay `router_unsupported`); `Covers` rejects NaN and infinity and reads a number written as text. Against this catalog the unambiguity check passes, the drafter lookups resolve as before (including Kimi-K3.1 with `moonshotai/Kimi-K3.1-Pro`), and the gate with blis-vllm's field list is unchanged: 840 points reach the simulator.
