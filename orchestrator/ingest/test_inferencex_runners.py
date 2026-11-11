@@ -131,7 +131,7 @@ def test_a_launch_size_that_differs_from_the_table_is_a_value_conflict():
 
 
 def test_a_label_with_no_runner_entry_stays_value_not_recorded():
-    for label in ("rtx6000pro", "vr200", "b200"):
+    for label in ("rtx6000pro", "vr200"):
         r = _res(label, "2026-10-01")
         assert r.reason == {"code": "value_not_recorded", "subject": "cluster.gpus_per_node"}, label
     assert _res("vr200", "2026-10-01", launch=8).gpus_per_node == 8
@@ -157,7 +157,7 @@ def test_a_launch_size_before_the_first_record_is_not_a_substitution_and_is_not_
 
 
 def test_an_unstable_label_before_its_first_record_stays_value_not_recorded():
-    unstable = dataclasses.replace(T.labels["mi355x"], stable=False, problems=("x: changed",))
+    unstable = dataclasses.replace(T.labels["mi355x"], stable=False, problems=("x: changed",), label_size=None, relied_on=())
     table = ir.Table(T.versions, {**T.labels, "mi355x": unstable})
     r = _res("mi355x", "2026-06-15", table=table)
     assert r.reason == {"code": "value_not_recorded", "subject": "cluster.gpus_per_node"} and r.substitution is None
@@ -278,3 +278,51 @@ def test_the_generator_refuses_a_version_it_cannot_read(tmp_path, capsys):
     assert gen.main(["--ix", str(d), "--out", str(tmp_path / "t.json"), "--version", "nope"]) == 2
     assert gen.main(["--ix", str(d), "--out", str(tmp_path / "t.json"), "--version", f"{c0}:runners.yaml"]) == 2
     assert "error" in capsys.readouterr().err
+
+
+# ---- the label-record rule (design 11.3): a runner no record lists takes its label's size
+
+def test_b200_and_h200_take_the_size_every_record_of_their_label_states_and_name_it():
+    for label, commits, days in (("b200", ("303669b0", "5d06e10c"), ("2026-06-01", "2026-08-01", "2026-10-01")),
+                                 ("h200", ("303669b0", "5d06e10c", "4a63bf50"), ("2026-06-01", "2026-08-01"))):
+        for day in days:
+            r = _res(label, day)
+            assert r.gpus_per_node == 8 and r.reason is None, (label, day)
+            s = r.substitution
+            assert s["kind"] == "later_record" and s["subject"] == "cluster.gpus_per_node"
+            assert s["record"].startswith(f"label {label} in ") and all(c in s["record"] for c in commits), s
+            assert s["date"] == T.labels[label].relied_on[-1].date and len(s["date"]) == 10
+            assert "no record lists the runner" in s["detail"]
+
+
+def test_a_label_with_one_disagreeing_record_is_refused():
+    b200 = T.labels["b200"]
+    recs = dict(b200.records)
+    last = list(recs)[0]
+    recs[last] = ir.Record(None, "x", (ir.Cluster("b200-odd", 4, "runners.yaml:1"),))
+    size, relied = ir.label_size(list(T.versions), recs)
+    assert size is None                                            # 8 in one record, 4 in another
+    table = ir.Table(T.versions, {**T.labels, "b200": dataclasses.replace(b200, records=recs, label_size=size, relied_on=tuple(relied))})
+    r = _res("b200", "2026-10-01", table=table)
+    assert r.reason == {"code": "value_not_recorded", "subject": "cluster.gpus_per_node"} and r.substitution is None
+
+
+def test_a_runner_a_record_lists_keeps_the_same_runner_rule():
+    # h100 has a single-size record in force: the size is the record's, with no substitution.
+    r = _res("h100", "2026-10-01")
+    assert r.gpus_per_node == 8 and r.substitution is None and "runners.yaml at" in r.provenance
+    # before its first record the same-runner later_record applies, naming the record and its date
+    s = _res("h100", "2026-06-01").substitution
+    assert s["kind"] == "later_record" and s["record"].count(" at ") == 1 and s["date"] == "2026-07-02"
+
+
+def test_the_later_record_substitution_carries_the_keys_the_point_record_requires():
+    import grade
+    for label in ("b200", "h200", "h100"):
+        s = _res(label, "2026-06-01").substitution
+        grade.grade(engine_version="0.32.0", release=grade.Release(version="0.32.0", nightly_or_custom=False), substitutions=[s])
+
+
+def test_h200_from_the_first_complete_record_on_uses_the_record_in_force_without_a_substitution():
+    r = _res("h200", "2026-10-01")
+    assert r.gpus_per_node == 8 and r.substitution is None
