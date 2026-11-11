@@ -29,7 +29,9 @@ LEAVE_UNSET, SUBSTITUTE, NONE = "leave_unset", "substitute", "none"
 _LIST_KEYS = {"kind", "engine", "fields"}
 _ENGINE_KEYS = {"kind", "version"}
 _FIELD_KEYS = {"name", "source", "status", "evidence", "estimation", "value_classes"}
-_CLASS_KEYS = {"name", "values", "min", "max"}
+_CLASS_KEYS = {"type", "covered", "values", "thresholds", "covered_classes"}
+_THRESHOLD_KEYS = {"value", "closed"}
+CLASS_TYPES = ("boolean", "enumerated", "numeric")
 _EVIDENCE_KEYS = {"traces", "proof", "issue", "note"}
 _ESTIMATION_KEYS = {"rule", "setting", "reason"}
 
@@ -45,9 +47,9 @@ class Field:
     status: str
     evidence: dict
     estimation: dict
-    # The value classes the field's evidence covers (VLM-3, blis-vllm#102): a tuple of classes,
-    # each {"name", and "values" or "min"/"max"}; None when the list states none for the field.
-    value_classes: tuple | None = None
+    # The value classes the field's evidence covers (VLM-3, blis-vllm#102), as the object
+    # _value_classes reads; None when the list states none for the field.
+    value_classes: dict | None = None
 
     @property
     def path(self) -> str:
@@ -90,6 +92,53 @@ def _no_duplicates(pairs):
     return out
 
 
+def _value_classes(raw, where: str, status: str) -> dict:
+    """The value classes a field's evidence covers (blis-substrate fields.ValueClasses): {type,
+    covered, values, thresholds, covered_classes}. A numeric field's class of x is the number of
+    thresholds t with x > t.value, or x == t.value where the threshold is closed "above"."""
+    c = _keys(raw, _CLASS_KEYS, where)
+    t = c.get("type")
+    if t not in CLASS_TYPES:
+        raise FieldsError(f"{where}.type: must be one of {CLASS_TYPES}, got {t!r}")
+    if t == "numeric":
+        th = c.get("thresholds")
+        if not isinstance(th, list) or not th:
+            raise FieldsError(f"{where}.thresholds: a numeric field needs thresholds")
+        for k, x in enumerate(th):
+            x = _keys(x, _THRESHOLD_KEYS, f"{where}.thresholds[{k}]")
+            if isinstance(x.get("value"), bool) or not isinstance(x.get("value"), (int, float)) or x.get("closed") not in ("above", "below"):
+                raise FieldsError(f"{where}.thresholds[{k}]: a number value and closed 'above' or 'below'")
+        cc = c.get("covered_classes")
+        if not isinstance(cc, list) or not cc or any(isinstance(n, bool) or not isinstance(n, int) or not 0 <= n <= len(th) for n in cc):
+            raise FieldsError(f"{where}.covered_classes: integers from 0 to {len(th)}")
+    else:
+        if "thresholds" in c or "covered_classes" in c:
+            raise FieldsError(f"{where}: thresholds and covered_classes only for a numeric field")
+        if not isinstance(c.get("covered"), list) or not c["covered"] or not all(isinstance(x, str) for x in c["covered"]):
+            raise FieldsError(f"{where}.covered: a non-empty list of strings")
+    if status == PROVEN_INERT and t != "numeric" and not c.get("values"):
+        raise FieldsError(f"{where}.values: a proven-inert field lists every value")
+    return c
+
+
+def class_of(x, classes: dict) -> int:
+    """The numeric class of x: the number of thresholds it is above (or on, where closed above)."""
+    return sum(1 for t in classes["thresholds"] if x > t["value"] or (t["closed"] == "above" and x == t["value"]))
+
+
+def covers(value, classes: dict) -> bool:
+    """Whether the field's evidence covers `value` (the reimplementation of the substrate's
+    ValueClasses.Covers, pinned by test_g1.py). Unlike the substrate it returns False, not an error,
+    for a value of the wrong type, and accepts a number for an enumerated field by its text, because
+    a value read from a log is parsed."""
+    if classes["type"] == "numeric":
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return False
+        return class_of(value, classes) in classes["covered_classes"]
+    text = str(value).lower() if isinstance(value, bool) else str(value)
+    return text in classes["covered"]
+
+
 def parse(data: bytes | str) -> FieldList:
     doc = json.loads(data, object_pairs_hook=_no_duplicates)
     _keys(doc, _LIST_KEYS, "field list")
@@ -130,17 +179,9 @@ def parse(data: bytes | str) -> FieldList:
         prev = key
         classes = None
         if "value_classes" in f:
-            if not isinstance(f["value_classes"], list) or not f["value_classes"]:
-                raise FieldsError(f"{where}.value_classes: must be a non-empty list")
-            if status != MODELLED:
-                raise FieldsError(f"{where}.value_classes: only a modelled field has value classes")
-            cl = []
-            for j, c in enumerate(f["value_classes"]):
-                c = _keys(c, _CLASS_KEYS, f"{where}.value_classes[{j}]")
-                if not c.get("name") or ("values" in c) == ("min" in c or "max" in c):
-                    raise FieldsError(f"{where}.value_classes[{j}]: a name and either values or min/max")
-                cl.append(c)
-            classes = tuple(cl)
+            if status not in (MODELLED, PROVEN_INERT):
+                raise FieldsError(f"{where}.value_classes: only a modelled or proven-inert field has value classes")
+            classes = _value_classes(f["value_classes"], f"{where}.value_classes", status)
         fld = Field(name, source, status, ev, est, classes)
         fl.fields[fld.path] = fld
     return fl
