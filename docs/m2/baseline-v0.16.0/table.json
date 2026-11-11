@@ -221,28 +221,233 @@
    "blocks": 1,
    "demotes": 0,
    "entry": "value_conflict:kv_transfer_config.engine_id"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "client_difference:client_flags"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "client_difference:send_gap"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-attention/attention_decode_floor_mla"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-host-overheads/host_admission_per_request"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-host-overheads/host_admission_per_token"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-host-overheads/host_completion"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-host-overheads/host_launch_eager_per_layer"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-host-overheads/host_launch_per_kernel"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-host-overheads/host_output_token"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-host-overheads/host_replay_graph_per_step"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-memory/activation_scratch_floor_bytes"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-memory/cudagraph_capture_bytes_full_and_piecewise"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-primitives/engine_workspace_bytes"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_method:cost-model-primitives/hbm_derate"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "coefficient_range:unevaluated"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "estimated:gpu_memory_utilization"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "interim_status:host"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "interim_status:model"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "interim_status:model_tag"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "interim_status:port"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "interim_status:reasoning_parser"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "interim_status:served_model_name"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "interim_status:tool_call_parser"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "interim_status:trust_remote_code"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "kernel_hash:unevaluated"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "other_release:engine release"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "ported_functions_unpublished:engine release"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "resolved_differs:unevaluated"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "value_class:unevaluated"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 20,
+   "entry": "client_difference:sent_prompt_lengths"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 18,
+   "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_4rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 18,
+   "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_4rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 13,
+   "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_8rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 13,
+   "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_8rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 11,
+   "entry": "later_record:cluster.gpus_per_node"
   }
  ],
  "coverage": {
   "all": {
    "by_grade": {
-    "G5": 1703,
-    "failed": 31
+    "G4": 31,
+    "G5": 1703
    },
-   "failed": 31,
+   "failed": 0,
    "not_scored": 1703,
    "points": 1734,
    "primary_reason": {
-    "blis_refused": 31,
     "field_not_modelled": 925,
     "not_in_catalog": 82,
     "value_not_recorded": 696
    },
    "reasons": {
-    "blis_refused:scenario": {
-     "alone": 31,
-     "blocks": 31
-    },
     "field_not_in_release:env.MC_ENABLE_DEST_DEVICE_AFFINITY": {
      "alone": 0,
      "blocks": 2
@@ -392,27 +597,22 @@
      "blocks": 5
     }
    },
-   "scored": 0,
-   "share_scored": 0.0
+   "scored": 31,
+   "share_scored": 0.01787773933102653
   },
   "in_scope": {
    "by_grade": {
-    "G5": 1157,
-    "failed": 31
+    "G4": 31,
+    "G5": 1157
    },
-   "failed": 31,
+   "failed": 0,
    "not_scored": 1157,
    "points": 1188,
    "primary_reason": {
-    "blis_refused": 31,
     "field_not_modelled": 469,
     "value_not_recorded": 688
    },
    "reasons": {
-    "blis_refused:scenario": {
-     "alone": 31,
-     "blocks": 31
-    },
     "field_not_in_release:env.MC_ENABLE_DEST_DEVICE_AFFINITY": {
      "alone": 0,
      "blocks": 2
@@ -550,8 +750,8 @@
      "blocks": 5
     }
    },
-   "scored": 0,
-   "share_scored": 0.0
+   "scored": 31,
+   "share_scored": 0.026094276094276093
   },
   "out_of_scope": {
    "by_grade": {
@@ -654,7 +854,7 @@
    },
    "points": 0,
    "share_of_all": "too few points",
-   "share_of_graded": null
+   "share_of_graded": "too few points"
   },
   "G2": {
    "accuracy": {
@@ -684,7 +884,7 @@
    },
    "points": 0,
    "share_of_all": "too few points",
-   "share_of_graded": null
+   "share_of_graded": "too few points"
   },
   "G3": {
    "accuracy": {
@@ -714,37 +914,37 @@
    },
    "points": 0,
    "share_of_all": "too few points",
-   "share_of_graded": null
+   "share_of_graded": "too few points"
   },
   "G4": {
    "accuracy": {
     "noise_floor_pct": 1.6,
     "noise_floor_source": "fallback; none measured per point",
-    "points": 0,
+    "points": 31,
     "tpot": {
      "mape": {
-      "n": 0,
-      "value": "too few points"
+      "n": 31,
+      "value": 17.302592794078805
      },
      "shape": {
-      "n": 0,
-      "value": "too few points"
+      "n": 25,
+      "value": 10.660419937110554
      }
     },
     "ttft": {
      "mape": {
-      "n": 0,
-      "value": "too few points"
+      "n": 31,
+      "value": 30.204950199986843
      },
      "shape": {
-      "n": 0,
-      "value": "too few points"
+      "n": 25,
+      "value": 17.72683899748134
      }
     }
    },
-   "points": 0,
-   "share_of_all": "too few points",
-   "share_of_graded": null
+   "points": 31,
+   "share_of_all": 0.01787773933102653,
+   "share_of_graded": 1.0
   },
   "G5": {
    "points": 1703,
@@ -752,36 +952,36 @@
    "share_of_graded": null
   },
   "failed": {
-   "points": 31
+   "points": 0
   }
  },
  "headline": {
   "noise_floor_pct": 1.6,
   "noise_floor_source": "fallback; none measured per point",
-  "points": 0,
+  "points": 31,
   "tpot": {
    "mape": {
-    "n": 0,
-    "value": "too few points"
+    "n": 31,
+    "value": 17.302592794078805
    },
    "shape": {
-    "n": 0,
-    "value": "too few points"
+    "n": 25,
+    "value": 10.660419937110554
    }
   },
   "ttft": {
    "mape": {
-    "n": 0,
-    "value": "too few points"
+    "n": 31,
+    "value": 30.204950199986843
    },
    "shape": {
-    "n": 0,
-    "value": "too few points"
+    "n": 25,
+    "value": 17.72683899748134
    }
   }
  },
  "identity": {
-  "harness_commit": "6310041bdd8f015782e9e1a29d3864e0d240f48c",
+  "harness_commit": "73a01afdef586519c4ee551cd7245a0fb386aed1",
   "point_set_sha256": "6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60",
   "points": 1734,
   "pull_manifest_sha256": "c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166",
@@ -809,19 +1009,117 @@
     "kind": "vllm",
     "version": "0.32.0"
    },
-   "harness_commit": "6310041bdd8f015782e9e1a29d3864e0d240f48c"
+   "harness_commit": "73a01afdef586519c4ee551cd7245a0fb386aed1"
   }
  },
  "kind": "run",
  "sample": "in_sample",
  "sample_text": "IN-SAMPLE: the points are the ones the model was calibrated on or tuned against; there is no anchor list yet, so no point is held out. These figures say how well the simulator reproduces data it has seen, not how well it predicts new data.",
- "serving_by_grade": {},
+ "serving_by_grade": {
+  "aggregated": {
+   "G1": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    }
+   },
+   "G2": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    }
+   },
+   "G3": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    }
+   },
+   "G4": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 31,
+    "tpot": {
+     "mape": {
+      "n": 31,
+      "value": 17.302592794078805
+     },
+     "shape": {
+      "n": 25,
+      "value": 10.660419937110554
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 31,
+      "value": 30.204950199986843
+     },
+     "shape": {
+      "n": 25,
+      "value": 17.72683899748134
+     }
+    }
+   }
+  }
+ },
  "unlock": [
-  {
-   "alone": 31,
-   "blocker": "blis_refused:scenario",
-   "blocks": 31
-  },
   {
    "alone": 28,
    "blocker": "field_not_modelled:max_cudagraph_capture_size",
