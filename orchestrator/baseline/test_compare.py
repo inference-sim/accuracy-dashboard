@@ -224,8 +224,9 @@ def test_check_table_rejects_a_mixed_table(runs):
     assert c.check_table(m)
 
 
-def test_committed_tables():
+def test_committed_tables(monkeypatch):
     """Every comparison table committed under docs/m2 (and its baseline) obeys the rules above."""
+    monkeypatch.undo()                      # the real split rule, not the fixtures' all-train
     root = HERE.parent.parent / "docs" / "m2"
     tables = sorted(p for p in root.rglob("*.json") if p.name == "table.json" or p.name.startswith("pair")) if root.is_dir() else []
     bad = [f"{p}: {pr}" for p in tables for pr in c.check_table(json.loads(p.read_text()))]
@@ -237,6 +238,12 @@ def test_committed_tables():
             fresh = c.run_report(c.Run(data), stored["sample"])
             assert json.loads(json.dumps(fresh)) == stored, f"{p} is not what compare.py makes of {data}"
             assert (p.parent / "table.md").read_text() == c.run_markdown(fresh), f"{p.parent}/table.md is stale"
+        if p.name == "table.json" and data.is_dir() and json.loads(p.read_text()).get("kind") == "pair":
+            stored = json.loads(p.read_text())
+            before = root / "baseline-v0.16.0" / "contract"
+            fresh = c.pair_report(c.Run(before), c.Run(data), stored["sample"])
+            assert json.loads(json.dumps(fresh)) == stored, f"{p} is not what compare.py makes of {before} and {data}"
+            assert (p.parent / "table.md").read_text() == c.pair_markdown(fresh), f"{p.parent}/table.md is stale"
 
 
 def test_scope_is_amd_and_tpu_only():

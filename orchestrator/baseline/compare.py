@@ -551,9 +551,18 @@ def _dev_md(ds: dict, title: str = "Development split") -> list[str]:
     return L + [""]
 
 
+def _withheld_md(withheld: int, test_evaluated: bool) -> str:
+    if test_evaluated:
+        return "A logged test evaluation was asked for: the accuracy figures below include the test and prospective points."
+    return (f"**Accuracy figures leave out the {withheld} scored test and prospective points** (they are withheld "
+            f"from every figure, so none can be derived by subtraction; docs/m2/evaluation-protocol.md section 6). "
+            f"Every count of points includes them.")
+
+
 def run_markdown(t: dict) -> str:
     ident = t["identity"]
-    L = [f"# Scored run ({t['sample'].replace('_', '-')})", "", t["sample_text"], "", *_identity_md(ident), ""]
+    L = [f"# Scored run ({t['sample'].replace('_', '-')})", "", t["sample_text"], "",
+         _withheld_md(t["headline"]["withheld"], t["development_split"]["test_evaluated"]), "", *_identity_md(ident), ""]
     L += [f"Simulator `{(t['inputs'].get('simulator') or {}).get('build')}`, engine {t['inputs'].get('engine')}, "
           f"fields sha256 `{t['inputs'].get('fields_sha256')}`.", ""]
     h = t["headline"]
@@ -587,6 +596,7 @@ def _unlock_md(rows: list[dict], title: str) -> list[str]:
 def pair_markdown(t: dict) -> str:
     b, a = t["before"], t["after"]
     L = [f"# Before and after ({t['sample'].replace('_', '-')})", "", t["sample_text"], "",
+         _withheld_md(max(b["headline"]["withheld"], a["headline"]["withheld"]), b["development_split"]["test_evaluated"]), "",
          "Both runs share one harness commit, one units file, one frozen pull and one point set:", "", *_identity_md(b["identity"]), "",
          f"Before: simulator `{(b['inputs'].get('simulator') or {}).get('build')}`, fields `{b['inputs'].get('fields_sha256')}`.  ",
          f"After: simulator `{(a['inputs'].get('simulator') or {}).get('build')}`, fields `{a['inputs'].get('fields_sha256')}`.", ""]

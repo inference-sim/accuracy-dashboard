@@ -4,7 +4,8 @@ The contract names the harness commit that scored it (provenance.json `harness_c
 harness/run.sh records as the commit of the checkout it ran from). The results are committed after
 that commit, so the commit cannot be HEAD; what must hold is that nothing that scores changed in
 between. The files that score are harness/, schemas/, requirements-ci.txt and every non-test file
-under orchestrator/. A change to any of them means the contract describes another scorer's output,
+under orchestrator/ except orchestrator/baseline/ (the table, split and residual tools read a
+contract; none writes one). A change to any of them means the contract describes another scorer's output,
 and the run is made again (docs/m2/after-run.md).
 
 CI checks the repository out in full (fetch-depth 0): the harness commit must be in the history.
@@ -16,7 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent.parent
 SCORER_PATHS = ["harness", "orchestrator", "schemas", "requirements-ci.txt"]
 NOT_THE_SCORER = [":(exclude,glob)orchestrator/**/test_*.py", ":(exclude,glob)orchestrator/**/testdata/**",
-                  ":(exclude,glob)orchestrator/**/test_*", ":(exclude,glob)harness/test_*"]
+                  ":(exclude,glob)orchestrator/**/test_*", ":(exclude,glob)harness/test_*", ":(exclude)orchestrator/baseline"]
 
 
 def git(repo, *args):
@@ -58,11 +59,13 @@ def test_the_check_sees_a_changed_scorer_file_and_ignores_tests_and_docs(tmp_pat
         return git(tmp_path, "rev-parse", "HEAD").stdout.strip()
     git(tmp_path, "init", "-q")
     for rel in ("orchestrator/ingest/score.py", "orchestrator/ingest/test_score.py", "docs/a.md", "schemas/s.json",
+                "orchestrator/baseline/compare.py",
                 "harness/run.sh", "orchestrator/ingest/testdata/x.json", "requirements-ci.txt"):
         (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / rel).write_text("1\n")
     base = commit("base")
-    for rel in ("orchestrator/ingest/test_score.py", "docs/a.md", "orchestrator/ingest/testdata/x.json"):
+    for rel in ("orchestrator/ingest/test_score.py", "docs/a.md", "orchestrator/ingest/testdata/x.json",
+                "orchestrator/baseline/compare.py"):
         (tmp_path / rel).write_text("2\n")
     after_tests = commit("tests and docs only")
     assert scorer_changes(tmp_path, base, after_tests) == []
