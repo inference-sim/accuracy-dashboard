@@ -573,7 +573,39 @@ def test_agentx_replays_as_the_mvp_scenario_with_the_runs_own_inputs():
     spec = rp.workload_spec(r, {"repo": "d/c", "revision": "rev", "file": "traces.jsonl", "sha256": "a" * 64})
     assert spec["concurrency"] == 8 and spec["random_seed"] == 42 and spec["benchmark_duration_s"] == 3600.0
     assert spec["trajectory_start"] == {"min_ratio": 0.25, "max_ratio": 0.75}
-    assert "trace_idle_gap_cap_s" not in spec       # inference-sim#1971: not passed
+    # The export's cap and per-lane warm-up reach the scenario (inference-sim#1971, closed).
+    assert spec["trace_idle_gap_cap_s"] == 300.0
+    assert spec["warmup"] == {"mode": "cache_pressure", "requests_per_lane": 10}
+    rec = r.record("a" * 64)
+    assert rec["trace_idle_gap_cap_s"] == 300.0 and rec["warmup_requests_per_lane"] == 10
+    assert rec["system_idle_gap_cap_s"] == 10.0 and rec["grace_period_s"] == 30.0
+
+
+def test_the_cap_and_warmup_are_not_invented_when_the_export_lacks_them():
+    e = _export()
+    del e["input_config"]["phases"][0]["warmup_requests_per_lane"]
+    del e["input_config"]["datasets"][0]["trace_idle_gap_cap_seconds"]
+    r = rp.from_export(e)
+    spec = rp.workload_spec(r, {"repo": "d/c", "revision": "rev", "file": "t.jsonl", "sha256": "a" * 64})
+    assert "trace_idle_gap_cap_s" not in spec and "warmup" not in spec
+    assert "trace_idle_gap_cap_s" not in r.record("a" * 64)
+
+
+def test_a_non_positive_or_fractional_cap_or_warmup_refuses_the_point():
+    r = rp.from_export(_export(phase={"warmup_requests_per_lane": 2.5}))
+    assert "client_scenario_not_replayable:warmup_requests_per_lane" in r.reasons
+    e = _export()
+    e["input_config"]["datasets"][0]["trace_idle_gap_cap_seconds"] = 0
+    assert "client_scenario_not_replayable:trace_idle_gap_cap_s" in rp.from_export(e).reasons
+
+
+def test_the_command_line_flags_for_the_cap_and_warmup_must_agree_with_the_export():
+    r = rp.from_export(_export())
+    rp.cross_check(r, "aiperf profile --trace-idle-gap-cap-seconds 60 --warmup-requests-per-lane 3", 8)
+    assert r.reasons == ["conflict:replay.trace_idle_gap_cap_s", "conflict:replay.warmup_requests_per_lane"]
+    r = rp.from_export(_export())
+    rp.cross_check(r, "aiperf profile --trace-idle-gap-cap-seconds 300 --warmup-requests-per-lane 10", 8)
+    assert r.reasons == []
 
 
 def test_a_command_line_or_row_that_disagrees_with_the_export_conflicts():
