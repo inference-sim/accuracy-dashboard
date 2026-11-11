@@ -61,7 +61,7 @@ python3 orchestrator/baseline/compare.py pair --before OUT --after OUT_AFTER --s
 
 The units file for step 3 is committed; `split.py splits --pull PULL --out splits.json` makes the splits file (committed beside each contract directory).
 
-**A contract is made by the scorer it sits beside.** The harness commit in each `contract/provenance.json` is the checkout `run.sh` ran from; the results are committed after it, so it is not the head. `orchestrator/baseline/test_contracts_current.py` fails if any scoring file (`harness/`, `schemas/`, `requirements-ci.txt`, a non-test file under `orchestrator/`) differs between that commit and the head: a change to the scorer means every committed contract is scored again and the tables regenerated. CI checks out the full history for this.
+**A contract is made by the scorer it sits beside.** The harness commit in each `contract/provenance.json` is the checkout `run.sh` ran from; the results are committed after it, so it is not the head. `orchestrator/baseline/test_contracts_current.py` fails if any scoring file (`harness/`, `schemas/`, `requirements-ci.txt`, a non-test file under `orchestrator/` except the boundary lint and `build_summary_v2.py`, which write no contract) differs between that commit and the head: a change to the scorer means every committed contract is scored again and the tables regenerated. CI checks out the full history for this.
 
 ## Expected results
 

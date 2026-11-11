@@ -18,7 +18,8 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 SCORER_PATHS = ["harness", "orchestrator", "schemas", "requirements-ci.txt"]
 NOT_THE_SCORER = [":(exclude,glob)orchestrator/**/test_*.py", ":(exclude,glob)orchestrator/**/testdata/**",
                   ":(exclude,glob)orchestrator/**/test_*", ":(exclude,glob)harness/test_*", ":(exclude)orchestrator/baseline",
-                  ":(exclude)orchestrator/lint_blis_boundary.py"]  # a lint of the source tree; it writes no contract
+                  ":(exclude)orchestrator/lint_blis_boundary.py",  # a lint of the source tree; it writes no contract
+                  ":(exclude)orchestrator/build_summary_v2.py"]  # reads a contract and writes a summary; the contract it inverts a summary to is a test aid
 
 
 def git(repo, *args):

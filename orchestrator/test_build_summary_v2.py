@@ -779,6 +779,7 @@ def _subset_contract(src: Path, dst: Path, keep: set):
     (dst / c.FACETS_JSON).write_text(c.canonical_dumps(fac) + "\n")
     (dst / c.NOT_SCORED_JSONL).write_text("")
     (dst / c.FAILED_JSONL).write_text("")
+    (dst / c.POINTRECORDS_JSONL).write_text("")      # a subset carries no substrate point records
     shutil.copy(src / c.PROVENANCE_JSON, dst / c.PROVENANCE_JSON)
     _recount(dst)
 

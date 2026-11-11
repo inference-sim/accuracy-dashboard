@@ -464,6 +464,9 @@ def summary_to_contract(summary: dict, out: Path) -> None:
     for name, key in ((contract.NOT_SCORED_JSONL, "not_scored"), (contract.FAILED_JSONL, "failed")):
         recs = sorted(summary.get(key, []), key=lambda n: n["point_id"])
         (out / name).write_text("".join(contract.canonical_dumps(n) + "\n" for n in recs))
+    # The summary does not carry the substrate point records, so the inverted contract has none: the file
+    # is present and empty, which validate_dir accepts ("or none").
+    (out / contract.POINTRECORDS_JSONL).write_text("")
     (out / contract.PROVENANCE_JSON).write_text(
         contract.canonical_dumps(_prov_out_to_in(summary["provenance"], summary["coverage"])) + "\n")
 
