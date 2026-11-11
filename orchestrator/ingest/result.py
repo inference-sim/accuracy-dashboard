@@ -205,19 +205,31 @@ def coefficient_substitutions(doc: dict) -> list[dict]:
 ACCEPTANCE_SUBJECT = "speculative_config.acceptance_length"
 
 
-def acceptance_substitution(doc: dict | None) -> dict:
+def _realised_text(realised) -> str:
+    if realised is False:             # the log was not read (a point graded without the simulator)
+        return ""
+    if not realised:
+        return "; the server log reports no mean acceptance length"
+    return (f"; the server log reports mean acceptance length {realised['mean_acceptance_length']} "
+            f"over {realised['log_lines']} interval(s), {realised['drafted_tokens']} drafted tokens")
+
+
+def acceptance_substitution(doc: dict | None, realised=False) -> dict:
     """The G2 substitution for a drafter whose acceptance the run did not record (design D8):
     blis resolves it from the substrate's profile, and the Result's input.workload_properties
     says which. Kind estimated; the detail names the profile (set/key), or says the Result does
     not report it. With no Result yet (doc None, a point graded without the simulator) the detail
-    says the profile is not read."""
+    says the profile is not read. `realised` is settings.realised_acceptance(log): the detail
+    names the acceptance length the run's server logged beside the profile, so the substituted
+    value can be read against it."""
+    tail = _realised_text(realised)
     if doc is None:
-        return {"kind": "estimated", "subject": ACCEPTANCE_SUBJECT, "detail": "profile not read"}
+        return {"kind": "estimated", "subject": ACCEPTANCE_SUBJECT, "detail": "profile not read" + tail}
     for p in (doc.get("input") or {}).get("workload_properties") or []:
         if p.get("name") == "speculative_acceptance":
             if p.get("source") == "profile" and p.get("profile"):
                 detail = f"profile {p['profile']} from the registry"
             else:
                 detail = f"supplied by {p.get('source')}, not a registry profile"
-            return {"kind": "estimated", "subject": ACCEPTANCE_SUBJECT, "detail": detail}
-    return {"kind": "estimated", "subject": ACCEPTANCE_SUBJECT, "detail": "profile not reported"}
+            return {"kind": "estimated", "subject": ACCEPTANCE_SUBJECT, "detail": detail + tail}
+    return {"kind": "estimated", "subject": ACCEPTANCE_SUBJECT, "detail": "profile not reported" + tail}

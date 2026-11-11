@@ -917,3 +917,30 @@ def topology_reasons(launch_config: dict | None, args: "Reading", field_list) ->
         if dec.g5:
             out.append(f"{dec.g5['code']}:{p}")
     return sorted(out)
+
+
+# ------------------------------------------------------------------ the acceptance a run realised
+
+_SPEC_LINE = re.compile(r"SpecDecoding metrics: Mean acceptance length: ([0-9.]+).*?Drafted: ([0-9]+) tokens")
+
+
+def realised_acceptance(log: str) -> dict | None:
+    """The mean acceptance length the vLLM server logged while it served (its periodic
+    "SpecDecoding metrics: Mean acceptance length: X, ... Drafted: D tokens" lines), or None when
+    the log has none. The figure is the mean of the lines' lengths weighted by the tokens each
+    interval drafted, which is the length over all drafts when the draft length is fixed. The log
+    covers the server's whole life, warm-up and any other client included, so it is the run's
+    realised acceptance only to that extent; `lines` and `drafted_tokens` say how much it rests on.
+    Idle intervals (nothing drafted) are skipped."""
+    total = weighted = 0.0
+    lines = 0
+    for m in _SPEC_LINE.finditer(log):
+        drafted = int(m.group(2))
+        if drafted <= 0:
+            continue
+        lines += 1
+        total += drafted
+        weighted += float(m.group(1)) * drafted
+    if not lines:
+        return None
+    return {"mean_acceptance_length": round(weighted / total, 3), "log_lines": lines, "drafted_tokens": int(total)}

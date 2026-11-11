@@ -540,13 +540,23 @@ def unread_result_substitutions(b: st.Built) -> list[dict]:
     return result.coefficient_substitutions({}) + _acceptance_subs(b, None)
 
 
-def _acceptance_subs(b: st.Built, doc: dict | None) -> list[dict]:
+def _acceptance_subs(b: st.Built, doc: dict | None, log: str | None = None) -> list[dict]:
     """A drafter with no recorded acceptance is simulated with the substrate's profile (D8); the
     scenario pins nothing and the point names the profile blis resolved."""
     spec = b.deployment["pools"][0]["engine"].get("speculative")
     if spec is None or b.acceptance_length is not None:
         return []
-    return [result.acceptance_substitution(doc)]
+    return [result.acceptance_substitution(doc, st.realised_acceptance(log) if log is not None else False)]
+
+
+def note_realised_acceptance(fidelity: dict, b: st.Built, log: str) -> None:
+    """Record the acceptance length the run's server logged, beside what the simulation used,
+    on every point of a speculative deployment."""
+    if b.deployment["pools"][0]["engine"].get("speculative") is None:
+        return
+    fidelity["acceptance"] = {"realised": st.realised_acceptance(log),
+                              "simulated": "recorded" if b.acceptance_length is not None else "profile",
+                              **({"simulated_length": float(b.acceptance_length)} if b.acceptance_length is not None else {})}
 
 
 def check_all_scored(points: list, outcomes: list) -> list[str]:
@@ -767,7 +777,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
 
     try:
         o.subs += result.coefficient_substitutions(doc)
-        o.subs += _acceptance_subs(b, doc)
+        o.subs += _acceptance_subs(b, doc, log)
     except result.ResultError as e:
         o.reasons = [f"blis_refused:{e.slug}"]
         return o
@@ -776,6 +786,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     o.fidelity = {"build": entry["build"], "args": args,
                   "resolved": resolved_kv(log, doc), "replay": {**r.record(corpus["sha256"]), "differences": rp.client_differences(r)},
                   "blis_kernel_provenance": result.kernel_report(doc)}
+    note_realised_acceptance(o.fidelity, b, log)
     par = dep["pools"][0]["parallel"]
     ep = (par["tp"] * par["dp"]) if par.get("enable_expert_parallel") else 1
     scen = f"{sup.model}-{row['hardware']}-{row['precision']}-vllm-tp{par['tp']}-dp{par['dp']}-ep{ep}-agentx"
@@ -849,9 +860,12 @@ def _run_result(o: Outcome, argv: list[str], key: str, cache: Path, env: Env, wo
     return doc
 
 
-# A single-turn point with data-parallel ranks is simulated behind the llm-d endpoint picker
-# profile vllm-dp-lb (inferencex/vllm-dp-lb.epp.yaml), which stands in for vLLM's internal load
-# balancer; the point names it (design 11.3, an execution mode substituted).
+# A single-turn point with data-parallel ranks is simulated as ONE instance whose engine holds
+# the whole data-parallel group, its ranks, waves and vLLM's internal balancer (inference-sim
+# cmd/engine_driver_build.go). The scenario still carries the endpoint picker profile
+# vllm-dp-lb (inferencex/vllm-dp-lb.epp.yaml); with one endpoint it picks nothing, so the
+# profile is inert and stands for the balancer only in name. The point names it anyway
+# (design 11.3, an execution mode substituted).
 DP_BALANCER = {"kind": "execution_mode", "subject": "data-parallel balancer",
                "detail": "llm-d endpoint picker profile vllm-dp-lb stands in for vLLM's internal load balancer"}
 
@@ -886,8 +900,9 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     phase runs from an empty engine. Otherwise it runs primed by the client's own warm-up: the
     2*CONC copies of request 0 it sends and drains before the main phase (inferencex_client.
     WARMUPS_PER_CONCURRENCY), so the warm-up state is the client's and not an equivalent of it,
-    whatever the deployment's data-parallel width. The scenario gains the router block of every single-turn point (vLLM's data-parallel
-    balancer, which places by requests in flight), written beside it. The predicted means are
+    whatever the deployment's data-parallel width. The scenario gains the router block of every
+    single-turn point, written beside it (the data-parallel balancer is inside the engine: see
+    DP_BALANCER). The predicted means are
     the client's own, computed from the Result's request rows (inferencex_client.summarize);
     the fidelity record's `requests` names how the requests were replayed and every difference
     from the run's client."""
@@ -974,13 +989,14 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
 
     try:
         o.subs += result.coefficient_substitutions(doc)
-        o.subs += _acceptance_subs(b, doc)
+        o.subs += _acceptance_subs(b, doc, log)
     except result.ResultError as e:
         o.reasons = [f"blis_refused:{e.slug}"]
         return o
     evaluate_g1(o, doc, env)
     o.fidelity = {"build": entry["build"], "args": args, "resolved": [],
                   "blis_kernel_provenance": result.kernel_report(doc), "requests": requests}
+    note_realised_acceptance(o.fidelity, b, log)
     ep = (par["tp"] * par["dp"]) if par.get("enable_expert_parallel") else 1
     label = _single_turn_label(isl, osl)
     scen = f"{model}-{row['hardware']}-{row['precision']}-vllm-tp{par['tp']}-dp{par['dp']}-ep{ep}"
