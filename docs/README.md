@@ -32,6 +32,8 @@ The dashboard asks one question of every InferenceX benchmark point it can read:
 | [Gate with blis-vllm's classification](m2/gate-real-fields.md), [dry run](m2/dry-run-field-gate.md) | How many points reach the simulator when the field list is opened. |
 | [Local-path checkpoints](m2/local-path-checkpoints.md), [node size of b200/h200](m2/node-size-b200-h200.md) | Two decisions with their evidence. |
 | [Prefill/decode coverage](m2/pd-coverage.md) | What the two-pool writer scores on the data-parallel-free Dynamo rows, at what error, what is refused and why; the commands. |
+| [Workload statements](m2/workload-statements.md) | What each benchmark family states about the workload's category and thinking mode, which profile pairs the substrate holds, and how many points each unlocks. |
+| [Who owns the router policies](m2/policy-table-owner.md) | The policy list and compositions are the substrate router table's; the check that the dashboard's copy matches, and what the owner does not yet state. |
 | [Agentic coverage](m2/agentic-coverage.md) | The 47 agentic points: each one's first refusal and the field that blocks it. |
 | [Dynamo router evidence](m2/dynamo-router-evidence.md) | What router the Dynamo runs used. |
 | [The dashboard against the final substrate](m2/final-catalog-check.md) | Names the code reads, checked at the audited substrate stack. |

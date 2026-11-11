@@ -30,7 +30,7 @@ All 47 `agentic_traces` points of the baseline's frozen pull are in scope (h200 
 
 * A multi-node colocated run (`is_multinode`, not `disagg`) is no longer refused for its topology: it is one pool over several nodes, and the cluster, the fabric and the pool are written as for any engine (`score.score_point`, `settings.build`).
 * A colocated multi-node run whose server log is gone has its arguments recovered from its aggregated recipe at the run's commit, as [disaggregation](../disaggregation.md) describes for prefill/decode, and says so on the point. The recipe is found from the `worker` block of the master configuration (an agentic item has no sequence lengths), checked against the row's GPUs and parallel sizes, and kept by the pull.
-* The reasoning-parser rule for a speculative point's thinking mode ([coverage accounting](../coverage-accounting.md)) applies to agentic points as to single-turn ones; none of these 47 is held by it.
+* A speculative agentic point pins the acceptance length its server states (a synthetic one); the workload's category and thinking mode are the AgentX workload file's ([workload statements](workload-statements.md)). None of these 47 is held by a missing category.
 
 ## The 47 points
 

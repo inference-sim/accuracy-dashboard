@@ -19,7 +19,7 @@
 | Run | Scored | Refused by the simulator | Not scored (G5) | TTFT MAPE | TPOT MAPE |
 |---|---|---|---|---|---|
 | Baseline: inference-sim v0.16.0, substrate v0.13.0 | 41 | 10 | 1683 | 47.1 (n=11) | 58.0 (n=11) |
-| Preliminary after-run: M2 simulator at commit pins | 530 | 406 | 798 | 32.6 (n=441) | 17.9 (n=441) |
+| Preliminary after-run: M2 simulator at commit pins | 450 | 117 | 1167 | 34.0 (n=361) | 17.7 (n=361) |
 
 All scored points are G4. The accuracy columns are over the train and validation points only (the test split is withheld from every figure, `m2/evaluation-protocol.md` section 6), so the baseline's rest on eleven. The after-run is preliminary (commit pins, to be re-run at the final ones) and in-sample. The 406 refusals and what each asks for are in [its report](m2/preliminary-after/preliminary-after-run.md); the final after-run replaces it when the pins exist ([command](m2/after-run.md)). The residuals that point to where the model is wrong are on the train split only: [residuals](m2/preliminary-after/residuals.md).
 

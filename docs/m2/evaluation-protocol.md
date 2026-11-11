@@ -45,7 +45,7 @@ Split sizes on the frozen pull (1734 points, the baseline's point set; groups ar
 | test | 446 | not shown | not shown | 30 | 89 |
 | prospective | 0 | 0 | 0 | 0 | 0 |
 
-The scored counts of the test row follow from the totals (41 and 530 scored, less the other splits), and a count is not an accuracy figure; what is withheld is how accurate those points are. The groups are few and uneven (one group can hold a hundred points), so the split by points is 55% train, 19% validation and 26% test of the pull, not 60/20/20; the 60/20/20 is of groups.
+The scored counts of the test row follow from the totals (41 and 450 scored, less the other splits), and a count is not an accuracy figure; what is withheld is how accurate those points are. The groups are few and uneven (one group can hold a hundred points), so the split by points is 55% train, 19% validation and 26% test of the pull, not 60/20/20; the 60/20/20 is of groups.
 
 Every scored point is G4, so each split has one grade today.
 

@@ -85,6 +85,15 @@ When a P/D run's own record of the engine arguments is missing or is one worker'
 
 The engine's block takes only the environment variables it reads (`PYTHONHASHSEED`, `VLLM_USE_V2_MODEL_RUNNER` at the pinned list) and refuses any other key. A variable the field list calls `proven_inert` or `inert_unproven` (a timeout, a matmul-precision hint) is therefore recorded on the point (`match: inert` in the fidelity `args`, and for `inert_unproven` the `interim_status` substitution) and not stated in the scenario. Before this rule the scorer stated them and the engine refused all 84 P/D points that reached it.
 
-## Thinking mode of a speculative point
+## Workload mode and category of a speculative point
 
-A speculative point needs the workload's thinking mode to select the acceptance profile (design §11.2). The order: (1) a mode the run recorded (the chat-template kwargs) is passed; (2) a logged acceptance length is pinned in place of a profile when the engine models the field; (3) otherwise, if the server runs a reasoning parser (recorded in the arguments or launch configuration, never inferred from a model name), the point states `thinking on` and the fallback category `coding` and names an `estimated` substitution on `workload.thinking_mode` naming both; (4) otherwise the simulator refuses and the point is G5 `value_not_recorded`. The maintainer's decision for (3) rests on the measurements: realised acceptance against profile, DeepSeek-V4-Pro K=2 realised 2.20, profile off 2.61, on 2.27; MiniMax-M3 K=3 realised 2.57, off 2.93, on 2.83 (thinking on is the closer profile in both).
+A speculative point's acceptance profile is keyed by the workload's category and thinking mode (design D8, §11.2). The
+dashboard states neither on its own: a server's reasoning parser is a capability of the engine and says nothing about the
+prompts it was sent. The order: (1) an acceptance length the run set is pinned; (2) otherwise a length its server logged
+is pinned in place of a profile when the engine models the field (named `estimated`, with the log's figures); (3)
+otherwise the workload's category and thinking mode must be stated, by a mode the run recorded (the chat-template kwargs) or by
+the benchmark's own definition (the AgentX workload file of the catalog states both), or a fallback category the caller
+asked for (`--speculative-fallback-category`, named `estimated` on `workload.category`, experimental); (4) otherwise the
+point is G5 `value_not_recorded:workload_category_not_stated`, and a pair the substrate holds no profile for is
+`value_not_recorded:profile_not_available:<category>/<thinking>`. What each benchmark family states, and which pairs have a
+profile, is in [workload statements](m2/workload-statements.md).

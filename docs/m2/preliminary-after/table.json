@@ -1,6 +1,12 @@
 {
  "backlog": [
   {
+   "alone": 369,
+   "blocks": 382,
+   "demotes": 0,
+   "entry": "value_not_recorded:workload_category_not_stated"
+  },
+  {
    "alone": 298,
    "blocks": 538,
    "demotes": 0,
@@ -13,12 +19,6 @@
    "entry": "field_not_modelled:linear_backend"
   },
   {
-   "alone": 38,
-   "blocks": 226,
-   "demotes": 0,
-   "entry": "field_not_modelled:moe_backend"
-  },
-  {
    "alone": 37,
    "blocks": 37,
    "demotes": 0,
@@ -29,6 +29,12 @@
    "blocks": 35,
    "demotes": 0,
    "entry": "field_not_in_release:env.VLLM_MXFP4_USE_MARLIN"
+  },
+  {
+   "alone": 25,
+   "blocks": 226,
+   "demotes": 0,
+   "entry": "field_not_modelled:moe_backend"
   },
   {
    "alone": 10,
@@ -135,200 +141,170 @@
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "client_difference:client_flags"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "client_difference:failed_requests"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "client_difference:send_gap"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "coefficient_method:cost-model-attention/attention_decode_floor_mla"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "coefficient_method:cost-model-host-overheads/host_admission_per_request"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "coefficient_method:cost-model-host-overheads/host_admission_per_token"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "coefficient_method:cost-model-host-overheads/host_completion"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "coefficient_method:cost-model-host-overheads/host_launch_eager_per_layer"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "coefficient_method:cost-model-host-overheads/host_launch_per_kernel"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "coefficient_method:cost-model-host-overheads/host_output_token"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "coefficient_method:cost-model-host-overheads/host_replay_graph_per_step"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "coefficient_method:cost-model-memory/activation_scratch_floor_bytes"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "coefficient_method:cost-model-memory/cudagraph_capture_bytes_full_and_piecewise"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "coefficient_method:cost-model-primitives/engine_workspace_bytes"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "coefficient_method:cost-model-primitives/hbm_derate"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "interim_status:model"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "interim_status:model_tag"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "interim_status:port"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 530,
+   "demotes": 450,
    "entry": "kernel_hash:unevaluated"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 502,
+   "demotes": 422,
    "entry": "interim_status:trust_remote_code"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 467,
-   "entry": "value_class:max_num_batched_tokens"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 455,
+   "demotes": 420,
    "entry": "estimated:gpu_memory_utilization"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 429,
+   "demotes": 387,
+   "entry": "value_class:max_num_batched_tokens"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 376,
    "entry": "later_record:cluster.gpus_per_node"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 428,
-   "entry": "value_class:block_size"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 399,
+   "demotes": 351,
    "entry": "client_difference:sent_prompt_lengths"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 395,
+   "demotes": 348,
+   "entry": "value_class:block_size"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 315,
    "entry": "coefficient_range:unevaluated"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 319,
-   "entry": "interim_status:host"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 295,
+   "demotes": 252,
    "entry": "value_class:tensor_parallel_size"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 292,
-   "entry": "other_release:engine release"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 292,
-   "entry": "ported_functions_unpublished:engine release"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 266,
-   "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_8rank"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 266,
-   "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_8rank"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 253,
-   "entry": "value_class:max_model_len"
+   "demotes": 239,
+   "entry": "interim_status:host"
   },
   {
    "alone": 0,
@@ -339,50 +315,62 @@
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 224,
+   "demotes": 223,
+   "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_8rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 223,
+   "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_8rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 213,
+   "entry": "value_class:max_model_len"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 212,
+   "entry": "other_release:engine release"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 212,
+   "entry": "ported_functions_unpublished:engine release"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 189,
    "entry": "coefficient_method:cost-model-primitives/host_gather_rate_uva"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 220,
-   "entry": "interim_status:reasoning_parser"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 220,
-   "entry": "interim_status:tool_call_parser"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 170,
+   "demotes": 151,
    "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_4rank"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 170,
+   "demotes": 151,
    "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_4rank"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 158,
-   "entry": "interim_status:enable_auto_tool_choice"
+   "demotes": 140,
+   "entry": "interim_status:reasoning_parser"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 150,
-   "entry": "interim_status:served_model_name"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 146,
-   "entry": "interim_status:tokenizer_mode"
+   "demotes": 140,
+   "entry": "interim_status:tool_call_parser"
   },
   {
    "alone": 0,
@@ -411,6 +399,12 @@
   {
    "alone": 0,
    "blocks": 0,
+   "demotes": 123,
+   "entry": "interim_status:served_model_name"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
    "demotes": 103,
    "entry": "coefficient_method:cost-model-primitives/gemm_eps_max_w8a16_mxfp8"
   },
@@ -423,50 +417,50 @@
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 91,
+   "demotes": 78,
+   "entry": "interim_status:enable_auto_tool_choice"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 73,
    "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_2rank"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 80,
-   "entry": "estimated:speculative_config.acceptance_length"
+   "demotes": 66,
+   "entry": "interim_status:tokenizer_mode"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 80,
-   "entry": "estimated:workload.thinking_mode"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 71,
-   "entry": "interim_status:enable_flashinfer_autotune"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 65,
+   "demotes": 47,
    "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_1rank"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 65,
+   "demotes": 47,
    "entry": "resolved_differs:all_reduce_backend"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 62,
+   "demotes": 44,
    "entry": "estimated:api_server_count"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 62,
+   "demotes": 44,
    "entry": "execution_mode:data-parallel balancer"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 36,
+   "entry": "interim_status:enable_flashinfer_autotune"
   },
   {
    "alone": 0,
@@ -478,25 +472,25 @@
  "coverage": {
   "all": {
    "by_grade": {
-    "G4": 530,
-    "G5": 798,
-    "failed": 406
+    "G4": 450,
+    "G5": 1167,
+    "failed": 117
    },
-   "failed": 406,
-   "not_scored": 798,
+   "failed": 117,
+   "not_scored": 1167,
    "points": 1734,
    "primary_reason": {
-    "blis_refused": 406,
+    "blis_refused": 117,
     "field_not_in_release": 72,
-    "field_not_modelled": 368,
+    "field_not_modelled": 355,
     "not_in_catalog": 298,
     "value_conflict": 9,
-    "value_not_recorded": 51
+    "value_not_recorded": 433
    },
    "reasons": {
     "blis_refused:scenario": {
-     "alone": 406,
-     "blocks": 406
+     "alone": 117,
+     "blocks": 117
     },
     "field_not_in_release:env.VLLM_MXFP4_USE_MARLIN": {
      "alone": 35,
@@ -543,7 +537,7 @@
      "blocks": 65
     },
     "field_not_modelled:moe_backend": {
-     "alone": 38,
+     "alone": 25,
      "blocks": 226
     },
     "field_not_modelled:prefix_match_unit": {
@@ -585,31 +579,35 @@
     "value_not_recorded:speculative_config.model": {
      "alone": 0,
      "blocks": 5
+    },
+    "value_not_recorded:workload_category_not_stated": {
+     "alone": 369,
+     "blocks": 382
     }
    },
-   "scored": 530,
-   "share_scored": 0.30565167243367936
+   "scored": 450,
+   "share_scored": 0.25951557093425603
   },
   "in_scope": {
    "by_grade": {
-    "G4": 530,
-    "G5": 252,
-    "failed": 406
+    "G4": 450,
+    "G5": 621,
+    "failed": 117
    },
-   "failed": 406,
-   "not_scored": 252,
+   "failed": 117,
+   "not_scored": 621,
    "points": 1188,
    "primary_reason": {
-    "blis_refused": 406,
+    "blis_refused": 117,
     "field_not_in_release": 72,
-    "field_not_modelled": 128,
+    "field_not_modelled": 115,
     "value_conflict": 9,
-    "value_not_recorded": 43
+    "value_not_recorded": 425
    },
    "reasons": {
     "blis_refused:scenario": {
-     "alone": 406,
-     "blocks": 406
+     "alone": 117,
+     "blocks": 117
     },
     "field_not_in_release:env.VLLM_MXFP4_USE_MARLIN": {
      "alone": 35,
@@ -648,7 +646,7 @@
      "blocks": 67
     },
     "field_not_modelled:moe_backend": {
-     "alone": 38,
+     "alone": 25,
      "blocks": 56
     },
     "field_not_modelled:prefix_match_unit": {
@@ -686,10 +684,14 @@
     "value_not_recorded:speculative_config.model": {
      "alone": 0,
      "blocks": 5
+    },
+    "value_not_recorded:workload_category_not_stated": {
+     "alone": 369,
+     "blocks": 382
     }
    },
-   "scored": 530,
-   "share_scored": 0.44612794612794615
+   "scored": 450,
+   "share_scored": 0.3787878787878788
   },
   "out_of_scope": {
    "by_grade": {
@@ -758,49 +760,48 @@
     "accuracy": {
      "noise_floor_pct": 1.6,
      "noise_floor_source": "fallback; none measured per point",
-     "points": 366,
+     "points": 286,
      "tpot": {
       "mape": {
-       "n": 366,
-       "value": 16.78663828470882
+       "n": 286,
+       "value": 16.221150339333935
       },
       "shape": {
-       "n": 266,
-       "value": 12.934788119320478
+       "n": 231,
+       "value": 12.620563270413001
       }
      },
      "ttft": {
       "mape": {
-       "n": 366,
-       "value": 34.64414336918592
+       "n": 286,
+       "value": 36.95479828001689
       },
       "shape": {
-       "n": 266,
-       "value": 18.486993905656362
+       "n": 231,
+       "value": 17.548246806141734
       }
      },
      "withheld": 0
     },
     "grades": {
-     "G4": 366,
-     "G5": 514,
-     "failed": 76
+     "G4": 286,
+     "G5": 670
     },
     "in_scope": 626,
     "points": 956,
     "ranking": {
      "throughput_per_gpu": {
-      "groups": 19,
-      "kendall": 0.9342573213106845,
+      "groups": 16,
+      "kendall": 0.9358113777901877,
       "left_out": 0,
-      "regret": 0.02713443806305401,
-      "spearman": 0.981349406671117,
-      "top1": 0.8421052631578947,
+      "regret": 0.020089326969035454,
+      "spearman": 0.9816115756323449,
+      "top1": 0.8125,
       "top3": 1.0,
       "value": "throughput_per_gpu"
      }
     },
-    "scored": 366,
+    "scored": 286,
     "series": 33
    },
    "unassigned": {
@@ -877,8 +878,8 @@
     },
     "grades": {
      "G4": 75,
-     "G5": 172,
-     "failed": 85
+     "G5": 231,
+     "failed": 26
     },
     "in_scope": 220,
     "points": 332,
@@ -1000,70 +1001,70 @@
    "accuracy": {
     "noise_floor_pct": 1.6,
     "noise_floor_source": "fallback; none measured per point",
-    "points": 441,
+    "points": 361,
     "tpot": {
      "mape": {
-      "n": 441,
-      "value": 17.89584725116243
+      "n": 361,
+      "value": 17.69365103215709
      },
      "shape": {
-      "n": 325,
-      "value": 13.146977252396274
+      "n": 290,
+      "value": 12.92228994053429
      }
     },
     "ttft": {
      "mape": {
-      "n": 441,
-      "value": 32.609143023965586
+      "n": 361,
+      "value": 33.988775369893645
      },
      "shape": {
-      "n": 325,
-      "value": 18.384107998816873
+      "n": 290,
+      "value": 17.62393011355045
      }
     },
     "withheld": 89
    },
-   "points": 530,
-   "share_of_all": 0.30565167243367936,
+   "points": 450,
+   "share_of_all": 0.25951557093425603,
    "share_of_graded": 1.0
   },
   "G5": {
-   "points": 798,
-   "share_of_all": 0.4602076124567474,
+   "points": 1167,
+   "share_of_all": 0.6730103806228374,
    "share_of_graded": null
   },
   "failed": {
-   "points": 406
+   "points": 117
   }
  },
  "headline": {
   "noise_floor_pct": 1.6,
   "noise_floor_source": "fallback; none measured per point",
-  "points": 441,
+  "points": 361,
   "tpot": {
    "mape": {
-    "n": 441,
-    "value": 17.89584725116243
+    "n": 361,
+    "value": 17.69365103215709
    },
    "shape": {
-    "n": 325,
-    "value": 13.146977252396274
+    "n": 290,
+    "value": 12.92228994053429
    }
   },
   "ttft": {
    "mape": {
-    "n": 441,
-    "value": 32.609143023965586
+    "n": 361,
+    "value": 33.988775369893645
    },
    "shape": {
-    "n": 325,
-    "value": 18.384107998816873
+    "n": 290,
+    "value": 17.62393011355045
    }
   },
   "withheld": 89
  },
  "identity": {
-  "harness_commit": "9a8b45f55c103044ba6609f7fcef1a6f94826353",
+  "harness_commit": "bcfc04f4959d9c6642709da8e918ebc17b862634",
   "point_set_sha256": "6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60",
   "points": 1734,
   "pull_manifest_sha256": "c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166",
@@ -1091,26 +1092,14 @@
     "kind": "vllm",
     "version": "0.32.0"
    },
-   "harness_commit": "9a8b45f55c103044ba6609f7fcef1a6f94826353"
+   "harness_commit": "bcfc04f4959d9c6642709da8e918ebc17b862634"
   }
  },
  "kind": "run",
  "refusals": [
   [
-   "the deployment names draft_model minimax-m3-eagle3 and the target graph minimax-m3 already states a speculator",
-   117
-  ],
-  [
-   "the deployment names draft_model minimax-m3-eagle3 and the target graph minimax-m3-mxfp8 already states a spec",
-   116
-  ],
-  [
    "quantization \"modelopt_mixed\" is stated: it names a ModelOpt MIXED_PRECISION checkpoint, whose per-layer algor",
    68
-  ],
-  [
-   "the deployment names draft_model minimax-m3-eagle3-gqa and the target graph minimax-m3-mxfp8 already states a ",
-   56
   ],
   [
    "kernelmodel: deployment block_size is not stated, and minimax-m2.5-nvfp4 on compute capability 10.0 with KV dt",
@@ -1206,25 +1195,25 @@
    "G4": {
     "noise_floor_pct": 1.6,
     "noise_floor_source": "fallback; none measured per point",
-    "points": 441,
+    "points": 361,
     "tpot": {
      "mape": {
-      "n": 441,
-      "value": 17.89584725116243
+      "n": 361,
+      "value": 17.69365103215709
      },
      "shape": {
-      "n": 325,
-      "value": 13.146977252396274
+      "n": 290,
+      "value": 12.92228994053429
      }
     },
     "ttft": {
      "mape": {
-      "n": 441,
-      "value": 32.609143023965586
+      "n": 361,
+      "value": 33.988775369893645
      },
      "shape": {
-      "n": 325,
-      "value": 18.384107998816873
+      "n": 290,
+      "value": 17.62393011355045
      }
     },
     "withheld": 89
@@ -1233,19 +1222,19 @@
  },
  "unlock": [
   {
-   "alone": 406,
+   "alone": 369,
+   "blocker": "value_not_recorded:workload_category_not_stated",
+   "blocks": 382
+  },
+  {
+   "alone": 117,
    "blocker": "blis_refused:scenario",
-   "blocks": 406
+   "blocks": 117
   },
   {
    "alone": 67,
    "blocker": "field_not_modelled:linear_backend",
    "blocks": 67
-  },
-  {
-   "alone": 38,
-   "blocker": "field_not_modelled:moe_backend",
-   "blocks": 56
   },
   {
    "alone": 37,
@@ -1256,6 +1245,11 @@
    "alone": 35,
    "blocker": "field_not_in_release:env.VLLM_MXFP4_USE_MARLIN",
    "blocks": 35
+  },
+  {
+   "alone": 25,
+   "blocker": "field_not_modelled:moe_backend",
+   "blocks": 56
   },
   {
    "alone": 10,
