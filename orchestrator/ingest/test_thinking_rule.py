@@ -134,3 +134,15 @@ def test_the_chat_template_is_assumed_on_for_a_speculative_run_whose_job_log_is_
         assert flags and "--use-chat-template" in flags[0]["detail"]
     finally:
         shutil.rmtree(tmp)
+
+
+def test_an_agentic_point_is_never_named_for_a_missing_category():
+    """AgentX's category and thinking mode are the catalog workload file's; the run does not state them."""
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = e2e._setup(tmp, log=WITH_PARSER, benchmark_type="agentic_traces")
+        env.field_list = _fields(acceptance_modelled=False)
+        o, _ = e2e._score(tmp, entry, env, tmp / "c1")
+        assert "value_not_recorded:workload_category_not_stated" not in o.reasons
+    finally:
+        shutil.rmtree(tmp)

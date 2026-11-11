@@ -802,7 +802,8 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
                        "detail": f"the mean acceptance length the run's server logged, "
                                  f"{realised['mean_acceptance_length']} over {realised['log_lines']} interval(s), "
                                  f"{realised['drafted_tokens']} drafted tokens; the run set none"})
-    require_workload_category(o, b, env.speculative_fallback_category)
+    if not agentic:       # an AgentX workload's category and thinking mode are the catalog workload file's, not the run's to state
+        require_workload_category(o, b, env.speculative_fallback_category)
     if b.acceptance_length is not None and spec.get(tokens_key):
         # The run's own synthetic acceptance, pinned in the scenario so every replay runs it: the
         # agentic one (which also takes --speculative-acceptance-length) and the single-turn one
