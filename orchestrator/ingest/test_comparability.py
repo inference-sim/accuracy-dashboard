@@ -9,7 +9,6 @@ testdata/client/SOURCE.json: the excerpts are the client's functions verbatim.
 Run: python orchestrator/ingest/test_comparability.py   (or pytest)"""
 from __future__ import annotations
 
-import ast
 import dataclasses
 import hashlib
 import json
@@ -237,31 +236,11 @@ def test_t10_a_run_near_the_clients_chunk_ceiling_is_flagged():
 
 
 # ------------------------------------------------------------------ T7: no Result aggregate on single-turn
-
-def test_t7_ttft_and_tpot_aggregates_are_read_only_on_the_agentic_path():
-    names = ("TTFT_MEAN_MS", "TPOT_MEAN_MS", "ttft_mean_ms", "tpot_mean_ms")
-    uses = {}
-    for path in sorted(HERE.glob("*.py")):
-        if path.name.startswith("test_") or path.name in ("result.py",):
-            continue
-        tree = ast.parse(path.read_text())
-        for node in ast.walk(tree):
-            hit = (isinstance(node, ast.Attribute) and node.attr in names) or \
-                  (isinstance(node, ast.Name) and node.id in names) or \
-                  (isinstance(node, ast.Constant) and node.value in names)
-            if hit:
-                uses.setdefault(path.name, []).append(node.lineno)
-    assert set(uses) == {"score.py"}, uses
-    tree = ast.parse((HERE / "score.py").read_text())
-    dispatch = None
-    for fn in [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]:
-        for node in ast.walk(fn):
-            if isinstance(node, ast.Return) and isinstance(node.value, ast.Call) and \
-                    getattr(node.value.func, "id", "") == "score_single_turn":
-                dispatch = (fn.name, node.lineno, fn.end_lineno)
-    assert dispatch, "the single-turn dispatch moved; update this test"
-    _, after, end = dispatch
-    assert all(after < ln <= end for ln in uses["score.py"]), (dispatch, uses)
+# A single-turn point's TTFT and TPOT are the means over the request rows (warm-ups left out), never the Result's own
+# aggregate figures, which only the agentic path reads. test_score_e2e.py scores both kinds against a Result whose
+# aggregate (1500 ms, 4.5 ms) differs from its rows (180 ms, 9 ms) and asserts the predicted figures of each:
+# test_a_single_turn_point_is_scored_with_the_clients_means_and_rescores_identically and
+# test_the_agentic_path_reads_the_registry_means_and_the_engine_report (their predicted figures).
 
 
 if __name__ == "__main__":
