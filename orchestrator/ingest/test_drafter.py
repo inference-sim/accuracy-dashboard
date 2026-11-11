@@ -93,11 +93,11 @@ def test_the_scenario_names_the_drafter_by_its_catalog_entry_and_only_when_the_r
 
 # ---- MTP: vLLM states every model-specific MTP method as `mtp`
 
-def _mtp(spec="mtp", model=MM3, draft=None, cat=None):
+def _mtp(spec="mtp", model=MM3, draft=None, tokens=None, cat=None):
     cat = cat or _cat()
     _entry(Path(cat.root), "mm3", graph_method="minimax_m3_mtp", tokens=7, drafters=["mm3-eagle3"])
     return sp.check(cat, {"h200"}, checkpoints=[model], base_models={}, hardware="h200", spec_method=spec,
-                    draft_checkpoint=draft)
+                    draft_checkpoint=draft, num_spec_tokens=tokens)
 
 
 def test_the_engine_names_a_model_specific_mtp_method_mtp_and_keeps_the_others():
@@ -125,8 +125,50 @@ def test_a_model_with_no_mtp_speculator_or_another_method_is_still_refused():
     assert _mtp(spec="minimax_m3_mtp").reasons == ["drafter_not_in_catalog:minimax_m3_mtp"]   # the engine never states it
 
 
-def test_a_stated_token_count_is_neither_refused_nor_named():
-    # The graph's num_spec_tokens is the MTP module count; a deployment may state fewer.
-    # sp.check takes no count, so nothing can differ.
-    import inspect
-    assert "num_spec_tokens" not in inspect.signature(sp.check).parameters
+# ---- the stated draft length (vLLM v0.32.0 vllm/config/speculative.py, via the layer 8 reference)
+
+import pytest  # noqa: E402
+
+
+@pytest.mark.parametrize("method, k, n", [
+    ("mtp", 3, 7), ("mtp", 7, 7), ("mtp", 1, 7), ("mtp", 14, 7), ("mtp", 21, 7),     # minimax-m3 (7 modules)
+    ("mtp", 1, 1), ("mtp", 4, 1), ("mtp", 3, 1),                                      # mxfp8 and dsv4 (1 module): any multiple of 1
+    ("eagle", 1, None), ("eagle3", 9, None), ("draft_model", 2, None), ("dflash", 5, None), ("dspark", 7, None),
+])
+def test_a_draft_length_vllm_accepts_is_not_a_conflict(method, k, n):
+    assert sp.draft_length_conflict(method, k, n) is None
+
+
+@pytest.mark.parametrize("method, k, n, text", [
+    ("mtp", 8, 7, "8 exceeds the model's 7 MTP modules and is not a multiple of 7"),
+    ("mtp", 13, 7, "13 exceeds"), ("mtp", 20, 7, "20 exceeds"),
+    ("mtp", 0, 7, "0 is below 1"), ("eagle3", 0, None, "0 is below 1"), ("dspark", -2, None, "-2 is below 1"),
+])
+def test_a_draft_length_vllm_refuses_is_named_with_its_numbers(method, k, n, text):
+    assert text in sp.draft_length_conflict(method, k, n)
+
+
+def test_a_point_stating_a_length_vllm_refuses_is_value_conflict_and_a_valid_length_names_nothing():
+    s = _mtp(tokens=3)                                   # 3 against 7 modules
+    assert s.reasons == []
+    s = _mtp(tokens=14)
+    assert s.reasons == []
+    s = _mtp(tokens=8)
+    assert s.reasons == ["value_conflict:speculative_config.num_speculative_tokens: vLLM refuses "
+                         "8 exceeds the model's 7 MTP modules and is not a multiple of 7"]
+    assert _mtp(tokens=0).reasons[0].startswith("value_conflict:speculative_config.num_speculative_tokens")
+    assert _mtp(tokens=None).reasons == []              # an unstated length is the builder's to require
+
+
+def test_the_separate_drafter_path_requires_a_length_of_at_least_one():
+    assert _check(_cat()).reasons == []
+    s = sp.check(_cat(), {"h200"}, checkpoints=[MM3], base_models={}, hardware="h200", spec_method="eagle3",
+                 draft_checkpoint=EAGLE, num_spec_tokens=0)
+    assert s.reasons and s.reasons[0].startswith("value_conflict:speculative_config.num_speculative_tokens")
+
+
+def test_mutation_comparing_the_length_for_equality_would_refuse_valid_runs(monkeypatch):
+    # The rule is "K <= n_predict, or a multiple of it"; an equality check (the graph's default as an
+    # expectation) would refuse 3 against 7. The test above passes only with the rule.
+    monkeypatch.setattr(sp, "draft_length_conflict", lambda m, k, n: None if k == n else "differs")
+    assert _mtp(tokens=3).reasons != []
