@@ -56,6 +56,12 @@
   },
   {
    "alone": 0,
+   "blocks": 382,
+   "demotes": 0,
+   "entry": "value_not_recorded:workload_category_not_stated"
+  },
+  {
+   "alone": 0,
    "blocks": 226,
    "demotes": 0,
    "entry": "field_not_modelled:moe_backend"
@@ -445,9 +451,9 @@
    "points": 1734,
    "primary_reason": {
     "blis_refused": 10,
-    "field_not_modelled": 1550,
+    "field_not_modelled": 1168,
     "not_in_catalog": 82,
-    "value_not_recorded": 51
+    "value_not_recorded": 433
    },
    "reasons": {
     "blis_refused:scenario": {
@@ -597,6 +603,10 @@
     "value_not_recorded:speculative_config.model": {
      "alone": 0,
      "blocks": 5
+    },
+    "value_not_recorded:workload_category_not_stated": {
+     "alone": 0,
+     "blocks": 382
     }
    },
    "scored": 41,
@@ -613,8 +623,8 @@
    "points": 1188,
    "primary_reason": {
     "blis_refused": 10,
-    "field_not_modelled": 1094,
-    "value_not_recorded": 43
+    "field_not_modelled": 712,
+    "value_not_recorded": 425
    },
    "reasons": {
     "blis_refused:scenario": {
@@ -752,6 +762,10 @@
     "value_not_recorded:speculative_config.model": {
      "alone": 0,
      "blocks": 5
+    },
+    "value_not_recorded:workload_category_not_stated": {
+     "alone": 0,
+     "blocks": 382
     }
    },
    "scored": 41,
@@ -1150,7 +1164,7 @@
   "withheld": 30
  },
  "identity": {
-  "harness_commit": "9a8b45f55c103044ba6609f7fcef1a6f94826353",
+  "harness_commit": "bcfc04f4959d9c6642709da8e918ebc17b862634",
   "point_set_sha256": "6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60",
   "points": 1734,
   "pull_manifest_sha256": "c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166",
@@ -1178,7 +1192,7 @@
     "kind": "vllm",
     "version": "0.32.0"
    },
-   "harness_commit": "9a8b45f55c103044ba6609f7fcef1a6f94826353"
+   "harness_commit": "bcfc04f4959d9c6642709da8e918ebc17b862634"
   }
  },
  "kind": "run",
@@ -1333,6 +1347,11 @@
    "alone": 0,
    "blocker": "field_not_modelled:language_model_only",
    "blocks": 607
+  },
+  {
+   "alone": 0,
+   "blocker": "value_not_recorded:workload_category_not_stated",
+   "blocks": 382
   },
   {
    "alone": 0,
