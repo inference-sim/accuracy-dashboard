@@ -6,7 +6,7 @@
 
 | Input | Value |
 |---|---|
-| Harness | accuracy-dashboard commit `a0e899b9c1f433ea99fee80d78ac6f5a54241962`; the baseline was scored again at the same commit |
+| Harness | accuracy-dashboard commit `3bbff9b1a4f1e191cba2b32645d27162b4210d3f`; the baseline was scored again at the same commit |
 | Simulator | inference-sim `ece61af0eccb863ba527d9e1a6dd2ffc97d0c5cf` (branch `m2/5-closeness-data-in-the-result`, a local checkout; `run.sh --sim-repo` takes the path) |
 | Catalog and registry | blis-substrate `f70c6c7503a47442c4c5d989f8f17b093c14e069`, passed as the 40-hex commit for `--catalog-release` and `--registry-release` |
 | Engine | vLLM 0.32.0; field list: blis-vllm `5de11f598bf78017429355b368bbb7a93e312ef1` `fields.json`, sha256 `9a3a88857a9462caf7b09433cfb53ac377d042aea10e7da2af3a8f9fd1ecccaa` |
@@ -31,7 +31,7 @@ In scope, the baseline scored 41 of 1188 points and this run 450; the 546 AMD po
 
 ## What the stated-only rule did
 
-A value the engine only resolved, for a field it neither models nor proves inert, is recorded on the point and not stated in the scenario (`coverage-accounting.md`, "Resolved-only values"; pending blis-design#3). This run applies it. The engine fills `compilation_config.custom_ops` with `all`, `none` or `+quant_fp8` in every log, and the kernel refused each as a stated value: 434 points, of which 340 are scored here; the printed `indexer_kv_dtype` of the DeepSeek-V4 and MiniMax-M3 logs, copied, was a second refusal behind it. The rule also leaves out `cudagraph_mode` and `cudagraph_capture_sizes` where only resolved, which the kernel does price although the field list calls them not modelled (blis-vllm#78): in a dry run, the DeepSeek-V4-Pro points on h200 moved by 5% to 16% in TTFT against a run that stated them.
+A value the engine only resolved, for a field it neither models nor proves inert, is recorded on the point and not stated in the scenario (`coverage-accounting.md`, "Resolved-only values"; design change merged as blis-design#3). This run applies it. The engine fills `compilation_config.custom_ops` with `all`, `none` or `+quant_fp8` in every log, and the kernel refused each as a stated value: 434 points, of which 340 are scored here; the printed `indexer_kv_dtype` of the DeepSeek-V4 and MiniMax-M3 logs, copied, was a second refusal behind it. The rule also leaves out `cudagraph_mode` and `cudagraph_capture_sizes` where only resolved, which the kernel does price although the field list calls them not modelled (blis-vllm#78): in a dry run, the DeepSeek-V4-Pro points on h200 moved by 5% to 16% in TTFT against a run that stated them.
 
 ## What the simulator refuses: the next work list
 
