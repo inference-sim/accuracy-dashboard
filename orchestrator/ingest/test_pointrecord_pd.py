@@ -79,7 +79,8 @@ def test_a_prefill_decode_point_is_a_disaggregated_record_with_the_router_substi
         assert rd["revision"] == P.REV and rd["policy"] == "round-robin" and rd["entry"] == "dynamo-round-robin"
         assert rd["difference"] == [{"aspect": "counter", "text": "counters differ"}] and rd["bound"]["ratios"]
         g5 = sorted((r["g5_reason"]["code"], r["g5_reason"].get("subject")) for r in recs if r["grade"] == "G5")
-        assert ("topology_unsupported", "pd_pool_data_parallel") in g5
+        # The pool on DP attention is outside the router bound's regime too; the record names the first reason in order.
+        assert ("router_unsupported", "dynamo-router:no_bound_for_regime") in g5
         assert any(c == "value_not_recorded" and s == "not_in_tree" for c, s in g5) or ("router_unsupported", "dynamo-router") in g5
         assert all(r["facets"]["serving"] == "disaggregated" for r in recs if r["grade"] == "G5")
     finally:

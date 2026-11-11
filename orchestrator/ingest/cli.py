@@ -423,7 +423,8 @@ def cmd_score(a) -> int:
         max_rss_mb=getattr(a, "max_rss_mb", 0) or 0, engine_release=engine_release,
         routers_dir=Path(a.router_table).resolve() if getattr(a, "router_table", None) else None,
         assumed_router_revision=getattr(a, "assume_router_revision", None),
-        router_policy_experiment=getattr(a, "router_policy_experiment", None))
+        router_policy_experiment=getattr(a, "router_policy_experiment", None),
+        speculative_fallback_category=getattr(a, "speculative_fallback_category", None))
     # The build every point records: --sim-build, else the release tag the checkout is at
     # (check_blis_inputs required one), with the engine release its stack.json names (COV-6).
     env.sim_build = sim_build or env.blis_release
@@ -460,7 +461,7 @@ def cmd_score(a) -> int:
             # Design §11.7, X8: a figure is experimental unless its build and its data are both
             # released. The build is released when it is a release tag, and the data when the
             # catalog and the registry are named by release tags, not by commits.
-            "experimental": env.routers_dir is not None or env.assumed_router_revision is not None or env.router_policy_experiment is not None or not all(
+            "experimental": env.routers_dir is not None or env.assumed_router_revision is not None or env.router_policy_experiment is not None or env.speculative_fallback_category is not None or not all(
                 _RELEASE_TAG.match(x) for x in (env.sim_build, env.catalog_release, env.registry_release)),
             "left_out_records": len((manifest.get("ledger") or {}).get("unlisted") or []),
             "vllm_ref": manifest["vllm_ref"], "vllm_max_distance": manifest["vllm_max_distance"],
@@ -710,6 +711,10 @@ def main(argv=None) -> int:
     s.add_argument("--router-policy-experiment", choices=["round-robin", "random-picker", "least-active-requests", "default"],
                    help="an llm-d policy to stand in for a router the table does not map, to measure the prefill/decode writer "
                         "apart from the router question (an experiment: each such point names it, and the run is experimental)")
+    s.add_argument("--speculative-fallback-category", metavar="CATEGORY",
+                   help="the acceptance profile's category to fall back to where the benchmark states none (design D8: a "
+                        "fallback the caller requested). Without it a speculative point that pins no acceptance length is G5 "
+                        "value_not_recorded:workload_category_not_stated. The point names it, and the run is experimental.")
     s.add_argument("--work")
     s.add_argument("--timeout", type=int, default=7200)
     s.add_argument("--only", nargs="*")

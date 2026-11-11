@@ -128,10 +128,26 @@ def read_pool(launch: dict) -> "tuple[st.Reading, dict]":
     return rd, taken
 
 
+def pool_parallel(pool: "Pool", flags: dict) -> dict:
+    """One instance of the pool, in the router table's regime form: tensor, pipeline and data parallel size and
+    whether expert parallelism is on. Pipeline parallelism is the recipe's flag for the pool; unset, the engine's
+    default of 1 stands."""
+    pp = _flag_int(flags, "pipeline-parallel-size")
+    ep = next((flags[k] for k in ("enable-expert-parallel", "enable_expert_parallel") if isinstance(flags.get(k), bool)), None)
+    return {"tp": pool.tp, "pp": 1 if pp is None else pp, "dp": pool.dp,
+            "expert_parallel": pool.ep > 1 if ep is None else ep}
+
+
 def epp_config(policy: str) -> str:
     """The endpoint picker configuration of a P/D deployment under one of the policies the router
     table may name (blis-substrate routertable.Policies): every request is split into a prefill and a
-    decode leg, and each leg is placed by the policy's composition."""
+    decode leg, and each leg is placed by the policy's composition.
+
+    The policy list and the plugins, scorer weights and picker of each policy are the router table's
+    (blis-substrate `routertable.Policies()`); this table is a copy of what the owner states plus the parts it
+    does not (the filters, the decider, the producers' parameters). test_pd_policy_owner.py fails when the copy
+    differs from the owner's at the pinned substrate commit; docs/m2/policy-table-owner.md lists what the owner
+    does not yet state."""
     scorers = {"round-robin": [], "random-picker": [],
                "least-active-requests": [("active-request-scorer", 1)],
                "default": [("queue-scorer", 2), ("kv-cache-utilization-scorer", 2), ("prefix-cache-scorer", 3)]}

@@ -340,6 +340,7 @@ def test_a_drafter_with_no_recorded_acceptance_is_replayed_with_the_profile_and_
         log = LOG.replace(", 'synthetic_acceptance_length': 2.4", "") + SPEC_LINES
         entry, env = _setup(tmp, log=log)
         env.field_list = _fields_without_acceptance()
+        env.speculative_fallback_category = "coding"     # the benchmark states no category; the caller requested the fallback
         env.blis = _fake_blis(tmp, workload_properties=[
             {"name": "speculative_acceptance", "values": {"acceptance_length": 3.1}, "source": "profile",
              "profile": "mtp/deepseek"}])
@@ -544,6 +545,7 @@ def test_the_logged_acceptance_replaces_the_profile_only_when_the_engine_models_
         # A log with no acceptance line pins nothing.
         tmp2 = Path(tempfile.mkdtemp())
         entry, env = _setup(tmp2, log=LOG.replace(", 'synthetic_acceptance_length': 2.4", ""))
+        env.speculative_fallback_category = "coding"
         o, work = _score(tmp2, entry, env, tmp2 / "c2")
         scen = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
         assert "acceptance:" not in scen.replace("rejection_sample_method", "")
@@ -575,6 +577,7 @@ def test_speculation_is_found_under_vllms_names_so_the_pin_and_the_profile_are_b
         tmp = Path(tempfile.mkdtemp())
         try:
             entry, env = _setup(tmp, log=log)
+            env.speculative_fallback_category = "coding"     # the benchmark states no category; the caller requested the fallback
             env.field_list = _vllm_names_fields()
             o, work = _score(tmp, entry, env, tmp / "c1")
             assert o.fidelity is not None, o.reasons
