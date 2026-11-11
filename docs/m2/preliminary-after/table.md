@@ -6,7 +6,7 @@ IN-SAMPLE: the points are the ones the model was calibrated on or tuned against;
 
 Both runs share one harness commit, one units file, one frozen pull and one point set:
 
-- harness commit `3bbff9b1a4f1e191cba2b32645d27162b4210d3f`
+- harness commit `54fbe017a4b2ea698abd7f8c9ceea19bf2a2ed9c`
 - units sha256 `d89f860a46c0470a22543dc7fb77b8d1b10e508ce4f5ef5073e96f359f08597e` (1740 units)
 - pull manifest sha256 `c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166`
 - point set sha256 `6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60` (1734 points)
