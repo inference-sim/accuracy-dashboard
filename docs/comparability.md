@@ -46,9 +46,12 @@ Each is a `client_difference` in the point's fidelity record, so a point that na
 | `client_release` | the InferenceX commit of the run is not recorded | The client's release is unknown. |
 | `failed_requests` | `completed` and `num_prompts` are in no pulled file | Requests the client lost are not ruled out. |
 | `client_saturation` | the chunk rate is above half of 50,000 a second | The measured latencies may include client queueing. |
+| `benchmark_client` | every prefill/decode point | The run's client is its recipe's srt-slurm benchmark (`sa-bench` in every recipe read), not InferenceX's `benchmark_serving.py`. The replay sends the InferenceX client's seed-0 lengths; the recipe's benchmark draws its own random prompts (range ratio 0.8, 10 x concurrency prompts, 2 x concurrency warm-ups: the benchmark's defaults at srt-slurm main on 2026-11-11, assumed equal), and sends them through the chat template unless the recipe says otherwise, which can shift the lengths. |
 | `client_build` | every agentic point | The export says aiperf 0.12.0; InferenceX pins a fork; BLIS transcribes the tag; the fork commit is not recorded on the point (the pull does not keep an agentic run's InferenceX commit). |
 
-A scenario of more than one node also names `cluster.fabric`, an `estimated` substitution: no InferenceX record names a cluster's fabric class, so `ib-400g` is assumed and the scenario lists `cost-model-fabric` (without it a cross-node transfer is priced at the catalog's nominal rate, 23% fast on that class; accuracy-dashboard#66). A fabric class a launch configuration records (`resources.fabric`) is used and not named. The NIC classes and rails are blis-substrate#50 and #51, planned for M3.
+A prefill/decode point also names, as substitutions of the deployment and not of the client: `engine.prefill.recipe` and `engine.decode.recipe` (each pool's arguments are the run's recipe's, not its log), `pool placement` (`execution_mode`: BLIS never puts two pools on one node; a recipe that allows prefill and decode workers to share one says so), and, where the table maps its router, `router_differs` with the entry, policy, evidence, difference and bound.
+
+A scenario of more than one node also names `cluster.fabric`, an `estimated` substitution: no InferenceX record names a cluster's fabric class, so `ib-400g` is assumed and the scenario lists `cost-model-fabric` (without it a cross-node transfer is priced at the catalog's nominal rate, 23% fast on that class). A fabric class a launch configuration records (`resources.fabric`) is used and not named. The NIC classes and rails are blis-substrate#50 and #51, planned for M3.
 
 A speculative point also records the mean acceptance length its server logged (the `SpecDecoding metrics` lines, weighted by drafted tokens, with the number of lines and tokens) beside what the simulation used, and the acceptance substitution names it. When the engine models `speculative_config.synthetic_acceptance_length` and the run set no length, the logged figure is pinned in place of the registry's profile; otherwise it is only recorded.
 
@@ -85,7 +88,7 @@ Inputs by commit: InferenceX 08d7a9cd and 96d6fb58; aiperf be53bf29 (the tag) an
 - Throughput and per-GPU figures: not compared, and their denominators differ (data-parallel replicas are in BLIS's GPU count and not in InferenceX's).
 - Percentiles and distributions (COV-10, M3).
 - The real runners' client ceiling: the 50,000 chunks a second is a floor measured on a laptop with the server on the same machine.
-- Disaggregated and multi-node runs: they are G5, and their client is a different one (srt-slurm's `sa-bench`), so the single-turn column above does not describe them.
+- Disaggregated runs: their client is a different one (srt-slurm's `sa-bench`), so the single-turn column above does not describe them; a scored prefill/decode point names `benchmark_client`. The first token the Dynamo client sees (the prefill worker's sampled token or the decode worker's) is not established; BLIS reports the decode leg's. The router is substituted by an llm-d policy only through the router table (`router_differs`, [disaggregation](disaggregation.md)).
 - AMD and TPU rows: out of scope.
 
 ## Sources

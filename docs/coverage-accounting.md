@@ -58,3 +58,33 @@ The GPUs per node of a run is recorded in its launch configuration when it is re
 4. A **runner that no record lists** (it sits in no cluster, or the newest file omits its label) may take the fact from the records of its label when every record that lists the label states the same size. The point is G2 `later_record`; `record` names the label and each record relied on (file and full commit) and `date` is the latest record's date. A label whose records state two sizes stays `value_not_recorded`.
 
 The row does not carry its runner, so rules 3 and 4 act on the label. Rule 4 is design §11.3 as merged ("for a runner that no record lists, from the records of its label, when every record that lists the label states the same value; the point names the field and the record and its date, or the label and the records it relied on"). The ruling and the evidence are in [the b200/h200 report](m2/node-size-b200-h200.md).
+
+## Prefill/decode reasons, counted apart
+
+The dashboard names why a prefill/decode (P/D) row is not scored by the part of the layout or the record that is missing, not by one generic reason, so the blocks and alone counts above separate a missing engine feature from a missing writer or a missing record. Each is a `code:subject` reason like any other, so `blocks`, `alone` and the primary counts keep them apart:
+
+| Reason | Counted as | Gap |
+|---|---|---|
+| `topology_unsupported:pd_pool_data_parallel` | a pool at data-parallel size above 1 | engine (blis-vllm#47, M3) |
+| `topology_unsupported:pd_unequal_data_parallel` | pools of different data-parallel size | placement (inference-sim#1952, M3) |
+| `topology_unsupported:pd_pool_not_recorded` | a pool with no workers or GPUs in the row | the row |
+| `topology_unsupported:pd_agentic` | an agentic replay of a P/D deployment | writer (dashboard#64, M3) |
+| `value_not_recorded:recipe_unresolved:<slug>` (slug `no_master_entry`, `ambiguous`, `not_in_tree`, `unreadable`, `no_config_file`, `run_commit_unreadable`) | no recipe to give the pools' arguments | record |
+| `value_not_recorded:server_log_missing...` | the log is gone (404 or 413 from the API) | record |
+| `router_unsupported:dynamo-router` | the router table maps nothing for the run's mode | table (blis-substrate#47) |
+
+A row can carry several; the primary reason is the first in the closed order (`router_unsupported` before `topology_unsupported` before `value_not_recorded`), and `alone` says how many points a single reason holds back by itself. The generated [grade tables](grades.md) list the subjects.
+
+Design §11.4 says `topology_unsupported` is "cleared when the harness can write that topology". For the first two subjects the harness can write the topology and the engine or placement refuses it, so the subject names the issue that clears it; the code stays on the closed list.
+
+## Recovering a pool's arguments from the recipe (design §11.2, §11.3)
+
+When a P/D run's own record of the engine arguments is missing or is one worker's, the arguments come from the recipe the run launched from, at the commit it executed, found by the rule in [disaggregation](disaggregation.md). The point names each pool's recovery as an `estimated` substitution (`engine.prefill.recipe`, `engine.decode.recipe`) with the recipe's path and commit and the fields the recipe states. Only a field the recipe states is written; a size it leaves at vLLM's default is written only where the pool's GPUs equal the product of the sizes; nothing else is invented, so the engine resolves the rest (X19). The recovery is G2 at best (design §11.3's clause "a recorded value was missing and replaced"); a recipe is a statement of intent, not a record of what ran.
+
+## An environment variable the engine does not read
+
+The engine's block takes only the environment variables it reads (`PYTHONHASHSEED`, `VLLM_USE_V2_MODEL_RUNNER` at the pinned list) and refuses any other key. A variable the field list calls `proven_inert` or `inert_unproven` (a timeout, a matmul-precision hint) is therefore recorded on the point (`match: inert` in the fidelity `args`, and for `inert_unproven` the `interim_status` substitution) and not stated in the scenario. Before this rule the scorer stated them and the engine refused all 84 P/D points that reached it.
+
+## Thinking mode of a speculative point
+
+A speculative point needs the workload's thinking mode to select the acceptance profile (design §11.2). The order: (1) a mode the run recorded (the chat-template kwargs) is passed; (2) a logged acceptance length is pinned in place of a profile when the engine models the field; (3) otherwise, if the server runs a reasoning parser (recorded in the arguments or launch configuration, never inferred from a model name), the point states `thinking on` and the fallback category `coding` and names an `estimated` substitution on `workload.thinking_mode` naming both; (4) otherwise the simulator refuses and the point is G5 `value_not_recorded`. The maintainer's decision for (3) rests on the measurements: realised acceptance against profile, DeepSeek-V4-Pro K=2 realised 2.20, profile off 2.61, on 2.27; MiniMax-M3 K=3 realised 2.57, off 2.93, on 2.83 (thinking on is the closer profile in both).
