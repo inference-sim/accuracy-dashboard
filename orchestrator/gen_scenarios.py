@@ -70,6 +70,9 @@ COEFFICIENTS = (
     "cost-model-attention, cost-model-recurrent, cost-model-memory]"
 )
 
+# A multi-node scenario also carries the fabric efficiency; without it the handoff is priced 23% fast.
+COEFFICIENTS_MULTINODE = COEFFICIENTS[:-1] + ", cost-model-fabric]"
+
 # Artifact precision -> the engine's quantization name. bf16 means the checkpoint is served
 # unquantised, which the schema spells as an absent quantization rather than a name.
 # int4 is a weight-only integer format the checkpoint declares in its own
@@ -172,7 +175,7 @@ def emit(dep: dict, labels: set[str], packaging: dict, engine_release: str) -> s
         f'  version: "{engine_release}"',
         "",
         f"model: {dep['model']}",
-        f"coefficients: {COEFFICIENTS}",
+        f"coefficients: {COEFFICIENTS_MULTINODE if nodes > 1 else COEFFICIENTS}",
         "",
         # The hardware inventory lives inside the cluster: it is what the problem is
         # handed and a deployment cannot change it.
@@ -180,6 +183,8 @@ def emit(dep: dict, labels: set[str], packaging: dict, engine_release: str) -> s
         f"  hardware: {dep['gpu']}",
     ]
     if nodes > 1:
+        # No InferenceX record names a cluster's fabric class: ib-400g is ASSUMED (accuracy-dashboard#66).
+        lines.append("  # fabric: ASSUMED. No record names this cluster's fabric class; ib-400g is the catalog's class.")
         lines.append("  fabric: ib-400g")
     lines.append(f"  nodes: {nodes}")
     if packaging["gpus_per_node"] is None:

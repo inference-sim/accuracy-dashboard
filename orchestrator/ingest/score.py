@@ -718,7 +718,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
                       launch_size=st.recorded_node_size(launch), fixes_packaging=catalog_size is not None)
     b = st.build(c, name=name, model=sup.model, part=part, engine_version=env.engine_release,
                  field_list=env.field_list, catalog_node_size=catalog_size, node=node,
-                 draft_model=sup.drafter)
+                 draft_model=sup.drafter, launch_config=launch)
     o.reasons += b.reasons
     o.subs += b.substitutions
     b.thinking = st.recorded_thinking(c.settings)

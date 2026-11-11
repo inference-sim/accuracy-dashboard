@@ -541,10 +541,30 @@ RANKS = ("'tensor_parallel_size': 16, 'max_num_seqs': 16, 'max_num_batched_token
          "'gpu_memory_utilization': 0.9")
 
 
+def test_a_scenario_of_several_nodes_states_a_fabric_class_and_the_fabric_efficiency_and_names_the_assumption():
+    # accuracy-dashboard#66: without cost-model-fabric a cross-node transfer is priced 23% fast, and a
+    # hardwired class on a cluster of another class is wrong in the nominal rate; no source names the class.
+    c = _classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16")))
+    b = _build(c)
+    assert b.scenario["cluster"]["nodes"] == 2 and b.scenario["cluster"]["fabric"] == "ib-400g"
+    assert b.scenario["coefficients"][-1] == "cost-model-fabric" and "cost-model-fabric" not in st.COEFFICIENTS
+    assert [s for s in b.substitutions if s["subject"] == "cluster.fabric"] == [st.ASSUMED_FABRIC_SUBSTITUTION]
+    assert st.ASSUMED_FABRIC_SUBSTITUTION["kind"] == "estimated"
+    # A fabric class the run's launch configuration records is used and is not an assumption.
+    b = _build(c, launch_config={"resources": {"fabric": "roce-200g"}})
+    assert b.scenario["cluster"]["fabric"] == "roce-200g"
+    assert not [s for s in b.substitutions if s["subject"] == "cluster.fabric"]
+    # One node: no fabric, no fabric coefficient, nothing to name.
+    one = _build(_classify(_log("'tensor_parallel_size': 1, 'max_num_seqs': 16, 'max_num_batched_tokens': 4096, 'block_size': 128, "
+                                "'gpu_memory_utilization': 0.9")))
+    assert "fabric" not in one.scenario["cluster"] and "cost-model-fabric" not in one.scenario["coefficients"]
+    assert not [s for s in one.substitutions if s["subject"] == "cluster.fabric"]
+
+
 def test_a_chip_whose_catalog_entry_fixes_the_node_size_states_none_and_nodes_follow_from_it():
     b = _build(_classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16"))),
                catalog_node_size=4, node=ir.NodeSize())
-    assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 4}
+    assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 4, "fabric": "ib-400g"}
     assert b.reasons == [] and b.node_source is None
 
 
@@ -552,8 +572,8 @@ def test_a_node_size_the_table_supplied_is_written_and_its_later_record_is_named
     sub = {"kind": "later_record", "subject": "cluster.gpus_per_node", "detail": "d"}
     node = ir.NodeSize(8, "cluster.gpus_per_node: InferenceX runners.yaml at 303669b0", sub)
     b = _build(_classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16"))), node=node)
-    assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 2, "gpus_per_node": 8}
-    assert b.node_source == node.provenance and b.substitutions == [sub]
+    assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 2, "gpus_per_node": 8, "fabric": "ib-400g"}
+    assert b.node_source == node.provenance and b.substitutions == [sub, st.ASSUMED_FABRIC_SUBSTITUTION]
 
 
 def test_a_node_size_nothing_records_or_two_sources_disagree_on_makes_the_point_g5():
@@ -1266,7 +1286,7 @@ def test_a_gb200_point_with_more_ranks_than_a_tray_spans_nodes_of_the_entrys_siz
                        "'block_size': 128, 'gpu_memory_utilization': 0.9",
                        RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=8")))
     b = _build(c, catalog_node_size=4, node=ir.NodeSize())
-    assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 2}
+    assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 2, "fabric": "ib-400g"}
     assert b.deployment["pools"][0]["nodes"] == 2
 
 
@@ -1276,7 +1296,7 @@ def test_an_h100_point_writes_the_node_size_the_run_recorded():
     # Not the rank count: 4 ranks on a recorded 8-GPU server is one 8-GPU node.
     assert b.scenario["cluster"]["gpus_per_node"] != 4
     b = _build(_dp4(), node=ir.NodeSize(2, "cluster.gpus_per_node: launch_config"))
-    assert b.scenario["cluster"] == {"hardware": "h200", "gpus_per_node": 2, "nodes": 2}
+    assert b.scenario["cluster"] == {"hardware": "h200", "gpus_per_node": 2, "nodes": 2, "fabric": "ib-400g"}
 
 
 def test_packaging_comes_from_blis_catalog_resolve_and_falls_back_to_the_catalog_files_for_an_older_blis():

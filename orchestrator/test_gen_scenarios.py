@@ -106,6 +106,12 @@ def main() -> int:
     ck("a recorded node of 4 is written as 4, and 8 ranks span two of them",
        cluster_of(sweep(gpu="h100", node=4, tp=8), OPEN) == {"hardware": "h100", "nodes": "2", "gpus_per_node": "4",
                                                               "fabric": "ib-400g"})
+    multi = emit(sweep(gpu="h100", node=4, tp=8), {"1k1k"}, OPEN, "0.32.0")
+    text = next(iter(multi.values())) if isinstance(multi, dict) else str(multi)
+    ck("a multi-node scenario lists cost-model-fabric (without it the handoff is priced 23% fast)",
+       "cost-model-fabric" in text and "ASSUMED" in text)
+    one = emit(sweep(gpu="h100", node=8), {"1k1k"}, OPEN, "0.32.0")
+    ck("a one-node scenario lists no fabric set", "cost-model-fabric" not in (next(iter(one.values())) if isinstance(one, dict) else str(one)))
     try:
         emit(sweep(gpu="h100", node=None), {"1k1k"}, OPEN, "0.32.0")
         ck("no recorded node size on a chip that fixes none is refused", False)
