@@ -526,7 +526,8 @@ SEND_GAP_DETAIL = (f"BLIS releases the next request at the previous one's comple
 
 def client_differences(verified: bool, why: str, *, flags_assumed: bool = False,
                        release_unrecorded: bool = False, population_unrecorded: bool = False,
-                       client_bound: bool = False, benchmark_client: str | None = None) -> list[dict]:
+                       client_bound: bool = False, benchmark_client: str | None = None,
+                       chat_template_assumed: bool = False) -> list[dict]:
     """Every remaining difference between the run's client and the simulated one, each named on
     the point; any of them makes the point G2 (COV-12). Kind "client_difference" is the
     dashboard's name for design §11.3's G2 condition "the simulated requests differ from the
@@ -551,7 +552,9 @@ def client_differences(verified: bool, why: str, *, flags_assumed: bool = False,
                     "detail": f"sent prompt lengths not verified equal to the replayed targets: {why}"})
     if flags_assumed:
         out.append({"kind": "client_difference", "subject": "client_flags",
-                    "detail": "job log expired; the client's flags are assumed to be the launcher's defaults"})
+                    "detail": "job log expired; the client's flags are assumed to be the launcher's defaults"
+                              + ("; the launch scripts of speculative runs pass --use-chat-template, so it is assumed on"
+                                 if chat_template_assumed else "")})
     if release_unrecorded:
         out.append({"kind": "client_difference", "subject": "client_release",
                     "detail": "the InferenceX commit of the run is not recorded"})

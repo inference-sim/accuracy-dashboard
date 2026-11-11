@@ -119,3 +119,18 @@ def test_a_requested_fallback_category_is_used_and_named():
         assert "value_not_recorded:workload_category_not_stated" not in o.reasons
     finally:
         shutil.rmtree(tmp)
+
+
+def test_the_chat_template_is_assumed_on_for_a_speculative_run_whose_job_log_is_gone():
+    """A speculative run's launch scripts pass --use-chat-template, so with the job log gone the assumed client flags
+    say so."""
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = e2e._setup(tmp, log=WITH_PARSER + e2e.SPEC_LINES, job_log=None)
+        env.field_list = _fields(acceptance_modelled=True)
+        o, _ = e2e._score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        flags = [d for d in o.fidelity["requests"]["differences"] if d["subject"] == "client_flags"]
+        assert flags and "--use-chat-template" in flags[0]["detail"]
+    finally:
+        shutil.rmtree(tmp)
