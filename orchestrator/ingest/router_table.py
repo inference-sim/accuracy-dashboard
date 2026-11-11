@@ -126,16 +126,44 @@ def evidence_text(e: Entry) -> str:
     return "; ".join(out) or e.reason
 
 
-def matched_ratios(e: Entry, *, workload: str | None, conc: int, model: str, hardware: str, shape: str) -> list[dict]:
-    """The entry's bound ratios whose regime holds the point: its workload kind, a concurrency in the
-    regime's range, the point's catalog model and hardware part, and its pool shape (`<n>P<m>D`)."""
+POOL_KEYS = ("tp", "pp", "dp", "expert_parallel")
+
+
+def _pool_equal(regime_pool, point_pool) -> bool:
+    """Both name exactly the keys of POOL_KEYS with equal values; anything absent or extra is a mismatch."""
+    if not isinstance(regime_pool, dict) or not isinstance(point_pool, dict):
+        return False
+    for d in (regime_pool, point_pool):
+        if set(d) != set(POOL_KEYS):
+            return False
+    return all(type(regime_pool[k]) is type(point_pool[k]) and regime_pool[k] == point_pool[k] for k in POOL_KEYS)
+
+
+def matched_ratios(e: Entry, *, workload: str | None, conc: int, model: str, hardware: str, shape: str,
+                   engine_version: str | None = None, fabric: str | None = None,
+                   prefill: dict | None = None, decode: dict | None = None) -> list[dict]:
+    """The entry's bound ratios whose regime is exactly the point's, as the substrate's `Regime.Mismatches`
+    states it: the workload kind, the client count LISTED in `regime.concurrencies` (a count between two sampled
+    ones is not covered; nothing is interpolated), the catalog model and hardware part, the engine release, the
+    cluster fabric, the per-instance parallelism of the prefill and the decode pool (`tp`, `pp`, `dp`,
+    `expert_parallel`), and the pool shape (`<n>P<m>D`) in `shapes`. A value the point does not know (None) matches
+    nothing, and a regime that does not state a dimension matches nothing."""
     out = []
     for r in ((e.bound or {}).get("ratios") or []):
         g = r.get("regime") or {}
         if workload is None or g.get("workload") != workload or g.get("model") != model or g.get("hardware") != hardware:
             continue
-        lo, hi = g.get("concurrency_min"), g.get("concurrency_max")
-        if not (isinstance(lo, int) and isinstance(hi, int) and lo <= conc <= hi) or shape not in (g.get("shapes") or []):
+        concs = g.get("concurrencies")
+        if not (isinstance(concs, list) and isinstance(conc, int) and not isinstance(conc, bool)
+                and any(isinstance(c, int) and not isinstance(c, bool) and c == conc for c in concs)):
+            continue
+        if shape not in (g.get("shapes") or []):
+            continue
+        if not (isinstance(engine_version, str) and g.get("engine_version") == engine_version):
+            continue
+        if not (isinstance(fabric, str) and g.get("fabric") == fabric):
+            continue
+        if not (_pool_equal(g.get("prefill"), prefill) and _pool_equal(g.get("decode"), decode)):
             continue
         out.append({"metric": r.get("metric"), "against": list(r.get("against") or []), "max_ratio": r.get("max_ratio")})
     return out

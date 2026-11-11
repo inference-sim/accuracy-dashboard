@@ -66,8 +66,13 @@ backend:
 benchmark: {type: "sa-bench", isl: 1024, osl: 1024, concurrencies: "4x8"}
 """
 
+RECIPE_FABRIC = RECIPE.replace('gpu_type: "mi355x",', 'gpu_type: "mi355x", fabric: "ib-400g",')
 REV = "1682167d3c97f0fc8cd405dee51f17288eeaeb55"
-REGIME = {"workload": "balanced", "concurrency_min": 1, "concurrency_max": 64, "model": "m", "hardware": "mi355x", "shapes": ["1P2D"]}
+POOL_P = {"tp": 1, "pp": 1, "dp": 1, "expert_parallel": False}
+POOL_D = {"tp": 4, "pp": 1, "dp": 1, "expert_parallel": True}
+# The substrate's exact regime (layer 12): the sampled client counts, the engine release, the fabric, each pool's instance.
+REGIME = {"workload": "balanced", "concurrencies": [1, 4, 16, 64], "model": "m", "hardware": "mi355x", "shapes": ["1P2D"],
+          "engine_version": "0.31.0", "fabric": "ib-400g", "prefill": POOL_P, "decode": POOL_D}
 TABLE_ENTRY = {"kind": "RouterMapping", "router": "dynamo", "mode": "round-robin", "revisions": [REV], "policy": "round-robin",
                "reason": "r", "difference": [{"aspect": "counter", "text": "counters differ", "evidence": [0]}],
                "bound": {"evidence": {"file": "runs.csv", "sha256": "0" * 64, "producer": "o/r", "commit": "a" * 40, "command": "c"},
@@ -273,18 +278,39 @@ def test_the_table_is_resolved_as_the_substrate_does(tmp_path):
 
 def test_a_bound_holds_a_point_only_in_its_regime(tmp_path):
     e = _table(tmp_path).entries[0]
-    ok = dict(workload="balanced", conc=4, model="m", hardware="mi355x", shape="1P2D")
+    ok = dict(workload="balanced", conc=4, model="m", hardware="mi355x", shape="1P2D",
+              engine_version="0.31.0", fabric="ib-400g", prefill=POOL_P, decode=POOL_D)
     assert [m["metric"] for m in rt.matched_ratios(e, **ok)] == ["ttft_p50_ms", "ttft_p99_ms"]
-    for change in ({"workload": "prefill-bound"}, {"workload": None}, {"conc": 65}, {"conc": 0}, {"model": "n"},
-                   {"hardware": "b200"}, {"shape": "2P2D"}):
+    # The known-bad points: each differs from the sampled regime in one dimension and never gets a bound.
+    bad = ({"workload": "prefill-bound"}, {"workload": None}, {"model": "n"}, {"hardware": "b200"}, {"shape": "2P2D"},
+           {"conc": 8},                                   # between two sampled counts (4 and 16): not run, not covered
+           {"conc": 100}, {"conc": 65}, {"conc": 0}, {"conc": None},
+           {"engine_version": "0.32.0"}, {"engine_version": None},          # another engine release
+           {"fabric": "roce-200g"}, {"fabric": None},                      # another or an unrecorded fabric
+           {"prefill": {**POOL_P, "tp": 2}}, {"decode": {**POOL_D, "dp": 2}}, {"decode": {**POOL_D, "pp": 2}},
+           {"decode": {**POOL_D, "expert_parallel": False}}, {"prefill": None}, {"decode": {"tp": 4}},
+           {"decode": {**POOL_D, "extra": 1}})
+    for change in bad:
         assert rt.matched_ratios(e, **{**ok, **change}) == [], change
     assert rt.workload_kind(1024, 1024) == "balanced" and rt.workload_kind(8192, 16) == "prefill-bound"
     assert rt.workload_kind(256, 2048) == "decode-bound" and rt.workload_kind(8192, 1024) is None
 
 
+def test_the_old_range_form_of_a_regime_covers_no_point(tmp_path):
+    """A regime that still states `concurrency_min` and `concurrency_max` (the form before the substrate made it
+    exact) is not interpolated: it matches nothing."""
+    old = {k: v for k, v in REGIME.items() if k != "concurrencies"} | {"concurrency_min": 1, "concurrency_max": 64}
+    entry = {**TABLE_ENTRY, "bound": {**TABLE_ENTRY["bound"], "ratios": [
+        {"metric": "ttft_p50_ms", "against": ["random-picker"], "regime": old, "max_ratio": 1.07}]}}
+    e = _table(tmp_path, bound=entry["bound"]).entries[0]
+    assert rt.matched_ratios(e, workload="balanced", conc=4, model="m", hardware="mi355x", shape="1P2D",
+                             engine_version="0.31.0", fabric="ib-400g", prefill=POOL_P, decode=POOL_D) == []
+
+
 def test_the_substitution_carries_the_entry_as_it_states_it_and_a_wide_bound_is_flagged(tmp_path):
     e = _table(tmp_path).entries[0]
-    m = rt.matched_ratios(e, workload="balanced", conc=4, model="m", hardware="mi355x", shape="1P2D")
+    m = rt.matched_ratios(e, workload="balanced", conc=4, model="m", hardware="mi355x", shape="1P2D",
+                          engine_version="0.31.0", fabric="ib-400g", prefill=POOL_P, decode=POOL_D)
     sub = rt.substitution(e, "dynamo", REV, m)
     assert sub["kind"] == "router_differs" and sub["entry"] == "dynamo-round-robin" and sub["policy"] == "round-robin"
     assert sub["revision"] == REV and sub["difference"] == [{"aspect": "counter", "text": "counters differ"}]
@@ -373,8 +399,9 @@ def test_a_run_of_another_repository_has_no_commit_to_read(tmp_path):
 
 # ---------------------------------------------------------------- a point scored through two pools
 
-def _pd_point(tmp: Path, *, row=None, recipe_text=RECIPE, with_recipe=True, table=True, log=True):
+def _pd_point(tmp: Path, *, row=None, recipe_text=None, with_recipe=True, table=True, log=True):
     # table: the router table maps Dynamo's default mode (router_differs); False leaves the catalog's own, which has none here.
+    recipe_text = RECIPE_FABRIC if recipe_text is None else recipe_text   # a stated fabric: the router bound's regime needs a recorded one
     entry, env = e2e._setup(tmp)
     pdir = tmp / "pull" / "points" / entry["point_id"]
     entry["row"].update({**ROW, **(row or {})})
@@ -413,10 +440,23 @@ def _fields_with(*names_status):
     return fl.parse(json.dumps(doc).encode())
 
 
+def test_an_assumed_fabric_or_an_unsampled_concurrency_never_gets_router_differs():
+    for kw, row in (({"recipe_text": RECIPE}, None),              # the recipe states no fabric: the class is assumed
+                    ({"recipe_text": RECIPE_FABRIC}, {"conc": 100})):       # 100 is between the sampled 64 and nothing
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            entry, env = _pd_point(tmp, log=False, row=row, **kw)
+            o, _ = e2e._score(tmp, entry, env, tmp / "c1")
+            assert "router_unsupported:dynamo-router:no_bound_for_regime" in o.reasons, o.reasons
+            assert o.fidelity is None
+        finally:
+            shutil.rmtree(tmp)
+
+
 def test_a_dp_free_row_is_written_as_two_pools_and_scored_with_the_instance_counts_and_a_named_router():
     tmp = Path(tempfile.mkdtemp())
     try:
-        entry, env = _pd_point(tmp, log=False)
+        entry, env = _pd_point(tmp, log=False, recipe_text=RECIPE_FABRIC)
         o, work = e2e._score(tmp, entry, env, tmp / "c1")
         assert o.fidelity is not None, o.reasons
         assert c.validate_dir(tmp / "c1") == []
@@ -445,7 +485,7 @@ def test_a_dp_free_row_is_written_as_two_pools_and_scored_with_the_instance_coun
         for role in ("prefill", "decode"):
             rec = subs[("estimated", f"engine.{role}.recipe")]
             assert pdr.ROOT + "vllm/m/a.yaml" in rec["detail"] and "a" * 40 in rec["detail"] and "max_num_batched_tokens" in rec["detail"]
-        assert ("estimated", "cluster.fabric") in subs and ("execution_mode", "pool placement") in subs
+        assert ("estimated", "cluster.fabric") not in subs and ("execution_mode", "pool placement") in subs
         bc = subs[("client_difference", "benchmark_client")]["detail"]
         assert "sa-bench" in bc and "not InferenceX's" in bc and "chat template on (its default)" in bc
         assert o.fidelity["grade"] == "G2" or o.fidelity["grade"] in ("G3", "G4")
@@ -461,7 +501,7 @@ def test_a_row_on_dp_attention_is_refused_by_name_and_blis_is_never_asked():
         row = {"prefill_dp_attention": True, "num_prefill_gpu": 8, "prefill_tp": 8}
         entry, env = _pd_point(tmp, row=row, recipe_text=RECIPE.replace("gpus_per_prefill: 1", "gpus_per_prefill: 8"))
         o, _ = e2e._score(tmp, entry, env, tmp / "c1")
-        assert o.fidelity is None and o.g5 == {"code": "topology_unsupported", "subject": "pd_pool_data_parallel"}
+        assert o.fidelity is None      # the pools differ from the router bound's regime too, so that is named beside the topology
         assert {"topology_unsupported:pd_pool_data_parallel", "topology_unsupported:pd_unequal_data_parallel"} <= set(o.reasons)
         assert e2e._saw(env) == []
     finally:
@@ -695,6 +735,7 @@ def test_a_fabric_class_the_recipe_states_is_used_and_not_named_as_assumed():
         tmp = Path(tempfile.mkdtemp())
         try:
             entry, env = _pd_point(tmp, log=False, recipe_text=text)
+            env.router_policy_experiment = "round-robin"     # the router bound's regime needs a recorded fabric; this test is about the fabric
             o, work = e2e._score(tmp, entry, env, tmp / "c1")
             assert o.fidelity is not None, o.reasons
             scen = next(d for d in yaml.safe_load_all(next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text())

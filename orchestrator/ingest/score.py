@@ -114,6 +114,10 @@ class Env:
     # apart from the router question (cli score --router-policy-experiment): the point names it as an
     # experiment, and the run is experimental.
     router_policy_experiment: str | None = None
+    # A category the caller asks the acceptance profile to fall back to where the workload states none (design D8:
+    # "a fallback category the user requested"); cli score --speculative-fallback-category. The point names it as an
+    # `estimated` substitution on workload.category, and the run is experimental.
+    speculative_fallback_category: str | None = None
 
     def simulator(self) -> dict:
         """The simulator block every point of this run records: its build and engine release."""
@@ -231,6 +235,9 @@ def _blis_refusal(stderr: str, work: Path) -> str:
     return f"blis_refused:{slug}" if slug else "blis_refused"
 
 
+# The substrate's refusal when no acceptance profile holds the key (contracts/spec/acceptance Resolve):
+# "... no profile for <model>/<method>/k<n>/thinking-<mode>/<category> in <sets>". The pair named is the gap.
+_NO_PROFILE = re.compile(r"acceptance: no profile for \S+/\S+/k\d+/thinking-(\w+)/(\S+) in ")
 _STATES_NO = re.compile(r"\bstates no ([A-Za-z_][A-Za-z0-9_.]*)")
 # "the workload states no thinking mode": the simulator wants a statement about the WORKLOAD (it
 # selects the acceptance profile), not a field of the engine's list. The reason names the workload
@@ -247,6 +254,9 @@ def value_refusal(stderr: str, work: Path, field_list) -> str | None:
     but names no parseable field takes the refusal's slug as the subject."""
     slug = _blis_refusal(stderr, work)
     text = slug.partition(":")[2]
+    miss = _NO_PROFILE.search(re.sub(r"\s+", " ", stderr))
+    if miss:
+        return f"value_not_recorded:profile_not_available:{miss.group(2)}/{miss.group(1)}"
     if "states_no" not in text and "states no" not in stderr:
         return None
     flat = re.sub(r"\s+", " ", stderr)
@@ -566,10 +576,9 @@ def _acceptance_subs(b: st.Built, doc: dict | None, log: str | None = None) -> l
 
 
 def thinking_argv(b: st.Built) -> list[str]:
-    """The workload's thinking mode, stated to `blis replay` where the run recorded it or the
-    reasoning-parser rule gave it (default_thinking), with the fallback category that rule names. A
-    speculative run with neither is not given one (the profile it would select is a guess); the
-    simulator then refuses and the point is G5 value_not_recorded."""
+    """The workload's thinking mode, stated to `blis replay` where the run recorded it, with the fallback
+    category a caller requested. A speculative run with neither is not given one (the profile it would
+    select is a guess); the point is G5 value_not_recorded."""
     if not (b.thinking and spec_of(b)):
         return []
     argv = ["--speculative-thinking", b.thinking]
@@ -578,28 +587,29 @@ def thinking_argv(b: st.Built) -> list[str]:
     return argv
 
 
-# Design §11.2: a workload-dependent value the run did not record is taken from a substrate profile,
-# which for a speculative run needs the workload's thinking mode and a category. Decision on dashboard
-# Decision: where the server runs a reasoning parser, the workload is a reasoning one, so the mode is "on"
-# and the category the one whose profile the run's agentic and fixed-length clients draw most like,
-# "coding"; a logged acceptance length takes precedence over any profile, and a server with no parser
-# is given neither.
-DEFAULT_THINKING, DEFAULT_CATEGORY = "on", "coding"
+# Design §11.2 and D8: a speculative point's acceptance profile is keyed by the workload's category and
+# thinking mode. A value the run did not record comes from a substrate profile or the point stays G5
+# value_not_recorded; the dashboard supplies neither. A server's reasoning parser is an engine capability and
+# says nothing about the prompts it was sent, so it is never read as a thinking mode or a category. The
+# fixed-length InferenceX client sends random tokens (`--dataset-name random`): it states a thinking mode for
+# some models (`--dsv4`) and no category at all (docs/m2/workload-statements.md), so a speculative point of that
+# client with no pinned or logged acceptance length is not scored.
+CATEGORY_NOT_STATED = "value_not_recorded:workload_category_not_stated"
 
 
-def default_thinking(o: "Outcome", b: st.Built, settings: dict) -> None:
-    """Apply the reasoning-parser rule to a speculative point that recorded no thinking mode and pins no acceptance
-    length, naming it as an `estimated` substitution on workload.thinking_mode."""
-    if spec_of(b) is None or b.thinking is not None or b.acceptance_length is not None:
+def require_workload_category(o: "Outcome", b: st.Built, requested: str | None = None) -> None:
+    """A speculative point whose acceptance length is neither pinned nor logged needs the workload's category. The
+    caller's requested fallback category (Env.speculative_fallback_category) stands in and is named; with none, the
+    gap is named and the point stays G5."""
+    if spec_of(b) is None or b.acceptance_length is not None:
         return
-    parser = st.recorded_reasoning_parser(settings)
-    if parser is None:
-        return
-    b.thinking, b.fallback_category = DEFAULT_THINKING, DEFAULT_CATEGORY
-    o.subs.append({"kind": "estimated", "subject": "workload.thinking_mode",
-                   "detail": f"the run recorded no thinking mode and no acceptance length; its server runs the "
-                             f"reasoning parser {parser}, so thinking {DEFAULT_THINKING} and the fallback category "
-                             f"{DEFAULT_CATEGORY} select the substrate's acceptance profile"})
+    if requested and b.fallback_category is None:
+        b.fallback_category = requested
+        o.subs.append({"kind": "estimated", "subject": "workload.category",
+                       "detail": f"the benchmark states no workload category; the fallback category {requested} was "
+                                 f"requested for the acceptance profile"})
+    if b.fallback_category is None and CATEGORY_NOT_STATED not in o.reasons:
+        o.reasons.append(CATEGORY_NOT_STATED)
 
 
 def spec_of(b: st.Built):
@@ -792,7 +802,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
                        "detail": f"the mean acceptance length the run's server logged, "
                                  f"{realised['mean_acceptance_length']} over {realised['log_lines']} interval(s), "
                                  f"{realised['drafted_tokens']} drafted tokens; the run set none"})
-    default_thinking(o, b, c.settings)
+    require_workload_category(o, b, env.speculative_fallback_category)
     if b.acceptance_length is not None and spec.get(tokens_key):
         # The run's own synthetic acceptance, pinned in the scenario so every replay runs it: the
         # agentic one (which also takes --speculative-acceptance-length) and the single-turn one
@@ -1177,7 +1187,9 @@ def pd_router(row: dict, name: str | None, recipe: "pdr.Recipe | None", table: "
     if ctx is None:
         return None, [], [base], None
     matched = rt.matched_ratios(entry, workload=rt.workload_kind(ctx["isl"], ctx["osl"]), conc=ctx["conc"],
-                                model=ctx["model"], hardware=ctx["hardware"], shape=ctx["shape"])
+                                model=ctx["model"], hardware=ctx["hardware"], shape=ctx["shape"],
+                                engine_version=ctx.get("engine_version"), fabric=ctx.get("fabric"),
+                                prefill=ctx.get("prefill"), decode=ctx.get("decode"))
     if not matched:
         return None, [], [f"{base}:{rt.NO_BOUND}"], {"outcome": rt.NO_BOUND, "entry": entry.name, "mode": mode}
     sub = rt.substitution(entry, key, revision, matched, assumed=assumed)
@@ -1302,7 +1314,12 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
         if not isinstance(v, int) or isinstance(v, bool) or v < 1:
             o.reasons.append(f"required_setting_missing:replay.{k}")
     ctx = {"isl": row.get("isl"), "osl": row.get("osl"), "conc": row.get("conc"), "model": sup.model, "hardware": part_name,
-           "shape": f"{pools['prefill'].workers}P{pools['decode'].workers}D"}
+           "shape": f"{pools['prefill'].workers}P{pools['decode'].workers}D",
+           # The rest of the regime (the substrate's exact form): the engine release, the fabric the run recorded
+           # (an assumed class is not a recorded one, so it is None), and each pool's per-instance parallelism.
+           "engine_version": env.engine_release, "fabric": recipe.fabric or st.recorded_fabric(launches["decode"]),
+           "prefill": pdm.pool_parallel(pools["prefill"], recipe.pools["prefill"].flags),
+           "decode": pdm.pool_parallel(pools["decode"], recipe.pools["decode"].flags)}
     policy, rsubs, rreasons, rrec = pd_router(row, router_name, recipe, table, ctx, env.assumed_router_revision)
     if policy is None and env.router_policy_experiment and rreasons and all(r.startswith("router_unsupported") for r in rreasons):
         policy, rsubs, rreasons, rrec = router_experiment(router_name, env.router_policy_experiment, rreasons, rrec)
@@ -1324,7 +1341,7 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
     o.reasons += b.reasons
     o.subs += b.substitutions
     b.thinking = st.recorded_thinking({**decided["prefill"].settings, **decided["decode"].settings})
-    default_thinking(o, b, {**decided["prefill"].settings, **decided["decode"].settings})
+    require_workload_category(o, b, env.speculative_fallback_category)
     if row.get("benchmark_type") != "single_turn":
         o.reasons.append(f"topology_unsupported:{pdm.AGENTIC}")
     header = [f"point {pid}", f"InferenceX row {row['id']} ({row['run_url']})",
