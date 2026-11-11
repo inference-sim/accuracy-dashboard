@@ -6,7 +6,7 @@ This is the "before" of the M2 before/after. It is a labelled in-sample run (no 
 
 | Input | Value |
 |---|---|
-| Harness | accuracy-dashboard commit `bcfc04f4959d9c6642709da8e918ebc17b862634` (branch m2/2-rescore-and-repin). `harness/run.sh` records it as `harness_commit`. |
+| Harness | accuracy-dashboard commit `f2754b1031e8d90962c6ec39675eeede91a42728` (branch m2/2-rescore-and-repin). `harness/run.sh` records it as `harness_commit`. |
 | Simulator | inference-sim `v0.16.0` = `3f4998e28f922611a2d21d5c7ffe18a5272fe114`, built by run.sh with Go 1.27.2 (its go.mod) |
 | Substrate, registry, catalog | blis-substrate `v0.13.0` = `fe6eab10b9795933de38122ba55e5299dcb20b5e` (the release v0.16.0's stack.json pins); `--catalog <checkout>/catalog`, `--registry <checkout>/registry`, both released as `v0.13.0` |
 | Ledger | the ledger in that substrate checkout, source revision `db-dump/2026-09-28` |
