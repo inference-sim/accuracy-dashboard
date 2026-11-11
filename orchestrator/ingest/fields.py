@@ -101,9 +101,11 @@ def _value_classes(raw, where: str, status: str) -> dict:
     if t not in CLASS_TYPES:
         raise FieldsError(f"{where}.type: must be one of {CLASS_TYPES}, got {t!r}")
     if t == "numeric":
-        th = c.get("thresholds")
-        if not isinstance(th, list) or not th:
-            raise FieldsError(f"{where}.thresholds: a numeric field needs thresholds")
+        th = c.get("thresholds", [])      # none: one class, number 0
+        if not isinstance(th, list):
+            raise FieldsError(f"{where}.thresholds: a list")
+        if [t.get("value") for t in th if isinstance(t, dict)] != sorted({t.get("value") for t in th if isinstance(t, dict)}):
+            raise FieldsError(f"{where}.thresholds: strictly increasing")
         for k, x in enumerate(th):
             x = _keys(x, _THRESHOLD_KEYS, f"{where}.thresholds[{k}]")
             if isinstance(x.get("value"), bool) or not isinstance(x.get("value"), (int, float)) or x.get("closed") not in ("above", "below"):
@@ -123,7 +125,7 @@ def _value_classes(raw, where: str, status: str) -> dict:
 
 def class_of(x, classes: dict) -> int:
     """The numeric class of x: the number of thresholds it is above (or on, where closed above)."""
-    return sum(1 for t in classes["thresholds"] if x > t["value"] or (t["closed"] == "above" and x == t["value"]))
+    return sum(1 for t in classes.get("thresholds", []) if x > t["value"] or (t["closed"] == "above" and x == t["value"]))
 
 
 def covers(value, classes: dict) -> bool:

@@ -412,7 +412,7 @@ def read_all(server_log: str, launch_config: dict | None) -> tuple[dict[str, Rea
 _SAME_NAME = (
     "all2all_backend", "async_scheduling", "block_size", "cp_kv_cache_interleave_size", "dcp_comm_backend",
     "dcp_q_replicate", "disable_cascade_attn", "disable_custom_all_reduce", "disable_hybrid_kv_cache_manager",
-    "enable_prefix_caching", "gpu_memory_utilization", "kv_cache_memory_bytes", "long_prefill_token_threshold",
+    "enable_chunked_prefill", "enable_prefix_caching", "language_model_only", "gpu_memory_utilization", "kv_cache_memory_bytes", "long_prefill_token_threshold",
     "long_prefill_token_threshold_adaptive", "mamba_cache_dtype", "mamba_cache_mode", "mamba_ssm_cache_dtype",
     "max_cpu_loras", "max_cudagraph_capture_size", "max_loras", "max_model_len", "max_num_active_seqs",
     "max_num_batched_tokens", "max_num_scheduled_tokens", "max_num_seqs", "moe_backend",
