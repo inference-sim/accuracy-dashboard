@@ -106,6 +106,17 @@ class Catalog:
         spec = graph.get("speculator") if isinstance(graph, dict) else None
         return spec.get("method") if isinstance(spec, dict) else None
 
+    def speculator_tokens(self, model: str) -> int | None:
+        """The speculative tokens per step of a catalog model's graph (its speculator's
+        num_spec_tokens): the checkpoint's default draft length, and for MTP the number of MTP
+        modules. None when it has none. TEMPORARY, like speculator()."""
+        import yaml
+        g = Path(self.root) / "models" / model / "graph.yaml"
+        graph = (yaml.safe_load(g.read_text()) or {}) if g.is_file() else {}
+        spec = graph.get("speculator") if isinstance(graph, dict) else None
+        n = spec.get("num_spec_tokens") if isinstance(spec, dict) else None
+        return n if isinstance(n, int) and not isinstance(n, bool) else None
+
     def drafter_links(self, target: str, drafter: str) -> bool:
         """Whether catalog entry `drafter` and catalog entry `target` name each other: the drafter
         lists the target among its `targets`, and the target lists the drafter among its
@@ -227,9 +238,29 @@ def engine_method(graph_method: str | None) -> str | None:
     return "mtp" if graph_method and graph_method.endswith("_mtp") else graph_method
 
 
+def draft_length_conflict(method: str, k, n_predict: int | None) -> str | None:
+    """Why a stated num_speculative_tokens K cannot be a real run's, or None when vLLM accepts it
+    and it is simply priced as stated. The rule is the layer 8 model reference's "Stated draft
+    lengths" table (vLLM v0.32.0 vllm/config/speculative.py); TEMPORARY copy (X7).
+
+      every method  K >= 1 (:393, :1826-1830)
+      mtp           K <= n_predict is valid; K > n_predict must be a multiple of n_predict (:1493-1501),
+                    n_predict being the graph's num_spec_tokens (the number of MTP modules)
+      eagle, eagle3, draft_model, dflash, dspark   any K >= 1
+
+    The graph's num_spec_tokens is the checkpoint's default draft length, not a value to equal."""
+    if isinstance(k, bool) or not isinstance(k, int):
+        return None         # a value that is not a count is the field list's to judge
+    if k < 1:
+        return f"{k} is below 1"
+    if engine_method(method) == "mtp" and n_predict and k > n_predict and k % n_predict:
+        return f"{k} exceeds the model's {n_predict} MTP modules and is not a multiple of {n_predict}"
+    return None
+
+
 def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models: dict,
           hardware: str, spec_method: str | None,
-          draft_checkpoint: str | None = None) -> Support:
+          draft_checkpoint: str | None = None, num_spec_tokens: int | None = None) -> Support:
     """checkpoints: candidate HF repos for the served model, most authoritative first.
     draft_checkpoint: the HF repo the run named as its draft model (speculative_config.model), if any.
     When it names one, that checkpoint must be a catalog entry that lists the served model among
@@ -266,6 +297,9 @@ def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models:
             # it name each other, whose graph speculates by the run's method.
             if cat.drafter_links(s.model, d) and engine_method(cat.speculator(d)) == spec_method:
                 s.drafter = d
+                why = draft_length_conflict(spec_method, num_spec_tokens, None) if num_spec_tokens is not None else None
+                if why:
+                    s.reasons.append(f"value_conflict:speculative_config.num_speculative_tokens: vLLM refuses {why}")
             else:
                 s.reasons.append(f"drafter_not_in_catalog:{spec_method}")
         elif draft_checkpoint and d is None:
@@ -274,4 +308,8 @@ def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models:
             # No separate checkpoint, or vLLM named the served model itself as its drafter (MTP):
             # the served model's own graph decides.
             s.reasons.append(f"drafter_not_in_catalog:{spec_method}")
+        elif num_spec_tokens is not None:
+            why = draft_length_conflict(spec_method, num_spec_tokens, cat.speculator_tokens(s.model))
+            if why:
+                s.reasons.append(f"value_conflict:speculative_config.num_speculative_tokens: vLLM refuses {why}")
     return s
