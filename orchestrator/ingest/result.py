@@ -40,13 +40,46 @@ CLIENT_DEFINITIONS = {
 }
 
 
-def check_definitions(registry: dict) -> list[str]:
+# The other figures InferenceX reports, with the definition each has there. The dashboard compares
+# none of them yet; one is added to COMPARED_FIGURES only together with a registry metric that has
+# this definition, and check_definitions refuses the registry when it does not. The registry ids are
+# the ones blis-substrate#52 names; that commit is not available to this repository yet, so they and the
+# keys below follow the definitions in the readiness analysis of 2026-11-11 (target scenarios, section 6)
+# and are to be confirmed against #52 when it lands. `gpus` is the registry's GPU scope of a per-GPU rate.
+#   tput_per_gpu         (input + output tokens/s) / all the deployment's GPUs
+#   input_tput_per_gpu   input tokens/s / the prefill GPUs (a disaggregated run)
+#   output_tput_per_gpu  output tokens/s / the decode GPUs (a disaggregated run)
+#   mean_intvty          1 / mean(ITL): the reciprocal of the mean, not the mean of the reciprocals
+_RATE = {"statistic": "rate", "population": "requests", "window": "measured", "unit": "tokens_per_s",
+         "denominator": "window_and_gpus", "unfinished": "not_applicable"}
+CLIENT_RATE_DEFINITIONS = {
+    "total_tokens_per_second_per_gpu": {**_RATE, "formula": "total_throughput", "gpus": "all_gpus"},
+    "input_tokens_per_second_per_prefill_gpu": {**_RATE, "formula": "input_throughput", "gpus": "prefill_gpus"},
+    "output_tokens_per_second_per_decode_gpu": {**_RATE, "formula": "output_throughput", "gpus": "decode_gpus"},
+    "interactivity_of_mean_tpot": {"formula": "interactivity", "statistic": "reciprocal_of_mean",
+                                   "population": "requests_min_2_output_tokens", "window": "measured",
+                                   "unit": "tokens_per_s_per_user", "unfinished": "excluded"},
+}
+# The figures the harness compares with the client's. check_definitions runs for exactly these, at the
+# start of every scoring run (cli.py cmd_score).
+COMPARED_FIGURES = (TTFT_MEAN_MS, TPOT_MEAN_MS)
+
+
+def check_definitions(registry: dict, compared=COMPARED_FIGURES) -> list[str]:
     """Why the simulator's metric registry (`blis metrics`, an M2 command: the M1 simulator has
-    none, so nothing calls this in M1; inference-sim/accuracy-dashboard#52) cannot be compared with the
-    client, or [] when it can: each metric the harness reads must exist and have the client's
-    definition, field for field (DEV-8)."""
+    none; inference-sim/accuracy-dashboard#52) cannot be compared with the client, or [] when it
+    can: each figure compared must exist in the registry with the client's definition, field for
+    field (DEV-8). `compared` names the figures; a per-GPU rate or an interactivity is checked
+    against CLIENT_RATE_DEFINITIONS, so a figure is never compared with another of the same name
+    but another scope, token kind or aggregate (output against total tokens, all GPUs against the
+    decode GPUs, 1/mean(ITL) against the mean of 1/ITL)."""
     out = []
-    for metric, want in CLIENT_DEFINITIONS.items():
+    known = {**CLIENT_DEFINITIONS, **CLIENT_RATE_DEFINITIONS}
+    for metric in compared:
+        want = known.get(metric)
+        if want is None:
+            out.append(f"the harness has no client definition for {metric}: it is not compared")
+            continue
         d = registry.get(metric)
         if d is None:
             out.append(f"the simulator's metric registry has no {metric}")

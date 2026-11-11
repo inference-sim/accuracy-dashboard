@@ -230,3 +230,90 @@ def test_a_definition_other_than_the_clients_is_refused_naming_the_field(metric,
 def test_a_registry_without_a_metric_the_harness_reads_is_refused():
     assert result.check_definitions({"ttft_mean_ms": REGISTRY["ttft_mean_ms"]}) == [
         "the simulator's metric registry has no tpot_mean_ms"]
+
+
+# ---- the other figures: a rate or an interactivity is compared only with the same scope and aggregate
+# (readiness analysis of 2026-11-11, section 6; the registry ids follow blis-substrate#52, to be confirmed)
+
+def _registry_with(metric, **over):
+    base = dict(result.CLIENT_RATE_DEFINITIONS[metric])
+    base.update(over)
+    return {metric: {"id": metric, **base}}
+
+
+@pytest.mark.parametrize("metric", sorted(result.CLIENT_RATE_DEFINITIONS))
+def test_a_rate_or_interactivity_with_the_clients_definition_is_comparable(metric):
+    assert result.check_definitions(_registry_with(metric), compared=(metric,)) == []
+
+
+@pytest.mark.parametrize("metric,key,value", [
+    # output tokens against total tokens: the plotted axis differs by two orders of magnitude on AgentX
+    ("total_tokens_per_second_per_gpu", "formula", "output_throughput"),
+    # all the deployment's GPUs against the decode GPUs of a disaggregated run
+    ("total_tokens_per_second_per_gpu", "gpus", "decode_gpus"),
+    ("output_tokens_per_second_per_decode_gpu", "gpus", "all_gpus"),
+    ("input_tokens_per_second_per_prefill_gpu", "gpus", "all_gpus"),
+    # a rate per window against a rate with no GPU denominator
+    ("total_tokens_per_second_per_gpu", "denominator", "window"),
+    # 1 / mean(ITL) against the mean of the per-request 1 / ITL (2% to 27% apart on TP8 H200 replays)
+    ("interactivity_of_mean_tpot", "statistic", "mean"),
+    ("interactivity_of_mean_tpot", "formula", "user_tps"),
+])
+def test_a_known_bad_definition_is_refused_naming_the_field(metric, key, value):
+    reg = _registry_with(metric, **{key: value})
+    got = result.check_definitions(reg, compared=(metric,))
+    assert got == [f"the simulator's {metric} has {key} {value!r}; the InferenceX client's has "
+                   f"{result.CLIENT_RATE_DEFINITIONS[metric][key]!r}"]
+
+
+def test_a_registry_that_names_a_figure_by_another_scope_is_refused_not_matched_by_name():
+    # The registry today has output_tok_s_per_gpu (output tokens over every GPU) and interactivity_mean
+    # (the mean of 1/ITL); neither is the client's figure, and no registry record is looked up by a
+    # similar name.
+    reg = {"output_tok_s_per_gpu": {"id": "output_tok_s_per_gpu", "formula": "output_throughput"},
+           "interactivity_mean": {"id": "interactivity_mean", "formula": "user_tps", "statistic": "mean"}}
+    for metric in ("total_tokens_per_second_per_gpu", "interactivity_of_mean_tpot"):
+        assert result.check_definitions(reg, compared=(metric,)) == [f"the simulator's metric registry has no {metric}"]
+
+
+def test_a_figure_with_no_client_definition_is_not_compared():
+    assert result.check_definitions(REGISTRY, compared=("goodput",)) == [
+        "the harness has no client definition for goodput: it is not compared"]
+    assert result.COMPARED_FIGURES == ("ttft_mean_ms", "tpot_mean_ms")
+
+
+# ---- score calls it
+
+def _fake_blis(tmp_path, body: str) -> Path:
+    p = tmp_path / "blis"
+    p.write_text("#!/usr/bin/env python3\nimport sys, json\n" + body)
+    p.chmod(0o755)
+    return p
+
+
+def test_score_refuses_a_simulator_whose_ttft_or_tpot_is_not_the_clients(tmp_path):
+    import cli
+    bad = {k: dict(v) for k, v in REGISTRY.items()}
+    bad["tpot_mean_ms"]["population"] = "tokens"
+    blis = _fake_blis(tmp_path, f"print(json.dumps({{'metrics': {json.dumps(list(bad.values()))}}}))\n")
+    assert cli.check_metric_definitions(blis) == [
+        "the simulator's tpot_mean_ms has population 'tokens'; the InferenceX client's has 'requests_min_2_output_tokens'"]
+    good = _fake_blis(tmp_path, f"print(json.dumps({{'metrics': {json.dumps(list(REGISTRY.values()))}}}))\n")
+    assert cli.check_metric_definitions(good) == []
+
+
+def test_a_build_without_blis_metrics_is_not_refused_and_other_failures_are(tmp_path, capsys):
+    import cli
+    old = _fake_blis(tmp_path, "sys.stderr.write('Error: unknown command \"metrics\" for \"blis\"\\n'); sys.exit(1)\n")
+    assert cli.check_metric_definitions(old) == []
+    assert "not checked" in capsys.readouterr().err
+    broken = _fake_blis(tmp_path, "sys.stderr.write('panic'); sys.exit(2)\n")
+    assert cli.check_metric_definitions(broken) and "panic" in cli.check_metric_definitions(broken)[0]
+
+
+def test_cmd_score_runs_the_definition_check():
+    import ast
+    tree = ast.parse((Path(__file__).parent / "cli.py").read_text())
+    fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "cmd_score")
+    calls = {getattr(c.func, "id", None) for c in ast.walk(fn) if isinstance(c, ast.Call)}
+    assert "check_metric_definitions" in calls

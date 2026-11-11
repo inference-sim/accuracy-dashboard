@@ -354,12 +354,29 @@ def read_stack(blis: Path, given: str | None) -> sk.Stack:
     return sk.load(path)
 
 
+def check_metric_definitions(blis: Path) -> list[str]:
+    """Why the simulator's figures cannot be compared with the client's (DEV-8): `blis metrics` gives the
+    registry of the build, and each figure the harness compares (result.COMPARED_FIGURES) must have the
+    client's definition there. A build without the command (the M1 simulator, v0.16.0) has no registry to
+    check; the run says so and goes on, and its figures rest on the definitions the scorer assumes."""
+    try:
+        registry = bc.metrics(str(blis))
+    except bc.CommandError as e:
+        if "unknown command" in str(e):
+            _log("score: this build has no `blis metrics`: the definitions of the figures compared are not checked")
+            return []
+        return [str(e)]
+    return result.check_definitions(registry)
+
+
 def cmd_score(a) -> int:
     pull_dir = Path(a.pull)
     blis = Path(a.blis).resolve()
     sim_build = getattr(a, "sim_build", None)
     bad = check_blis_inputs(blis, getattr(a, "catalog_release", None), getattr(a, "registry_release", None), sim_build)
     bad += check_harness_commit(getattr(a, "harness_commit", None))
+    if not bad:
+        bad += check_metric_definitions(blis)
     try:
         stack = read_stack(blis, getattr(a, "stack", None))
         engine_release = stack.engine("vllm")
