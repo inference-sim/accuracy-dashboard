@@ -2,7 +2,7 @@
 
 How accurately BLIS predicts real inference latency, scored nightly against
 [SemiAnalysis InferenceX](https://inferencex.semianalysis.com). v0.1.0 — see
-[`docs/RFC-0001.md`](docs/RFC-0001.md) for the full design.
+[`docs/RFC-0001.md`](docs/RFC-0001.md) for the full design. The methodology (how a point is scored and graded, how to reproduce the baseline, the evaluation protocol, the known limits) is in [`docs/README.md`](docs/README.md).
 
 **BLIS only. End-to-end only. Tables only, no plots.** Every number is a full `blis replay`
 through the whole stack (router/admission → scheduler → batch → kernel), scored against the
@@ -72,6 +72,7 @@ never published as BLIS's accuracy.
 
 | Path | What |
 |---|---|
+| `docs/README.md` | The methodology pages: overview, scoring pipeline, grades, coverage accounting, evaluation protocol, reproducing, limits. |
 | `docs/RFC-0001.md` | The complete v0.1.0 design (the spec). |
 | `docs/mockups/` | The approved Overview mockup (`.png` + `.html`). |
 | `schemas/summary.v1.json` | Local JSON schema `summary.json` is validated against (RFC §4.4). |
