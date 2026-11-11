@@ -11,9 +11,13 @@ line states, and the row's concurrency, must agree with the export.
 scenario BLIS replays; each run's own values are passed explicitly, so the two replay alike.
 Any other scenario is client_scenario_not_replayable.
 
-Not passed, and not recorded per point: trace_idle_gap_cap_seconds and
-warmup_requests_per_lane. BLIS can't state either yet (inference-sim#1971), and the points
-are scored without them (Discussion #28).
+Two inputs beyond the scenario's locked ones are read from the export and passed:
+trace_idle_gap_cap_seconds (the dataset's per-trajectory idle cap, 300 s in every run
+InferenceX has made) as the workload spec's trace_idle_gap_cap_s, and warmup_requests_per_lane
+(10) as warmup {mode: cache_pressure, requests_per_lane}. inference-sim closed #1971 on
+2026-10-24 by implementing both (cmd/replay_agentx.go). Both are recorded on the point.
+What the point still differs in is named by `client_differences` below (client build,
+which the export does not identify beyond the string "0.12.0").
 """
 from __future__ import annotations
 
@@ -37,6 +41,8 @@ _FLAGS = {
     "--public-dataset": ("corpus", str),
     "--benchmark-grace-period": ("grace_s", float),
     "--max-context-length": ("max_context_length", int),
+    "--trace-idle-gap-cap-seconds": ("trace_idle_gap_cap_s", float),
+    "--warmup-requests-per-lane": ("warmup_requests_per_lane", int),
 }
 
 
@@ -45,21 +51,19 @@ _FLAGS = {
 # input added later can't silently change the workload BLIS replays.
 #   read        passed to BLIS (or checked against the one value BLIS's scenario locks)
 #   inert       no effect on what is sent or when
-#   gap_1971    the two AgentX inputs BLIS can't state yet (inference-sim#1971): not passed, not
-#               recorded, and the point is still scored (Discussion #28)
 PHASE_KEYS = {
     "name": "inert", "kind": "inert", "type": "read", "timing_mode": "read", "concurrency": "read",
     "duration": "read", "grace_period": "read", "trajectory_start_min_ratio": "read",
     "trajectory_start_max_ratio": "read", "system_idle_gap_cap_seconds": "read",
     "failed_request_threshold": "inert",        # when the client aborts; a scored run didn't
     "agentic_warmup_grace_period": "inert",     # how long warm-up may take before aborting
-    "warmup_requests_per_lane": "gap_1971",
+    "warmup_requests_per_lane": "read",
 }
 DATASET_KEYS = {
     "name": "inert", "type": "read", "dataset": "read", "random_seed": "read",
     "entries": "inert",                         # the corpus' own trace count (393), not a sample
     "max_context_length": "read",               # the client's trace filter, a token count
-    "trace_idle_gap_cap_seconds": "gap_1971",
+    "trace_idle_gap_cap_seconds": "read",
 }
 ENDPOINT_KEYS = {"urls": "inert", "type": "read", "path": "inert", "streaming": "read",
                  "use_server_token_count": "inert"}
@@ -86,13 +90,18 @@ class Replay:
     entries: int | None = None
     max_context_length: int | None = None  # the client's trace filter; None: it filtered nothing
     system_idle_cap_s: float | None = None
+    trace_idle_gap_cap_s: float | None = None   # dataset.trace_idle_gap_cap_seconds, passed to BLIS
+    warmup_requests_per_lane: int | None = None  # phase.warmup_requests_per_lane, passed to BLIS
     reasons: list = field(default_factory=list)
 
     def record(self, corpus_sha256: str) -> dict:
         rec = {"client": "aiperf", "client_version": self.client_version, "scenario": self.scenario,
                "replayed_as": self.replayed_as, "concurrency": self.concurrency,
                "duration_s": self.duration_s, "corpus": self.corpus, "corpus_sha256": corpus_sha256,
-               "seed": self.seed}
+               "seed": self.seed, "trace_idle_gap_cap_s": self.trace_idle_gap_cap_s,
+               "warmup_requests_per_lane": self.warmup_requests_per_lane,
+               "system_idle_gap_cap_s": self.system_idle_cap_s, "grace_period_s": self.grace_s,
+               "max_context_length": self.max_context_length}
         if self.trajectory_min is not None or self.trajectory_max is not None:
             rec["trajectory_start"] = {k: v for k, v in (("min_ratio", self.trajectory_min),
                                                          ("max_ratio", self.trajectory_max)) if v is not None}
@@ -120,6 +129,15 @@ def from_export(export: dict) -> Replay:
     r.trajectory_min = ph.get("trajectory_start_min_ratio")
     r.trajectory_max = ph.get("trajectory_start_max_ratio")
     r.system_idle_cap_s = ph.get("system_idle_gap_cap_seconds")
+    r.trace_idle_gap_cap_s = ds.get("trace_idle_gap_cap_seconds")
+    r.warmup_requests_per_lane = ph.get("warmup_requests_per_lane")
+    for name, v, integral in (("trace_idle_gap_cap_s", r.trace_idle_gap_cap_s, False),
+                              ("warmup_requests_per_lane", r.warmup_requests_per_lane, True)):
+        if v is None:
+            continue
+        ok = isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 and (not integral or float(v) == int(v))
+        if not ok:
+            r.reasons.append(f"client_scenario_not_replayable:{name}")
     r.seed = ds.get("random_seed")
     r.corpus = ds.get("dataset")
     r.entries = ds.get("entries")
@@ -190,6 +208,29 @@ def cross_check(r: Replay, command: str | None, row_conc) -> None:
     r.reasons = sorted(set(r.reasons))
 
 
+CLIENT_SUBJECT = "aiperf agentx replay"
+# The tag BLIS transcribes (ai-dynamo/aiperf v0.12.0).
+TRANSCRIBED_TAG_COMMIT = "be53bf29"
+
+
+def client_differences(r: Replay) -> list[dict]:
+    """Every difference between the client that ran and the one BLIS replays that the point
+    cannot rule out, each named on the point (grade G2, kind client_difference; design 11.3).
+
+    client_build: the export records only the version string. InferenceX pins SemiAnalysisAI's
+    aiperf fork, which reports the same "0.12.0"; BLIS transcribes the ai-dynamo tag (commit
+    be53bf29). The fork changes the warm-up handoff, the warm-up lead cap and the first
+    minutes' idle shift, so the ramp can differ. The fork commit a run used is the
+    utils/aiperf gitlink of that run's InferenceX commit; the pull does not record it for
+    agentic runs, so the point cannot name it. Nothing proves the replay equal to the fork's,
+    so the difference is always named."""
+    return [{"kind": "client_difference", "subject": "client_build",
+             "detail": f"the export states aiperf {r.client_version or 'version unrecorded'}; InferenceX pins "
+                       f"SemiAnalysisAI's aiperf fork, BLIS transcribes ai-dynamo/aiperf v0.12.0 "
+                       f"({TRANSCRIBED_TAG_COMMIT}); the fork's warm-up handoff and ramp differ, "
+                       f"and the point does not record the fork commit"}]
+
+
 def workload_spec(r: Replay, corpus: dict) -> dict:
     """The blis-schemas Replay document (--workload-spec) for the run's inputs. `corpus` is the
     catalog replay workload entry of the alias the run loaded (resolve_agentic_corpus): it pins
@@ -215,6 +256,10 @@ def workload_spec(r: Replay, corpus: dict) -> dict:
         spec["grace_period_s"] = float(r.grace_s)
     if r.system_idle_cap_s is not None:
         spec["system_idle_gap_cap_s"] = float(r.system_idle_cap_s)
+    if r.trace_idle_gap_cap_s is not None:
+        spec["trace_idle_gap_cap_s"] = float(r.trace_idle_gap_cap_s)
+    if r.warmup_requests_per_lane is not None:
+        spec["warmup"] = {"mode": "cache_pressure", "requests_per_lane": int(r.warmup_requests_per_lane)}
     ts = {k: float(v) for k, v in (("min_ratio", r.trajectory_min), ("max_ratio", r.trajectory_max)) if v is not None}
     if ts:
         spec["trajectory_start"] = ts

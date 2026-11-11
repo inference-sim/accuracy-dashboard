@@ -427,6 +427,62 @@
         },
         "seed": {
           "type": "integer"
+        },
+        "trace_idle_gap_cap_s": {
+          "description": "The dataset's per-trajectory idle cap the export records, passed as the spec's trace_idle_gap_cap_s. Absent when the export states none.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "warmup_requests_per_lane": {
+          "description": "The export's warm-up requests per lane, passed as warmup {mode: cache_pressure, requests_per_lane}. Absent when the export states none.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "system_idle_gap_cap_s": {
+          "type": "number"
+        },
+        "grace_period_s": {
+          "type": "number"
+        },
+        "max_context_length": {
+          "type": "integer"
+        },
+        "differences": {
+          "$ref": "#/definitions/client_differences"
+        }
+      }
+    },
+    "client_differences": {
+      "description": "Each difference between the run's client and the simulated one, sorted by kind, then subject.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "subject",
+          "detail"
+        ],
+        "properties": {
+          "kind": {
+            "const": "client_difference"
+          },
+          "subject": {
+            "description": "send_gap: the interval between a response ending and the client sending the next request, which the simulator sets to the assumed completion overhead and the real client's is not measured. sent_prompt_lengths: the sent prompt lengths are not verified equal to the replayed targets. client_flags: the run's job log is gone, so the client's flags are taken to be the launcher's defaults. client_release: the InferenceX commit of the run is not recorded. client_saturation: the run's chunk rate is near the single-process client's ceiling. failed_requests: the run's completed and num_prompts counts are in no pulled file. client_build (agentic): the export records only a version string, and InferenceX pins a fork of the client BLIS transcribes by tag.",
+            "enum": [
+              "client_build",
+              "client_flags",
+              "client_release",
+              "client_saturation",
+              "failed_requests",
+              "send_gap",
+              "sent_prompt_lengths"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
@@ -464,36 +520,21 @@
           "type": "integer",
           "minimum": 1
         },
+        "client_bound": {
+          "description": "T10: the run's chunk rate (concurrency over its mean TPOT) is above half of 50,000 chunks/s, a floor on the InferenceX client's ceiling.",
+          "type": "boolean"
+        },
+        "chunk_rate_per_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "achieved_concurrency": {
+          "description": "The simulated main phase's mean number of requests in flight, from the first arrival to the last completion (check T1: within 10% below the client's concurrency, never above it).",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
         "differences": {
-          "description": "Each difference between the run's client and the simulated one, sorted by kind, then subject.",
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "kind",
-              "subject",
-              "detail"
-            ],
-            "properties": {
-              "kind": {
-                "const": "client_difference"
-              },
-              "subject": {
-                "description": "send_gap: the client's interval between one response ending and the next request, which the simulator does not model. sent_prompt_lengths: the sent prompt lengths are not verified equal to the replayed targets. client_flags: the run's job log is gone, so the client's flags are taken to be the launcher's defaults. client_release: the InferenceX commit of the run is not recorded.",
-                "enum": [
-                  "client_flags",
-                  "client_release",
-                  "send_gap",
-                  "sent_prompt_lengths"
-                ]
-              },
-              "detail": {
-                "type": "string",
-                "minLength": 1
-              }
-            }
-          }
+          "$ref": "#/definitions/client_differences"
         }
       },
       "allOf": [

@@ -64,6 +64,7 @@ LOG = (
 FAKE_BLIS = """#!/usr/bin/env python3
 import csv, json, os, sys
 VALIDATE, DROP, EARLY_HOLDER, SHORT, TTFT_US, TPOT_US = {validate}, {drop}, {early_holder}, {short}, 180000, 9000.0
+BURST = {burst}
 METHODS = {methods}
 WP = {wp}
 a = sys.argv[1:]
@@ -107,6 +108,18 @@ if "--trace-data" in a:
             row = {{"id": rid, "fate": "dropped", "drop_reason": "unservable", "arrival_us": arrival,
                    "prompt_tokens": row["prompt_tokens"], "output_tokens": 0}}
         rows.append(row)
+    # The closed loop: the client's `pool` slots each take the next request in order when they
+    # free, one completion overhead after the request they held completed.
+    pool = int(arg("--concurrent-sessions")) - len({{r["session_id"] for r in recs if r["session_id"].startswith("warmup-")}})
+    main_ids = {{f"request_{{r['request_id']}}" for r in recs if r["session_id"].startswith("main-")}}
+    mains = sorted((r for r in rows if r["id"] in main_ids), key=lambda r: int(r["id"][8:]))
+    if mains and not BURST:
+        t0 = mains[0]["arrival_us"]
+        free = [t0] * pool
+        for r in mains:
+            free.sort()
+            r["arrival_us"] = free.pop(0)
+            free.append(r["arrival_us"] + r.get("e2e_us", 0) + 777)
     counts["generated"] = len(rows)
     counts["completed"] = sum(r["fate"] == "completed" for r in rows)
     if DROP:
@@ -123,13 +136,13 @@ def _exe(path: Path, body: str) -> str:
 
 
 def _fake_blis(tmp: Path, *, validate: int = 0, drop: bool = False, early_holder: bool = False,
-               short: bool = False, methods=("measured",), workload_properties=None) -> str:
+               short: bool = False, methods=("measured",), workload_properties=None, burst: bool = False) -> str:
     d = tmp / "sim"
     d.mkdir(exist_ok=True)
     (d / "blis_saw.json").unlink(missing_ok=True)
     return _exe(d / "blis", FAKE_BLIS.format(validate=validate, drop=drop, early_holder=early_holder,
                                                      short=short, methods=repr(methods),
-                                                     wp=repr(workload_properties)))
+                                                     wp=repr(workload_properties), burst=burst))
 
 
 # A blis that answers only `catalog resolve --catalog DIR --model|--chip NAME --json`: a model
@@ -349,6 +362,29 @@ def test_a_row_without_its_isl_is_refused_before_blis():
         shutil.rmtree(tmp)
 
 
+def test_a_simulated_run_that_is_not_the_clients_closed_loop_is_refused():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        env.blis = _fake_blis(tmp, burst=True)        # every request arrives at once: not conc in flight
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is None and o.reasons == ["blis_refused:request_pattern_not_the_clients"]
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_scored_single_turn_point_records_its_achieved_concurrency_and_client_bound_flag():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        req = o.fidelity["requests"]
+        assert 3.6 <= req["achieved_concurrency"] <= 4.0 and req["client_bound"] is False
+        assert abs(req["chunk_rate_per_s"] - 400.0) < 0.5    # conc 4, measured TPOT 10 ms
+    finally:
+        shutil.rmtree(tmp)
+
+
 def test_prefix_caching_off_replays_the_main_phase_cold():
     tmp = Path(tempfile.mkdtemp())
     try:
@@ -428,9 +464,12 @@ def test_every_single_turn_point_names_the_send_gap_and_is_g2():
         entry, env = _setup(tmp, repo="openai/gpt-oss-120b", isl=1024, osl=8192, date="2026-02-25")
         o, _ = _score(tmp, entry, env, tmp / "c1")
         assert o.fidelity is not None, o.reasons
-        assert [d["subject"] for d in o.fidelity["requests"]["differences"]] == ["send_gap"]
+        # The pulled data holds neither completed nor num_prompts, so lost requests are not ruled out (T6).
+        assert [d["subject"] for d in o.fidelity["requests"]["differences"]] == ["failed_requests", "send_gap"]
+        assert "777 us" in o.fidelity["requests"]["differences"][1]["detail"]
         assert o.fidelity["grade"] == "G2"
-        assert [s["subject"] for s in o.fidelity["substitutions"] if s["kind"] == "client_difference"] == ["send_gap"]
+        assert [s["subject"] for s in o.fidelity["substitutions"] if s["kind"] == "client_difference"] == \
+            ["failed_requests", "send_gap"]
         # model and served_model_name are inert, unproven in the field list: named, as interim.
         assert {s["subject"] for s in o.fidelity["substitutions"] if s["kind"] == "interim_status"} == \
             {"model", "served_model_name"}
@@ -439,14 +478,47 @@ def test_every_single_turn_point_names_the_send_gap_and_is_g2():
         shutil.rmtree(tmp)
 
 
+def _with_counts(entry, **counts):
+    entry["row"].update(counts)
+    for m in entry.get("measurements") or []:
+        m.setdefault("metrics", {}).update(counts)
+
+
+def test_a_run_that_recorded_all_its_requests_names_no_failed_requests_difference():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)                     # conc 4: 40 requests
+        _with_counts(entry, completed=40, num_prompts=40, benchmark_outcome="success")
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        assert "failed_requests" not in [d["subject"] for d in o.fidelity["requests"]["differences"]]
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_run_that_lost_requests_or_did_not_succeed_is_g5_not_scored_on_its_survivors():
+    for counts, reason in (({"completed": 38, "num_prompts": 40}, "conflict:measured.completed"),
+                           ({"completed": 40, "num_prompts": 41}, "conflict:measured.completed"),
+                           ({"completed": 40, "num_prompts": 40, "benchmark_outcome": "failed"},
+                            "conflict:measured.benchmark_outcome")):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            entry, env = _setup(tmp)
+            _with_counts(entry, **counts)
+            o, _ = _score(tmp, entry, env, tmp / "c1")
+            assert o.fidelity is None and reason in o.reasons, (counts, o.reasons)
+        finally:
+            shutil.rmtree(tmp)
+
+
 def test_an_unverified_point_names_the_sent_prompt_length_difference():
     tmp = Path(tempfile.mkdtemp())
     try:
         entry, env = _setup(tmp)          # org/m: the evidence holds no such point
         o, _ = _score(tmp, entry, env, tmp / "c1")
         diffs = o.fidelity["requests"]["differences"]
-        assert [d["subject"] for d in diffs] == ["send_gap", "sent_prompt_lengths"]
-        assert "not verified" in diffs[1]["detail"]
+        assert [d["subject"] for d in diffs] == ["failed_requests", "send_gap", "sent_prompt_lengths"]
+        assert "not verified" in diffs[2]["detail"]
         assert o.fidelity["grade"] == "G2"
     finally:
         shutil.rmtree(tmp)
@@ -616,6 +688,26 @@ def test_the_agentic_path_reads_the_registry_means_and_the_engine_report():
         next((work / "results").glob("*.key")).write_text("other")
         o3 = sc._score_one(entry, tmp / "pull", work, env)
         assert o3.fidelity is None and o3.faults[0].startswith("blis_refused")
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_an_agentic_points_cap_and_warmup_reach_the_replay_and_its_client_build_is_named():
+    import yaml
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _agentic(tmp)
+        o, work = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        spec = yaml.safe_load((work / "replay-specs" / f"{entry['point_id']}.yaml").read_text())["replay"]
+        assert spec["trace_idle_gap_cap_s"] == 300.0
+        assert spec["warmup"] == {"mode": "cache_pressure", "requests_per_lane": 10}
+        rec = o.fidelity["replay"]
+        assert rec["trace_idle_gap_cap_s"] == 300.0 and rec["warmup_requests_per_lane"] == 10
+        named = [(d["kind"], d["subject"]) for d in sc.substitutions(o.subs, o.fidelity)]
+        assert ("client_difference", "client_build") in named
+        pts = list(csv.DictReader((tmp / "c1" / c.POINTS_CSV).open()))
+        assert pts[0]["grade"] == "G2"       # a named client difference is never G1
     finally:
         shutil.rmtree(tmp)
 

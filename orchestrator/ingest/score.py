@@ -174,6 +174,39 @@ def measured(entry: dict) -> dict:
     return out
 
 
+SUCCESS_OUTCOMES = ("success", "succeeded", "completed", "ok")
+
+
+def measured_population(entry: dict, pdir: Path, conc: int) -> tuple[list[str], bool]:
+    """T6: what the measured side recorded of how many requests the client ran. Reads
+    `completed`, `num_prompts` and `benchmark_outcome` from the run's row, its measurements and
+    its frozen result file, wherever present. Returns (reasons, recorded). A run that completed
+    fewer than its 10 x conc requests measured a different, easier population (the slowest are
+    the ones lost): conflict:measured.completed. A benchmark_outcome that is not a success:
+    conflict:measured.benchmark_outcome. `recorded` is False when neither count is present
+    anywhere, which the point names as the client_difference `failed_requests`."""
+    sources = [entry.get("row") or {}] + [m.get("metrics") or {} for m in entry.get("measurements") or []]
+    sources += [m for m in entry.get("measurements") or []]
+    raw = _read(pdir, entry.get("files") or {}, "result_json")
+    if raw:
+        try:
+            sources.append(json.loads(raw))
+        except ValueError:
+            pass
+
+    def find(key):
+        vals = [s[key] for s in sources if isinstance(s, dict) and s.get(key) is not None]
+        return vals
+    completed, prompts, outcome = find("completed"), find("num_prompts"), find("benchmark_outcome")
+    reasons = []
+    expected = 10 * conc
+    if any(v != expected for v in completed) or any(v != expected for v in prompts):
+        reasons.append("conflict:measured.completed")
+    if any(str(v).lower() not in SUCCESS_OUTCOMES for v in outcome):
+        reasons.append("conflict:measured.benchmark_outcome")
+    return reasons, bool(completed or prompts)
+
+
 def _blis_refusal(stderr: str, work: Path) -> str:
     """blis_refused:<slug> from BLIS's fatal message, with this run's paths removed so the
     reason is the same on every machine."""
@@ -741,7 +774,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     evaluate_g1(o, doc, env)
     m = measured(entry)
     o.fidelity = {"build": entry["build"], "args": args,
-                  "resolved": resolved_kv(log, doc), "replay": r.record(corpus["sha256"]),
+                  "resolved": resolved_kv(log, doc), "replay": {**r.record(corpus["sha256"]), "differences": rp.client_differences(r)},
                   "blis_kernel_provenance": result.kernel_report(doc)}
     par = dep["pools"][0]["parallel"]
     ep = (par["tp"] * par["dp"]) if par.get("enable_expert_parallel") else 1
@@ -833,11 +866,13 @@ def client_reasons(entry: dict, pdir: Path, client: dict) -> list[str]:
     log_b = _read(pdir, entry["files"], "job_log")
     client["flags_assumed"] = log_b is None
     client["release_unrecorded"] = not entry.get("client_commit")
+    pop_reasons, recorded = measured_population(entry, pdir, int(row["conc"]))
+    client["population_unrecorded"] = not recorded
     if log_b is None:
-        return []
+        return pop_reasons
     flags = sx.client_flag_differences(log_b.decode("utf-8", "replace"), int(row["isl"]), int(row["osl"]),
                                        int(row["conc"]))
-    return [f"value_not_recorded:client:{f}" for f in flags]
+    return pop_reasons + [f"value_not_recorded:client:{f}" for f in flags]
 
 
 def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built, header: list[str],
@@ -893,11 +928,13 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     if env.registry:
         argv += ["--registry", str(env.registry)]
     verified, why = _prompt_lengths().verified(sup.checkpoint, row.get("date"), isl, osl, conc)
-    differences = ix.client_differences(verified, why, **client)
+    bound = ix.client_bound(conc, meas_tpot_us)
+    differences = ix.client_differences(verified, why, client_bound=bound, **client)
     if int(par.get("dp") or 1) > 1:
         o.subs.append(DP_BALANCER)
     requests = {"client": ix.CLIENT_SUBJECT, "start": "primed" if primed else "cold",
-                "copies": copies, "count": len(ins), "differences": differences}
+                "copies": copies, "count": len(ins), "client_bound": bound,
+                "chunk_rate_per_s": round(ix.chunk_rate(conc, meas_tpot_us), 1), "differences": differences}
     if not simulate:
         o.subs += unread_result_substitutions(b)
         o.fidelity = {"build": entry["build"], "args": args, "resolved": [], "requests": requests}
@@ -928,6 +965,12 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     if s["mean_tpot_us"] is None:
         o.reasons = ["blis_refused:metrics_incomplete"]
         return o
+    try:
+        flight = ix.check_request_pattern(rows, len(ins), conc, ignore=ix.main_phase_only(len(ins)) if primed else None)
+    except ValueError:
+        o.reasons = ["blis_refused:request_pattern_not_the_clients"]
+        return o
+    requests["achieved_concurrency"] = flight["achieved_concurrency"]
 
     try:
         o.subs += result.coefficient_substitutions(doc)
@@ -981,6 +1024,7 @@ def substitutions(o_subs: list[dict], fidelity: dict, unevaluated=None) -> list[
     every point, each G1 condition that is unevaluated (grade.UNCHECKED_KINDS), so the scorer
     publishes a G1 only when every condition has been checked."""
     return list(o_subs) + list((fidelity.get("requests") or {}).get("differences") or []) \
+        + list((fidelity.get("replay") or {}).get("differences") or []) \
         + gr.unchecked(unevaluated)
 
 
