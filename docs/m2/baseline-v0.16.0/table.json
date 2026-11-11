@@ -989,7 +989,7 @@
   }
  },
  "identity": {
-  "harness_commit": "41fec06cea6d7a28706e0e6039d559ac732c32c4",
+  "harness_commit": "29e8ce49cfe7df2c968a39d0ef2541e658f8dcf2",
   "point_set_sha256": "6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60",
   "points": 1734,
   "pull_manifest_sha256": "6b37908b08dfbb51af35977dbbd0afd2f764ea564443022a07858b186630a816",
@@ -1017,7 +1017,7 @@
     "kind": "vllm",
     "version": "0.32.0"
    },
-   "harness_commit": "41fec06cea6d7a28706e0e6039d559ac732c32c4"
+   "harness_commit": "29e8ce49cfe7df2c968a39d0ef2541e658f8dcf2"
   }
  },
  "kind": "run",
