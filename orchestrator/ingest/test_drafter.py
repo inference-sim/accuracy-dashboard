@@ -93,11 +93,11 @@ def test_the_scenario_names_the_drafter_by_its_catalog_entry_and_only_when_the_r
 
 # ---- MTP: vLLM states every model-specific MTP method as `mtp`
 
-def _mtp(spec="mtp", model=MM3, draft=None, tokens=None, cat=None):
+def _mtp(spec="mtp", model=MM3, draft=None, cat=None):
     cat = cat or _cat()
     _entry(Path(cat.root), "mm3", graph_method="minimax_m3_mtp", tokens=7, drafters=["mm3-eagle3"])
     return sp.check(cat, {"h200"}, checkpoints=[model], base_models={}, hardware="h200", spec_method=spec,
-                    draft_checkpoint=draft, num_spec_tokens=tokens)
+                    draft_checkpoint=draft)
 
 
 def test_the_engine_names_a_model_specific_mtp_method_mtp_and_keeps_the_others():
@@ -107,7 +107,7 @@ def test_the_engine_names_a_model_specific_mtp_method_mtp_and_keeps_the_others()
 
 def test_an_mtp_point_resolves_against_the_catalogs_model_specific_method():
     s = _mtp()
-    assert s.reasons == [] and s.drafter is None and s.substitutions == []
+    assert s.reasons == [] and s.drafter is None
 
 
 def test_vllm_naming_the_served_model_as_its_own_drafter_is_the_served_models_graph():
@@ -125,9 +125,8 @@ def test_a_model_with_no_mtp_speculator_or_another_method_is_still_refused():
     assert _mtp(spec="minimax_m3_mtp").reasons == ["drafter_not_in_catalog:minimax_m3_mtp"]   # the engine never states it
 
 
-def test_a_stated_token_count_that_differs_from_the_graphs_is_a_named_substitution():
-    assert _mtp(tokens=7).substitutions == []
-    s = _mtp(tokens=1)
-    assert s.reasons == [] and s.substitutions == [{
-        "kind": "value_class", "subject": "speculative_config.num_speculative_tokens",
-        "detail": "the run states 1, the catalog graph of mm3 derives 7"}]
+def test_a_stated_token_count_is_neither_refused_nor_named():
+    # The graph's num_spec_tokens is the MTP module count; a deployment may state fewer.
+    # sp.check takes no count, so nothing can differ.
+    import inspect
+    assert "num_spec_tokens" not in inspect.signature(sp.check).parameters
