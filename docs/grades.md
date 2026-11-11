@@ -45,12 +45,12 @@ A condition leaves this table when it is evaluated from data; the point then nam
 | `execution_mode` | The point ran in a substituted execution mode. |
 | `kernel_hash` | A library's kernel hash differs from the one BLIS priced. |
 | `value_class` | A modelled field's value is outside the value classes its evidence covers. |
-| `estimated` | A field's value was estimated by the engine's rule (`leave_unset` or `substitute`), or a needed value the run did not record was taken by that rule. |
+| `estimated` | A field's value was estimated by the engine's rule (`leave_unset` or `substitute`), or a needed value the run did not record was taken by that rule; or a prefill/decode pool's engine arguments are the run's recipe's (subject `engine.<pool>.recipe`), or a speculative run's thinking mode is the reasoning-parser rule's (subject `workload.thinking_mode`). |
 | `interim_status` | The run set a field whose status is `inert_unproven`, allowed only during a release plan. |
 | `resolved_differs` | The value the engine resolves differs from the one the run used. |
 | `client_difference` | The simulated requests differ from the ones the run's client sent. |
 | `later_record` | A fact of the cluster the run's own record lacks was taken from the benchmark's later record of the same runner. |
-| `router_differs` | The run's router, which BLIS does not host, was replaced by an llm-d router policy from the substrate's router table. The subject is the router the run used; the point names the table entry, the policy (one llm-d offers) and the table's evidence. |
+| `router_differs` | The run's router, which BLIS does not host, was replaced by an llm-d router policy from the substrate's router table. The subject is the router the run used; the point names the table entry, the policy (one llm-d offers), the router build (a full commit the entry lists), the table's evidence, and the entry's difference statements and bound as it states them. |
 
 ## Other release or build (G3, G4)
 
@@ -69,8 +69,8 @@ The list is closed (design §11.4). The scorer's own reason codes map onto it (`
 |---|---|---|
 | `code_not_visible` | The engine code the build runs cannot be seen (a private image). The scorer emits no such reason today: a build it cannot resolve is G4 (nightly or custom). | Not applicable until the scorer tells a private build from a nightly one. |
 | `router_unsupported` | The run was measured behind a router BLIS does not host. BLIS hosts llm-d's router only. | Host the router in BLIS (a router in inference-sim, then the scenario names it). |
-| `topology_unsupported` | The deployment is a shape the scenario cannot state (a disaggregated or multinode layout the engine block cannot express). | Add the topology to the engine's deployment block and to the scorer's scenario writer. |
-| `value_not_recorded` | A value the simulation needs was recorded by no source: the server log is missing, the launch artifact does not match the row, a required setting is absent, or the client's scenario cannot be replayed. | Record the value (InferenceX uploads the log or artifact), or give the field an estimation rule in fields.json. |
+| `topology_unsupported` | The deployment is a shape the scenario cannot state. The subject names which part of the layout (the table below): a prefill/decode split whose pools the stack cannot yet run, or a replay it does not yet write. | Add the topology to the engine and the deployment block, or the scenario writer; the subject says which. |
+| `value_not_recorded` | A value the simulation needs was recorded by no source: the server log is missing, the launch artifact does not match the row, a required setting is absent, the client's scenario cannot be replayed, or a prefill/decode run's recipe cannot be found (`recipe_unresolved`, table below). | Record the value (InferenceX uploads the log or artifact), or give the field an estimation rule in fields.json. |
 | `field_not_modelled` | The run set a field the engine's fields.json lists as not modelled, with rule `none`. | Model the field in the engine, or give it `leave_unset` or `substitute` in fields.json. |
 | `field_unclassified` | The run set a field that fields.json lists but has not classified. | Classify the field in fields.json. |
 | `engine_unsupported` | The row's inference engine is not vLLM. | Add the engine (blis-sglang, blis-trt) and its fields.json; the score then reads that engine's list. |
@@ -78,6 +78,35 @@ The list is closed (design §11.4). The scorer's own reason codes map onto it (`
 | `field_not_in_release` | The run set a field the engine release does not list. | Add the field to the release's fields.json, or score the point on a release that lists it. |
 | `value_conflict` | Two sources of one stage record different values for a field (launch configuration against the logged arguments, or a launch node size against the runners table). | Correct the source; the harness never picks one. |
 | `build_unparseable` | The run's image and log banner name no engine build at all. The scorer emits no such reason today: a build it cannot resolve is G4 (nightly or custom). | Not applicable until the scorer tells an unnamed build from a nightly one. |
+
+### Named `topology_unsupported` subjects (prefill/decode)
+
+| Subject | Meaning | Removed by |
+|---|---|---|
+| `pd_pool_data_parallel` | A prefill or decode pool runs data-parallel attention (data-parallel size above 1). | The engine refuses a KV transfer with data parallelism: blis-vllm#47 (M3). |
+| `pd_unequal_data_parallel` | The two pools differ in data-parallel size (a DEP prefill pool with a TEP decode pool, or the reverse). | The placement refuses pools of different data-parallel size: inference-sim#1952 (M3). |
+| `pd_pool_not_recorded` | The row records a pool with no workers or no GPUs. | Not removable: the row does not describe a prefill/decode run. |
+| `pd_agentic` | An agentic replay of a prefill/decode deployment is not written. | Write the agentic replay for two pools, with the router's session affinity (accuracy-dashboard#64, M3). |
+
+### Named `recipe_unresolved` subjects
+
+| Subject | Meaning |
+|---|---|
+| `no_master_entry` | No search-space item of the master configuration at the run's commit is this row (framework, model, runner, precision, sequence lengths, concurrency, workers, parallel sizes, speculation). |
+| `ambiguous` | More than one item fits the row with different recipes, or the launch scripts' overlays give different files. |
+| `not_in_tree` | The recipe the item names is in no file of InferenceX at the run's commit: it came from the srt-slurm repository's own, unpinned branch. |
+| `unreadable` | The recipe file does not parse as a recipe. |
+| `no_config_file` | The item names no recipe (`CONFIG_FILE`). |
+| `run_commit_unreadable` | The run's commit, or its tree, cannot be read (a run of another repository, or a commit the repository no longer holds). |
+
+### Named `router_unsupported` subjects (`<router>:<outcome>`)
+
+| Outcome | Meaning |
+|---|---|
+| `no_policy` | The entry says no llm-d policy is close enough. |
+| `revision_not_covered` | The entry does not list the run's router build, or the run records none (a wheel version maps to no commit). |
+| `no_entry` | No entry of the router table has the run's router, mode and session-affinity setting. |
+| `no_bound_for_regime` | The entry maps, and no ratio of its bound has a regime that holds the point (its request lengths, concurrency, catalog model, hardware part and pool shape). |
 
 The scorer's reasons and the G5 reason each becomes:
 
@@ -89,6 +118,7 @@ The scorer's reasons and the G5 reason each becomes:
 | `conflict` | `value_conflict` |
 | `required_setting_missing` | `value_not_recorded` |
 | `server_log_missing` | `value_not_recorded` |
+| `recipe_unresolved` | `value_not_recorded` |
 | `artifact_unmatched` | `value_not_recorded` |
 | `client_scenario_not_replayable` | `value_not_recorded` |
 | `router_unsupported` | `router_unsupported` |

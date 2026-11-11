@@ -40,6 +40,8 @@ A run's log often names only a local path (`/scratch/models/MiniMax-M3-NVFP4`), 
 
 The recipe at the run's commit is part of the run's own record (the same kind of source as the server log), not a substituted fact.
 
+- **A prefill/decode run's recipe.** For a row with `disagg`, the pull also keeps the srt-slurm recipe the run launched from (the role `recipe`), found as [disaggregation](disaggregation.md) describes: the one search-space item of the commit's master configuration that is the row, the file the runner's launch script overlays for its `CONFIG_FILE`. The scorer reads each pool's engine arguments from it; unlike the checkpoint above, these are named on the point as a recovery (`estimated`), because the recipe states what the launcher was told and the run's own log of it is gone. A commit the repository does not hold (a fork's pull request) is `recipe_unresolved:run_commit_unreadable`, not a failed pull.
+
 ## 5. The harness: `harness/run.sh`
 
 ```
