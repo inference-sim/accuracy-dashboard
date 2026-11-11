@@ -5,10 +5,10 @@ Measured 2026-11-10 with the dashboard's coverage command (no simulator), over t
 | | Points that reach the simulator | Still G5 |
 |---|---|---|
 | Baseline (v0.13.0 catalog, v0.32.0-blis.2 fields) | 31 | 1703 |
-| Real fields, layer 10 catalog, dashboard as it is | 405 | 1329 |
-| The same with the node size of b200 and h200 taken as 8 (scratch; not a decision) | 840 | 894 |
+| Real fields, layer 10 catalog, node size by the same-runner rule only | 405 | 1329 |
+| The same with the label-record rule (maintainer ruling; implemented) | 840 | 894 |
 
-The 840 are 71 percent of the 1188 in-scope points; 546 points are AMD and out of scope.
+The label-record rule adds exactly 435 points at the gate (405 to 840). The 840 are 71 percent of the 1188 in-scope points; 546 points are AMD and out of scope.
 
 **The 290 `not_in_catalog` points are all AMD.** In the scratch run (and in the as-is run) the 290 points whose first reason is `not_in_catalog` are mi300x, mi325x and mi355x points: their reason is the chip (`hardware_no_coefficients`, which the scorer files under `not_in_catalog`), and the catalog and registry have no AMD part. Not one in-scope point carries a `not_in_catalog` reason against the layer 10 catalog with this field list (my earlier sentence that said the 290 included DeepSeek-V4-Pro and Kimi-K3 points was wrong). Per-unit breakdown, from the dashboard's own outcomes:
 
