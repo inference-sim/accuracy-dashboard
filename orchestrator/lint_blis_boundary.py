@@ -78,6 +78,16 @@ DATA_READS = {
         "TEMPORARY until a command prints a catalog model graph's speculator method",
     ("orchestrator/ingest/support.py", "registry_parts"):
         "TEMPORARY until a command prints the parts the registry scopes coefficients to",
+    ("orchestrator/ingest/support.py", "Catalog.drafters_of"):
+        "TEMPORARY until a command prints a catalog model's drafters list (models/<name>/model.yaml)",
+    ("orchestrator/ingest/support.py", "Catalog.speculator_tokens"):
+        "TEMPORARY until a command prints a catalog model graph's speculator draft length",
+    ("orchestrator/ingest/support.py", "Catalog._listed"):
+        "TEMPORARY with Catalog.drafters_of: reads the model.yaml list both use",
+    ("orchestrator/baseline/split.py", "check_registry"):
+        "TEMPORARY until the registry's own CI runs the withheld-citation check against the published "
+        "list at a pinned commit (the protocol page says it belongs there): until then the dashboard's "
+        "check reads the registry checkout's coefficients/*.yaml",
     ("orchestrator/resolve_agentic_corpus.py", "workload_path"):
         "TEMPORARY until a command prints a catalog replay workload entry: `blis catalog resolve` "
         "takes only --model and --chip",
@@ -96,6 +106,10 @@ TEXT_READS = {
         "TEMPORARY until an inference-sim command prints the full unit list with identities and the "
         "ingest report (`blis ledger --list` prints only the published unit ids): the job checks out "
         "blis-substrate at the commit stack.json pins, for catalog/, registry/ and catalog/ledger",
+    ("docs/m2/after-run.sh", "clone"):
+        "TEMPORARY with the api-nightly.yml substrate checkout: the after-run script checks out the "
+        "blis-substrate commit the run pins, for the catalog and registry, until the M2 substrate "
+        "release lets the build print them",
     ("orchestrator/resolve_stack.py", "pins"):
         "TEMPORARY with the api-nightly.yml substrate checkout: prints the commit it clones",
     ("orchestrator/ingest/cli.py", "pins"):
