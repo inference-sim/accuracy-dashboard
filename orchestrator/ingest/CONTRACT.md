@@ -195,9 +195,11 @@ The pull lists every framework InferenceX reports in the window. `engines.FRAMEW
 
 ## Disaggregated and multi-node runs
 
-The fabric between a run's engines is a catalog property, not a run value, so no fields.json rule can clear it, and the backlog would have pointed at InferenceX instead of BLIS. A vLLM-engine row with `disagg` or `is_multinode` instead goes through the same Decide step as every other point, on the topology fields its own record states: every `kv_transfer_config.*` field and the parallel sizes, read from its launch config and its logged arguments (`settings.topology_reasons`). Whatever the engine's fields.json classifies `not_modelled` with no rule is `field_not_modelled` on that field; a field the release lacks is `field_not_in_release`. A run that records no `kv_transfer_config` field at all is `value_not_recorded` with the subject `kv_transfer_config.kv_role`, which is a run value. Nothing is simulated for such a point.
+The fabric between a run's engines is a catalog property, not a run value, so no fields.json rule can clear it. A scenario of more than one node states a fabric class and the registry's fabric coefficient, and the point names the class it assumed (`cluster.fabric`, `estimated`).
 
-A run whose recorded topology fields are all modelled is G5 `topology_unsupported`: the harness builds one colocated pool and cannot write several engines as a scenario. It is a blocker-backlog entry, cleared when the harness can write that topology.
+**A prefill/decode row** (`disagg`) is written as two pools (`pd.py`, `score.score_pd`): the pools' counts, GPUs and parallel sizes from the row, each pool's engine arguments from the recipe the run launched from (`pd_recipe.py`, frozen by the pull as the role `recipe`), the NIXL connector, the endpoint picker file of the router table's policy, and the instance counts as `blis replay` flags. The recipe is named on the point as a recovery (`estimated`, subject `engine.<pool>.recipe`). A row the stack cannot yet run is G5 `topology_unsupported` with the part of the layout as the subject: `pd_pool_data_parallel`, `pd_unequal_data_parallel`, `pd_pool_not_recorded`, `pd_agentic` ([grades](../../docs/grades.md)). A row whose recipe is not found is `value_not_recorded` with the subject `recipe_unresolved:<slug>` (and `server_log_missing` where the log is gone too). Where there is no recipe and a log, the topology fields the log records still go through the field list (`settings.topology_reasons`).
+
+**A multi-node colocated row** (`is_multinode`, not `disagg`) is one pool over several nodes, written like any other point (`settings.build` sizes the cluster from the engine's ranks); it is no longer refused for its topology.
 
 ## Tests that need a simulator
 
@@ -219,7 +221,7 @@ The closed list of design §11.4 (`grade.G5_CODES`; COV-5). A reason the scorer 
 |---|---|
 | `code_not_visible` | An out-of-tree connector or a patched private build. |
 | `router_unsupported` | The run was measured behind a router BLIS does not host: the API row's `router_name`, or the launch configuration's frontend, names one other than llm-d's. BLIS is not asked about such a point. |
-| `topology_unsupported` | The run was measured on a deployment the scoring harness cannot write as a scenario: several engines, as in a prefill and decode split or a run across nodes, where it builds one colocated pool. A blocker-backlog entry, cleared when the harness can write that topology. |
+| `topology_unsupported` | The run was measured on a deployment the scoring harness or the stack cannot yet run as a scenario; the subject names which part (a pool at data-parallel size above 1, pools of unequal size, a pool with no workers, an agentic replay of a prefill/decode deployment). A blocker-backlog entry, cleared when the harness writes that topology or the stack runs it. |
 | `value_not_recorded` | A value the simulation needs is not recorded: the server log or the client export is missing, the row has no artifact, a required setting no source states, or a client scenario BLIS does not replay. |
 | `field_not_modelled` | The run sets a field the engine classifies as not modelled, with no estimation rule. |
 | `field_unclassified` | The engine has not classified a field the run sets, or the engine's repository publishes no field list yet. For the SGLang family (`sglang`, `dynamo-sglang`, `mori-sglang`) the subject is `sglang: no field list published` (`engines.SGLANG_FIELD_LIST_UNPUBLISHED`): blis-sglang is empty until M3. |

@@ -29,3 +29,20 @@ def test_the_document_names_every_g5_reason_and_unevaluated_condition():
     for kind in gr.UNCHECKED_KINDS:
         assert f"`{kind}`" in text
     assert gr.NOT_CHECKED_SUBJECT == "unevaluated"
+
+
+def test_every_named_subject_has_prose_and_is_in_the_document():
+    import pd as pdm
+    import pd_recipe as pdr
+    assert set(g.TOPOLOGY_SUBJECT_TEXT) == set(pdm.TOPOLOGY_SLUGS)
+    assert set(g.RECIPE_SLUG_TEXT) == set(pdr.SLUGS)
+    text = g.DOC.read_text()
+    for slug in (*pdm.TOPOLOGY_SLUGS, *pdr.SLUGS):
+        assert f"`{slug}`" in text
+
+
+def test_every_router_outcome_that_refuses_has_prose():
+    import router_table as rtab
+    assert set(g.ROUTER_OUTCOME_TEXT) == set(rtab.OUTCOMES) - {rtab.MAPPED}
+    for k in g.ROUTER_OUTCOME_TEXT:
+        assert f"`{k}`" in g.DOC.read_text()

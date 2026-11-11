@@ -242,7 +242,8 @@ def test_t7_ttft_and_tpot_aggregates_are_read_only_on_the_agentic_path():
     names = ("TTFT_MEAN_MS", "TPOT_MEAN_MS", "ttft_mean_ms", "tpot_mean_ms")
     uses = {}
     for path in sorted(HERE.glob("*.py")):
-        if path.name.startswith("test_") or path.name in ("result.py",):
+        # pointrecord.py names the metric ids of the figures it writes; it reads no aggregate.
+        if path.name.startswith("test_") or path.name in ("result.py", "pointrecord.py"):
             continue
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):
@@ -254,7 +255,8 @@ def test_t7_ttft_and_tpot_aggregates_are_read_only_on_the_agentic_path():
     assert set(uses) == {"score.py"}, uses
     tree = ast.parse((HERE / "score.py").read_text())
     dispatch = None
-    for fn in [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]:
+    # score_point's dispatch: the prefill/decode path (score_pd) calls the single-turn scorer too.
+    for fn in [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "score_point"]:
         for node in ast.walk(fn):
             if isinstance(node, ast.Return) and isinstance(node.value, ast.Call) and \
                     getattr(node.value.func, "id", "") == "score_single_turn":

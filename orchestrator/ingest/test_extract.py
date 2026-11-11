@@ -566,7 +566,7 @@ RANKS = ("'tensor_parallel_size': 16, 'max_num_seqs': 16, 'max_num_batched_token
 
 
 def test_a_scenario_of_several_nodes_states_a_fabric_class_and_the_fabric_efficiency_and_names_the_assumption():
-    # accuracy-dashboard#66: without cost-model-fabric a cross-node transfer is priced 23% fast, and a
+    # Without cost-model-fabric a cross-node transfer is priced 23% fast, and a
     # hardwired class on a cluster of another class is wrong in the nominal rate; no source names the class.
     c = _classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16")))
     b = _build(c)

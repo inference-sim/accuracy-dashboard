@@ -57,13 +57,15 @@ G2_KINDS = ("coefficient_method", "coefficient_range", "execution_mode", "kernel
 # policy from the router table" (design change blis-design#1; blis-substrate router table).
 
 # The keys a substitution of a kind names, as blis-substrate's point record requires them: a
-# later_record the record and its date, a router_differs the policy and the router table's
-# evidence (its subject is the router the run used), a client_difference and a resolved_differs
+# later_record the record and its date, a router_differs the entry, the policy, the router table's
+# evidence, the router build (a full commit), and the entry's difference and bound (its subject is the router the run used; the
+# difference and bound are copied from the entry as it states them), a client_difference and a resolved_differs
 # the detail. A key belongs to its own kind only.
-KIND_KEYS = {"later_record": ("record", "date"), "router_differs": ("entry", "policy", "evidence")}
+KIND_KEYS = {"later_record": ("record", "date"),
+             "router_differs": ("entry", "policy", "evidence", "revision", "difference", "bound")}
 # The llm-d policies the router table may map to (blis-substrate routertable.Policies; "none" records
 # that no policy is close enough, so a point cannot be simulated with it). TEMPORARY copy.
-ROUTER_POLICIES = ("round-robin", "least-active-requests", "default")
+ROUTER_POLICIES = ("round-robin", "random-picker", "least-active-requests", "default")
 DETAIL_KINDS = ("client_difference", "resolved_differs")
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -146,7 +148,7 @@ def _check_keys(s: dict) -> None:
             raise GradeError(f"a {s['kind']} substitution on {s['subject']!r} names no {k}")
     if s["kind"] in DETAIL_KINDS and not s.get("detail"):
         raise GradeError(f"a {s['kind']} substitution on {s['subject']!r} names no detail")
-    for k in ("record", "date", "entry", "policy", "evidence"):
+    for k in ("record", "date", "entry", "policy", "evidence", "revision", "difference", "bound"):
         if s.get(k) is not None and k not in need:
             raise GradeError(f"{k} is not a key of {s['kind']} (substitution on {s['subject']!r})")
     if s["kind"] == "router_differs":
@@ -154,6 +156,8 @@ def _check_keys(s: dict) -> None:
             raise GradeError(f"{s['policy']!r} is not a policy llm-d's router offers {ROUTER_POLICIES}")
         if not s["entry"].startswith(s["subject"] + "-"):
             raise GradeError(f"router table entry {s['entry']!r} is not an entry of the router {s['subject']!r}")
+    if s["kind"] == "router_differs" and not re.match(r"^[0-9a-f]{40}$", str(s["revision"])):
+        raise GradeError(f"a router_differs revision is a full 40-hex commit, got {s['revision']!r}")
     if s["kind"] == "later_record" and not _DATE.match(s["date"]):
         raise GradeError(f"a later_record date is YYYY-MM-DD, got {s['date']!r}")
 

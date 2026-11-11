@@ -105,6 +105,8 @@ jobs:
             orchestrator/ingest/test_locations.py \
             orchestrator/ingest/test_value_refusal.py \
             orchestrator/ingest/test_g1.py \
+            orchestrator/ingest/test_pd.py \
+            orchestrator/ingest/test_thinking_rule.py \
             orchestrator/baseline/test_compare.py \
             orchestrator/baseline/test_split.py \
             orchestrator/baseline/test_residuals.py \
@@ -164,7 +166,7 @@ jobs:
           BLIS_BIN: ${{ runner.temp }}/sim/blis
           BLIS_SUBSTRATE: ${{ runner.temp }}/substrate
           BLIS_SUBSTRATE_LAYER10: ${{ runner.temp }}/substrate-pointrecord
-        run: python3 -m pytest -q orchestrator/ingest/test_inferencex_client_sim.py orchestrator/ingest/test_score_real_blis.py orchestrator/ingest/test_pointrecord.py
+        run: python3 -m pytest -q orchestrator/ingest/test_inferencex_client_sim.py orchestrator/ingest/test_score_real_blis.py orchestrator/ingest/test_pointrecord.py orchestrator/ingest/test_pointrecord_pd.py
 
   web:
     runs-on: ubuntu-latest

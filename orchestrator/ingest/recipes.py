@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import base64
 import re
+import urllib.error
 from dataclasses import dataclass, field
 
 import yaml
@@ -42,6 +43,8 @@ class Recipes:
     recipes: list = field(default_factory=list)     # recipe dicts (each has "model", "image", ...)
     dirs: dict = field(default_factory=dict)        # staged directory name -> {HF model names}
     scripts: dict = field(default_factory=dict)     # path of a benchmark script -> its blob sha
+    entries: list = field(default_factory=list)     # (key, dict) of every master-configuration entry
+    tree: dict = field(default_factory=dict)        # path of every file of the commit -> its blob sha
 
 
 def parse(master_docs: list[str], runners_doc: str | None) -> Recipes:
@@ -53,6 +56,7 @@ def parse(master_docs: list[str], runners_doc: str | None) -> Recipes:
         except yaml.YAMLError:
             continue
         out.recipes += [v for v in doc.values() if isinstance(v, dict) and isinstance(v.get("model"), str)]
+        out.entries += [(k, v) for k, v in doc.items() if isinstance(v, dict) and isinstance(v.get("model"), str)]
     if runners_doc:
         try:
             doc = yaml.safe_load(runners_doc) or {}
@@ -118,6 +122,11 @@ def checkpoint(rc: Recipes, row: dict, served_path: str | None) -> str | None:
     return hits.pop() if len(hits) == 1 else None
 
 
+class RecipesUnavailable(Exception):
+    """The run's commit or its tree is not readable (HTTP 404: a commit of a fork's pull request, or
+    one the repository no longer holds), so nothing of the commit's recipes is known."""
+
+
 class GitHubRecipes:
     """Reads a run's commit and that commit's recipes through the GitHub REST API, cached."""
 
@@ -125,6 +134,7 @@ class GitHubRecipes:
         self.get, self.repo = get, repo          # get(path) -> parsed JSON
         self._sha: dict = {}
         self._at: dict = {}
+        self._blob: dict = {}
 
     def run_commit(self, run_id: str) -> str:
         if run_id not in self._sha:
@@ -134,13 +144,25 @@ class GitHubRecipes:
     def script(self, rc: Recipes, path: str) -> str:
         return base64.b64decode(self.get(f"/repos/{self.repo}/git/blobs/{rc.scripts[path]}")["content"]).decode()
 
+    def blob_text(self, blob_sha: str) -> str:
+        # Cached: the pull asks for the launch scripts of a commit once per row of its run.
+        if blob_sha not in self._blob:
+            self._blob[blob_sha] = base64.b64decode(self.get(f"/repos/{self.repo}/git/blobs/{blob_sha}")["content"]).decode()
+        return self._blob[blob_sha]
+
     def at(self, sha: str) -> Recipes:
         if sha not in self._at:
-            tree = self.get(f"/repos/{self.repo}/git/trees/{sha}?recursive=1")["tree"]
+            try:
+                tree = self.get(f"/repos/{self.repo}/git/trees/{sha}?recursive=1")["tree"]
+            except urllib.error.HTTPError as e:
+                if e.code == 404:
+                    raise RecipesUnavailable(sha) from e
+                raise
             blob = lambda t: base64.b64decode(self.get(f"/repos/{self.repo}/git/blobs/{t['sha']}")["content"]).decode()
             masters = [blob(t) for t in sorted(tree, key=lambda t: t["path"]) if _MASTER.search(t["path"])]
             runners = next((blob(t) for t in tree if _RUNNERS.search(t["path"])), None)
             rc = parse(masters, runners)
             rc.scripts = {t["path"]: t["sha"] for t in tree if t["path"].startswith("benchmarks/") and t["path"].endswith(".sh")}
+            rc.tree = {t["path"]: t["sha"] for t in tree if t.get("type", "blob") == "blob"}
             self._at[sha] = rc
         return self._at[sha]
