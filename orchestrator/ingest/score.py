@@ -34,6 +34,9 @@ import engines  # noqa: E402
 import fields as fl  # noqa: E402
 import g1  # noqa: E402
 import grade as gr  # noqa: E402
+import pd as pdm  # noqa: E402
+import pd_recipe as pdr  # noqa: E402
+import router_table as rt  # noqa: E402
 import inferencex_client as ix  # noqa: E402
 import inferencex_runners as ir  # noqa: E402
 import replay as rp  # noqa: E402
@@ -102,6 +105,15 @@ class Env:
     # unpredictable per point (profiled: a c64 point used 11.5GB where a c128 used 6.9GB), so a
     # reactive RSS cap is the only reliable bound on a fixed-RAM runner; 0 locally scores everything.
     max_rss_mb: int = 0
+    # A router table other than the catalog's own (cli score --router-table): for an experiment with a
+    # candidate entry; a run that uses one is experimental.
+    routers_dir: Path | None = None
+    # A router build (a full commit) to assume where a run records only a wheel version: for an experiment.
+    assumed_router_revision: str | None = None
+    # An llm-d policy to stand in for a router the table does not map, to measure the two-pool writer's accuracy
+    # apart from the router question (cli score --router-policy-experiment): the point names it as an
+    # experiment, and the run is experimental.
+    router_policy_experiment: str | None = None
 
     def simulator(self) -> dict:
         """The simulator block every point of this run records: its build and engine release."""
@@ -658,32 +670,39 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
         o.reasons = sorted(set(o.reasons + engines.reasons(fw) + asx.router_reason(row, fw.router)))
         return o
     pdir = pull_dir / "points" / pid
+    if row.get("disagg"):
+        return score_pd(o, entry, pdir, env, work, fw, simulate=simulate)
     log_b = _read(pdir, entry["files"], "server_log")
-    if log_b is None:
-        # The pull may already have said why (the API answered 413): that reason stands alone.
-        bare = [] if "server_log_missing:api_413" in o.reasons else ["server_log_missing"]
+    agg = aggregated_recipe(entry, pdir) if log_b is None else None
+    if log_b is None and agg is None:
+        # The pull may already have said why (the API answered 413 or 404): that reason stands alone.
+        bare = [] if any(r.startswith("server_log_missing:api_") for r in o.reasons) else ["server_log_missing"]
         o.reasons = sorted(set(o.reasons + bare + asx.router_reason(row, fw.router)))
         return o
-    log = log_b.decode("utf-8", "replace")
+    log = log_b.decode("utf-8", "replace") if log_b is not None else ""
     o.banner = _banner_version(log)
     lc_b = _read(pdir, entry["files"], "launch_config")
     launch = json.loads(lc_b) if lc_b else None
+    recovery = []
+    if agg is not None:
+        # A colocated multi-node run whose log is gone: its arguments are its aggregated recipe's
+        # named on the point as a recovery, and the log is not asked for.
+        launch, derived = pdm.aggregated_launch(agg, entry["recipe"])
+        o.reasons = [r for r in o.reasons if r.partition(":")[0] != "server_log_missing"] + pdr.check_row(agg, row)
+        recovery = [pdm.recovery_substitution("aggregated", entry["recipe"],
+                                              sorted(k.replace("-", "_") for k in agg.pools["aggregated"].flags), derived)]
     # A run measured behind a router BLIS does not host is never scored as if llm-d had routed
     # it (design §11.4, X4; inference-sim #2028), so BLIS is not asked about it.
     o.reasons += asx.router_reason(row, _launch_router(launch) or fw.router)
 
-    if row.get("disagg") or row.get("is_multinode"):
-        # One colocated engine is not this run (design §11.4): decide its recorded topology
-        # fields by the engine's field list and stop; nothing is simulated.
-        topo = st.topology_reasons(launch, st.read_args(log), env.field_list)
-        o.reasons = sorted(set(o.reasons + topo))
-        if not o.reasons:
-            # Every recorded topology field is modelled, but the harness builds one colocated
-            # pool and cannot write several engines as a scenario (design §11.4).
-            o.reasons = ["topology_unsupported"]
-        return o
-
-    readings, problems = st.read_all(log, launch)
+    # A colocated engine over several nodes (row.is_multinode, not disagg) is one pool: build() sizes the
+    # cluster from the engine's ranks and states the fabric. A prefill/decode run never
+    # reaches here: score_pd takes it before the log is read.
+    if agg is not None:
+        readings, problems = {src: st.Reading() for src in st.SOURCES}, []
+        readings["launch_config"] = st.read_launch_config(launch)
+    else:
+        readings, problems = st.read_all(log, launch)
     # The API row's router is its own source: it states the frontend, nothing about the engine.
     rm = row.get("metrics") or {}
     if rm.get("router_name") and "frontend.router" not in readings["launch_config"].values:
@@ -698,7 +717,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     defaults = st.defaults_for(o.banner, env.vllm_defaults, env.vllm_defaults_release)
     c = st.decide(st.merge(readings, defaults), env.field_list)
     o.reasons += c.reasons
-    o.subs = list(c.substitutions)
+    o.subs = recovery + list(c.substitutions)
     o.reasons += row_vs_run(row, c)
 
     o.g1_inputs = {"requested": {p: s.value for p, s in c.settings.items() if s.requested and s.value is not None},
@@ -955,9 +974,25 @@ def client_reasons(entry: dict, pdir: Path, client: dict) -> list[str]:
     return pop_reasons + [f"value_not_recorded:client:{f}" for f in flags]
 
 
+@dataclass
+class PdRun:
+    """What a prefill/decode point adds to the single-turn replay: the endpoint picker file the
+    deployment names (written beside the scenario), the instance counts `blis replay` takes as
+    flags, and how the point is labelled."""
+    epp_name: str
+    epp_bytes: bytes
+    prefill: int
+    decode: int
+    parallelism: dict
+    label: str                     # the shape in the scenario's name: "pd-1p1x4tp1-1d4tp4ep4"
+    client_note: str | None = None  # the benchmark_client difference's text
+    router: dict | None = None      # the router table's outcome for the point (score.pd_router)
+    subs: list = field(default_factory=list)
+
+
 def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built, header: list[str],
                       name: str, dep: dict, args: list, log: str, sup: sp.Support, pdir_in: Path, *,
-                      simulate: bool = True) -> Outcome:
+                      simulate: bool = True, pd_run: "PdRun | None" = None) -> Outcome:
     """One single-turn point, replayed as the run's client sent it (COV-12).
 
     The requests are the client's seed-0 draws for the row's (isl, osl, conc)
@@ -974,7 +1009,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     from the run's client."""
     row, pid, ident = entry["row"], entry["point_id"], entry["identity"]
     model = b.scenario["model"]
-    pool = dep["pools"][0]
+    pool = dep["pools"][-1]       # the one pool of a colocated point; the decode pool of a P/D one
     eng, par = pool["engine"], pool["parallel"]
     m = measured(entry)
     try:
@@ -989,18 +1024,21 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
         o.reasons = sorted(set(o.reasons + refused))
         return o
     ins, outs = ix.target_lengths(isl, osl, conc)
-    primed = eng.get("enable_prefix_caching") is not False
+    primed = any((p["engine"] or {}).get("enable_prefix_caching") is not False for p in dep["pools"])
     copies = ix.WARMUPS_PER_CONCURRENCY * conc if primed else 0
     replay = ix.primed_phase(ins, outs, conc, copies) if primed else ix.main_phase(ins, outs, conc)
 
     pdir = (work / "single_turn" / pid).resolve()
     pdir.mkdir(parents=True, exist_ok=True)
-    routed = dataclasses.replace(b, deployment={**b.deployment,
-                                                "router": {"endpoint_picker_config": ix.ROUTER_CONFIG_NAME}})
+    if pd_run is None:
+        routed = dataclasses.replace(b, deployment={**b.deployment,
+                                                    "router": {"endpoint_picker_config": ix.ROUTER_CONFIG_NAME}})
+        router, router_name = ix.router_config_bytes(), ix.ROUTER_CONFIG_NAME
+    else:
+        routed, router, router_name = b, pd_run.epp_bytes, pd_run.epp_name
     text = st.to_yaml(routed, header)
     (pdir / f"{name}.yaml").write_text(text)
-    router = ix.router_config_bytes()
-    (pdir / ix.ROUTER_CONFIG_NAME).write_bytes(router)
+    (pdir / router_name).write_bytes(router)
     header_path, data_path = ix.write_trace(replay, pdir)
     argv = ix.replay_argv(env.blis, f"{name}.yaml", pdir, header_path, data_path, replay.sessions, replay.pool,
                           SINGLE_TURN_SEED)
@@ -1009,10 +1047,15 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     if env.registry:
         argv += ["--registry", str(env.registry)]
     argv += thinking_argv(b)
+    if pd_run is not None:
+        argv += ["--num-instances", str(pd_run.prefill + pd_run.decode), "--prefill-instances", str(pd_run.prefill),
+                 "--decode-instances", str(pd_run.decode)]
+        o.subs += pd_run.subs
     verified, why = _prompt_lengths().verified(sup.checkpoint, row.get("date"), isl, osl, conc)
     bound = ix.client_bound(conc, meas_tpot_us)
-    differences = ix.client_differences(verified, why, client_bound=bound, **client)
-    if int(par.get("dp") or 1) > 1:
+    differences = ix.client_differences(verified, why, client_bound=bound,
+                                        benchmark_client=pd_run.client_note if pd_run else None, **client)
+    if int(par.get("dp") or 1) > 1 and pd_run is None:
         o.subs.append(DP_BALANCER)
     requests = {"client": ix.CLIENT_SUBJECT, "start": "primed" if primed else "cold",
                 "copies": copies, "count": len(ins), "client_bound": bound,
@@ -1063,17 +1106,25 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     evaluate_g1(o, doc, env)
     o.fidelity = {"build": entry["build"], "args": args, "resolved": [],
                   "blis_kernel_provenance": result.kernel_report(doc), "requests": requests}
+    if pd_run is not None and pd_run.router:
+        o.fidelity["router"] = pd_run.router
     note_realised_acceptance(o.fidelity, b, log)
     o.result_data = result.data_block(doc)
     o.samples = (len(ins), len(ins))       # the client's num-prompts: 10 x concurrency requests
     ep = (par["tp"] * par["dp"]) if par.get("enable_expert_parallel") else 1
     label = _single_turn_label(isl, osl)
     scen = f"{model}-{row['hardware']}-{row['precision']}-vllm-tp{par['tp']}-dp{par['dp']}-ep{ep}"
+    parallelism = {"tp": par["tp"], "pp": par["pp"], "dp": par["dp"], "ep": ep}
+    if pd_run is not None:
+        scen = f"{model}-{row['hardware']}-{row['precision']}-vllm-{pd_run.label}"
+        parallelism = pd_run.parallelism
     o.facets = {"identity": ident, "sweep_id": sweep_id(row, scen, label),
                 "scenario": scen, "label": label, "workload": f"{isl}:{osl}",
-                "model": model, "gpu": row["hardware"], "precision": row["precision"], "framework": "vllm",
-                "serving": "aggregated", "spec_method": row.get("spec_method") or "none",
-                "parallelism": {"tp": par["tp"], "pp": par["pp"], "dp": par["dp"], "ep": ep},
+                "model": model, "gpu": row["hardware"], "precision": row["precision"],
+                "framework": "vllm" if pd_run is None else row["framework"],
+                "serving": "aggregated" if pd_run is None else "disaggregated",
+                "spec_method": row.get("spec_method") or "none",
+                "parallelism": parallelism,
                 "image": row.get("image"), "vllm_version": _banner_version(log)}
     o.csv_row = [scen, model, row["hardware"], label, ident["conc"],
                  round(meas_tpot_us, 3), round(s["mean_tpot_us"], 3),
@@ -1081,6 +1132,231 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
                  None, pid, ident["measured_date"]]     # the grade column is filled by grade_outcome
     return o
 
+
+
+# ---------------------------------------------------------------- prefill/decode points
+
+def router_experiment(name: str, policy: str, reasons: list[str], rec: dict | None):
+    """The stand-in of a router-policy experiment for a router the table did not map: (policy, substitutions,
+    reasons, record). It is a measurement of the writer, not a grade of the router: the substitution says so."""
+    key = rt.router_key(name)
+    sub = {"kind": "execution_mode", "subject": f"router {key} (experiment)",
+           "detail": f"EXPERIMENT ONLY: the run's {key} router was replaced by llm-d's {policy} policy with no router table "
+                     f"entry, build or bound for it (the table said: {', '.join(reasons)}); the figure measures the two-pool "
+                     f"writer under that stand-in and is not a graded result"}
+    return policy, [sub], [], {"outcome": "experiment", "policy": policy, "table": reasons}
+
+
+def pd_router(row: dict, name: str | None, recipe: "pdr.Recipe | None", table: "rt.Table", ctx: dict | None = None,
+              assumed_revision: str | None = None):
+    """(policy, substitutions, reasons, record) for a P/D point's router (design §11.3, §11.4).
+
+    llm-d's own router: the row does not say which endpoint picker configuration it ran, so there is no
+    policy to simulate (value_not_recorded). Another router: the table is asked for the run's router, mode
+    (the recipe's; none set is the frontend's default, round-robin), session-affinity setting and build
+    (the recipe's pinned commit, if any), as the substrate's Resolve does. Only a `mapped` entry whose
+    bound has a ratio in the point's regime (`ctx`: lengths, concurrency, catalog model, hardware part and
+    pool shape) gives a G2 `router_differs`, carrying the entry's policy, build, differences and bound
+    whatever its ratios are; the record holds the matched ratios and `bound_wide`. Every other outcome
+    leaves the point `router_unsupported` and names it in the subject (`no_entry`, `no_policy`,
+    `revision_not_covered`, `no_bound_for_regime`); with no recipe to say the mode, or no context yet, the
+    subject is the router alone."""
+    if not name or str(name).startswith("llm-d"):
+        return None, [], ["required_setting_missing:router.endpoint_picker_config"], None
+    base = f"router_unsupported:{name}"
+    key = rt.router_key(name)
+    if recipe is None or (recipe.frontend.get("type") or "").lower() != key:
+        return None, [], [base], None
+    mode, ttl, stated = pdr.router_mode(recipe)
+    revision, assumed = pdr.router_revision(recipe), False
+    if revision is None and assumed_revision:
+        revision, assumed = assumed_revision, True
+    entry, outcome = table.resolve(key, mode, ttl, revision)
+    if outcome != rt.MAPPED:
+        return None, [], [f"{base}:{outcome}"], {"outcome": outcome, "entry": entry.name if entry else None, "mode": mode}
+    if ctx is None:
+        return None, [], [base], None
+    matched = rt.matched_ratios(entry, workload=rt.workload_kind(ctx["isl"], ctx["osl"]), conc=ctx["conc"],
+                                model=ctx["model"], hardware=ctx["hardware"], shape=ctx["shape"])
+    if not matched:
+        return None, [], [f"{base}:{rt.NO_BOUND}"], {"outcome": rt.NO_BOUND, "entry": entry.name, "mode": mode}
+    sub = rt.substitution(entry, key, revision, matched, assumed=assumed)
+    if not stated:
+        sub["detail"] += "; the recipe sets no router mode, so the frontend's default ran"
+    return entry.policy, [sub], [], {"outcome": rt.MAPPED, "entry": entry.name, "policy": entry.policy, "mode": mode,
+                                     "revision": revision, "matched_ratios": matched, "bound_wide": rt.bound_wide(matched)}
+
+
+def aggregated_recipe(entry: dict, pdir: Path) -> "pdr.Recipe | None":
+    """The aggregated recipe the pull kept for a colocated multi-node row, or None (not multi-node, no
+    recipe frozen, or a recipe of prefill/decode pools)."""
+    row = entry["row"]
+    if not (row.get("is_multinode") and not row.get("disagg") and entry.get("recipe")):
+        return None
+    rb = _read(pdir, entry["files"], "recipe")
+    if rb is None:
+        return None
+    try:
+        r = pdr.parse(rb.decode("utf-8", "replace"))
+    except ValueError:
+        return None
+    return r if "aggregated" in r.pools else None
+
+
+def logged_configs(log: str) -> list[dict]:
+    """The resolved engine configuration of each engine core a server log prints, as flat dicts
+    (settings.read_resolved reads them together)."""
+    import pyrepr
+    out = []
+    for line in sorted(set(st._RESOLVED.findall(log))):
+        try:
+            out.append(st.flatten(pyrepr.parse_kwargs(line)))
+        except pyrepr.ReprError:
+            continue
+    return out
+
+
+def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, simulate: bool = True) -> Outcome:
+    """One prefill/decode point (design §11.4 topology_unsupported, §11.2, §11.3; dashboard #61). The two pools' engine arguments are the run's recipe's (a P/D server log is one worker's, and
+    usually gone), named on the point as the recovery they are; the shape is refused by name where the
+    stack cannot express it (pd.py); the router is read from the router table (pd_router); the
+    scenario states two pools and the NIXL connector, and the instance counts reach `blis replay` as
+    flags. The replay is the single-turn one."""
+    row, pid, ident = entry["row"], entry["point_id"], entry["identity"]
+    rb = _read(pdir, entry["files"], "recipe")
+    recipe = None
+    if entry.get("recipe") and rb:
+        try:
+            recipe = pdr.parse(rb.decode("utf-8", "replace"))
+        except ValueError:
+            o.reasons.append("recipe_unresolved:unreadable")
+    else:
+        o.reasons.append(f"recipe_unresolved:{entry.get('recipe_reason') or 'not_frozen'}")
+    if recipe is not None:
+        # The recipe answers what the missing log would have.
+        o.reasons = [r for r in o.reasons if r.partition(":")[0] != "server_log_missing"]
+    else:
+        # Without a recipe the pools' arguments are not known. A log that records topology fields still
+        # has them decided by the engine's field list (design §11.4), as every other recorded field is.
+        log_b = _read(pdir, entry["files"], "server_log")
+        if log_b is not None:
+            lc = _read(pdir, entry["files"], "launch_config")
+            o.reasons += st.topology_reasons(json.loads(lc) if lc else None,
+                                             st.read_args(log_b.decode("utf-8", "replace")), env.field_list)
+    pools = pdm.pools_of(row, recipe)
+    router_name = (row.get("metrics") or {}).get("router_name") or fw.router
+    table = rt.load(env.catalog, env.routers_dir)
+    o.reasons += pdm.topology_reasons(row, pools)
+    if recipe is None or pools is None:
+        o.reasons += pd_router(row, router_name, recipe, table)[2]
+        o.reasons = sorted(set(o.reasons))
+        return o
+    o.reasons += pdr.check_row(recipe, row)
+    log_b = _read(pdir, entry["files"], "server_log")
+    if log_b is not None and pools is not None:
+        o.reasons += pdm.log_conflicts(logged_configs(log_b.decode("utf-8", "replace")), recipe, pools)
+
+    meta = entry["recipe"]
+    cat = env.catalog_obj
+    part_name = (sp.catalog_part(cat, env.parts, row["hardware"]) if cat else None) or row["hardware"]
+    decided, taken, launches = {}, {}, {}
+    for role, pool in pools.items():
+        launches[role] = pdm.pseudo_launch(recipe, role, row, pool)
+        rd, taken[role] = pdm.read_pool(launches[role])
+        c = st.decide(st.merge({"launch_config": rd}, {}), env.field_list)
+        decided[role] = c
+        o.reasons += c.reasons
+        o.subs += c.substitutions
+        stated = sorted(k.replace("-", "_") for k in recipe.pools[role].flags)
+        derived = sorted(f for f in ("tensor_parallel_size", "pipeline_parallel_size", "data_parallel_size")
+                         if f in rd.values and f.replace("_", "-") not in recipe.pools[role].flags)
+        o.subs.append(pdm.recovery_substitution(role, meta, stated, derived))
+        for p in pdm.TRANSFER_PATHS:
+            if p in taken[role]:
+                dec = fl.decide(env.field_list, p, set_by_run=True)
+                if dec.g5:
+                    o.reasons.append(f"{dec.g5['code']}:{p}")
+    connectors = {t.get("kv_transfer_config.kv_connector") for t in taken.values()}
+    if len(connectors) > 1:
+        o.reasons.append("conflict:kv_transfer_config.kv_connector")
+    if None in connectors:
+        o.reasons.append("required_setting_missing:kv_transfer_config.kv_connector")
+    placement = pdm.placement_substitution(recipe)
+    if placement:
+        o.subs.append(placement)
+
+    # The model, chip and drafter, from the recipe's master entry (the HF repo the sweep served).
+    c_dec = decided["decode"]
+    spec = c_dec.mapped.get("engine.speculative.method", (None, None))[1]
+    served = [x for k in ("served_model", "model") for x in ([c_dec.roles.get(k)] if not isinstance(c_dec.roles.get(k), list) else c_dec.roles.get(k))]
+    draft_ck, draft_reason = sp.resolve_draft(c_dec.roles.get("drafter"), served, entry)
+    if draft_reason:
+        o.reasons.append(draft_reason)
+        spec = None
+    cks = [meta["model"]] if meta.get("model") else []
+    sup = sp.check(cat, env.parts, checkpoints=cks, base_models=env.base_models, hardware=part_name, spec_method=spec,
+                   draft_checkpoint=draft_ck, num_spec_tokens=c_dec.mapped.get("engine.speculative.num_spec_tokens", (None, None))[1])
+    o.reasons += sup.reasons
+    for k in ("isl", "osl", "conc"):
+        v = row.get(k)
+        if not isinstance(v, int) or isinstance(v, bool) or v < 1:
+            o.reasons.append(f"required_setting_missing:replay.{k}")
+    ctx = {"isl": row.get("isl"), "osl": row.get("osl"), "conc": row.get("conc"), "model": sup.model, "hardware": part_name,
+           "shape": f"{pools['prefill'].workers}P{pools['decode'].workers}D"}
+    policy, rsubs, rreasons, rrec = pd_router(row, router_name, recipe, table, ctx, env.assumed_router_revision)
+    if policy is None and env.router_policy_experiment and rreasons and all(r.startswith("router_unsupported") for r in rreasons):
+        policy, rsubs, rreasons, rrec = router_experiment(router_name, env.router_policy_experiment, rreasons, rrec)
+    o.reasons += rreasons
+    o.subs += rsubs
+    if sup.model is None or sup.chip is None:
+        o.reasons = sorted(set(o.reasons))
+        return o
+
+    name = f"p-{pid[:16]}"
+    part = st.Part(name=part_name)
+    catalog_size = cat.packaging(sup.chip)["gpus_per_node"]
+    node = ir.resolve(env.runner_table, row["hardware"], run_date=ident["measured_date"],
+                      launch_size=recipe.gpus_per_node, fixes_packaging=catalog_size is not None)
+    builts = {role: st.build(decided[role], name=name, model=sup.model, part=part, engine_version=env.engine_release,
+                             field_list=env.field_list, catalog_node_size=catalog_size, node=node,
+                             draft_model=sup.drafter, launch_config=launches[role]) for role in pools}
+    b = pdm.build_pd(builts, recipe, pools, taken, name=name, policy=policy, per_node=catalog_size or node.gpus_per_node)
+    o.reasons += b.reasons
+    o.subs += b.substitutions
+    b.thinking = st.recorded_thinking({**decided["prefill"].settings, **decided["decode"].settings})
+    default_thinking(o, b, {**decided["prefill"].settings, **decided["decode"].settings})
+    if row.get("benchmark_type") != "single_turn":
+        o.reasons.append(f"topology_unsupported:{pdm.AGENTIC}")
+    header = [f"point {pid}", f"InferenceX row {row['id']} ({row['run_url']})",
+              f"GENERATED by orchestrator/ingest/score.py from the run's recipe {meta['path']} at {meta['commit']}. Do not edit."]
+    if b.node_source:
+        header.append(b.node_source)
+    text = st.to_yaml(b, header)
+    sdir = work / "scenarios"
+    sdir.mkdir(parents=True, exist_ok=True)
+    (sdir / f"{name}.yaml").write_text(text)
+    dep = _parse_back(text)
+    args = []
+    for role, pool_dict in zip(("prefill", "decode"), dep["pools"]):
+        view = {**dep, "pools": [pool_dict]}
+        pool_args = decided[role].args
+        o.reasons += _diff_args(pool_args, view, b)
+        for a in pool_args:
+            args.append({**a, "arg": f"{role}.{a['arg']}"})
+    args.sort(key=lambda a: a["arg"])
+    o.reasons = sorted(set(o.reasons))
+    if o.reasons or policy is None:
+        return o
+    label = "pd-" + "-".join(f"{p.workers}{r[0]}{p.gpus}tp{p.tp}" + (f"ep{p.ep}" if p.ep > 1 else "") for r, p in pools.items())
+    # The facets' parallelism is the decode pool's (the labels every point has), then each pool's own.
+    dpar = dep["pools"][1]["parallel"]
+    par = {"tp": dpar["tp"], "pp": dpar["pp"], "dp": dpar["dp"],
+           "ep": dpar["tp"] * dpar["dp"] if dpar.get("enable_expert_parallel") else 1}
+    par.update({f"{r}_{k}": v for r, p in pools.items() for k, v in (("workers", p.workers), ("tp", p.tp), ("ep", p.ep), ("dp", p.dp))})
+    run = PdRun(epp_name=pdm.epp_name(policy), epp_bytes=pdm.epp_config(policy).encode(), prefill=pools["prefill"].workers,
+                decode=pools["decode"].workers, parallelism=par, label=label,
+                client_note=pdm.benchmark_client_note(recipe), router=rrec)
+    return score_single_turn(o, entry, env, work, b, header, name, dep, args, "", sup, pdir, simulate=simulate, pd_run=run)
 
 _EVIDENCE: list = []
 
@@ -1179,10 +1455,12 @@ def _row_topology_vs_run(row: dict, c: st.Decided) -> list[str]:
         return []
     world = tp * dp * pp * pcp
     out = []
-    row_tp, row_ep = row.get("decode_tp"), row.get("decode_ep")
-    if row_tp and int(row_tp) not in ({tp, tp * dp} if row.get("decode_dp_attention") else {tp}):
+    # A colocated engine over several nodes is recorded in the row's prefill fields (the decode ones are 0).
+    side = "prefill" if row.get("is_multinode") else "decode"
+    row_tp, row_ep = row.get(f"{side}_tp"), row.get(f"{side}_ep")
+    if row_tp and int(row_tp) not in ({tp, tp * dp} if row.get(f"{side}_dp_attention") else {tp}):
         out.append("conflict:tp")
-    gpus = row.get("num_decode_gpu")
+    gpus = row.get(f"num_{side}_gpu")
     if gpus and int(gpus) != world and not (row_tp and row_ep and int(gpus) == int(row_tp) * int(row_ep)
                                              and int(row_tp) * pp * pcp == world):
         out.append("conflict:num_gpus")

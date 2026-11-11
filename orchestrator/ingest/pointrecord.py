@@ -28,7 +28,7 @@ HEX40 = re.compile(r"^[0-9a-f]{40}$")
 
 # The keys of a substitution the substrate declares (Substitution in pointrecord.go).
 SUBSTITUTION_KEYS = ("kind", "subject", "detail", "record", "date", "policy", "entry", "evidence", "revision",
-                     "profile_family", "differed")
+                     "profile_family", "differed", "difference", "bound")
 SETTING_KEYS = ("arg", "measured", "source", "blis", "field", "match", "rule", "occurrences", "values", "delta",
                 "ratio", "note")
 REPLAY_KEYS = ("client", "client_version", "scenario", "replayed_as", "concurrency", "duration_s",
@@ -145,7 +145,8 @@ def g5_facets(o) -> dict:
     deployment = f"{i['model']}-{i['hardware']}-{i['precision'] or 'na'}-{i['framework']}"
     return {"sweep_id": f"{deployment}|{i['benchmark_type']}|{i['recipe']}", "scenario": deployment,
             "label": i["benchmark_type"], "workload": i["benchmark_type"], "model": i["model"], "gpu": i["hardware"],
-            "precision": i["precision"], "framework": i["framework"], "serving": "aggregated", "spec_method": "none",
+            "precision": i["precision"], "framework": i["framework"],
+            "serving": "disaggregated" if o.row.get("disagg") else "aggregated", "spec_method": "none",
             "parallelism": {"tp": 1, "pp": 1, "dp": 1, "ep": 1}}
 
 
