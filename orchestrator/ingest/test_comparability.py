@@ -198,11 +198,23 @@ def test_t1_every_violation_is_refused():
     fails(burst)                                                                         # not a closed loop
 
 
-def test_t1_slack_for_the_releases_overhead_is_small_and_stated():
-    base = _closed_loop(40, 4, e2e=lambda i: 1_000_000)      # arrivals tie in pairs of four
-    base[10]["arrival_us"] += 200                           # request 10 lands 200 us after request 11
-    ix.check_request_pattern(base, 40, 4)        # a few hundred us out of order is the pool's per-request overhead
-    assert ix.ORDER_SLACK_US == 1000
+def _two_lanes_freeing_together(first_overhead_us, tokens):
+    """Two lanes finish 1 us apart. The lane that finished first hands its request over after a longer
+    overhead, so the next record in order arrives after the one after it."""
+    rows = [(0, 1_000), (0, 1_001), (1_000 + first_overhead_us, 100_000), (1_001 + 777, 100_000)]
+    rows += [(101_778 + 777, 100_000), (1_000 + first_overhead_us + 100_000 + 777, 100_000)]
+    return [{"id": f"request_{i}", "fate": "completed", "arrival_us": a, "e2e_us": e, "output_tokens": tokens}
+            for i, (a, e) in enumerate(rows)]
+
+
+def test_t1_the_slack_for_the_releases_overhead_grows_with_the_output_tokens():
+    # 8.2 ms out of order: allowed for requests of 1024 output tokens (1 ms + 12 us x 1024 = 13.3 ms),
+    # refused for requests of 100 tokens (2.2 ms).
+    ix.check_request_pattern(_two_lanes_freeing_together(9_000, 1024), 6, 2)
+    with pytest.raises(ValueError):
+        ix.check_request_pattern(_two_lanes_freeing_together(9_000, 100), 6, 2)
+    ix.check_request_pattern(_two_lanes_freeing_together(900, 100), 6, 2)       # 0.1 ms: within 2.2 ms
+    assert (ix.ORDER_SLACK_BASE_US, ix.ORDER_SLACK_PER_TOKEN_US) == (1000, 12)
 
 
 # ------------------------------------------------------------------ T9: the send gap text

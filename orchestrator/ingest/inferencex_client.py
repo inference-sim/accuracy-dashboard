@@ -434,12 +434,16 @@ def summarize(rows: list[dict], input_lens: list[int], output_lens: list[int], i
             "mean_tpot_us": tpot_sum / tpot_n if tpot_n else None, "first_ttft_us": first_ttft}
 
 
-# T1 tolerances. BLIS releases a lane's next request at completion plus an overhead that varies a
-# little by request, so a later request can arrive a few hundred us before an earlier one
-# (measured over the 98 baseline single-turn Results: at most 225 us); the client's semaphore
-# wakes waiters in order. Mean concurrency over the main phase is below conc by the falling
-# load of the last round (measured: at least 0.965 of conc).
-ORDER_SLACK_US = 1000
+# T1 tolerances. BLIS gives a freed lane's next request to the next record in order, but it lands
+# one completion overhead after the request that freed the lane, and that overhead grows with the
+# finished request's output tokens (detokenisation). Two lanes freeing within a few ms of each
+# other can therefore hand their requests over in the other order: measured over the 168 baseline
+# single-turn Results, at most 9.2 ms, or 9 us per output token of the longest request. The
+# client's semaphore wakes waiters in order. Allowed: 1 ms plus 12 us per output token of the
+# longest request. Mean concurrency over the main phase is below conc by the falling load of the
+# last round (measured: at least 0.965 of conc).
+ORDER_SLACK_BASE_US = 1000
+ORDER_SLACK_PER_TOKEN_US = 12
 MEAN_CONCURRENCY_TOLERANCE = 0.10
 
 
@@ -463,7 +467,7 @@ def client_bound(conc: int, mean_tpot_us: float) -> bool:
 def check_request_pattern(rows: list[dict], n: int, conc: int, ignore=None) -> dict:
     """The simulated main phase has the client's request pattern (COV-10): n completed requests
     request_0..request_{n-1}; the first `conc` arrive together; arrivals follow the request order
-    (within ORDER_SLACK_US); no more than `conc` are in flight at any instant (arrival to
+    (within the slack above); no more than `conc` are in flight at any instant (arrival to
     completion); and the mean number in flight, over the span from the first arrival to the last
     completion, is within MEAN_CONCURRENCY_TOLERANCE below `conc`. Raises ValueError naming the
     first violation; returns the achieved concurrency otherwise."""
@@ -480,8 +484,9 @@ def check_request_pattern(rows: list[dict], n: int, conc: int, ignore=None) -> d
     arr = [main[i]["arrival_us"] for i in range(n)]
     if any(a != arr[0] for a in arr[:conc]):
         raise ValueError(f"the first {conc} requests do not arrive together")
+    slack = ORDER_SLACK_BASE_US + ORDER_SLACK_PER_TOKEN_US * max(main[i].get("output_tokens") or 0 for i in range(n))
     for i in range(1, n):
-        if arr[i] < arr[i - 1] - ORDER_SLACK_US:
+        if arr[i] < arr[i - 1] - slack:
             raise ValueError(f"request {i} arrived {arr[i - 1] - arr[i]} us before request {i - 1}")
     events = sorted([(arr[i], 1) for i in range(n)] + [(arr[i] + main[i]["e2e_us"], -1) for i in range(n)],
                     key=lambda e: (e[0], e[1]))
