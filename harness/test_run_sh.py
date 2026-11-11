@@ -37,6 +37,22 @@ def test_a_release_tag_and_a_full_commit_are_accepted():
         assert p.returncode == 0, p.stderr
 
 
+def test_the_data_pins_are_a_tag_or_a_full_commit_and_nothing_else():
+    flags = ("--catalog-release", "--registry-release")
+
+    def with_pin(flag, value):
+        out = list(GOOD)
+        out[out.index(flag) + 1] = value
+        return out
+    for flag in flags:
+        for ok in ("v0.3.0", "v0.3.0-rc.1", COMMIT):
+            p = check("--sim", "v0.16.0", *with_pin(flag, ok))
+            assert p.returncode == 0, (flag, ok, p.stderr)
+        for bad in ("main", "m2/10-router-table", COMMIT[:7], COMMIT[:12], COMMIT.upper(), "0.3.0", "v1"):
+            p = check("--sim", "v0.16.0", *with_pin(flag, bad))
+            assert p.returncode == 2 and f"{flag} {bad}" in p.stderr and "40-hex commit" in p.stderr, (flag, bad)
+
+
 def test_a_branch_name_is_refused():
     for sim in ("main", "m1/result", COMMIT[:12], "0.16.0"):
         p = check("--sim", sim, *GOOD)
@@ -217,7 +233,7 @@ def harness_checkout(tmp: Path, git_history: bool = True) -> tuple[Path, str]:
     return root / "harness" / "run.sh", git("rev-parse", "HEAD", cwd=root)
 
 
-def run_real(tmp: Path, sim_of, extra=(), tag="v0.16.0", env_extra=None, history=True):
+def run_real(tmp: Path, sim_of, extra=(), tag="v0.16.0", env_extra=None, history=True, releases=("v0.3.0", "v0.2.0")):
     """run.sh from a committed copy of the harness files, against the stand-in simulator."""
     bare, commit, bin_, log, pull, units, fields, cat, reg = real_setup(tmp, tag)
     run_sh, head = harness_checkout(tmp, history)
@@ -227,7 +243,7 @@ def run_real(tmp: Path, sim_of, extra=(), tag="v0.16.0", env_extra=None, history
     p = subprocess.run(["bash", str(run_sh), "--sim", sim_of(commit), "--sim-repo", str(bare), "--units", str(units),
                         "--pull", str(pull), "--out", str(out), "--catalog", str(cat), "--registry", str(reg),
                         "--corpus-dir", str(tmp / "corpora"), "--fields", str(fields),
-                        "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0", *extra], capture_output=True, text=True, env=env)
+                        "--catalog-release", releases[0], "--registry-release", releases[1], *extra], capture_output=True, text=True, env=env)
     return p, out, log, commit, head, run_sh
 
 
@@ -355,6 +371,20 @@ def test_the_real_path_scores_a_pre_release_tag_and_marks_its_figures_experiment
     assert p.returncode == 0, p.stderr
     prov = json.loads((out / "provenance.json").read_text())
     assert prov["simulator"]["build"] == "v0.16.0-rc1" and prov["experimental"] is True
+
+
+def test_data_pinned_by_commit_is_recorded_as_given_and_marks_the_figures_experimental(tmp_path):
+    cat, reg = "c" * 40, "e" * 40
+    p, out, *_ = run_real(tmp_path, lambda c: "v0.16.0", releases=(cat, reg))
+    assert p.returncode == 0, p.stderr
+    prov = json.loads((out / "provenance.json").read_text())
+    assert prov["blis"]["catalog"] == cat and prov["blis"]["registry"] == reg
+    assert prov["simulator"]["build"] == "v0.16.0" and prov["experimental"] is True
+    # tags for the data and a tag for the build: not experimental, as before
+    (tmp_path / "t").mkdir()
+    p, out, *_ = run_real(tmp_path / "t", lambda c: "v0.16.0")
+    assert p.returncode == 0, p.stderr
+    assert json.loads((out / "provenance.json").read_text())["experimental"] is False
 
 
 # ------------------------------------------------------------------ pinned workflows

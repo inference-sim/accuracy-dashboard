@@ -9,9 +9,14 @@
 #                       to blis, and reads two facts from them that no blis command prints yet,
 #                       the graph's speculator method and the registry's coefficient scopes
 #                       (orchestrator/ingest/support.py, TEMPORARY).
-#                       --catalog-release TAG and --registry-release TAG name the releases the two
-#                       directories are at. The directories may carry no git history (a copy
-#                       of the data), so the scorer is told the names, not left to read them.
+#                       --catalog-release PIN and --registry-release PIN name what the two
+#                       directories are at: a release tag (vMAJOR.MINOR.PATCH, with an optional
+#                       pre-release suffix) or a full 40-hex commit, as --sim does ("from any pinned
+#                       release or commit", design §11.7; while a stack is open its pins are
+#                       commits). A branch name or a short hash is refused. The directories may
+#                       carry no git history (a copy of the data), so the scorer is told the
+#                       names, not left to read them, and records each exactly as given. A figure
+#                       whose data is pinned by commit is experimental, as one whose build is.
 #   a set of units      --units FILE, the ledger units to score, and --pull DIR, their frozen
 #                       recorded runs.
 #
@@ -32,7 +37,7 @@
 # Usage:
 #   run.sh --sim <tag|commit> [--sim-repo URL] --units FILE --pull DIR --out DIR
 #          --catalog DIR --registry DIR --corpus-dir DIR
-#          --fields FILE --catalog-release TAG --registry-release TAG [--max-rss-mb N]
+#          --fields FILE --catalog-release PIN --registry-release PIN [--max-rss-mb N]
 #   run.sh --check-args <the same flags>     validate the flags, do nothing else
 #
 # Exit status: 0 on success, 2 for a refused flag or value, otherwise the failing step's status.
@@ -90,8 +95,14 @@ fi
 [ -n "$corpus_dir" ] || refuse "--corpus-dir is required: the directory of AgentX corpora, <workload>/<file>, that resolve_agentic_corpus.py --all fetched"
 [ -n "$fields" ] || refuse "--fields is required: the engine's fields.json for the release the simulator runs (the pinned blis-vllm release's file)"
 
-[ -n "$catalog_release" ] || refuse "--catalog-release is required: the release tag the catalog is at"
-[ -n "$registry_release" ] || refuse "--registry-release is required: the release tag the registry is at"
+[ -n "$catalog_release" ] || refuse "--catalog-release is required: the release tag or full 40-hex commit the catalog is at"
+[ -n "$registry_release" ] || refuse "--registry-release is required: the release tag or full 40-hex commit the registry is at"
+check_pin() {
+  [[ "$2" =~ ^[0-9a-f]{40}$ || "$2" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] ||
+    refuse "$1 $2 is neither a release tag (vMAJOR.MINOR.PATCH) nor a full 40-hex commit; a branch name or a short hash is refused because it names no one tree"
+}
+check_pin --catalog-release "$catalog_release"
+check_pin --registry-release "$registry_release"
 
 harness_commit="${HARNESS_COMMIT:-}"
 if [ -n "$harness_commit" ] && ! [[ "$harness_commit" =~ ^[0-9a-f]{40}$ ]]; then

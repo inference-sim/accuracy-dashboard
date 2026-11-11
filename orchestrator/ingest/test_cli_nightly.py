@@ -438,8 +438,23 @@ def test_the_data_releases_are_named_by_the_caller_and_need_no_git_history(tmp_p
     (bare / "models").mkdir(parents=True)
     assert not (bare / ".git").exists()
     assert cli.check_blis_inputs(sim / "blis", "v1.0.0", "v2.3.4-rc1") == []
-    assert cli.check_blis_inputs(sim / "blis", None, "v1.0.0") == ["--catalog-release is required: the release tag the data is at"]
-    assert cli.check_blis_inputs(sim / "blis", "v1.0.0", "bad tag") == ["--registry-release 'bad tag' is not a release tag"]
+    assert cli.check_blis_inputs(sim / "blis", "a" * 40, "b" * 40) == []
+    assert cli.check_blis_inputs(sim / "blis", None, "v1.0.0") == ["--catalog-release is required: the release tag or full 40-hex commit the data is at"]
+    for bad in ("bad tag", "main", "m2/10-x", "e1a1d97", "A" * 40, "v1"):
+        assert cli.check_blis_inputs(sim / "blis", "v1.0.0", bad) == [
+            f"--registry-release {bad!r} is neither a release tag nor a full 40-hex commit"], bad
+
+
+def test_a_release_build_over_mutable_data_names_is_refused_and_cannot_be_a_released_figure(tmp_path):
+    """A branch name or `latest` names data that moves; with a tagged build it used to make a figure that
+    looked released."""
+    sim = tmp_path / "sim"
+    _tagged_repo(sim, "v0.16.0")
+    (sim / "blis").write_text("")
+    bad = cli.check_blis_inputs(sim / "blis", "main", "latest", "v0.16.0")
+    assert bad == ["--catalog-release 'main' is neither a release tag nor a full 40-hex commit",
+                   "--registry-release 'latest' is neither a release tag nor a full 40-hex commit"]
+    assert cli.check_blis_inputs(sim / "blis", "v0.13.0", "v0.13.0", "v0.16.0") == []
 
 
 FIELD_LIST = {"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": []}
@@ -694,7 +709,7 @@ def test_a_score_run_replays_every_agentx_corpus_by_its_catalog_entry(tmp_path, 
     for flag in ("--corpus-dataset", "--corpus-revision", "--corpus-sha256"):
         with pytest.raises(SystemExit):
             cli.main(["score", "--pull", "p", "--out", "o", "--blis", "b", "--catalog", "c", "--registry", "r",
-                      "--catalog-release", "v1", "--registry-release", "v1", "--harness-commit", "c" * 40,
+                      "--catalog-release", "v1.0.0", "--registry-release", "v1.0.0", "--harness-commit", "c" * 40,
                       "--corpus-dir", "d", flag, "x"])
 
 
