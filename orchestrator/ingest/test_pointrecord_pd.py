@@ -25,9 +25,17 @@ import test_pointrecord as TP
 from test_pointrecord import validator  # noqa: F401  (the fixture)
 
 L12 = os.environ.get("BLIS_SUBSTRATE_ROUTER_BOUNDS")
+def _has_exact_regime(root) -> bool:
+    """Whether the checkout's router table states a bound's regime in the exact form the dashboard writes (a list of
+    sampled `Concurrencies`, the engine release, the fabric and each pool's layout). The pinned commit before the substrate's
+    round that made the regime exact has the range form, which refuses a record in the new one."""
+    f = Path(root) / "contracts" / "spec" / "routertable" / "bound.go"
+    return f.is_file() and "Concurrencies" in f.read_text()
+
+
 SKIP12 = pytest.mark.skipif(
-    not L12 or not (Path(L12 or "x") / "contracts" / "spec" / "routertable" / "bound.go").is_file() or not shutil.which("go"),
-    reason="BLIS_SUBSTRATE_ROUTER_BOUNDS (a blis-substrate checkout at layer 12, the router table's bounds) and a Go toolchain are needed")
+    not L12 or not _has_exact_regime(L12) or not shutil.which("go"),
+    reason="BLIS_SUBSTRATE_ROUTER_BOUNDS (a blis-substrate checkout whose router table has the exact regime) and a Go toolchain are needed")
 
 
 def _build_validator(substrate: str, tmp: Path) -> Path:
