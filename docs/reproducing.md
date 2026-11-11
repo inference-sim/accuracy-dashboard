@@ -15,7 +15,7 @@ Everything here was run on one machine (macOS, Apple silicon) on 2026-11-10 and 
 
 | Input | Baseline | Preliminary after-run |
 |---|---|---|
-| Harness | accuracy-dashboard commit recorded in `docs/m2/baseline-v0.16.0/contract/provenance.json` (`10b2a36cb91d4c65dd9096d5f4689f3e80ec93b0`) | the same commit |
+| Harness | accuracy-dashboard commit recorded in `docs/m2/baseline-v0.16.0/contract/provenance.json` (`a0e899b9c1f433ea99fee80d78ac6f5a54241962`) | the same commit |
 | inference-sim | `v0.16.0` = `3f4998e28f922611a2d21d5c7ffe18a5272fe114` | `ece61af0eccb863ba527d9e1a6dd2ffc97d0c5cf` (branch `m2/5-closeness-data-in-the-result`) |
 | blis-substrate (catalog, registry, ledger) | `v0.13.0` = `fe6eab10b9795933de38122ba55e5299dcb20b5e` | `f70c6c7503a47442c4c5d989f8f17b093c14e069` |
 | blis-vllm `fields.json` | `v0.32.0-blis.2` = `1cf030eb888270c114308c3ae3102d02994f015c`, sha256 `d32342c4f9ae5c578ba578fd5e6575aa8db8bce099e0708480d55f7e8de5a6fc` | `5de11f598bf78017429355b368bbb7a93e312ef1`, sha256 `9a3a88857a9462caf7b09433cfb53ac377d042aea10e7da2af3a8f9fd1ecccaa` |
@@ -44,7 +44,9 @@ bash harness/run.sh --sim v0.16.0 --units docs/m2/baseline-v0.16.0/units.txt --p
   --catalog SUBSTRATE_V013/catalog --registry SUBSTRATE_V013/registry --corpus-dir CORPUS \
   --fields FIELDS_V032_BLIS2.json --catalog-release v0.13.0 --registry-release v0.13.0
 
-# 4. the table
+# 4. the splits file and the table (the splits file sits beside OUT; compare.py refuses a contract with
+#    unscored points and no splits file)
+python3 orchestrator/baseline/split.py splits --pull PULL --out splits.json   # then beside OUT, or pass --splits
 python3 orchestrator/baseline/compare.py run --dir OUT --sample in_sample --out table
 
 # 5. the preliminary after-run (a commit pin for the simulator, a local clone allowed)
@@ -59,14 +61,16 @@ python3 orchestrator/baseline/compare.py pair --before OUT --after OUT_AFTER --s
 
 The units file for step 3 is committed; `split.py splits --pull PULL --out splits.json` makes the splits file (committed beside each contract directory).
 
+**A contract is made by the scorer it sits beside.** The harness commit in each `contract/provenance.json` is the checkout `run.sh` ran from; the results are committed after it, so it is not the head. `orchestrator/baseline/test_contracts_current.py` fails if any scoring file (`harness/`, `schemas/`, `requirements-ci.txt`, a non-test file under `orchestrator/`) differs between that commit and the head: a change to the scorer means every committed contract is scored again and the tables regenerated. CI checks out the full history for this.
+
 ## Expected results
 
 | | Baseline | Preliminary after-run |
 |---|---|---|
 | Points | 1734 (in scope 1188, AMD 546) | 1734 |
-| Scored | 41, all G4 (TTFT MAPE 31.0, TPOT MAPE 16.7) | 110, all G4 (TTFT 30.8, TPOT 17.7) |
-| Refused by the simulator | 10 | 791 |
-| Not scored (G5) | 1683 | 833 |
+| Scored | 41, all G4 (TTFT MAPE 47.1, TPOT 58.0, over the 11 train and validation points) | 450, all G4 (TTFT 34.0, TPOT 17.7, over the 361 train and validation points) |
+| Refused by the simulator | 10 | 406 |
+| Not scored (G5) | 1683 | 878 |
 
 The committed tables and contract directories are `docs/m2/baseline-v0.16.0/` and `docs/m2/preliminary-after/`; `test_compare.py::test_committed_tables` regenerates each table from its contract directory and fails on any difference.
 
@@ -76,8 +80,8 @@ The committed tables and contract directories are `docs/m2/baseline-v0.16.0/` an
 |---|---|---|
 | Freeze (1734 points, 4 download workers, 60 MB of artifacts) | 752 s (first), 1522 s (second, with the recipe lookups) | 2.5 GB |
 | Corpora | 39 s | 18 MB |
-| Baseline | 33 to 55 s | 1.8 GB |
-| Preliminary after-run | 110 to 130 s | 1.8 GB |
+| Baseline | 33 to 184 s | 1.8 GB |
+| Preliminary after-run | 110 s to about 20 min (the 450 scored points run longer replays; several heavy jobs shared the machine) | 1.8 GB |
 
 ## What cannot be reproduced
 

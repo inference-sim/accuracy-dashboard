@@ -6,7 +6,7 @@ This is the "before" of the M2 before/after. It is a labelled in-sample run (no 
 
 | Input | Value |
 |---|---|
-| Harness | accuracy-dashboard commit `10b2a36cb91d4c65dd9096d5f4689f3e80ec93b0` (branch m2/2-rescore-and-repin). `harness/run.sh` records it as `harness_commit`. |
+| Harness | accuracy-dashboard commit `a0e899b9c1f433ea99fee80d78ac6f5a54241962` (branch m2/2-rescore-and-repin). `harness/run.sh` records it as `harness_commit`. |
 | Simulator | inference-sim `v0.16.0` = `3f4998e28f922611a2d21d5c7ffe18a5272fe114`, built by run.sh with Go 1.27.2 (its go.mod) |
 | Substrate, registry, catalog | blis-substrate `v0.13.0` = `fe6eab10b9795933de38122ba55e5299dcb20b5e` (the release v0.16.0's stack.json pins); `--catalog <checkout>/catalog`, `--registry <checkout>/registry`, both released as `v0.13.0` |
 | Ledger | the ledger in that substrate checkout, source revision `db-dump/2026-09-28` |
@@ -31,7 +31,7 @@ python3 orchestrator/baseline/freeze.py --snapshot-state state/last-run-api.json
 # 2. fetch the corpora
 python3 orchestrator/resolve_agentic_corpus.py --all --catalog SUBSTRATE/catalog -o CORPUS
 
-# 3. score, from a clean checkout of the harness commit (git worktree add --detach DIR 10b2a36...)
+# 3. score, from a clean checkout of the harness commit (git worktree add --detach DIR a0e899b...)
 cd DIR && bash harness/run.sh --sim v0.16.0 --units units.txt --pull PULL --out OUT \
   --catalog SUBSTRATE/catalog --registry SUBSTRATE/registry --corpus-dir CORPUS \
   --fields FIELDS.json --catalog-release v0.13.0 --registry-release v0.13.0
@@ -55,12 +55,13 @@ python3 orchestrator/baseline/compare.py run --dir OUT --sample in_sample --out 
 - The nightly keeps nothing raw (COV-8) and the pull is not persisted. Step 1 needs the live API. The API has moved since the snapshot: it now returns 38 rows dated 2026-11-10 that this baseline does not hold (they are reported separately, never mixed in), and 6 rows whose identity no longer matches the ledger (`drift.json`; 6 units are therefore not in the pull) and 2 frameworks (`rubin-july`, `teacup`, 42 rows) that `engines.FRAMEWORKS` does not name, which `freeze.py` drops and records. A later freeze will differ from `pull_manifest_sha256`; the after run must reuse this pull or re-run both sides.
 - Artifacts expire after 90 days. Of 111 disaggregated-vLLM runs fetched on 2026-11-10 for the scope analysis, 69 (dated 2026-05-19 to 2026-08-04) answered HTTP 404, so a freeze made later holds fewer logs than this one. This baseline's own freeze finished with no download error; a freeze made after more runs pass the 90 days will not.
 - The published snapshot (`data/latest/summary.json`: schema 2, 747 scored points, TTFT 35.6 and TPOT 16.7 MAPE) was scored by an older scorer that did not gate on the engine's field list. It is not the same measurement as this run, so it is not compared with it; only a rerun at the same harness commit is a before.
+- v0.16.0 has no `blis metrics` command, so the scorer could not check that its TTFT and TPOT have the InferenceX client's definitions (`docs/comparability.md`, "Which figures are compared"); the baseline's figures rest on the definitions the scorer assumes. The after-run's simulator has the command and is checked.
 - `extractor_version` records `blis-latency-kernel@unknown`: v0.16.0's go.mod does not list the kernel module, so there is nothing for the scorer to read.
 - stack.json is read from the v0.16.0 checkout run.sh builds, so it needs network access to GitHub (clone) and the Go module proxy.
 
 ## Result
 
-41 of the 1734 points are scored, all G4 (no point can be G1 or G3 while four G1 conditions are unevaluated, and every point is measured on another release or build): TTFT MAPE 31.0 (n=41), TPOT 16.7. 10 more points (Kimi-K2.5 on h200) pass the scorer and are refused by the simulator (`blis_refused:scenario`: v0.16.0 will not state `block_size` for that model on that chip), so they are listed as failed. The other 1683 are G5; 546 of those are AMD points (out of scope). The leading blockers over in-scope points are in `table.md`; `table.json` holds every count.
+41 of the 1734 points are scored, all G4 (no point can be G1 or G3 while four G1 conditions are unevaluated, and every point is measured on another release or build): TTFT MAPE 47.1 (n=11), TPOT 58.0 (n=11) over the train and validation points: the 30 test points are withheld from every accuracy figure (`../evaluation-protocol.md`, section 6). 10 more points (Kimi-K2.5 on h200) pass the scorer and are refused by the simulator (`blis_refused:scenario`: v0.16.0 will not state `block_size` for that model on that chip), so they are listed as failed. The other 1683 are G5; 546 of those are AMD points (out of scope). The leading blockers over in-scope points are in `table.md`; `table.json` holds every count.
 
 ### Change since the first baseline of this directory
 

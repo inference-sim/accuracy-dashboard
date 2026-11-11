@@ -4,17 +4,19 @@
 
 Code: `orchestrator/baseline/split.py` (assignment, folds, the published list, the citation check), `ranking.py` (ranking metrics), `compare.py` (per-split reporting, the evaluation log), `residuals.py` (analysis on the train split). Tests: `test_split.py`, `test_compare.py`, `test_residuals.py`.
 
-## 1. The group is the series
+## 1. The group is the deployment shape
 
-A **series** is the InferenceX deployment shape: its model, hardware, framework, precision, speculation method, disaggregation flag, benchmark type, ISL, OSL and image (the image without its digest). The rows of a series differ in concurrency (and run); adjacent concurrency points are near-duplicates, so splitting them would leak. The series is never split: every point of a series has the same split, except for the prospective rule below. A series is written as the JSON array of those ten values in that order (`split.series_id`), for example `["minimaxm3","b200","vllm","fp8","none",false,"single_turn",8192,1024,"vllm/vllm-openai:v0.32.0"]`.
+A **group** is an InferenceX deployment shape: its model, hardware, precision, framework, speculation method and disaggregation flag, six values (the code calls a group's id a *series id*, `split.series_id`). Every point of a group has the same split, whatever its concurrency, ISL, OSL, image or benchmark type, except for the prospective rule below. A group is written as the JSON array of those six values in that order, for example `["minimaxm3","b200","fp8","vllm","none",false]`.
+
+**Why not finer.** The first version of this split keyed on the image, ISL, OSL and benchmark type as well, so that a series was one workload on one image. Then 127 of the 278 model/hardware/precision/framework groups had points in more than one split: a test point was often the same model on the same chip and engine at another ISL/OSL or image as a train point. That makes the test set a test of interpolation across workload and image for a deployment the fitters have seen, not of a deployment they have not. A test that asks whether the simulator predicts a model/hardware/precision/framework/speculation/serving combination nobody fitted on needs the coarser group, so that is the group. The cost is that the groups are few (404 in the API window) and unevenly sized, so a split by group is lumpy: one group of a hundred points moves the proportions of the points.
 
 ## 2. Deterministic assignment
 
-`bucket = int.from_bytes(sha256(SALT + b"\0" + series_id)[:8], "big") % 100`, with the salt `blis-dev-split-1`. Below 60 is **train**, below 80 **validation**, otherwise **test** (60, 20 and 20 percent). The salt, the cut-offs and the field list are constants in `split.py`, and `test_split.py` pins them and the split of known series: changing any of them changes the split and fails the test. For example, the series above has bucket 88, so it is test; the same series on h200 has bucket 28, so it is train.
+`bucket = int.from_bytes(sha256(SALT + b"\0" + series_id)[:8], "big") % 100`, with the salt `blis-dev-split-2`. Below 60 is **train**, below 80 **validation**, otherwise **test** (60, 20 and 20 percent of the groups). The salt, the cut-offs and the field list are constants in `split.py`, and `test_split.py` pins them and the split of known groups: changing any of them changes the split and fails the test. For example, the group above has bucket 74, so it is validation; the same group on h200 has bucket 7, so it is train. The salt changed from `blis-dev-split-1` with the definition of the group, so no earlier assignment carries over.
 
 ## 3. The prospective test
 
-A point **measured after 2026-11-09** (`FREEZE_DATE`, the date of the frozen pull) is **prospective**: it is test whatever its series hashes to, is never used in any fit or selection, and is reported apart. `split.kind_of(series, measured_date)` returns `train`, `validation`, `test` or `prospective`. As of 2026-11-11 the API window holds 168 rows dated 2026-11-10 or 2026-11-11 (99 and 69), all agentic traces, 130 on in-scope chips, in 23 series (86 rows in series that hash to train, 40 validation, 42 test). None has a ledger unit yet (the ledger's source revision is older), so none can be scored; they are the prospective set when a ledger release holds them.
+A point **measured after 2026-11-09** (`FREEZE_DATE`, the date of the frozen pull) is **prospective**: it is test whatever its series hashes to, is never used in any fit or selection, and is reported apart. `split.kind_of(series, measured_date)` returns `train`, `validation`, `test` or `prospective`. As of 2026-11-11 the API window holds 168 rows dated 2026-11-10 or 2026-11-11 (99 and 69), all agentic traces, 130 on in-scope chips. None has a ledger unit yet (the ledger's source revision is older), so none can be scored; they are the prospective set when a ledger release holds them.
 
 ## 4. Model selection
 
@@ -30,18 +32,22 @@ Kernel sweeps and forward-pass measurements are train-only inputs to coefficient
 
 ## 6. Reporting
 
+**The test split is withheld from every figure, not only from its own row.** Unless a logged test evaluation is asked for (`--evaluate-test`), every accuracy figure of a report (the headline, each grade, the attribution tables, the both-scored and newly-scored comparisons, the per-split rows) is computed over the train and validation points only, and says how many scored points it left out (`withheld`). A figure over all scored points next to figures for train and validation would let the test figure be derived by subtraction. Counts of points (how many are scored, how many are G5, per reason) are not accuracy figures and include every point. The committed `contract/points.csv` of a run still holds every point's prediction and measurement: the contract is data, and the protection of the test set from selection is the log and review (section 8), as before.
+
 `compare.py` reports every figure per split (train, validation, test, prospective, and *unassigned* for a point with no known series) and per grade, with n, and shows *too few points* under ten points as everywhere else. It refuses a table labelled *held-out* if any point is not a test or prospective point, and `held_out_figure` refuses a figure that includes a train point. Note the label: `held_out` in these tables means the ledger's anchor list; a development-split test figure is never called that.
 
-Split sizes on the frozen pull (1734 points, the baseline's point set):
+Split sizes on the frozen pull (1734 points, the baseline's point set; groups are those that hold a point of the pull):
 
-| Split | Points | In scope | Series | Baseline scored | Preliminary after-run scored |
+| Split | Points | In scope | Groups | Baseline scored | Preliminary after-run scored |
 |---|---|---|---|---|---|
-| train | 1120 | 792 | 72 | 26 | 89 |
-| validation | 282 | 196 | 21 | 15 | 15 |
-| test | 332 | 200 | 22 | 0 | 6 |
+| train | 956 | 626 | 33 | 0 | 286 |
+| validation | 332 | 220 | 9 | 11 | 75 |
+| test | 446 | not shown | not shown | 30 | 89 |
 | prospective | 0 | 0 | 0 | 0 | 0 |
 
-Every scored point is G4, so each split has one grade today; the test split has too few scored points for any accuracy figure.
+The scored counts of the test row follow from the totals (41 and 450 scored, less the other splits), and a count is not an accuracy figure; what is withheld is how accurate those points are. The groups are few and uneven (one group can hold a hundred points), so the split by points is 55% train, 19% validation and 26% test of the pull, not 60/20/20; the 60/20/20 is of groups.
+
+Every scored point is G4, so each split has one grade today.
 
 ## 7. Metrics
 

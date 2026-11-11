@@ -25,7 +25,7 @@ Two numbers per point: mean time to first token (TTFT) and mean time per output 
 | Agentic request pattern | aiperf's AgentX replay: seed, duration, trajectory window, 10 s whole-system idle cap, grace period, and, in every export, a 300 s per-trajectory idle cap and 10 warm-up requests per lane. | All of these are read from the run's export and passed (`replay.py`): the cap as `trace_idle_gap_cap_s`, the warm-up as a cache-pressure warm-up with `requests_per_lane`. | Same inputs. | no (equal) |
 | Agentic client build | The SemiAnalysisAI fork of aiperf, which reports the version string `0.12.0`. | BLIS transcribes ai-dynamo's tag v0.12.0. | Differs in the warm-up handoff, the warm-up lead cap and the first minutes' idle shift. Size not measured. | `client_build` |
 | Agentic window | Records tagged profiling without error, including requests that finish in the 30 s grace period. | The Result's measured set follows the same rule. | Same. | no (equal) |
-| Deployment | The run's launch flags, environment, engine release, recipe. | Only what the run set, for fields the engine models; the substitutions of [coverage accounting](coverage-accounting.md). | Never G1 while the engine release differs: no in-scope point ran the simulator's release. | substitutions on the point |
+| Deployment | The run's launch flags, environment, engine release, recipe. | What the run set, and the engine-resolved values of fields the engine models or proves inert; a resolved-only value of any other field is recorded and not stated ([coverage accounting](coverage-accounting.md), pending blis-design#3). Substitutions are named. | Never G1 while the engine release differs: no in-scope point ran the simulator's release. | substitutions on the point |
 
 ## Windows
 
@@ -48,6 +48,8 @@ Each is a `client_difference` in the point's fidelity record, so a point that na
 | `client_saturation` | the chunk rate is above half of 50,000 a second | The measured latencies may include client queueing. |
 | `client_build` | every agentic point | The export says aiperf 0.12.0; InferenceX pins a fork; BLIS transcribes the tag; the fork commit is not recorded on the point (the pull does not keep an agentic run's InferenceX commit). |
 
+A scenario of more than one node also names `cluster.fabric`, an `estimated` substitution: no InferenceX record names a cluster's fabric class, so `ib-400g` is assumed and the scenario lists `cost-model-fabric` (without it a cross-node transfer is priced at the catalog's nominal rate, 23% fast on that class; accuracy-dashboard#66). A fabric class a launch configuration records (`resources.fabric`) is used and not named. The NIC classes and rails are blis-substrate#50 and #51, planned for M3.
+
 A speculative point also records the mean acceptance length its server logged (the `SpecDecoding metrics` lines, weighted by drafted tokens, with the number of lines and tokens) beside what the simulation used, and the acceptance substitution names it. When the engine models `speculative_config.synthetic_acceptance_length` and the run set no length, the logged figure is pinned in place of the registry's profile; otherwise it is only recorded.
 
 ## Differences no point names today
@@ -57,10 +59,16 @@ Open items, with the tracking issue where there is one. None of these is hidden 
 - First-call costs on the real engine (JIT, autotune, allocator growth) land in the measured phase at shapes the warm-up lacks. Up to one request in ten at concurrency 1. No issue yet.
 - The chat template, when the job log has expired and the run passed `--use-chat-template`: request lengths shift by the template. Named only as the generic `client_flags`.
 - The client's version after 2026-08-07: the draws and `calculate_metrics` read as unchanged by diff, but no check runs the post-2026-09-26 client (the audit's T2).
-- Round trip of per-request rows through the client's JSON (T5), the definitions check at run time (T8, `result.check_definitions`, dashboard 52), and replication and noise (T11, COV-10): not built.
+- Round trip of per-request rows through the client's JSON (T5), and replication and noise (T11, COV-10): not built.
 - `gpu_memory_utilization` is dropped on most points (named as `estimated`); the engine release differs on all of them (G4).
 - Percentiles and distributions: COV-10, planned for M3.
 - Mean-only statistics against heavy tails: the agentic standard error of the mean is 3% to 29% for TTFT, so a fixed 1.6% floor is used and is too small for those.
+
+## Which figures are compared
+
+Only TTFT and TPOT (`result.COMPARED_FIGURES`). At the start of every scoring run `cli.py` asks the build for its metric registry (`blis metrics --json`) and `result.check_definitions` requires each figure compared to have the client's definition there, field for field; a registry that differs stops the run. A build without the command (v0.16.0, the baseline's simulator) has no registry to check: the run says so and its definitions are the ones the scorer assumes.
+
+InferenceX reports other figures with other definitions, and a figure of the same name at another scope is not the same figure: total tokens per second per GPU is input plus output over all the deployment's GPUs, where `output_tok_s_per_gpu` is output tokens only; for a disaggregated run the input rate is over the prefill GPUs and the output rate over the decode GPUs; `mean_intvty` is 1 over the mean ITL, where the registry's `interactivity_mean` is the mean of each request's 1 over ITL (2% to 27% higher on TP8 H200 replays). `result.CLIENT_RATE_DEFINITIONS` holds those definitions, and tests refuse each known-bad pairing. The registry ids they expect are those blis-substrate#52 names; **that commit was not available when this was written**, so the ids and keys follow the definitions in the readiness analysis of 2026-11-11 and are to be confirmed against #52 when it lands. No such figure is compared yet.
 
 ## How to reproduce
 

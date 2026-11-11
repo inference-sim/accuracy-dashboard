@@ -1,12 +1,12 @@
 # InferenceX series classes and what the harness does with each
 
-Measured on 2026-11-10 from the live API: `/api/v1/availability` (7185 series, 2025-09-29 to 2026-11-10) and `/api/v1/benchmarks` for the 180-day window the nightly pulls (6306 rows, 2026-05-15 to 2026-11-10). A series is one deployment shape for one model and chip; a row is one concurrency of it. The treatment columns come from `engines.py` and `assess.py`; the scored and G5 columns come from the baseline run in `baseline-v0.16.0/` (v0.16.0, harness `10b2a36`), which covers only the units of the published snapshot, so they are 0 for every class the snapshot did not hold. Regenerate the table with `series_classes.py` (this directory).
+Measured on 2026-11-10 from the live API: `/api/v1/availability` (7185 series, 2025-09-29 to 2026-11-10) and `/api/v1/benchmarks` for the 180-day window the nightly pulls (6306 rows, 2026-05-15 to 2026-11-10). A series is one deployment shape for one model and chip; a row is one concurrency of it. The treatment columns come from `engines.py` and `assess.py`; the scored and G5 columns come from the baseline run in `baseline-v0.16.0/` (v0.16.0, harness `a0e899b`), which covers only the units of the published snapshot, so they are 0 for every class the snapshot did not hold. Regenerate the table with `series_classes.py` (this directory).
 
 ## The table
 
 | Framework | Topology | Type | Series | Window rows | AMD or TPU rows | Rows with no ledger unit | Units | In the baseline set: scored | G5 | Treatment |
 |---|---|---|---|---|---|---|---|---|---|---|
-| vllm | agg | single_turn | 2393 | 1696 | 555 | 9 | 1687 | 31 | 1656 | fetched; scored by the harness |
+| vllm | agg | single_turn | 2393 | 1696 | 555 | 9 | 1687 | 41 | 1636 | fetched; scored by the harness |
 | sglang | agg | single_turn | 2037 | 994 | 361 | 144 | 850 | 0 | 0 | G5 field_unclassified (no fetch) |
 | sglang | agg | agentic_traces | 207 | 739 | 195 | 624 | 115 | 0 | 0 | G5 field_unclassified (no fetch) |
 | dynamo-vllm | disagg | single_turn | 68 | 496 | 0 | 0 | 496 | 0 | 0 | fetched; G5 router_unsupported at scoring; else disaggregated: topology reasons, else topology_unsupported |
