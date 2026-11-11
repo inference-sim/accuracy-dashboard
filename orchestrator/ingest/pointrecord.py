@@ -60,8 +60,17 @@ def identity_of(o) -> dict:
             "conc": i["conc"], "measured_date": i["measured_date"]}
 
 
+# The dashboard's kind for "the engine publishes no list of its ported functions, so a changed one cannot be
+# ruled out" is the substrate's changed_functions (a G4 condition); the detail keeps the reason.
+KIND_MAP = {"ported_functions_unpublished": "changed_functions"}
+
+
 def substitutions_of(subs: list[dict]) -> list[dict]:
     out = [{k: s[k] for k in SUBSTITUTION_KEYS if s.get(k) not in (None, "", [])} for s in subs]
+    for s in out:
+        if s["kind"] in KIND_MAP:
+            s["detail"] = s.get("detail") or "no list of the engine's ported functions is published: a changed one is not ruled out"
+            s["kind"] = KIND_MAP[s["kind"]]
     out.sort(key=lambda s: (s["kind"], s["subject"]))
     return out
 
@@ -77,7 +86,8 @@ def settings_and_notes(args: list[dict]) -> tuple[list[dict], list[dict]]:
             s["field"] = a["blis_field"]
         s["match"] = MATCH.get(s.get("match"), s.get("match"))
         if s["match"] == "estimated" and "rule" not in s:
-            s["rule"] = "estimation_rule"
+            # The field list's rule, read from the detail the substitution carries (fields.decide).
+            s["rule"] = "substitute" if "stands in" in str(a.get("note", "")) else "leave_unset"
         for k in ("measured", "blis"):
             s[k] = _scalar(s.get(k))
         if "values" in s:
