@@ -52,7 +52,7 @@ The list is closed (design §11.4); [grades.md](grades.md) has the table with th
 - **`value_conflict`**: two sources of one stage disagree (the launch configuration against the printed arguments; a served path against the run's recipe checkpoint). The harness never picks one; the source must be corrected, or the draft length is one vLLM would refuse.
 - **`not_in_catalog`**: the model, the chip's coefficients or the drafter is not in the catalog or registry. Removed by adding the entry (and measuring a chip's coefficients).
 - **`router_unsupported`**: the run was behind a router BLIS does not host (BLIS hosts llm-d's). Removed by a router-table substitution the design allows, or by hosting the router ([disaggregation](disaggregation.md)).
-- **`topology_unsupported`**: a prefill/decode or multinode deployment the scenario writer cannot yet state ([disaggregation](disaggregation.md)).
+- **`topology_unsupported`**: a prefill/decode deployment the stack cannot yet run, named by its subject: a pool at data-parallel size above 1, pools of unequal size, a pool the row does not record, an agentic replay ([disaggregation](disaggregation.md)).
 - **`engine_unsupported`**: no BLIS engine exists for the run's engine (TensorRT-LLM, ATOM, TileRT and the like). Removed by adding the engine.
 - **`code_not_visible`**, **`build_unparseable`**: in the list, emitted by no scorer path today; a build the scorer cannot resolve is G4.
 
