@@ -6,7 +6,7 @@
 
 | Input | Value |
 |---|---|
-| Harness | accuracy-dashboard commit `338a5760895ddfcc69db40e862e7b3fcab1741c1`; the baseline was scored again at the same commit |
+| Harness | accuracy-dashboard commit `9a8b45f55c103044ba6609f7fcef1a6f94826353`; the baseline was scored again at the same commit |
 | Simulator | inference-sim `ece61af0eccb863ba527d9e1a6dd2ffc97d0c5cf` (branch `m2/5-closeness-data-in-the-result`, a local checkout; `run.sh --sim-repo` takes the path) |
 | Catalog and registry | blis-substrate `f70c6c7503a47442c4c5d989f8f17b093c14e069`, passed as the 40-hex commit for `--catalog-release` and `--registry-release` |
 | Engine | vLLM 0.32.0; field list: blis-vllm `5de11f598bf78017429355b368bbb7a93e312ef1` `fields.json`, sha256 `9a3a88857a9462caf7b09433cfb53ac377d042aea10e7da2af3a8f9fd1ecccaa` |
