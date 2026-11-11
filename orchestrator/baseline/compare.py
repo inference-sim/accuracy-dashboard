@@ -29,6 +29,7 @@ count them apart from the in-scope points; the scorer's reason codes are not cha
 """
 from __future__ import annotations
 
+import re
 import argparse
 import hashlib
 import json
@@ -89,6 +90,8 @@ class Run:
         sp = Path(splits) if splits else d.parent / "splits.json"
         if sp.is_file():
             self._splits = json.loads(sp.read_text())
+        rf = d.parent / "refusals.json"
+        self._refusals = json.loads(rf.read_text()) if rf.is_file() else {}
         self.prov = json.loads((d / "provenance.json").read_text())
         facets = json.loads((d / "facets.json").read_text())
         fidelity = {r["point_id"]: r for r in _lines(d / "fidelity.jsonl")}
@@ -123,6 +126,8 @@ class Run:
             raise CompareError(f"{d}: {len(self.points)} points in the files, {self.prov['points']} in provenance.json")
         for pid, p in self.points.items():
             p["series"], p["kind"] = None, None
+            if p["status"] == "failed":
+                p["error"] = self._refusals.get(pid)
             if p["status"] == "scored":
                 fc = facets[pid]
                 p["series"] = dsplit.series_id(dsplit.from_contract(fc))
@@ -405,6 +410,7 @@ def run_report(run: Run, sample: str, evaluate_test: bool = False) -> dict:
             "headline": accuracy([p for p in pts if p["grade"] in gr.GRADED]),
             "grades": by_grade(pts), "serving_by_grade": serving_by_grade(pts),
             "development_split": development_split(run, evaluate_test),
+            "refusals": refusal_classes([p.get("error") for p in pts if p["status"] == "failed"]),
             "coverage": coverage(pts), "backlog": backlog_for(pts),
             "unlock": unlock_table(pts)}
 
@@ -436,12 +442,14 @@ def pair_report(before: Run, after: Run, sample: str, evaluate_test: bool = Fals
                        "headline": accuracy([p for p in b.values() if p["grade"] in gr.GRADED]),
                        "grades": by_grade(list(b.values())), "serving_by_grade": serving_by_grade(list(b.values())),
                        "development_split": development_split(before, evaluate_test),
+                       "refusals": refusal_classes([p.get("error") for p in b.values() if p["status"] == "failed"]),
                        "coverage": cov_b,
                        "backlog": backlog_for(list(b.values()))},
             "after": {"identity": after.identity(sample), "inputs": after.inputs(),
                       "headline": accuracy([p for p in a.values() if p["grade"] in gr.GRADED]),
                       "grades": by_grade(list(a.values())), "serving_by_grade": serving_by_grade(list(a.values())),
                       "development_split": development_split(after, evaluate_test),
+                      "refusals": refusal_classes([p.get("error") for p in a.values() if p["status"] == "failed"]),
                       "coverage": cov_a,
                       "backlog": backlog_for(list(a.values()))},
             "scored_in_both": {"points": len(both), "before": accuracy(bpts), "after": accuracy(apts),
@@ -449,6 +457,8 @@ def pair_report(before: Run, after: Run, sample: str, evaluate_test: bool = Fals
                                "attribution": {"before": attribution(bpts), "after": attribution(apts)}},
             "newly_scored": {"points": len(new), "after": accuracy([a[i] for i in new]),
                              "list": [_brief(a[i]) | {"before": b[i]["status"], "before_reasons": _brief(b[i])["reasons"]} for i in new]},
+            "failed_in_after": [{"id": i, "model": a[i]["model"], "hardware": a[i]["hardware"], "error": a[i].get("error")}
+                                for i in sorted(a) if a[i]["status"] == "failed"],
             "newly_refused": {"points": len(lost), "before": accuracy([b[i] for i in lost]),
                               "list": [_brief(b[i]) | {"after": a[i]["status"], "after_reasons": _brief(a[i])["reasons"]} for i in lost]},
             "reason_movement": {name: {"primary": {k: {"before": cov_b[name]["primary_reason"].get(k, 0),
@@ -627,6 +637,37 @@ def _write(table: dict, md: str, prefix: str | None):
         print(md)
 
 
+def refusals_from_logs(work: Path) -> dict:
+    """point id to the simulator's first error, from the scorer's per-point logs (<work>/logs/<id>.err):
+    the text of the first fatal message, without the scenario's file name and timestamp."""
+    out = {}
+    for f in sorted(Path(work).glob("**/logs/*.err")):
+        text = f.read_text()
+        k = text.find('msg="')
+        if not text.strip() or k < 0:
+            continue
+        body, esc = [], False
+        for ch in text[k + 5:]:
+            if esc:
+                body.append(ch)
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                break
+            else:
+                body.append(ch)
+        msg = "".join(body)
+        msg = re.sub(r'^scenario "p-[0-9a-f]+[.]yaml"[:]? ?(?:p-[0-9a-f]+[.]yaml: )?', "", msg)
+        out[f.stem] = re.sub(r"\s+", " ", msg)[:400]
+    return out
+
+
+def refusal_classes(errors: list[str]) -> list[tuple[str, int]]:
+    """The refusals grouped by the first 110 characters of their text, most frequent first."""
+    return Counter(e[:110] for e in errors if e).most_common()
+
+
 LOG_HEADER = """# Evaluation log
 
 Every evaluation of the development split's test set (and the prospective set) is one row, so repeated peeking is visible. A candidate release is evaluated once. See evaluation-protocol.md.
@@ -669,11 +710,19 @@ def main(argv=None) -> int:
     p.add_argument("--evaluate-test", action="store_true"); p.add_argument("--log"); p.add_argument("--estimator")
     c = sub.add_parser("check")
     c.add_argument("tables", nargs="+")
+    rf = sub.add_parser("refusals", help="write the simulator's first error per refused point from the scorer's logs")
+    rf.add_argument("--work", required=True)
+    rf.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     try:
         if a.cmd in ("run", "pair") and a.evaluate_test:
             if not a.log or not a.estimator:
                 raise CompareError("--evaluate-test needs --log and --estimator: a test evaluation is logged (date, commit, estimator, split)")
+        if a.cmd == "refusals":
+            r = refusals_from_logs(Path(a.work))
+            Path(a.out).write_text(json.dumps(r, indent=0, sort_keys=True) + "\n")
+            print(f"wrote {a.out}: {len(r)} refusals")
+            return 0
         if a.cmd == "run":
             run = Run(a.dir, a.splits)
             t = run_report(run, a.sample, a.evaluate_test)

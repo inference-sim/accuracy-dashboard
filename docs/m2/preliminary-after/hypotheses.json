@@ -1,0 +1,12 @@
+{
+ "hardware|b200|TTFT": "The b200 prefill is over-priced: its attention and GEMM coefficients are transferred from another part (fidelity: coefficient_method transferred), and the host admission terms are assumed. Check the transferred prefill rates against a b200 kernel sweep.",
+ "regime|shallow queue, long prompt|TTFT": "With a shallow queue and a prompt over 4096 tokens TTFT is the prefill itself: long-sequence attention (or the chunk size set by max_num_batched_tokens) is priced too high. The wide spread (IQR above 100) says it depends on the model.",
+ "concurrency band|3-8|TTFT": "The same prefill over-pricing as the shallow-queue row, seen by concurrency: nine series share the band, so it is not one model.",
+ "model|kimi-k2.5|TTFT": "Kimi-K2.5 is int4 on these points: the dequantizing MoE and projection kernels are probably priced as the fp8 ones, which are slower. Price the int4 weight path (quantization is a modelled field now).",
+ "precision|int4|TTFT": "The same four series as the Kimi-K2.5 row (int4 is only Kimi-K2.5): one cause, counted twice.",
+ "model|kimi-k2.5-nvfp4|TTFT": "fp4 GEMMs are priced at rates transferred from fp8; Blackwell fp4 tensor-core throughput is about twice fp8, so prefill is over-predicted.",
+ "precision|fp4|TTFT": "The same two series as the Kimi-K2.5 NVFP4 row: one cause, counted twice.",
+ "hardware|b300|TTFT": "The b300 points are the NVFP4 ones above, on a part whose coefficients are mostly transferred from b200; the fp4 rate and the b300 transfer compound.",
+ "model|deepseek-v4-pro|TTFT": "The only large under-prediction: DeepSeek-V4-Pro prefill is under-priced. Sparse-attention indexer cost and the expert-parallel all-to-all are the terms an MoE with a custom indexer adds; check that both are charged and not overlapped away.",
+ "hardware|h100|TPOT": "Decode on h100 (one series, MiniMax-M2.5) is under-predicted by about 22 percent: the HBM derate may be too optimistic or the per-step host launch cost (assumed, CUDA graph off or partial) is not charged. One series: low confidence."
+}
