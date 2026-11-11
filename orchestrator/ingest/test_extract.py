@@ -219,6 +219,30 @@ def test_a_resolved_only_value_with_no_scenario_location_is_never_dropped_silent
     assert r.reasons == [] and [a["match"] for a in r.args] == ["resolved_not_stated"]
 
 
+def test_a_resolved_only_value_is_stated_exactly_when_the_field_list_marks_the_field_modelled():
+    """The rule follows the field list, not the field: when blis-vllm marks cudagraph_mode and
+    cudagraph_capture_sizes modelled (the kernel prices them), the engine's resolved value is stated again."""
+    def lst(status):
+        ev = {"modelled": {"traces": ["t"]}}.get(status, {"issue": "inference-sim/blis-vllm#78"})
+        fields = [{"name": n, "source": "config", "status": status, "evidence": ev, "estimation": {"rule": "none"}}
+                  for n in ("compilation_config.cudagraph_capture_sizes", "compilation_config.cudagraph_mode")]
+        return fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"},
+                                    "fields": fields}))
+    def decide(status):
+        s = {"compilation_config.cudagraph_mode": st.Setting("compilation_config.cudagraph_mode", "FULL_DECODE_ONLY",
+                                                              "resolved_config", requested=False),
+             "compilation_config.cudagraph_capture_sizes": st.Setting("compilation_config.cudagraph_capture_sizes",
+                                                                      [1, 2, 4], "resolved_config", requested=False)}
+        return st.decide(s, lst(status))
+    modelled = decide("modelled")
+    assert modelled.mapped["engine.cudagraph_mode"][1] == "FULL_DECODE_ONLY"
+    assert modelled.mapped["engine.cudagraph_capture_sizes"][1] == [1, 2, 4]
+    assert modelled.reasons == [] and not [a for a in modelled.args if a.get("match") == "resolved_not_stated"]
+    unmodelled = decide("not_modelled")
+    assert not {"engine.cudagraph_mode", "engine.cudagraph_capture_sizes"} & set(unmodelled.mapped)
+    assert [a["match"] for a in unmodelled.args] == ["resolved_not_stated"] * 2 and unmodelled.reasons == []
+
+
 def test_a_custom_ops_list_the_run_set_is_still_refused_as_not_modelled():
     c = _classify(_log("'compilation_config': {'custom_ops': ['+rms_norm']}"))
     assert c.reasons == ["field_not_modelled:compilation_config.custom_ops"]

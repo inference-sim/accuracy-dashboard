@@ -42,21 +42,21 @@ CLIENT_DEFINITIONS = {
 
 # The other figures InferenceX reports, with the definition each has there. The dashboard compares
 # none of them yet; one is added to COMPARED_FIGURES only together with a registry metric that has
-# this definition, and check_definitions refuses the registry when it does not. The registry ids are
-# the ones blis-substrate#52 names; that commit is not available to this repository yet, so they and the
-# keys below follow the definitions in the readiness analysis of 2026-11-11 (target scenarios, section 6)
-# and are to be confirmed against #52 when it lands. `gpus` is the registry's GPU scope of a per-GPU rate.
-#   tput_per_gpu         (input + output tokens/s) / all the deployment's GPUs
-#   input_tput_per_gpu   input tokens/s / the prefill GPUs (a disaggregated run)
-#   output_tput_per_gpu  output tokens/s / the decode GPUs (a disaggregated run)
-#   mean_intvty          1 / mean(ITL): the reciprocal of the mean, not the mean of the reciprocals
+# this definition, and check_definitions refuses the registry when it does not. The ids and keys are
+# those blis-substrate#52 shipped in layer 7 (contracts/metrics/metrics.go, 41ae65f):
+#   total_tokens_per_second_per_gpu          InferenceX tput_per_gpu: (input + output tokens/s) / all GPUs
+#   output_tokens_per_second_per_decode_gpu  InferenceX output_tput_per_gpu: output tokens/s / the decode GPUs
+#   interactivity_of_mean_tpot               InferenceX mean_intvty: 1000 / mean(TPOT), the reciprocal of the mean
+# interactivity_mean is the mean of each request's 1/TPOT, a different number (2% to 27% higher on TP8 H200
+# replays); the registry keeps it unchanged and it is not the client's figure. InferenceX's
+# input_tput_per_gpu (input tokens/s over the prefill GPUs) has no registry metric yet.
 _RATE = {"statistic": "rate", "population": "requests", "window": "measured", "unit": "tokens_per_s",
-         "denominator": "window_and_gpus", "unfinished": "not_applicable"}
+         "unfinished": "not_applicable"}
 CLIENT_RATE_DEFINITIONS = {
-    "total_tokens_per_second_per_gpu": {**_RATE, "formula": "total_throughput", "gpus": "all_gpus"},
-    "input_tokens_per_second_per_prefill_gpu": {**_RATE, "formula": "input_throughput", "gpus": "prefill_gpus"},
-    "output_tokens_per_second_per_decode_gpu": {**_RATE, "formula": "output_throughput", "gpus": "decode_gpus"},
-    "interactivity_of_mean_tpot": {"formula": "interactivity", "statistic": "reciprocal_of_mean",
+    "total_tokens_per_second_per_gpu": {**_RATE, "formula": "total_throughput", "denominator": "window_and_gpus"},
+    "output_tokens_per_second_per_decode_gpu": {**_RATE, "formula": "output_throughput",
+                                                "denominator": "window_and_decode_gpus"},
+    "interactivity_of_mean_tpot": {"formula": "interactivity", "statistic": "mean",
                                    "population": "requests_min_2_output_tokens", "window": "measured",
                                    "unit": "tokens_per_s_per_user", "unfinished": "excluded"},
 }

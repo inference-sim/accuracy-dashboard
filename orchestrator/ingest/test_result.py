@@ -233,7 +233,7 @@ def test_a_registry_without_a_metric_the_harness_reads_is_refused():
 
 
 # ---- the other figures: a rate or an interactivity is compared only with the same scope and aggregate
-# (readiness analysis of 2026-11-11, section 6; the registry ids follow blis-substrate#52, to be confirmed)
+# (readiness analysis of 2026-11-11, section 6; the ids and keys are those of blis-substrate#52, layer 7, 41ae65f)
 
 def _registry_with(metric, **over):
     base = dict(result.CLIENT_RATE_DEFINITIONS[metric])
@@ -249,15 +249,14 @@ def test_a_rate_or_interactivity_with_the_clients_definition_is_comparable(metri
 @pytest.mark.parametrize("metric,key,value", [
     # output tokens against total tokens: the plotted axis differs by two orders of magnitude on AgentX
     ("total_tokens_per_second_per_gpu", "formula", "output_throughput"),
-    # all the deployment's GPUs against the decode GPUs of a disaggregated run
-    ("total_tokens_per_second_per_gpu", "gpus", "decode_gpus"),
-    ("output_tokens_per_second_per_decode_gpu", "gpus", "all_gpus"),
-    ("input_tokens_per_second_per_prefill_gpu", "gpus", "all_gpus"),
+    # all the deployment's GPUs against the decode GPUs of a disaggregated run, and the reverse
+    ("total_tokens_per_second_per_gpu", "denominator", "window_and_decode_gpus"),
+    ("output_tokens_per_second_per_decode_gpu", "denominator", "window_and_gpus"),
     # a rate per window against a rate with no GPU denominator
     ("total_tokens_per_second_per_gpu", "denominator", "window"),
-    # 1 / mean(ITL) against the mean of the per-request 1 / ITL (2% to 27% apart on TP8 H200 replays)
-    ("interactivity_of_mean_tpot", "statistic", "mean"),
+    # 1 / mean(ITL) against the mean of 1 / ITL (interactivity_mean's formula; 2% to 27% apart on TP8 H200)
     ("interactivity_of_mean_tpot", "formula", "user_tps"),
+    ("interactivity_of_mean_tpot", "statistic", "p50"),
 ])
 def test_a_known_bad_definition_is_refused_naming_the_field(metric, key, value):
     reg = _registry_with(metric, **{key: value})
