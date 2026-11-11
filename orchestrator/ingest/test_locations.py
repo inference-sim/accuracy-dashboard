@@ -60,3 +60,10 @@ def test_the_m2_field_list_is_told_by_its_value_classes():
         {"name": "language_model_only", "source": "config", "status": "modelled", "evidence": {"traces": ["t"]},
          "value_classes": {"type": "boolean", "covered": ["true"]}, "estimation": {"rule": "none"}}]}))
     assert st.names_are_vllms(f) is True
+
+
+def test_a_location_is_translated_to_vllms_name_and_the_rest_are_unchanged():
+    assert st.vllm_location("engine.cache_dtype") == "engine.kv_cache_dtype"
+    assert st.vllm_location("engine.cudagraph_mode") == "engine.compilation_config.cudagraph_mode"
+    assert st.vllm_location("engine.speculative.num_spec_tokens") == "engine.speculative_config.num_speculative_tokens"
+    assert st.vllm_location("engine.max_num_seqs") == "engine.max_num_seqs" and st.vllm_location("parallel.tp") == "parallel.tp"
