@@ -423,6 +423,9 @@ _SAME_NAME = (
 # written only when the engine's field list calls the field modelled; an older engine's block
 # refuses the key, and its field list does not model the field.
 MODELLED_ONLY = ("engine.enable_chunked_prefill", "engine.language_model_only")
+# Block keys that blis-vllm renamed to vLLM's own name when it modelled the field: the old key for a
+# field list that does not model the field (the older engine block), the new one for a list that does.
+RENAMED_WHEN_MODELLED = {"engine.cache_dtype": "engine.kv_cache_dtype"}
 LOCATIONS = {
     **{f: f"engine.{f}" for f in _SAME_NAME},
     "kv_cache_dtype": "engine.cache_dtype",
@@ -582,6 +585,8 @@ def decide(settings: dict[str, Setting], field_list) -> Decided:
         loc = location(path)
         if loc in MODELLED_ONLY and not ((field_list.lookup(path) or fl.Field("", "", "", {}, {})).status == fl.MODELLED):
             loc = None      # the engine block of an older release has no such key
+        if loc in RENAMED_WHEN_MODELLED and (field_list.lookup(path) or fl.Field("", "", "", {}, {})).status == fl.MODELLED:
+            loc = RENAMED_WHEN_MODELLED[loc]
         if estimated is not None:
             # The field's estimation rule decides what the scenario states for it, not the run.
             d.args.append({**rec, "blis": None, "match": "approximated",

@@ -179,7 +179,7 @@ def test_every_recorded_value_is_copied_verbatim_under_the_engines_own_names():
                        "'compilation_config': {'max_cudagraph_capture_size': 512}, "
                        "'speculative_config': {'method': 'mtp', 'num_speculative_tokens': 2}"))
     assert {k: v[1] for k, v in c.mapped.items() if k.startswith("engine.")} == {
-        "engine.max_num_seqs": 16, "engine.cache_dtype": "fp8", "engine.quantization": "fp8",
+        "engine.max_num_seqs": 16, "engine.kv_cache_dtype": "fp8", "engine.quantization": "fp8",
         "engine.enable_prefix_caching": True, "engine.cudagraph_mode": "FULL_AND_PIECEWISE",
         "engine.max_cudagraph_capture_size": 512,
         "engine.speculative.method": "mtp", "engine.speculative.num_spec_tokens": 2}
