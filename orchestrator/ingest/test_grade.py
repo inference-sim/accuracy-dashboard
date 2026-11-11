@@ -112,3 +112,31 @@ def test_the_four_conditions_that_are_not_graded_yet_are_g2_kinds_named_on_a_sub
                for s in subs)
     out = g.grade(engine_version=V, release=REL, substitutions=subs)
     assert out.grade == g.G2 and out.substitutions == subs
+
+
+# ---- the keys a substitution of a kind names (blis-substrate's point record)
+
+def _g(subs, version="0.32.0"):
+    return g.grade(engine_version="0.32.0", release=g.Release(version=version, nightly_or_custom=False), substitutions=subs)
+
+
+def test_g1_g2_still_grade_correctly_for_a_run_on_the_simulators_release():
+    # No in-scope InferenceX point runs v0.32.0 today; when one does, the grade must be right.
+    assert _g([]).grade == "G1"
+    sub = {"kind": "router_differs", "subject": "dynamo-router", "policy": "least-loaded", "evidence": "table row 3"}
+    assert _g([sub]).grade == "G2"
+    assert _g([], version="0.31.0").grade == "G4"           # another release, no published diff
+
+
+def test_a_substitution_names_the_keys_of_its_kind_and_no_others():
+    ok = {"kind": "later_record", "subject": "cluster.gpus_per_node", "record": "runners.yaml at abc", "date": "2026-07-02"}
+    assert _g([ok]).grade == "G2"
+    for bad in ({**ok, "date": "2026-7-2"}, {k: v for k, v in ok.items() if k != "record"},
+                {k: v for k, v in ok.items() if k != "date"}, {**ok, "policy": "x"},
+                {"kind": "router_differs", "subject": "r", "policy": "p"},
+                {"kind": "router_differs", "subject": "r", "evidence": "e"},
+                {"kind": "estimated", "subject": "f", "detail": "d", "record": "x"},
+                {"kind": "client_difference", "subject": "send_gap"}, {"kind": "resolved_differs", "subject": "block_size"}):
+        with pytest.raises(g.GradeError):
+            _g([bad])
+    assert _g([{"kind": "resolved_differs", "subject": "block_size", "detail": "the run resolved 32"}]).grade == "G2"

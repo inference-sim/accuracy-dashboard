@@ -13,30 +13,20 @@ of its kind for every case where it is false, or nothing when it is true. When t
 the condition stays unevaluated and the point names it so (grade.unchecked). Nothing here guesses a
 missing datum or reads a registry file (X7): the data is the Result's and the field list's.
 
-THE SHAPE READ HERE is blis-substrate layer 10's, provisional commit 2a9ea3d1 of branch
-m2/10-router-table-and-closeness-record (it will be rebased). Each entry of
-doc["selected_entries"]["coefficients"] may carry
+THE SHAPE READ HERE is blis-substrate layer 10's (branch m2/10-router-table-and-closeness-record,
+provisional until it is rebased). doc["selected_entries"] carries `closeness_version: 1` when every
+coefficient was recorded whole; then each coefficient states its `kernel_impls` ([{library, variant,
+code_hash}]) and `fit_range` ([{dim, low, high}]) or none, and an omitted `extrapolated` or
+`unidentified` means false. Without the marker the report does not say, and the conditions that
+read those data stay unevaluated. doc["resolutions"] is a list of {setting, pool, host, engine,
+reason}, all values strings, `host` absent when the host gave none, `pool` the pool role
+(colocated, prefill, decode, or decode-0, decode-1 when several share a role). A field of the field
+list may carry `value_classes` (fields._value_classes).
 
-  "kernel_impls": [{library, variant, code_hash}]   the kernels the entry is valid for (maybe none)
-  "fit_range": [{dim, low, high}]                   the fit's input range (maybe none)
-  "extrapolated": true, "unidentified": true        written only when true (omitted when false)
-
-and doc["resolutions"] is a list of {setting, host, engine, reason}, all values strings, `host`
-absent when the host gave none and `reason` present only where host and engine differ. A field of
-the field list may carry `value_classes`, an object (fields._value_classes).
-
-What the shape cannot say, and what is done about it:
-
-  * The Result has no version marker, and a boolean is omitted when false, so a coefficient without
-    flags is either clean or written by an older build. A report is taken as written by a build
-    that carries the data when some coefficient of it carries kernel_impls, fit_range or a flag;
-    a report with none of them leaves coefficient_range unevaluated.
-  * Resolutions are always written by a build that carries them (a mode resolved without moving is
-    recorded too), so an absent or empty list leaves resolved_differs unevaluated.
-  * The substrate holds no map from a library version to a kernel hash, and the dashboard has none
-    (blis-registry#73 asks for the engine to publish one). kernel_hash is evaluated only when the
-    caller passes such a map, `version_hashes`; the scorer passes none, so the condition stays
-    unevaluated on every point until a published source exists.
+The substrate holds no map from a library version to a kernel hash and the dashboard has none
+(blis-registry#73 asks for the engine to publish one). kernel_hash is evaluated only when the
+caller passes such a map, `version_hashes`; the scorer passes none, so the condition stays
+unevaluated on every point until a published source exists.
 """
 from __future__ import annotations
 
@@ -64,7 +54,12 @@ def _coefficients(doc) -> list | None:
     return cs if isinstance(cs, list) and cs else None
 
 
-_NEW_KEYS = ("kernel_impls", "fit_range", "extrapolated", "unidentified")
+CLOSENESS_VERSION = 1
+
+
+def _whole(doc) -> bool:
+    """Whether the report says every coefficient was recorded whole (closeness_version 1)."""
+    return ((doc or {}).get("selected_entries") or {}).get("closeness_version") == CLOSENESS_VERSION
 
 
 def coefficient_range(doc) -> Evaluation:
@@ -72,9 +67,9 @@ def coefficient_range(doc) -> Evaluation:
     cs = _coefficients(doc)
     if cs is None:
         return _unevaluated(kind, "the Result has no selected-entry report")
-    if not any(k in c for c in cs for k in _NEW_KEYS):
-        return _unevaluated(kind, "no coefficient carries a fit range, kernel implementation or trust flag: "
-                                  "the Result was written by a build that does not report them")
+    if not _whole(doc):
+        return _unevaluated(kind, "the report carries no closeness_version: it does not say whether a coefficient "
+                                  "was extrapolated or unidentified")
     subs = []
     for c in cs:
         flags = [w for w in ("extrapolated", "unidentified") if c.get(w) is True]
@@ -93,9 +88,16 @@ def kernel_hash(doc, libraries: dict | None, version_hashes: dict | None = None)
     cs = _coefficients(doc)
     if cs is None:
         return _unevaluated(kind, "the Result has no selected-entry report")
+    if not _whole(doc):
+        return _unevaluated(kind, "the report carries no closeness_version: it does not say which kernels were priced")
     priced: dict = {}
     for c in cs:
-        for k in c.get("kernel_impls") or []:
+        impls = c.get("kernel_impls") or []
+        if c.get("fit_range") and not impls:
+            # A fitted coefficient is tied to a kernel; one that names none cannot be compared, and
+            # skipping it would call the condition true for a coefficient nobody checked.
+            return _unevaluated(kind, f"the fitted coefficient {c.get('set')}/{c.get('name')} names no kernel implementation")
+        for k in impls:
             priced.setdefault(k["library"], set()).add(k["code_hash"])
     if not priced:
         return _unevaluated(kind, "no coefficient names a kernel implementation")
@@ -143,34 +145,69 @@ def value_class(requested: dict | None, field_list) -> Evaluation:
     return Evaluation(kind, True, subs)
 
 
-# The Result's setting names for the settings the run's log states under a vLLM name. A declined
-# request is recorded under its own field name, which is the vLLM name, so it needs no entry.
-# TEMPORARY, from the names the Result is described to use; settings with no entry here
-# (expert_parallel_width, all_reduce_backend, cascade_attention, sequence_parallel_moe) are not
-# compared.
-RESOLUTION_NAMES = {"tensor_parallel_width": "tensor_parallel_size", "data_parallel_width": "data_parallel_size",
-                    "async_scheduling": "async_scheduling"}
+def _bool_text(v):
+    return None if v is None else str(bool(v)).lower()
 
 
-def resolved_value(doc, resolved: dict | None) -> Evaluation:
-    """resolved: vLLM setting path -> the value the run's log resolved."""
+def run_value(setting: str, resolved: dict):
+    """The value the run's log resolved for a Result resolution setting, as the Result writes it, or
+    None when the log states none or the setting has no single vLLM name. The settings and the
+    vLLM setting each answers are the table of blis-substrate docs/contracts/reference/result.md
+    (TEMPORARY copy, X7)."""
+    r = resolved
+    if setting == "tensor_parallel_width":
+        return r.get("tensor_parallel_size")
+    if setting == "data_parallel_width":
+        return r.get("data_parallel_size")
+    if setting == "expert_parallel_width":
+        # derived: tensor, prefill-context and data-parallel width multiplied with
+        # enable_expert_parallel on, else 1
+        ep = r.get("enable_expert_parallel")
+        if ep is None:
+            return None
+        if not ep:
+            return 1
+        tp, dp = r.get("tensor_parallel_size"), r.get("data_parallel_size")
+        return None if tp is None or dp is None else tp * dp * (r.get("prefill_context_parallel_size") or 1)
+    if setting == "all_reduce_backend":
+        d = r.get("disable_custom_all_reduce")
+        return None if d is None else ("nccl" if d else "custom")
+    if setting == "async_scheduling":
+        return _bool_text(r.get("async_scheduling"))
+    if setting == "cascade_attention":
+        d = r.get("disable_cascade_attn")
+        return None if d is None else _bool_text(not d)
+    if setting == "sequence_parallel_moe":
+        return None         # no single vLLM name
+    return r.get(setting)   # a declined request is recorded under the engine's own field name
+
+
+def resolved_value(doc, resolved: dict | None, resolved_by_pool: dict | None = None) -> Evaluation:
+    """resolved: vLLM setting -> the value the run's log resolved, for a colocated point.
+    resolved_by_pool: pool -> that dict, for a disaggregated one. A resolution naming a pool the
+    run gives no values for is not compared."""
     kind = "resolved_differs"
     rs = (doc or {}).get("resolutions")
     if not isinstance(rs, list) or not rs:
         return _unevaluated(kind, "the Result records no engine resolution")
     subs = []
     for r in rs:
-        name = RESOLUTION_NAMES.get(r.get("setting"), r.get("setting"))
-        if name in (resolved or {}) and not _same(resolved[name], r.get("engine")):
-            subs.append({"kind": kind, "subject": name,
-                         "detail": f"the run resolved {resolved[name]!r}, the engine resolves {r.get('engine')!r}"})
+        pool = r.get("pool") or "colocated"
+        values = resolved if pool == "colocated" else (resolved_by_pool or {}).get(pool)
+        if values is None:
+            continue
+        have = run_value(r.get("setting"), values)
+        if have is not None and not _same(have, r.get("engine")):
+            where = "" if pool == "colocated" else f" in the {pool} pool"
+            subs.append({"kind": kind, "subject": r["setting"] if pool == "colocated" else f"{r['setting']} ({pool})",
+                         "detail": f"the run resolved {have!r}{where}, the engine resolves {r.get('engine')!r}"})
     return Evaluation(kind, True, sorted(subs, key=lambda s: s["subject"]))
 
 
 def evaluate(doc, *, field_list, requested=None, resolved=None, libraries=None,
-             version_hashes=None) -> list[Evaluation]:
+             version_hashes=None, resolved_by_pool=None) -> list[Evaluation]:
     return [coefficient_range(doc), kernel_hash(doc, libraries, version_hashes), value_class(requested, field_list),
-            resolved_value(doc, resolved)]
+            resolved_value(doc, resolved, resolved_by_pool)]
 
 
 def split(evals: list[Evaluation]) -> tuple[list[dict], list[str]]:

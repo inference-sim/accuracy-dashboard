@@ -52,7 +52,17 @@ G5_CODES = (
 # for it yet.
 G2_KINDS = ("coefficient_method", "coefficient_range", "execution_mode", "kernel_hash", "value_class",
             "estimated", "interim_status", "resolved_differs", "client_difference",
-            "later_record")
+            "later_record", "router_differs")
+# router_differs is §11.3's "the run's router, which BLIS does not host, was replaced by an llm-d
+# policy from the router table" (design change blis-design#1; blis-substrate router table).
+
+# The keys a substitution of a kind names, as blis-substrate's point record requires them: a
+# later_record the record and its date, a router_differs the policy and the router table's
+# evidence (its subject is the router the run used), a client_difference and a resolved_differs
+# the detail. A key belongs to its own kind only.
+KIND_KEYS = {"later_record": ("record", "date"), "router_differs": ("policy", "evidence")}
+DETAIL_KINDS = ("client_difference", "resolved_differs")
+_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # Four of design §11.3's G1 conditions cannot be checked yet, because no source carries the
 # datum: a library's kernel hash (the run's server log and launch configuration name library
@@ -126,6 +136,20 @@ def _sorted(subs: list[dict]) -> list[dict]:
     return out
 
 
+def _check_keys(s: dict) -> None:
+    need = KIND_KEYS.get(s["kind"], ())
+    for k in need:
+        if not s.get(k):
+            raise GradeError(f"a {s['kind']} substitution on {s['subject']!r} names no {k}")
+    if s["kind"] in DETAIL_KINDS and not s.get("detail"):
+        raise GradeError(f"a {s['kind']} substitution on {s['subject']!r} names no detail")
+    for k in ("record", "date", "policy", "evidence"):
+        if s.get(k) is not None and k not in need:
+            raise GradeError(f"{k} is not a key of {s['kind']} (substitution on {s['subject']!r})")
+    if s["kind"] == "later_record" and not _DATE.match(s["date"]):
+        raise GradeError(f"a later_record date is YYYY-MM-DD, got {s['date']!r}")
+
+
 def grade(*, engine_version: str, release: Release, substitutions: list[dict],
           g5: list[dict] | None = None, ported: dict | None = None) -> Graded:
     """The point's one grade.
@@ -144,6 +168,7 @@ def grade(*, engine_version: str, release: Release, substitutions: list[dict],
             raise GradeError(f"substitution kind {s.get('kind')!r} is not a G2 condition")
         if not s.get("subject"):
             raise GradeError(f"a {s['kind']} substitution names no subject")
+        _check_keys(s)
     if g5:
         for r in g5:
             if r.get("code") not in G5_CODES:

@@ -227,7 +227,7 @@ def resolve(table: Table, label: str, *, run_date: str, launch_size: int | None,
         return NodeSize(table_size, f"{SUBJECT}: InferenceX runners.yaml at {_short(in_force[0].commit)}")
     if lab is not None and lab.stable and day < lab.first_recorded.date:
         f = lab.first_recorded
-        sub = {"kind": "later_record", "subject": SUBJECT,
+        sub = {"kind": "later_record", "subject": SUBJECT, "record": f"{f.path} at {f.commit}", "date": f.date,
                "detail": f"taken from InferenceX runners.yaml at {_short(f.commit)}, recorded after the run "
                          f"({_short(f.commit)} of {f.date})"}
         return NodeSize(lab.records[f.commit].gpus_per_node,
