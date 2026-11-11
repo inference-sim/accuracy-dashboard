@@ -148,13 +148,23 @@ jobs:
           set -euo pipefail
           tag="$(python3 -c 'import json,sys; print([m["version"] for m in json.load(open(sys.argv[1]))["modules"] if m["path"].endswith("/blis-substrate")][0])' "$RUNNER_TEMP/sim/stack.json")"
           git clone -q --depth 1 --branch "$tag" https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
+      - name: Check out the blis-substrate commit that defines the point record's harness_commit (layer 10, blis-substrate #45)
+        run: |
+          set -euo pipefail
+          sha=2614960854b3368f5d5f29f35ed6256f72eccd19
+          git init -q "$RUNNER_TEMP/substrate-pointrecord"
+          git -C "$RUNNER_TEMP/substrate-pointrecord" remote add origin https://github.com/inference-sim/blis-substrate.git
+          git -C "$RUNNER_TEMP/substrate-pointrecord" fetch -q --depth 1 origin "$sha"
+          git -C "$RUNNER_TEMP/substrate-pointrecord" checkout -q FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/substrate-pointrecord" rev-parse HEAD)" = "$sha"
       - name: Build blis
         run: cd "$RUNNER_TEMP/sim" && GOFLAGS=-mod=mod go build -o blis main.go
       - name: Tests that simulate
         env:
           BLIS_BIN: ${{ runner.temp }}/sim/blis
           BLIS_SUBSTRATE: ${{ runner.temp }}/substrate
-        run: python3 -m pytest -q orchestrator/ingest/test_inferencex_client_sim.py orchestrator/ingest/test_score_real_blis.py
+          BLIS_SUBSTRATE_LAYER10: ${{ runner.temp }}/substrate-pointrecord
+        run: python3 -m pytest -q orchestrator/ingest/test_inferencex_client_sim.py orchestrator/ingest/test_score_real_blis.py orchestrator/ingest/test_pointrecord.py
 
   web:
     runs-on: ubuntu-latest
