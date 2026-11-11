@@ -13,15 +13,26 @@ of its kind for every case where it is false, or nothing when it is true. When t
 the condition stays unevaluated and the point names it so (grade.unchecked). Nothing here guesses a
 missing datum or reads a registry file (X7): the data is the Result's and the field list's.
 
-THE SHAPE READ HERE is blis-substrate layer 10's (branch m2/10-router-table-and-closeness-record,
-provisional until it is rebased). doc["selected_entries"] carries `closeness_version: 1` when every
-coefficient was recorded whole; then each coefficient states its `kernel_impls` ([{library, variant,
-code_hash}]) and `fit_range` ([{dim, low, high}]) or none, and an omitted `extrapolated` or
-`unidentified` means false. Without the marker the report does not say, and the conditions that
-read those data stay unevaluated. doc["resolutions"] is a list of {setting, pool, host, engine,
-reason}, all values strings, `host` absent when the host gave none, `pool` the pool role
-(colocated, prefill, decode, or decode-0, decode-1 when several share a role). A field of the field
-list may carry `value_classes` (fields._value_classes).
+THE SHAPE READ HERE is blis-substrate layer 10's as audited (a parameter of the after run, not a hash
+here). doc["selected_entries"] carries `closeness_version: 1` when at least one coefficient was
+recorded and every one was recorded whole: that says the recorder passed on everything each entry
+states, not that a condition was decided. Per coefficient:
+
+  "kernel_impls": [{library, variant, code_hash}]   the kernels the entry is valid for
+  "fit_range":   [{dim, low, high}]                 the fit's input range
+  "ci95":        {...}                              the entry's 95 percent interval
+  "extrapolated": true, "unidentified": true        written only when true
+
+Extrapolated is evaluated only for a coefficient that states a fit_range, unidentified only for one
+that states a ci95, and the kernel hash only for one that states kernel_impls. Where the entry
+states none of it, a false (an omitted flag) is "not evaluated". So a flag counts as evaluated only
+when the entry states what it needs, and most registry-measured coefficients leave their
+conditions unevaluated. A flag that is true is evidence whatever else is missing.
+
+doc["resolutions"] is a list of {setting, pool, host, engine, reason}, all values strings, `host`
+absent when the host gave none, `pool` the pool role (colocated, prefill, decode, or decode-0,
+decode-1 when several share a role). A field of the field list may carry `value_classes`
+(fields._value_classes).
 
 The substrate holds no map from a library version to a kernel hash and the dashboard has none
 (blis-registry#73 asks for the engine to publish one). kernel_hash is evaluated only when the
@@ -70,14 +81,21 @@ def coefficient_range(doc) -> Evaluation:
     if not _whole(doc):
         return _unevaluated(kind, "the report carries no closeness_version: it does not say whether a coefficient "
                                   "was extrapolated or unidentified")
-    subs = []
+    subs, undecided = [], []
     for c in cs:
-        flags = [w for w in ("extrapolated", "unidentified") if c.get(w) is True]
+        flags = [w for w, need in (("extrapolated", "fit_range"), ("unidentified", "ci95")) if c.get(w) is True]
         if flags:
             rng = "; fit range " + ", ".join(f"{b['dim']} {b['low']} to {b['high']}" for b in c.get("fit_range") or [])
             subs.append({"kind": kind, "subject": f"{c['set']}/{c['name']}",
                          "detail": " and ".join(flags) + (rng if c.get("fit_range") else "")})
-    return Evaluation(kind, True, sorted(subs, key=lambda s: s["subject"]))
+        if not c.get("fit_range") or not c.get("ci95"):
+            undecided.append(f"{c['set']}/{c['name']}")
+    if subs:
+        return Evaluation(kind, True, sorted(subs, key=lambda s: s["subject"]))     # known to be false
+    if undecided:
+        return _unevaluated(kind, f"{len(undecided)} coefficient(s) state no fit range or no interval, so "
+                                  f"extrapolated or unidentified is not evaluated for them (first: {undecided[0]})")
+    return Evaluation(kind, True, [])
 
 
 def kernel_hash(doc, libraries: dict | None, version_hashes: dict | None = None) -> Evaluation:
@@ -93,10 +111,10 @@ def kernel_hash(doc, libraries: dict | None, version_hashes: dict | None = None)
     priced: dict = {}
     for c in cs:
         impls = c.get("kernel_impls") or []
-        if c.get("fit_range") and not impls:
-            # A fitted coefficient is tied to a kernel; one that names none cannot be compared, and
-            # skipping it would call the condition true for a coefficient nobody checked.
-            return _unevaluated(kind, f"the fitted coefficient {c.get('set')}/{c.get('name')} names no kernel implementation")
+        if not impls:
+            # The kernel hash is evaluated only for an entry that states kernel_impls; skipping the
+            # others would call the condition true for a coefficient nobody could check.
+            return _unevaluated(kind, f"the coefficient {c.get('set')}/{c.get('name')} names no kernel implementation")
         for k in impls:
             priced.setdefault(k["library"], set()).add(k["code_hash"])
     if not priced:

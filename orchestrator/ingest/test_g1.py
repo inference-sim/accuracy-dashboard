@@ -21,7 +21,7 @@ def coeff(name="host_launch_per_kernel", **kw):
     """A coefficient as the final layer 10 Result writes it: booleans only when true."""
     return {"set": "cost-model-host-overheads", "name": name, "method": "measured", "scope": "h200", "file": "f.yaml",
             "kernel_impls": [{"library": "flashinfer", "variant": "decode", "code_hash": HASH}],
-            "fit_range": [{"dim": "tokens", "low": 1, "high": 64}], **kw}
+            "fit_range": [{"dim": "tokens", "low": 1, "high": 64}], "ci95": {"low": 0.9, "high": 1.1}, **kw}
 
 
 def doc(*cs, resolutions=None):
@@ -43,7 +43,7 @@ def field_list(classes=None, status="modelled"):
 
 # ---- coefficient_range
 
-def test_a_report_with_fit_ranges_and_no_flags_is_evaluated_and_clean():
+def test_a_report_whose_entries_state_a_fit_range_and_an_interval_and_no_flags_is_evaluated_and_clean():
     e = g1.coefficient_range(doc())
     assert e.evaluated and e.subs == []
 
@@ -64,9 +64,23 @@ def test_a_report_without_the_closeness_marker_leaves_the_range_and_the_hash_une
     assert not g1.coefficient_range(d).evaluated        # only version 1 is read
 
 
-def test_under_the_marker_an_entry_with_no_keys_is_clean_not_unknown():
+def test_an_entry_that_states_no_fit_range_or_no_interval_leaves_the_flags_not_evaluated():
     bare = {"set": "s", "name": "n", "method": "assumed", "scope": "h200", "file": "f.yaml"}
-    assert g1.coefficient_range(doc(bare)).evaluated
+    e = g1.coefficient_range(doc(bare))
+    assert not e.evaluated and "state no fit range or no interval" in e.why
+    no_ci = coeff()
+    del no_ci["ci95"]
+    assert not g1.coefficient_range(doc(no_ci)).evaluated          # extrapolated is decidable, unidentified is not
+    no_fit = coeff()
+    del no_fit["fit_range"]
+    assert not g1.coefficient_range(doc(coeff(), no_fit)).evaluated
+    assert g1.coefficient_range(doc(coeff(), coeff("b"))).evaluated
+
+
+def test_a_true_flag_is_evidence_even_when_other_entries_state_nothing():
+    bare = {"set": "s", "name": "n", "method": "assumed", "scope": "h200", "file": "f.yaml"}
+    e = g1.coefficient_range(doc(bare, coeff("a", extrapolated=True)))
+    assert e.evaluated and [x["subject"] for x in e.subs] == ["cost-model-host-overheads/a"]
 
 
 @pytest.mark.parametrize("d", [{}, {"selected_entries": {}}, {"selected_entries": {"coefficients": []}}])
@@ -102,12 +116,13 @@ def test_a_missing_run_version_or_library_or_kernel_impl_leaves_it_unevaluated()
     assert not g1.kernel_hash(doc(c), {"flashinfer": "0.4.1"}, VERSIONS).evaluated
 
 
-def test_a_fitted_coefficient_with_no_kernel_implementation_leaves_the_hash_unevaluated_not_skipped():
-    fitted = coeff("b")
-    del fitted["kernel_impls"]                     # a fit range, no kernel
-    assert not g1.kernel_hash(doc(coeff(), fitted), {"flashinfer": "0.4.1"}, VERSIONS).evaluated
+def test_a_coefficient_with_no_kernel_implementation_leaves_the_hash_unevaluated_not_skipped():
+    for drop in ("kernel_impls",):
+        fitted = coeff("b")
+        del fitted[drop]
+        assert not g1.kernel_hash(doc(coeff(), fitted), {"flashinfer": "0.4.1"}, VERSIONS).evaluated
     constant = {"set": "s", "name": "c", "method": "assumed", "scope": "h200", "file": "f.yaml"}
-    assert g1.kernel_hash(doc(coeff(), constant), {"flashinfer": "0.4.1"}, VERSIONS).evaluated   # tied to no kernel
+    assert not g1.kernel_hash(doc(coeff(), constant), {"flashinfer": "0.4.1"}, VERSIONS).evaluated   # the entry states none
 
 
 def test_an_entry_listing_several_implementations_of_a_library_accepts_any_priced_hash():
@@ -127,7 +142,10 @@ BOOL = {"type": "boolean", "covered": ["true"]}
 def test_a_numeric_class_counts_the_thresholds_below_the_value_and_a_closed_above_one_includes_equality():
     assert [fl.class_of(x, NUMERIC) for x in (1, 63, 64, 65, 512, 513)] == [0, 0, 1, 1, 1, 2]
     assert [fl.covers(x, NUMERIC) for x in (1, 64, 512, 513, 10000)] == [True, False, False, True, True]
-    assert not fl.covers(True, NUMERIC) and not fl.covers("64", NUMERIC)
+    assert not fl.covers(True, NUMERIC)
+    assert fl.covers("32", NUMERIC) and not fl.covers("64", NUMERIC) and not fl.covers("x", NUMERIC)   # a number written as text
+    for bad in (float("nan"), float("inf"), float("-inf")):
+        assert not fl.covers(bad, NUMERIC)
 
 
 def test_a_numeric_field_with_no_thresholds_has_one_class():

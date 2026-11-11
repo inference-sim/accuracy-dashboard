@@ -577,6 +577,11 @@
           "type": "string",
           "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
         },
+        "entry": {
+          "description": "router_differs only: the router table entry used, by name; it begins with the router, which is the subject.",
+          "type": "string",
+          "minLength": 1
+        },
         "policy": {
           "description": "router_differs only: the llm-d router policy BLIS simulated in place of the run's router.",
           "type": "string",
