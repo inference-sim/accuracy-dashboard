@@ -149,3 +149,34 @@ def test_the_committed_runs_records_load_and_validate(validator, run_dir):
     code, out, err = run(validator, contract / "pointrecords.jsonl")
     assert code == 0, err[:3000]
     assert out.strip() == f"{len(recs)} records, 0 refused"
+
+
+@SKIP
+def test_the_grade_must_agree_with_the_substitutions_as_the_substrates_validator_reads_them(validator, tmp_path):
+    """The dashboard keeps no schema that ties a grade to its substitutions (SUB-19): the substrate's validator does."""
+    recs = [json.loads(l) for l in (ROOT / "docs" / "m2" / "pd-writer-experiment" / "contract" / "pointrecords.jsonl").read_text().splitlines()]
+    g4 = next(r for r in recs if r["grade"] == "G4")
+    unchecked = [{"kind": "unevaluated", "subject": "kernel_hash"}]
+
+    def verdict(rec):
+        p = tmp_path / "r.jsonl"
+        p.write_text(json.dumps(rec) + "\n")
+        return run(validator, p)[0]
+    assert verdict(g4) == 0
+    assert verdict({**g4, "grade": "G1"}) == 1                                  # G1 names no substitution
+    assert verdict({**g4, "substitutions": []}) == 1                            # G4 names the one that makes it so
+    assert verdict({**g4, "grade": "G2"}) == 1                                  # a G4 floor is not G2
+    assert verdict({**g4, "grade": "G2", "substitutions": unchecked}) == 0      # an unevaluated condition makes G2
+    assert verdict({**g4, "grade": "G1", "substitutions": unchecked}) == 1      # and not G1
+
+
+def test_point_record_problems_runs_the_substrates_command_on_every_record(tmp_path):
+    import contract as c
+    fake = tmp_path / "blis"
+    fake.write_text('#!/bin/sh\n[ "$1 $2 $3" = "schema validate point-record" ] || exit 2\ngrep -q \'"grade": "G9"\' "$4" && { echo "grade: bad"; exit 1; }\nexit 0\n')
+    fake.chmod(0o755)
+    d = tmp_path / "run"
+    d.mkdir()
+    (d / c.POINTRECORDS_JSONL).write_text(c.canonical_dumps({"grade": "G2", "point_id": "a"}) + "\n" + c.canonical_dumps({"grade": "G9", "point_id": "b"}) + "\n")
+    problems = c.point_record_problems(d, str(fake))
+    assert len(problems) == 1 and "pointrecords.jsonl:2" in problems[0] and "grade: bad" in problems[0]

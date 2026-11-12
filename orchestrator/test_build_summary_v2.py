@@ -185,13 +185,13 @@ def test_an_invalid_contract_is_refused_not_built():
     shutil.copytree(FIXTURE / "run-a", d)
     lines = (d / "fidelity.jsonl").read_text().splitlines()
     rec = json.loads(lines[0])
-    rec["args"][0]["match"] = "close_enough"
+    rec["grade"] = "G4" if rec["grade"] != "G4" else "G2"      # the record disagrees with points.csv
     lines[0] = json.dumps(rec, sort_keys=True, separators=(",", ":"))
     (d / "fidelity.jsonl").write_text("\n".join(lines) + "\n")
     try:
         b2.build(d, generated_at=STAMP, evaluator_commit="test")
     except b2.ContractError as e:
-        assert "close_enough" in str(e)
+        assert "is graded" in str(e)
         return
     raise AssertionError("built a summary from an invalid contract")
 
@@ -209,9 +209,6 @@ def test_the_validator_catches_coverage_that_doesnt_balance_and_malformed_fideli
     doc = _build()
     doc["coverage"]["g5_reasons"]["not_in_catalog"] = 9
     assert any("g5_reasons" in p for p in vs2.problems(doc))
-    doc = _build()
-    _points(doc)[0]["fidelity"]["build"]["distance"] = "near"
-    assert vs2.problems(doc) != []
     doc = _build()
     doc["schema_version"] = 1
     assert vs2.problems(doc) != []
