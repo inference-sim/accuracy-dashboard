@@ -1371,3 +1371,47 @@ def test_packaging_comes_from_blis_catalog_resolve_and_falls_back_to_the_catalog
     with pytest.raises(bc.CommandError, match="packaging"):
         sp.Catalog(blis=str(blis), root=tmp).packaging("h100")
 
+
+
+# ---- the fabric class of a multi-node cluster no record states (blis-substrate SUB-3; #72 review): documented, labelled, or refused
+
+def _multi(chip):
+    return st.build(_classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16"))), name="p",
+                    model="m", part=st.Part(name=chip), engine_version="0.32.0", field_list=FIELDS, catalog_node_size=None, node=NODE8)
+
+
+@pytest.mark.parametrize("chip,tech,cls,stands_in", [
+    ("h200", "InfiniBand NDR", "ib-400g", False), ("gb200-nvl72", "InfiniBand NDR", "ib-400g", False),
+    ("gb300", "InfiniBand XDR", "ib-800g", False),
+    ("h100", "RoCEv2 Ethernet", "ib-400g", True), ("b200", "gIB RoCEv2 Ethernet", "ib-400g", True),
+    ("b300", "RoCEv2 Ethernet", "ib-800g", True)])
+def test_a_chip_whose_fabric_inferencex_documents_gets_that_fabric_cited_on_the_point(chip, tech, cls, stands_in):
+    b = _multi(chip)
+    (sub,) = [x for x in b.substitutions if x["subject"] == "cluster.fabric"]
+    assert b.scenario["cluster"]["fabric"] == cls and sub["kind"] == "estimated" and b.reasons == []
+    assert tech in sub["detail"] and "inferencex.semianalysis.com/gpu-specs" in sub["detail"]
+    assert "documented by InferenceX" in sub["detail"]
+    # a RoCE fabric is not an InfiniBand class: the point says a class of the same line rate stands in
+    assert ("stands in" in sub["detail"]) is stands_in
+
+
+def test_a_chip_nothing_documents_gets_the_default_class_and_the_point_says_nothing_documents_it():
+    for chip in ("l40s", "not-a-chip"):
+        b = _multi(chip)
+        (sub,) = [x for x in b.substitutions if x["subject"] == "cluster.fabric"]
+        assert b.scenario["cluster"]["fabric"] == st.DEFAULT_ASSUMED_FABRIC
+        assert "no source documents the fabric" in sub["detail"] and "documented by InferenceX" not in sub["detail"]
+
+
+def test_under_the_refuse_switch_a_multi_node_point_with_no_recorded_fabric_is_g5_value_not_recorded(monkeypatch):
+    monkeypatch.setattr(st, "FABRIC_WHEN_UNRECORDED", "refuse")
+    for chip in ("h200", "b300", "not-a-chip"):
+        b = _multi(chip)
+        assert "value_not_recorded:cluster.fabric" in b.reasons
+        assert "fabric" not in b.scenario["cluster"] and "cost-model-fabric" not in b.scenario["coefficients"]
+        assert not [x for x in b.substitutions if x["subject"] == "cluster.fabric"]
+    # a class a launch configuration records is still used
+    b = st.build(_classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16"))), name="p", model="m",
+                 part=st.Part(name="h200"), engine_version="0.32.0", field_list=FIELDS, catalog_node_size=None, node=NODE8,
+                 launch_config={"resources": {"fabric": "roce-200g"}})
+    assert b.scenario["cluster"]["fabric"] == "roce-200g" and b.reasons == []

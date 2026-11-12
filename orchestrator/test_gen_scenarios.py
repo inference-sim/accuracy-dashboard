@@ -113,6 +113,14 @@ def main() -> int:
     for chip, want in (("b300", "ib-800g"), ("gb300", "ib-800g"), ("h200", "ib-400g"), ("b200", "ib-400g")):
         ck(f"a multi-node {chip} scenario assumes {want}",
            cluster_of(sweep(gpu=chip, node=4, tp=8), OPEN).get("fabric") == want)
+    import settings as st_
+    st_.FABRIC_WHEN_UNRECORDED = "refuse"
+    try:
+        refused = emit(sweep(gpu="h200", node=4, tp=8), {"1k1k"}, OPEN, "0.32.0")
+        ck("under the refuse switch a multi-node scenario writes no fabric and no fabric coefficient",
+           "fabric: ib" not in refused and "cost-model-fabric" not in refused and "NOT WRITTEN" in refused)
+    finally:
+        st_.FABRIC_WHEN_UNRECORDED = "assume"
     one = emit(sweep(gpu="h100", node=8), {"1k1k"}, OPEN, "0.32.0")
     ck("a one-node scenario lists no fabric set", "cost-model-fabric" not in (next(iter(one.values())) if isinstance(one, dict) else str(one)))
     try:

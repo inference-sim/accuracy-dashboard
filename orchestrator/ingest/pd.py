@@ -246,20 +246,22 @@ def build_pd(pool_builts: dict, recipe: "pdr.Recipe", pools: dict, taken: dict, 
     scenario = dict(pre.scenario)
     scenario["cluster"] = {**scenario["cluster"], "nodes": nodes}
     subs = pre.substitutions + dec.substitutions
+    fabric_reasons: list[str] = []
     if nodes > 1 and "fabric" not in scenario["cluster"]:
         # Two pools never share a node, so a P/D deployment crosses the fabric: the handoff is priced
         # at its class and the registry's efficiency for it. No recipe or cluster record of
-        # InferenceX names the class, so the assumed one is named on the point.
-        recorded = recipe.fabric or st.recorded_fabric(launch)
-        assumed, assumed_sub = st.assumed_fabric(scenario["cluster"].get("hardware"))
-        scenario["cluster"]["fabric"] = recorded or assumed
-        if st.FABRIC_COEFFICIENT not in scenario["coefficients"]:
-            scenario["coefficients"] = [*scenario["coefficients"], st.FABRIC_COEFFICIENT]
-        if recorded is None:
-            subs = subs + [assumed_sub]
+        # InferenceX names the class: settings.fabric_for refuses the point (G5) or, under the
+        # maintainer's switch, names an assumed class on it.
+        fabric, fabric_subs, fabric_reasons = st.fabric_for(recipe.fabric or st.recorded_fabric(launch),
+                                                            scenario["cluster"].get("hardware"))
+        subs = subs + fabric_subs
+        if fabric is not None:
+            scenario["cluster"]["fabric"] = fabric
+            if st.FABRIC_COEFFICIENT not in scenario["coefficients"]:
+                scenario["coefficients"] = [*scenario["coefficients"], st.FABRIC_COEFFICIENT]
     out = st.Built(scenario=scenario, deployment=dep, acceptance_length=None,
                    gpus=sum(p.workers * p.gpus for p in pools.values()))
-    out.reasons = sorted(set(pre.reasons + dec.reasons))
+    out.reasons = sorted(set(pre.reasons + dec.reasons + fabric_reasons))
     out.substitutions = subs
     out.node_source = pre.node_source
     out.vllm_names = pre.vllm_names

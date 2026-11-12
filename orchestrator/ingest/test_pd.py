@@ -906,3 +906,16 @@ def test_a_point_whose_policy_the_router_does_not_publish_is_g5_with_the_named_r
             assert e2e._saw(env) == []                    # the simulator was never asked
         finally:
             shutil.rmtree(tmp)
+
+
+def test_under_the_refuse_switch_a_pd_point_with_no_recorded_fabric_is_g5_value_not_recorded_and_by_default_it_names_a_fabric(monkeypatch):
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _pd_point(tmp, log=False, recipe_text=RECIPE)
+        o, _ = e2e._score(tmp, entry, env, tmp / "c1")
+        assert not any(r.startswith("value_not_recorded:cluster.fabric") for r in o.reasons), o.reasons   # default: assumed and named
+        monkeypatch.setattr(st, "FABRIC_WHEN_UNRECORDED", "refuse")
+        o, _ = e2e._score(tmp, entry, env, tmp / "c2")
+        assert "value_not_recorded:cluster.fabric" in o.reasons and o.fidelity is None, o.reasons
+    finally:
+        shutil.rmtree(tmp)
