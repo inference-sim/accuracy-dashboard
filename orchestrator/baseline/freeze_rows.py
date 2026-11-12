@@ -1,26 +1,28 @@
 #!/usr/bin/env python3
-"""Freeze the recorded runs of a pinned list of InferenceX rows that the ledger does not hold yet.
+"""Freeze the recorded runs of InferenceX rows that the pinned dump does not hold, as the substrate's ledger holds them.
 
-The baseline's pull (freeze.py) is the 1734 points of the ledger's source revision. It is a fixed
-set and this script never touches it. Rows measured after that revision have no ledger unit, so
-this script makes the unit the way the ledger's ingest tool does (contract.unit_identity, whose
-hash is the unit_id) into a supplementary ledger directory, and freezes the rows' artifacts into a
-pull of their own. The rows are pinned by their API records, committed as ROWS.json (the API's
-records are not stable, and the artifacts expire after 90 days), so the same rows can be frozen
-again while the artifacts last.
+The baseline's pull (freeze.py) is the 1734 points of the ledger's source revision; this script never touches it. Rows InferenceX
+published after that dump are pinned by blis-substrate (catalog/ledger/sources.yaml, the `inferencex` source's supplements: record id
+and content SHA-256), and the substrate's ingest makes their units (catalog/ledger/units/inferencex.jsonl.gz). The dashboard makes no
+unit, no role key and no ledger report (design 2.2: the substrate owns turning each source's records into ledger units), and commits
+no third-party record (X12). It takes:
 
-    freeze_rows.py --rows ROWS.json --revision NAME --ledger-out DIR --out PULL --cache CACHE
-                   [--units-out FILE]
+  --ledger DIR    the substrate's catalog/ledger at the pinned commit (pins.env, BLIS_SUBSTRATE_COMMIT)
+  --records FILE  the records of a run, written by `go run ./ledger/cmd/ledger supplement-records -out FILE catalog/ledger`, which
+                  refuses any record whose content differs from its pin. Never committed.
 
-A supplementary ledger is not the substrate's ledger: its units have no role key (the placeholder
-is all zeros) and its `revision` says so. The development split does not read role keys.
+and freezes the rows' artifacts into a pull of its own:
+
+    freeze_rows.py --ledger DIR --records FILE --out PULL --cache CACHE [--units-out FILE] [--pins pins.env] [--allow-unpinned]
+
+Each row must be placed by a unit of the substrate's list; a row the list does not hold is refused, never given a unit here. Scoring
+reads the published anchor lists only (COV-2): a unit with no role until the seed and lists are published is not an anchor.
 """
 from __future__ import annotations
 
 import argparse
-import gzip
-import hashlib
 import json
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -30,53 +32,70 @@ sys.path.insert(0, str(HERE.parent / "ingest"))
 import api  # noqa: E402
 import cli  # noqa: E402
 import contract  # noqa: E402
+import ledger as ldg  # noqa: E402
 
-NO_ROLE_KEY = "0" * 64
+PIN_KEY = "BLIS_SUBSTRATE_COMMIT"
 
 
-def write_ledger(directory: Path, rows: list[dict], revision: str) -> list[str]:
-    """A ledger directory (units/inferencex.jsonl.gz, reports/inferencex.yaml) holding one unit
-    per row, in the format ledger.load reads. Returns the unit ids."""
-    d = Path(directory)
-    (d / "units").mkdir(parents=True, exist_ok=True)
-    (d / "reports").mkdir(parents=True, exist_ok=True)
+class FreezeError(ValueError):
+    pass
+
+
+def read_pin(path: Path) -> str:
+    """The blis-substrate commit the pins file names, or '' while it is a placeholder."""
+    for line in Path(path).read_text().splitlines():
+        line = line.strip()
+        if line.startswith(PIN_KEY + "="):
+            return line.split("=", 1)[1].strip()
+    raise FreezeError(f"{path}: no {PIN_KEY}=")
+
+
+def check_pin(ledger_dir: Path, pins: Path, allow_unpinned: bool) -> str:
+    """Refuse a ledger checkout that is not the pinned commit; an empty pin is refused unless allowed (a scratch build)."""
+    pin = read_pin(pins)
+    if not pin:
+        if allow_unpinned:
+            return ""
+        raise FreezeError(f"{pins} holds no {PIN_KEY} yet: the substrate commit is not pinned (--allow-unpinned only for a scratch build)")
+    top = Path(ledger_dir).resolve()
+    got = subprocess.run(["git", "-C", str(top), "rev-parse", "HEAD"], capture_output=True, text=True)
+    if got.returncode != 0 or got.stdout.strip() != pin:
+        raise FreezeError(f"the ledger checkout is at {got.stdout.strip() or 'no commit'}, not the pinned {pin}")
+    return pin
+
+
+def place_all(lg: ldg.Ledger, rows: list[dict]) -> list[str]:
+    """The unit id of each row, from the substrate's unit list. A row it does not hold, or whose identity the list gives another
+    hash, is refused; two rows in one unit are one point."""
     dates = contract.run_dates(rows)
-    units = {}
+    ids: dict[str, str] = {}
     for r in rows:
-        ident = contract.unit_identity(r, dates)
-        uid = contract.point_id(ident)
-        if uid in units:
-            raise ValueError(f"rows {units[uid]['measurements'][0]['record']} and {r['id']} have one identity")
-        measured = hashlib.sha256(contract.canonical_dumps(r["metrics"]).encode()).hexdigest()
-        units[uid] = {"unit_id": uid, "role_key": NO_ROLE_KEY, "identity": ident,
-                      "measurements": [{"record": str(r["id"]), "measured": measured, "duplicates": [],
-                                        "merged": [], "recorded": {}}]}
-    lines = [units[k] for k in sorted(units)]
-    (d / "units" / "inferencex.jsonl.gz").write_bytes(
-        gzip.compress("".join(json.dumps(u, sort_keys=True) + "\n" for u in lines).encode(), mtime=0))
-    by_fw: dict = {}
-    for r in rows:
-        by_fw[r["framework"]] = by_fw.get(r["framework"], 0) + 1
-    (d / "reports" / "inferencex.yaml").write_text(json.dumps({
-        "kind": "IngestReport", "source": "inferencex", "revision": revision, "input": "0" * 64,
-        "records": len(rows), "units": len(lines), "role_keys": 0, "duplicates": 0, "merged": 0,
-        "joined_units": 0, "joined_records": 0, "left_out": {}, "units_by_framework": dict(sorted(by_fw.items()))},
-        indent=1, sort_keys=True) + "\n")
-    return sorted(units)
+        p = lg.place(r, dates)
+        if p is None:
+            raise FreezeError(f"row {r['id']}: the substrate's unit list holds no unit for it; pin it in catalog/ledger/sources.yaml")
+        uid = p.unit.unit_id
+        if uid in ids and ids[uid] != str(r["id"]):
+            raise FreezeError(f"rows {ids[uid]} and {r['id']} are one unit")
+        ids[uid] = str(r["id"])
+    return sorted(ids)
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--rows", required=True, help="the pinned API records (a JSON list)")
-    ap.add_argument("--revision", required=True, help="the supplementary ledger's name, written to its report")
-    ap.add_argument("--ledger-out", required=True)
+    ap.add_argument("--ledger", required=True, help="the substrate's catalog/ledger directory")
+    ap.add_argument("--records", required=True, help="the verified records of the run (supplement-records output; not committed)")
     ap.add_argument("--out", required=True, help="the new pull directory (never the baseline's)")
     ap.add_argument("--cache", required=True)
     ap.add_argument("--units-out")
+    ap.add_argument("--pins", default=str(HERE.parent.parent / "docs" / "m2" / "h200-v033" / "pins.env"))
+    ap.add_argument("--allow-unpinned", action="store_true")
     ap.add_argument("--download-workers", type=int, default=4)
     a = ap.parse_args(argv)
-    rows = sorted(json.loads(Path(a.rows).read_text()), key=lambda r: int(r["id"]))
-    units = write_ledger(Path(a.ledger_out), rows, a.revision)
+    ledger_dir = Path(a.ledger)
+    check_pin(ledger_dir, Path(a.pins), a.allow_unpinned)
+    rows = sorted(json.loads(Path(a.records).read_text()), key=lambda r: int(r["id"]))
+    lg = ldg.load(ledger_dir)
+    units = place_all(lg, rows)
     if a.units_out:
         Path(a.units_out).write_text("".join(u + "\n" for u in units))
     dates = sorted({str(r["date"])[:10] for r in rows})
@@ -88,7 +107,7 @@ def main(argv=None) -> int:
     try:
         rc = cli.cmd_pull(types.SimpleNamespace(
             out=a.out, today=dates[-1], window_days=180, cache=a.cache, prior=None, only=units,
-            download_workers=a.download_workers, ledger=a.ledger_out))
+            download_workers=a.download_workers, ledger=str(ledger_dir)))
     finally:
         api.pull = real
     if rc == 0:
