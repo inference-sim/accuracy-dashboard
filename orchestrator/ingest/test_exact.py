@@ -121,3 +121,49 @@ def test_the_engines_whole_field_list_parses_and_the_three_fields_state_when_the
     flist = fl.parse(Path(REAL).read_bytes())
     for name in ("VLLM_FLASHINFER_ALLREDUCE_BACKEND", "UCX_RCACHE_MAX_UNRELEASED", "UCX_TLS"):
         assert "valid_when" in flist.lookup(f"env.{name}").estimation
+
+
+# ---- the substrate's known-bad vectors (contracts/spec/fields exact_test.go TestEveryBadExactnessStatementIsRefused): each is refused,
+# naming what the substrate names. A malformed clause must never parse, and so never count as vacuously exact.
+
+_PRE = {"rule": "leave_unset", "preserves": "p"}
+BAD = [
+    ("unknown clause key", {**_PRE, "valid_when": [{"value_is": ["auto"]}]}, ["valid_when[0]", 'unknown key "value_is"']),
+    ("unknown comparison operator", {**_PRE, "valid_when": [{"tp_group_nodes": {"ge": 1}}]},
+     ["valid_when[0].tp_group_nodes", 'unknown key "ge"']),
+    ("unknown key on the estimation", {**_PRE, "valid_if": []}, ["unknown key 'valid_if'"]),
+    ("capability that is not major.minor", {**_PRE, "valid_when": [{"compute_capability": {"gte": "10"}}]},
+     ["valid_when[0].compute_capability.gte", "<major>.<minor>"]),
+    ("capability that is not a number", {**_PRE, "valid_when": [{"compute_capability": {"lt": "hopper"}}]}, ["compute_capability.lt"]),
+    ("capability given as a number", {**_PRE, "valid_when": [{"compute_capability": {"gte": 10.0}}]}, ["gte"]),
+    ("node count that is not a whole number", {**_PRE, "valid_when": [{"tp_group_nodes": {"eq": 1.5}}]}, ["eq"]),
+    ("node count that is a boolean", {**_PRE, "valid_when": [{"tp_group_nodes": {"eq": True}}]}, ["eq"]),
+    ("empty clause", {**_PRE, "valid_when": [{}]}, ["valid_when[0]", "at least one key"]),
+    ("empty comparison", {**_PRE, "valid_when": [{"tp_group_nodes": {}}]}, ["valid_when[0].tp_group_nodes", "at least one of eq"]),
+    ("empty valid_when", {**_PRE, "valid_when": []}, ["valid_when", "at least one clause"]),
+    ("empty string list", {**_PRE, "valid_when": [{"value_in": []}]}, ["value_in", "at least one string"]),
+    ("blank string in a list", {**_PRE, "valid_when": [{"value_in": ["auto", " "]}]}, ["value_in[1]"]),
+    ("valid_when without preserves", {"rule": "leave_unset", "valid_when": [{"value_in": ["auto"]}]},
+     ["estimation.preserves", "required with valid_when"]),
+    ("valid_when on rule none", {"rule": "none", "valid_when": [{"value_in": ["auto"]}]}, ["estimation.valid_when", "only with rule"]),
+    ("preserves on rule none", {"rule": "none", "preserves": "p"}, ["estimation.preserves", "only with rule"]),
+    ("a clause whose keys are all null", {**_PRE, "valid_when": [{"value_in": None}]}, ["at least one key"]),
+]
+
+
+def _parse_est(est):
+    row = {"name": "X", "source": "env", "status": "not_modelled", "evidence": {"issue": "o/r#1"}, "estimation": est}
+    return fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": [row]}))
+
+
+@pytest.mark.parametrize("name,est,want", BAD, ids=[b[0] for b in BAD])
+def test_every_bad_exactness_statement_the_substrate_refuses_is_refused_here_too(name, est, want):
+    with pytest.raises(fl.FieldsError) as e:
+        _parse_est(est)
+    for w in want:
+        assert w in str(e.value), f"{w!r} not in {e.value}"
+
+
+def test_a_null_valid_when_is_absent_as_in_the_substrates_decoder():
+    est = _parse_est({"rule": "leave_unset", "preserves": "p", "valid_when": None}).fields["env.X"].estimation
+    assert fl.exact(est, {"value": "anything"}) is True
