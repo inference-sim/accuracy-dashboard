@@ -26,6 +26,8 @@ UNIT_KEYS = {"unit_id", "role_key", "identity", "measurements"}
 MEASUREMENT_KEYS = {"record", "measured", "duplicates", "merged", "recorded"}
 REPORT_KEYS = {"kind", "source", "revision", "input", "records", "units", "role_keys", "duplicates",
                "merged", "joined_units", "joined_records", "left_out", "units_by_framework"}
+# A report names the supplements (records published after the pinned dump) when the source pins any.
+REPORT_OPTIONAL = frozenset({"supplements"})
 PUBLISHED_KEYS = {"kind", "role", "partition_version", "seed_sha256", "units"}
 
 KEPT, DUPLICATE, MERGED = "kept", "duplicate", "merged"
@@ -96,10 +98,10 @@ class Ledger:
         return p
 
 
-def _strict(obj, keys: set, where: str) -> dict:
+def _strict(obj, keys: set, where: str, optional: frozenset = frozenset()) -> dict:
     if not isinstance(obj, dict):
         raise LedgerError(f"{where}: not an object")
-    extra = set(obj) - keys
+    extra = set(obj) - keys - optional
     missing = keys - set(obj)
     if extra or missing:
         raise LedgerError(f"{where}: unexpected keys {sorted(extra)}, missing {sorted(missing)}")
@@ -141,7 +143,7 @@ def load(ledger_dir: Path, source: str = contract.SOURCE) -> Ledger:
                     raise LedgerError(f"record {rid} is in two units")
                 lg.by_record[rid] = Placement(u, how, own)
     rep = _strict(yaml.safe_load((d / "reports" / f"{source}.yaml").read_text()), REPORT_KEYS,
-                  f"reports/{source}.yaml")
+                  f"reports/{source}.yaml", REPORT_OPTIONAL)
     lg.revision = str(rep["revision"])
     for reason, ids in sorted((rep["left_out"] or {}).items()):
         for rid in ids:
