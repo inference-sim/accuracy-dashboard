@@ -1,8 +1,3 @@
 # The Go release the nightly installs to build a simulator (the one inference-sim's go.mod names).
 # The only place the dashboard states it.
 GO_VERSION=1.27.2
-
-# The inference-sim commit the compatibility job builds and runs the real-simulator tests against
-# (checks.yml, job `simulator`): the top of the final inference-sim stack
-# (branch m2/11-router-configs-command). The baseline rescore still passes --sim v0.16.0.
-SIM_COMMIT=c97c497b104a556515717599a4468352c1234d28

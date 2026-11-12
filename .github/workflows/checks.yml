@@ -122,8 +122,8 @@ jobs:
 
   # The tests that simulate (X16): the primed-warm-up equivalence of the single-turn replay and the
   # request_rows boundary, run through a real `blis replay` built at the pinned commit. They fail,
-  # not skip, without a binary, so this job is where they run. The commit is harness/harness.pin's
-  # SIM_COMMIT; the Go release is read from that checkout's go.mod.
+  # not skip, without a binary, so this job is where they run. The build is .github/stack-pins.env's
+  # SIM_REF (a commit or a release tag); the Go release is read from that checkout's go.mod.
   simulator:
     runs-on: ubuntu-latest
     steps:
@@ -135,12 +135,12 @@ jobs:
       - name: Check out inference-sim at the pinned commit
         run: |
           set -euo pipefail
-          sim_commit="$(sed -n 's/^SIM_COMMIT=//p' harness/harness.pin)"
+          sim_ref="$(sed -n 's/^SIM_REF=//p' .github/stack-pins.env)"
           git init -q "$RUNNER_TEMP/sim"
           git -C "$RUNNER_TEMP/sim" remote add origin https://github.com/inference-sim/inference-sim.git
-          git -C "$RUNNER_TEMP/sim" fetch -q --depth 1 origin "$sim_commit"
+          git -C "$RUNNER_TEMP/sim" fetch -q --depth 1 origin "$sim_ref"
           git -C "$RUNNER_TEMP/sim" checkout -q FETCH_HEAD
-          test "$(git -C "$RUNNER_TEMP/sim" rev-parse HEAD)" = "$sim_commit"
+          if echo "$sim_ref" | grep -Eq '^[0-9a-f]{40}$'; then test "$(git -C "$RUNNER_TEMP/sim" rev-parse HEAD)" = "$sim_ref"; fi
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: ${{ runner.temp }}/sim/go.mod
@@ -148,33 +148,33 @@ jobs:
       - name: Check out the blis-substrate release the build pins
         run: |
           set -euo pipefail
-          # stack.json names the substrate by commit; its version is a pseudo-version, not a tag on origin.
-          sha="$(python3 -c 'import json,sys; print([m["commit"] for m in json.load(open(sys.argv[1]))["modules"] if m["path"].endswith("/blis-substrate")][0])' "$RUNNER_TEMP/sim/stack.json")"
+          # stack.json names the substrate by commit, or by release tag when the build pins a release.
+          ref="$(python3 -c 'import json,sys; m=[m for m in json.load(open(sys.argv[1]))["modules"] if m["path"].endswith("/blis-substrate")][0]; print(m.get("commit") or m["version"])' "$RUNNER_TEMP/sim/stack.json")"
           git init -q "$RUNNER_TEMP/substrate"
           git -C "$RUNNER_TEMP/substrate" remote add origin https://github.com/inference-sim/blis-substrate.git
-          git -C "$RUNNER_TEMP/substrate" fetch -q --depth 1 origin "$sha"
+          git -C "$RUNNER_TEMP/substrate" fetch -q --depth 1 origin "$ref"
           git -C "$RUNNER_TEMP/substrate" checkout -q FETCH_HEAD
-          test "$(git -C "$RUNNER_TEMP/substrate" rev-parse HEAD)" = "$sha"
-      - name: Check out the blis-substrate commit that defines the point record, with harness_commit and router_differs (blis-substrate the commit the simulator resolves, on origin)
+          if echo "$ref" | grep -Eq '^[0-9a-f]{40}$'; then test "$(git -C "$RUNNER_TEMP/substrate" rev-parse HEAD)" = "$ref"; fi
+      - name: Check out the blis-substrate ref that defines the point record, with harness_commit and router_differs (.github/stack-pins.env)
         run: |
           set -euo pipefail
-          sha=6faaccf8f1a2344918241d6b54fe339de44f7345
+          sha="$(sed -n 's/^SUBSTRATE_REF=//p' .github/stack-pins.env)"
           git init -q "$RUNNER_TEMP/substrate-pointrecord"
           git -C "$RUNNER_TEMP/substrate-pointrecord" remote add origin https://github.com/inference-sim/blis-substrate.git
           git -C "$RUNNER_TEMP/substrate-pointrecord" fetch -q --depth 1 origin "$sha"
           git -C "$RUNNER_TEMP/substrate-pointrecord" checkout -q FETCH_HEAD
-          test "$(git -C "$RUNNER_TEMP/substrate-pointrecord" rev-parse HEAD)" = "$sha"
+          if echo "$sha" | grep -Eq '^[0-9a-f]{40}$'; then test "$(git -C "$RUNNER_TEMP/substrate-pointrecord" rev-parse HEAD)" = "$sha"; fi
       - name: Check out the router fork at the pinned commit (its published endpoint-picker files and index)
         run: |
           set -euo pipefail
-          # The router fork's commit that publishes reference-configs/ (branch m2/2-reference-endpoint-picker-configs, PR 7).
-          router_sha="98c38c04de494e4e64fe23c4532074c6df95a898"
+          # The router fork's ref that publishes reference-configs/ (.github/stack-pins.env).
+          router_sha="$(sed -n 's/^ROUTER_REF=//p' .github/stack-pins.env)"
           if [ -n "$router_sha" ]; then
             git init -q "$RUNNER_TEMP/router"
             git -C "$RUNNER_TEMP/router" remote add origin https://github.com/inference-sim/llm-d-router.git
             git -C "$RUNNER_TEMP/router" fetch -q --depth 1 origin "$router_sha"
             git -C "$RUNNER_TEMP/router" checkout -q FETCH_HEAD
-            test "$(git -C "$RUNNER_TEMP/router" rev-parse HEAD)" = "$router_sha"
+            if echo "$router_sha" | grep -Eq '^[0-9a-f]{40}$'; then test "$(git -C "$RUNNER_TEMP/router" rev-parse HEAD)" = "$router_sha"; fi
             echo "BLIS_ROUTER_CHECKOUT=$RUNNER_TEMP/router" >> "$GITHUB_ENV"
           fi
       - name: Build blis
