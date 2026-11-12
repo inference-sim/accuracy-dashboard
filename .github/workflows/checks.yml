@@ -162,9 +162,8 @@ jobs:
       - name: Check out the router fork at the pinned commit (its published endpoint-picker files and index)
         run: |
           set -euo pipefail
-          # PROVISIONAL: the router's commit that publishes the files and the index is not known yet. While it is empty this step
-          # does nothing and test_router_configs.py skips its real-router check, saying so; set it to the commit when it exists.
-          router_sha=""
+          # The router fork's commit that publishes reference-configs/ (branch m2/2-reference-endpoint-picker-configs, PR 7).
+          router_sha="03246be994224ef031dfdafb966c54f60d01e933"
           if [ -n "$router_sha" ]; then
             git init -q "$RUNNER_TEMP/router"
             git -C "$RUNNER_TEMP/router" remote add origin https://github.com/inference-sim/llm-d-router.git

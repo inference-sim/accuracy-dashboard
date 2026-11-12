@@ -143,7 +143,7 @@ def pool_parallel(pool: "Pool", flags: dict) -> dict:
 # EndpointPickerConfig file per policy and an index of them; the dashboard selects the policy the router table names and passes
 # the router's file to the simulator unchanged (design X1, X7). It holds no policy table and writes no configuration.
 # INDEX_PATH and the index's shape are the one place that knows how the router names them.
-INDEX_PATH = "config/reference/index.json"
+INDEX_PATH = "reference-configs/policies.json"      # the router's index; its files are named relative to its directory
 
 
 class PolicyConfigError(ValueError):
@@ -155,30 +155,43 @@ class PolicyConfigError(ValueError):
 
 
 def router_index(router: Path) -> dict:
-    """{policy: path of its configuration file} from the router checkout's index. Each file must exist inside the checkout."""
+    """{policy: {"colocated": path or None, "pd": path or None}} from the router checkout's index. A form the index
+    names must be a file of the checkout; a form it records as null does not exist (`default` has no prefill/decode form,
+    `pd-prefix-based` no colocated one)."""
     import json
     f = Path(router) / INDEX_PATH
     if not f.is_file():
         raise PolicyConfigError("router_index_missing", f"{f} does not exist: the router at this commit publishes no index")
-    try:
-        doc = json.loads(f.read_text())
-        entries = {e["policy"]: Path(router) / e["file"] for e in doc["policies"]}
-    except (ValueError, KeyError, TypeError) as e:
-        raise PolicyConfigError("router_index_unreadable", f"{f} is not an index of policies: {e}")
     root = Path(router).resolve()
-    for policy, path in entries.items():
-        if root not in path.resolve().parents or not path.is_file():
-            raise PolicyConfigError("router_index_unreadable", f"{policy}: {path} is not a file of the router checkout")
-    return entries
+    out: dict = {}
+    try:
+        for e in json.loads(f.read_text())["policies"]:
+            forms = {}
+            for form in ("colocated", "pd"):
+                name = e["files"].get(form)
+                forms[form] = None if name is None else f.parent / name
+            out[e["name"]] = forms
+    except (ValueError, KeyError, TypeError, AttributeError) as e:
+        raise PolicyConfigError("router_index_unreadable", f"{f} is not an index of policies: {e}")
+    for policy, forms in out.items():
+        for form, path in forms.items():
+            if path is not None and (root not in path.resolve().parents or not path.is_file()):
+                raise PolicyConfigError("router_index_unreadable", f"{policy}: {path} is not a file of the router checkout")
+    return out
 
 
-def epp_file(policy: str, router: Path) -> bytes:
-    """The router's endpoint-picker file for `policy`, byte for byte."""
+def epp_file(policy: str, router: Path, form: str = "pd") -> bytes:
+    """The router's endpoint-picker file for `policy` in `form` ("pd" for a prefill/decode deployment, "colocated"),
+    byte for byte. A policy the index does not list, or lists without that form, is refused by name."""
     index = router_index(router)
     if policy not in index:
         raise PolicyConfigError(f"policy_config_not_published:{policy}",
                                 f"the router publishes no configuration for policy {policy!r} (it publishes {sorted(index)})")
-    return index[policy].read_bytes()
+    path = index[policy][form]
+    if path is None:
+        raise PolicyConfigError(f"policy_form_missing:{policy}:{form}",
+                                f"the router publishes policy {policy!r} with no {form} form")
+    return path.read_bytes()
 
 
 def epp_name(policy: str) -> str:
