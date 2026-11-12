@@ -433,9 +433,7 @@ def _diff_args(args: list, dep: dict, b: st.Built) -> list[str]:
             continue
         else:
             got = _blis_value(dep, f)
-            if f == "engine.frontend":
-                want = st.FRONTEND[want]
-            elif f.startswith("engine.env."):
+            if f.startswith("engine.env."):
                 want = str(want)
         a["blis"] = json.dumps(got) if isinstance(got, list) else (repr(got) if isinstance(got, float) else got)
         if got is None:

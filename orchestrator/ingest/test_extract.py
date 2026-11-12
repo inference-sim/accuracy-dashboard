@@ -408,13 +408,42 @@ def test_moe_backend_is_copied_to_the_engine_blocks_field():
     assert c.mapped["engine.moe_backend"][1] == "deep_gemm_mega_moe"
 
 
-def test_the_rust_frontend_line_maps_to_engine_frontend():
+RUST_ENV = "engine.env.VLLM_USE_RUST_FRONTEND"
+
+
+def test_the_rust_frontend_is_stated_as_the_variable_vllm_reads_not_as_a_frontend_key():
+    # The engine refuses the key `frontend` and asks for env: {VLLM_USE_RUST_FRONTEND: "1"}; the
+    # server log's "Launching Rust frontend" line and the launch configuration's variable both say it.
     c = _classify(_log("'max_num_seqs': 1", extra="INFO Launching Rust frontend: /usr/bin/vllm\n"))
-    assert c.mapped["engine.frontend"][1] is True
+    assert c.mapped[RUST_ENV][1] == "1" and "engine.frontend" not in c.mapped
+    eng = _build(c).deployment["pools"][0]["engine"]
+    assert eng["env"] == {"VLLM_USE_RUST_FRONTEND": "1"} and "frontend" not in eng
     launch = {"roles": {"agg": {"args": {"max-num-seqs": 1}, "env": {"VLLM_USE_RUST_FRONTEND": "1"}}}}
-    assert _classify(_log("'max_num_seqs': 1"), launch).mapped["engine.frontend"][1] is True
+    assert _classify(_log("'max_num_seqs': 1"), launch).mapped[RUST_ENV][1] == "1"
+    launch["roles"]["agg"]["env"]["VLLM_USE_RUST_FRONTEND"] = "0"
+    c0 = _classify(_log("'max_num_seqs': 1"), launch)
+    assert c0.mapped[RUST_ENV][1] == "0"
+    assert _build(c0).deployment["pools"][0]["engine"]["env"] == {"VLLM_USE_RUST_FRONTEND": "0"}
     launch["roles"]["agg"]["env"]["VLLM_USE_RUST_FRONTEND"] = "maybe"
     assert "conflict:env.VLLM_USE_RUST_FRONTEND" in _classify(_log("'max_num_seqs': 1"), launch).reasons
+
+
+SYNTHETIC = ("'tensor_parallel_size': 1, 'speculative_config': {'method': 'dspark', 'num_speculative_tokens': 5, "
+             "'rejection_sample_method': 'synthetic'%s}")
+
+
+def test_synthetic_rejection_sampling_states_the_runs_length_in_the_engine_block():
+    # vLLM takes the acceptance of synthetic sampling from synthetic_acceptance_length, and the engine
+    # accepts the method only with one; the run's length is also the replay's acceptance.
+    b = _build(_classify(_log(SYNTHETIC % ", 'synthetic_acceptance_length': 3.51")))
+    spec, _ = st.speculative_block(b.deployment["pools"][0]["engine"])
+    assert spec["rejection_sample_method"] == "synthetic" and spec["synthetic_acceptance_length"] == 3.51
+    assert b.acceptance_length == "3.51" and b.reasons == []
+
+
+def test_synthetic_rejection_sampling_without_a_recorded_length_is_refused_by_name():
+    b = _build(_classify(_log(SYNTHETIC % "")))
+    assert "required_setting_missing:speculative_config.synthetic_acceptance_length" in b.reasons
 
 
 def test_served_model_name_is_a_list_in_args_and_a_scalar_in_the_launch_config():
@@ -1221,7 +1250,7 @@ def test_every_value_a_real_log_records_is_read_and_copied_verbatim():
         d = st.decide(merged, everything)
         for loc, (path, value) in d.mapped.items():
             s_ = merged[path]
-            assert st._canon(value) == st._canon(st._yaml_value(s_.value)) or loc == "engine.frontend", (name, path)
+            assert st._canon(value) == st._canon(st._yaml_value(s_.value)) or loc == RUST_ENV, (name, path)
             # The passed value where the run passed one; the resolved one only where it passed none.
             passed = [v for x in st.PASSED for v in readings[x].values.get(path, []) if v is not None]
             assert s_.source in st.PASSED or not passed, (name, path)
