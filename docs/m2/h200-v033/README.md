@@ -8,7 +8,7 @@ These are the first InferenceX rows of the model, chip and workload family the t
 
 | | |
 |---|---|
-| Rows | InferenceX API ids 447774 to 447789, committed as [rows.json](rows.json) (the API's own records, so the set can be named again) |
+| Rows | InferenceX API ids 447774 to 447789, pinned in blis-substrate `catalog/ledger/sources.yaml` (source `inferencex`, supplement `h200-dsv41flash-vllm-v0-33-0`: record id and content SHA-256 of each); no record is committed here (X12) |
 | Run | GitHub Actions run 42341901521 of SemiAnalysisAI/InferenceX, attempt 1, 2026-11-09 |
 | Model, chip, engine | `dsv41flash` (DeepSeek-V4.1-Flash), `h200`, vLLM, image `vllm/vllm-openai:v0.33.0@sha256:d825baf9ce4b1b6bfc5ecc7b79880c7e6748c65a72d697ce3d47607aafa84c6e` |
 | Workload | `agentic_traces`: aiperf replay of the AgentX trace corpus (`agentx-mvp-uncapped`), 3600 s, concurrency 1, 2, 4, 8, 16, 32, 64 and 128 |
@@ -19,9 +19,9 @@ These are the first InferenceX rows of the model, chip and workload family the t
 
 ## How they are pinned and split
 
-Pinned by their API records ([rows.json](rows.json)) and by the frozen pull's `pull_manifest_sha256` `9e9588ad78ee04870416a0992c2e8eaba865fbf98e7f9b806bfef67eaca32a36` (in `contract/provenance.json`). The artifacts expire 90 days after the run (about 2027-02-07), so a pull can be made again only until then; the pull itself is not committed (it holds the server logs and client exports).
+Pinned by blis-substrate (`catalog/ledger/sources.yaml`: each record's id and content SHA-256) and by the frozen pull's `pull_manifest_sha256` `9e9588ad78ee04870416a0992c2e8eaba865fbf98e7f9b806bfef67eaca32a36` (in `contract/provenance.json`). The artifacts expire 90 days after the run (about 2027-02-07), so a pull can be made again only until then; the pull itself is not committed (it holds the server logs and client exports).
 
-A unit is made for each row by `contract.unit_identity`, the function the ledger's ingest tool is checked against, and written into a supplementary ledger directory, [ledger/](ledger/), in the format the harness reads. It is not the substrate's ledger: its units have role key `00...0` and its report says `revision: supplement/rows-447774-447789`. The unit ids are in [units.txt](units.txt). When a ledger release holds these rows, its units replace these; the unit ids are the same hashes if the rows are unchanged.
+The units are the substrate's (`catalog/ledger/units/inferencex.jsonl.gz`, made by its ingest): the dashboard makes no unit, no role key and no ledger report (design 2.2, COV-2). The substrate commit is pinned in [pins.env](pins.env) (`BLIS_SUBSTRATE_COMMIT`, empty until the final substrate commit is filled in). The records of a run are fetched, and refused if any differs from its pin, by `go run ./ledger/cmd/ledger supplement-records -out records.json catalog/ledger`; the file is an input for a run and is never committed. The unit ids are in [units.txt](units.txt) (derived values); they are the same hashes the dashboard's own earlier supplementary units had. **At published pins these sixteen units have no role** until the substrate publishes the seed and the anchor lists, and scoring uses the published anchor lists only (COV-2), so they score 0 of 16 there. The figures below that say 16 of 16 came from a scratch build with the units forced in and placeholder proofs; they are evidence of the pipeline, not a result at published pins.
 
 **Split.** Every point of a series takes the series's split, by the same rule as all others (`split.py`, salt `blis-dev-split-2`). The series `["dsv41flash","h200","fp4","vllm","mtp",false]` hashes to **validation**, so all sixteen are development points. They are not prospective: `FREEZE_DATE` is 2026-11-09 and a point is prospective only when measured after it; these were measured on that date. The committed `docs/m2/series-split.json` already lists the same row ids under that series as validation. The assignment is in [splits.json](splits.json). No row of a test or prospective series was opened in making this page: the only row looked at before its split was known was one of these sixteen, and the other newer rows of the API were selected by id.
 
@@ -85,8 +85,9 @@ The G1 conditions that are not evaluated are named as `unevaluated` substitution
 
 ```
 # 1. freeze (needs GH_TOKEN; artifacts last until about 2027-02-07)
-python3 orchestrator/baseline/freeze_rows.py --rows docs/m2/h200-v033/rows.json \
-  --revision supplement/rows-447774-447789 --ledger-out LEDGER --out PULL --cache CACHE --units-out UNITS
+(cd SUBSTRATE && go run ./ledger/cmd/ledger supplement-records -out ../records.json catalog/ledger)   # SUBSTRATE at pins.env's commit
+python3 orchestrator/baseline/freeze_rows.py --ledger SUBSTRATE/catalog/ledger --records records.json \
+  --out PULL --cache CACHE --units-out UNITS
 # 2. score, from a clean checkout of the harness commit in contract/provenance.json
 bash harness/run.sh --sim 780f661ef9c18a2a9928acf8a63a67667cd597c0 --sim-repo <inference-sim checkout> \
   --units docs/m2/h200-v033/units.txt --pull PULL --out OUT \
@@ -105,4 +106,4 @@ python3 orchestrator/baseline/compare.py run --dir docs/m2/h200-v033/contract --
 - Nothing here is held-out: the points are the development split's validation portion and the figures are labelled so.
 - The dry run is not a score of record. It sets three engine refusals aside with placeholder proofs that prove nothing; with them in place the points are G5.
 - The field list is the engine's for vLLM v0.32.0, and the rows ran v0.33.0. A field v0.33.0 added and the list does not know would show as `field_not_in_release`; the published run found one (`PYTHONUNBUFFERED`, which is not a vLLM variable).
-- The supplementary ledger is the dashboard's, not the substrate's. Its units carry no role key, so nothing here is an anchor.
+- The units are the substrate's and hold no role until the seed and lists are published, so nothing here is an anchor and the published scoring of these rows is 0 of 16.
