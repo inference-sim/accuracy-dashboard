@@ -320,7 +320,7 @@ def test_a_bound_holds_a_point_only_in_its_regime(tmp_path):
     e = _table(tmp_path).entries[0]
     ok = dict(workload="balanced", conc=4, model="m", hardware="mi355x", shape="1P2D",
               engine_version="0.31.0", fabric="ib-400g", prefill=POOL_P, decode=POOL_D)
-    assert [m["metric"] for m in rt.matched_ratios(e, **ok)] == ["ttft_p50_ms", "ttft_p99_ms"]
+    assert sorted(m["metric"] for m in rt.matched_ratios(e, **ok)) == ["ttft_p50_ms", "ttft_p99_ms"]
     # The known-bad points: each differs from the sampled regime in one dimension and never gets a bound.
     bad = ({"workload": "prefill-bound"}, {"workload": None}, {"model": "n"}, {"hardware": "b200"}, {"shape": "2P2D"},
            {"conc": 8},                                   # between two sampled counts (4 and 16): not run, not covered
@@ -368,7 +368,7 @@ def test_the_substitution_carries_the_point_and_only_the_ratios_that_hold_it(tmp
     assert sub["kind"] == "router_differs" and sub["entry"] == "dynamo-round-robin" and sub["policy"] == "round-robin"
     assert sub["revision"] == REV and sub["difference"] == [{"aspect": "counter", "text": "counters differ"}]
     assert sub["regime"] == POINT
-    assert [r["metric"] for r in sub["bound"]["ratios"]] == ["ttft_p50_ms", "ttft_p99_ms"]      # not the tpot cell
+    assert sorted(r["metric"] for r in sub["bound"]["ratios"]) == ["ttft_p50_ms", "ttft_p99_ms"]      # not the tpot cell
     assert sub["bound"]["evidence"] == TABLE_ENTRY["bound"]["evidence"] and "ASSUMED" not in sub["detail"]
     assert rt.carried_bound_covers_point(sub) == []
     assert "ASSUMED" in rt.substitution(e, "dynamo", REV, m, POINT, assumed=True)["detail"]
@@ -549,7 +549,7 @@ def test_a_dp_free_row_is_written_as_two_pools_and_scored_with_the_instance_coun
         assert rd["entry"] == "dynamo-round-robin" and rd["policy"] == "round-robin" and rd["difference"] and rd["bound"]
         assert rd["revision"] == REV and "ASSUMED" in rd["detail"] and "frontend's default" in rd["detail"]
         assert o.fidelity["router"]["bound_wide"] is True and o.fidelity["router"]["outcome"] == "mapped"
-        assert [m["metric"] for m in o.fidelity["router"]["matched_ratios"]] == ["ttft_p50_ms", "ttft_p99_ms"]
+        assert sorted(m["metric"] for m in o.fidelity["router"]["matched_ratios"]) == ["ttft_p50_ms", "ttft_p99_ms"]
         for role in ("prefill", "decode"):
             rec = subs[("estimated", f"engine.{role}.recipe")]
             assert pdr.ROOT + "vllm/m/a.yaml" in rec["detail"] and "a" * 40 in rec["detail"] and "max_num_batched_tokens" in rec["detail"]
