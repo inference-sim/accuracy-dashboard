@@ -53,6 +53,10 @@ LOG = (
     '"POST /v1/completions HTTP/1.1" 200\n')
 
 # Two periodic spec-decode lines of vLLM's metrics logger, and an idle one that drafted nothing.
+# A run whose rejection sampling is not the synthetic kind records no length, and a synthetic run that
+# recorded none is refused by name (test_extract.py: test_synthetic_rejection_sampling_without_a_recorded_length_is_refused_by_name).
+LOG_NO_LENGTH = LOG.replace(", 'synthetic_acceptance_length': 2.4", "").replace("'rejection_sample_method': 'synthetic'", "'rejection_sample_method': 'strict'")
+
 SPEC_LINES = (
     "(APIServer pid=1) INFO 07-05 02:05:14 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 2.00, "
     "Accepted throughput: 10.00 tokens/s, Drafted throughput: 20.00 tokens/s, Accepted: 50 tokens, "
@@ -337,7 +341,7 @@ def test_a_drafter_with_no_recorded_acceptance_is_replayed_with_the_profile_and_
     # substrate's profile, and the point names the profile as an estimate.
     tmp = Path(tempfile.mkdtemp())
     try:
-        log = LOG.replace(", 'synthetic_acceptance_length': 2.4", "") + SPEC_LINES
+        log = LOG_NO_LENGTH + SPEC_LINES
         entry, env = _setup(tmp, log=log)
         env.field_list = _fields_without_acceptance()
         env.speculative_fallback_category = "coding"     # the benchmark states no category; the caller requested the fallback
@@ -532,7 +536,7 @@ def _vllm_names_fields():
 def test_the_logged_acceptance_replaces_the_profile_only_when_the_engine_models_the_field():
     tmp = Path(tempfile.mkdtemp())
     try:
-        log = LOG.replace(", 'synthetic_acceptance_length': 2.4", "") + SPEC_LINES
+        log = LOG_NO_LENGTH + SPEC_LINES
         entry, env = _setup(tmp, log=log)                 # the fixture's list models the acceptance field
         o, work = _score(tmp, entry, env, tmp / "c1")
         assert o.fidelity is not None, o.reasons
@@ -544,7 +548,7 @@ def test_the_logged_acceptance_replaces_the_profile_only_when_the_engine_models_
         assert c.validate_dir(tmp / "c1") == []
         # A log with no acceptance line pins nothing.
         tmp2 = Path(tempfile.mkdtemp())
-        entry, env = _setup(tmp2, log=LOG.replace(", 'synthetic_acceptance_length': 2.4", ""))
+        entry, env = _setup(tmp2, log=LOG_NO_LENGTH)
         env.speculative_fallback_category = "coding"
         o, work = _score(tmp2, entry, env, tmp2 / "c2")
         scen = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
@@ -573,7 +577,7 @@ def test_the_thinking_mode_is_stated_only_where_the_run_recorded_it():
 def test_speculation_is_found_under_vllms_names_so_the_pin_and_the_profile_are_both_stated():
     # The M2 block is speculative_config / num_speculative_tokens; reading only the earlier
     # names left the pin never written and the profile never named (score.py read engine["speculative"]).
-    for pinned, log in ((True, LOG), (False, LOG.replace(", 'synthetic_acceptance_length': 2.4", ""))):
+    for pinned, log in ((True, LOG), (False, LOG_NO_LENGTH)):
         tmp = Path(tempfile.mkdtemp())
         try:
             entry, env = _setup(tmp, log=log)
@@ -849,7 +853,7 @@ def test_the_scenario_engine_block_holds_the_runs_values_under_the_engines_own_n
              "enable_prefix_caching": False, "cache_dtype": "auto"}
         assert "quantization" not in eng       # the engine printed fp8; the fixture's list does not model it
         assert eng["gpu_memory_utilization"] == 0.9 and eng["speculative"] == {
-            "method": "mtp", "num_spec_tokens": 2, "rejection_sample_method": "synthetic"}
+            "method": "mtp", "num_spec_tokens": 2, "rejection_sample_method": "synthetic", "synthetic_acceptance_length": 2.4}
         assert dep["pools"][0]["parallel"] == {"tp": 1, "pp": 1, "dp": 1}   # expert parallelism unstated: left to the engine (X19)
         assert o.fidelity["run_release"] == "0.31.0"
         # Every point records the simulator build and engine release that scored it (COV-6).
