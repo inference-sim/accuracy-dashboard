@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Validate a summary.json v2 or v3 against its schema (schemas/summary.v2.json, summary.v3.json).
 
-Each $refs its fidelity record's schema (schemas/fidelity.v2.json, fidelity.v3.json) by its $id,
+Each $refs its fidelity record's schema (schemas/fidelity.v2.json for v2; v3 defines none: the per-point record is the substrate's) by its $id,
 so the validator is given a registry holding it. v2 is what snapshots published before grades
 hold; they never change (COV-8), and are checked as they were. Beyond the schema, for both: the
 coverage counts match the lists, no point is both scored and not scored, every not-scored
@@ -42,15 +42,17 @@ import grade as gr  # noqa: E402
 import headline as hl  # noqa: E402
 
 SCHEMAS = {2: (REPO / "schemas" / "summary.v2.json", REPO / "schemas" / "fidelity.v2.json"),
-           3: (REPO / "schemas" / "summary.v3.json", REPO / "schemas" / "fidelity.v3.json")}
+           3: (REPO / "schemas" / "summary.v3.json", None)}      # v3 defines no fidelity schema: the per-point record is the substrate's (SUB-19)
 
 
 def validator(version: int):
     import jsonschema
     from referencing import Registry, Resource
     schema, fidelity = SCHEMAS[version]
-    fid = json.loads(fidelity.read_text())
-    reg = Registry().with_resource(fid["$id"], Resource.from_contents(fid))
+    reg = Registry()
+    if fidelity is not None:
+        fid = json.loads(fidelity.read_text())
+        reg = reg.with_resource(fid["$id"], Resource.from_contents(fid))
     return jsonschema.Draft7Validator(json.loads(schema.read_text()), registry=reg)
 
 

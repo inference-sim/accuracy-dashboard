@@ -632,19 +632,6 @@ def test_an_unverified_point_names_the_sent_prompt_length_difference():
         shutil.rmtree(tmp)
 
 
-def test_the_fidelity_schema_refuses_g1_for_a_point_naming_a_client_difference():
-    import jsonschema
-    tmp = Path(tempfile.mkdtemp())
-    try:
-        entry, env = _setup(tmp)
-        o, _ = _score(tmp, entry, env, tmp / "c1")
-        v = jsonschema.Draft7Validator(json.loads(c.FIDELITY_SCHEMA.read_text()))
-        assert v.is_valid(o.fidelity)
-        assert not v.is_valid({**o.fidelity, "grade": "G1", "substitutions": []})
-        assert not v.is_valid({**o.fidelity, "requests": {**o.fidelity["requests"], "extra": 1}})
-        assert not v.is_valid({**o.fidelity, "requests": {**o.fidelity["requests"], "copies": 1}})  # cold
-    finally:
-        shutil.rmtree(tmp)
 
 
 def test_a_point_behind_a_router_blis_does_not_host_is_g5_and_never_simulated():
