@@ -1,0 +1,17 @@
+{
+ "duplicates": 0,
+ "input": "0000000000000000000000000000000000000000000000000000000000000000",
+ "joined_records": 0,
+ "joined_units": 0,
+ "kind": "IngestReport",
+ "left_out": {},
+ "merged": 0,
+ "records": 16,
+ "revision": "supplement/rows-447774-447789",
+ "role_keys": 0,
+ "source": "inferencex",
+ "units": 16,
+ "units_by_framework": {
+  "vllm": 16
+ }
+}
