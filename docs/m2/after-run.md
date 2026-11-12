@@ -5,7 +5,7 @@
 | Parameter | What | State |
 |---|---|---|
 | `SIM` | the inference-sim commit with PR 4 (`fields`, `ledger`, `metrics`) and PR 5 (Result data), as a 40-hex commit or release tag | waiting on blis-vllm's final pin |
-| `SUBSTRATE` | the blis-substrate layer 10 tip (a 40-hex commit; also recorded as `--catalog-release` and `--registry-release`) | final target `0182c0ef42b08ef5a0b196b3e413c21c16b6d28d`; a pin by commit makes the figure experimental |
+| `SUBSTRATE` | the blis-substrate layer 10 tip (a 40-hex commit; also recorded as `--catalog-release` and `--registry-release`) | final target `6d53cf403a17d0367a3d17951b42eb2d6215767f`; a pin by commit makes the figure experimental |
 | `BLIS_VLLM` | the blis-vllm commit whose `fields.json` the simulator's engine carries | waiting on the blis-vllm agent's final tip |
 | `PULL` | the baseline's frozen pull: manifest sha256 `c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166`, kept on the machine that froze it (60 MB; not committed) | present at `/tmp/baseline/pull2` on this machine |
 | `CORPUS` | the corpora, fetched with `orchestrator/resolve_agentic_corpus.py --all --catalog SUBSTRATE_CHECKOUT/catalog -o CORPUS` | `/tmp/baseline/corpus` |
@@ -13,7 +13,7 @@
 
 ```
 cd accuracy-dashboard-wt-m2
-SIM=<inference-sim commit> SUBSTRATE=0182c0ef42b08ef5a0b196b3e413c21c16b6d28d BLIS_VLLM=<blis-vllm commit> \
+SIM=<inference-sim commit> SUBSTRATE=6d53cf403a17d0367a3d17951b42eb2d6215767f BLIS_VLLM=<blis-vllm commit> \
 PULL=/tmp/baseline/pull2 CORPUS=/tmp/baseline/corpus WORK=/tmp/after-work \
 bash docs/m2/after-run.sh
 ```
