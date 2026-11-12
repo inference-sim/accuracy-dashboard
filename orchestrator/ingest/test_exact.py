@@ -79,3 +79,45 @@ def test_a_stand_in_is_used_only_where_the_engines_clauses_hold_for_the_points_f
         assert c.reasons == [] and [x["kind"] for x in c.substitutions] == ["estimated"]
     else:
         assert c.reasons == ["field_not_modelled:env.SOME_NEW_VARIABLE"] and c.substitutions == []
+
+
+# ---- the engine owner's resolution cases (blis-vllm fields/stand_in_vectors.json, from vLLM's own functions), through the
+# real estimations of the three fields (blis-vllm fields.json), by the port and by the consumer
+
+REAL = os.environ.get("BLIS_VLLM_FIELDS")                     # blis-vllm's fields.json; else the committed copy of the three rows
+ROWS = ({r["name"]: r for r in json.loads(Path(REAL).read_text())["fields"]} if REAL
+        else {r["name"]: r for r in json.loads((HERE / "testdata" / "fields" / "stand_in_rows.json").read_text())})
+OWNER_VECTORS = json.loads(Path(os.environ.get("BLIS_STAND_IN_VECTORS") or HERE / "testdata" / "stand_in_vectors.json").read_text())
+
+
+def _facts(v):
+    return {k: v[k] for k in ("value", "tp_group_nodes", "compute_capability") if v.get(k) not in (None, "")}
+
+
+@pytest.mark.parametrize("v", OWNER_VECTORS, ids=[f"{v['field']}={v['value']!r} n={v.get('tp_group_nodes')} cc={v.get('compute_capability')}" for v in OWNER_VECTORS])
+def test_the_port_answers_the_engine_owners_resolution_cases(v):
+    assert fl.exact(ROWS[v["field"]]["estimation"], _facts(v)) is v["exact"]
+
+
+@pytest.mark.parametrize("v", OWNER_VECTORS, ids=[f"{v['field']}={v['value']!r} n={v.get('tp_group_nodes')} cc={v.get('compute_capability')}" for v in OWNER_VECTORS])
+def test_a_point_scores_through_the_generic_path_exactly_where_the_owner_says_the_stand_in_is_exact(v):
+    name = v["field"]
+    rows = sorted([ROWS[name], {"name": "tensor_parallel_size", "source": "config", "status": "modelled",
+                                "evidence": {"traces": ["t.json"]}, "estimation": {"rule": "none"}}], key=lambda f: (f["name"], f["source"]))
+    flist = fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": rows}))
+    r = st.Reading()
+    r.add(f"env.{name}", v["value"])
+    nodes = v.get("tp_group_nodes")
+    r.add("tensor_parallel_size", 8 * nodes if nodes else None)           # nodes of 8 GPUs
+    c = st.decide(st.merge({"launch_config": r}, {}), flist, "p", sif.facts_of(8, v.get("compute_capability") or None))
+    if v["exact"]:
+        assert c.reasons == [] and [x["subject"] for x in c.substitutions] == [f"env.{name}"]
+    else:
+        assert c.reasons == [f"field_not_modelled:env.{name}"] and c.substitutions == []
+
+
+@pytest.mark.skipif(not REAL, reason="BLIS_VLLM_FIELDS (blis-vllm's fields.json) is not set")
+def test_the_engines_whole_field_list_parses_and_the_three_fields_state_when_their_stand_in_is_exact():
+    flist = fl.parse(Path(REAL).read_bytes())
+    for name in ("VLLM_FLASHINFER_ALLREDUCE_BACKEND", "UCX_RCACHE_MAX_UNRELEASED", "UCX_TLS"):
+        assert "valid_when" in flist.lookup(f"env.{name}").estimation

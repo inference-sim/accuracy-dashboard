@@ -623,53 +623,6 @@ def _stated_by_resolution(field_list, path: str) -> bool:
     return f is not None and f.status in (fl.MODELLED, fl.PROVEN_INERT)
 
 
-# A `leave_unset` rule is unconditional in the engine's field list, but a stand-in is exact only for
-# some of the values a recipe can state. Each check returns the reason a stated value is NOT exactly
-# stood in for by an unset one, or None. A value it rejects is refused as `field_not_modelled`, named,
-# and not dropped (design 11.2: an estimate stands in for a setting the engine does not model; it
-# does not hide a different path). The reasons are the engine's: blis-vllm
-# fields/status.json `estimation_sources` cites each one.
-_BLACKWELL = ("b200", "b300", "gb200", "gb300")     # compute capability 10.x catalog parts
-_RDMA_TRANSPORTS = {"rc", "rc_x", "rc_v", "rc_verbs", "rc_mlx5", "dc", "dc_x", "dc_mlx5", "ib", "ud", "ud_x",
-                    "ud_verbs", "ud_mlx5", "all"}
-
-
-def _fi_allreduce_backend(value, part):
-    # vllm/distributed/device_communicators/flashinfer_all_reduce.py:152-178@5df63a72: an unset (auto)
-    # backend is mnnvl on one node and on compute capability 10.0 and up across nodes; other values
-    # (trtllm, nccl, ...) select another kernel, and mnnvl on an earlier part is not what auto picks.
-    v = str(value).strip().lower()
-    if v == "auto":
-        return None
-    if v == "mnnvl" and part and part.lower().startswith(_BLACKWELL):
-        return None
-    return f"{value!r} is not what vLLM resolves auto to on {part or 'this part'}"
-
-
-def _ucx_rcache(value, part):
-    # vllm/distributed/nixl_utils.py:20-36@5df63a72 sets 1024 itself when the variable is not stated.
-    return None if str(value).strip() == "1024" else f"{value!r} is not vLLM's own 1024"
-
-
-def _ucx_tls(value, part):
-    # The engine prices a handoff between nodes over the NIC unless UCX_CUDA_IPC_ENABLE_MNNVL=y is
-    # stated. A list that names an RDMA transport (or all) reaches the NIC; a deny list or a list with
-    # no RDMA transport (tcp only) does not.
-    v = str(value).strip().lower()
-    if not v or v.startswith("^"):
-        return f"{value!r} is a deny list or empty, which does not say the handoff uses RDMA"
-    if _RDMA_TRANSPORTS & {t.strip() for t in v.split(",")}:
-        return None
-    return f"{value!r} names no RDMA transport, so the handoff would not cross the NIC the engine prices"
-
-
-INEXACT_STAND_IN = {
-    "env.VLLM_FLASHINFER_ALLREDUCE_BACKEND": _fi_allreduce_backend,
-    "env.UCX_RCACHE_MAX_UNRELEASED": _ucx_rcache,
-    "env.UCX_TLS": _ucx_tls,
-}
-
-
 def decide(settings: dict[str, Setting], field_list, part: str | None = None, facts_of=None) -> Decided:
     """Decide every recorded setting by the engine's fields.json (design §11.2, State and Decide).
 
@@ -712,12 +665,6 @@ def decide(settings: dict[str, Setting], field_list, part: str | None = None, fa
                     # The engine states when its stand-in is exact; the dashboard supplies the facts and asks the evaluator.
                     facts = facts_of(st.value, settings) if facts_of else {"value": st.value}
                     if not fl.exact(est, facts):
-                        d.reasons.append(f"field_not_modelled:{path}")
-                        continue
-                else:
-                    # TEMPORARY: an engine field list that states no valid_when for these three fields (blis-vllm owner).
-                    check = INEXACT_STAND_IN.get(path)
-                    if check is not None and check(st.value, part) is not None:
                         d.reasons.append(f"field_not_modelled:{path}")
                         continue
             if dec.substitution:
