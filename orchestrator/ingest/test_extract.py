@@ -910,7 +910,7 @@ APPROX = {"kind": "estimated", "subject": "quantization", "detail": "left unset"
 DEFAULTED = {"kind": "estimated", "subject": "max_num_seqs", "detail": "not recorded; left unset"}
 
 
-UNCHECKED = [{"kind": k, "subject": "unevaluated", "detail": f"{k} is unevaluated"}
+UNCHECKED = [{"kind": "unevaluated", "subject": k, "detail": f"{k} is unevaluated"}
              for k in ("coefficient_range", "kernel_hash", "resolved_differs", "value_class")]
 
 
@@ -931,9 +931,9 @@ def test_every_estimate_and_client_difference_is_named_and_makes_the_point_g2():
     o = _graded(subs=[APPROX, DEFAULTED], requests={"differences": [gap]})
     assert o.fidelity["grade"] == "G2"
     assert [(s["kind"], s["subject"]) for s in o.fidelity["substitutions"]] == [
-        ("client_difference", "send_gap"), ("coefficient_range", "unevaluated"), ("estimated", "max_num_seqs"),
-        ("estimated", "quantization"), ("kernel_hash", "unevaluated"), ("resolved_differs", "unevaluated"),
-        ("value_class", "unevaluated")]
+        ("client_difference", "send_gap"), ("estimated", "max_num_seqs"), ("estimated", "quantization"),
+        ("unevaluated", "coefficient_range"), ("unevaluated", "kernel_hash"), ("unevaluated", "resolved_differs"),
+        ("unevaluated", "value_class")]
     assert next(s for s in o.fidelity["substitutions"] if s["subject"] == "quantization")["detail"] == "left unset"
 
 
@@ -945,7 +945,7 @@ def test_another_release_or_a_nightly_build_is_g4_and_says_so():
     o = _graded(image="vllm/vllm-openai:nightly-abc", banner="0.30.1rc1.dev493+gac9126e58")
     assert o.fidelity["grade"] == "G4" and o.fidelity["run_release"] is None
     assert [s["kind"] for s in o.fidelity["substitutions"]] == [
-        "coefficient_range", "kernel_hash", "nightly_or_custom", "resolved_differs", "value_class"]
+        "nightly_or_custom", "unevaluated", "unevaluated", "unevaluated", "unevaluated"]
 
 
 def test_a_point_not_scored_is_g5_with_every_reason_on_the_closed_list():

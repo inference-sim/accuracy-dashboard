@@ -52,7 +52,7 @@ G5_CODES = (
 # for it yet.
 G2_KINDS = ("coefficient_method", "coefficient_range", "execution_mode", "kernel_hash", "value_class",
             "estimated", "interim_status", "resolved_differs", "client_difference",
-            "later_record", "router_differs")
+            "later_record", "router_differs", "unevaluated")
 # router_differs is §11.3's "the run's router, which BLIS does not host, was replaced by an llm-d
 # policy from the router table" (design change blis-design#1; blis-substrate router table).
 
@@ -74,7 +74,10 @@ _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 # a G2 substitution of its own kind, so no G1 and no G3 is published for a condition nobody
 # graded. A condition is evaluated from data by g1.py; the point names its kind only when the data
 # is absent for that point (score.evaluate_g1), or when the condition is false.
-NOT_CHECKED_SUBJECT = "unevaluated"
+# An unevaluated condition is recorded as the substrate records it (pointrecord.SubUnevaluated):
+# kind `unevaluated`, whose subject is the condition, named by the kind that would record its failure.
+# The kind `kernel_hash` (and the other three) is then only ever a condition found false.
+NOT_CHECKED_KIND = "unevaluated"
 UNCHECKED_KINDS = ("coefficient_range", "kernel_hash", "resolved_differs", "value_class")
 G34_KINDS = ("other_release", "changed_functions", "nightly_or_custom", "ported_functions_unpublished")
 
@@ -125,7 +128,7 @@ def unchecked(kinds=None) -> list[dict]:
     """The substitutions naming the G1 conditions that are unevaluated: all of UNCHECKED_KINDS, or
     the given ones, the conditions whose data is not present for the point (g1.evaluate)."""
     kinds = UNCHECKED_KINDS if kinds is None else tuple(k for k in UNCHECKED_KINDS if k in kinds)
-    return [{"kind": k, "subject": NOT_CHECKED_SUBJECT, "detail": f"{k} is unevaluated"} for k in kinds]
+    return [{"kind": NOT_CHECKED_KIND, "subject": k, "detail": f"{k} is unevaluated"} for k in kinds]
 
 
 def _sorted(subs: list[dict]) -> list[dict]:
@@ -138,7 +141,16 @@ def _sorted(subs: list[dict]) -> list[dict]:
     return out
 
 
+# The conditions of G1 a point can leave unevaluated (pointrecord's g1Conditions): the subject of an
+# `unevaluated` substitution is one of these, the kind that would record the condition's failure.
+G1_CONDITIONS = ("coefficient_method", "coefficient_range", "execution_mode", "kernel_hash", "value_class",
+                 "interim_status", "resolved_differs", "client_difference", "other_release")
+
+
 def _check_keys(s: dict) -> None:
+    if s["kind"] == NOT_CHECKED_KIND and s["subject"] not in G1_CONDITIONS:
+        raise GradeError(f"an unevaluated substitution names {s['subject']!r}, which is not a condition of G1 "
+                         f"({', '.join(G1_CONDITIONS)})")
     need = KIND_KEYS.get(s["kind"], ())
     for k in need:
         if not s.get(k):

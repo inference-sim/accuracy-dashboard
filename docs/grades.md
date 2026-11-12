@@ -25,12 +25,12 @@ A point counts toward the headline when its grade is G1 to G4. Each grade is als
 
 ## Unevaluated conditions
 
-A condition is *unevaluated* when no source records the datum it needs. An unevaluated condition is not assumed true: the point names it as a substitution whose subject is `unevaluated`, so the point is G2 at best. A point can be G1 only when none of these is named.
+A condition is *unevaluated* when no source records the datum it needs. An unevaluated condition is not assumed true: the point names it as a substitution of kind `unevaluated` whose subject is the condition, so the point is G2 at best. A point can be G1 only when none of these is named.
 
 | Condition | Meaning |
 |---|---|
 | `coefficient_range` | A coefficient lookup was extrapolated or unidentified. |
-| `kernel_hash` | A library's kernel hash differs from the one BLIS priced. |
+| `kernel_hash` | A library's kernel hash differs from the one BLIS priced. When the condition could not be decided it is named by kind `unevaluated`, not this one. |
 | `resolved_differs` | The value the engine resolves differs from the one the run used. |
 | `value_class` | A modelled field's value is outside the value classes its evidence covers. |
 
@@ -43,7 +43,7 @@ A condition leaves this table when it is evaluated from data; the point then nam
 | `coefficient_method` | A coefficient the point used is transferred, literature, vendor_spec, roofline, assumed or copied, not measured or calibrated. |
 | `coefficient_range` | A coefficient lookup was extrapolated or unidentified. |
 | `execution_mode` | The point ran in a substituted execution mode. |
-| `kernel_hash` | A library's kernel hash differs from the one BLIS priced. |
+| `kernel_hash` | A library's kernel hash differs from the one BLIS priced. When the condition could not be decided it is named by kind `unevaluated`, not this one. |
 | `value_class` | A modelled field's value is outside the value classes its evidence covers. |
 | `estimated` | A field's value was estimated by the engine's rule (`leave_unset` or `substitute`), or a needed value the run did not record was taken by that rule; or a prefill/decode pool's engine arguments are the run's recipe's (subject `engine.<pool>.recipe`), or a speculative run's thinking mode is the reasoning-parser rule's (subject `workload.thinking_mode`). |
 | `interim_status` | The run set a field whose status is `inert_unproven`, allowed only during a release plan. |
@@ -51,6 +51,7 @@ A condition leaves this table when it is evaluated from data; the point then nam
 | `client_difference` | The simulated requests differ from the ones the run's client sent. |
 | `later_record` | A fact of the cluster the run's own record lacks was taken from the benchmark's later record of the same runner. |
 | `router_differs` | The run's router, which BLIS does not host, was replaced by an llm-d router policy from the substrate's router table. The subject is the router the run used; the point names the table entry, the policy (one llm-d offers), the router build (a full commit the entry lists), the table's evidence, and the entry's difference statements and bound as it states them. |
+| `unevaluated` | A condition of G1 could not be evaluated because the data it needs is not recorded for the point. The subject is the condition, named by the kind that would record its failure. |
 
 ## Other release or build (G3, G4)
 
