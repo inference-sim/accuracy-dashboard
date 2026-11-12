@@ -812,6 +812,24 @@ FRONTEND_ENV = "env.VLLM_USE_RUST_FRONTEND"
 ENV_FLAG = {True: "1", False: "0"}   # a boolean environment variable as the engine block writes it
 
 
+def requested_values(settings: dict) -> dict:
+    """The values the run set, by path, as the G1 value-class check reads them. A boolean environment
+    variable the run wrote as text ("1") is read as vLLM's envs.py reads it, so the check compares the
+    class "true" and not the text."""
+    out = {}
+    for p, s in settings.items():
+        if not s.requested or s.value is None:
+            continue
+        v = s.value
+        if p == FRONTEND_ENV:
+            try:
+                v = _flag(v)
+            except ValueError:
+                pass
+        out[p] = v
+    return out
+
+
 def recorded_node_size(launch: dict | None) -> int | None:
     """The GPUs in one node as the run's launch configuration recorded them
     (resources.gpus_per_node), or None. Never a rank count: the GPUs a run used are not the GPUs

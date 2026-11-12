@@ -428,6 +428,18 @@ def test_the_rust_frontend_is_stated_as_the_variable_vllm_reads_not_as_a_fronten
     assert "conflict:env.VLLM_USE_RUST_FRONTEND" in _classify(_log("'max_num_seqs': 1"), launch).reasons
 
 
+def test_the_rust_frontend_the_run_set_is_judged_against_the_class_true_not_the_text_1():
+    import g1
+    FL = fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": [
+        {"name": "VLLM_USE_RUST_FRONTEND", "source": "env", "status": "modelled", "evidence": {"traces": ["t"]},
+         "value_classes": {"type": "boolean", "covered": ["false", "true"]}, "estimation": {"rule": "none"}}]}))
+    launch = {"roles": {"agg": {"args": {"max-num-seqs": 1}, "env": {"VLLM_USE_RUST_FRONTEND": "1"}}}}
+    c = _classify(_log("'max_num_seqs': 1"), launch)
+    requested = st.requested_values(c.settings)
+    assert requested["env.VLLM_USE_RUST_FRONTEND"] is True
+    assert g1.value_class(requested, FL).subs == []
+
+
 SYNTHETIC = ("'tensor_parallel_size': 1, 'speculative_config': {'method': 'dspark', 'num_speculative_tokens': 5, "
              "'rejection_sample_method': 'synthetic'%s}")
 
