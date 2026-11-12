@@ -139,56 +139,46 @@ def pool_parallel(pool: "Pool", flags: dict) -> dict:
             "expert_parallel": pool.ep > 1 if ep is None else ep}
 
 
-def load_owner_policies(substrate: Path) -> dict:
-    """The router table's checked policy list, read from its owner at the pinned commit: `go run ./tools/prcheck
-    router-policies` in a blis-substrate checkout prints {"closed_policies": [...], "policies": [...]} and exits
-    non-zero, naming the problems, when the list fails the owner's own check."""
+# The router's published endpoint-picker configurations. The router (llm-d's router fork, at a pinned commit) publishes one
+# EndpointPickerConfig file per policy and an index of them; the dashboard selects the policy the router table names and passes
+# the router's file to the simulator unchanged (design X1, X7). It holds no policy table and writes no configuration.
+# INDEX_PATH and the index's shape are the one place that knows how the router names them.
+INDEX_PATH = "config/reference/index.json"
+
+
+class PolicyConfigError(ValueError):
+    """The router publishes no usable configuration for a policy; `.slug` is the reason's subject."""
+
+    def __init__(self, slug: str, text: str):
+        super().__init__(text)
+        self.slug = slug
+
+
+def router_index(router: Path) -> dict:
+    """{policy: path of its configuration file} from the router checkout's index. Each file must exist inside the checkout."""
     import json
-    import subprocess
-    out = subprocess.run(["go", "run", "./tools/prcheck", "router-policies"], cwd=substrate, capture_output=True, text=True)
-    if out.returncode != 0:
-        raise ValueError(f"the router table's policy list is not readable from {substrate}: {out.stderr.strip()[:500]}")
-    return json.loads(out.stdout)
+    f = Path(router) / INDEX_PATH
+    if not f.is_file():
+        raise PolicyConfigError("router_index_missing", f"{f} does not exist: the router at this commit publishes no index")
+    try:
+        doc = json.loads(f.read_text())
+        entries = {e["policy"]: Path(router) / e["file"] for e in doc["policies"]}
+    except (ValueError, KeyError, TypeError) as e:
+        raise PolicyConfigError("router_index_unreadable", f"{f} is not an index of policies: {e}")
+    root = Path(router).resolve()
+    for policy, path in entries.items():
+        if root not in path.resolve().parents or not path.is_file():
+            raise PolicyConfigError("router_index_unreadable", f"{policy}: {path} is not a file of the router checkout")
+    return entries
 
 
-def epp_config(policy: str, owner: dict) -> str:
-    """The endpoint-picker file of a prefill/decode deployment under one of the policies the router table names,
-    rendered from the owner's complete configuration of that policy (`owner`: load_owner_policies). The dashboard
-    selects the policy; it defines no plugin, filter, weight, decider or parameter of its own."""
-    by = {p["policy"]: p for p in owner["policies"]}
-    if policy not in by:
-        raise ValueError(f"{policy!r} is not a policy the router table's list offers ({sorted(by)})")
-    cfg = by[policy]["config"]
-    lines = ["apiVersion: llm-d.ai/v1", "kind: EndpointPickerConfig", "plugins:"]
-    for plug in cfg["plugins"]:
-        lines.append(f"- type: {plug['type']}")
-        params = plug.get("parameters") or []
-        if params:
-            tree: dict = {}
-            for prm in params:
-                node = tree
-                *path, leaf = prm["name"].split(".")
-                for k in path:
-                    node = node.setdefault(k, {})
-                node[leaf] = int(prm["value"]) if prm.get("integer") else prm["value"]
-            lines.append("  parameters:")
-
-            def emit(d, depth):
-                for k, v in d.items():
-                    if isinstance(v, dict):
-                        lines.append("  " * depth + f"{k}:")
-                        emit(v, depth + 1)
-                    else:
-                        lines.append("  " * depth + f"{k}: {v}")
-            emit(tree, 2)
-    lines.append("schedulingProfiles:")
-    for prof in cfg["scheduling_profiles"]:
-        lines += [f"- name: {prof['name']}", "  plugins:"]
-        for ref in prof["plugins"]:
-            lines.append(f"  - pluginRef: {ref['plugin']}")
-            if "weight" in ref:
-                lines.append(f"    weight: {ref['weight']}")
-    return "\n".join(lines) + "\n"
+def epp_file(policy: str, router: Path) -> bytes:
+    """The router's endpoint-picker file for `policy`, byte for byte."""
+    index = router_index(router)
+    if policy not in index:
+        raise PolicyConfigError(f"policy_config_not_published:{policy}",
+                                f"the router publishes no configuration for policy {policy!r} (it publishes {sorted(index)})")
+    return index[policy].read_bytes()
 
 
 def epp_name(policy: str) -> str:

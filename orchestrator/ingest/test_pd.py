@@ -130,36 +130,42 @@ def test_the_named_refusals_are_topology_unsupported_with_the_slug_as_subject():
 
 # ---------------------------------------------------------------- the endpoint picker configuration
 
-OWNER = json.loads((HERE / "testdata" / "router-policies.json").read_text())      # the owner's output, at the pinned commit
+POLICIES = ("round-robin", "random-picker", "least-active-requests", "default")      # names a fixture router publishes
 
 
-def _rendered(policy):
-    return yaml.safe_load(pdm.epp_config(policy, OWNER))
+def router_checkout(root: Path, policies=POLICIES) -> Path:
+    """A fixture of the router checkout: an index and one configuration file per policy, each with its own bytes (the
+    dashboard never reads their content, so any bytes will do; a trailing space and a CRLF make a rewrite visible)."""
+    d = root / "router"
+    (d / "config" / "reference").mkdir(parents=True, exist_ok=True)
+    for p in policies:
+        (d / "config" / "reference" / f"{p}.yaml").write_bytes(f"# router file for {p} \r\nkind: EndpointPickerConfig\n".encode())
+    (d / pdm.INDEX_PATH).write_text(json.dumps({"policies": [{"policy": p, "file": f"config/reference/{p}.yaml"} for p in policies]}))
+    return d
 
 
-@pytest.mark.parametrize("policy", [p["policy"] for p in OWNER["policies"]])
-def test_the_file_written_for_a_policy_is_the_owners_configuration_of_it(policy):
-    cfg = next(p for p in OWNER["policies"] if p["policy"] == policy)["config"]
-    doc = _rendered(policy)
-    assert [p["type"] for p in doc["plugins"]] == [p["type"] for p in cfg["plugins"]]
-    assert [(p["name"], [(r["pluginRef"], r.get("weight")) for r in p["plugins"]]) for p in doc["schedulingProfiles"]] == \
-        [(p["name"], [(r["plugin"], r.get("weight")) for r in p["plugins"]]) for p in cfg["scheduling_profiles"]]
-    for plug in cfg["plugins"]:                        # every parameter is written, integers as integers
-        got = next(p for p in doc["plugins"] if p["type"] == plug["type"]).get("parameters", {})
-        for prm in plug.get("parameters") or []:
-            node = got
-            *path, leaf = prm["name"].split(".")
-            for k in path:
-                node = node[k]
-            assert node[leaf] == (int(prm["value"]) if prm.get("integer") else prm["value"])
+@pytest.mark.parametrize("policy", POLICIES)
+def test_the_file_passed_for_a_policy_is_the_routers_byte_for_byte(tmp_path, policy):
+    d = router_checkout(tmp_path)
+    assert pdm.epp_file(policy, d) == (d / "config" / "reference" / f"{policy}.yaml").read_bytes()
 
 
-def test_a_policy_the_owner_does_not_list_is_refused():
-    with pytest.raises(ValueError):
-        pdm.epp_config("random", OWNER)
-    shrunk = {**OWNER, "policies": [p for p in OWNER["policies"] if p["policy"] != "default"]}
-    with pytest.raises(ValueError):
-        pdm.epp_config("default", shrunk)                # a policy removed from the owner is no longer written
+def test_a_policy_the_router_does_not_publish_is_refused_by_name(tmp_path):
+    d = router_checkout(tmp_path, POLICIES[:3])
+    with pytest.raises(pdm.PolicyConfigError) as e:
+        pdm.epp_file("default", d)
+    assert e.value.slug == "policy_config_not_published:default"
+    with pytest.raises(pdm.PolicyConfigError) as e:
+        pdm.epp_file("round-robin", tmp_path)                          # no index at all
+    assert e.value.slug == "router_index_missing"
+
+
+def test_an_index_naming_a_file_outside_the_checkout_is_refused(tmp_path):
+    d = router_checkout(tmp_path)
+    (tmp_path / "outside.yaml").write_text("x")
+    (d / pdm.INDEX_PATH).write_text(json.dumps({"policies": [{"policy": "default", "file": "../outside.yaml"}]}))
+    with pytest.raises(pdm.PolicyConfigError):
+        pdm.epp_file("default", d)
 
 
 # ---------------------------------------------------------------- the recipe
@@ -419,7 +425,7 @@ def _pd_point(tmp: Path, *, row=None, recipe_text=None, with_recipe=True, table=
     # table: the router table maps Dynamo's default mode (router_differs); False leaves the catalog's own, which has none here.
     recipe_text = RECIPE_FABRIC if recipe_text is None else recipe_text   # a stated fabric: the router bound's regime needs a recorded one
     entry, env = e2e._setup(tmp)
-    env.router_policies = OWNER
+    env.router_checkout = router_checkout(tmp)
     pdir = tmp / "pull" / "points" / entry["point_id"]
     entry["row"].update({**ROW, **(row or {})})
     entry["measurements"] = [{"record": "1", "metrics": entry["row"]["metrics"]}]
@@ -486,7 +492,7 @@ def test_a_dp_free_row_is_written_as_two_pools_and_scored_with_the_instance_coun
         assert (mnbt(pre), mnbt(dec)) == (2048, 4096)                   # each pool's own, from the recipe
         assert dep["pd_transfer"] == {"connector": "NixlConnector"}
         assert dep["router"] == {"endpoint_picker_config": "pd-round-robin.epp.yaml"}
-        assert (sdir / "pd-round-robin.epp.yaml").read_text() == pdm.epp_config("round-robin", OWNER)
+        assert (sdir / "pd-round-robin.epp.yaml").read_bytes() == pdm.epp_file("round-robin", env.router_checkout)     # unchanged
         scen = next(d for d in yaml.safe_load_all(next(sdir.glob("p-*.yaml")).read_text()) if d["kind"] == "Scenario")
         assert scen["cluster"]["fabric"] == "ib-400g" and "cost-model-fabric" in scen["coefficients"]
         assert scen["cluster"]["nodes"] == 2
@@ -823,3 +829,17 @@ def test_a_prefill_decode_point_starts_cold_even_with_prefix_caching_on():
         assert o.fidelity["requests"]["start"] == "cold"
     finally:
         shutil.rmtree(tmp)
+
+
+def test_a_point_whose_policy_the_router_does_not_publish_is_g5_with_the_named_reason():
+    for kw, want in (({"policies": POLICIES[1:]}, "router_unsupported:dynamo-router:policy_config_not_published:round-robin"),
+                     ({"none": True}, "router_unsupported:dynamo-router:router_checkout_not_given")):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            entry, env = _pd_point(tmp, log=False)
+            env.router_checkout = None if kw.get("none") else router_checkout(tmp / "r2", kw["policies"])
+            o, _ = e2e._score(tmp, entry, env, tmp / "c1")
+            assert o.fidelity is None and want in o.reasons, o.reasons
+            assert e2e._saw(env) == []                    # the simulator was never asked
+        finally:
+            shutil.rmtree(tmp)

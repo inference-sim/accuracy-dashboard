@@ -5,38 +5,34 @@
 ## Contents
 
 1. [The rule](#the-rule)
-2. [How the dashboard reads the owner](#how-the-dashboard-reads-the-owner)
-3. [What the owner states, and what it leaves to the deployment](#what-the-owner-states-and-what-it-leaves-to-the-deployment)
-4. [The mechanical check](#the-mechanical-check)
+2. [How a point gets its file](#how-a-point-gets-its-file)
+3. [The check](#the-check)
+4. [State of the router's index](#state-of-the-routers-index)
 
 ## The rule
 
-A router policy (`round-robin`, `random-picker`, `least-active-requests`, `default`) is a composition of llm-d's router plugins.
-The substrate's router table names the policy an entry maps a router to, and states the complete endpoint-picker configuration of
-each policy (`routertable.Policies()` in blis-substrate). The dashboard selects the policy the table names and renders that
-configuration (`orchestrator/ingest/pd.py`, `epp_config`); it defines no plugin, filter, weight, decider or parameter of its own
-(design X7).
+A router policy is a configuration of llm-d's router. The substrate's router table names the policy an entry maps a router to; the
+router (llm-d's router fork, at a pinned commit) publishes the endpoint-picker file of each policy and an index of them. The
+dashboard holds no policy table and writes no configuration: it selects the policy the table names and passes the router's file to
+the simulator unchanged (design X1, X7).
 
-## How the dashboard reads the owner
+## How a point gets its file
 
-`go run ./tools/prcheck router-policies`, run in the blis-substrate checkout the catalog sits in, prints
-`{"closed_policies": [...], "policies": [...]}` and exits non-zero, naming the problems, when the owner's list fails its own check.
-`pd.load_owner_policies` runs it the first time a prefill/decode point needs a file; `epp_config(policy, owner)` renders the
-configuration of the named policy and refuses a policy the owner does not list. The unit tests use a snapshot of the owner's output
-(`orchestrator/ingest/testdata/router-policies.json`), which the owner check compares with the live owner.
+`score --router-checkout DIR` names the router checkout. `pd.epp_file(policy, DIR)` reads the checkout's index (`pd.INDEX_PATH`, the
+one place that knows how the router names it) and returns the file's bytes, which are copied into the point's scenario directory under
+`pd-<policy>.epp.yaml` byte for byte. A policy the index does not list is G5 `router_unsupported:<router>:policy_config_not_published:<policy>`;
+no checkout given is `...:router_checkout_not_given`; an index that is missing or names a file outside the checkout is `router_index_missing`
+or `router_index_unreadable`. The simulator is not asked in any of these cases.
 
-## What the owner states, and what it leaves to the deployment
+## The check
 
-Each parameter and weight carries an origin: `source` (the router's code or README states it), `sample` (the router's own sample
-deployment sets it; the router's default is another value, named in the owner's claim: `maxPrefixTokensToMatch` is 16384 in the
-sample, 131072 by default), or `not-stated` (the router's source does not state it for the policy; the value is what BLIS's
-prefill/decode deployments use). The dashboard renders every value. A `not-stated` value, today the choice of the prefill decider
-(`always-disagg-pd-decider`) for every policy, is a choice of the deployment and not the router's; it is reported as that here and
-not as the router's behaviour.
+`orchestrator/ingest/test_router_configs.py` fails when a policy the router table names has no file in the router's index. Removing
+any policy from a fixture index makes it fail; with `BLIS_ROUTER_CHECKOUT` and `BLIS_SUBSTRATE_ROUTER_BOUNDS` set it runs against the
+real router and table.
 
-## The mechanical check
+## State of the router's index
 
-`orchestrator/ingest/test_pd_policy_owner.py` reads the owner from the checkout (`BLIS_SUBSTRATE_ROUTER_BOUNDS`; the `simulator` job
-of `checks` fetches the pinned commit) and fails when the owner's closed list is not the four policies the dashboard writes (a policy
-removed or added), when the file written for a policy differs from the owner's configuration, or when the snapshot the unit tests use
-differs from the live owner. A test removes each policy from the owner's output in turn and requires the check to fail.
+The router's published files and index are being built (branch `m2/2-reference-endpoint-picker-configs` of the router fork). The
+index path and shape in `pd.py` are provisional until its head is pinned: `INDEX_PATH` and `router_index` are the only code to change.
+The scored prefill/decode runs in `docs/m2/` were made before this change (the dashboard then rendered the file itself) and are scored
+again at the final pins.

@@ -118,17 +118,9 @@ class Env:
     # "a fallback category the user requested"); cli score --speculative-fallback-category. The point names it as an
     # `estimated` substitution on workload.category, and the run is experimental.
     speculative_fallback_category: str | None = None
-    # The router table's checked policy list (pd.load_owner_policies); read from the substrate checkout the catalog
-    # sits in the first time a prefill/decode point needs it, unless a caller supplies it.
-    router_policies: dict | None = None
-    # The blis-substrate checkout that holds the router table's policies when it is not the catalog's own (cli score
-    # --policy-source): the catalog and registry pins and the router table's pin are separate commits while the stack is open.
-    policy_source: Path | None = None
-
-    def owner_policies(self) -> dict:
-        if self.router_policies is None:
-            self.router_policies = pdm.load_owner_policies(Path(self.policy_source or Path(self.catalog).resolve().parent))
-        return self.router_policies
+    # The checkout of the router (llm-d's router fork) at a pinned commit, which publishes the endpoint-picker file of each
+    # policy (cli score --router-checkout). A prefill/decode point passes the router's file for its policy unchanged.
+    router_checkout: Path | None = None
 
     def simulator(self) -> dict:
         """The simulator block every point of this run records: its build and engine release."""
@@ -1216,6 +1208,12 @@ def pd_router(row: dict, name: str | None, recipe: "pdr.Recipe | None", table: "
                                      "revision": revision, "matched_ratios": matched, "bound_wide": rt.bound_wide(matched)}
 
 
+def _router_config_refusal(o: Outcome, router_name: str | None, e: "pdm.PolicyConfigError") -> Outcome:
+    """G5 router_unsupported with the named slug: the router publishes no configuration for the policy the table names."""
+    o.reasons = sorted(set(o.reasons + [f"router_unsupported:{router_name}:{e.slug}"]))
+    return o
+
+
 def aggregated_recipe(entry: dict, pdir: Path) -> "pdr.Recipe | None":
     """The aggregated recipe the pull kept for a colocated multi-node row, or None (not multi-node, no
     recipe frozen, or a recipe of prefill/decode pools)."""
@@ -1387,7 +1385,13 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
     par = {"tp": dpar["tp"], "pp": dpar["pp"], "dp": dpar["dp"],
            "ep": dpar["tp"] * dpar["dp"] if dpar.get("enable_expert_parallel") else 1}
     par.update({f"{r}_{k}": v for r, p in pools.items() for k, v in (("workers", p.workers), ("tp", p.tp), ("ep", p.ep), ("dp", p.dp))})
-    run = PdRun(epp_name=pdm.epp_name(policy), epp_bytes=pdm.epp_config(policy, env.owner_policies()).encode(), prefill=pools["prefill"].workers,
+    try:
+        if env.router_checkout is None:
+            raise pdm.PolicyConfigError("router_checkout_not_given", "no router checkout was given (--router-checkout)")
+        epp = pdm.epp_file(policy, env.router_checkout)
+    except pdm.PolicyConfigError as e:
+        return _router_config_refusal(o, router_name, e)
+    run = PdRun(epp_name=pdm.epp_name(policy), epp_bytes=epp, prefill=pools["prefill"].workers,
                 decode=pools["decode"].workers, parallelism=par, label=label,
                 client_note=pdm.benchmark_client_note(recipe), router=rrec)
     return score_single_turn(o, entry, env, work, b, header, name, dep, args, "", sup, pdir, simulate=simulate, pd_run=run)
