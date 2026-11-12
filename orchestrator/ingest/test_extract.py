@@ -1346,3 +1346,47 @@ def test_packaging_comes_from_blis_catalog_resolve_and_falls_back_to_the_catalog
                     "\"packaging\": {\"gpus_per_node\": 0, \"gpus_per_rack\": null}}'\n")
     with pytest.raises(bc.CommandError, match="packaging"):
         sp.Catalog(blis=str(blis), root=tmp).packaging("h100")
+
+
+# ------------------------------------------------ leave_unset stand-ins that are exact for some values only
+
+def _stand_in_fields():
+    rows = [{"name": n, "source": "env", "status": "not_modelled", "evidence": {"issue": "o/r#1"},
+             "estimation": {"rule": "leave_unset"}}
+            for n in ("UCX_RCACHE_MAX_UNRELEASED", "UCX_TLS", "VLLM_FLASHINFER_ALLREDUCE_BACKEND")]
+    return fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": rows}))
+
+
+def _decide_env(name, value, part):
+    r = st.Reading()
+    r.add(f"env.{name}", value)
+    return st.decide(st.merge({"launch_config": r}, {}), _stand_in_fields(), part)
+
+
+@pytest.mark.parametrize("name,value,part", [
+    ("VLLM_FLASHINFER_ALLREDUCE_BACKEND", "mnnvl", "b300"),
+    ("VLLM_FLASHINFER_ALLREDUCE_BACKEND", "mnnvl", "gb300"),
+    ("VLLM_FLASHINFER_ALLREDUCE_BACKEND", "auto", "h100"),
+    ("UCX_RCACHE_MAX_UNRELEASED", "1024", "b200"),
+    ("UCX_TLS", "cuda_copy,rc", "gb200-nvl72"),
+    ("UCX_TLS", "cuda_copy,cuda_ipc,rc", "b300"),
+])
+def test_a_value_an_unset_field_stands_in_for_exactly_is_left_unset_and_named(name, value, part):
+    c = _decide_env(name, value, part)
+    assert c.reasons == []
+    assert [(x["kind"], x["subject"]) for x in c.substitutions] == [("estimated", f"env.{name}")]
+    assert not any(k.endswith(name) for k in c.mapped)
+
+
+@pytest.mark.parametrize("name,value,part", [
+    ("VLLM_FLASHINFER_ALLREDUCE_BACKEND", "nccl", "b300"),       # not a FlashInfer backend vLLM resolves auto to
+    ("VLLM_FLASHINFER_ALLREDUCE_BACKEND", "trtllm", "gb300"),
+    ("VLLM_FLASHINFER_ALLREDUCE_BACKEND", "mnnvl", "h100"),      # earlier than compute capability 10.0
+    ("UCX_RCACHE_MAX_UNRELEASED", "0", "b200"),
+    ("UCX_TLS", "tcp", "b300"),
+    ("UCX_TLS", "^rc", "b300"),
+])
+def test_a_value_an_unset_field_does_not_stand_in_for_is_refused_by_name(name, value, part):
+    c = _decide_env(name, value, part)
+    assert c.reasons == [f"field_not_modelled:env.{name}"]
+    assert c.substitutions == []

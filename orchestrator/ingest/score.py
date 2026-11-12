@@ -728,7 +728,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     part_name = (sp.catalog_part(env.catalog_obj, env.parts, row["hardware"]) if env.catalog_obj else None) \
         or row["hardware"]
     defaults = st.defaults_for(o.banner, env.vllm_defaults, env.vllm_defaults_release)
-    c = st.decide(st.merge(readings, defaults), env.field_list)
+    c = st.decide(st.merge(readings, defaults), env.field_list, part_name)
     o.reasons += c.reasons
     o.subs = recovery + list(c.substitutions)
     o.reasons += row_vs_run(row, c)
@@ -1293,7 +1293,7 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
     for role, pool in pools.items():
         launches[role] = pdm.pseudo_launch(recipe, role, row, pool)
         rd, taken[role] = pdm.read_pool(launches[role])
-        c = st.decide(st.merge({"launch_config": rd}, {}), env.field_list)
+        c = st.decide(st.merge({"launch_config": rd}, {}), env.field_list, part_name)
         decided[role] = c
         o.reasons += c.reasons
         o.subs += c.substitutions
