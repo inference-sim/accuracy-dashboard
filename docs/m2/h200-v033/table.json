@@ -1,0 +1,467 @@
+{
+ "backlog": [
+  {
+   "alone": 0,
+   "blocks": 16,
+   "demotes": 0,
+   "entry": "field_not_in_release:env.PYTHONUNBUFFERED"
+  },
+  {
+   "alone": 0,
+   "blocks": 16,
+   "demotes": 0,
+   "entry": "field_not_modelled:env.VLLM_USE_RUST_FRONTEND"
+  },
+  {
+   "alone": 0,
+   "blocks": 16,
+   "demotes": 0,
+   "entry": "field_not_modelled:speculative_config.rejection_sample_method"
+  }
+ ],
+ "coverage": {
+  "all": {
+   "by_grade": {
+    "G5": 16
+   },
+   "failed": 0,
+   "not_scored": 16,
+   "points": 16,
+   "primary_reason": {
+    "field_not_modelled": 16
+   },
+   "reasons": {
+    "field_not_in_release:env.PYTHONUNBUFFERED": {
+     "alone": 0,
+     "blocks": 16
+    },
+    "field_not_modelled:env.VLLM_USE_RUST_FRONTEND": {
+     "alone": 0,
+     "blocks": 16
+    },
+    "field_not_modelled:speculative_config.rejection_sample_method": {
+     "alone": 0,
+     "blocks": 16
+    }
+   },
+   "scored": 0,
+   "share_scored": 0.0
+  },
+  "in_scope": {
+   "by_grade": {
+    "G5": 16
+   },
+   "failed": 0,
+   "not_scored": 16,
+   "points": 16,
+   "primary_reason": {
+    "field_not_modelled": 16
+   },
+   "reasons": {
+    "field_not_in_release:env.PYTHONUNBUFFERED": {
+     "alone": 0,
+     "blocks": 16
+    },
+    "field_not_modelled:env.VLLM_USE_RUST_FRONTEND": {
+     "alone": 0,
+     "blocks": 16
+    },
+    "field_not_modelled:speculative_config.rejection_sample_method": {
+     "alone": 0,
+     "blocks": 16
+    }
+   },
+   "scored": 0,
+   "share_scored": 0.0
+  },
+  "out_of_scope": {
+   "by_grade": {},
+   "failed": 0,
+   "not_scored": 0,
+   "points": 0,
+   "primary_reason": {},
+   "reasons": {},
+   "scored": 0,
+   "share_scored": null
+  },
+  "out_of_scope_by_chip": {}
+ },
+ "development_split": {
+  "constants": {
+   "freeze_date": "2026-11-09",
+   "salt": "blis-dev-split-2",
+   "train_pct": 60,
+   "validation_pct": 20
+  },
+  "kinds": {
+   "prospective": {
+    "points": 0,
+    "withheld": true
+   },
+   "test": {
+    "points": 0,
+    "withheld": true
+   },
+   "train": {
+    "accuracy": {
+     "noise_floor_pct": 1.6,
+     "noise_floor_source": "fallback; none measured per point",
+     "points": 0,
+     "tpot": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "ttft": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "withheld": 0
+    },
+    "grades": {},
+    "in_scope": 0,
+    "points": 0,
+    "ranking": {
+     "throughput_per_gpu": {
+      "groups": 0,
+      "kendall": "too few groups",
+      "left_out": 0,
+      "regret": "too few groups",
+      "spearman": "too few groups",
+      "top1": "too few groups",
+      "top3": "too few groups",
+      "value": "throughput_per_gpu"
+     }
+    },
+    "scored": 0,
+    "series": 0
+   },
+   "unassigned": {
+    "accuracy": {
+     "noise_floor_pct": 1.6,
+     "noise_floor_source": "fallback; none measured per point",
+     "points": 0,
+     "tpot": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "ttft": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "withheld": 0
+    },
+    "grades": {},
+    "in_scope": 0,
+    "points": 0,
+    "ranking": {
+     "throughput_per_gpu": {
+      "groups": 0,
+      "kendall": "too few groups",
+      "left_out": 0,
+      "regret": "too few groups",
+      "spearman": "too few groups",
+      "top1": "too few groups",
+      "top3": "too few groups",
+      "value": "throughput_per_gpu"
+     }
+    },
+    "scored": 0,
+    "series": 0
+   },
+   "validation": {
+    "accuracy": {
+     "noise_floor_pct": 1.6,
+     "noise_floor_source": "fallback; none measured per point",
+     "points": 0,
+     "tpot": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "ttft": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "withheld": 0
+    },
+    "grades": {
+     "G5": 16
+    },
+    "in_scope": 16,
+    "points": 16,
+    "ranking": {
+     "throughput_per_gpu": {
+      "groups": 0,
+      "kendall": "too few groups",
+      "left_out": 0,
+      "regret": "too few groups",
+      "spearman": "too few groups",
+      "top1": "too few groups",
+      "top3": "too few groups",
+      "value": "throughput_per_gpu"
+     }
+    },
+    "scored": 0,
+    "series": 1
+   }
+  },
+  "test_evaluated": false,
+  "text": "Per-split figures use the DEVELOPMENT split of docs/m2/evaluation-protocol.md, not the ledger's held-out: its test set is 'development split, not the ledger's held-out'."
+ },
+ "format": "baseline-compare-1",
+ "grades": {
+  "G1": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "points": 0,
+   "share_of_all": "too few points",
+   "share_of_graded": null
+  },
+  "G2": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "points": 0,
+   "share_of_all": "too few points",
+   "share_of_graded": null
+  },
+  "G3": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "points": 0,
+   "share_of_all": "too few points",
+   "share_of_graded": null
+  },
+  "G4": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "points": 0,
+   "share_of_all": "too few points",
+   "share_of_graded": null
+  },
+  "G5": {
+   "points": 16,
+   "share_of_all": 1.0,
+   "share_of_graded": null
+  },
+  "failed": {
+   "points": 0
+  }
+ },
+ "headline": {
+  "noise_floor_pct": 1.6,
+  "noise_floor_source": "fallback; none measured per point",
+  "points": 0,
+  "tpot": {
+   "mape": {
+    "n": 0,
+    "value": "too few points"
+   },
+   "shape": {
+    "n": 0,
+    "value": "too few points"
+   }
+  },
+  "ttft": {
+   "mape": {
+    "n": 0,
+    "value": "too few points"
+   },
+   "shape": {
+    "n": 0,
+    "value": "too few points"
+   }
+  },
+  "withheld": 0
+ },
+ "identity": {
+  "harness_commit": "8170499e5026673be63c4f442057dcb3eee05ec4",
+  "point_set_sha256": "fa56a43c439ff679d358a2649f94040e917d80279002cf6a0b54d72c651cf7b0",
+  "points": 16,
+  "pull_manifest_sha256": "9e9588ad78ee04870416a0992c2e8eaba865fbf98e7f9b806bfef67eaca32a36",
+  "sample": "in_sample",
+  "units_count": 16,
+  "units_sha256": "a44e14f4d8d35e44a9c6586599ffdcc6d70a932566df3a4da51529aeaab1f0ca"
+ },
+ "inputs": {
+  "blis": {
+   "catalog": "f70c6c7503a47442c4c5d989f8f17b093c14e069",
+   "commit_sha": "780f661ef9c18a2a9928acf8a63a67667cd597c0",
+   "extractor_version": "blis-latency-kernel@unknown",
+   "registry": "f70c6c7503a47442c4c5d989f8f17b093c14e069",
+   "release": "unknown"
+  },
+  "engine": {
+   "kind": "vllm",
+   "version": "0.32.0"
+  },
+  "experimental": true,
+  "fields_sha256": "dbe9123a677792edf030a0da584b9fc915c45ec206a5cebbffc3944568b6e879",
+  "simulator": {
+   "build": "780f661ef9c18a2a9928acf8a63a67667cd597c0",
+   "engine": {
+    "kind": "vllm",
+    "version": "0.32.0"
+   },
+   "harness_commit": "8170499e5026673be63c4f442057dcb3eee05ec4"
+  }
+ },
+ "kind": "run",
+ "refusals": [],
+ "sample": "in_sample",
+ "sample_text": "IN-SAMPLE: the points are the ones the model was calibrated on or tuned against; there is no anchor list yet, so no point is held out. These figures say how well the simulator reproduces data it has seen, not how well it predicts new data.",
+ "serving_by_grade": {},
+ "unlock": [
+  {
+   "alone": 0,
+   "blocker": "field_not_in_release:env.PYTHONUNBUFFERED",
+   "blocks": 16
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:env.VLLM_USE_RUST_FRONTEND",
+   "blocks": 16
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:speculative_config.rejection_sample_method",
+   "blocks": 16
+  },
+  {
+   "alone": 0,
+   "blocker": "out of scope (AMD, TPU)",
+   "blocks": 0,
+   "out_of_scope": true
+  }
+ ]
+}
