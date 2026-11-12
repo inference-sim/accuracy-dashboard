@@ -731,7 +731,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     o.subs = recovery + list(c.substitutions)
     o.reasons += row_vs_run(row, c)
 
-    o.g1_inputs = {"requested": {p: s.value for p, s in c.settings.items() if s.requested and s.value is not None},
+    o.g1_inputs = {"requested": st.requested_values(c.settings),
                    "resolved": {p: v[0] for p, v in readings["resolved_config"].values.items() if v},
                    "libraries": {}}      # no source of the run's library versions is read yet
     cat = env.catalog_obj
