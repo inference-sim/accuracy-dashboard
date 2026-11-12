@@ -1,0 +1,811 @@
+{
+ "backlog": [
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "client_difference:client_build"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-attention/attention_decode_floor_mla"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-attention/attention_decode_rate_block_index_scores"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-attention/attention_prefill_floor_block_index_scores"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-attention/attention_prefill_per_token_block_index_scores"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-attention/attention_prefill_rate_block_index_scores"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-host-overheads/host_admission_per_token"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-host-overheads/host_admission_per_token_rust_frontend"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-host-overheads/host_completion"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-host-overheads/host_launch_eager_per_kernel"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-host-overheads/host_launch_eager_per_layer"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-host-overheads/host_launch_per_kernel"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-host-overheads/host_output_token"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-host-overheads/host_replay_graph_per_step"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-memory/activation_scratch_floor_bytes"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-memory/cudagraph_capture_bytes_full_and_piecewise"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-primitives/engine_workspace_bytes"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-primitives/gemm_eps_max_w8a16_mxfp8"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-primitives/gemm_m_half_w8a16_mxfp8"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-primitives/hbm_derate"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "coefficient_method:cost-model-primitives/host_gather_rate_uva"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "estimated:api_server_count"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "estimated:engram_config.cpu_offload"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "interim_status:device_ids"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "interim_status:disable_uvicorn_access_log"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "interim_status:enable_auto_tool_choice"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "interim_status:env.VLLM_ENGINE_READY_TIMEOUT_S"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "interim_status:host"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "interim_status:model"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "interim_status:model_tag"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "interim_status:reasoning_parser"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "interim_status:safetensors_load_strategy"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "interim_status:served_model_name"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "interim_status:speculative_config.draft_sample_method"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "interim_status:tokenizer_mode"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "interim_status:tool_call_parser"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "other_release:engine release"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "ported_functions_unpublished:engine release"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "resolved_differs:kv_cache_dtype"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "unevaluated:coefficient_range"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "unevaluated:kernel_hash"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "value_class:max_model_len"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "value_class:speculative_config.enable_adaptive_verification"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 16,
+   "entry": "value_class:speculative_config.num_speculative_tokens"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 8,
+   "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_4rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 8,
+   "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_8rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 8,
+   "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_4rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 8,
+   "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_8rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 8,
+   "entry": "value_class:max_num_batched_tokens"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 8,
+   "entry": "value_class:tensor_parallel_size"
+  }
+ ],
+ "coverage": {
+  "all": {
+   "by_grade": {
+    "G4": 16
+   },
+   "failed": 0,
+   "not_scored": 0,
+   "points": 16,
+   "primary_reason": {},
+   "reasons": {},
+   "scored": 16,
+   "share_scored": 1.0
+  },
+  "in_scope": {
+   "by_grade": {
+    "G4": 16
+   },
+   "failed": 0,
+   "not_scored": 0,
+   "points": 16,
+   "primary_reason": {},
+   "reasons": {},
+   "scored": 16,
+   "share_scored": 1.0
+  },
+  "out_of_scope": {
+   "by_grade": {},
+   "failed": 0,
+   "not_scored": 0,
+   "points": 0,
+   "primary_reason": {},
+   "reasons": {},
+   "scored": 0,
+   "share_scored": null
+  },
+  "out_of_scope_by_chip": {}
+ },
+ "development_split": {
+  "constants": {
+   "freeze_date": "2026-11-09",
+   "salt": "blis-dev-split-2",
+   "train_pct": 60,
+   "validation_pct": 20
+  },
+  "kinds": {
+   "prospective": {
+    "points": 0,
+    "withheld": true
+   },
+   "test": {
+    "points": 0,
+    "withheld": true
+   },
+   "train": {
+    "accuracy": {
+     "noise_floor_pct": 1.6,
+     "noise_floor_source": "fallback; none measured per point",
+     "points": 0,
+     "tpot": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "ttft": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "withheld": 0
+    },
+    "grades": {},
+    "in_scope": 0,
+    "points": 0,
+    "ranking": {
+     "throughput_per_gpu": {
+      "groups": 0,
+      "kendall": "too few groups",
+      "left_out": 0,
+      "regret": "too few groups",
+      "spearman": "too few groups",
+      "top1": "too few groups",
+      "top3": "too few groups",
+      "value": "throughput_per_gpu"
+     }
+    },
+    "scored": 0,
+    "series": 0
+   },
+   "unassigned": {
+    "accuracy": {
+     "noise_floor_pct": 1.6,
+     "noise_floor_source": "fallback; none measured per point",
+     "points": 0,
+     "tpot": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "ttft": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "withheld": 0
+    },
+    "grades": {},
+    "in_scope": 0,
+    "points": 0,
+    "ranking": {
+     "throughput_per_gpu": {
+      "groups": 0,
+      "kendall": "too few groups",
+      "left_out": 0,
+      "regret": "too few groups",
+      "spearman": "too few groups",
+      "top1": "too few groups",
+      "top3": "too few groups",
+      "value": "throughput_per_gpu"
+     }
+    },
+    "scored": 0,
+    "series": 0
+   },
+   "validation": {
+    "accuracy": {
+     "noise_floor_pct": 1.6,
+     "noise_floor_source": "fallback; none measured per point",
+     "points": 16,
+     "tpot": {
+      "mape": {
+       "n": 16,
+       "value": 23.467553698521684
+      },
+      "shape": {
+       "n": 14,
+       "value": 23.964789685084643
+      }
+     },
+     "ttft": {
+      "mape": {
+       "n": 16,
+       "value": 34.80443457333226
+      },
+      "shape": {
+       "n": 14,
+       "value": 30.9857768273508
+      }
+     },
+     "withheld": 0
+    },
+    "grades": {
+     "G4": 16
+    },
+    "in_scope": 16,
+    "points": 16,
+    "ranking": {
+     "throughput_per_gpu": {
+      "groups": 0,
+      "kendall": "too few groups",
+      "left_out": 0,
+      "regret": "too few groups",
+      "spearman": "too few groups",
+      "top1": "too few groups",
+      "top3": "too few groups",
+      "value": "throughput_per_gpu"
+     }
+    },
+    "scored": 16,
+    "series": 1
+   }
+  },
+  "test_evaluated": false,
+  "text": "Per-split figures use the DEVELOPMENT split of docs/m2/evaluation-protocol.md, not the ledger's held-out: its test set is 'development split, not the ledger's held-out'."
+ },
+ "format": "baseline-compare-1",
+ "grades": {
+  "G1": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "points": 0,
+   "share_of_all": "too few points",
+   "share_of_graded": "too few points"
+  },
+  "G2": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "points": 0,
+   "share_of_all": "too few points",
+   "share_of_graded": "too few points"
+  },
+  "G3": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "points": 0,
+   "share_of_all": "too few points",
+   "share_of_graded": "too few points"
+  },
+  "G4": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 16,
+    "tpot": {
+     "mape": {
+      "n": 16,
+      "value": 23.467553698521684
+     },
+     "shape": {
+      "n": 14,
+      "value": 23.964789685084643
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 16,
+      "value": 34.80443457333226
+     },
+     "shape": {
+      "n": 14,
+      "value": 30.9857768273508
+     }
+    },
+    "withheld": 0
+   },
+   "points": 16,
+   "share_of_all": 1.0,
+   "share_of_graded": 1.0
+  },
+  "G5": {
+   "points": 0,
+   "share_of_all": "too few points",
+   "share_of_graded": null
+  },
+  "failed": {
+   "points": 0
+  }
+ },
+ "headline": {
+  "noise_floor_pct": 1.6,
+  "noise_floor_source": "fallback; none measured per point",
+  "points": 16,
+  "tpot": {
+   "mape": {
+    "n": 16,
+    "value": 23.467553698521684
+   },
+   "shape": {
+    "n": 14,
+    "value": 23.964789685084643
+   }
+  },
+  "ttft": {
+   "mape": {
+    "n": 16,
+    "value": 34.80443457333226
+   },
+   "shape": {
+    "n": 14,
+    "value": 30.9857768273508
+   }
+  },
+  "withheld": 0
+ },
+ "identity": {
+  "harness_commit": "8611215558f77ad1d760918dbe1ca698fc70e556",
+  "point_set_sha256": "fa56a43c439ff679d358a2649f94040e917d80279002cf6a0b54d72c651cf7b0",
+  "points": 16,
+  "pull_manifest_sha256": "9e9588ad78ee04870416a0992c2e8eaba865fbf98e7f9b806bfef67eaca32a36",
+  "sample": "in_sample",
+  "units_count": 16,
+  "units_sha256": "a44e14f4d8d35e44a9c6586599ffdcc6d70a932566df3a4da51529aeaab1f0ca"
+ },
+ "inputs": {
+  "blis": {
+   "catalog": "6d53cf403a17d0367a3d17951b42eb2d6215767f",
+   "commit_sha": "75c3359188e1ece7dcc2c4b5e35361614f225463",
+   "extractor_version": "blis-latency-kernel@unknown",
+   "registry": "6d53cf403a17d0367a3d17951b42eb2d6215767f",
+   "release": "unknown"
+  },
+  "engine": {
+   "kind": "vllm",
+   "version": "0.32.0"
+  },
+  "experimental": true,
+  "fields_sha256": "aa0d3d175827e6ca31a56d0efb54c27727659a44384937e2d285aacf88435db9",
+  "simulator": {
+   "build": "75c3359188e1ece7dcc2c4b5e35361614f225463",
+   "engine": {
+    "kind": "vllm",
+    "version": "0.32.0"
+   },
+   "harness_commit": "8611215558f77ad1d760918dbe1ca698fc70e556"
+  }
+ },
+ "kind": "run",
+ "refusals": [],
+ "sample": "in_sample",
+ "sample_text": "IN-SAMPLE: the points are the ones the model was calibrated on or tuned against; there is no anchor list yet, so no point is held out. These figures say how well the simulator reproduces data it has seen, not how well it predicts new data.",
+ "serving_by_grade": {
+  "aggregated": {
+   "G1": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "G2": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "G3": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "G4": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 16,
+    "tpot": {
+     "mape": {
+      "n": 16,
+      "value": 23.467553698521684
+     },
+     "shape": {
+      "n": 14,
+      "value": 23.964789685084643
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 16,
+      "value": 34.80443457333226
+     },
+     "shape": {
+      "n": 14,
+      "value": 30.9857768273508
+     }
+    },
+    "withheld": 0
+   }
+  }
+ },
+ "unlock": [
+  {
+   "alone": 0,
+   "blocker": "out of scope (AMD, TPU)",
+   "blocks": 0,
+   "out_of_scope": true
+  }
+ ]
+}

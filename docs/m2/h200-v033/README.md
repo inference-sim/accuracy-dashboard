@@ -1,6 +1,6 @@
 # DeepSeek-V4.1-Flash on H200 under vLLM v0.33.0: sixteen rows newer than the ledger
 
-Contents: [What the rows are](#what-the-rows-are) · [How they are pinned and split](#how-they-are-pinned-and-split) · [Result of the scorer as published](#result-of-the-scorer-as-published) · [What BLIS refuses, by name](#what-blis-refuses-by-name) · [Dry run: the rows with the three refusals set aside](#dry-run-the-rows-with-the-three-refusals-set-aside) · [Dry run with the three fields classified](#dry-run-with-the-three-fields-classified) · [Grade](#grade) · [How to reproduce](#how-to-reproduce) · [What this does not show](#what-this-does-not-show)
+Contents: [What the rows are](#what-the-rows-are) · [How they are pinned and split](#how-they-are-pinned-and-split) · [Result of the scorer as published](#result-of-the-scorer-as-published) · [What BLIS refuses, by name](#what-blis-refuses-by-name) · [Dry run: the rows with the three refusals set aside](#dry-run-the-rows-with-the-three-refusals-set-aside) · [Dry run with the three fields classified](#dry-run-with-the-three-fields-classified) · [Run at the final stack pins](#run-at-the-final-stack-pins) · [Grade](#grade) · [How to reproduce](#how-to-reproduce) · [What this does not show](#what-this-does-not-show)
 
 These are the first InferenceX rows of the model, chip and workload family the team runs. They were measured on 2026-11-09, after the baseline's ledger source revision (`db-dump/2026-09-28`), so the ledger holds no unit for them and the baseline's frozen pull does not hold them. They are scored here from a pull of their own. The baseline pull and its 1734 points are not touched.
 
@@ -88,7 +88,7 @@ earlier mapping, `engine.frontend`, is refused by the simulator), and a syntheti
 engine block as well as in the replay, because the engine accepts the method only beside one.
 
 Command: as in [How to reproduce](#how-to-reproduce), with `--fields` the `fields.json` of that branch (sha256
-`474e99d960638604b169417a9b7dc0fc4abb7c47b9b1ea5a35e69338e84df573`), harness commit `c474b95c1a86e9763b91ab9cec1987386233d8a1`,
+`474e99d960638604b169417a9b7dc0fc4abb7c47b9b1ea5a35e69338e84df573`), scorer commit `c474b95c1a86e9763b91ab9cec1987386233d8a1`,
 simulator `780f661e` (blis-vllm `96ea750e` inside it, which already reads the Rust variable and a synthetic length). No scratch
 file is used. **16 of 16 are scored, 0 refused, 0 failed, all G4** (the engine release, as before). Over the sixteen development
 (validation) points: **TTFT MAPE 75.4 %, TPOT MAPE 38.1 %** (TTFT shape 31.7 %, TPOT shape 42.0 %, over the 14 points with a shape).
@@ -130,8 +130,12 @@ What changed, and what it does not show:
   At 128 clients on 4 GPUs both figures are of a saturated queue (382 s measured, 1194 s predicted) and say little.
 - The synthetic acceptance is a mean. The simulator accrues the mean each step, where vLLM accepts by position; they agree while
   every draft is verified (blis-vllm's page says when they differ). The realised mean in the server log, 3.511, suggests they did.
-- The grade is G4 for the reason given under [Grade](#grade). The harness commit of the run is `c474b95c`; a later commit, `f7bb446`,
+- The grade is G4 for the reason given under [Grade](#grade). The scorer commit of that dry run is `c474b95c`; a later commit, `f7bb446`,
   changes only which substitutions a point names (the Rust variable is read as true, not as the text "1", by the value-class check).
+
+## Run at the final stack pins
+
+The sixteen rows are scored again, with no scratch file, at the final stack pins: 16 of 16 scored, all G4, TTFT MAPE 34.8 %, TPOT MAPE 23.5 % (development split, in-sample). The run, its inputs and its table are in [h200-v033-final-pins](../h200-v033-final-pins/README.md).
 
 ## Grade
 
