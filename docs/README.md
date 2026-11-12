@@ -35,6 +35,7 @@ The dashboard asks one question of every InferenceX benchmark point it can read:
 | [Workload statements](m2/workload-statements.md) | What each benchmark family states about the workload's category and thinking mode, which profile pairs the substrate holds, and how many points each unlocks. |
 | [Who owns the router policies](m2/policy-table-owner.md) | The policy list and compositions are the substrate router table's; the check that the dashboard's copy matches, and what the owner does not yet state. |
 | [Agentic coverage](m2/agentic-coverage.md) | The 47 agentic points: each one's first refusal and the field that blocks it. |
+| [DeepSeek-V4.1-Flash on H200, vLLM v0.33.0](m2/h200-v033/README.md) | Sixteen rows newer than the ledger: how they are pinned and split, what BLIS refuses for them by name, and a dry run of their accuracy. |
 | [Dynamo router evidence](m2/dynamo-router-evidence.md) | What router the Dynamo runs used. |
 | [The dashboard against the final substrate](m2/final-catalog-check.md) | Names the code reads, checked at the audited substrate stack. |
 
