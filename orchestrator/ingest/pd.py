@@ -24,6 +24,7 @@ recipe names, and counts of instances that `blis replay` takes as flags (`--pref
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import pd_recipe as pdr
 import settings as st
@@ -138,39 +139,55 @@ def pool_parallel(pool: "Pool", flags: dict) -> dict:
             "expert_parallel": pool.ep > 1 if ep is None else ep}
 
 
-def epp_config(policy: str) -> str:
-    """The endpoint picker configuration of a P/D deployment under one of the policies the router
-    table may name (blis-substrate routertable.Policies): every request is split into a prefill and a
-    decode leg, and each leg is placed by the policy's composition.
+def load_owner_policies(substrate: Path) -> dict:
+    """The router table's checked policy list, read from its owner at the pinned commit: `go run ./tools/prcheck
+    router-policies` in a blis-substrate checkout prints {"closed_policies": [...], "policies": [...]} and exits
+    non-zero, naming the problems, when the list fails the owner's own check."""
+    import json
+    import subprocess
+    out = subprocess.run(["go", "run", "./tools/prcheck", "router-policies"], cwd=substrate, capture_output=True, text=True)
+    if out.returncode != 0:
+        raise ValueError(f"the router table's policy list is not readable from {substrate}: {out.stderr.strip()[:500]}")
+    return json.loads(out.stdout)
 
-    The policy list and the plugins, scorer weights and picker of each policy are the router table's
-    (blis-substrate `routertable.Policies()`); this table is a copy of what the owner states plus the parts it
-    does not (the filters, the decider, the producers' parameters). test_pd_policy_owner.py fails when the copy
-    differs from the owner's at the pinned substrate commit; docs/m2/policy-table-owner.md lists what the owner
-    does not yet state."""
-    scorers = {"round-robin": [], "random-picker": [],
-               "least-active-requests": [("active-request-scorer", 1)],
-               "default": [("queue-scorer", 2), ("kv-cache-utilization-scorer", 2), ("prefix-cache-scorer", 3)]}
-    producers = {"round-robin": [], "random-picker": [], "least-active-requests": ["inflight-load-producer"],
-                 "default": ["approx-prefix-cache-producer"]}
-    if policy not in scorers:
-        raise ValueError(f"{policy!r} is not a policy llm-d's router offers")
-    plugins = producers[policy] + sorted({s for s, _ in scorers[policy]}) + [
-        "prefill-filter", "decode-filter", "random-picker" if policy == "random-picker" else "max-score-picker",
-        "always-disagg-pd-decider"]
+
+def epp_config(policy: str, owner: dict) -> str:
+    """The endpoint-picker file of a prefill/decode deployment under one of the policies the router table names,
+    rendered from the owner's complete configuration of that policy (`owner`: load_owner_policies). The dashboard
+    selects the policy; it defines no plugin, filter, weight, decider or parameter of its own."""
+    by = {p["policy"]: p for p in owner["policies"]}
+    if policy not in by:
+        raise ValueError(f"{policy!r} is not a policy the router table's list offers ({sorted(by)})")
+    cfg = by[policy]["config"]
     lines = ["apiVersion: llm-d.ai/v1", "kind: EndpointPickerConfig", "plugins:"]
-    for p in plugins:
-        if p == "approx-prefix-cache-producer":
-            lines += [f"- type: {p}", "  parameters:", "    maxPrefixTokensToMatch: 16384", "    lruCapacityPerServer: 31250"]
-        else:
-            lines.append(f"- type: {p}")
-    lines += ["- type: disagg-profile-handler", "  parameters:", "    deciders:", "      prefill: always-disagg-pd-decider",
-              "schedulingProfiles:"]
-    for prof in ("prefill", "decode"):
-        lines += [f"- name: {prof}", "  plugins:", f"  - pluginRef: {prof}-filter"]
-        for s, w in scorers[policy]:
-            lines += [f"  - pluginRef: {s}", f"    weight: {w}"]
-        lines.append("  - pluginRef: " + ("random-picker" if policy == "random-picker" else "max-score-picker"))
+    for plug in cfg["plugins"]:
+        lines.append(f"- type: {plug['type']}")
+        params = plug.get("parameters") or []
+        if params:
+            tree: dict = {}
+            for prm in params:
+                node = tree
+                *path, leaf = prm["name"].split(".")
+                for k in path:
+                    node = node.setdefault(k, {})
+                node[leaf] = int(prm["value"]) if prm.get("integer") else prm["value"]
+            lines.append("  parameters:")
+
+            def emit(d, depth):
+                for k, v in d.items():
+                    if isinstance(v, dict):
+                        lines.append("  " * depth + f"{k}:")
+                        emit(v, depth + 1)
+                    else:
+                        lines.append("  " * depth + f"{k}: {v}")
+            emit(tree, 2)
+    lines.append("schedulingProfiles:")
+    for prof in cfg["scheduling_profiles"]:
+        lines += [f"- name: {prof['name']}", "  plugins:"]
+        for ref in prof["plugins"]:
+            lines.append(f"  - pluginRef: {ref['plugin']}")
+            if "weight" in ref:
+                lines.append(f"    weight: {ref['weight']}")
     return "\n".join(lines) + "\n"
 
 
