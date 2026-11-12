@@ -27,7 +27,7 @@ The units are the substrate's (`catalog/ledger/units/inferencex.jsonl.gz`, made 
 
 ## Result of the scorer as published
 
-Command: `harness/run.sh` with the inputs of [prefill/decode coverage](../pd-coverage.md) (inference-sim `780f661e`, blis-substrate `f70c6c75`, field list of blis-vllm `96ea750e`) over this pull and [units.txt](units.txt); see [How to reproduce](#how-to-reproduce).
+Command: `harness/run.sh` with the inputs of [prefill/decode coverage](../pd-coverage.md) (inference-sim `c97c497b`, blis-substrate `6faaccf8`, field list of blis-vllm `28deab08`) over this pull and [units.txt](units.txt); see [How to reproduce](#how-to-reproduce).
 
 **0 of 16 are scored. All 16 are G5.** [contract/](contract/) is the run; [table.md](table.md) is its table (all development points). Each point has the same three reasons:
 
@@ -35,7 +35,7 @@ Command: `harness/run.sh` with the inputs of [prefill/decode coverage](../pd-cov
 
 | Reason | Field | Where it comes from | What clears it |
 |---|---|---|---|
-| `field_not_in_release:env.PYTHONUNBUFFERED` | the environment variable the recipe sets | the engine's field list at `96ea750e` does not list it | classify it (a Python interpreter setting; not read by vLLM) in blis-vllm |
+| `field_not_in_release:env.PYTHONUNBUFFERED` | the environment variable the recipe sets | the engine's field list at `28deab08` does not list it | classify it (a Python interpreter setting; not read by vLLM) in blis-vllm |
 | `field_not_modelled:env.VLLM_USE_RUST_FRONTEND` | the Rust API frontend | blis-vllm#85, status `not_modelled`, rule `none` | model it, or prove it inert |
 | `field_not_modelled:speculative_config.rejection_sample_method` | `synthetic` | blis-vllm#106, status `not_modelled`, rule `none` | model it (the synthetic acceptance length fixes the acceptance; the scorer already pins 3.51) |
 
@@ -89,17 +89,17 @@ The G1 conditions that are not evaluated are named as `unevaluated` substitution
 python3 orchestrator/baseline/freeze_rows.py --ledger SUBSTRATE/catalog/ledger --records records.json \
   --out PULL --cache CACHE --units-out UNITS
 # 2. score, from a clean checkout of the harness commit in contract/provenance.json
-bash harness/run.sh --sim 780f661ef9c18a2a9928acf8a63a67667cd597c0 --sim-repo <inference-sim checkout> \
+bash harness/run.sh --sim c97c497b104a556515717599a4468352c1234d28 --sim-repo <inference-sim checkout> \
   --units docs/m2/h200-v033/units.txt --pull PULL --out OUT \
   --catalog SUBSTRATE/catalog --registry SUBSTRATE/registry --corpus-dir CORPORA \
-  --fields FIELDS.json --catalog-release f70c6c7503a47442c4c5d989f8f17b093c14e069 \
-  --registry-release f70c6c7503a47442c4c5d989f8f17b093c14e069
+  --fields FIELDS.json --catalog-release 6faaccf8f1a2344918241d6b54fe339de44f7345 \
+  --registry-release 6faaccf8f1a2344918241d6b54fe339de44f7345
 # 3. splits and the table
 python3 orchestrator/baseline/split.py splits --pull PULL --out docs/m2/h200-v033/splits.json
 python3 orchestrator/baseline/compare.py run --dir docs/m2/h200-v033/contract --sample in_sample --out docs/m2/h200-v033/table
 ```
 
-`FIELDS.json` is blis-vllm `96ea750e3a626ab2f9c60ca3bc871b8a74839cc2`'s `fields.json` (sha256 `dbe9123a677792edf030a0da584b9fc915c45ec206a5cebbffc3944568b6e879`); the corpora are fetched as the baseline's README says. Cost: the freeze is about a minute for sixteen rows; the published scoring is about 40 seconds; the dry run is about 16 minutes (one replay of an hour-long trace per point, one worker) and 2 GB of memory.
+`FIELDS.json` is blis-vllm `28deab082a2fba6762b922c64c7b5b81b7eeac8e`'s `fields.json` (sha256 `2a84767a67027a9237934038a513252d7ed65cf8ff8ee203cad8fc0a8c51cc39`); the corpora are fetched as the baseline's README says. Cost: the freeze is about a minute for sixteen rows; the published scoring is about 40 seconds; the dry run is about 16 minutes (one replay of an hour-long trace per point, one worker) and 2 GB of memory.
 
 ## What this does not show
 
