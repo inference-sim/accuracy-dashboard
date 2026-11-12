@@ -747,11 +747,22 @@ def decide(settings: dict[str, Setting], field_list, part: str | None = None, fa
 # fabric class of a cluster (runners.yaml and the launch configuration hold none), so the class is
 # assumed and the point names it.
 FABRIC_COEFFICIENT = "cost-model-fabric"
-ASSUMED_FABRIC = "ib-400g"
-ASSUMED_FABRIC_SUBSTITUTION = {
-    "kind": "estimated", "subject": "cluster.fabric",
-    "detail": f"the run's inter-node fabric class is recorded by no source; {ASSUMED_FABRIC} is assumed, so a "
-              f"cross-node transfer is priced at that class's nominal rate times the registry's fabric efficiency"}
+DEFAULT_ASSUMED_FABRIC = "ib-400g"
+# The assumed class follows the chip generation's NIC: ConnectX-8 (800 Gb/s) on b300 and gb300,
+# ConnectX-7 (400 Gb/s) on the others the catalog names. An unknown chip keeps the default.
+ASSUMED_FABRIC_BY_CHIP = {"b300": "ib-800g", "gb300": "ib-800g"}
+_NIC_NOTE = {"ib-800g": "the chip's ConnectX-8 NIC is 800 Gb/s; the catalog's ib-800g efficiency is the ib-400g value "
+                        "carried over (assumed, not measured)"}
+
+
+def assumed_fabric(hardware: str | None) -> tuple[str, dict]:
+    """The fabric class assumed for a chip when no source records one, and the substitution that names it."""
+    cls = ASSUMED_FABRIC_BY_CHIP.get(hardware or "", DEFAULT_ASSUMED_FABRIC)
+    why = _NIC_NOTE.get(cls, "the class of the chip generation's 400 Gb/s NIC, and the catalog's default")
+    return cls, {
+        "kind": "estimated", "subject": "cluster.fabric",
+        "detail": f"the run's inter-node fabric class is recorded by no source; {cls} is assumed ({why}), so a "
+                  f"cross-node transfer is priced at that class's nominal rate times the registry's fabric efficiency"}
 
 
 def recorded_fabric(launch: dict | None) -> str | None:
@@ -883,10 +894,11 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
     coefficients = list(COEFFICIENTS)
     if cluster["nodes"] > 1:
         recorded = recorded_fabric(launch_config)
-        cluster["fabric"] = recorded or ASSUMED_FABRIC
+        assumed, assumed_sub = assumed_fabric(cluster["hardware"])
+        cluster["fabric"] = recorded or assumed
         coefficients.append(FABRIC_COEFFICIENT)
         if recorded is None:
-            b.substitutions.append(ASSUMED_FABRIC_SUBSTITUTION)
+            b.substitutions.append(assumed_sub)
     b.scenario = {"kind": "Scenario", "name": name, "engine_version": engine_version.lstrip("v"),
                   "model": model, "coefficients": coefficients, "cluster": cluster}
     if names_are_vllms(field_list):

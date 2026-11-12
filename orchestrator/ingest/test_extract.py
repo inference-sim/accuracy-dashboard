@@ -572,8 +572,8 @@ def test_a_scenario_of_several_nodes_states_a_fabric_class_and_the_fabric_effici
     b = _build(c)
     assert b.scenario["cluster"]["nodes"] == 2 and b.scenario["cluster"]["fabric"] == "ib-400g"
     assert b.scenario["coefficients"][-1] == "cost-model-fabric" and "cost-model-fabric" not in st.COEFFICIENTS
-    assert [s for s in b.substitutions if s["subject"] == "cluster.fabric"] == [st.ASSUMED_FABRIC_SUBSTITUTION]
-    assert st.ASSUMED_FABRIC_SUBSTITUTION["kind"] == "estimated"
+    assert [s for s in b.substitutions if s["subject"] == "cluster.fabric"] == [st.assumed_fabric('h200')[1]]
+    assert st.assumed_fabric("h200")[1]["kind"] == "estimated"
     # A fabric class the run's launch configuration records is used and is not an assumption.
     b = _build(c, launch_config={"resources": {"fabric": "roce-200g"}})
     assert b.scenario["cluster"]["fabric"] == "roce-200g"
@@ -583,6 +583,30 @@ def test_a_scenario_of_several_nodes_states_a_fabric_class_and_the_fabric_effici
                                 "'gpu_memory_utilization': 0.9")))
     assert "fabric" not in one.scenario["cluster"] and "cost-model-fabric" not in one.scenario["coefficients"]
     assert not [s for s in one.substitutions if s["subject"] == "cluster.fabric"]
+
+
+def test_the_assumed_fabric_class_follows_the_chip_generations_nic():
+    c = _classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16")))
+    seen = {}
+    for chip in ("b300", "gb300", "b200", "gb200-nvl72", "h100", "h200", "a100-80", "l40s", "not-a-chip"):
+        b = st.build(c, name="p", model="m", part=st.Part(name=chip), engine_version="0.32.0", field_list=FIELDS,
+                     catalog_node_size=None, node=NODE8)
+        sub = [x for x in b.substitutions if x["subject"] == "cluster.fabric"]
+        assert len(sub) == 1 and "cost-model-fabric" in b.scenario["coefficients"]
+        seen[chip] = b.scenario["cluster"]["fabric"]
+        # the substitution names the class actually assumed, not a literal
+        assert seen[chip] in sub[0]["detail"]
+        if seen[chip] == "ib-800g":
+            assert "not measured" in sub[0]["detail"]
+        else:
+            assert "ib-800g" not in sub[0]["detail"]
+    assert {k: v for k, v in seen.items() if v == "ib-800g"} == {"b300": "ib-800g", "gb300": "ib-800g"}
+    assert seen["h100"] == seen["h200"] == seen["b200"] == seen["not-a-chip"] == "ib-400g"
+    # a class the launch configuration records still wins over the chip's
+    b = st.build(c, name="p", model="m", part=st.Part(name="b300"), engine_version="0.32.0", field_list=FIELDS,
+                 catalog_node_size=None, node=NODE8, launch_config={"resources": {"fabric": "roce-200g"}})
+    assert b.scenario["cluster"]["fabric"] == "roce-200g"
+    assert not [x for x in b.substitutions if x["subject"] == "cluster.fabric"]
 
 
 def test_a_chip_whose_catalog_entry_fixes_the_node_size_states_none_and_nodes_follow_from_it():
@@ -597,7 +621,7 @@ def test_a_node_size_the_table_supplied_is_written_and_its_later_record_is_named
     node = ir.NodeSize(8, "cluster.gpus_per_node: InferenceX runners.yaml at 303669b0", sub)
     b = _build(_classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16"))), node=node)
     assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 2, "gpus_per_node": 8, "fabric": "ib-400g"}
-    assert b.node_source == node.provenance and b.substitutions == [sub, st.ASSUMED_FABRIC_SUBSTITUTION]
+    assert b.node_source == node.provenance and b.substitutions == [sub, st.assumed_fabric('h200')[1]]
 
 
 def test_a_node_size_nothing_records_or_two_sources_disagree_on_makes_the_point_g5():
