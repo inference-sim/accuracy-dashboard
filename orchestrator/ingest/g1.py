@@ -13,18 +13,21 @@ of its kind for every case where it is false, or nothing when it is true. When t
 the condition stays unevaluated and the point names it so (grade.unchecked). Nothing here guesses a
 missing datum or reads a registry file (X7): the data is the Result's and the field list's.
 
-THE SHAPE READ HERE is blis-substrate layer 10's as audited (a parameter of the after run, not a hash
-here). doc["selected_entries"] carries `closeness_version: 1` when at least one coefficient was
-recorded and every one was recorded whole: that says the recorder passed on everything each entry
-states, not that a condition was decided. Per coefficient:
+THE SHAPE READ HERE is the substrate's selected-entry report (contracts/spec/result, ClosenessVersion 2;
+version 1 is still read for the range). doc["selected_entries"] carries `closeness_version` when at
+least one coefficient was recorded and every one was recorded whole: that says the recorder passed on
+everything each entry states, not that a condition was decided. Per coefficient:
 
-  "kernel_impls": [{library, variant, code_hash}]   the kernels the entry is valid for
+  "kernel_impls": [{library, variant, code_hash}]   the kernels the entry is valid for (not the kernels priced)
+  "primitive":    the lowered primitive the name prices, empty for a name that prices no kernel   (version 2)
+  "priced":       [{library, variant, code_hash}]   the kernels BLIS priced with it                (version 2)
+  "kernel_match": "exact" or "unkeyed"                                                              (version 2)
   "fit_range":   [{dim, low, high}]                 the fit's input range
   "ci95":        {...}                              the entry's 95 percent interval
   "extrapolated": true, "unidentified": true        written only when true
 
 Extrapolated is evaluated only for a coefficient that states a fit_range, unidentified only for one
-that states a ci95, and the kernel hash only for one that states kernel_impls. Where the entry
+that states a ci95, and the kernel hash only for an exact entry, against `priced`. Where the entry
 states none of it, a false (an omitted flag) is "not evaluated". So a flag counts as evaluated only
 when the entry states what it needs, and most registry-measured coefficients leave their
 conditions unevaluated. A flag that is true is evidence whatever else is missing.
@@ -36,8 +39,8 @@ decode-1 when several share a role). A field of the field list may carry `value_
 
 The substrate holds no map from a library version to a kernel hash and the dashboard has none
 (blis-registry#73 asks for the engine to publish one). kernel_hash is evaluated only when the
-caller passes such a map, `version_hashes`; the scorer passes none, so the condition stays
-unevaluated on every point until a published source exists.
+caller passes such a map, `version_hashes`, and the run's `libraries`; the scorer passes neither, so
+the condition stays unevaluated on every point until a published source exists.
 """
 from __future__ import annotations
 
@@ -65,12 +68,20 @@ def _coefficients(doc) -> list | None:
     return cs if isinstance(cs, list) and cs else None
 
 
-CLOSENESS_VERSION = 1
+# The substrate emits closeness_version 2 (result.ClosenessVersion). Version 1 reports are still read
+# for the range condition, which they carry whole; they carry no priced implementation, so the kernel
+# hash is not decided from them.
+CLOSENESS_VERSIONS = (1, 2)
+PRICED_VERSION = 2
+
+
+def _version(doc):
+    return ((doc or {}).get("selected_entries") or {}).get("closeness_version")
 
 
 def _whole(doc) -> bool:
-    """Whether the report says every coefficient was recorded whole (closeness_version 1)."""
-    return ((doc or {}).get("selected_entries") or {}).get("closeness_version") == CLOSENESS_VERSION
+    """Whether the report says every coefficient was recorded whole (closeness_version 1 or 2)."""
+    return _version(doc) in CLOSENESS_VERSIONS
 
 
 def coefficient_range(doc) -> Evaluation:
@@ -99,42 +110,63 @@ def coefficient_range(doc) -> Evaluation:
 
 
 def kernel_hash(doc, libraries: dict | None, version_hashes: dict | None = None) -> Evaluation:
-    """libraries: library -> the version the run recorded. version_hashes: library -> {version ->
-    kernel code hash}, from a source that publishes the hash of each library release (none exists
-    yet; blis-registry#73). Both are needed for each library a coefficient's kernel_impls name."""
+    """Each library version the run recorded maps to the kernel hash BLIS priced (design 11.3, G1).
+
+    The hash BLIS priced is a coefficient's `priced` list, not its `kernel_impls`: the latter is every
+    build the entry is valid for, which can name a sibling the run did not run (result.go,
+    SelectedCoefficient.Priced). The condition is decided only for an entry whose `kernel_match` is
+    exact. An unkeyed entry that prices a kernel (it has a `primitive`) applies to every build without
+    having been shown to match the one that ran, so it leaves the condition unevaluated; an unkeyed
+    entry that prices no kernel (host overheads, memory sizes) has no hash to compare and is passed over.
+
+    libraries: library -> the version the run recorded. version_hashes: library -> {version ->
+    {variant -> kernel code hash}}, from a source that publishes the hash of each library release
+    (none exists yet; blis-registry#73). A library holds one hash per variant, so a version is keyed
+    by variant as well; the hash covers the target architecture (design 6.2)."""
     kind = "kernel_hash"
     cs = _coefficients(doc)
     if cs is None:
         return _unevaluated(kind, "the Result has no selected-entry report")
-    if not _whole(doc):
-        return _unevaluated(kind, "the report carries no closeness_version: it does not say which kernels were priced")
-    priced: dict = {}
+    if _version(doc) != PRICED_VERSION:
+        return _unevaluated(kind, "the report carries no closeness_version 2: it does not say which kernels were priced")
+    priced: dict = {}       # (library, variant) -> the code hashes BLIS priced
+    undecided = []
     for c in cs:
-        impls = c.get("kernel_impls") or []
-        if not impls:
-            # The kernel hash is evaluated only for an entry that states kernel_impls; skipping the
-            # others would call the condition true for a coefficient nobody could check.
-            return _unevaluated(kind, f"the coefficient {c.get('set')}/{c.get('name')} names no kernel implementation")
-        for k in impls:
-            priced.setdefault(k["library"], set()).add(k["code_hash"])
-    if not priced:
-        return _unevaluated(kind, "no coefficient names a kernel implementation")
-    if not version_hashes:
-        return _unevaluated(kind, "no source maps a library version to a kernel hash")
+        who = f"{c.get('set')}/{c.get('name')}"
+        match = c.get("kernel_match")
+        if match == "exact":
+            if not c.get("priced"):
+                undecided.append(f"{who} is exact but names no priced implementation")
+            for k in c.get("priced") or []:
+                priced.setdefault((k["library"], k["variant"]), set()).add(k["code_hash"])
+        elif match == "unkeyed":
+            if c.get("primitive"):
+                undecided.append(f"{who} prices {c['primitive']} but states no kernel implementation, so nothing shows "
+                                 f"it was measured on the kernel that ran")
+        else:
+            undecided.append(f"{who} states no kernel_match")
     subs = []
-    for lib, hashes in sorted(priced.items()):
+    for (lib, variant), hashes in sorted(priced.items()):
         version = (libraries or {}).get(lib)
         if version is None:
-            return _unevaluated(kind, f"the run records no version of {lib}")
-        table = version_hashes.get(lib)
-        if table is None:
-            return _unevaluated(kind, f"no source maps a version of {lib} to a kernel hash")
-        have = table.get(version)
+            undecided.append(f"the run records no version of {lib}")
+            continue
+        by_version = (version_hashes or {}).get(lib)
+        if by_version is None:
+            undecided.append(f"no source maps a version of {lib} to a kernel hash")
+            continue
+        have = (by_version.get(version) or {}).get(variant)
         if have not in hashes:
-            detail = (f"{lib} {version} has kernel hash {have}" if have else f"{lib} {version} maps to no kernel hash") \
-                + f", BLIS priced {', '.join(sorted(hashes))}"
+            detail = (f"{lib} {version} ({variant}) has kernel hash {have}" if have
+                      else f"{lib} {version} ({variant}) maps to no kernel hash") + f", BLIS priced {', '.join(sorted(hashes))}"
             subs.append({"kind": kind, "subject": lib, "detail": detail})
-    return Evaluation(kind, True, subs)
+    if subs:
+        return Evaluation(kind, True, subs)         # known to be false
+    if not priced and not undecided:
+        undecided.append("no coefficient names a kernel implementation it priced")
+    if undecided:
+        return _unevaluated(kind, undecided[0] + (f" (and {len(undecided) - 1} more)" if len(undecided) > 1 else ""))
+    return Evaluation(kind, True, [])
 
 
 def _same(a, b) -> bool:
@@ -190,6 +222,8 @@ def run_value(setting: str, resolved: dict):
         tp, dp = r.get("tensor_parallel_size"), r.get("data_parallel_size")
         return None if tp is None or dp is None else tp * dp * (r.get("prefill_context_parallel_size") or 1)
     if setting == "all_reduce_backend":
+        if r.get("tensor_parallel_size") == 1:
+            return None         # no tensor-parallel all-reduce group exists at width 1, so there is nothing to resolve
         d = r.get("disable_custom_all_reduce")
         return None if d is None else ("nccl" if d else "custom")
     if setting == "async_scheduling":

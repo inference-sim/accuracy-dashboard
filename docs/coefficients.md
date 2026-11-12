@@ -16,11 +16,11 @@ The dashboard consumes coefficients; it does not produce them. The cost model's 
 
 ## What the dashboard reads about a coefficient
 
-For each coefficient a simulation priced with, the Result's `selected_entries` names the set, the name, the method, the scope and the file, and (with `closeness_version` 1) the kernel implementations the entry is valid for, its fit range and interval, and whether the run left the range or the entry is unidentified. The dashboard grades:
+For each coefficient a simulation priced with, the Result's `selected_entries` names the set, the name, the method, the scope and the file, and (with `closeness_version` 1 or 2) the kernel implementations the entry is valid for (and, with 2, the ones priced and whether the entry matched exactly), its fit range and interval, and whether the run left the range or the entry is unidentified. The dashboard grades:
 
 - a method other than *measured*, *calibrated* or *not_charged* as a G2 `coefficient_method` substitution, named by `set/name`;
 - an extrapolated or unidentified lookup as a `coefficient_range` substitution, where the entry states what the flag needs;
-- a library version whose kernel hash differs from the one priced as a `kernel_hash` substitution (not evaluable today).
+- a library version whose kernel hash differs from the one priced (the entry's `priced` list) as a `kernel_hash` substitution (not evaluable today); a condition that could not be decided as an `unevaluated` substitution naming it.
 
 See [closeness grades](closeness-grades.md). The method *error* and the registry's own ranking of coefficient quality (VAL) belong to the registry's methodology above; the dashboard does not recompute them.
 
