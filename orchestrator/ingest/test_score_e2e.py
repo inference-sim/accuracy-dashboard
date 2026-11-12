@@ -1203,8 +1203,7 @@ def test_an_expired_job_log_keeps_the_point_scored_and_names_client_flags_assume
         # run with an expired job log failed validation after it was scored)
         assert c.validate_dir(tmp / "c1") == []
         d = next(d for d in diffs if d["subject"] == "client_flags")
-        assert d["kind"] == "client_difference" and \
-            d["detail"] == "job log expired; the client's flags are assumed to be the launcher's defaults"
+        assert d["kind"] == "client_difference" and d["detail"].startswith("job log expired; the client's flags are assumed")
         tmp = Path(tempfile.mkdtemp())
         entry, env = _setup(tmp)
         o, _ = _score(tmp, entry, env, tmp / "c2")

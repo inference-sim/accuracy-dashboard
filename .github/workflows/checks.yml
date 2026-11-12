@@ -159,6 +159,20 @@ jobs:
           git -C "$RUNNER_TEMP/substrate-pointrecord" fetch -q --depth 1 origin "$sha"
           git -C "$RUNNER_TEMP/substrate-pointrecord" checkout -q FETCH_HEAD
           test "$(git -C "$RUNNER_TEMP/substrate-pointrecord" rev-parse HEAD)" = "$sha"
+      - name: Check out the router fork at the pinned commit (its published endpoint-picker files and index)
+        run: |
+          set -euo pipefail
+          # PROVISIONAL: the router's commit that publishes the files and the index is not known yet. While it is empty this step
+          # does nothing and test_router_configs.py skips its real-router check, saying so; set it to the commit when it exists.
+          router_sha=""
+          if [ -n "$router_sha" ]; then
+            git init -q "$RUNNER_TEMP/router"
+            git -C "$RUNNER_TEMP/router" remote add origin https://github.com/inference-sim/llm-d-router.git
+            git -C "$RUNNER_TEMP/router" fetch -q --depth 1 origin "$router_sha"
+            git -C "$RUNNER_TEMP/router" checkout -q FETCH_HEAD
+            test "$(git -C "$RUNNER_TEMP/router" rev-parse HEAD)" = "$router_sha"
+            echo "BLIS_ROUTER_CHECKOUT=$RUNNER_TEMP/router" >> "$GITHUB_ENV"
+          fi
       - name: Build blis
         run: cd "$RUNNER_TEMP/sim" && GOFLAGS=-mod=mod go build -o blis main.go
       - name: Tests that simulate

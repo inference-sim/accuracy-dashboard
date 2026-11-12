@@ -695,8 +695,12 @@
             "object"
           ]
         },
+        "regime": {
+          "description": "router_differs only: the point's own regime (workload kind, client count, model, hardware, engine release, fabric, pool shape and each pool's instance), from which the carried bound is the entry's applicable subset.",
+          "type": "object"
+        },
         "bound": {
-          "description": "router_differs only: what that difference does to the figures, as the router table entry states it.",
+          "description": "router_differs only: what that difference does to the figures: the entry's bound cut to the ratios whose regime holds the point.",
           "type": [
             "string",
             "array",
