@@ -670,7 +670,7 @@ INEXACT_STAND_IN = {
 }
 
 
-def decide(settings: dict[str, Setting], field_list, part: str | None = None) -> Decided:
+def decide(settings: dict[str, Setting], field_list, part: str | None = None, facts_of=None) -> Decided:
     """Decide every recorded setting by the engine's fields.json (design §11.2, State and Decide).
 
     A setting two same-stage sources disagree on is a conflict (value_conflict). Every recorded
@@ -706,12 +706,20 @@ def decide(settings: dict[str, Setting], field_list, part: str | None = None) ->
             if dec.g5:
                 d.reasons.append(f"{dec.g5['code']}:{path}")
                 continue
-            check = INEXACT_STAND_IN.get(path)
-            if dec.substitution and dec.substitution["kind"] == "estimated" and check is not None:
-                why = check(st.value, part)
-                if why is not None:
-                    d.reasons.append(f"field_not_modelled:{path}")
-                    continue
+            if dec.substitution and dec.substitution["kind"] == "estimated":
+                est = field_list.lookup(path).estimation
+                if "valid_when" in est:
+                    # The engine states when its stand-in is exact; the dashboard supplies the facts and asks the evaluator.
+                    facts = facts_of(st.value, settings) if facts_of else {"value": st.value}
+                    if not fl.exact(est, facts):
+                        d.reasons.append(f"field_not_modelled:{path}")
+                        continue
+                else:
+                    # TEMPORARY: an engine field list that states no valid_when for these three fields (blis-vllm owner).
+                    check = INEXACT_STAND_IN.get(path)
+                    if check is not None and check(st.value, part) is not None:
+                        d.reasons.append(f"field_not_modelled:{path}")
+                        continue
             if dec.substitution:
                 d.substitutions.append(dec.substitution)
                 if dec.substitution["kind"] == "estimated":

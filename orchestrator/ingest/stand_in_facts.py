@@ -42,3 +42,12 @@ def facts(value, *, tp=None, gpus_per_node=None, capability: str | None = None) 
     if capability:
         out["compute_capability"] = str(capability).strip()
     return out
+
+
+def facts_of(gpus_per_node, capability):
+    """The `facts_of` callable settings.decide takes: (recorded value, the point's settings) -> facts, with the part's GPUs per node
+    and compute capability bound and the tensor-parallel size read from the settings."""
+    def of(value, settings):
+        tp = getattr(settings.get("tensor_parallel_size"), "value", None)
+        return facts(value, tp=tp, gpus_per_node=gpus_per_node, capability=capability)
+    return of
