@@ -39,3 +39,26 @@ def test_the_top_reasons_do_not_depend_on_the_order_of_the_points():
     tied = [{"framework": "vllm", "grade": "G2", "substitutions": [{"kind": "estimated", "subject": s}]}
             for s in ("b", "a")]
     assert bl.top(tied) == bl.top(tied[::-1]) == [("estimated: a", 1), ("estimated: b", 1)]
+
+
+# ---- COV-12: the send gap and the host_completion coefficient are one unmeasured quantity (777 us); the backlog counts it once
+
+GAP = {"kind": "client_difference", "subject": "send_gap"}
+HOST = {"kind": "coefficient_method", "subject": "h200-set/host_completion"}
+OTHER = {"kind": "coefficient_method", "subject": "h200-set/attention"}
+
+
+def test_the_send_gap_and_the_host_completion_coefficient_are_counted_once_per_point():
+    pts = [{"framework": "vllm", "grade": "G2", "substitutions": [GAP, HOST, OTHER]} for _ in range(3)]
+    v = {e["entry"]: e for e in bl.build(pts)["vllm"]}
+    assert v["coefficient_method:h200-set/host_completion"]["demotes"] == 3
+    assert "client_difference:send_gap" not in v                          # the alias adds nothing
+    assert sum(e["demotes"] for e in v.values()) == 6                     # two causes per point, not three
+    top = dict(bl.top(pts))
+    assert top == {"coefficient_method: h200-set/host_completion": 3, "coefficient_method: h200-set/attention": 3}
+
+
+def test_a_send_gap_with_no_host_completion_demoter_on_the_point_still_counts():
+    pts = [{"framework": "vllm", "grade": "G2", "substitutions": [GAP, OTHER]}]
+    assert {e["entry"] for e in bl.build(pts)["vllm"]} == {"client_difference:send_gap", "coefficient_method:h200-set/attention"}
+    assert dict(bl.top(pts)) == {"client_difference: send_gap": 1, "coefficient_method: h200-set/attention": 1}
