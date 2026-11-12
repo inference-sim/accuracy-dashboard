@@ -425,7 +425,7 @@ def cmd_score(a) -> int:
         assumed_router_revision=getattr(a, "assume_router_revision", None),
         router_policy_experiment=getattr(a, "router_policy_experiment", None),
         speculative_fallback_category=getattr(a, "speculative_fallback_category", None),
-        policy_source=Path(a.policy_source).resolve() if getattr(a, "policy_source", None) else None)
+        router_checkout=Path(a.router_checkout).resolve() if getattr(a, "router_checkout", None) else None)
     # The build every point records: --sim-build, else the release tag the checkout is at
     # (check_blis_inputs required one), with the engine release its stack.json names (COV-6).
     env.sim_build = sim_build or env.blis_release
@@ -709,16 +709,14 @@ def main(argv=None) -> int:
                                           "experiment with a candidate entry. The run is then experimental.")
     s.add_argument("--assume-router-revision", help="a 40-hex commit of the router build to assume where a run records only "
                                                     "a wheel version (an experiment; the point says it was assumed, and the run is experimental)")
-    s.add_argument("--router-policy-experiment", choices=["round-robin", "random-picker", "least-active-requests", "default"],
-                   help="an llm-d policy to stand in for a router the table does not map, to measure the prefill/decode writer "
+    s.add_argument("--router-policy-experiment", help="an llm-d policy to stand in for a router the table does not map, to measure the prefill/decode writer "
                         "apart from the router question (an experiment: each such point names it, and the run is experimental)")
     s.add_argument("--speculative-fallback-category", metavar="CATEGORY",
                    help="the acceptance profile's category to fall back to where the benchmark states none (design D8: a "
                         "fallback the caller requested). Without it a speculative point that pins no acceptance length is G5 "
                         "value_not_recorded:workload_category_not_stated. The point names it, and the run is experimental.")
-    s.add_argument("--policy-source", metavar="SUBSTRATE", help="the blis-substrate checkout whose router table states the "
-                   "endpoint-picker configuration of each policy (read with `go run ./tools/prcheck router-policies`); "
-                   "default: the checkout the catalog sits in")
+    s.add_argument("--router-checkout", metavar="DIR", help="a checkout of llm-d's router fork at a pinned commit: it publishes the "
+                   "endpoint-picker file of each policy, which a prefill/decode point passes to the simulator unchanged")
     s.add_argument("--work")
     s.add_argument("--timeout", type=int, default=7200)
     s.add_argument("--only", nargs="*")
