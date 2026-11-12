@@ -240,19 +240,19 @@
   "backlog": {
     "top": [
       {
-        "reason": "coefficient_range: unevaluated",
+        "reason": "unevaluated: coefficient_range",
         "points": 8
       },
       {
-        "reason": "kernel_hash: unevaluated",
+        "reason": "unevaluated: kernel_hash",
         "points": 8
       },
       {
-        "reason": "resolved_differs: unevaluated",
+        "reason": "unevaluated: resolved_differs",
         "points": 8
       },
       {
-        "reason": "value_class: unevaluated",
+        "reason": "unevaluated: value_class",
         "points": 8
       },
       {
@@ -585,23 +585,23 @@
                           },
                           {
                             "detail": "coefficient_range is unevaluated",
-                            "kind": "coefficient_range",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "coefficient_range"
                           },
                           {
                             "detail": "kernel_hash is unevaluated",
-                            "kind": "kernel_hash",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "kernel_hash"
                           },
                           {
                             "detail": "resolved_differs is unevaluated",
-                            "kind": "resolved_differs",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "resolved_differs"
                           },
                           {
                             "detail": "value_class is unevaluated",
-                            "kind": "value_class",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "value_class"
                           }
                         ]
                       }
@@ -714,23 +714,23 @@
                           },
                           {
                             "detail": "coefficient_range is unevaluated",
-                            "kind": "coefficient_range",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "coefficient_range"
                           },
                           {
                             "detail": "kernel_hash is unevaluated",
-                            "kind": "kernel_hash",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "kernel_hash"
                           },
                           {
                             "detail": "resolved_differs is unevaluated",
-                            "kind": "resolved_differs",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "resolved_differs"
                           },
                           {
                             "detail": "value_class is unevaluated",
-                            "kind": "value_class",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "value_class"
                           }
                         ]
                       }
@@ -843,23 +843,23 @@
                           },
                           {
                             "detail": "coefficient_range is unevaluated",
-                            "kind": "coefficient_range",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "coefficient_range"
                           },
                           {
                             "detail": "kernel_hash is unevaluated",
-                            "kind": "kernel_hash",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "kernel_hash"
                           },
                           {
                             "detail": "resolved_differs is unevaluated",
-                            "kind": "resolved_differs",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "resolved_differs"
                           },
                           {
                             "detail": "value_class is unevaluated",
-                            "kind": "value_class",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "value_class"
                           }
                         ]
                       }
@@ -1181,11 +1181,6 @@
                         },
                         "substitutions": [
                           {
-                            "detail": "coefficient_range is unevaluated",
-                            "kind": "coefficient_range",
-                            "subject": "unevaluated"
-                          },
-                          {
                             "detail": "left unset; the engine resolves the upstream default",
                             "kind": "estimated",
                             "subject": "attention_config.indexer_kv_dtype"
@@ -1196,24 +1191,29 @@
                             "subject": "attention_config.indexer_sparse_logits"
                           },
                           {
-                            "detail": "kernel_hash is unevaluated",
-                            "kind": "kernel_hash",
-                            "subject": "unevaluated"
-                          },
-                          {
                             "detail": "vllm/vllm-openai:nightly-dev-x86_64-cu130-ac9126e58aa7 (banner 0.30.1rc1.dev493+gac9126e58)",
                             "kind": "nightly_or_custom",
                             "subject": "engine build"
                           },
                           {
+                            "detail": "coefficient_range is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "coefficient_range"
+                          },
+                          {
+                            "detail": "kernel_hash is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "kernel_hash"
+                          },
+                          {
                             "detail": "resolved_differs is unevaluated",
-                            "kind": "resolved_differs",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "resolved_differs"
                           },
                           {
                             "detail": "value_class is unevaluated",
-                            "kind": "value_class",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "value_class"
                           }
                         ]
                       }
@@ -1412,23 +1412,23 @@
                         "substitutions": [
                           {
                             "detail": "coefficient_range is unevaluated",
-                            "kind": "coefficient_range",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "coefficient_range"
                           },
                           {
                             "detail": "kernel_hash is unevaluated",
-                            "kind": "kernel_hash",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "kernel_hash"
                           },
                           {
                             "detail": "resolved_differs is unevaluated",
-                            "kind": "resolved_differs",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "resolved_differs"
                           },
                           {
                             "detail": "value_class is unevaluated",
-                            "kind": "value_class",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "value_class"
                           }
                         ]
                       }
@@ -1538,23 +1538,23 @@
                         "substitutions": [
                           {
                             "detail": "coefficient_range is unevaluated",
-                            "kind": "coefficient_range",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "coefficient_range"
                           },
                           {
                             "detail": "kernel_hash is unevaluated",
-                            "kind": "kernel_hash",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "kernel_hash"
                           },
                           {
                             "detail": "resolved_differs is unevaluated",
-                            "kind": "resolved_differs",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "resolved_differs"
                           },
                           {
                             "detail": "value_class is unevaluated",
-                            "kind": "value_class",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "value_class"
                           }
                         ]
                       }
@@ -1705,19 +1705,9 @@
                         },
                         "substitutions": [
                           {
-                            "detail": "coefficient_range is unevaluated",
-                            "kind": "coefficient_range",
-                            "subject": "unevaluated"
-                          },
-                          {
                             "detail": "not recorded; left unset, so the engine resolves the upstream default",
                             "kind": "estimated",
                             "subject": "max_num_seqs"
-                          },
-                          {
-                            "detail": "kernel_hash is unevaluated",
-                            "kind": "kernel_hash",
-                            "subject": "unevaluated"
                           },
                           {
                             "detail": "0.25.0, scored on 0.31.0",
@@ -1730,14 +1720,24 @@
                             "subject": "engine release"
                           },
                           {
+                            "detail": "coefficient_range is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "coefficient_range"
+                          },
+                          {
+                            "detail": "kernel_hash is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "kernel_hash"
+                          },
+                          {
                             "detail": "resolved_differs is unevaluated",
-                            "kind": "resolved_differs",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "resolved_differs"
                           },
                           {
                             "detail": "value_class is unevaluated",
-                            "kind": "value_class",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "value_class"
                           }
                         ]
                       }
@@ -2007,29 +2007,29 @@
                         },
                         "substitutions": [
                           {
-                            "detail": "coefficient_range is unevaluated",
-                            "kind": "coefficient_range",
-                            "subject": "unevaluated"
-                          },
-                          {
-                            "detail": "kernel_hash is unevaluated",
-                            "kind": "kernel_hash",
-                            "subject": "unevaluated"
-                          },
-                          {
                             "detail": "vllm/vllm-openai:vllm-minimax-m3-perf-x86_64-13.0.1-8b00f41 (banner 0.30.0rc2.dev44+g8b00f4123)",
                             "kind": "nightly_or_custom",
                             "subject": "engine build"
                           },
                           {
+                            "detail": "coefficient_range is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "coefficient_range"
+                          },
+                          {
+                            "detail": "kernel_hash is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "kernel_hash"
+                          },
+                          {
                             "detail": "resolved_differs is unevaluated",
-                            "kind": "resolved_differs",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "resolved_differs"
                           },
                           {
                             "detail": "value_class is unevaluated",
-                            "kind": "value_class",
-                            "subject": "unevaluated"
+                            "kind": "unevaluated",
+                            "subject": "value_class"
                           }
                         ]
                       }
