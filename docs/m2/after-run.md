@@ -4,16 +4,16 @@
 
 | Parameter | What | State |
 |---|---|---|
-| `SIM` | the inference-sim commit with PR 4 (`fields`, `ledger`, `metrics`) and PR 5 (Result data), as a 40-hex commit or release tag | waiting on blis-vllm's final pin |
-| `SUBSTRATE` | the blis-substrate layer 10 tip (a 40-hex commit; also recorded as `--catalog-release` and `--registry-release`) | final target `6d53cf403a17d0367a3d17951b42eb2d6215767f`; a pin by commit makes the figure experimental |
-| `BLIS_VLLM` | the blis-vllm commit whose `fields.json` the simulator's engine carries | waiting on the blis-vllm agent's final tip |
+| `SIM` | the inference-sim commit with PR 4 (`fields`, `ledger`, `metrics`) and PR 5 (Result data), as a 40-hex commit or release tag | `c97c497b104a556515717599a4468352c1234d28` (branch `m2/11-router-configs-command`) |
+| `SUBSTRATE` | the blis-substrate layer 10 tip (a 40-hex commit; also recorded as `--catalog-release` and `--registry-release`) | `6faaccf8f1a2344918241d6b54fe339de44f7345`, the commit the pinned simulator's `stack.json` resolves; a pin by commit makes the figure experimental |
+| `BLIS_VLLM` | the blis-vllm commit whose `fields.json` the simulator's engine carries | `28deab082a2fba6762b922c64c7b5b81b7eeac8e`, the commit the pinned simulator's `stack.json` resolves (sha256 of its `fields.json` `2a84767a67027a9237934038a513252d7ed65cf8ff8ee203cad8fc0a8c51cc39`) |
 | `PULL` | the baseline's frozen pull: manifest sha256 `c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166`, kept on the machine that froze it (60 MB; not committed) | present at `/tmp/baseline/pull2` on this machine |
 | `CORPUS` | the corpora, fetched with `orchestrator/resolve_agentic_corpus.py --all --catalog SUBSTRATE_CHECKOUT/catalog -o CORPUS` | `/tmp/baseline/corpus` |
 | `WORK` | scratch space | any |
 
 ```
 cd accuracy-dashboard-wt-m2
-SIM=<inference-sim commit> SUBSTRATE=6d53cf403a17d0367a3d17951b42eb2d6215767f BLIS_VLLM=<blis-vllm commit> \
+SIM=c97c497b104a556515717599a4468352c1234d28 SUBSTRATE=6faaccf8f1a2344918241d6b54fe339de44f7345 BLIS_VLLM=28deab082a2fba6762b922c64c7b5b81b7eeac8e \
 PULL=/tmp/baseline/pull2 CORPUS=/tmp/baseline/corpus WORK=/tmp/after-work \
 bash docs/m2/after-run.sh
 ```

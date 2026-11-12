@@ -34,7 +34,7 @@ All 47 `agentic_traces` points of the baseline's frozen pull are in scope (h200 
 
 ## The 47 points
 
-Scored with the m2/5 simulator and the pins of [prefill/decode coverage](pd-coverage.md) (inference-sim `780f661e`, blis-substrate `f70c6c75`, blis-vllm `96ea750e`). The first refusal is the G5 reason of the contract (`not_scored.jsonl`); `value_not_recorded` with no subject is the scorer's `server_log_missing`.
+Scored with the simulator and the pins of [prefill/decode coverage](pd-coverage.md) (inference-sim `c97c497b`, blis-substrate `6faaccf8`, blis-vllm `28deab08`). The first refusal is the G5 reason of the contract (`not_scored.jsonl`); `value_not_recorded` with no subject is the scorer's `server_log_missing`.
 
 | Point | Model, chip | Measured | Clients | First refusal |
 |---|---|---|---|---|

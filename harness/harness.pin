@@ -3,5 +3,6 @@
 GO_VERSION=1.27.2
 
 # The inference-sim commit the compatibility job builds and runs the real-simulator tests against
-# (checks.yml, job `simulator`): the commit of the release tag v0.16.0.
-SIM_COMMIT=3f4998e28f922611a2d21d5c7ffe18a5272fe114
+# (checks.yml, job `simulator`): the top of the final inference-sim stack
+# (branch m2/11-router-configs-command). The baseline rescore still passes --sim v0.16.0.
+SIM_COMMIT=c97c497b104a556515717599a4468352c1234d28

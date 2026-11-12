@@ -148,12 +148,17 @@ jobs:
       - name: Check out the blis-substrate release the build pins
         run: |
           set -euo pipefail
-          tag="$(python3 -c 'import json,sys; print([m["version"] for m in json.load(open(sys.argv[1]))["modules"] if m["path"].endswith("/blis-substrate")][0])' "$RUNNER_TEMP/sim/stack.json")"
-          git clone -q --depth 1 --branch "$tag" https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
-      - name: Check out the blis-substrate commit that defines the point record, with harness_commit and router_differs (blis-substrate layer 20, on origin)
+          # stack.json names the substrate by commit; its version is a pseudo-version, not a tag on origin.
+          sha="$(python3 -c 'import json,sys; print([m["commit"] for m in json.load(open(sys.argv[1]))["modules"] if m["path"].endswith("/blis-substrate")][0])' "$RUNNER_TEMP/sim/stack.json")"
+          git init -q "$RUNNER_TEMP/substrate"
+          git -C "$RUNNER_TEMP/substrate" remote add origin https://github.com/inference-sim/blis-substrate.git
+          git -C "$RUNNER_TEMP/substrate" fetch -q --depth 1 origin "$sha"
+          git -C "$RUNNER_TEMP/substrate" checkout -q FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/substrate" rev-parse HEAD)" = "$sha"
+      - name: Check out the blis-substrate commit that defines the point record, with harness_commit and router_differs (blis-substrate the commit the simulator resolves, on origin)
         run: |
           set -euo pipefail
-          sha=6d53cf403a17d0367a3d17951b42eb2d6215767f
+          sha=6faaccf8f1a2344918241d6b54fe339de44f7345
           git init -q "$RUNNER_TEMP/substrate-pointrecord"
           git -C "$RUNNER_TEMP/substrate-pointrecord" remote add origin https://github.com/inference-sim/blis-substrate.git
           git -C "$RUNNER_TEMP/substrate-pointrecord" fetch -q --depth 1 origin "$sha"
@@ -163,7 +168,7 @@ jobs:
         run: |
           set -euo pipefail
           # The router fork's commit that publishes reference-configs/ (branch m2/2-reference-endpoint-picker-configs, PR 7).
-          router_sha="03246be994224ef031dfdafb966c54f60d01e933"
+          router_sha="98c38c04de494e4e64fe23c4532074c6df95a898"
           if [ -n "$router_sha" ]; then
             git init -q "$RUNNER_TEMP/router"
             git -C "$RUNNER_TEMP/router" remote add origin https://github.com/inference-sim/llm-d-router.git

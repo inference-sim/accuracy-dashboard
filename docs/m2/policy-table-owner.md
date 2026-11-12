@@ -34,7 +34,7 @@ the real router and table (the `simulator` job of `checks` fetches the router at
 
 ## State of the router's index
 
-The router fork publishes the files and the index at commit `03246be9` (branch `m2/2-reference-endpoint-picker-configs`, pull request 7 of
+The router fork publishes the files and the index at commit `98c38c04de494e4e64fe23c4532074c6df95a898` (branch `m2/3-host-guide-plugins`, pull request 8 of
 inference-sim/llm-d-router), pinned as `router_sha` in `.github/workflows/checks.yml`. The index records, per policy, the files of its
 colocated and prefill/decode forms, a knob list (the file's value or "not stated", the router's default, the source line) and that rotation
 is not strict per request for any policy; the dashboard reads only the files. The scored prefill/decode runs in `docs/m2/` were made before

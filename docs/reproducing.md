@@ -16,9 +16,9 @@ Everything here was run on one machine (macOS, Apple silicon) on 2026-11-10 and 
 | Input | Baseline | Preliminary after-run |
 |---|---|---|
 | Harness | accuracy-dashboard commit recorded in `docs/m2/baseline-v0.16.0/contract/provenance.json` (`0b8154ccefcb14311cf323e143d8520f59944fbb`) | the same commit |
-| inference-sim | `v0.16.0` = `3f4998e28f922611a2d21d5c7ffe18a5272fe114` | `ece61af0eccb863ba527d9e1a6dd2ffc97d0c5cf` (branch `m2/5-closeness-data-in-the-result`) |
-| blis-substrate (catalog, registry, ledger) | `v0.13.0` = `fe6eab10b9795933de38122ba55e5299dcb20b5e` | `f70c6c7503a47442c4c5d989f8f17b093c14e069` |
-| blis-vllm `fields.json` | `v0.32.0-blis.2` = `1cf030eb888270c114308c3ae3102d02994f015c`, sha256 `d32342c4f9ae5c578ba578fd5e6575aa8db8bce099e0708480d55f7e8de5a6fc` | `5de11f598bf78017429355b368bbb7a93e312ef1`, sha256 `9a3a88857a9462caf7b09433cfb53ac377d042aea10e7da2af3a8f9fd1ecccaa` |
+| inference-sim | `v0.16.0` = `3f4998e28f922611a2d21d5c7ffe18a5272fe114` | `c97c497b104a556515717599a4468352c1234d28` (branch `m2/11-router-configs-command`) |
+| blis-substrate (catalog, registry, ledger) | `v0.13.0` = `fe6eab10b9795933de38122ba55e5299dcb20b5e` | `6faaccf8f1a2344918241d6b54fe339de44f7345` |
+| blis-vllm `fields.json` | `v0.32.0-blis.2` = `1cf030eb888270c114308c3ae3102d02994f015c`, sha256 `d32342c4f9ae5c578ba578fd5e6575aa8db8bce099e0708480d55f7e8de5a6fc` | `28deab082a2fba6762b922c64c7b5b81b7eeac8e`, sha256 `2a84767a67027a9237934038a513252d7ed65cf8ff8ee203cad8fc0a8c51cc39` |
 | Corpora | `semianalysisai/cc-traces-weka-062126` at `23f152f6f0f9399a85901b89a6458def0ef16729` (sha256 `29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276`) and `...-256k` at `8fecd2fc56694469f758f0afbbb6335ad3043740` (sha256 `e39cd2ff3eba21d4a3664be51da743ac3d2149a1933898cafc7bfeac8147eeef`) | the same |
 | Frozen pull | manifest sha256 `c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166` | the same pull |
 | Units | `docs/m2/baseline-v0.16.0/units.txt`, 1740 units, sha256 `d89f860a46c0470a22543dc7fb77b8d1b10e508ce4f5ef5073e96f359f08597e` | the same |
@@ -50,11 +50,11 @@ python3 orchestrator/baseline/split.py splits --pull PULL --out splits.json   # 
 python3 orchestrator/baseline/compare.py run --dir OUT --sample in_sample --out table
 
 # 5. the preliminary after-run (a commit pin for the simulator, a local clone allowed)
-bash harness/run.sh --sim ece61af0eccb863ba527d9e1a6dd2ffc97d0c5cf --sim-repo PATH_TO_INFERENCE_SIM \
+bash harness/run.sh --sim c97c497b104a556515717599a4468352c1234d28 --sim-repo PATH_TO_INFERENCE_SIM \
   --units docs/m2/baseline-v0.16.0/units.txt --pull PULL --out OUT_AFTER \
-  --catalog SUBSTRATE_F70/catalog --registry SUBSTRATE_F70/registry --corpus-dir CORPUS \
-  --fields FIELDS_5DE11F5.json \
-  --catalog-release f70c6c7503a47442c4c5d989f8f17b093c14e069 --registry-release f70c6c7503a47442c4c5d989f8f17b093c14e069
+  --catalog SUBSTRATE_FINAL/catalog --registry SUBSTRATE_FINAL/registry --corpus-dir CORPUS \
+  --fields FIELDS_FINAL.json \
+  --catalog-release 6faaccf8f1a2344918241d6b54fe339de44f7345 --registry-release 6faaccf8f1a2344918241d6b54fe339de44f7345
 python3 orchestrator/baseline/compare.py refusals --work OUT_AFTER-work --out refusals.json
 python3 orchestrator/baseline/compare.py pair --before OUT --after OUT_AFTER --sample in_sample --out before-after
 ```

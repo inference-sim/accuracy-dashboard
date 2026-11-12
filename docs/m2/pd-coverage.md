@@ -20,9 +20,9 @@ Two runs of the same scorer over the same pull, differing in one input:
 | Input | Value |
 |---|---|
 | Harness | accuracy-dashboard commit in each run's `provenance.json` (`harness_commit`) |
-| Simulator | inference-sim `780f661ef9c18a2a9928acf8a63a67667cd597c0` (branch `m2/5-closeness-data-in-the-result`), built with Go 1.27.2 |
-| Catalog, registry | blis-substrate `f70c6c7503a47442c4c5d989f8f17b093c14e069` (the pin of the audited M2 stack), as a 40-hex commit for `--catalog-release` and `--registry-release` |
-| Field list | blis-vllm `96ea750e3a626ab2f9c60ca3bc871b8a74839cc2` `fields.json`, sha256 `dbe9123a677792edf030a0da584b9fc915c45ec206a5cebbffc3944568b6e879` |
+| Simulator | inference-sim `c97c497b104a556515717599a4468352c1234d28` (branch `m2/11-router-configs-command`, the top of the final inference-sim stack), built with Go 1.27.2 |
+| Catalog, registry | blis-substrate `6faaccf8f1a2344918241d6b54fe339de44f7345` (the commit the pinned simulator resolves, `stack.json`), as a 40-hex commit for `--catalog-release` and `--registry-release` |
+| Field list | blis-vllm `28deab082a2fba6762b922c64c7b5b81b7eeac8e` `fields.json` (the commit the pinned simulator resolves), sha256 `2a84767a67027a9237934038a513252d7ed65cf8ff8ee203cad8fc0a8c51cc39` |
 | Pull | `pull_manifest_sha256` `bfa74604f84e64aa2f6c44d73fedee45a816c15d11f66da02396913354f5c3d4`, 188 points; not committed (60 MB of server logs and recipes) |
 | Units | the 188 ledger units (`units.txt` of each run directory) |
 | Corpora | not used (single-turn) |
@@ -108,9 +108,9 @@ python3 orchestrator/baseline/freeze.py --units-file units.txt --ledger SUBSTRAT
   --today 2026-11-09 --out PULL --cache ARTIFACTS
 # 2. run A: the substrate's table
 python3 orchestrator/ingest/cli.py score --pull PULL --out OUT_A --units units.txt \
-  --blis INFERENCE_SIM/blis --sim-build 780f661ef9c18a2a9928acf8a63a67667cd597c0 \
+  --blis INFERENCE_SIM/blis --sim-build c97c497b104a556515717599a4468352c1234d28 \
   --catalog SUBSTRATE/catalog --registry SUBSTRATE/registry \
-  --catalog-release f70c6c7503a47442c4c5d989f8f17b093c14e069 --registry-release f70c6c7503a47442c4c5d989f8f17b093c14e069 \
+  --catalog-release 6faaccf8f1a2344918241d6b54fe339de44f7345 --registry-release 6faaccf8f1a2344918241d6b54fe339de44f7345 \
   --fields FIELDS.json --harness-commit HARNESS_COMMIT --corpus-dir CORPORA
 # 3. run B: add  --router-policy-experiment round-robin
 # 4. the table
@@ -118,7 +118,7 @@ python3 orchestrator/baseline/split.py splits --pull PULL --out OUT/../splits.js
 python3 orchestrator/baseline/compare.py run --dir OUT --sample in_sample --out table
 ```
 
-`INFERENCE_SIM` is a checkout at the commit with `go build -o blis .` (about 2 minutes); `SUBSTRATE` a checkout at `f70c6c7503a47442c4c5d989f8f17b093c14e069`; `FIELDS.json` is blis-vllm's `fields.json` at `96ea750e3a626ab2f9c60ca3bc871b8a74839cc2`. The freeze reads the live API and GitHub: the artifacts it needs expire after 90 days, and the server logs of 148 of the 188 rows are already gone (the recipes are not), so a later freeze differs from this one in `server_log` only. Run A takes about 20 s (nothing is simulated) and run B about a minute on an idle laptop (84 simulations; far longer when the machine is loaded), 2 GB. To use the substrate's layer 12 entries: `--router-table SUBSTRATE_L12/catalog/routers --assume-router-revision 1682167d3c97f0fc8cd405dee51f17288eeaeb55`.
+`INFERENCE_SIM` is a checkout at the commit with `go build -o blis .` (about 2 minutes); `SUBSTRATE` a checkout at `6faaccf8f1a2344918241d6b54fe339de44f7345`; `FIELDS.json` is blis-vllm's `fields.json` at `28deab082a2fba6762b922c64c7b5b81b7eeac8e`. The freeze reads the live API and GitHub: the artifacts it needs expire after 90 days, and the server logs of 148 of the 188 rows are already gone (the recipes are not), so a later freeze differs from this one in `server_log` only. Run A takes about 20 s (nothing is simulated) and run B about a minute on an idle laptop (84 simulations; far longer when the machine is loaded), 2 GB. To use the substrate's layer 12 entries: `--router-table SUBSTRATE_L12/catalog/routers --assume-router-revision 1682167d3c97f0fc8cd405dee51f17288eeaeb55`.
 
 ## What this does not show
 

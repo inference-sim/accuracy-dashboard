@@ -1,18 +1,18 @@
 # How the cost model's coefficients are produced and graded
 
-The dashboard consumes coefficients; it does not produce them. The cost model's constants live in the substrate's **registry**, and the methodology of that registry is the substrate's to state. This page says only what the dashboard relies on and links to the pages that define it, at the pinned substrate commit `6d53cf403a17d0367a3d17951b42eb2d6215767f` (the pin is a parameter of the after-run; the links move with it).
+The dashboard consumes coefficients; it does not produce them. The cost model's constants live in the substrate's **registry**, and the methodology of that registry is the substrate's to state. This page says only what the dashboard relies on and links to the pages that define it, at the pinned substrate commit `6faaccf8f1a2344918241d6b54fe339de44f7345` (the pin is a parameter of the after-run; the links move with it).
 
 | Question | Substrate page |
 |---|---|
-| What is a coefficient, its entry, its scope and sets | [Coefficients (concepts)](https://github.com/inference-sim/blis-substrate/blob/6d53cf403a17d0367a3d17951b42eb2d6215767f/docs/registry/concepts/coefficients.md) |
+| What is a coefficient, its entry, its scope and sets | [Coefficients (concepts)](https://github.com/inference-sim/blis-substrate/blob/6faaccf8f1a2344918241d6b54fe339de44f7345/docs/registry/concepts/coefficients.md) |
 | What a **method** is (measured, calibrated, transferred, literature, vendor_spec, roofline, assumed, copied, not_charged) and how a value was obtained | the same page, *Method: how the value was obtained* |
-| Where the numbers come from; why a sweep can fit a constant and a forward pass cannot | [Evidence](https://github.com/inference-sim/blis-substrate/blob/6d53cf403a17d0367a3d17951b42eb2d6215767f/docs/registry/concepts/evidence.md) |
-| How a coefficient is defined, fitted and checked; the lane rule; train, validate, evaluate; per-part provenance | [Methodology](https://github.com/inference-sim/blis-substrate/blob/6d53cf403a17d0367a3d17951b42eb2d6215767f/docs/registry/methodology.md) |
-| Fitting principles: data roles, the loss, where direct data is missing | [Fitting principles](https://github.com/inference-sim/blis-substrate/blob/6d53cf403a17d0367a3d17951b42eb2d6215767f/docs/registry/fitting-principles.md) |
-| Choosing between the kernel's two step-time band edges | [Band selection](https://github.com/inference-sim/blis-substrate/blob/6d53cf403a17d0367a3d17951b42eb2d6215767f/docs/registry/band-selection.md) |
-| Re-deriving every value from the original datasets | [Reproducing coefficients](https://github.com/inference-sim/blis-substrate/blob/6d53cf403a17d0367a3d17951b42eb2d6215767f/docs/registry/reproducing-coefficients.md) |
-| What the Result carries about the coefficients a run used | [Result](https://github.com/inference-sim/blis-substrate/blob/6d53cf403a17d0367a3d17951b42eb2d6215767f/docs/contracts/reference/result.md), `selected_entries` |
-| The point record the dashboard writes | [Point record](https://github.com/inference-sim/blis-substrate/blob/6d53cf403a17d0367a3d17951b42eb2d6215767f/docs/contracts/reference/point-record.md) |
+| Where the numbers come from; why a sweep can fit a constant and a forward pass cannot | [Evidence](https://github.com/inference-sim/blis-substrate/blob/6faaccf8f1a2344918241d6b54fe339de44f7345/docs/registry/concepts/evidence.md) |
+| How a coefficient is defined, fitted and checked; the lane rule; train, validate, evaluate; per-part provenance | [Methodology](https://github.com/inference-sim/blis-substrate/blob/6faaccf8f1a2344918241d6b54fe339de44f7345/docs/registry/methodology.md) |
+| Fitting principles: data roles, the loss, where direct data is missing | [Fitting principles](https://github.com/inference-sim/blis-substrate/blob/6faaccf8f1a2344918241d6b54fe339de44f7345/docs/registry/fitting-principles.md) |
+| Choosing between the kernel's two step-time band edges | [Band selection](https://github.com/inference-sim/blis-substrate/blob/6faaccf8f1a2344918241d6b54fe339de44f7345/docs/registry/band-selection.md) |
+| Re-deriving every value from the original datasets | [Reproducing coefficients](https://github.com/inference-sim/blis-substrate/blob/6faaccf8f1a2344918241d6b54fe339de44f7345/docs/registry/reproducing-coefficients.md) |
+| What the Result carries about the coefficients a run used | [Result](https://github.com/inference-sim/blis-substrate/blob/6faaccf8f1a2344918241d6b54fe339de44f7345/docs/contracts/reference/result.md), `selected_entries` |
+| The point record the dashboard writes | [Point record](https://github.com/inference-sim/blis-substrate/blob/6faaccf8f1a2344918241d6b54fe339de44f7345/docs/contracts/reference/point-record.md) |
 
 ## What the dashboard reads about a coefficient
 
