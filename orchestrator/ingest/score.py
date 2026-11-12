@@ -121,10 +121,13 @@ class Env:
     # The router table's checked policy list (pd.load_owner_policies); read from the substrate checkout the catalog
     # sits in the first time a prefill/decode point needs it, unless a caller supplies it.
     router_policies: dict | None = None
+    # The blis-substrate checkout that holds the router table's policies when it is not the catalog's own (cli score
+    # --policy-source): the catalog and registry pins and the router table's pin are separate commits while the stack is open.
+    policy_source: Path | None = None
 
     def owner_policies(self) -> dict:
         if self.router_policies is None:
-            self.router_policies = pdm.load_owner_policies(Path(self.catalog).resolve().parent)
+            self.router_policies = pdm.load_owner_policies(Path(self.policy_source or Path(self.catalog).resolve().parent))
         return self.router_policies
 
     def simulator(self) -> dict:

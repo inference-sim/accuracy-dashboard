@@ -424,7 +424,8 @@ def cmd_score(a) -> int:
         routers_dir=Path(a.router_table).resolve() if getattr(a, "router_table", None) else None,
         assumed_router_revision=getattr(a, "assume_router_revision", None),
         router_policy_experiment=getattr(a, "router_policy_experiment", None),
-        speculative_fallback_category=getattr(a, "speculative_fallback_category", None))
+        speculative_fallback_category=getattr(a, "speculative_fallback_category", None),
+        policy_source=Path(a.policy_source).resolve() if getattr(a, "policy_source", None) else None)
     # The build every point records: --sim-build, else the release tag the checkout is at
     # (check_blis_inputs required one), with the engine release its stack.json names (COV-6).
     env.sim_build = sim_build or env.blis_release
@@ -715,6 +716,9 @@ def main(argv=None) -> int:
                    help="the acceptance profile's category to fall back to where the benchmark states none (design D8: a "
                         "fallback the caller requested). Without it a speculative point that pins no acceptance length is G5 "
                         "value_not_recorded:workload_category_not_stated. The point names it, and the run is experimental.")
+    s.add_argument("--policy-source", metavar="SUBSTRATE", help="the blis-substrate checkout whose router table states the "
+                   "endpoint-picker configuration of each policy (read with `go run ./tools/prcheck router-policies`); "
+                   "default: the checkout the catalog sits in")
     s.add_argument("--work")
     s.add_argument("--timeout", type=int, default=7200)
     s.add_argument("--only", nargs="*")
