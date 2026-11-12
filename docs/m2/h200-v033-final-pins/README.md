@@ -6,6 +6,8 @@ Contents: [Result](#result) · [What it shows and does not show](#what-it-shows-
 
 **Development split only (the sixteen are validation-split points; no test or prospective point is in the pull or was read). In-sample. Not a result of record: the simulator is a draft build, see [Inputs](#inputs).** No scratch field list and no scratch scorer: the committed scorer, the engine's own `fields.json`. [contract/](contract/) is the run, [splits.json](splits.json) its splits and [table.md](table.md) its table. The rows, their pinning and their split are described in [the page of the rows](../h200-v033/README.md).
 
+**Scratch-build figure, not a result at published pins.** The sixteen units are the substrate's and have no role until the seed and the anchor lists are published; scoring uses the published anchor lists only (COV-2), so at published pins they score 0 of 16. The run below scored them with the units forced in.
+
 **16 of 16 scored, 0 refused, 0 failed, all G4.** Over the sixteen points: **TTFT MAPE 34.8 %, TPOT MAPE 23.5 %** (TTFT shape 31.0 %, TPOT shape 24.0 %, over the 14 points with a shape). Before (the dry run with the three fields classified, old pins): 75.4 % and 38.1 %.
 
 | GPUs | Clients | TTFT measured | TTFT predicted | Error | TPOT measured | TPOT predicted | Error |
