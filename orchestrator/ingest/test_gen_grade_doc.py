@@ -28,7 +28,7 @@ def test_the_document_names_every_g5_reason_and_unevaluated_condition():
         assert f"`{code}`" in text
     for kind in gr.UNCHECKED_KINDS:
         assert f"`{kind}`" in text
-    assert gr.NOT_CHECKED_SUBJECT == "unevaluated"
+    assert gr.NOT_CHECKED_KIND == "unevaluated" and "`unevaluated`" in text
 
 
 def test_every_named_subject_has_prose_and_is_in_the_document():

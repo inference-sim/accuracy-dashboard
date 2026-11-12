@@ -25,16 +25,16 @@ A point counts toward the headline when it is G1 to G4. A figure over fewer than
 
 ## Unevaluated conditions
 
-A condition is *unevaluated* when no source records the datum it needs. It is then not assumed true: the point names it as a substitution whose subject is `unevaluated`, so the point is at best G2. `orchestrator/ingest/g1.py` evaluates four conditions from the simulator's Result and the field list, and names a condition unevaluated exactly when the Result or the list does not carry what the condition reads:
+A condition is *unevaluated* when no source records the datum it needs. It is then not assumed true: the point names it as a substitution of kind `unevaluated` whose subject is the condition (`kernel_hash`, `value_class` and so on), as the substrate's point record does. A substitution of kind `kernel_hash` means the condition was decided and is false, so the published `kernel_hash` counts mean what they say. The point is at best G2. `orchestrator/ingest/g1.py` evaluates four conditions from the simulator's Result and the field list, and names a condition unevaluated exactly when the Result or the list does not carry what the condition reads:
 
 | Condition | Read from | Evaluated when |
 |---|---|---|
-| `coefficient_range` | each selected coefficient in `selected_entries` | `closeness_version` is 1 and every coefficient states a `fit_range` (for *extrapolated*) and a `ci95` (for *unidentified*). A true flag is evidence and is always named. |
-| `kernel_hash` | the coefficient's `kernel_impls` and a map from a library version to a kernel hash | every coefficient states `kernel_impls`, the run recorded the library's version, and a source maps that version to a hash. No such source exists yet (blis-registry#73), so this condition is unevaluated on every point. |
+| `coefficient_range` | each selected coefficient in `selected_entries` | `closeness_version` is 1 or 2 and every coefficient states a `fit_range` (for *extrapolated*) and a `ci95` (for *unidentified*). A true flag is evidence and is always named. |
+| `kernel_hash` | the coefficient's `priced` implementations (not its `kernel_impls`, the builds it is valid for), its `kernel_match`, and a map from a library version and variant to a kernel hash | `closeness_version` is 2, every entry that prices a kernel is `exact`, the run recorded the library's version, and a source maps that version and variant to a hash. An `unkeyed` entry that prices a kernel leaves the condition unevaluated; one that prices no kernel (a host overhead) is passed over. No hash source exists yet (blis-registry#73), so this condition is unevaluated on every point. |
 | `value_class` | each modelled or proven-inert field's `value_classes` in `fields.json` | every field the run set carries its classes; a value outside every covered class is named |
-| `resolved_differs` | the Result's `resolutions` (setting, pool, host, engine value) against the run's logged value | the Result lists resolutions; each is compared with the run's value for that setting and pool |
+| `resolved_differs` | the Result's `resolutions` (setting, pool, host, engine value) against the run's logged value | the Result lists resolutions; each is compared with the run's value for that setting and pool. `all_reduce_backend` is not compared at tensor-parallel width 1, where no tensor-parallel all-reduce group exists. |
 
-`closeness_version = 1` on `selected_entries` says only that the recorder passed on everything each entry states; it does not say the conditions were decided. Where an entry states no fit range, no interval or no kernel implementation, the corresponding flag, which the Result omits when false, means *not evaluated*, not *false*, so most registry-measured coefficients leave their conditions unevaluated.
+`closeness_version` (1, or 2 since the substrate added the priced kernels) on `selected_entries` says only that the recorder passed on everything each entry states; it does not say the conditions were decided. Where an entry states no fit range, no interval or no kernel implementation, the corresponding flag, which the Result omits when false, means *not evaluated*, not *false*, so most registry-measured coefficients leave their conditions unevaluated.
 
 ## Why G1 and G2 are rare, and G3 is empty
 

@@ -133,10 +133,10 @@ def test_the_fixture_holds_g2_and_g4_but_no_g1_while_four_conditions_are_not_gra
     # (another release with no changed function) needs an engine that publishes its ported list.
     recs = _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL)
     assert {r["grade"] for r in recs} == {"G2", "G4"}
-    unchecked = [{"kind": k, "subject": "unevaluated", "detail": f"{k} is unevaluated"}
+    unchecked = [{"kind": "unevaluated", "subject": k, "detail": f"{k} is unevaluated"}
                  for k in ("coefficient_range", "kernel_hash", "resolved_differs", "value_class")]
     for r in recs:
-        assert [s for s in r["substitutions"] if s["subject"] == "unevaluated"] == unchecked, r["point_id"]
+        assert [s for s in r["substitutions"] if s["kind"] == "unevaluated"] == unchecked, r["point_id"]
     assert {r["grade"] for r in _lines(FIXTURE / "run-a" / c.NOT_SCORED_JSONL)} == {"G5"}
 
 
@@ -354,7 +354,7 @@ def test_fidelity_schema_ties_the_grade_to_its_substitutions():
     g4 = next(r for r in recs if r["grade"] == "G4")
     assert all(v.is_valid(r) for r in (g1, g2, g4))
     assert not v.is_valid({**g1, "substitutions": g2["substitutions"]})       # G1 names nothing
-    unchecked = [x for x in g2["substitutions"] if x["subject"] == "unevaluated"]
+    unchecked = [x for x in g2["substitutions"] if x["kind"] == "unevaluated"]
     assert len(unchecked) == 4 and not v.is_valid({**g1, "substitutions": unchecked})   # a G1 names none
     assert not v.is_valid({**g2, "substitutions": []})                         # G2 names something
     assert not v.is_valid({**g2, "substitutions": g4["substitutions"]})        # another release is not G2
@@ -368,7 +368,7 @@ def test_an_estimated_build_is_scored_and_named():
     recs = [r for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL) if r["build"].get("why") == "custom_build"]
     assert len(recs) == 1 and recs[0]["grade"] == "G4" and recs[0]["run_release"] is None
     assert [s["kind"] for s in recs[0]["substitutions"]] == [
-        "coefficient_range", "kernel_hash", "nightly_or_custom", "resolved_differs", "value_class"]
+        "nightly_or_custom", "unevaluated", "unevaluated", "unevaluated", "unevaluated"]
 
 
 def test_validator_requires_every_provenance_key():

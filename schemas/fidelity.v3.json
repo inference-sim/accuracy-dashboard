@@ -649,6 +649,7 @@
             "client_difference",
             "later_record",
             "router_differs",
+            "unevaluated",
             "other_release",
             "changed_functions",
             "nightly_or_custom",
@@ -1069,7 +1070,8 @@
                     "resolved_differs",
                     "client_difference",
                     "later_record",
-                    "router_differs"
+                    "router_differs",
+                    "unevaluated"
                   ]
                 }
               }

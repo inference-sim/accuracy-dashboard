@@ -21,11 +21,13 @@ def coeff(name="host_launch_per_kernel", **kw):
     """A coefficient as the final layer 10 Result writes it: booleans only when true."""
     return {"set": "cost-model-host-overheads", "name": name, "method": "measured", "scope": "h200", "file": "f.yaml",
             "kernel_impls": [{"library": "flashinfer", "variant": "decode", "code_hash": HASH}],
+            "primitive": "attention.decode", "kernel_match": "exact",
+            "priced": [{"library": "flashinfer", "variant": "decode", "code_hash": HASH}],
             "fit_range": [{"dim": "tokens", "low": 1, "high": 64}], "ci95": {"low": 0.9, "high": 1.1}, **kw}
 
 
-def doc(*cs, resolutions=None):
-    d = {"selected_entries": {"closeness_version": 1, "coefficients": list(cs) or [coeff()]}}
+def doc(*cs, resolutions=None, version=2):
+    d = {"selected_entries": {"closeness_version": version, "coefficients": list(cs) or [coeff()]}}
     if resolutions is not None:
         d["resolutions"] = resolutions
     return d
@@ -60,8 +62,17 @@ def test_a_report_without_the_closeness_marker_leaves_the_range_and_the_hash_une
     d = doc()
     del d["selected_entries"]["closeness_version"]
     assert not g1.coefficient_range(d).evaluated and not g1.kernel_hash(d, {"flashinfer": "0.4.1"}, VERSIONS).evaluated
-    d["selected_entries"]["closeness_version"] = 2
-    assert not g1.coefficient_range(d).evaluated        # only version 1 is read
+
+
+@pytest.mark.parametrize("version", [1, 2])
+def test_the_range_is_evaluated_from_version_1_and_version_2_reports(version):
+    # The substrate writes 2 (result.ClosenessVersion); 1 is the layout before the priced kernels.
+    e = g1.coefficient_range(doc(coeff("a", extrapolated=True), version=version))
+    assert e.evaluated and [x["subject"] for x in e.subs] == ["cost-model-host-overheads/a"]
+
+
+def test_a_version_this_reader_does_not_know_leaves_the_range_unevaluated():
+    assert not g1.coefficient_range(doc(version=3)).evaluated
 
 
 def test_an_entry_that_states_no_fit_range_or_no_interval_leaves_the_flags_not_evaluated():
@@ -90,45 +101,87 @@ def test_a_result_without_a_report_leaves_the_range_unevaluated(d):
 
 # ---- kernel_hash
 
-VERSIONS = {"flashinfer": {"0.4.1": HASH, "0.5.0": OTHER}}
+VERSIONS = {"flashinfer": {"0.4.1": {"decode": HASH}, "0.5.0": {"decode": OTHER}}}
+LIBS = {"flashinfer": "0.4.1"}
+
+
+def impl(variant="decode", h=HASH, library="flashinfer"):
+    return {"library": library, "variant": variant, "code_hash": h}
 
 
 def test_a_recorded_version_that_maps_to_the_priced_hash_is_true_and_another_is_named():
-    e = g1.kernel_hash(doc(), {"flashinfer": "0.4.1"}, VERSIONS)
+    e = g1.kernel_hash(doc(), LIBS, VERSIONS)
     assert e.evaluated and e.subs == []
     e = g1.kernel_hash(doc(), {"flashinfer": "0.5.0"}, VERSIONS)
-    assert e.subs == [{"kind": "kernel_hash", "subject": "flashinfer",
-                       "detail": f"flashinfer 0.5.0 has kernel hash {OTHER}, BLIS priced {HASH}"}]
-    assert g1.kernel_hash(doc(), {"flashinfer": "9.9"}, VERSIONS).subs[0]["detail"].startswith("flashinfer 9.9 maps to no")
+    assert [(s["kind"], s["subject"]) for s in e.subs] == [("kernel_hash", "flashinfer")]
+    assert OTHER in e.subs[0]["detail"] and HASH in e.subs[0]["detail"]
+    assert g1.kernel_hash(doc(), {"flashinfer": "9.9"}, VERSIONS).subs[0]["detail"].startswith("flashinfer 9.9 (decode) maps to no")
+
+
+def test_the_hash_is_compared_with_the_kernel_priced_not_with_every_build_the_entry_is_valid_for():
+    # The entry is valid for two builds and BLIS priced the first. A run whose library maps to the
+    # second ran a build BLIS did not price: the condition is false, though the entry lists it.
+    c = coeff(kernel_impls=[impl(h=HASH), impl(h=OTHER)], priced=[impl(h=HASH)])
+    e = g1.kernel_hash(doc(c), {"flashinfer": "0.5.0"}, VERSIONS)
+    assert e.evaluated and [s["subject"] for s in e.subs] == ["flashinfer"]
+    assert g1.kernel_hash(doc(c), LIBS, VERSIONS).subs == []
+
+
+def test_a_library_that_ships_several_variants_is_compared_variant_by_variant():
+    versions = {"flashinfer": {"0.4.1": {"decode": HASH, "prefill": OTHER}}}
+    decode = coeff("a")
+    prefill = coeff("b", primitive="attention.prefill", kernel_impls=[impl("prefill", OTHER)], priced=[impl("prefill", OTHER)])
+    assert g1.kernel_hash(doc(decode, prefill), LIBS, versions).subs == []
+    swapped = {"flashinfer": {"0.4.1": {"decode": OTHER, "prefill": OTHER}}}
+    e = g1.kernel_hash(doc(decode, prefill), LIBS, swapped)
+    assert len(e.subs) == 1 and "(decode)" in e.subs[0]["detail"]
 
 
 def test_with_no_published_map_from_a_version_to_a_hash_the_condition_stays_unevaluated():
     # No source exists today (blis-registry#73); the scorer passes none.
-    assert not g1.kernel_hash(doc(), {"flashinfer": "0.4.1"}).evaluated
-    assert not g1.kernel_hash(doc(), {"flashinfer": "0.4.1"}, {}).evaluated
+    assert not g1.kernel_hash(doc(), LIBS).evaluated
+    assert not g1.kernel_hash(doc(), LIBS, {}).evaluated
 
 
-def test_a_missing_run_version_or_library_or_kernel_impl_leaves_it_unevaluated():
+def test_a_missing_run_version_or_library_leaves_it_unevaluated():
     assert not g1.kernel_hash(doc(), {}, VERSIONS).evaluated
-    assert not g1.kernel_hash(doc(), {"flashinfer": "0.4.1"}, {"other": {}}).evaluated
+    assert not g1.kernel_hash(doc(), LIBS, {"other": {}}).evaluated
+
+
+def test_a_version_1_report_names_no_priced_kernel_so_the_hash_is_not_decided_from_it():
+    assert not g1.kernel_hash(doc(version=1), LIBS, VERSIONS).evaluated
+
+
+def test_an_unkeyed_entry_that_prices_a_kernel_leaves_the_hash_unevaluated():
+    unkeyed = coeff("u", kernel_match="unkeyed", kernel_impls=[], priced=[])
+    e = g1.kernel_hash(doc(coeff(), unkeyed), LIBS, VERSIONS)
+    assert not e.evaluated and "u" in e.why
+
+
+def test_an_unkeyed_entry_that_prices_no_kernel_is_passed_over():
+    # Host overheads and memory sizes have no primitive: there is no kernel hash to compare.
+    host = {"set": "s", "name": "host_completion", "method": "assumed", "scope": "h200", "file": "f.yaml",
+            "kernel_match": "unkeyed"}
+    e = g1.kernel_hash(doc(coeff(), host), LIBS, VERSIONS)
+    assert e.evaluated and e.subs == []
+    assert not g1.kernel_hash(doc(host), LIBS, VERSIONS).evaluated          # nothing priced is nothing decided
+
+
+def test_a_hash_that_differs_is_named_even_when_another_entry_leaves_the_condition_undecided():
+    unkeyed = coeff("u", kernel_match="unkeyed", kernel_impls=[], priced=[])
+    e = g1.kernel_hash(doc(coeff(), unkeyed), {"flashinfer": "0.5.0"}, VERSIONS)
+    assert e.evaluated and len(e.subs) == 1
+
+
+def test_an_entry_that_states_no_kernel_match_leaves_the_hash_unevaluated():
     c = coeff()
-    del c["kernel_impls"]
-    assert not g1.kernel_hash(doc(c), {"flashinfer": "0.4.1"}, VERSIONS).evaluated
+    del c["kernel_match"]
+    assert not g1.kernel_hash(doc(c), LIBS, VERSIONS).evaluated
 
 
-def test_a_coefficient_with_no_kernel_implementation_leaves_the_hash_unevaluated_not_skipped():
-    for drop in ("kernel_impls",):
-        fitted = coeff("b")
-        del fitted[drop]
-        assert not g1.kernel_hash(doc(coeff(), fitted), {"flashinfer": "0.4.1"}, VERSIONS).evaluated
-    constant = {"set": "s", "name": "c", "method": "assumed", "scope": "h200", "file": "f.yaml"}
-    assert not g1.kernel_hash(doc(coeff(), constant), {"flashinfer": "0.4.1"}, VERSIONS).evaluated   # the entry states none
-
-
-def test_an_entry_listing_several_implementations_of_a_library_accepts_any_priced_hash():
-    c = coeff(kernel_impls=[{"library": "flashinfer", "variant": "a", "code_hash": OTHER},
-                            {"library": "flashinfer", "variant": "b", "code_hash": HASH}])
-    assert g1.kernel_hash(doc(c), {"flashinfer": "0.4.1"}, VERSIONS).subs == []
+def test_an_exact_entry_priced_with_several_builds_accepts_any_of_them():
+    c = coeff(kernel_impls=[impl(h=OTHER), impl(h=HASH)], priced=[impl(h=OTHER), impl(h=HASH)])
+    assert g1.kernel_hash(doc(c), LIBS, VERSIONS).subs == []
 
 
 # ---- value_class: the substrate's rules, pinned
@@ -224,6 +277,20 @@ def test_a_resolved_value_equal_to_the_engines_is_true_and_a_different_one_is_na
         ("tensor_parallel_width", "the run resolved 4, the engine resolves '8'")]
 
 
+def test_all_reduce_is_not_compared_at_tensor_parallel_width_1_where_no_such_group_exists():
+    # Data-parallel attention (tp1 dp4) and single-GPU points log "custom" while the engine resolves
+    # nccl; with one rank in the tensor-parallel group there is no all-reduce to resolve.
+    d = doc(resolutions=[{"setting": "all_reduce_backend", "pool": "colocated", "engine": "nccl"},
+                         {"setting": "block_size", "pool": "colocated", "engine": "16"}])
+    tp1 = {**RUN, "tensor_parallel_size": 1, "data_parallel_size": 4, "disable_custom_all_reduce": False}
+    assert g1.run_value("all_reduce_backend", tp1) is None
+    e = g1.resolved_value(d, tp1)
+    assert e.evaluated and e.subs == []
+    assert [s["subject"] for s in g1.resolved_value(d, RUN).subs] == ["all_reduce_backend"]     # at width 8 it is compared
+    only = doc(resolutions=[{"setting": "all_reduce_backend", "pool": "colocated", "engine": "nccl"}])
+    assert not g1.resolved_value(only, tp1).evaluated      # nothing else compared: not decided, not assumed true
+
+
 def test_a_disaggregated_pointss_pools_are_compared_each_with_the_runs_value_for_that_pool():
     d = doc(resolutions=[{"setting": "tensor_parallel_width", "pool": "decode", "engine": "8"},
                          {"setting": "tensor_parallel_width", "pool": "prefill", "engine": "4"}])
@@ -275,7 +342,7 @@ def test_the_scorer_today_leaves_kernel_hash_unevaluated_because_no_source_maps_
                      resolved={"block_size": 16}, libraries={"flashinfer": "0.4.1"})
     subs, unevaluated = g1.split(ev)
     assert unevaluated == ["kernel_hash"] and subs == []
-    assert [(s["kind"], s["subject"]) for s in sc.substitutions([], {}, unevaluated)] == [("kernel_hash", "unevaluated")]
+    assert [(s["kind"], s["subject"]) for s in sc.substitutions([], {}, unevaluated)] == [("unevaluated", "kernel_hash")]
 
 
 def test_a_condition_is_unevaluated_only_when_its_data_is_absent():
@@ -301,3 +368,20 @@ def test_a_false_condition_makes_the_point_g2():
     rel = gr.Release(version="0.32.0", nightly_or_custom=False)
     g = gr.grade(engine_version="0.32.0", release=rel, substitutions=sc.substitutions(subs, {}, unevaluated))
     assert unevaluated == [] and g.grade == gr.G2 and [s["kind"] for s in g.substitutions] == ["value_class"]
+
+
+def _graded_with(resolved):
+    d = doc(resolutions=[{"setting": "all_reduce_backend", "pool": "colocated", "engine": "nccl"},
+                         {"setting": "block_size", "pool": "colocated", "engine": "16"}])
+    subs, unevaluated = g1.split(g1.evaluate(d, field_list=field_list(NUMERIC), requested={"max_num_seqs": 32},
+                                             resolved=resolved, libraries={"flashinfer": "0.4.1"}, version_hashes=VERSIONS))
+    rel = gr.Release(version="0.32.0", nightly_or_custom=False)
+    return gr.grade(engine_version="0.32.0", release=rel, substitutions=sc.substitutions(subs, {}, unevaluated))
+
+
+def test_a_data_parallel_attention_point_is_not_named_for_an_all_reduce_it_never_runs():
+    dp = {"tensor_parallel_size": 1, "data_parallel_size": 8, "disable_custom_all_reduce": False, "block_size": 16}
+    assert _graded_with(dp).grade == gr.G1
+    tp = {**dp, "tensor_parallel_size": 8, "data_parallel_size": 1}
+    g = _graded_with(tp)
+    assert g.grade == gr.G2 and [(s["kind"], s["subject"]) for s in g.substitutions] == [("resolved_differs", "all_reduce_backend")]

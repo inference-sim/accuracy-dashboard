@@ -105,13 +105,23 @@ def test_check_requires_one_simulator_build_and_engine_release_for_every_point()
     assert any("running '0.31.0'" in x for x in g.check([{**pts[0], "simulator": wrong}], V))
 
 
-def test_the_four_conditions_that_are_not_graded_yet_are_g2_kinds_named_on_a_subject_of_their_own():
+def test_a_condition_that_is_not_graded_yet_is_an_unevaluated_substitution_naming_the_condition():
+    # The substrate's point record has the kind `unevaluated`, whose subject is the condition. The
+    # kind `kernel_hash` and the others mean the condition was decided and is false.
     subs = g.unchecked()
-    assert [s["kind"] for s in subs] == ["coefficient_range", "kernel_hash", "resolved_differs", "value_class"]
-    assert all(s["kind"] in g.G2_KINDS and s["subject"] == "unevaluated" and s["detail"] == f"{s['kind']} is unevaluated"
-               for s in subs)
+    assert [s["subject"] for s in subs] == ["coefficient_range", "kernel_hash", "resolved_differs", "value_class"]
+    assert all(s["kind"] == "unevaluated" and s["kind"] in g.G2_KINDS for s in subs)
     out = g.grade(engine_version=V, release=REL, substitutions=subs)
     assert out.grade == g.G2 and out.substitutions == subs
+    assert not any(s["kind"] in g.UNCHECKED_KINDS for s in out.substitutions)
+
+
+def test_an_unevaluated_substitution_must_name_a_condition_of_g1():
+    bad = [{"kind": "unevaluated", "subject": "send_gap_typo", "detail": "x"}]
+    with pytest.raises(g.GradeError, match="not a condition of G1"):
+        g.grade(engine_version=V, release=REL, substitutions=bad)
+    ok = [{"kind": "unevaluated", "subject": "client_difference", "detail": "x"}]
+    assert g.grade(engine_version=V, release=REL, substitutions=ok).grade == g.G2
 
 
 # ---- the keys a substitution of a kind names (blis-substrate's point record)
