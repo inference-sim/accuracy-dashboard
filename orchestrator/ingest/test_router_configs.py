@@ -23,9 +23,10 @@ import test_pd as P  # noqa: E402
 
 
 def unpublished(router: Path, table_policies: set[str]) -> list[str]:
-    """The policies the table names that the router's index does not carry."""
+    """The policies the table names that the router's index does not carry in the prefill/decode form the dashboard's
+    writer passes (a policy missing, or listed with no pd file)."""
     index = pdm.router_index(router)
-    return sorted(p for p in table_policies if p not in index)
+    return sorted(p for p in table_policies if p not in index or index[p]["pd"] is None)
 
 
 def table_policies(substrate: Path) -> set[str]:
@@ -33,11 +34,12 @@ def table_policies(substrate: Path) -> set[str]:
 
 
 def test_a_policy_removed_from_the_routers_index_fails_the_drift_check(tmp_path):
-    named = set(P.POLICIES)
+    named = {p for p in P.POLICIES if p != "default"}          # the policies a table maps a P/D deployment to
     assert unpublished(P.router_checkout(tmp_path / "a"), named) == []
-    for gone in P.POLICIES:
+    for gone in sorted(named):
         d = P.router_checkout(tmp_path / gone, tuple(p for p in P.POLICIES if p != gone))
         assert unpublished(d, named) == [gone]
+    assert unpublished(P.router_checkout(tmp_path / "d"), P.POLICIES) == ["default"]      # an entry mapped to default has no P/D file
 
 
 ROUTER, SUBSTRATE = os.environ.get("BLIS_ROUTER_CHECKOUT"), os.environ.get("BLIS_SUBSTRATE_ROUTER_BOUNDS")

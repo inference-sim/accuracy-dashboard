@@ -133,21 +133,28 @@ def test_the_named_refusals_are_topology_unsupported_with_the_slug_as_subject():
 POLICIES = ("round-robin", "random-picker", "least-active-requests", "default")      # names a fixture router publishes
 
 
-def router_checkout(root: Path, policies=POLICIES) -> Path:
-    """A fixture of the router checkout: an index and one configuration file per policy, each with its own bytes (the
-    dashboard never reads their content, so any bytes will do; a trailing space and a CRLF make a rewrite visible)."""
+def router_checkout(root: Path, policies=POLICIES, no_pd=("default",)) -> Path:
+    """A fixture of the router checkout in the router's layout: reference-configs/policies.json and one file per form,
+    each with its own bytes (the dashboard never reads their content; a trailing space and a CRLF make a rewrite visible).
+    A policy in `no_pd` has no prefill/decode form, as `default` has none."""
     d = root / "router"
-    (d / "config" / "reference").mkdir(parents=True, exist_ok=True)
+    (d / "reference-configs").mkdir(parents=True, exist_ok=True)
+    entries = []
     for p in policies:
-        (d / "config" / "reference" / f"{p}.yaml").write_bytes(f"# router file for {p} \r\nkind: EndpointPickerConfig\n".encode())
-    (d / pdm.INDEX_PATH).write_text(json.dumps({"policies": [{"policy": p, "file": f"config/reference/{p}.yaml"} for p in policies]}))
+        files = {"colocated": f"{p}.yaml", "pd": None if p in no_pd else f"{p}-pd.yaml"}
+        for form, name in files.items():
+            if name:
+                (d / "reference-configs" / name).write_bytes(f"# router file for {p} {form} \r\nkind: EndpointPickerConfig\n".encode())
+        entries.append({"name": p, "files": files})
+    (d / pdm.INDEX_PATH).write_text(json.dumps({"schema": 1, "policies": entries}))
     return d
 
 
-@pytest.mark.parametrize("policy", POLICIES)
-def test_the_file_passed_for_a_policy_is_the_routers_byte_for_byte(tmp_path, policy):
+@pytest.mark.parametrize("policy", [p for p in POLICIES if p != "default"])
+def test_the_file_passed_for_a_policy_is_the_routers_pd_file_byte_for_byte(tmp_path, policy):
     d = router_checkout(tmp_path)
-    assert pdm.epp_file(policy, d) == (d / "config" / "reference" / f"{policy}.yaml").read_bytes()
+    assert pdm.epp_file(policy, d) == (d / "reference-configs" / f"{policy}-pd.yaml").read_bytes()
+    assert pdm.epp_file(policy, d, "colocated") == (d / "reference-configs" / f"{policy}.yaml").read_bytes()
 
 
 def test_a_policy_the_router_does_not_publish_is_refused_by_name(tmp_path):
@@ -160,12 +167,23 @@ def test_a_policy_the_router_does_not_publish_is_refused_by_name(tmp_path):
     assert e.value.slug == "router_index_missing"
 
 
+def test_a_policy_without_the_needed_form_is_refused_by_name(tmp_path):
+    d = router_checkout(tmp_path)
+    with pytest.raises(pdm.PolicyConfigError) as e:
+        pdm.epp_file("default", d)                                     # default has no prefill/decode form
+    assert e.value.slug == "policy_form_missing:default:pd"
+    assert pdm.epp_file("default", d, "colocated")                     # but a colocated one
+    d2 = router_checkout(tmp_path / "x", ("round-robin",), no_pd=("round-robin",))
+    with pytest.raises(pdm.PolicyConfigError):
+        pdm.epp_file("round-robin", d2)
+
+
 def test_an_index_naming_a_file_outside_the_checkout_is_refused(tmp_path):
     d = router_checkout(tmp_path)
     (tmp_path / "outside.yaml").write_text("x")
-    (d / pdm.INDEX_PATH).write_text(json.dumps({"policies": [{"policy": "default", "file": "../outside.yaml"}]}))
+    (d / pdm.INDEX_PATH).write_text(json.dumps({"policies": [{"name": "default", "files": {"colocated": "../../outside.yaml", "pd": None}}]}))
     with pytest.raises(pdm.PolicyConfigError):
-        pdm.epp_file("default", d)
+        pdm.epp_file("default", d, "colocated")
 
 
 # ---------------------------------------------------------------- the recipe
@@ -519,7 +537,7 @@ def test_a_dp_free_row_is_written_as_two_pools_and_scored_with_the_instance_coun
         assert (mnbt(pre), mnbt(dec)) == (2048, 4096)                   # each pool's own, from the recipe
         assert dep["pd_transfer"] == {"connector": "NixlConnector"}
         assert dep["router"] == {"endpoint_picker_config": "pd-round-robin.epp.yaml"}
-        assert (sdir / "pd-round-robin.epp.yaml").read_bytes() == pdm.epp_file("round-robin", env.router_checkout)     # unchanged
+        assert (sdir / "pd-round-robin.epp.yaml").read_bytes() == pdm.epp_file("round-robin", env.router_checkout, "pd")     # unchanged
         scen = next(d for d in yaml.safe_load_all(next(sdir.glob("p-*.yaml")).read_text()) if d["kind"] == "Scenario")
         assert scen["cluster"]["fabric"] == "ib-400g" and "cost-model-fabric" in scen["coefficients"]
         assert scen["cluster"]["nodes"] == 2
