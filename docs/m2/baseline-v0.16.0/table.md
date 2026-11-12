@@ -4,7 +4,7 @@ IN-SAMPLE: the points are the ones the model was calibrated on or tuned against;
 
 **Coverage counts include every point, the test split too, by design. Accuracy figures are over train and validation points only, with N stated.** 446 of the points are test or prospective and 30 of them are scored; those 30 are left out of every accuracy figure, so none can be derived by subtraction (docs/m2/evaluation-protocol.md section 6).
 
-- harness commit `f2754b1031e8d90962c6ec39675eeede91a42728`
+- harness commit `0b8154ccefcb14311cf323e143d8520f59944fbb`
 - units sha256 `d89f860a46c0470a22543dc7fb77b8d1b10e508ce4f5ef5073e96f359f08597e` (1740 units)
 - pull manifest sha256 `c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166`
 - point set sha256 `6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60` (1734 points)
