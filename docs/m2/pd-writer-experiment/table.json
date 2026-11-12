@@ -166,12 +166,6 @@
    "alone": 0,
    "blocks": 0,
    "demotes": 84,
-   "entry": "client_difference:send_gap"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 84,
    "entry": "client_difference:sent_prompt_lengths"
   },
   {
