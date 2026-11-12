@@ -20,8 +20,8 @@ COUNTS = {"generated": 10, "completed": 10, "timed_out": 0, "in_flight_at_horizo
 
 
 def _doc(**over) -> dict:
-    d = {"kind": "Result", "schema_version": 2, "name": "x", "requests": dict(COUNTS),
-         "metrics": {"ttft_mean_ms": {"value": 12.5, "samples": 10}, "tpot_mean_ms": {"value": 3, "samples": 9}}}
+    d = {"kind": "Result", "schema_version": 3, "name": "x", "requests": dict(COUNTS),
+         "metrics": {"ttft_mean_ms": {"value": 12.5, "samples": 10, "scope": "cluster"}, "tpot_mean_ms": {"value": 3, "samples": 9, "scope": "cluster"}}}
     d.update(over)
     return d
 
@@ -42,18 +42,19 @@ def _runner(rc: int, stdout: str, stderr: str = ""):
 
 # ------------------------------------------------------------------ parse
 
-def test_parse_reads_a_schema_version_2_result():
-    assert result.parse(json.dumps(_doc()).encode())["name"] == "x"
+@pytest.mark.parametrize("version", [2, 3])
+def test_parse_reads_a_schema_version_2_or_3_result(version):
+    assert result.parse(json.dumps(_doc(schema_version=version)).encode())["name"] == "x"
 
 
-@pytest.mark.parametrize("doc", [{"kind": "Scenario", "schema_version": 2}, [1, 2], "x"])
+@pytest.mark.parametrize("doc", [{"kind": "Scenario", "schema_version": 3}, [1, 2], "x"])
 def test_parse_refuses_another_kind(doc):
     with pytest.raises(result.ResultError) as e:
         result.parse(json.dumps(doc).encode())
     assert e.value.slug == "result_unreadable"
 
 
-@pytest.mark.parametrize("version", [1, 3, None, "2"])
+@pytest.mark.parametrize("version", [1, 4, None, "3", True])
 def test_parse_refuses_another_schema_version(version):
     with pytest.raises(result.ResultError) as e:
         result.parse(json.dumps(_doc(schema_version=version)).encode())

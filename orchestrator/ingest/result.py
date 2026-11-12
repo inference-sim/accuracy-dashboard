@@ -20,7 +20,9 @@ import json
 import subprocess
 import tempfile
 
-SCHEMA_VERSION = 2
+# Version 3 requires each metric to state its scope (the substrate since DEV-8); version 2 is what the
+# simulator releases before it write. The metrics the harness reads are the same in both.
+SCHEMA_VERSIONS = (2, 3)
 KIND = "Result"
 TTFT_MEAN_MS = "ttft_mean_ms"
 TPOT_MEAN_MS = "tpot_mean_ms"
@@ -164,9 +166,9 @@ def parse(document: bytes) -> dict:
         raise ResultError(f"the simulator's standard output is not a JSON Result: {e}", "result_unreadable") from e
     if not isinstance(doc, dict) or doc.get("kind") != KIND:
         raise ResultError("the simulator's standard output is not a Result document", "result_unreadable")
-    if doc.get("schema_version") != SCHEMA_VERSION:
-        raise ResultError(f"Result schema_version {doc.get('schema_version')!r}; the harness reads version "
-                          f"{SCHEMA_VERSION}", "result_schema_version")
+    if doc.get("schema_version") not in SCHEMA_VERSIONS:
+        raise ResultError(f"Result schema_version {doc.get('schema_version')!r}; the harness reads versions "
+                          f"{', '.join(map(str, SCHEMA_VERSIONS))}", "result_schema_version")
     return doc
 
 
