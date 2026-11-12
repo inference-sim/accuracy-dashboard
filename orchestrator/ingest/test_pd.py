@@ -329,29 +329,56 @@ def test_the_old_range_form_of_a_regime_covers_no_point(tmp_path):
                              engine_version="0.31.0", fabric="ib-400g", prefill=POOL_P, decode=POOL_D) == []
 
 
-def test_the_substitution_carries_the_entry_as_it_states_it_and_a_wide_bound_is_flagged(tmp_path):
-    e = _table(tmp_path).entries[0]
-    m = rt.matched_ratios(e, workload="balanced", conc=4, model="m", hardware="mi355x", shape="1P2D",
-                          engine_version="0.31.0", fabric="ib-400g", prefill=POOL_P, decode=POOL_D)
-    sub = rt.substitution(e, "dynamo", REV, m)
+POINT = {"workload": "balanced", "concurrency": 4, "model": "m", "hardware": "mi355x", "engine_version": "0.31.0",
+         "fabric": "ib-400g", "shape": "1P2D", "prefill": POOL_P, "decode": POOL_D}
+
+
+def _matched(e, **over):
+    p = {**POINT, **over}
+    return rt.matched_ratios(e, workload=p["workload"], conc=p["concurrency"], model=p["model"], hardware=p["hardware"],
+                             shape=p["shape"], engine_version=p["engine_version"], fabric=p["fabric"],
+                             prefill=p["prefill"], decode=p["decode"])
+
+
+def test_the_substitution_carries_the_point_and_only_the_ratios_that_hold_it(tmp_path):
+    other = {**REGIME, "concurrencies": [256]}              # a second cell of the sweep that does not hold a count of 4
+    bound = {**TABLE_ENTRY["bound"], "ratios": TABLE_ENTRY["bound"]["ratios"] + [
+        {"metric": "tpot_p50_ms", "against": ["random-picker"], "regime": other, "max_ratio": 1.4}]}
+    e = _table(tmp_path, bound=bound).entries[0]
+    m = _matched(e)
+    sub = rt.substitution(e, "dynamo", REV, m, POINT)
     assert sub["kind"] == "router_differs" and sub["entry"] == "dynamo-round-robin" and sub["policy"] == "round-robin"
     assert sub["revision"] == REV and sub["difference"] == [{"aspect": "counter", "text": "counters differ"}]
-    assert sub["bound"] == TABLE_ENTRY["bound"] and "ASSUMED" not in sub["detail"]
-    assert "ASSUMED" in rt.substitution(e, "dynamo", REV, m, assumed=True)["detail"]
+    assert sub["regime"] == POINT
+    assert [r["metric"] for r in sub["bound"]["ratios"]] == ["ttft_p50_ms", "ttft_p99_ms"]      # not the tpot cell
+    assert sub["bound"]["evidence"] == TABLE_ENTRY["bound"]["evidence"] and "ASSUMED" not in sub["detail"]
+    assert rt.carried_bound_covers_point(sub) == []
+    assert "ASSUMED" in rt.substitution(e, "dynamo", REV, m, POINT, assumed=True)["detail"]
     assert rt.bound_wide(m) is True                                            # 1.7 > 1.25
     assert rt.bound_wide(m[:1]) is False and rt.bound_wide([]) is False
+    # Known bad: the whole bound carried is refused, and so is a record with no regime.
+    whole = {**sub, "bound": bound}
+    assert rt.carried_bound_covers_point(whole)
+    with pytest.raises(gr.GradeError):
+        gr.grade(engine_version="0.32.0", release=gr.Release("0.32.0", False), substitutions=[whole])
+    assert rt.carried_bound_covers_point({k: v for k, v in sub.items() if k != "regime"})
+    # An unsampled count has no bound for this regime.
+    assert _matched(e, concurrency=8) == []
 
 
-def test_the_grade_needs_the_build_the_difference_and_the_bound_of_a_router_differs():
+def test_the_grade_needs_the_build_the_difference_the_regime_and_the_bound_of_a_router_differs():
     base = {"kind": "router_differs", "subject": "dynamo", "entry": "dynamo-round-robin", "policy": "round-robin",
-            "evidence": "e", "detail": "d", "revision": REV, "difference": [{"aspect": "a", "text": "t"}], "bound": {"a": 1}}
+            "evidence": "e", "detail": "d", "revision": REV, "difference": [{"aspect": "a", "text": "t"}], "regime": POINT,
+            "bound": {"ratios": [{"metric": "ttft_p50_ms", "against": ["random-picker"], "regime": REGIME, "max_ratio": 1.1}]}}
     release = gr.Release("0.32.0", False)
     assert gr.grade(engine_version="0.32.0", release=release, substitutions=[base]).grade == gr.G2
-    for missing in ("revision", "difference", "bound"):
+    for missing in ("revision", "difference", "bound", "regime"):
         with pytest.raises(gr.GradeError):
             gr.grade(engine_version="0.32.0", release=release, substitutions=[{k: v for k, v in base.items() if k != missing}])
     with pytest.raises(gr.GradeError):
         gr.grade(engine_version="0.32.0", release=release, substitutions=[{**base, "revision": "1.2.0.dev20260526"}])
+    with pytest.raises(gr.GradeError):
+        gr.grade(engine_version="0.32.0", release=release, substitutions=[{**base, "policy": "none"}])
 
 
 # ---------------------------------------------------------------- the pull freezes the recipe

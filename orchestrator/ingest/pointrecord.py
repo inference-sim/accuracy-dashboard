@@ -28,7 +28,7 @@ HEX40 = re.compile(r"^[0-9a-f]{40}$")
 
 # The keys of a substitution the substrate declares (Substitution in pointrecord.go).
 SUBSTITUTION_KEYS = ("kind", "subject", "detail", "record", "date", "policy", "entry", "evidence", "revision",
-                     "profile_family", "differed", "difference", "bound")
+                     "profile_family", "differed", "difference", "bound", "regime")
 SETTING_KEYS = ("arg", "measured", "source", "blis", "field", "match", "rule", "occurrences", "values", "delta",
                 "ratio", "note")
 REPLAY_KEYS = ("client", "client_version", "scenario", "replayed_as", "concurrency", "duration_s",

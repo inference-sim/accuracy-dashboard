@@ -62,10 +62,7 @@ G2_KINDS = ("coefficient_method", "coefficient_range", "execution_mode", "kernel
 # difference and bound are copied from the entry as it states them), a client_difference and a resolved_differs
 # the detail. A key belongs to its own kind only.
 KIND_KEYS = {"later_record": ("record", "date"),
-             "router_differs": ("entry", "policy", "evidence", "revision", "difference", "bound")}
-# The llm-d policies the router table may map to (blis-substrate routertable.Policies; "none" records
-# that no policy is close enough, so a point cannot be simulated with it). TEMPORARY copy.
-ROUTER_POLICIES = ("round-robin", "random-picker", "least-active-requests", "default")
+             "router_differs": ("entry", "policy", "evidence", "revision", "difference", "regime", "bound")}
 DETAIL_KINDS = ("client_difference", "resolved_differs")
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -148,14 +145,19 @@ def _check_keys(s: dict) -> None:
             raise GradeError(f"a {s['kind']} substitution on {s['subject']!r} names no {k}")
     if s["kind"] in DETAIL_KINDS and not s.get("detail"):
         raise GradeError(f"a {s['kind']} substitution on {s['subject']!r} names no detail")
-    for k in ("record", "date", "entry", "policy", "evidence", "revision", "difference", "bound"):
+    for k in ("record", "date", "entry", "policy", "evidence", "revision", "difference", "regime", "bound"):
         if s.get(k) is not None and k not in need:
             raise GradeError(f"{k} is not a key of {s['kind']} (substitution on {s['subject']!r})")
     if s["kind"] == "router_differs":
-        if s["policy"] not in ROUTER_POLICIES:
-            raise GradeError(f"{s['policy']!r} is not a policy llm-d's router offers {ROUTER_POLICIES}")
+        if s["policy"] in ("", "none"):      # the policy is the router table's own; "none" records that no policy is close enough
+            raise GradeError(f"a router_differs substitution names policy {s['policy']!r}: the router table maps no policy")
         if not s["entry"].startswith(s["subject"] + "-"):
             raise GradeError(f"router table entry {s['entry']!r} is not an entry of the router {s['subject']!r}")
+    if s["kind"] == "router_differs":
+        import router_table as _rt
+        bad = _rt.carried_bound_covers_point(s)
+        if bad:
+            raise GradeError(f"router_differs on {s['subject']!r}: {'; '.join(bad)}")
     if s["kind"] == "router_differs" and not re.match(r"^[0-9a-f]{40}$", str(s["revision"])):
         raise GradeError(f"a router_differs revision is a full 40-hex commit, got {s['revision']!r}")
     if s["kind"] == "later_record" and not _DATE.match(s["date"]):

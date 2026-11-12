@@ -120,7 +120,9 @@ def _g(subs, version="0.32.0"):
     return g.grade(engine_version="0.32.0", release=g.Release(version=version, nightly_or_custom=False), substitutions=subs)
 
 
-RD = {"difference": [{"aspect": "counter", "text": "the counters differ"}], "bound": {"ratios": []}, "revision": "1" * 40}
+RD = {"difference": [{"aspect": "counter", "text": "the counters differ"}], "bound": {"ratios": []}, "revision": "1" * 40,
+      "regime": {"workload": "balanced", "concurrency": 4, "model": "m", "hardware": "mi355x", "engine_version": "0.32.0",
+                 "fabric": "ib-400g", "shape": "1P2D"}}
 
 
 def test_g1_g2_still_grade_correctly_for_a_run_on_the_simulators_release():
@@ -144,7 +146,7 @@ def test_a_substitution_names_the_keys_of_its_kind_and_no_others():
                 {"kind": "router_differs", "subject": "r", "evidence": "e", "policy": "round-robin", "entry": "r-x", "difference": RD["difference"]},
                 {"kind": "router_differs", "subject": "dynamo", "entry": "dynamo-round-robin", "policy": "none", "evidence": "e", **RD},
                 {"kind": "router_differs", "subject": "dynamo", "entry": "other-round-robin", "policy": "round-robin", "evidence": "e", **RD},
-                {"kind": "router_differs", "subject": "dynamo", "entry": "dynamo-x", "policy": "least-loaded", "evidence": "e", **RD},
+                {"kind": "router_differs", "subject": "dynamo", "entry": "dynamo-x", "policy": "none", "evidence": "e", **RD},
                 {"kind": "estimated", "subject": "f", "detail": "d", "record": "x"},
                 {"kind": "client_difference", "subject": "send_gap"}, {"kind": "resolved_differs", "subject": "block_size"}):
         with pytest.raises(g.GradeError):

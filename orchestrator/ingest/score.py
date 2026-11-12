@@ -1201,7 +1201,10 @@ def pd_router(row: dict, name: str | None, recipe: "pdr.Recipe | None", table: "
                                 prefill=ctx.get("prefill"), decode=ctx.get("decode"))
     if not matched:
         return None, [], [f"{base}:{rt.NO_BOUND}"], {"outcome": rt.NO_BOUND, "entry": entry.name, "mode": mode}
-    sub = rt.substitution(entry, key, revision, matched, assumed=assumed)
+    point = {"workload": rt.workload_kind(ctx["isl"], ctx["osl"]), "concurrency": ctx["conc"], "model": ctx["model"],
+             "hardware": ctx["hardware"], "engine_version": ctx["engine_version"], "fabric": ctx["fabric"],
+             "shape": ctx["shape"], "prefill": ctx["prefill"], "decode": ctx["decode"]}
+    sub = rt.substitution(entry, key, revision, matched, point, assumed=assumed)
     if not stated:
         sub["detail"] += "; the recipe sets no router mode, so the frontend's default ran"
     return entry.policy, [sub], [], {"outcome": rt.MAPPED, "entry": entry.name, "policy": entry.policy, "mode": mode,

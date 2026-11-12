@@ -148,30 +148,47 @@ def matched_ratios(e: Entry, *, workload: str | None, conc: int, model: str, har
     cluster fabric, the per-instance parallelism of the prefill and the decode pool (`tp`, `pp`, `dp`,
     `expert_parallel`), and the pool shape (`<n>P<m>D`) in `shapes`. A value the point does not know (None) matches
     nothing, and a regime that does not state a dimension matches nothing."""
+    kw = dict(workload=workload, conc=conc, model=model, hardware=hardware, shape=shape, engine_version=engine_version,
+              fabric=fabric, prefill=prefill, decode=decode)
+    return [{"metric": r.get("metric"), "against": list(r.get("against") or []), "regime": r.get("regime"),
+             "max_ratio": r.get("max_ratio")}
+            for r in ((e.bound or {}).get("ratios") or []) if regime_holds(r.get("regime") or {}, **kw)]
+
+
+def regime_holds(g: dict, *, workload, conc, model, hardware, shape, engine_version=None, fabric=None, prefill=None, decode=None) -> bool:
+    """Whether the regime `g` is exactly the point's (see matched_ratios)."""
+    if workload is None or g.get("workload") != workload or g.get("model") != model or g.get("hardware") != hardware:
+        return False
+    concs = g.get("concurrencies")
+    if not (isinstance(concs, list) and isinstance(conc, int) and not isinstance(conc, bool)
+            and any(isinstance(c, int) and not isinstance(c, bool) and c == conc for c in concs)):
+        return False
+    return (shape in (g.get("shapes") or []) and isinstance(engine_version, str) and g.get("engine_version") == engine_version
+            and isinstance(fabric, str) and g.get("fabric") == fabric
+            and _pool_equal(g.get("prefill"), prefill) and _pool_equal(g.get("decode"), decode))
+
+
+def carried_bound_covers_point(sub: dict) -> list[str]:
+    """The problems of a router_differs substitution's carried bound against its own regime, as the substrate's
+    `CheckRouterSubstitutions` states them: a ratio whose regime does not hold the point is not carried (the point would
+    have no bound for this regime and stay router_unsupported)."""
+    p = sub.get("regime")
+    if not isinstance(p, dict):
+        return ["a router_differs substitution carries no regime"]
     out = []
-    for r in ((e.bound or {}).get("ratios") or []):
-        g = r.get("regime") or {}
-        if workload is None or g.get("workload") != workload or g.get("model") != model or g.get("hardware") != hardware:
-            continue
-        concs = g.get("concurrencies")
-        if not (isinstance(concs, list) and isinstance(conc, int) and not isinstance(conc, bool)
-                and any(isinstance(c, int) and not isinstance(c, bool) and c == conc for c in concs)):
-            continue
-        if shape not in (g.get("shapes") or []):
-            continue
-        if not (isinstance(engine_version, str) and g.get("engine_version") == engine_version):
-            continue
-        if not (isinstance(fabric, str) and g.get("fabric") == fabric):
-            continue
-        if not (_pool_equal(g.get("prefill"), prefill) and _pool_equal(g.get("decode"), decode)):
-            continue
-        out.append({"metric": r.get("metric"), "against": list(r.get("against") or []), "max_ratio": r.get("max_ratio")})
+    for i, r in enumerate((sub.get("bound") or {}).get("ratios") or []):
+        if not regime_holds(r.get("regime") or {}, workload=p.get("workload"), conc=p.get("concurrency"), model=p.get("model"),
+                            hardware=p.get("hardware"), shape=p.get("shape"), engine_version=p.get("engine_version"),
+                            fabric=p.get("fabric"), prefill=p.get("prefill"), decode=p.get("decode")):
+            out.append(f"bound.ratios[{i}] does not hold the point: {NO_BOUND}")
     return out
 
 
-def substitution(e: Entry, router: str, revision: str, matched: list[dict], *, assumed: bool = False) -> dict:
+def substitution(e: Entry, router: str, revision: str, matched: list[dict], point: dict, *, assumed: bool = False) -> dict:
     """The router_differs substitution of a mapped entry whose bound covers the point: the router, entry, policy,
-    evidence and build, the entry's difference statements (aspect and text) and its bound, as it states them."""
+    evidence and build, the entry's difference statements (aspect and text), the point's own regime, and the entry's bound
+    cut to the ratios whose regime holds the point (what the substrate's `Entry.BoundFor` carries and its
+    `CheckRouterSubstitutions` recomputes), the rest of the bound as the entry states it."""
     detail = f"the run's {router} router ran mode {e.mode}; BLIS ran llm-d's {e.policy} policy"
     if assumed:
         detail += (f"; the run records its router build as a wheel version, not a commit, and the build {revision} "
@@ -179,7 +196,7 @@ def substitution(e: Entry, router: str, revision: str, matched: list[dict], *, a
     return {"kind": "router_differs", "subject": router, "entry": e.name, "policy": e.policy,
             "evidence": evidence_text(e), "revision": revision,
             "difference": [{"aspect": d.get("aspect"), "text": d.get("text")} for d in e.difference],
-            "bound": e.bound, "detail": detail}
+            "regime": point, "bound": {**(e.bound or {}), "ratios": matched}, "detail": detail}
 
 
 def bound_wide(matched: list[dict]) -> bool:
