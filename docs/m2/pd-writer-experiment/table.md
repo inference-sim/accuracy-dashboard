@@ -127,7 +127,6 @@ Blocks: in-scope points held at G5 by the blocker. Alone: points that would be s
 | `client_difference:benchmark_client` | 0 | 0 | 84 |
 | `client_difference:client_flags` | 0 | 0 | 84 |
 | `client_difference:failed_requests` | 0 | 0 | 84 |
-| `client_difference:send_gap` | 0 | 0 | 84 |
 | `client_difference:sent_prompt_lengths` | 0 | 0 | 84 |
 | `coefficient_method:cost-model-attention/attention_decode_floor_mla` | 0 | 0 | 84 |
 | `coefficient_method:cost-model-fabric/fabric_bandwidth_efficiency` | 0 | 0 | 84 |

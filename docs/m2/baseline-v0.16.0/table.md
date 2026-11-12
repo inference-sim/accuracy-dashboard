@@ -151,7 +151,6 @@ Blocks: in-scope points held at G5 by the blocker. Alone: points that would be s
 | `value_conflict:kv_transfer_config.engine_id` | 1 | 0 | 0 |
 | `client_difference:client_flags` | 0 | 0 | 41 |
 | `client_difference:failed_requests` | 0 | 0 | 41 |
-| `client_difference:send_gap` | 0 | 0 | 41 |
 | `coefficient_method:cost-model-attention/attention_decode_floor_mla` | 0 | 0 | 41 |
 | `coefficient_method:cost-model-host-overheads/host_admission_per_request` | 0 | 0 | 41 |
 | `coefficient_method:cost-model-host-overheads/host_admission_per_token` | 0 | 0 | 41 |
