@@ -22,7 +22,7 @@ import settings as st  # noqa: E402
 import test_score_e2e as e2e  # noqa: E402
 
 S = st.Setting
-NO_ACCEPTANCE = e2e.LOG.replace(", 'synthetic_acceptance_length': 2.4", "")
+NO_ACCEPTANCE = e2e.LOG_NO_LENGTH
 WITH_PARSER = NO_ACCEPTANCE.replace("'tensor_parallel_size': 1,", "'tensor_parallel_size': 1, 'reasoning_parser': 'deepseek_v4',")
 
 
