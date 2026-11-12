@@ -110,6 +110,9 @@ def main() -> int:
     text = next(iter(multi.values())) if isinstance(multi, dict) else str(multi)
     ck("a multi-node scenario lists cost-model-fabric (without it the handoff is priced 23% fast)",
        "cost-model-fabric" in text and "ASSUMED" in text)
+    for chip, want in (("b300", "ib-800g"), ("gb300", "ib-800g"), ("h200", "ib-400g"), ("b200", "ib-400g")):
+        ck(f"a multi-node {chip} scenario assumes {want}",
+           cluster_of(sweep(gpu=chip, node=4, tp=8), OPEN).get("fabric") == want)
     one = emit(sweep(gpu="h100", node=8), {"1k1k"}, OPEN, "0.32.0")
     ck("a one-node scenario lists no fabric set", "cost-model-fabric" not in (next(iter(one.values())) if isinstance(one, dict) else str(one)))
     try:

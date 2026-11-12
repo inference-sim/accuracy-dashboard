@@ -466,10 +466,10 @@ def test_a_run_of_another_repository_has_no_commit_to_read(tmp_path):
 
 # ---------------------------------------------------------------- a point scored through two pools
 
-def _pd_point(tmp: Path, *, row=None, recipe_text=None, with_recipe=True, table=True, log=True):
+def _pd_point(tmp: Path, *, row=None, recipe_text=None, with_recipe=True, table=True, log=True, chip="mi355x"):
     # table: the router table maps Dynamo's default mode (router_differs); False leaves the catalog's own, which has none here.
     recipe_text = RECIPE_FABRIC if recipe_text is None else recipe_text   # a stated fabric: the router bound's regime needs a recorded one
-    entry, env = e2e._setup(tmp)
+    entry, env = e2e._setup(tmp, hardware=chip)
     env.router_checkout = router_checkout(tmp)
     pdir = tmp / "pull" / "points" / entry["point_id"]
     entry["row"].update({**ROW, **(row or {})})
@@ -491,8 +491,8 @@ def _pd_point(tmp: Path, *, row=None, recipe_text=None, with_recipe=True, table=
         (d / "dynamo-round-robin.yaml").write_text(yaml.safe_dump(TABLE_ENTRY))
         env.routers_dir = d
         env.assumed_router_revision = REV
-    env.catalog_obj = e2e._catalog(tmp, {"org/m": "m"}, {"mi355x": (8, None)}, {})
-    env.parts = {"mi355x"}
+    env.catalog_obj = e2e._catalog(tmp, {"org/m": "m"}, {chip: (8, None)}, {})
+    env.parts = {chip}
     return entry, env
 
 
@@ -794,6 +794,24 @@ def test_a_multi_node_agentic_point_with_no_log_is_written_from_its_recipe_and_n
         assert o.fidelity is None and "conflict:recipe.gpus_per_agg" in o.reasons
     finally:
         shutil.rmtree(tmp)
+
+
+def test_a_prefill_decode_point_assumes_the_fabric_class_of_its_chips_nic():
+    for chip, want in (("b300", "ib-800g"), ("gb300", "ib-800g"), ("h200", "ib-400g")):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            text = RECIPE.replace('gpu_type: "mi355x",', f'gpu_type: "{chip}",')
+            entry, env = _pd_point(tmp, log=False, recipe_text=text, chip=chip, row={"hardware": chip})
+            env.router_policy_experiment = "round-robin"
+            o, work = e2e._score(tmp, entry, env, tmp / "c1")
+            assert o.fidelity is not None, o.reasons
+            scen = next(d for d in yaml.safe_load_all(next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text())
+                        if d["kind"] == "Scenario")
+            assert scen["cluster"]["hardware"] == chip and scen["cluster"]["fabric"] == want
+            named = [s for s in o.fidelity["substitutions"] if s["subject"] == "cluster.fabric"]
+            assert len(named) == 1 and want in named[0]["detail"]
+        finally:
+            shutil.rmtree(tmp)
 
 
 def test_a_fabric_class_the_recipe_states_is_used_and_not_named_as_assumed():

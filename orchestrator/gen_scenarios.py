@@ -63,6 +63,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "ingest"))
 import blis_commands as bc  # noqa: E402
 import stack as sk  # noqa: E402
+import settings as st  # noqa: E402
 import support as sp  # noqa: E402
 
 COEFFICIENTS = (
@@ -183,9 +184,10 @@ def emit(dep: dict, labels: set[str], packaging: dict, engine_release: str) -> s
         f"  hardware: {dep['gpu']}",
     ]
     if nodes > 1:
-        # No InferenceX record names a cluster's fabric class: ib-400g is ASSUMED.
-        lines.append("  # fabric: ASSUMED. No record names this cluster's fabric class; ib-400g is the catalog's class.")
-        lines.append("  fabric: ib-400g")
+        # No InferenceX record names a cluster's fabric class: the chip generation's NIC class is ASSUMED.
+        fabric, _ = st.assumed_fabric(dep["gpu"])
+        lines.append(f"  # fabric: ASSUMED. No record names this cluster's fabric class; {fabric} is the class of the chip's NIC.")
+        lines.append(f"  fabric: {fabric}")
     lines.append(f"  nodes: {nodes}")
     if packaging["gpus_per_node"] is None:
         lines.append(f"  gpus_per_node: {per_node}")

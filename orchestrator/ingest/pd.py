@@ -251,11 +251,12 @@ def build_pd(pool_builts: dict, recipe: "pdr.Recipe", pools: dict, taken: dict, 
         # at its class and the registry's efficiency for it. No recipe or cluster record of
         # InferenceX names the class, so the assumed one is named on the point.
         recorded = recipe.fabric or st.recorded_fabric(launch)
-        scenario["cluster"]["fabric"] = recorded or st.ASSUMED_FABRIC
+        assumed, assumed_sub = st.assumed_fabric(scenario["cluster"].get("hardware"))
+        scenario["cluster"]["fabric"] = recorded or assumed
         if st.FABRIC_COEFFICIENT not in scenario["coefficients"]:
             scenario["coefficients"] = [*scenario["coefficients"], st.FABRIC_COEFFICIENT]
         if recorded is None:
-            subs = subs + [st.ASSUMED_FABRIC_SUBSTITUTION]
+            subs = subs + [assumed_sub]
     out = st.Built(scenario=scenario, deployment=dep, acceptance_length=None,
                    gpus=sum(p.workers * p.gpus for p in pools.values()))
     out.reasons = sorted(set(pre.reasons + dec.reasons))
