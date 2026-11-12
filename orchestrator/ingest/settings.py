@@ -404,7 +404,7 @@ def read_all(server_log: str, launch_config: dict | None) -> tuple[dict[str, Rea
 # renames that file and blis-substrate's Deployment (contracts/spec/deployment/deployment.go)
 # require: kv_cache_dtype is the block's cache_dtype; the compilation, attention and kernel
 # config fields are the block's top-level ones; speculative_config is its speculative block
-# (num_speculative_tokens is num_spec_tokens); VLLM_USE_RUST_FRONTEND is its frontend; the
+# (num_speculative_tokens is num_spec_tokens); the
 # parallel sizes are the Deployment's parallel layout. kv_transfer_config's connector and CPU
 # bytes are the Deployment's offload block (_write_offload). Every other environment variable is
 # copied into the block's env as the launch gave it. The connector's own options go under the
@@ -451,6 +451,7 @@ VLLM_BLOCK_MOVES = (
     ("speculative.kv_cache_dtype", "speculative_config.kv_cache_dtype"),
     ("speculative.draft_sample_method", "speculative_config.draft_sample_method"),
     ("speculative.rejection_sample_method", "speculative_config.rejection_sample_method"),
+    ("speculative.synthetic_acceptance_length", "speculative_config.synthetic_acceptance_length"),
     ("speculative.enable_adaptive_verification", "speculative_config.enable_adaptive_verification"),
 )
 
@@ -530,7 +531,6 @@ LOCATIONS = {
     "engram_config.cpu_offload": "engine.engram_config.cpu_offload",
     "engram_config.dp_shared_memory": "engine.engram_config.dp_shared_memory",
     "engram_config.use_thp": "engine.engram_config.use_thp",
-    "env.VLLM_USE_RUST_FRONTEND": "engine.frontend",
     "tensor_parallel_size": "parallel.tp",
     "pipeline_parallel_size": "parallel.pp",
     "data_parallel_size": "parallel.dp",
@@ -715,14 +715,17 @@ def decide(settings: dict[str, Setting], field_list, part: str | None = None, fa
                 # calls inert is recorded on the point and not stated in the scenario.
                 d.args.append({**rec, "blis": None, "match": "inert"})
                 continue
-        if loc.startswith("engine.env.") and isinstance(st.value, bool):
+        if loc.startswith("engine.env.") and isinstance(st.value, bool) and path != FRONTEND_ENV:
             # vLLM's deprecation warning shows the variable was set, not its value.
             d.reasons.append(f"required_setting_missing:{path}")
             continue
         value = _yaml_value(st.value)
-        if loc == "engine.frontend":
+        if path == FRONTEND_ENV:
+            # The engine block states the front end as the variable itself, "1" or "0", as vLLM reads
+            # it (the engine refuses the key `frontend` and asks for this form). The server log's
+            # "Launching Rust frontend" line is the evidence it was 1.
             try:
-                value = _flag(value)
+                value = ENV_FLAG[_flag(value)]
             except ValueError:
                 d.reasons.append(f"conflict:{path}")
                 continue
@@ -856,7 +859,8 @@ class Built:
     acceptance_from_log: bool = False                 # acceptance_length is the server log's realised mean, not a run setting
 
 
-FRONTEND = {True: "rust", False: "python"}   # VLLM_USE_RUST_FRONTEND, parsed as a bool
+FRONTEND_ENV = "env.VLLM_USE_RUST_FRONTEND"
+ENV_FLAG = {True: "1", False: "0"}   # a boolean environment variable as the engine block writes it
 
 
 def recorded_node_size(launch: dict | None) -> int | None:
@@ -901,8 +905,6 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
         if top == "offload":
             offload[loc] = (path, value)
             continue
-        if loc == "engine.frontend":
-            value = FRONTEND[value]
         if loc.startswith("engine.env."):
             pool["engine"].setdefault("env", {})[loc[len("engine.env."):]] = str(value)
             continue
@@ -922,6 +924,15 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
         # The run named a draft checkpoint (speculative_config.model); the engine block names it by
         # its catalog entry (blis-vllm testdata/scenarios/muse-h100-pp2tp8-dspark.yaml: draft_model).
         spec["draft_model"] = draft_model
+    if spec is not None and spec.get("rejection_sample_method") == "synthetic":
+        # vLLM takes the acceptance of synthetic rejection sampling from synthetic_acceptance_length
+        # and refuses the method without one (vllm/config/speculative.py:575). The run's length is the
+        # replay's acceptance (LOCATIONS); the engine block states it too, which is the form the engine
+        # accepts the method in.
+        if b.acceptance_length is None:
+            b.reasons.append("required_setting_missing:speculative_config.synthetic_acceptance_length")
+        else:
+            spec["synthetic_acceptance_length"] = float(b.acceptance_length)
     if spec is not None and set(spec) >= {"method"} and "num_spec_tokens" not in spec:
         b.reasons.append("required_setting_missing:speculative_config.num_speculative_tokens")
     if offload:
