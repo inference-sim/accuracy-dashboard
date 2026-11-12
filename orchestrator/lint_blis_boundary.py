@@ -77,6 +77,9 @@ DATA_READS = {
         "TEMPORARY until a command answers `catalog resolve` for a catalog checkout with no simulator "
         "build: `cli.py coverage` grades a frozen pull without a simulator and reads models/*/model.yaml "
         "and hardware/*.yaml itself",
+    ("orchestrator/ingest/stand_in_facts.py", "compute_capability"):
+        "TEMPORARY until `blis catalog resolve --chip` prints the part's ComputeCapability: the engine-owned valid_when "
+        "clause on compute_capability (design 11.2) needs it, and until then hardware/<chip>.yaml is read from the catalog checkout",
     ("orchestrator/ingest/support.py", "Catalog.speculator"):
         "TEMPORARY until a command prints a catalog model graph's speculator method",
     ("orchestrator/ingest/support.py", "registry_parts"):
