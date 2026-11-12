@@ -1,6 +1,6 @@
 # DeepSeek-V4.1-Flash on H200 under vLLM v0.33.0: sixteen rows newer than the ledger
 
-Contents: [What the rows are](#what-the-rows-are) · [How they are pinned and split](#how-they-are-pinned-and-split) · [Result of the scorer as published](#result-of-the-scorer-as-published) · [What BLIS refuses, by name](#what-blis-refuses-by-name) · [Dry run: the rows with the three refusals set aside](#dry-run-the-rows-with-the-three-refusals-set-aside) · [Grade](#grade) · [How to reproduce](#how-to-reproduce) · [What this does not show](#what-this-does-not-show)
+Contents: [What the rows are](#what-the-rows-are) · [How they are pinned and split](#how-they-are-pinned-and-split) · [Result of the scorer as published](#result-of-the-scorer-as-published) · [What BLIS refuses, by name](#what-blis-refuses-by-name) · [Dry run: the rows with the three refusals set aside](#dry-run-the-rows-with-the-three-refusals-set-aside) · [Dry run with the three fields classified](#dry-run-with-the-three-fields-classified) · [Grade](#grade) · [How to reproduce](#how-to-reproduce) · [What this does not show](#what-this-does-not-show)
 
 These are the first InferenceX rows of the model, chip and workload family the team runs. They were measured on 2026-11-09, after the baseline's ledger source revision (`db-dump/2026-09-28`), so the ledger holds no unit for them and the baseline's frozen pull does not hold them. They are scored here from a pull of their own. The baseline pull and its 1734 points are not touched.
 
@@ -42,7 +42,7 @@ Command: `harness/run.sh` with the inputs of [prefill/decode coverage](../pd-cov
 The first reason by order is `field_not_modelled:env.VLLM_USE_RUST_FRONTEND`; all three are in `not_scored.jsonl` under `g5_reasons`. Two further facts surfaced when the three were set aside (next section); they are not yet refusals of the published run because the gate stops first:
 
 1. **The engine itself refuses `rejection_sample_method`.** With the field list opened, the engine's own error is `speculative.rejection_sample_method (vLLM's speculative_config.rejection_sample_method) is not modelled: this engine and the cost model read no such setting, so a value other than vLLM's default would be dropped (blis-vllm#106)`. Marking the field inert in the list is therefore not enough; the key must also not reach the scenario, or the engine must read it.
-2. **The scorer maps `env.VLLM_USE_RUST_FRONTEND` to `engine.frontend`, and the simulator at this pin refuses that key**: `engine key "frontend" is vLLM's environment variable VLLM_USE_RUST_FRONTEND: write env: {VLLM_USE_RUST_FRONTEND: "1"}`. When blis-vllm#85 lands, `settings.py` must write the variable under `engine.env`. This is not changed here: the field list gates it, and the value form the engine will accept is the engine's to say.
+2. **The scorer maps `env.VLLM_USE_RUST_FRONTEND` to `engine.frontend`, and the simulator at this pin refuses that key**: `engine key "frontend" is vLLM's environment variable VLLM_USE_RUST_FRONTEND: write env: {VLLM_USE_RUST_FRONTEND: "1"}`. When blis-vllm#85 lands, `settings.py` must write the variable under `engine.env`. This is not changed here: the field list gates it, and the value form the engine will accept is the engine's to say. *Changed afterwards: see [Dry run with the three fields classified](#dry-run-with-the-three-fields-classified).*
 
 ## Dry run: the rows with the three refusals set aside
 
@@ -74,6 +74,64 @@ What the table says, and what it does not:
 - **TPOT** is close at low load: within 6.1 % of the run at 1 to 4 clients on 8 GPUs and within 14 % up to 4 clients on 4 GPUs. It is under-predicted by at most 6.1 % and over-predicted more as load grows (20 % and 32 % at 32 and 64 clients on 8 GPUs, 79 % and 87 % on 4 GPUs, and 73 % and 182 % at 128 clients).
 - **TTFT** is over-predicted by 150 % to 400 % (2.5 to 5 times the measured value) at every concurrency up to 64, and at 128 clients on 4 GPUs both figures are of a saturated queue (382 s measured, 1194 s predicted). A bias that holds at one client, where nothing queues, is not a load effect. The replayed contexts are long (a mean input of 290k tokens at one client), so prefix reuse in the run is a candidate cause; the points also name `engram_config.cpu_offload` as left unset (`estimated`). This page does not test either.
 - Sixteen points of one series are one deployment shape, not sixteen findings.
+
+## Dry run with the three fields classified
+
+**Evidence only, until the engine's list is published with these entries.** The three refusals are lifted in blis-vllm
+by classification and not by placeholder: `env.PYTHONUNBUFFERED` is `proven_inert` (a proof that no file of vLLM's
+serving process names it), `speculative_config.rejection_sample_method` is `modelled` (the run's supplied acceptance
+length, 3.51), and `env.VLLM_USE_RUST_FRONTEND` is `modelled` (the engine prices admission at the Rust front end's
+per-token rate). The page [docs/h200-v033-fields.md](https://github.com/inference-sim/blis-vllm/blob/m2/15-h200-v033-fields/docs/h200-v033-fields.md)
+of blis-vllm's branch `m2/15-h200-v033-fields` says what each does in vLLM v0.32.0 and what stays an assumption. The scorer
+change is two things: the Rust front end is written as `env: {VLLM_USE_RUST_FRONTEND: "1"}`, the form the engine takes (the
+earlier mapping, `engine.frontend`, is refused by the simulator), and a synthetic run states its acceptance length in the
+engine block as well as in the replay, because the engine accepts the method only beside one.
+
+Command: as in [How to reproduce](#how-to-reproduce), with `--fields` the `fields.json` of that branch (sha256
+`474e99d960638604b169417a9b7dc0fc4abb7c47b9b1ea5a35e69338e84df573`), harness commit `c474b95c1a86e9763b91ab9cec1987386233d8a1`,
+simulator `780f661e` (blis-vllm `96ea750e` inside it, which already reads the Rust variable and a synthetic length). No scratch
+file is used. **16 of 16 are scored, 0 refused, 0 failed, all G4** (the engine release, as before). Over the sixteen development
+(validation) points: **TTFT MAPE 75.4 %, TPOT MAPE 38.1 %** (TTFT shape 31.7 %, TPOT shape 42.0 %, over the 14 points with a shape).
+Errors are predicted over measured, in percent; "before" is the dry run above.
+
+| GPUs | Clients | TTFT measured | TTFT predicted | Error | Error before | TPOT measured | TPOT predicted | Error | Error before |
+|---|---|---|---|---|---|---|---|---|---|
+| 4 | 1 | 452.8 | 658.2 | +45 | +192 | 2.96 | 3.10 | +5 | +5 |
+| 4 | 2 | 413.4 | 602.3 | +46 | +153 | 3.26 | 3.50 | +7 | +8 |
+| 4 | 4 | 387.0 | 522.4 | +35 | +154 | 3.43 | 3.80 | +11 | +14 |
+| 4 | 8 | 388.9 | 598.8 | +54 | +155 | 4.14 | 5.15 | +24 | +27 |
+| 4 | 16 | 493.7 | 865.3 | +75 | +150 | 6.04 | 8.50 | +41 | +39 |
+| 4 | 32 | 446.5 | 1116.2 | +150 | +311 | 8.85 | 16.30 | +84 | +79 |
+| 4 | 64 | 1116.2 | 2673.3 | +139 | +212 | 19.46 | 36.75 | +89 | +86 |
+| 4 | 128 | 382024.9 | 1194036.6 | +213 | +213 | 34.54 | 97.67 | +183 | +182 |
+| 8 | 1 | 391.8 | 530.7 | +35 | +212 | 2.71 | 2.55 | -6 | -6 |
+| 8 | 2 | 342.9 | 447.4 | +30 | +166 | 2.94 | 2.76 | -6 | -6 |
+| 8 | 4 | 325.0 | 402.2 | +24 | +159 | 3.08 | 3.17 | +3 | +0 |
+| 8 | 8 | 314.4 | 419.0 | +33 | +182 | 3.65 | 3.79 | +4 | +2 |
+| 8 | 16 | 361.5 | 570.0 | +58 | +205 | 5.26 | 5.65 | +7 | +4 |
+| 8 | 32 | 359.0 | 761.0 | +112 | +336 | 7.94 | 9.99 | +26 | +20 |
+| 8 | 64 | 468.6 | 1063.8 | +127 | +400 | 16.89 | 22.91 | +36 | +32 |
+| 8 | 128 | 5025.1 | 6504.0 | +29 | +72 | 44.02 | 78.23 | +78 | +73 |
+
+What changed, and what it does not show:
+
+- **TTFT** fell from 204.5 % to 75.4 %. The cause is the Rust front end: with the variable unstated the engine admitted a prompt at
+  the Python server's per-token rate (2.67 us), and the replayed prompts are long (a mean of 290k tokens at one client), so each
+  request paid about 0.7 s of admission the run did not (774 ms against 77 ms at 290k tokens). At one client on 8 GPUs the
+  prediction fell from 1223 ms to 531 ms, 692 ms. The first dry run left the variable out; this one states it. The Rust rate is the
+  registry's, method `assumed` (a vendor speedup applied to the Python rate), and each point names it among its coefficient methods
+  (`coefficient_method:cost-model-host-overheads/host_admission_per_token_rust_frontend`). It is not a measurement, so the gain
+  is a consequence of an assumed rate and should not be read as the model having been fitted to this run.
+- **TPOT** is nearly unchanged (36.6 % to 38.1 %). It is equal within 0.2 ms at one client, where nothing queues, and drifts by a few
+  points at higher load, as expected when requests reach the engine earlier. TPOT is still over-predicted by 26 % to 89 % at 32 and 64
+  clients and by 78 % and 183 % at 128.
+- **TTFT** is still over-predicted at every concurrency, by 24 % to 54 % up to 8 clients, by 58 % and 75 % at 16 and by 112 % to 150 % at 32
+  and 64 clients, on both shapes. The causes this page named (prefix reuse in the run, `engram_config.cpu_offload` left unset) are still not tested.
+  At 128 clients on 4 GPUs both figures are of a saturated queue (382 s measured, 1194 s predicted) and say little.
+- The synthetic acceptance is a mean. The simulator accrues the mean each step, where vLLM accepts by position; they agree while
+  every draft is verified (blis-vllm's page says when they differ). The realised mean in the server log, 3.511, suggests they did.
+- The grade is G4 for the reason given under [Grade](#grade). The harness commit of the run is `c474b95c`; a later commit, `f7bb446`,
+  changes only which substitutions a point names (the Rust variable is read as true, not as the text "1", by the value-class check).
 
 ## Grade
 
