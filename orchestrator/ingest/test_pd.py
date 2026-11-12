@@ -130,20 +130,36 @@ def test_the_named_refusals_are_topology_unsupported_with_the_slug_as_subject():
 
 # ---------------------------------------------------------------- the endpoint picker configuration
 
-@pytest.mark.parametrize("policy,scorers", [("round-robin", set()), ("least-active-requests", {"active-request-scorer"}),
-                                            ("default", {"queue-scorer", "kv-cache-utilization-scorer", "prefix-cache-scorer"})])
-def test_each_policy_has_a_prefill_and_a_decode_profile_with_its_composition(policy, scorers):
-    doc = yaml.safe_load(pdm.epp_config(policy))
-    assert {p["type"] for p in doc["plugins"]} >= {"prefill-filter", "decode-filter", "max-score-picker", "disagg-profile-handler"}
-    assert {p["type"] for p in doc["plugins"] if p["type"].endswith("-scorer")} == scorers
-    assert [p["name"] for p in doc["schedulingProfiles"]] == ["prefill", "decode"]
-    for prof in doc["schedulingProfiles"]:
-        assert {x["pluginRef"] for x in prof["plugins"] if x["pluginRef"].endswith("-scorer")} == scorers
+OWNER = json.loads((HERE / "testdata" / "router-policies.json").read_text())      # the owner's output, at the pinned commit
 
 
-def test_a_policy_llm_d_does_not_offer_is_refused():
+def _rendered(policy):
+    return yaml.safe_load(pdm.epp_config(policy, OWNER))
+
+
+@pytest.mark.parametrize("policy", [p["policy"] for p in OWNER["policies"]])
+def test_the_file_written_for_a_policy_is_the_owners_configuration_of_it(policy):
+    cfg = next(p for p in OWNER["policies"] if p["policy"] == policy)["config"]
+    doc = _rendered(policy)
+    assert [p["type"] for p in doc["plugins"]] == [p["type"] for p in cfg["plugins"]]
+    assert [(p["name"], [(r["pluginRef"], r.get("weight")) for r in p["plugins"]]) for p in doc["schedulingProfiles"]] == \
+        [(p["name"], [(r["plugin"], r.get("weight")) for r in p["plugins"]]) for p in cfg["scheduling_profiles"]]
+    for plug in cfg["plugins"]:                        # every parameter is written, integers as integers
+        got = next(p for p in doc["plugins"] if p["type"] == plug["type"]).get("parameters", {})
+        for prm in plug.get("parameters") or []:
+            node = got
+            *path, leaf = prm["name"].split(".")
+            for k in path:
+                node = node[k]
+            assert node[leaf] == (int(prm["value"]) if prm.get("integer") else prm["value"])
+
+
+def test_a_policy_the_owner_does_not_list_is_refused():
     with pytest.raises(ValueError):
-        pdm.epp_config("random")
+        pdm.epp_config("random", OWNER)
+    shrunk = {**OWNER, "policies": [p for p in OWNER["policies"] if p["policy"] != "default"]}
+    with pytest.raises(ValueError):
+        pdm.epp_config("default", shrunk)                # a policy removed from the owner is no longer written
 
 
 # ---------------------------------------------------------------- the recipe
@@ -403,6 +419,7 @@ def _pd_point(tmp: Path, *, row=None, recipe_text=None, with_recipe=True, table=
     # table: the router table maps Dynamo's default mode (router_differs); False leaves the catalog's own, which has none here.
     recipe_text = RECIPE_FABRIC if recipe_text is None else recipe_text   # a stated fabric: the router bound's regime needs a recorded one
     entry, env = e2e._setup(tmp)
+    env.router_policies = OWNER
     pdir = tmp / "pull" / "points" / entry["point_id"]
     entry["row"].update({**ROW, **(row or {})})
     entry["measurements"] = [{"record": "1", "metrics": entry["row"]["metrics"]}]
@@ -469,7 +486,7 @@ def test_a_dp_free_row_is_written_as_two_pools_and_scored_with_the_instance_coun
         assert (mnbt(pre), mnbt(dec)) == (2048, 4096)                   # each pool's own, from the recipe
         assert dep["pd_transfer"] == {"connector": "NixlConnector"}
         assert dep["router"] == {"endpoint_picker_config": "pd-round-robin.epp.yaml"}
-        assert (sdir / "pd-round-robin.epp.yaml").read_text() == pdm.epp_config("round-robin")
+        assert (sdir / "pd-round-robin.epp.yaml").read_text() == pdm.epp_config("round-robin", OWNER)
         scen = next(d for d in yaml.safe_load_all(next(sdir.glob("p-*.yaml")).read_text()) if d["kind"] == "Scenario")
         assert scen["cluster"]["fabric"] == "ib-400g" and "cost-model-fabric" in scen["coefficients"]
         assert scen["cluster"]["nodes"] == 2

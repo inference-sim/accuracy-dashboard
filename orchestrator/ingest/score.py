@@ -118,6 +118,14 @@ class Env:
     # "a fallback category the user requested"); cli score --speculative-fallback-category. The point names it as an
     # `estimated` substitution on workload.category, and the run is experimental.
     speculative_fallback_category: str | None = None
+    # The router table's checked policy list (pd.load_owner_policies); read from the substrate checkout the catalog
+    # sits in the first time a prefill/decode point needs it, unless a caller supplies it.
+    router_policies: dict | None = None
+
+    def owner_policies(self) -> dict:
+        if self.router_policies is None:
+            self.router_policies = pdm.load_owner_policies(Path(self.catalog).resolve().parent)
+        return self.router_policies
 
     def simulator(self) -> dict:
         """The simulator block every point of this run records: its build and engine release."""
@@ -1376,7 +1384,7 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
     par = {"tp": dpar["tp"], "pp": dpar["pp"], "dp": dpar["dp"],
            "ep": dpar["tp"] * dpar["dp"] if dpar.get("enable_expert_parallel") else 1}
     par.update({f"{r}_{k}": v for r, p in pools.items() for k, v in (("workers", p.workers), ("tp", p.tp), ("ep", p.ep), ("dp", p.dp))})
-    run = PdRun(epp_name=pdm.epp_name(policy), epp_bytes=pdm.epp_config(policy).encode(), prefill=pools["prefill"].workers,
+    run = PdRun(epp_name=pdm.epp_name(policy), epp_bytes=pdm.epp_config(policy, env.owner_policies()).encode(), prefill=pools["prefill"].workers,
                 decode=pools["decode"].workers, parallelism=par, label=label,
                 client_note=pdm.benchmark_client_note(recipe), router=rrec)
     return score_single_turn(o, entry, env, work, b, header, name, dep, args, "", sup, pdir, simulate=simulate, pd_run=run)

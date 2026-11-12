@@ -5,44 +5,38 @@
 ## Contents
 
 1. [The rule](#the-rule)
-2. [What the owner states, what the dashboard still writes itself](#what-the-owner-states-what-the-dashboard-still-writes-itself)
-3. [The mechanical check](#the-mechanical-check)
-4. [What is missing in the owner](#what-is-missing-in-the-owner)
+2. [How the dashboard reads the owner](#how-the-dashboard-reads-the-owner)
+3. [What the owner states, and what it leaves to the deployment](#what-the-owner-states-and-what-it-leaves-to-the-deployment)
+4. [The mechanical check](#the-mechanical-check)
 
 ## The rule
 
-A router policy (`round-robin`, `random-picker`, `least-active-requests`, `default`) is a composition of llm-d's router
-plugins. The substrate's router table names the policy an entry maps a router to (`routertable.Policies()` in
-`contracts/spec/routertable/routertable.go` of blis-substrate), so the table, and not the dashboard, says what each
-policy is. The dashboard selects the policy the table names and writes the endpoint-picker configuration BLIS runs
-(`orchestrator/ingest/pd.py`, `epp_config`); it must not define a different policy under the owner's name (design X7).
+A router policy (`round-robin`, `random-picker`, `least-active-requests`, `default`) is a composition of llm-d's router plugins.
+The substrate's router table names the policy an entry maps a router to, and states the complete endpoint-picker configuration of
+each policy (`routertable.Policies()` in blis-substrate). The dashboard selects the policy the table names and renders that
+configuration (`orchestrator/ingest/pd.py`, `epp_config`); it defines no plugin, filter, weight, decider or parameter of its own
+(design X7).
 
-## What the owner states, what the dashboard still writes itself
+## How the dashboard reads the owner
 
-| Part of the configuration | Stated by the owner | Written by the dashboard |
-|---|---|---|
-| The list of policy names | yes (`Policies()`, closed) | no |
-| The plugin types of a policy (producer, scorers, picker) | yes, as one text per policy | from the text's meaning |
-| A scorer's weight | only for `default` (2, 2, 3) | `active-request-scorer` weight 1 |
-| The picker | yes | from the text |
-| The prefill and decode filters, `disagg-profile-handler`, `always-disagg-pd-decider` | no | yes |
-| The producers' parameters (`approx-prefix-cache-producer`: 16384 tokens, 31250 entries per server) | no | yes |
-| Which file of llm-d's router defines each policy | yes (`Sources`) | no |
+`go run ./tools/prcheck router-policies`, run in the blis-substrate checkout the catalog sits in, prints
+`{"closed_policies": [...], "policies": [...]}` and exits non-zero, naming the problems, when the owner's list fails its own check.
+`pd.load_owner_policies` runs it the first time a prefill/decode point needs a file; `epp_config(policy, owner)` renders the
+configuration of the named policy and refuses a policy the owner does not list. The unit tests use a snapshot of the owner's output
+(`orchestrator/ingest/testdata/router-policies.json`), which the owner check compares with the live owner.
+
+## What the owner states, and what it leaves to the deployment
+
+Each parameter and weight carries an origin: `source` (the router's code or README states it), `sample` (the router's own sample
+deployment sets it; the router's default is another value, named in the owner's claim: `maxPrefixTokensToMatch` is 16384 in the
+sample, 131072 by default), or `not-stated` (the router's source does not state it for the policy; the value is what BLIS's
+prefill/decode deployments use). The dashboard renders every value. A `not-stated` value, today the choice of the prefill decider
+(`always-disagg-pd-decider`) for every policy, is a choice of the deployment and not the router's; it is reported as that here and
+not as the router's behaviour.
 
 ## The mechanical check
 
-`orchestrator/ingest/test_pd_policy_owner.py` reads `Policies()` from a substrate checkout (`BLIS_SUBSTRATE_ROUTER_BOUNDS`;
-the `simulator` job of `checks` fetches the pinned commit) and fails when the configuration the dashboard writes for a
-policy differs from what the owner states: a policy the dashboard cannot write, a scorer the owner does not name, a plugin
-the owner names that is missing, a different weight, or a different picker. Changing the weight of one scorer in `pd.py`
-makes it fail. Without a checkout it is skipped with the reason.
-
-## What is missing in the owner
-
-The owner's interface carries the composition as a sentence, not as a configuration. For the dashboard to select and not
-write, the owner should publish, for each policy, the complete endpoint-picker configuration it runs: every plugin with its
-parameters, the scorer weights, the picker, and for a prefill/decode deployment the filters, the profile handler and the
-decider. The natural place is the substrate's router catalog (`catalog/routers/`, beside the entries that name the
-policies), generated from llm-d's router fork at the pinned commit that `Sources` already cites, with a check that fails
-when the fork changes. The dashboard would then copy a file, and `epp_config` would be removed. Until the owner publishes
-it, the filters, the decider and the parameters are the dashboard's copy and are not checked.
+`orchestrator/ingest/test_pd_policy_owner.py` reads the owner from the checkout (`BLIS_SUBSTRATE_ROUTER_BOUNDS`; the `simulator` job
+of `checks` fetches the pinned commit) and fails when the owner's closed list is not the four policies the dashboard writes (a policy
+removed or added), when the file written for a policy differs from the owner's configuration, or when the snapshot the unit tests use
+differs from the live owner. A test removes each policy from the owner's output in turn and requires the check to fail.

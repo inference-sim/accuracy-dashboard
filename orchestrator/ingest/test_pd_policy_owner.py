@@ -1,22 +1,19 @@
-"""The endpoint-picker configuration the dashboard writes for a router policy is the policy its owner defines.
+"""The endpoint-picker file the dashboard writes for a router policy is the router table's, read from its owner.
 
-The owner of the policy list and of each policy's composition is blis-substrate's router table
-(`routertable.Policies()`: the name, the plugin types and the scorer weights it states). The dashboard selects a
-policy by name and writes the configuration file BLIS runs (pd.epp_config); it must not define a different policy
-under the owner's name. This check reads the owner's list from a substrate checkout (BLIS_SUBSTRATE_ROUTER_BOUNDS,
-the layer the `simulator` job of `checks` fetches) and fails when what the dashboard writes differs from what the
-owner states: a policy the dashboard cannot write, a plugin the owner does not name, a plugin the owner names that is
-missing, a scorer weight that differs, or a different picker.
-
-What the owner does not state (the filters, the decider, the producers' parameters, a weight it leaves out) is not
-checked here; it is a gap in the owner's interface, listed in docs/m2/policy-table-owner.md.
+The owner is blis-substrate's router table: `go run ./tools/prcheck router-policies` prints its checked policy list with the
+complete configuration of each policy. The dashboard selects a policy by name and renders that configuration (pd.epp_config);
+it defines no plugin, filter, weight, decider or parameter of its own. This check reads the owner from a substrate checkout
+(BLIS_SUBSTRATE_ROUTER_BOUNDS; the `simulator` job of `checks` fetches the pinned commit) and fails when: the owner's closed
+list is not the policies the dashboard writes (a policy removed or added), the file written for a policy differs from the
+owner's configuration, or the committed snapshot the unit tests use differs from the live owner.
 
 Run: BLIS_SUBSTRATE_ROUTER_BOUNDS=<substrate checkout> python3 -m pytest orchestrator/ingest/test_pd_policy_owner.py
 """
 from __future__ import annotations
 
+import json
 import os
-import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -27,63 +24,48 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import pd as pdm  # noqa: E402
 
-OWNER = os.environ.get("BLIS_SUBSTRATE_ROUTER_BOUNDS")
-GO = Path(OWNER or "x") / "contracts" / "spec" / "routertable" / "routertable.go"
-pytestmark = pytest.mark.skipif(not GO.is_file(), reason="BLIS_SUBSTRATE_ROUTER_BOUNDS (a blis-substrate checkout with the router table) is needed")
+OWNER_DIR = os.environ.get("BLIS_SUBSTRATE_ROUTER_BOUNDS")
+pytestmark = pytest.mark.skipif(not OWNER_DIR, reason="BLIS_SUBSTRATE_ROUTER_BOUNDS (a blis-substrate checkout) is not set")
 
-PICKERS = {"max-score-picker", "random-picker"}
+WRITTEN = {"round-robin", "random-picker", "least-active-requests", "default"}      # the policies the dashboard writes
 
 
-def owner_policies() -> dict[str, dict]:
-    """{policy: {"plugins": [type, ...], "weights": {type: weight}}} as `Policies()` states them."""
-    src = GO.read_text()
-    body = src[src.index("func Policies()"):src.index("func PolicyNames()")]
-    consts = dict(re.findall(r"(Policy\w+)\s+Policy\s*=\s*\"([a-z-]+)\"", src))
-    out = {}
-    for const, text in re.findall(r"\{(Policy\w+),\s*\"([^\"]*)\"", body):
-        plugins, weights = [], {}
-        for item in (i.strip() for i in text.split(";")):
-            if not item or item.startswith("no scorer"):
-                continue
-            m = re.fullmatch(r"([a-z-]+)(?: \((\d+)\))?", item)
-            assert m, f"the owner's composition {text!r} has an item this check cannot read: {item!r}"
-            plugins.append(m.group(1))
-            if m.group(2):
-                weights[m.group(1)] = int(m.group(2))
-        out[consts[const]] = {"plugins": plugins, "weights": weights}
+@pytest.fixture(scope="module")
+def owner():
+    assert shutil.which("go"), "a Go toolchain is needed to read the owner's list"
+    return pdm.load_owner_policies(Path(OWNER_DIR))
+
+
+def problems(owner: dict) -> list[str]:
+    out = []
+    if set(owner["closed_policies"]) != WRITTEN:
+        out.append(f"the owner's closed list {sorted(owner['closed_policies'])} is not the policies written {sorted(WRITTEN)}")
+    listed = {p["policy"] for p in owner["policies"]}
+    for policy in sorted(WRITTEN):
+        if policy not in listed:
+            out.append(f"{policy}: the owner states no configuration")
+            continue
+        try:
+            doc = yaml.safe_load(pdm.epp_config(policy, owner))
+        except ValueError as e:
+            out.append(str(e))
+            continue
+        cfg = next(p for p in owner["policies"] if p["policy"] == policy)["config"]
+        if [p["type"] for p in doc["plugins"]] != [p["type"] for p in cfg["plugins"]]:
+            out.append(f"{policy}: the plugins written differ from the owner's")
     return out
 
 
-def written(policy: str) -> dict:
-    doc = yaml.safe_load(pdm.epp_config(policy))
-    types = [p["type"] for p in doc["plugins"]]
-    weights, pickers = {}, set()
-    for prof in doc["schedulingProfiles"]:
-        for ref in prof["plugins"]:
-            if ref["pluginRef"] in PICKERS:
-                pickers.add(ref["pluginRef"])
-            elif "weight" in ref:
-                weights.setdefault(ref["pluginRef"], set()).add(ref["weight"])
-    return {"types": types, "weights": weights, "pickers": pickers}
+def test_the_dashboard_writes_what_the_owner_states(owner):
+    assert problems(owner) == []
 
 
-def test_the_dashboard_writes_exactly_the_policies_the_owner_offers():
-    owned = owner_policies()
-    assert owned, "the owner's list could not be read"
-    for policy in owned:
-        pdm.epp_config(policy)                       # raises for a policy the dashboard cannot write
-    # and no policy the owner does not offer is written
-    with pytest.raises(ValueError):
-        pdm.epp_config("not-a-policy")
+def test_a_policy_removed_from_the_owner_fails_the_check(owner):
+    for gone in sorted(WRITTEN):
+        shrunk = {"closed_policies": [p for p in owner["closed_policies"] if p != gone],
+                  "policies": [p for p in owner["policies"] if p["policy"] != gone]}
+        assert problems(shrunk), gone
 
 
-def test_each_policy_has_the_owners_plugins_scorers_weights_and_picker():
-    for policy, own in owner_policies().items():
-        got = written(policy)
-        stated_scorers = {p for p in own["plugins"] if p.endswith("-scorer")}
-        assert {t for t in got["types"] if t.endswith("-scorer")} == stated_scorers, policy
-        for plugin in own["plugins"]:
-            assert plugin in got["types"], (policy, plugin)
-        for plugin, weight in own["weights"].items():
-            assert got["weights"].get(plugin) == {weight}, (policy, plugin)
-        assert got["pickers"] == {p for p in own["plugins"] if p in PICKERS}, policy
+def test_the_snapshot_the_unit_tests_use_is_the_owners_output(owner):
+    assert json.loads((HERE / "testdata" / "router-policies.json").read_text()) == owner
