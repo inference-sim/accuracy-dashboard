@@ -743,26 +743,77 @@ def decide(settings: dict[str, Setting], field_list, part: str | None = None, fa
 
 # A scenario of more than one node needs a fabric class (the cluster states it) and the registry's
 # fabric efficiency: without cost-model-fabric the kernel prices a handoff or cross-node collective at
-# the catalog's nominal rate, 23% fast on ib-400g. No InferenceX record names the
-# fabric class of a cluster (runners.yaml and the launch configuration hold none), so the class is
-# assumed and the point names it.
+# the catalog's nominal rate, 23% fast on ib-400g. The class belongs to the user's scenario (design 2.2,
+# SUB-3). No launch configuration, recipe or runners.yaml of InferenceX names it (runners.yaml lists RDMA
+# devices, ports and the GID index of a cluster, not InfiniBand against Ethernet nor a line rate; the
+# srt-slurm recipes set UCX_TLS and NCCL_SOCKET_IFNAME). A class a record states is used as recorded. Otherwise
+# the point carries an `estimated` substitution naming how the class was chosen, from this order:
+#   1. the fabric InferenceX publishes for the chip SKU (DOCUMENTED_FABRIC), cited on the point;
+#   2. the default class, for a chip nothing documents.
+# THE SWITCH. FABRIC_WHEN_UNRECORDED = "refuse" makes the point G5 value_not_recorded:cluster.fabric instead.
 FABRIC_COEFFICIENT = "cost-model-fabric"
+FABRIC_WHEN_UNRECORDED = "assume"          # "assume" (labelled, cited) or "refuse" (G5 value_not_recorded:cluster.fabric)
+FABRIC_SUBJECT = "cluster.fabric"
 DEFAULT_ASSUMED_FABRIC = "ib-400g"
-# The assumed class follows the chip generation's NIC: ConnectX-8 (800 Gb/s) on b300 and gb300,
-# ConnectX-7 (400 Gb/s) on the others the catalog names. An unknown chip keeps the default.
-ASSUMED_FABRIC_BY_CHIP = {"b300": "ib-800g", "gb300": "ib-800g"}
-_NIC_NOTE = {"ib-800g": "the chip's ConnectX-8 NIC is 800 Gb/s; the catalog's ib-800g efficiency is the ib-400g value "
-                        "carried over (assumed, not measured)"}
+# What InferenceX documents about its scale-out network per chip SKU: the "Chip Specifications & Comparison" page, columns
+# "Scale-out BW per chip", "Scale-out tech" and "NIC". Fetched 2026-11-12 (sha256 of the HTML below); the page carries no revision.
+DOCUMENTATION = ("https://inferencex.semianalysis.com/gpu-specs (fetched 2026-11-12, sha256 "
+                 "f9ca3c284ebe0c7c8489611996f22ffcedd8fba562b55106f61f1e29a7ab25d8)")
+# chip -> (the documented technology, the documented line rate per chip in Gb/s, the NIC). The page lists the MI300X class
+# too; the catalog names none of them, so they are here only so a later catalog part finds its entry.
+DOCUMENTED_FABRIC = {
+    "h100": ("RoCEv2 Ethernet", 400, "ConnectX-7 2x200GbE"),
+    "h200": ("InfiniBand NDR", 400, "ConnectX-7 400G"),
+    "b200": ("gIB RoCEv2 Ethernet", 400, "ConnectX-7 400GbE"),
+    "b300": ("RoCEv2 Ethernet", 800, "ConnectX-8 2x400GbE"),
+    "gb200-nvl72": ("InfiniBand NDR", 400, "ConnectX-7 400G"),
+    "gb300": ("InfiniBand XDR", 800, "ConnectX-8 800G"),
+    "mi300x": ("RoCEv2 Ethernet", 400, "Pollara 400GbE"),
+    "mi325x": ("RoCEv2 Ethernet", 400, "Pollara 400GbE"),
+    "mi355x": ("RoCEv2 Ethernet", 400, "Pollara 400GbE"),
+}
+# The catalog's fabric classes by (technology family, line rate Gb/s): networks/ib-400g, ib-800g (InfiniBand). A documented
+# fabric of another family at the same line rate (RoCE 400G, 800G) has no class of its own yet (blis-substrate#50/#51).
+CATALOG_FABRIC = {("InfiniBand", 400): "ib-400g", ("InfiniBand", 800): "ib-800g"}
+_EFFICIENCY_NOTE = ("the registry's fabric efficiency for the class is the ib-400g value carried over (assumed, not measured)")
 
 
 def assumed_fabric(hardware: str | None) -> tuple[str, dict]:
-    """The fabric class assumed for a chip when no source records one, and the substitution that names it."""
-    cls = ASSUMED_FABRIC_BY_CHIP.get(hardware or "", DEFAULT_ASSUMED_FABRIC)
-    why = _NIC_NOTE.get(cls, "the class of the chip generation's 400 Gb/s NIC, and the catalog's default")
+    """The fabric class a chip gets when no record states one, and the `estimated` substitution that names it. The fabric
+    InferenceX documents for the chip is cited; a chip it does not document gets the default class."""
+    doc = DOCUMENTED_FABRIC.get(hardware or "")
+    if doc is None:
+        cls = DEFAULT_ASSUMED_FABRIC
+        why = (f"no source documents the fabric of a {hardware or 'unnamed'} cluster, so the default class {cls} is assumed; the "
+               f"real fabric may be slower or faster, and the class sets the nominal cross-node rate")
+    else:
+        tech, gbps, nic = doc
+        family = "InfiniBand" if tech.startswith("InfiniBand") else "RoCE"
+        exact = CATALOG_FABRIC.get((family, gbps))
+        cls = exact or CATALOG_FABRIC[("InfiniBand", gbps)]
+        if family == "InfiniBand":
+            why = (f"documented by InferenceX: {tech}, {gbps} Gb/s per chip, {nic} ({DOCUMENTATION}); the catalog class {cls} is that "
+                   f"fabric{'; ' + _EFFICIENCY_NOTE if cls == 'ib-800g' else ''}")
+        else:
+            why = (f"documented by InferenceX: {tech}, {gbps} Gb/s per chip, {nic} ({DOCUMENTATION}); the catalog has no RoCE class "
+                   f"of that rate, so {cls}, the class of the same line rate, stands in (assumed, labelled): the nominal rate is the "
+                   f"documented one, and the RoCE efficiency is not measured, so the registry's {cls} value is carried over")
     return cls, {
-        "kind": "estimated", "subject": "cluster.fabric",
-        "detail": f"the run's inter-node fabric class is recorded by no source; {cls} is assumed ({why}), so a "
-                  f"cross-node transfer is priced at that class's nominal rate times the registry's fabric efficiency"}
+        "kind": "estimated", "subject": FABRIC_SUBJECT,
+        "detail": f"the run's inter-node fabric class is recorded by no launch configuration or recipe; {cls} is assumed ({why}), "
+                  f"so a cross-node transfer is priced at that class's nominal rate times the registry's fabric efficiency"}
+
+
+def fabric_for(recorded: str | None, hardware: str | None) -> tuple[str | None, list[dict], list[str]]:
+    """The fabric class of a multi-node cluster, the substitutions that name how it was found, and the G5 reasons.
+    A recorded class is used as recorded. Otherwise FABRIC_WHEN_UNRECORDED decides: assume (the documented or default class and
+    its named substitution) or refuse (no class, the reason value_not_recorded:cluster.fabric)."""
+    if recorded:
+        return recorded, [], []
+    if FABRIC_WHEN_UNRECORDED == "assume":
+        cls, sub = assumed_fabric(hardware)
+        return cls, [sub], []
+    return None, [], [f"value_not_recorded:{FABRIC_SUBJECT}"]
 
 
 def recorded_fabric(launch: dict | None) -> str | None:
@@ -893,12 +944,12 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
     pool["nodes"] = cluster["nodes"]
     coefficients = list(COEFFICIENTS)
     if cluster["nodes"] > 1:
-        recorded = recorded_fabric(launch_config)
-        assumed, assumed_sub = assumed_fabric(cluster["hardware"])
-        cluster["fabric"] = recorded or assumed
-        coefficients.append(FABRIC_COEFFICIENT)
-        if recorded is None:
-            b.substitutions.append(assumed_sub)
+        fabric, fabric_subs, fabric_reasons = fabric_for(recorded_fabric(launch_config), cluster["hardware"])
+        b.substitutions.extend(fabric_subs)
+        b.reasons.extend(fabric_reasons)
+        if fabric is not None:
+            cluster["fabric"] = fabric
+            coefficients.append(FABRIC_COEFFICIENT)
     b.scenario = {"kind": "Scenario", "name": name, "engine_version": engine_version.lstrip("v"),
                   "model": model, "coefficients": coefficients, "cluster": cluster}
     if names_are_vllms(field_list):

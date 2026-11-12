@@ -122,6 +122,7 @@ def emit(dep: dict, labels: set[str], packaging: dict, engine_release: str) -> s
     ranks = tp * dp
     per_node = node_size(dep, packaging)
     nodes = max(1, -(-ranks // per_node))
+    fabric = st.fabric_for(None, dep["gpu"])[0] if nodes > 1 else None
     quant = QUANT[dep["precision"]]
     stated = dep.get("stated_config", {})
     # Each engine setting below is written only when the run stated it; an unstated one is left
@@ -176,7 +177,7 @@ def emit(dep: dict, labels: set[str], packaging: dict, engine_release: str) -> s
         f'  version: "{engine_release}"',
         "",
         f"model: {dep['model']}",
-        f"coefficients: {COEFFICIENTS_MULTINODE if nodes > 1 else COEFFICIENTS}",
+        f"coefficients: {COEFFICIENTS_MULTINODE if nodes > 1 and fabric is not None else COEFFICIENTS}",
         "",
         # The hardware inventory lives inside the cluster: it is what the problem is
         # handed and a deployment cannot change it.
@@ -184,10 +185,14 @@ def emit(dep: dict, labels: set[str], packaging: dict, engine_release: str) -> s
         f"  hardware: {dep['gpu']}",
     ]
     if nodes > 1:
-        # No InferenceX record names a cluster's fabric class: the chip generation's NIC class is ASSUMED.
-        fabric, _ = st.assumed_fabric(dep["gpu"])
-        lines.append(f"  # fabric: ASSUMED. No record names this cluster's fabric class; {fabric} is the class of the chip's NIC.")
-        lines.append(f"  fabric: {fabric}")
+        # No InferenceX record names a cluster's fabric class (settings.fabric_for): by default none is written
+        # and the file says so (the scorer then reads it as value_not_recorded, X19); under the maintainer's
+        # switch the chip generation's NIC class is ASSUMED and written.
+        if fabric is None:
+            lines.append("  # fabric: NOT WRITTEN. No record names this cluster's fabric class (value_not_recorded:cluster.fabric).")
+        else:
+            lines.append(f"  # fabric: ASSUMED. No record names this cluster's fabric class; {fabric} is the class of the chip's NIC.")
+            lines.append(f"  fabric: {fabric}")
     lines.append(f"  nodes: {nodes}")
     if packaging["gpus_per_node"] is None:
         lines.append(f"  gpus_per_node: {per_node}")
