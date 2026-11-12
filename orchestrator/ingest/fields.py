@@ -33,7 +33,77 @@ _CLASS_KEYS = {"type", "covered", "values", "thresholds", "covered_classes"}
 _THRESHOLD_KEYS = {"value", "closed"}
 CLASS_TYPES = ("boolean", "enumerated", "numeric")
 _EVIDENCE_KEYS = {"traces", "proof", "issue", "note"}
-_ESTIMATION_KEYS = {"rule", "setting", "reason"}
+_ESTIMATION_KEYS = {"rule", "setting", "reason", "preserves", "valid_when"}
+
+
+
+_CLAUSE_LISTS = ("value_in", "value_list_has_any", "value_list_has_none", "value_not_prefixed")
+_CLAUSE_KEYS = set(_CLAUSE_LISTS) | {"tp_group_nodes", "compute_capability"}
+_COMPARISONS = ("eq", "gt", "gte", "lt", "lte")
+
+
+def _check_valid_when(est: dict, where: str) -> None:
+    """preserves and valid_when state when a stand-in is exact (design 11.2): only a rule with a stand-in has them, valid_when
+    needs the sentence `preserves` and at least one clause, and a clause sets at least one known key."""
+    if "preserves" not in est and "valid_when" not in est:
+        return
+    if est.get("rule") not in (LEAVE_UNSET, SUBSTITUTE):
+        raise FieldsError(f"{where}.estimation: preserves and valid_when only with rule leave_unset or substitute")
+    if "valid_when" in est:
+        vw = est["valid_when"]
+        if not est.get("preserves") or not isinstance(vw, list) or not vw:
+            raise FieldsError(f"{where}.estimation: valid_when needs a preserves sentence and at least one clause")
+        for i, c in enumerate(vw):
+            if not isinstance(c, dict) or not c or set(c) - _CLAUSE_KEYS:
+                raise FieldsError(f"{where}.estimation.valid_when[{i}]: a clause sets at least one of {sorted(_CLAUSE_KEYS)}")
+
+
+def _capability(s):
+    import re
+    m = re.fullmatch(r"([0-9]+)\.([0-9]+)", str(s).strip())
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def _compare(cmp: dict, have, parse) -> bool:
+    ok = {"eq": lambda r: r == 0, "gt": lambda r: r > 0, "gte": lambda r: r >= 0, "lt": lambda r: r < 0, "lte": lambda r: r <= 0}
+    for k, want in cmp.items():
+        w = parse(want)
+        if k not in ok or w is None or not ok[k]((have > w) - (have < w)):
+            return False
+    return True
+
+
+def exact(estimation: dict, facts: dict) -> bool:
+    """Whether the estimation rule's stand-in is exact for a recorded value: the substrate's evaluator
+    (contracts/spec/fields Exact), ported. Never exact for a rule without a stand-in; exact for every value when valid_when is
+    absent; else exact when at least one clause holds. `facts`: value (any case, untrimmed), tp_group_nodes (int), compute_capability
+    ("major.minor"); a fact left out makes a clause that needs it false."""
+    if estimation.get("rule") not in (LEAVE_UNSET, SUBSTITUTE):
+        return False
+    clauses = estimation.get("valid_when")
+    if clauses is None:
+        return True
+    v = str(facts.get("value", "")).strip().lower()
+    fold = lambda s: str(s).strip().lower()
+    items = {i.strip() for i in v.split(",") if i.strip()}
+    nodes, cap = facts.get("tp_group_nodes"), _capability(facts.get("compute_capability", ""))
+
+    def holds(c: dict) -> bool:
+        if "value_in" in c and v not in {fold(s) for s in c["value_in"]}:
+            return False
+        if "value_list_has_any" in c and not any(fold(s) in items for s in c["value_list_has_any"]):
+            return False
+        if "value_list_has_none" in c and any(fold(s) in items for s in c["value_list_has_none"]):
+            return False
+        if any(v.startswith(fold(p)) for p in c.get("value_not_prefixed", ())):
+            return False
+        if "tp_group_nodes" in c and (not isinstance(nodes, int) or isinstance(nodes, bool)
+                                       or not _compare(c["tp_group_nodes"], nodes, lambda x: x if isinstance(x, int) else None)):
+            return False
+        if "compute_capability" in c and (cap is None or not _compare(c["compute_capability"], cap, _capability)):
+            return False
+        return True
+    return any(holds(c) for c in clauses)
 
 
 class FieldsError(ValueError):
@@ -180,6 +250,7 @@ def parse(data: bytes | str) -> FieldList:
                 raise FieldsError(f"{where}.estimation: setting and reason only with rule 'substitute'")
         else:
             raise FieldsError(f"{where}.estimation.rule: must be one of leave_unset, substitute, none, got {rule!r}")
+        _check_valid_when(est, where)
         key = (name, source)
         if prev is not None and not prev < key:
             raise FieldsError(f"{where}: out of order or repeated: {key} must sort after {prev}")

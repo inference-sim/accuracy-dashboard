@@ -728,7 +728,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     part_name = (sp.catalog_part(env.catalog_obj, env.parts, row["hardware"]) if env.catalog_obj else None) \
         or row["hardware"]
     defaults = st.defaults_for(o.banner, env.vllm_defaults, env.vllm_defaults_release)
-    c = st.decide(st.merge(readings, defaults), env.field_list, part_name)
+    c = st.decide(st.merge(readings, defaults), env.field_list, part_name, _facts_of(env, part_name, st.recorded_node_size(launch)))
     o.reasons += c.reasons
     o.subs = recovery + list(c.substitutions)
     o.reasons += row_vs_run(row, c)
@@ -1217,6 +1217,21 @@ def _router_config_refusal(o: Outcome, router_name: str | None, e: "pdm.PolicyCo
     return o
 
 
+def _facts_of(env: Env, part_name: str, launch_size):
+    """The facts a stand-in's validity is judged on for this part: its GPUs per node (the catalog's packaging, else the launch
+    configuration's) and its compute capability (the catalog's hardware entry)."""
+    import stand_in_facts as sif
+    cat = env.catalog_obj
+    gpn = launch_size
+    if cat is not None:
+        try:
+            gpn = cat.packaging(part_name).get("gpus_per_node") or launch_size
+        except (KeyError, ValueError, OSError):
+            pass
+    cap = sif.compute_capability(cat.root, part_name) if cat is not None else None
+    return sif.facts_of(gpn, cap)
+
+
 def aggregated_recipe(entry: dict, pdir: Path) -> "pdr.Recipe | None":
     """The aggregated recipe the pull kept for a colocated multi-node row, or None (not multi-node, no
     recipe frozen, or a recipe of prefill/decode pools)."""
@@ -1293,7 +1308,7 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
     for role, pool in pools.items():
         launches[role] = pdm.pseudo_launch(recipe, role, row, pool)
         rd, taken[role] = pdm.read_pool(launches[role])
-        c = st.decide(st.merge({"launch_config": rd}, {}), env.field_list, part_name)
+        c = st.decide(st.merge({"launch_config": rd}, {}), env.field_list, part_name, _facts_of(env, part_name, recipe.gpus_per_node))
         decided[role] = c
         o.reasons += c.reasons
         o.subs += c.substitutions
