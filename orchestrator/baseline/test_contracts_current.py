@@ -82,3 +82,23 @@ def test_the_check_sees_a_changed_scorer_file_and_ignores_tests_and_docs(tmp_pat
         raise SystemExit("a harness commit outside the history must raise")
     except AssertionError as e:
         assert "not in this clone" in str(e)
+
+
+def test_moving_an_upstream_pin_does_not_make_a_contract_stale(tmp_path):
+    """The upstream builds (inference-sim, blis-substrate, the router fork) are pinned in .github/stack-pins.env, which
+    is not a scorer file: replacing a commit by the release tag at that content is a pin-only change."""
+    pins = ".github/stack-pins.env"
+    listed = git(ROOT, "ls-files", "--", *SCORER_PATHS, *NOT_THE_SCORER).stdout.split()
+    assert (ROOT / pins).is_file() and pins not in listed
+    assert not [f for f in listed if f.startswith("harness/") and "SIM_" in (ROOT / f).read_text()], "a simulator pin in a scorer file"
+    git(tmp_path, "init", "-q")
+    for rel in ("orchestrator/ingest/score.py", pins):
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text("SIM_REF=" + "a" * 40 + "\n")
+    git(tmp_path, "add", "-A")
+    commit = lambda m: (git(tmp_path, "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-qm", m),
+                        git(tmp_path, "rev-parse", "HEAD").stdout.strip())[1]
+    base = commit("scored")
+    (tmp_path / pins).write_text("SIM_REF=v0.17.0\n")
+    git(tmp_path, "add", "-A")
+    assert scorer_changes(tmp_path, base, commit("pin to the tag")) == []
