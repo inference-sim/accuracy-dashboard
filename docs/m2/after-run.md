@@ -32,8 +32,8 @@ At the tags, change exactly these lines, and no other:
 
 | File | Line | From | To |
 |---|---|---|---|
-| `.github/stack-pins.env` | `SIM_REF=` | `a8bc3085a7c91c50a1d92862943a695c04adfe11` | inference-sim's release tag |
-| `.github/stack-pins.env` | `ROUTER_REF=` | `2a886db5d1be70aa2ae18a7dbed81f5e1cdbd1f8` | the router fork's tag, if one is cut |
+| `.github/stack-pins.env` | `SIM_REF=` | `a8bc3085a7c91c50a1d92862943a695c04adfe11` | `v0.17.0` (done; it differs from that commit by the pin-only commits that moved blis-vllm and the router to their tags) |
+| `.github/stack-pins.env` | `ROUTER_REF=` | `2a886db5d1be70aa2ae18a7dbed81f5e1cdbd1f8` | `v1.0.0-blis.4` (done) |
 | `.github/stack-pins.env` | `SUBSTRATE_REF=` | `965b05834c47882bc0f9f1a960c90327a756ef3d` | `v0.14.0` (the same commit; already done) |
 | `docs/m2/h200-v033/pins.env` | `BLIS_SUBSTRATE_COMMIT=` | `965b05834c47882bc0f9f1a960c90327a756ef3d` | unchanged: it is the commit of the tag `v0.14.0` |
 | this page, `docs/reproducing.md`, `docs/m2/pd-coverage.md`, the READMEs of the runs | the inference-sim commit in the pin tables and in the example commands | `a8bc3085...` | the tag, with the commit it names |
