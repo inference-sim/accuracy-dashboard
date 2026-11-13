@@ -9,13 +9,13 @@ IN-SAMPLE: the points are the ones the model was calibrated on or tuned against;
 - pull manifest sha256 `c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166`
 - point set sha256 `6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60` (1734 points)
 
-Simulator `81a46ba3e0b14ba828eaa46d21191d03dd17376f`, engine {'kind': 'vllm', 'version': '0.32.0'}, fields sha256 `7432f9f82bf551027233a3aae2387fc585408d77d1c44941d037217aed890f1a`.
+Simulator `a8bc3085a7c91c50a1d92862943a695c04adfe11`, engine {'kind': 'vllm', 'version': '0.32.0'}, fields sha256 `62743b57746f8376b291fdb853eb0eb19edacc5d717e1e7107d6e0f3ed41348d`.
 
 ## Headline (G1 to G4)
 
 | Points | TTFT MAPE % | TTFT shape % | TPOT MAPE % | TPOT shape % | Noise floor % |
 |---|---|---|---|---|---|
-| 520 | 27.8 (n=520) | 17.9 (n=353) | 19.8 (n=520) | 15.9 (n=353) | 1.6 (fallback; none measured per point) |
+| 520 | 27.4 (n=520) | 17.6 (n=353) | 19.7 (n=520) | 15.8 (n=353) | 1.6 (fallback; none measured per point) |
 
 ## By grade
 
@@ -26,7 +26,7 @@ Simulator `81a46ba3e0b14ba828eaa46d21191d03dd17376f`, engine {'kind': 'vllm', 'v
 | G1 | 0 | too few points | too few points | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
 | G2 | 0 | too few points | too few points | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
 | G3 | 0 | too few points | too few points | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
-| G4 | 795 | 45.8% | 100.0% | 27.8 (n=520) | 17.9 (n=353) | 19.8 (n=520) | 15.9 (n=353) |
+| G4 | 795 | 45.8% | 100.0% | 27.4 (n=520) | 17.6 (n=353) | 19.7 (n=520) | 15.8 (n=353) |
 | G5 | 836 | 48.2% | - | - | - | - | - |
 | failed | 103 | | | | | | |
 
@@ -37,7 +37,7 @@ Simulator `81a46ba3e0b14ba828eaa46d21191d03dd17376f`, engine {'kind': 'vllm', 'v
 | aggregated | G1 | 0 | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
 | aggregated | G2 | 0 | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
 | aggregated | G3 | 0 | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) |
-| aggregated | G4 | 520 | 27.8 (n=520) | 17.9 (n=353) | 19.8 (n=520) | 15.9 (n=353) |
+| aggregated | G4 | 520 | 27.4 (n=520) | 17.6 (n=353) | 19.7 (n=520) | 15.8 (n=353) |
 
 ## Development split
 
@@ -47,8 +47,8 @@ Assignment: sha256 of the salt `blis-dev-split-2` and the series, mod 100; train
 
 | Split | Points | In scope | Scored | Series | Grades | TTFT MAPE % | TTFT shape % | TPOT MAPE % | TPOT shape % | Ranking (groups; Spearman, top-1, regret) |
 |---|---|---|---|---|---|---|---|---|---|---|
-| train | 956 | 626 | 367 | 33 | G4 367, G5 535, failed 54 | 28.4 (n=367) | 16.4 (n=274) | 19.4 (n=367) | 16.1 (n=274) | 17; 0.97, 0.71, 0.05 |
-| validation | 332 | 220 | 153 | 9 | G4 153, G5 179 | 26.5 (n=153) | 23.2 (n=115) | 20.7 (n=153) | 14.5 (n=115) | 7; too few groups, too few groups, too few groups |
+| train | 956 | 626 | 367 | 33 | G4 367, G5 535, failed 54 | 27.8 (n=367) | 15.9 (n=274) | 19.3 (n=367) | 15.9 (n=274) | 17; 0.97, 0.71, 0.05 |
+| validation | 332 | 220 | 153 | 9 | G4 153, G5 179 | 26.4 (n=153) | 23.2 (n=115) | 20.7 (n=153) | 14.4 (n=115) | 7; too few groups, too few groups, too few groups |
 | test | 446 | | | | withheld: evaluate with `--evaluate-test`, which logs the evaluation | | | | | |
 | prospective | 0 | | | | withheld: evaluate with `--evaluate-test`, which logs the evaluation | | | | | |
 | unassigned | 0 | 0 | 0 | 0 |  | too few points (n=0) | too few points (n=0) | too few points (n=0) | too few points (n=0) | 0; too few groups, too few groups, too few groups |
@@ -131,7 +131,6 @@ Blocks: in-scope points held at G5 by the blocker. Alone: points that would be s
 | `coefficient_method:cost-model-memory/activation_scratch_floor_bytes` | 0 | 0 | 795 |
 | `coefficient_method:cost-model-primitives/engine_workspace_bytes` | 0 | 0 | 795 |
 | `coefficient_method:cost-model-primitives/hbm_derate` | 0 | 0 | 795 |
-| `estimated:gpu_memory_utilization` | 0 | 0 | 795 |
 | `interim_status:model` | 0 | 0 | 795 |
 | `interim_status:model_tag` | 0 | 0 | 795 |
 | `interim_status:port` | 0 | 0 | 795 |

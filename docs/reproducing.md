@@ -68,7 +68,7 @@ The units file for step 3 is committed; `split.py splits --pull PULL --out split
 | | Baseline | Preliminary after-run |
 |---|---|---|
 | Points | 1734 (in scope 1188, AMD 546) | 1734 |
-| Scored | 41, all G4 (TTFT MAPE 47.1, TPOT 58.0, over the 11 train and validation points) | 795, all G4 (TTFT 27.8, TPOT 19.8, over the 520 train and validation points) |
+| Scored | 41, all G4 (TTFT MAPE 47.1, TPOT 58.0, over the 11 train and validation points) | 795, all G4 (TTFT 27.4, TPOT 19.7, over the 520 train and validation points) |
 | Refused by the simulator | 10 | 103 |
 | Not scored (G5) | 1683 | 836 |
 

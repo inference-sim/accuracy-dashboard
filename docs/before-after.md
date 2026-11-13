@@ -19,7 +19,7 @@
 | Run | Scored | Refused by the simulator | Not scored (G5) | TTFT MAPE | TPOT MAPE |
 |---|---|---|---|---|---|
 | Baseline: inference-sim v0.16.0, substrate v0.13.0 | 41 | 10 | 1683 | 47.1 (n=11) | 58.0 (n=11) |
-| After-run: M2 simulator (inference-sim combined pull request head), substrate v0.14.0 | 795 | 103 | 836 | 27.8 (n=520) | 19.8 (n=520) |
+| After-run: M2 simulator (inference-sim combined pull request head), substrate v0.14.0 | 795 | 103 | 836 | 27.4 (n=520) | 19.7 (n=520) |
 
 All scored points are G4. The accuracy columns are over the train and validation points only (the test split is withheld from every figure, `m2/evaluation-protocol.md` section 6), so the baseline's rest on eleven. The after-run is in-sample, and preliminary only in that the simulator is pinned by commit until its release tag is cut (a pin-only change, [command](m2/after-run.md)). The 103 refusals and what each asks for are in [its report](m2/preliminary-after/preliminary-after-run.md). The residuals that point to where the model is wrong are on the train split only: [residuals](m2/preliminary-after/residuals.md).
 

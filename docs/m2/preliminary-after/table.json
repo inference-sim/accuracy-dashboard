@@ -208,12 +208,6 @@
    "alone": 0,
    "blocks": 0,
    "demotes": 795,
-   "entry": "estimated:gpu_memory_utilization"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 795,
    "entry": "interim_status:model"
   },
   {
@@ -736,21 +730,21 @@
      "tpot": {
       "mape": {
        "n": 367,
-       "value": 19.400383014460253
+       "value": 19.306831650140737
       },
       "shape": {
        "n": 274,
-       "value": 16.074682219954347
+       "value": 15.936918740818541
       }
      },
      "ttft": {
       "mape": {
        "n": 367,
-       "value": 28.39950191361076
+       "value": 27.844230155582462
       },
       "shape": {
        "n": 274,
-       "value": 16.363708063590476
+       "value": 15.917608076851387
       }
      },
      "withheld": 0
@@ -765,10 +759,10 @@
     "ranking": {
      "throughput_per_gpu": {
       "groups": 17,
-      "kendall": 0.9154473535065681,
+      "kendall": 0.9150226009748367,
       "left_out": 0,
       "regret": 0.05484215693431321,
-      "spearman": 0.9732184043974681,
+      "spearman": 0.9729664833562384,
       "top1": 0.7058823529411765,
       "top3": 0.8823529411764706,
       "value": "throughput_per_gpu"
@@ -830,21 +824,21 @@
      "tpot": {
       "mape": {
        "n": 153,
-       "value": 20.682751385418314
+       "value": 20.669410771391114
       },
       "shape": {
        "n": 115,
-       "value": 14.454071082552852
+       "value": 14.412549681722606
       }
      },
      "ttft": {
       "mape": {
        "n": 153,
-       "value": 26.509648675533516
+       "value": 26.379497012584547
       },
       "shape": {
        "n": 115,
-       "value": 23.23271661273678
+       "value": 23.19310039796546
       }
      },
      "withheld": 0
@@ -977,21 +971,21 @@
     "tpot": {
      "mape": {
       "n": 520,
-      "value": 19.777695246684452
+      "value": 19.70774435312402
      },
      "shape": {
       "n": 353,
-      "value": 15.941950090136903
+      "value": 15.821490729290755
      }
     },
     "ttft": {
      "mape": {
       "n": 520,
-      "value": 27.84344894163803
+      "value": 27.413260596200384
      },
      "shape": {
       "n": 353,
-      "value": 17.936058381927268
+      "value": 17.576887670694372
      }
     },
     "withheld": 275
@@ -1016,21 +1010,21 @@
   "tpot": {
    "mape": {
     "n": 520,
-    "value": 19.777695246684452
+    "value": 19.70774435312402
    },
    "shape": {
     "n": 353,
-    "value": 15.941950090136903
+    "value": 15.821490729290755
    }
   },
   "ttft": {
    "mape": {
     "n": 520,
-    "value": 27.84344894163803
+    "value": 27.413260596200384
    },
    "shape": {
     "n": 353,
-    "value": 17.936058381927268
+    "value": 17.576887670694372
    }
   },
   "withheld": 275
@@ -1047,7 +1041,7 @@
  "inputs": {
   "blis": {
    "catalog": "v0.14.0",
-   "commit_sha": "81a46ba3e0b14ba828eaa46d21191d03dd17376f",
+   "commit_sha": "a8bc3085a7c91c50a1d92862943a695c04adfe11",
    "extractor_version": "blis-latency-kernel@unknown",
    "registry": "v0.14.0",
    "release": "unknown"
@@ -1057,9 +1051,9 @@
    "version": "0.32.0"
   },
   "experimental": true,
-  "fields_sha256": "7432f9f82bf551027233a3aae2387fc585408d77d1c44941d037217aed890f1a",
+  "fields_sha256": "62743b57746f8376b291fdb853eb0eb19edacc5d717e1e7107d6e0f3ed41348d",
   "simulator": {
-   "build": "81a46ba3e0b14ba828eaa46d21191d03dd17376f",
+   "build": "a8bc3085a7c91c50a1d92862943a695c04adfe11",
    "engine": {
     "kind": "vllm",
     "version": "0.32.0"
@@ -1167,21 +1161,21 @@
     "tpot": {
      "mape": {
       "n": 520,
-      "value": 19.777695246684452
+      "value": 19.70774435312402
      },
      "shape": {
       "n": 353,
-      "value": 15.941950090136903
+      "value": 15.821490729290755
      }
     },
     "ttft": {
      "mape": {
       "n": 520,
-      "value": 27.84344894163803
+      "value": 27.413260596200384
      },
      "shape": {
       "n": 353,
-      "value": 17.936058381927268
+      "value": 17.576887670694372
      }
     },
     "withheld": 275

@@ -65,7 +65,7 @@ Open items, with the tracking issue where there is one. None of these is hidden 
 - The chat template, when the job log has expired and the run passed `--use-chat-template`: request lengths shift by the template. Named only as the generic `client_flags`.
 - The client's version after 2026-08-07: the draws and `calculate_metrics` read as unchanged by diff, but no check runs the post-2026-09-26 client (the audit's T2).
 - Round trip of per-request rows through the client's JSON (T5), and replication and noise (T11, COV-10): not built.
-- `gpu_memory_utilization` is dropped on most points (named as `estimated`); the engine release differs on all of them (G4).
+- `gpu_memory_utilization` is stated on every scored point of the after-run (the value the recipe or the server log gives: 0.9 on 634 points, 0.95 on 161) and the engine sizes the KV pool from it; the engine release differs on all of them (G4).
 - Percentiles and distributions: COV-10, planned for M3.
 - Mean-only statistics against heavy tails: the agentic standard error of the mean is 3% to 29% for TTFT, so a fixed 1.6% floor is used and is too small for those.
 

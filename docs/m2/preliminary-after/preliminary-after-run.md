@@ -22,7 +22,7 @@ Command: `harness/run.sh --sim a8bc3085a7c91c50a1d92862943a695c04adfe11 --units 
 | Scored | 41 | 795 |
 | Reached the simulator and refused | 10 | 103 |
 | Not scored (G5) | 1683 | 836 |
-| Accuracy, train and validation points | TTFT MAPE 47.1 (n=11), TPOT MAPE 58.0 | TTFT MAPE 27.8 (n=520), shape 17.9 (n=353); TPOT MAPE 19.8, shape 15.9 |
+| Accuracy, train and validation points | TTFT MAPE 47.1 (n=11), TPOT MAPE 58.0 | TTFT MAPE 27.4 (n=520), shape 17.6 (n=353); TPOT MAPE 19.7, shape 15.8 |
 | Scored in both runs (41), train and validation | TTFT 47.1, TPOT 58.0 (n=11) | TTFT 13.1, TPOT 19.6 (n=11) |
 
 All scored points in both runs are G4 (no point is measured on the simulator's engine release and four G1 conditions are unevaluated), so there is one grade to compare: 795 G4 after, 41 G4 before. The 41 and the 795 are counts of every scored point; the accuracy rows leave out 30 and 275 test points. Only 11 of the baseline's 41 points are train or validation, so its accuracy row rests on eleven points and says little about the baseline as a whole; it is the figure the protocol allows until a test evaluation is logged.
@@ -30,6 +30,8 @@ All scored points in both runs are G4 (no point is measured on the simulator's e
 In scope, the baseline scored 41 of 1188 points and this run 795; the 546 AMD points are out of scope (no catalog part). `table.md` has the coverage movement per reason, the figures per serving (all aggregated) and per split.
 
 **Against the earlier preliminary run (450 scored, 117 refused by the simulator, 1167 not scored; TTFT MAPE 34.0 and TPOT 17.7 over 361 points).** 403 points are scored that were not, and 58 are no longer: 30 DeepSeek-V4-Pro points and 28 gpt-oss-120b points that the simulator now refuses (next section). MiniMax-M3 went from 238 scored points to 575 (393 on `minimax-m3-mxfp8`, 182 on `minimax-m3-nvfp4`, the entry that did not exist at the earlier pins), and 49 MiniMax-M2.5 NVFP4 points that the block-size oracle refused now score. The earlier figures are not comparable point for point: the accuracy rows rest on 520 points instead of 361.
+
+**Against the previous build of the same pull request (inference-sim `81a46ba3e0b14ba828eaa46d21191d03dd17376f`, blis-vllm `33455e4cb2d52b9fc9fa6cfb36cf5c1f5e509f5b`).** The new build models `gpu_memory_utilization` and sizes the KV pool from it (blis-vllm `df9641b2f6c5782aa7987392f6d979e238ebe1ed`). The scorer used to leave the field unset and record it as an `estimated` substitution on all 795 scored points; it now states the value of the recipe or the log (0.9 on 634 points, 0.95 on 161) as an exact setting, and the `estimated:gpu_memory_utilization` blocker is gone from `table.md`. No point changed status: the same 795 points are scored, the same 103 are refused with the same reasons, and the same 836 are held at G5, so no point is scored only because the field is modelled. The predictions of 48 scored points moved, and the same 48 report a different achieved concurrency in their fidelity record. TTFT MAPE over the 520 train and validation points went from 27.8 to 27.4 and TPOT MAPE from 19.8 to 19.7; the 41 points scored in both runs with the baseline are unchanged (13.1 and 19.6 over the 11 in train and validation). The two prefill/decode runs and the sixteen H200 rows keep their scored sets and their figures.
 
 ## What the stated-only rule did
 

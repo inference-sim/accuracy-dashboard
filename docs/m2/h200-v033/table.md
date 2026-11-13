@@ -9,7 +9,7 @@ IN-SAMPLE: the points are the ones the model was calibrated on or tuned against;
 - pull manifest sha256 `e650d510ccde4b9027c194d9ca52bd40a03a8b7846f81b8e5a21fb615b052bac`
 - point set sha256 `fa56a43c439ff679d358a2649f94040e917d80279002cf6a0b54d72c651cf7b0` (16 points)
 
-Simulator `81a46ba3e0b14ba828eaa46d21191d03dd17376f`, engine {'kind': 'vllm', 'version': '0.32.0'}, fields sha256 `7432f9f82bf551027233a3aae2387fc585408d77d1c44941d037217aed890f1a`.
+Simulator `a8bc3085a7c91c50a1d92862943a695c04adfe11`, engine {'kind': 'vllm', 'version': '0.32.0'}, fields sha256 `62743b57746f8376b291fdb853eb0eb19edacc5d717e1e7107d6e0f3ed41348d`.
 
 ## Headline (G1 to G4)
 
