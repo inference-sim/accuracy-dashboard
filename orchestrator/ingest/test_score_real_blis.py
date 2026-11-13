@@ -59,7 +59,7 @@ def test_a_single_turn_point_is_scored_through_the_real_simulator(monkeypatch):
     entry["row"]["image"] = entry["build"]["image"] = "vllm/vllm-openai:v0.32.0"
     entry["build"]["ref"] = "v0.32.0"
     env = dataclasses.replace(env, blis=blis, catalog=sub / "catalog", registry=sub / "registry",
-                              engine_release="0.32.0")
+                              engine_release="0.32.0", field_list=e2e._vllm_names_fields())
     env.catalog_obj = sp.Catalog(blis=blis, root=sub / "catalog")
     env.parts = {"h100"}
     o = sc._score_one(entry, tmp / "pull", tmp / "work", env)

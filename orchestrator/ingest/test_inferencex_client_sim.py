@@ -44,7 +44,7 @@ def _run(tmp: Path, replay: ix.Replay) -> list[dict]:
     proc = subprocess.run(argv, capture_output=True, text=True, timeout=1800)
     assert proc.returncode == 0, proc.stderr[-4000:]
     doc = json.loads(proc.stdout)
-    assert (doc.get("kind"), doc.get("schema_version")) == ("Result", 2)
+    assert doc.get("kind") == "Result" and doc.get("schema_version") in (2, 3)   # 3 from the M2 simulators
     rows = doc.get("request_rows")
     assert rows, "the Result has no request_rows"
     return rows
