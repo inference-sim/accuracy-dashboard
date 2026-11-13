@@ -16,9 +16,9 @@ Everything here was run on one machine (macOS, Apple silicon) on 2026-11-10 and 
 | Input | Baseline | Preliminary after-run |
 |---|---|---|
 | Harness | accuracy-dashboard commit recorded in `docs/m2/baseline-v0.16.0/contract/provenance.json` (`0e9627e219c207593de5bc55d997cf3dca707d64`) | the same commit |
-| inference-sim | `v0.16.0` = `3f4998e28f922611a2d21d5c7ffe18a5272fe114` | `81a46ba3e0b14ba828eaa46d21191d03dd17376f` (the head of its combined pull request, branch `m2/combined-layers`) |
+| inference-sim | `v0.16.0` = `3f4998e28f922611a2d21d5c7ffe18a5272fe114` | `a8bc3085a7c91c50a1d92862943a695c04adfe11` (the head of its combined pull request, branch `m2/combined-layers`) |
 | blis-substrate (catalog, registry, ledger) | `v0.13.0` = `fe6eab10b9795933de38122ba55e5299dcb20b5e` | `v0.14.0` (commit `965b05834c47882bc0f9f1a960c90327a756ef3d`) |
-| blis-vllm `fields.json` | `v0.32.0-blis.2` = `1cf030eb888270c114308c3ae3102d02994f015c`, sha256 `d32342c4f9ae5c578ba578fd5e6575aa8db8bce099e0708480d55f7e8de5a6fc` | `33455e4cb2d52b9fc9fa6cfb36cf5c1f5e509f5b`, sha256 `7432f9f82bf551027233a3aae2387fc585408d77d1c44941d037217aed890f1a` |
+| blis-vllm `fields.json` | `v0.32.0-blis.2` = `1cf030eb888270c114308c3ae3102d02994f015c`, sha256 `d32342c4f9ae5c578ba578fd5e6575aa8db8bce099e0708480d55f7e8de5a6fc` | `df9641b2f6c5782aa7987392f6d979e238ebe1ed`, sha256 `62743b57746f8376b291fdb853eb0eb19edacc5d717e1e7107d6e0f3ed41348d` |
 | Corpora | `semianalysisai/cc-traces-weka-062126` at `23f152f6f0f9399a85901b89a6458def0ef16729` (sha256 `29b6a19e751ff5230771519aab755f80a0f43a4ba9cf96b72d3a6a437ec99276`) and `...-256k` at `8fecd2fc56694469f758f0afbbb6335ad3043740` (sha256 `e39cd2ff3eba21d4a3664be51da743ac3d2149a1933898cafc7bfeac8147eeef`) | the same |
 | Frozen pull | manifest sha256 `c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166` | the same pull |
 | Units | `docs/m2/baseline-v0.16.0/units.txt`, 1740 units, sha256 `d89f860a46c0470a22543dc7fb77b8d1b10e508ce4f5ef5073e96f359f08597e` | the same |
@@ -50,7 +50,7 @@ python3 orchestrator/baseline/split.py splits --pull PULL --out splits.json   # 
 python3 orchestrator/baseline/compare.py run --dir OUT --sample in_sample --out table
 
 # 5. the preliminary after-run (a commit pin for the simulator, a local clone allowed)
-bash harness/run.sh --sim 81a46ba3e0b14ba828eaa46d21191d03dd17376f --sim-repo PATH_TO_INFERENCE_SIM \
+bash harness/run.sh --sim a8bc3085a7c91c50a1d92862943a695c04adfe11 --sim-repo PATH_TO_INFERENCE_SIM \
   --units docs/m2/baseline-v0.16.0/units.txt --pull PULL --out OUT_AFTER \
   --catalog SUBSTRATE_FINAL/catalog --registry SUBSTRATE_FINAL/registry --corpus-dir CORPUS \
   --fields FIELDS_FINAL.json \

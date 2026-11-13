@@ -62,9 +62,9 @@ The units are the substrate's (`catalog/ledger/units/inferencex.jsonl.gz`, made 
 ## Inputs
 
 - Harness commit: `0e9627e219c207593de5bc55d997cf3dca707d64` (the contract's `provenance.json`).
-- Simulator: inference-sim `81a46ba3e0b14ba828eaa46d21191d03dd17376f`, the head of its combined pull request; built by `harness/run.sh` from a clean clone of that commit.
+- Simulator: inference-sim `a8bc3085a7c91c50a1d92862943a695c04adfe11`, the head of its combined pull request; built by `harness/run.sh` from a clean clone of that commit.
 - Catalog and registry: blis-substrate `v0.14.0` (commit `965b05834c47882bc0f9f1a960c90327a756ef3d`), passed as the release tag for `--catalog-release` and `--registry-release`.
-- Field list: blis-vllm `33455e4cb2d52b9fc9fa6cfb36cf5c1f5e509f5b` `fields.json`, sha256 `7432f9f82bf551027233a3aae2387fc585408d77d1c44941d037217aed890f1a`.
+- Field list: blis-vllm `df9641b2f6c5782aa7987392f6d979e238ebe1ed` `fields.json`, sha256 `62743b57746f8376b291fdb853eb0eb19edacc5d717e1e7107d6e0f3ed41348d`.
 - Pull: `pull_manifest_sha256` `e650d510ccde4b9027c194d9ca52bd40a03a8b7846f81b8e5a21fb615b052bac` (in `contract/provenance.json`).
 
 ## Grade
@@ -81,7 +81,7 @@ The G1 conditions that are not evaluated are named as `unevaluated` substitution
 python3 orchestrator/baseline/freeze_rows.py --ledger SUBSTRATE/catalog/ledger --records records.json \
   --out PULL --cache CACHE --units-out UNITS
 # 2. score, from a clean checkout of the harness commit in contract/provenance.json
-bash harness/run.sh --sim 81a46ba3e0b14ba828eaa46d21191d03dd17376f \
+bash harness/run.sh --sim a8bc3085a7c91c50a1d92862943a695c04adfe11 \
   --units docs/m2/h200-v033/units.txt --pull PULL --out OUT \
   --catalog SUBSTRATE/catalog --registry SUBSTRATE/registry --corpus-dir CORPORA \
   --fields FIELDS.json --catalog-release v0.14.0 --registry-release v0.14.0
@@ -90,7 +90,7 @@ python3 orchestrator/baseline/split.py splits --pull PULL --out docs/m2/h200-v03
 python3 orchestrator/baseline/compare.py run --dir docs/m2/h200-v033/contract --sample in_sample --out docs/m2/h200-v033/table
 ```
 
-`FIELDS.json` is blis-vllm `33455e4cb2d52b9fc9fa6cfb36cf5c1f5e509f5b`'s `fields.json`; the corpora are fetched as the baseline's README says. Cost: the freeze is about a minute for sixteen rows (artifacts cached); the scoring took 27 minutes with one worker and 2 GB of memory (one replay of an hour-long trace per point, simulated; the machine was shared with the four other runs).
+`FIELDS.json` is blis-vllm `df9641b2f6c5782aa7987392f6d979e238ebe1ed`'s `fields.json`; the corpora are fetched as the baseline's README says. Cost: the freeze is about a minute for sixteen rows (artifacts cached); the scoring took 27 minutes with one worker and 2 GB of memory (one replay of an hour-long trace per point, simulated; the machine was shared with the four other runs).
 
 ## What this does not show
 

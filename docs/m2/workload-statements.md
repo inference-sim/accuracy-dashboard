@@ -87,7 +87,7 @@ Speculative rows of the frozen pull (600: 553 single-turn, 47 agentic), by outco
 
 | Run | Family | Scored | G5 `workload_category_not_stated` | Other G5 | Refused by the simulator |
 |---|---|---|---|---|---|
-| After-run at the final pins (committed: inference-sim `81a46ba3`, blis-vllm `33455e4c`, substrate v0.14.0) | InferenceX fixed-sequence, 553 | 286 | 51 | 216 (other G5, and the points the simulator refuses) | see below |
+| After-run at the final pins (committed: inference-sim `a8bc3085`, blis-vllm `df9641b2`, substrate v0.14.0) | InferenceX fixed-sequence, 553 | 286 | 51 | 216 (other G5, and the points the simulator refuses) | see below |
 | | AgentX, 47 | 0 | 0 | 47 | 0 |
 
 At the final pins 286 of the 553 fixed-sequence rows are scored: the server log's realised acceptance length is pinned in place of

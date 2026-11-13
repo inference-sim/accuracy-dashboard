@@ -7,13 +7,13 @@
 | Input | Value |
 |---|---|
 | Harness | accuracy-dashboard commit `0e9627e219c207593de5bc55d997cf3dca707d64`; the baseline was scored again at the same commit |
-| Simulator | inference-sim `81a46ba3e0b14ba828eaa46d21191d03dd17376f` (the head of its combined pull request, branch `m2/combined-layers`; `run.sh` fetches the commit by its hash) |
+| Simulator | inference-sim `a8bc3085a7c91c50a1d92862943a695c04adfe11` (the head of its combined pull request, branch `m2/combined-layers`; `run.sh` fetches the commit by its hash) |
 | Catalog and registry | blis-substrate `v0.14.0` (commit `965b05834c47882bc0f9f1a960c90327a756ef3d`), passed as the release tag for `--catalog-release` and `--registry-release` |
-| Engine | vLLM 0.32.0; field list: blis-vllm `33455e4cb2d52b9fc9fa6cfb36cf5c1f5e509f5b` `fields.json`, sha256 `7432f9f82bf551027233a3aae2387fc585408d77d1c44941d037217aed890f1a` |
+| Engine | vLLM 0.32.0; field list: blis-vllm `df9641b2f6c5782aa7987392f6d979e238ebe1ed` `fields.json`, sha256 `62743b57746f8376b291fdb853eb0eb19edacc5d717e1e7107d6e0f3ed41348d` |
 | Pull, units, point set | as the baseline: manifest `c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166`, 1734 points |
 | Corpora | as the baseline |
 
-Command: `harness/run.sh --sim 81a46ba3e0b14ba828eaa46d21191d03dd17376f --units units.txt --pull <pull> --out <out> --catalog <substrate>/catalog --registry <substrate>/registry --corpus-dir <corpora> --fields fields.json --catalog-release v0.14.0 --registry-release v0.14.0`. The simulator has `blis metrics`, so the scorer checked that its TTFT and TPOT have the InferenceX client's definitions; the baseline's v0.16.0 has none. Cost: 12 minutes on one laptop with four workers while four other runs shared it (the baseline took 1.5 minutes, run B 6, run A 12 seconds, the sixteen H200 rows 27).
+Command: `harness/run.sh --sim a8bc3085a7c91c50a1d92862943a695c04adfe11 --units units.txt --pull <pull> --out <out> --catalog <substrate>/catalog --registry <substrate>/registry --corpus-dir <corpora> --fields fields.json --catalog-release v0.14.0 --registry-release v0.14.0`. The simulator has `blis metrics`, so the scorer checked that its TTFT and TPOT have the InferenceX client's definitions; the baseline's v0.16.0 has none. Cost: 12 minutes on one laptop with four workers while four other runs shared it (the baseline took 1.5 minutes, run B 6, run A 12 seconds, the sixteen H200 rows 27).
 
 ## Result
 

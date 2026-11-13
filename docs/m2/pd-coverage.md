@@ -20,9 +20,9 @@ Two runs of the same scorer over the same pull, differing in one input:
 | Input | Value |
 |---|---|
 | Harness | accuracy-dashboard commit in each run's `provenance.json` (`harness_commit`) |
-| Simulator | inference-sim `81a46ba3e0b14ba828eaa46d21191d03dd17376f` (the head of its combined pull request, branch `m2/combined-layers`), built with Go 1.27.2 |
+| Simulator | inference-sim `a8bc3085a7c91c50a1d92862943a695c04adfe11` (the head of its combined pull request, branch `m2/combined-layers`), built with Go 1.27.2 |
 | Catalog, registry | blis-substrate `v0.14.0` (commit `965b05834c47882bc0f9f1a960c90327a756ef3d`; the release the pinned simulator names in `stack.json`), as the release tag for `--catalog-release` and `--registry-release` |
-| Field list | blis-vllm `33455e4cb2d52b9fc9fa6cfb36cf5c1f5e509f5b` `fields.json` (the commit the pinned simulator resolves), sha256 `7432f9f82bf551027233a3aae2387fc585408d77d1c44941d037217aed890f1a` |
+| Field list | blis-vllm `df9641b2f6c5782aa7987392f6d979e238ebe1ed` `fields.json` (the commit the pinned simulator resolves), sha256 `62743b57746f8376b291fdb853eb0eb19edacc5d717e1e7107d6e0f3ed41348d` |
 | Pull | `pull_manifest_sha256` `bfa74604f84e64aa2f6c44d73fedee45a816c15d11f66da02396913354f5c3d4`, 188 points; not committed (60 MB of server logs and recipes) |
 | Units | the 188 ledger units (`units.txt` of each run directory) |
 | Corpora | not used (single-turn) |
@@ -107,7 +107,7 @@ python3 orchestrator/baseline/freeze.py --units-file units.txt --ledger SUBSTRAT
   --today 2026-11-09 --out PULL --cache ARTIFACTS
 # 2. run A: the substrate's table
 python3 orchestrator/ingest/cli.py score --pull PULL --out OUT_A --units units.txt \
-  --blis INFERENCE_SIM/blis --sim-build 81a46ba3e0b14ba828eaa46d21191d03dd17376f \
+  --blis INFERENCE_SIM/blis --sim-build a8bc3085a7c91c50a1d92862943a695c04adfe11 \
   --catalog SUBSTRATE/catalog --registry SUBSTRATE/registry \
   --catalog-release v0.14.0 --registry-release v0.14.0 \
   --fields FIELDS.json --harness-commit HARNESS_COMMIT --corpus-dir CORPORA
@@ -117,7 +117,7 @@ python3 orchestrator/baseline/split.py splits --pull PULL --out OUT/../splits.js
 python3 orchestrator/baseline/compare.py run --dir OUT --sample in_sample --out table
 ```
 
-`INFERENCE_SIM` is a checkout at the commit with `go build -o blis .` (about 2 minutes); `SUBSTRATE` a checkout at `v0.14.0` (commit `965b05834c47882bc0f9f1a960c90327a756ef3d`); `FIELDS.json` is blis-vllm's `fields.json` at `33455e4cb2d52b9fc9fa6cfb36cf5c1f5e509f5b`. The freeze reads the live API and GitHub: the artifacts it needs expire after 90 days, and the server logs of 148 of the 188 rows are already gone (the recipes are not), so a later freeze differs from this one in `server_log` only. Run A takes about 20 s (nothing is simulated) and run B about a minute on an idle laptop (84 simulations; far longer when the machine is loaded), 2 GB. To use the substrate's layer 12 entries: `--router-table SUBSTRATE_L12/catalog/routers --assume-router-revision 1682167d3c97f0fc8cd405dee51f17288eeaeb55`.
+`INFERENCE_SIM` is a checkout at the commit with `go build -o blis .` (about 2 minutes); `SUBSTRATE` a checkout at `v0.14.0` (commit `965b05834c47882bc0f9f1a960c90327a756ef3d`); `FIELDS.json` is blis-vllm's `fields.json` at `df9641b2f6c5782aa7987392f6d979e238ebe1ed`. The freeze reads the live API and GitHub: the artifacts it needs expire after 90 days, and the server logs of 148 of the 188 rows are already gone (the recipes are not), so a later freeze differs from this one in `server_log` only. Run A takes about 20 s (nothing is simulated) and run B about a minute on an idle laptop (84 simulations; far longer when the machine is loaded), 2 GB. To use the substrate's layer 12 entries: `--router-table SUBSTRATE_L12/catalog/routers --assume-router-revision 1682167d3c97f0fc8cd405dee51f17288eeaeb55`.
 
 ## What this does not show
 
