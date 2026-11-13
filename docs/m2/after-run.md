@@ -34,7 +34,7 @@ At the tags, change exactly these lines, and no other:
 |---|---|---|---|
 | `.github/stack-pins.env` | `SIM_REF=` | `81a46ba3e0b14ba828eaa46d21191d03dd17376f` | inference-sim's release tag |
 | `.github/stack-pins.env` | `ROUTER_REF=` | `2a886db5d1be70aa2ae18a7dbed81f5e1cdbd1f8` | the router fork's tag, if one is cut |
-| `.github/stack-pins.env` | `SUBSTRATE_REF=` | `965b05834c47882bc0f9f1a960c90327a756ef3d` | `v0.14.0` (the same commit; optional) |
+| `.github/stack-pins.env` | `SUBSTRATE_REF=` | `965b05834c47882bc0f9f1a960c90327a756ef3d` | `v0.14.0` (the same commit; already done) |
 | `docs/m2/h200-v033/pins.env` | `BLIS_SUBSTRATE_COMMIT=` | `965b05834c47882bc0f9f1a960c90327a756ef3d` | unchanged: it is the commit of the tag `v0.14.0` |
 | this page, `docs/reproducing.md`, `docs/m2/pd-coverage.md`, the READMEs of the runs | the inference-sim commit in the pin tables and in the example commands | `81a46ba3...` | the tag, with the commit it names |
 
