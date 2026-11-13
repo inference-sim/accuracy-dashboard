@@ -16,9 +16,9 @@
         "kind": "vllm",
         "version": "0.31.0"
       },
-      "harness_digest": "unreleased"
+      "harness_commit": "0123456789abcdef0123456789abcdef01234567"
     },
-    "harness_digest": "unreleased",
+    "harness_commit": "0123456789abcdef0123456789abcdef01234567",
     "experimental": false,
     "units": null,
     "engine": {
@@ -240,19 +240,19 @@
   "backlog": {
     "top": [
       {
-        "reason": "coefficient_range: not checked",
+        "reason": "unevaluated: coefficient_range",
         "points": 8
       },
       {
-        "reason": "kernel_hash: not checked",
+        "reason": "unevaluated: kernel_hash",
         "points": 8
       },
       {
-        "reason": "resolved_differs: not checked",
+        "reason": "unevaluated: resolved_differs",
         "points": 8
       },
       {
-        "reason": "value_class: not checked",
+        "reason": "unevaluated: value_class",
         "points": 8
       },
       {
@@ -575,7 +575,7 @@
                             "kind": "vllm",
                             "version": "0.31.0"
                           },
-                          "harness_digest": "unreleased"
+                          "harness_commit": "0123456789abcdef0123456789abcdef01234567"
                         },
                         "substitutions": [
                           {
@@ -584,24 +584,24 @@
                             "subject": "send_gap"
                           },
                           {
-                            "detail": "coefficient_range is not graded yet",
-                            "kind": "coefficient_range",
-                            "subject": "not checked"
+                            "detail": "coefficient_range is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "coefficient_range"
                           },
                           {
-                            "detail": "kernel_hash is not graded yet",
-                            "kind": "kernel_hash",
-                            "subject": "not checked"
+                            "detail": "kernel_hash is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "kernel_hash"
                           },
                           {
-                            "detail": "resolved_differs is not graded yet",
-                            "kind": "resolved_differs",
-                            "subject": "not checked"
+                            "detail": "resolved_differs is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "resolved_differs"
                           },
                           {
-                            "detail": "value_class is not graded yet",
-                            "kind": "value_class",
-                            "subject": "not checked"
+                            "detail": "value_class is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "value_class"
                           }
                         ]
                       }
@@ -704,7 +704,7 @@
                             "kind": "vllm",
                             "version": "0.31.0"
                           },
-                          "harness_digest": "unreleased"
+                          "harness_commit": "0123456789abcdef0123456789abcdef01234567"
                         },
                         "substitutions": [
                           {
@@ -713,24 +713,24 @@
                             "subject": "send_gap"
                           },
                           {
-                            "detail": "coefficient_range is not graded yet",
-                            "kind": "coefficient_range",
-                            "subject": "not checked"
+                            "detail": "coefficient_range is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "coefficient_range"
                           },
                           {
-                            "detail": "kernel_hash is not graded yet",
-                            "kind": "kernel_hash",
-                            "subject": "not checked"
+                            "detail": "kernel_hash is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "kernel_hash"
                           },
                           {
-                            "detail": "resolved_differs is not graded yet",
-                            "kind": "resolved_differs",
-                            "subject": "not checked"
+                            "detail": "resolved_differs is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "resolved_differs"
                           },
                           {
-                            "detail": "value_class is not graded yet",
-                            "kind": "value_class",
-                            "subject": "not checked"
+                            "detail": "value_class is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "value_class"
                           }
                         ]
                       }
@@ -833,7 +833,7 @@
                             "kind": "vllm",
                             "version": "0.31.0"
                           },
-                          "harness_digest": "unreleased"
+                          "harness_commit": "0123456789abcdef0123456789abcdef01234567"
                         },
                         "substitutions": [
                           {
@@ -842,24 +842,24 @@
                             "subject": "send_gap"
                           },
                           {
-                            "detail": "coefficient_range is not graded yet",
-                            "kind": "coefficient_range",
-                            "subject": "not checked"
+                            "detail": "coefficient_range is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "coefficient_range"
                           },
                           {
-                            "detail": "kernel_hash is not graded yet",
-                            "kind": "kernel_hash",
-                            "subject": "not checked"
+                            "detail": "kernel_hash is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "kernel_hash"
                           },
                           {
-                            "detail": "resolved_differs is not graded yet",
-                            "kind": "resolved_differs",
-                            "subject": "not checked"
+                            "detail": "resolved_differs is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "resolved_differs"
                           },
                           {
-                            "detail": "value_class is not graded yet",
-                            "kind": "value_class",
-                            "subject": "not checked"
+                            "detail": "value_class is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "value_class"
                           }
                         ]
                       }
@@ -1177,14 +1177,9 @@
                             "kind": "vllm",
                             "version": "0.31.0"
                           },
-                          "harness_digest": "unreleased"
+                          "harness_commit": "0123456789abcdef0123456789abcdef01234567"
                         },
                         "substitutions": [
-                          {
-                            "detail": "coefficient_range is not graded yet",
-                            "kind": "coefficient_range",
-                            "subject": "not checked"
-                          },
                           {
                             "detail": "left unset; the engine resolves the upstream default",
                             "kind": "estimated",
@@ -1196,24 +1191,29 @@
                             "subject": "attention_config.indexer_sparse_logits"
                           },
                           {
-                            "detail": "kernel_hash is not graded yet",
-                            "kind": "kernel_hash",
-                            "subject": "not checked"
-                          },
-                          {
                             "detail": "vllm/vllm-openai:nightly-dev-x86_64-cu130-ac9126e58aa7 (banner 0.30.1rc1.dev493+gac9126e58)",
                             "kind": "nightly_or_custom",
                             "subject": "engine build"
                           },
                           {
-                            "detail": "resolved_differs is not graded yet",
-                            "kind": "resolved_differs",
-                            "subject": "not checked"
+                            "detail": "coefficient_range is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "coefficient_range"
                           },
                           {
-                            "detail": "value_class is not graded yet",
-                            "kind": "value_class",
-                            "subject": "not checked"
+                            "detail": "kernel_hash is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "kernel_hash"
+                          },
+                          {
+                            "detail": "resolved_differs is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "resolved_differs"
+                          },
+                          {
+                            "detail": "value_class is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "value_class"
                           }
                         ]
                       }
@@ -1407,28 +1407,28 @@
                             "kind": "vllm",
                             "version": "0.31.0"
                           },
-                          "harness_digest": "unreleased"
+                          "harness_commit": "0123456789abcdef0123456789abcdef01234567"
                         },
                         "substitutions": [
                           {
-                            "detail": "coefficient_range is not graded yet",
-                            "kind": "coefficient_range",
-                            "subject": "not checked"
+                            "detail": "coefficient_range is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "coefficient_range"
                           },
                           {
-                            "detail": "kernel_hash is not graded yet",
-                            "kind": "kernel_hash",
-                            "subject": "not checked"
+                            "detail": "kernel_hash is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "kernel_hash"
                           },
                           {
-                            "detail": "resolved_differs is not graded yet",
-                            "kind": "resolved_differs",
-                            "subject": "not checked"
+                            "detail": "resolved_differs is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "resolved_differs"
                           },
                           {
-                            "detail": "value_class is not graded yet",
-                            "kind": "value_class",
-                            "subject": "not checked"
+                            "detail": "value_class is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "value_class"
                           }
                         ]
                       }
@@ -1533,28 +1533,28 @@
                             "kind": "vllm",
                             "version": "0.31.0"
                           },
-                          "harness_digest": "unreleased"
+                          "harness_commit": "0123456789abcdef0123456789abcdef01234567"
                         },
                         "substitutions": [
                           {
-                            "detail": "coefficient_range is not graded yet",
-                            "kind": "coefficient_range",
-                            "subject": "not checked"
+                            "detail": "coefficient_range is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "coefficient_range"
                           },
                           {
-                            "detail": "kernel_hash is not graded yet",
-                            "kind": "kernel_hash",
-                            "subject": "not checked"
+                            "detail": "kernel_hash is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "kernel_hash"
                           },
                           {
-                            "detail": "resolved_differs is not graded yet",
-                            "kind": "resolved_differs",
-                            "subject": "not checked"
+                            "detail": "resolved_differs is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "resolved_differs"
                           },
                           {
-                            "detail": "value_class is not graded yet",
-                            "kind": "value_class",
-                            "subject": "not checked"
+                            "detail": "value_class is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "value_class"
                           }
                         ]
                       }
@@ -1701,23 +1701,13 @@
                             "kind": "vllm",
                             "version": "0.31.0"
                           },
-                          "harness_digest": "unreleased"
+                          "harness_commit": "0123456789abcdef0123456789abcdef01234567"
                         },
                         "substitutions": [
-                          {
-                            "detail": "coefficient_range is not graded yet",
-                            "kind": "coefficient_range",
-                            "subject": "not checked"
-                          },
                           {
                             "detail": "not recorded; left unset, so the engine resolves the upstream default",
                             "kind": "estimated",
                             "subject": "max_num_seqs"
-                          },
-                          {
-                            "detail": "kernel_hash is not graded yet",
-                            "kind": "kernel_hash",
-                            "subject": "not checked"
                           },
                           {
                             "detail": "0.25.0, scored on 0.31.0",
@@ -1730,14 +1720,24 @@
                             "subject": "engine release"
                           },
                           {
-                            "detail": "resolved_differs is not graded yet",
-                            "kind": "resolved_differs",
-                            "subject": "not checked"
+                            "detail": "coefficient_range is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "coefficient_range"
                           },
                           {
-                            "detail": "value_class is not graded yet",
-                            "kind": "value_class",
-                            "subject": "not checked"
+                            "detail": "kernel_hash is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "kernel_hash"
+                          },
+                          {
+                            "detail": "resolved_differs is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "resolved_differs"
+                          },
+                          {
+                            "detail": "value_class is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "value_class"
                           }
                         ]
                       }
@@ -2003,33 +2003,33 @@
                             "kind": "vllm",
                             "version": "0.31.0"
                           },
-                          "harness_digest": "unreleased"
+                          "harness_commit": "0123456789abcdef0123456789abcdef01234567"
                         },
                         "substitutions": [
-                          {
-                            "detail": "coefficient_range is not graded yet",
-                            "kind": "coefficient_range",
-                            "subject": "not checked"
-                          },
-                          {
-                            "detail": "kernel_hash is not graded yet",
-                            "kind": "kernel_hash",
-                            "subject": "not checked"
-                          },
                           {
                             "detail": "vllm/vllm-openai:vllm-minimax-m3-perf-x86_64-13.0.1-8b00f41 (banner 0.30.0rc2.dev44+g8b00f4123)",
                             "kind": "nightly_or_custom",
                             "subject": "engine build"
                           },
                           {
-                            "detail": "resolved_differs is not graded yet",
-                            "kind": "resolved_differs",
-                            "subject": "not checked"
+                            "detail": "coefficient_range is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "coefficient_range"
                           },
                           {
-                            "detail": "value_class is not graded yet",
-                            "kind": "value_class",
-                            "subject": "not checked"
+                            "detail": "kernel_hash is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "kernel_hash"
+                          },
+                          {
+                            "detail": "resolved_differs is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "resolved_differs"
+                          },
+                          {
+                            "detail": "value_class is unevaluated",
+                            "kind": "unevaluated",
+                            "subject": "value_class"
                           }
                         ]
                       }
@@ -2091,7 +2091,7 @@
           "kind": "vllm",
           "version": "0.31.0"
         },
-        "harness_digest": "unreleased"
+        "harness_commit": "0123456789abcdef0123456789abcdef01234567"
       }
     },
     {
@@ -2139,7 +2139,7 @@
           "kind": "vllm",
           "version": "0.31.0"
         },
-        "harness_digest": "unreleased"
+        "harness_commit": "0123456789abcdef0123456789abcdef01234567"
       }
     },
     {
@@ -2191,7 +2191,7 @@
           "kind": "vllm",
           "version": "0.31.0"
         },
-        "harness_digest": "unreleased"
+        "harness_commit": "0123456789abcdef0123456789abcdef01234567"
       }
     },
     {
@@ -2239,7 +2239,7 @@
           "kind": "vllm",
           "version": "0.31.0"
         },
-        "harness_digest": "unreleased"
+        "harness_commit": "0123456789abcdef0123456789abcdef01234567"
       }
     },
     {
@@ -2287,7 +2287,7 @@
           "kind": "vllm",
           "version": "0.31.0"
         },
-        "harness_digest": "unreleased"
+        "harness_commit": "0123456789abcdef0123456789abcdef01234567"
       }
     }
   ],
@@ -2329,7 +2329,7 @@
           "kind": "vllm",
           "version": "0.31.0"
         },
-        "harness_digest": "unreleased"
+        "harness_commit": "0123456789abcdef0123456789abcdef01234567"
       }
     }
   ]

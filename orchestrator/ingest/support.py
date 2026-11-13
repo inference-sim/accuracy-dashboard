@@ -92,9 +92,10 @@ class Catalog:
             m = d / "model.yaml"
             if not m.is_file():
                 continue
+            doc = yaml.safe_load(m.read_text()) or {}
             self.model(d.name)
-            repo = (((yaml.safe_load(m.read_text()) or {}).get("source")) or {}).get("repo")
-            if repo:
+            repo = ((doc.get("source")) or {}).get("repo")
+            if repo and not _is_drafter(doc):
                 self.model(repo)
 
     def speculator(self, model: str) -> str | None:
@@ -105,6 +106,58 @@ class Catalog:
         graph = (yaml.safe_load(g.read_text()) or {}) if g.is_file() else {}
         spec = graph.get("speculator") if isinstance(graph, dict) else None
         return spec.get("method") if isinstance(spec, dict) else None
+
+    def drafters_of(self, repo: str) -> list[str]:
+        """The catalog entries that are drafters (they name `targets`) whose source repository is
+        `repo`, sorted. A drafter may share its repository with its target (a DSpark head in the
+        model's own repository, told apart by source.path), so the served-model lookup skips
+        drafters and this one finds them. TEMPORARY until a command prints it."""
+        import yaml
+        out = []
+        for m in sorted((Path(self.root) / "models").glob("*/model.yaml")):
+            doc = yaml.safe_load(m.read_text()) or {}
+            if _is_drafter(doc) and (((doc.get("source")) or {}).get("repo") or "").casefold() == repo.casefold():
+                out.append(m.parent.name)
+        return out
+
+    def speculator_tokens(self, model: str) -> int | None:
+        """The speculative tokens per step of a catalog model's graph (its speculator's
+        num_spec_tokens): the checkpoint's default draft length, and for MTP the number of MTP
+        modules. None when it has none. TEMPORARY, like speculator()."""
+        import yaml
+        g = Path(self.root) / "models" / model / "graph.yaml"
+        graph = (yaml.safe_load(g.read_text()) or {}) if g.is_file() else {}
+        spec = graph.get("speculator") if isinstance(graph, dict) else None
+        n = spec.get("num_spec_tokens") if isinstance(spec, dict) else None
+        return n if isinstance(n, int) and not isinstance(n, bool) else None
+
+    def drafter_links(self, target: str, drafter: str) -> bool:
+        """Whether catalog entry `drafter` and catalog entry `target` name each other: the drafter
+        lists the target among its `targets`, and the target lists the drafter among its
+        `drafters` (blis-substrate layer 8: a drafter names a list of targets, and the check is two-way).
+        TEMPORARY until a command prints it, and written against the schema as the layer 8 author
+        described it (a `targets` list on the drafter's model.yaml, a `drafters` list on the
+        target's; either may sit under `identity`). Re-check against the layer 8 tip."""
+        return (target in self._listed(drafter, "targets")) and (drafter in self._listed(target, "drafters"))
+
+    def _listed(self, entry: str, key: str) -> list:
+        import yaml
+        f = Path(self.root) / "models" / entry / "model.yaml"
+        doc = (yaml.safe_load(f.read_text()) or {}) if f.is_file() else {}
+        if not isinstance(doc, dict):
+            return []
+        v = doc.get(key)
+        if v is None and isinstance(doc.get("identity"), dict):
+            v = doc["identity"].get(key)
+        return [x for x in (v if isinstance(v, list) else []) if isinstance(x, str)]
+
+
+def _is_drafter(doc) -> bool:
+    """Whether a model.yaml is a drafter entry: it names its target or targets (layer 8)."""
+    if not isinstance(doc, dict):
+        return False
+    ident = doc.get("identity") if isinstance(doc.get("identity"), dict) else {}
+    return any(k in doc or k in ident for k in ("targets", "target"))
 
 
 @dataclass
@@ -126,8 +179,9 @@ class CheckoutCatalog(Catalog):
             root = Path(self.root)
             repos: dict = {}
             for m in sorted(root.glob("models/*/model.yaml")):
-                repo = (((yaml.safe_load(m.read_text()) or {}).get("source")) or {}).get("repo")
-                if repo:
+                doc = yaml.safe_load(m.read_text()) or {}
+                repo = ((doc.get("source")) or {}).get("repo")
+                if repo and not _is_drafter(doc):
                     repos.setdefault(repo.casefold(), []).append(m.parent.name)
             chips = {}
             for h in sorted(root.glob("hardware/*.yaml")):
@@ -194,12 +248,79 @@ class Support:
     matched_by: str | None = None       # checkpoint | base_model
     checkpoint: str | None = None
     chip: str | None = None             # the catalog chip, or None when the catalog has none
+    drafter: str | None = None          # the catalog entry of the run's draft checkpoint, when it named one
     reasons: list = field(default_factory=list)
 
 
+def _leaf(path: str) -> str:
+    return path.rstrip("/").rsplit("/", 1)[-1]
+
+
+def resolve_draft(drafter, served: list, entry: dict) -> tuple[str | None, str | None]:
+    """(the draft checkpoint's HF repo, a G5 reason) for the draft model the run's log names.
+
+    A repo the log names is used as it is. A local path is the recipe's: the pull records the
+    DRAFT_MODEL the run's benchmark script set at the commit it ran (entry["draft_checkpoint"]),
+    taken when the path's last component is that repo's name, a value_conflict when it is not, and
+    value_not_recorded when no recipe names one. A path that is the served model's own (MTP names
+    the target) is no draft. Nothing is matched by a file name alone."""
+    repo = hf_repo(drafter)
+    if repo or not isinstance(drafter, str) or not drafter.startswith("/") or drafter in served:
+        return repo, None
+    dc = entry.get("draft_checkpoint") or {}
+    if not dc.get("repo"):
+        return None, "value_not_recorded:speculative_config.model"
+    if _leaf(drafter) != _leaf(dc["repo"]):
+        return None, f"value_conflict:speculative_config.model: the log names {drafter}, the recipe {dc['repo']}"
+    return dc["repo"], None
+
+
+def served_conflict(entry: dict) -> str | None:
+    """The G5 reason when the run's served path and its recipe's checkpoint disagree (the pull
+    records the recipe's one checkpoint as checkpoint_conflict), naming both."""
+    c = entry.get("checkpoint_conflict")
+    if not c:
+        return None
+    return f"value_conflict:model: the log serves {c['served_path']}, the recipe {c['repo']}"
+
+
+def engine_method(graph_method: str | None) -> str | None:
+    """The method a deployment states for a catalog speculator method. vLLM rewrites every
+    model-specific MTP name to `mtp` (vllm/config/speculative.py:1141-1145), and the catalog's
+    derive_graph.vllm_speculative_method states the same rule; eagle3, dflash and dspark keep their
+    names. TEMPORARY: a copy of that rule until a substrate command prints the method as a
+    deployment states it (X7)."""
+    return "mtp" if graph_method and graph_method.endswith("_mtp") else graph_method
+
+
+def draft_length_conflict(method: str, k, n_predict: int | None) -> str | None:
+    """Why a stated num_speculative_tokens K cannot be a real run's, or None when vLLM accepts it
+    and it is simply priced as stated. The rule is the layer 8 model reference's "Stated draft
+    lengths" table (vLLM v0.32.0 vllm/config/speculative.py); TEMPORARY copy (X7).
+
+      every method  K >= 1 (:393, :1826-1830)
+      mtp           K <= n_predict is valid; K > n_predict must be a multiple of n_predict (:1493-1501),
+                    n_predict being the graph's num_spec_tokens (the number of MTP modules)
+      eagle, eagle3, draft_model, dflash, dspark   any K >= 1
+
+    The graph's num_spec_tokens is the checkpoint's default draft length, not a value to equal."""
+    if isinstance(k, bool) or not isinstance(k, int):
+        return None         # a value that is not a count is the field list's to judge
+    if k < 1:
+        return f"{k} is below 1"
+    if engine_method(method) == "mtp" and n_predict and k > n_predict and k % n_predict:
+        return f"{k} exceeds the model's {n_predict} MTP modules and is not a multiple of {n_predict}"
+    return None
+
+
 def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models: dict,
-          hardware: str, spec_method: str | None) -> Support:
+          hardware: str, spec_method: str | None,
+          draft_checkpoint: str | None = None, num_spec_tokens: int | None = None) -> Support:
     """checkpoints: candidate HF repos for the served model, most authoritative first.
+    draft_checkpoint: the HF repo the run named as its draft model (speculative_config.model), if any.
+    When it names one, that checkpoint must be a catalog entry that lists the served model among
+    its targets and is listed by it, and its graph's speculator method must be the run's; otherwise
+    the served model's own graph decides.
     base_models: repo -> its HF base_model (frozen at pull time). A repository two catalog
     entries claim is refused by `blis catalog resolve`, and raises its CommandError."""
     s = Support()
@@ -225,7 +346,37 @@ def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models:
     if s.chip is None or hardware not in parts:
         s.reasons.append("hardware_no_coefficients")
     if s.model and spec_method:
-        have = cat.speculator(s.model)
-        if have != spec_method:
+        d = cat.model(draft_checkpoint) if draft_checkpoint else None
+        named = cat.drafters_of(draft_checkpoint) if draft_checkpoint else []
+        if named:
+            # The checkpoint is a drafter entry's repository (maybe the served model's own, told
+            # apart by the entry): one the served model and it name each other, speculating by the run's method.
+            linked = [n for n in named if cat.drafter_links(s.model, n) and engine_method(cat.speculator(n)) == spec_method]
+            if linked:
+                s.drafter = linked[0]
+                why = draft_length_conflict(spec_method, num_spec_tokens, None) if num_spec_tokens is not None else None
+                if why:
+                    s.reasons.append(f"value_conflict:speculative_config.num_speculative_tokens: vLLM refuses {why}")
+            else:
+                s.reasons.append(f"drafter_not_in_catalog:{spec_method}")
+        elif d is not None and d != s.model:
+            # A separate drafter checkpoint (eagle3, dspark): a catalog entry the served model and
+            # it name each other, whose graph speculates by the run's method.
+            if cat.drafter_links(s.model, d) and engine_method(cat.speculator(d)) == spec_method:
+                s.drafter = d
+                why = draft_length_conflict(spec_method, num_spec_tokens, None) if num_spec_tokens is not None else None
+                if why:
+                    s.reasons.append(f"value_conflict:speculative_config.num_speculative_tokens: vLLM refuses {why}")
+            else:
+                s.reasons.append(f"drafter_not_in_catalog:{spec_method}")
+        elif draft_checkpoint and d is None:
             s.reasons.append(f"drafter_not_in_catalog:{spec_method}")
+        elif engine_method(cat.speculator(s.model)) != spec_method:
+            # No separate checkpoint, or vLLM named the served model itself as its drafter (MTP):
+            # the served model's own graph decides.
+            s.reasons.append(f"drafter_not_in_catalog:{spec_method}")
+        elif num_spec_tokens is not None:
+            why = draft_length_conflict(spec_method, num_spec_tokens, cat.speculator_tokens(s.model))
+            if why:
+                s.reasons.append(f"value_conflict:speculative_config.num_speculative_tokens: vLLM refuses {why}")
     return s

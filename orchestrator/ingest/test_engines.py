@@ -20,7 +20,7 @@ import pull as pl  # noqa: E402
 import score as sc  # noqa: E402
 
 LABELS = ["vllm", "llmd-vllm", "vllm-disagg", "dynamo-vllm", "sglang", "dynamo-sglang", "mori-sglang", "trt",
-          "dynamo-trt", "atom", "atom-disagg", "mooncake-atom", "tilert"]
+          "dynamo-trt", "atom", "atom-disagg", "mooncake-atom", "teacup", "rubin-july", "tokenspeed", "tilert"]
 
 
 def _row(framework, router=None, **kw):
@@ -47,7 +47,7 @@ def _score(tmp, entry):
                  registry=tmp, registry_release="r", kernel="k", corpora={})
     o = sc.score_point(entry, tmp / "pull", tmp / "w", env)
     sc.grade_outcome(o, "0.32.0", {"build": "v0.16.0", "engine": {"kind": "vllm", "version": "0.32.0"},
-                                   "harness_digest": "unreleased"})
+                                   "harness_commit": "0123456789abcdef0123456789abcdef01234567"})
     return o
 
 
@@ -155,28 +155,37 @@ def test_a_disaggregated_runs_recorded_topology_fields_go_through_the_field_list
                  field_list=_fields(("kv_transfer_config.kv_role", "not_modelled"),
                                     ("kv_transfer_config.kv_connector", "modelled")))
     o = sc.score_point(_disagg_entry(tmp_path / "a", kv), tmp_path / "a" / "pull", tmp_path / "w", env)
-    assert o.reasons == ["field_not_modelled:kv_transfer_config.kv_role"]
+    assert "field_not_modelled:kv_transfer_config.kv_role" in o.reasons
     # No topology field recorded at all: value_not_recorded for the field that would be needed.
     o = sc.score_point(_disagg_entry(tmp_path / "b", "'tensor_parallel_size': 8"), tmp_path / "b" / "pull",
                        tmp_path / "w", env)
-    assert o.reasons == ["field_not_in_release:tensor_parallel_size",
-                         "required_setting_missing:kv_transfer_config.kv_role"]
+    assert {"field_not_in_release:tensor_parallel_size", "required_setting_missing:kv_transfer_config.kv_role"} <= set(o.reasons)
     o = sc.score_point(_disagg_entry(tmp_path / "d", "'max_num_seqs': 8"), tmp_path / "d" / "pull",
                        tmp_path / "w", env)
-    assert o.reasons == ["required_setting_missing:kv_transfer_config.kv_role"]
-    assert asx.g5_of(o.reasons[0]) == {"code": "value_not_recorded", "subject": "kv_transfer_config.kv_role"}
+    assert "required_setting_missing:kv_transfer_config.kv_role" in o.reasons
+    assert asx.g5_of("required_setting_missing:kv_transfer_config.kv_role") == \
+        {"code": "value_not_recorded", "subject": "kv_transfer_config.kv_role"}
 
 
-def test_a_disaggregated_run_whose_topology_is_all_modelled_is_g5_topology_unsupported(tmp_path):
+def test_a_disaggregated_row_with_no_pools_in_it_is_g5_topology_unsupported_by_name(tmp_path):
+    # The row records no workers or GPUs for a pool (pd.py): named, and the generic reason is gone.
     kv = "'kv_transfer_config': KVTransferConfig(kv_connector='NixlConnector', kv_role='kv_producer')"
     env = sc.Env(blis="/nonexistent", blis_release="v0.16.0", blis_commit="a" * 40, catalog=tmp_path,
                  catalog_release="c", registry=tmp_path, registry_release="r", kernel="k", corpora={},
                  field_list=_fields(("kv_transfer_config.kv_role", "modelled"),
                                     ("kv_transfer_config.kv_connector", "modelled")))
     o = sc.score_point(_disagg_entry(tmp_path / "c", kv), tmp_path / "c" / "pull", tmp_path / "w", env)
-    assert o.reasons == ["topology_unsupported"]
-    assert asx.g5_of(o.reasons[0]) == {"code": "topology_unsupported"}
+    assert "topology_unsupported:pd_pool_not_recorded" in o.reasons and "topology_unsupported" not in o.reasons
+    assert asx.g5_of("topology_unsupported:pd_pool_not_recorded") == {"code": "topology_unsupported", "subject": "pd_pool_not_recorded"}
 
 
 def test_the_fabric_reason_is_gone():
     assert not hasattr(pl, "_row_reasons") and not hasattr(pl, "MULTI_NODE_FABRIC")
+
+
+def test_teacup_rubin_july_and_tokenspeed_are_named_engineless_and_no_longer_stop_the_pull():
+    for label in ("teacup", "rubin-july", "tokenspeed"):
+        fw = engines.lookup(label)
+        assert fw.engine is None and fw.router is None and fw.topology == engines.AGGREGATED
+    assert engines.unknown_labels([{"framework": "teacup"}, {"framework": "rubin-july"}, {"framework": "tokenspeed"}]) == []
+    assert engines.unknown_labels([{"framework": "nonesuch"}]) == ["nonesuch"]

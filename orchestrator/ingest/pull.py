@@ -24,6 +24,7 @@ import artifacts as art  # noqa: E402
 import build  # noqa: E402
 import contract  # noqa: E402
 import engines  # noqa: E402
+import pd_recipe as pdr  # noqa: E402
 import recipes as rcp  # noqa: E402
 
 IX_REPO = "SemiAnalysisAI/InferenceX"
@@ -89,8 +90,119 @@ def recipe_checkpoint(row: dict, server_log: str | None, recipes) -> dict | None
         if e.code == 404:
             return None
         raise
-    repo = rcp.checkpoint(recipes.at(sha), row, paths[0])
+    try:
+        repo = rcp.checkpoint(recipes.at(sha), row, paths[0])
+    except rcp.RecipesUnavailable:
+        return None
     return {"repo": repo, "source": "inferencex_recipe", "commit": sha, "served_path": paths[0]} if repo else None
+
+
+def _local_paths(row: dict, server_log: str | None, recipes, setting_keys) -> tuple[list, str | None] | None:
+    """The local paths the log names for the given settings with no HF repo among them, and the
+    commit the run executed; None when the log names a repo or the run's recipes are not readable."""
+    if recipes is None or not server_log:
+        return None
+    import settings as st
+    import support as sp
+    vals = st.read_args(server_log).values
+    named = [x for k in setting_keys for v in vals.get(k, []) for x in (v if isinstance(v, list) else [v])]
+    if any(sp.hf_repo(x) for x in named):
+        return None
+    paths = [x for x in named if isinstance(x, str) and x.startswith("/")]
+    run = api.run_of(row)
+    if not paths or run is None or run_repo(row) != recipes.repo:
+        return None
+    try:
+        return paths, recipes.run_commit(run[0])
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise
+
+
+def recipe_checkpoint_conflict(row: dict, server_log: str | None, recipes) -> dict | None:
+    """The recipe's one checkpoint where the log's served path names another (no checkpoint is
+    taken, and the scorer refuses the point as a value_conflict naming both)."""
+    got = _local_paths(row, server_log, recipes, ("served_model_name", "model"))
+    if got is None:
+        return None
+    paths, sha = got
+    try:
+        repo = rcp.conflicting_checkpoint(recipes.at(sha), row, paths[0])
+    except rcp.RecipesUnavailable:
+        return None
+    return {"repo": repo, "source": "inferencex_recipe", "commit": sha, "served_path": paths[0]} if repo else None
+
+
+def recipe_draft_checkpoint(row: dict, server_log: str | None, recipes) -> dict | None:
+    """When the log names the draft model by a local path, the DRAFT_MODEL the run's benchmark
+    script set at the commit it ran (script and line recorded), whatever the path's name: the
+    scorer compares the two. The draft path that is the served model's own (MTP) is not a draft."""
+    got = _local_paths(row, server_log, recipes, ("speculative_config.model",))
+    if got is None:
+        return None
+    paths, sha = got
+    import settings as st
+    vals = st.read_args(server_log).values
+    served = {x for k in ("served_model_name", "model") for v in vals.get(k, []) for x in (v if isinstance(v, list) else [v])}
+    if paths[0] in served:
+        return None
+    try:
+        rc = recipes.at(sha)
+    except rcp.RecipesUnavailable:
+        return None
+    script = rcp.draft_script(rc, row)
+    found = rcp.draft_model(recipes.script(rc, script)) if script else None
+    if found is None:
+        return None
+    return {"repo": found[0], "source": "inferencex_recipe", "commit": sha, "script": script, "line": found[1],
+            "logged_path": paths[0]}
+
+
+def freeze_pd_recipe(row: dict, recipes, frozen: "Frozen") -> dict:
+    """The recipe a prefill/decode row launched from, frozen with the point, or why
+    it cannot be: {"recipe": {...}} with the recipe file kept as the role `recipe`, else
+    {"recipe_reason": slug} (pd_recipe.SLUGS). Nothing is guessed: the row must be exactly one
+    search-space item of the master configuration at the run's commit, and the file exactly one
+    InferenceX file (pd_recipe's module docstring)."""
+    run = api.run_of(row)
+    if recipes is None or run is None or run_repo(row) != recipes.repo:
+        return {"recipe_reason": pdr.NO_COMMIT}
+    try:
+        sha = recipes.run_commit(run[0])
+        rc = recipes.at(sha)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return {"recipe_reason": pdr.NO_COMMIT}
+        raise
+    except rcp.RecipesUnavailable:
+        return {"recipe_reason": pdr.NO_COMMIT}
+    hits = pdr.master_matches(rc.entries, row)
+    if not hits:
+        return {"recipe_reason": pdr.NO_MASTER}
+    if len({cf for _, cf in hits}) > 1:
+        return {"recipe_reason": pdr.AMBIGUOUS}
+    key, cf = hits[0]
+    if cf is None:
+        return {"recipe_reason": pdr.NO_CONFIG_FILE}
+    hw = row.get("hardware")
+    launch = {p: recipes.blob_text(b) for p, b in sorted(rc.tree.items())
+              if p.startswith("runners/launch_") and p.endswith(".sh") and p.rsplit("/", 1)[-1].startswith(f"launch_{hw}-")}
+    paths = pdr.source_paths(cf, rc.tree, launch, hw)
+    if not paths:
+        return {"recipe_reason": pdr.NOT_IN_TREE}
+    if len({rc.tree[p] for p in paths}) > 1:
+        return {"recipe_reason": pdr.AMBIGUOUS}
+    text = recipes.blob_text(rc.tree[paths[0]])
+    try:
+        pdr.parse(text)
+    except ValueError:
+        return {"recipe_reason": pdr.UNREADABLE}
+    master = dict(rc.entries)[key]
+    frozen.put("recipe", text.encode(), f"{recipes.repo}@{sha}:{paths[0]}")
+    return {"recipe": {"repo": recipes.repo, "commit": sha, "path": paths[0], "config_file": cf, "master_key": key,
+                       "model": master.get("model"), "image": master.get("image"),
+                       "paths_tried": paths}}
 
 
 def client_release(entry: dict, frozen: "Frozen", gh, run_id: str, attempt: int, result_filename: str | None) -> None:
@@ -216,13 +328,14 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
         try:
             text = api.server_log(fetch, row["id"])
         except urllib.error.HTTPError as e:
-            # The API answers 413 for a row whose log it will not serve: a fact about the source's
-            # data, reported to it and listed in the backlog. Any other HTTP error is a fault of
+            # The API answers 413 for a row whose log it will not serve, and 404 for one it holds none
+            # of: a fact about the source's data, reported to it and listed in the backlog. Any other HTTP error is a fault of
             # the run and stays an exception (cmd_pull records it as a pull error).
-            if e.code != 413:
+            if e.code not in (404, 413):
                 raise
             text = None
-            entry["reasons"].append("server_log_missing:api_413")
+            # 404: the API holds no log for the row (a disaggregated row's, for one); the same fact.
+            entry["reasons"].append(f"server_log_missing:api_{e.code}")
         else:
             if text and art.is_server_log(text.encode()):
                 frozen.put("server_log", text.encode(), "api:/server-log")
@@ -235,6 +348,17 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
     ck = recipe_checkpoint(row, server_log, recipes)
     if ck:
         entry["checkpoint"] = ck
+    else:
+        conflict = recipe_checkpoint_conflict(row, server_log, recipes)
+        if conflict:
+            entry["checkpoint_conflict"] = conflict
+    draft = recipe_draft_checkpoint(row, server_log, recipes)
+    if draft:
+        entry["draft_checkpoint"] = draft
+    if row.get("disagg") or row.get("is_multinode"):
+        # A P/D run's log is one worker's, and a multi-node run's is often gone: the recipe it launched from
+        # states each pool's arguments.
+        entry.update(freeze_pd_recipe(row, recipes, frozen))
     entry["files"] = frozen.files
     entry["reasons"] = sorted(set(entry["reasons"]))
     if entry.get("artifact_notes") is not None:

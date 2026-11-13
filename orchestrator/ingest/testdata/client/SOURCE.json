@@ -1,0 +1,39 @@
+[
+  {
+    "repo": "SemiAnalysisAI/InferenceX",
+    "commit": "08d7a9cda233099b1d19aa1ba6ea32446d4d18a0",
+    "path": "utils/bench_serving/benchmark_serving.py",
+    "file_sha256": "40a4bebd80cb6a8eeb3f3666ba49cf9d1d6f6cfa8fbc391c9fc7acc2e20393c3",
+    "excerpt": "calculate_metrics_08d7a9cd.py",
+    "excerpt_lines": [
+      386,
+      491
+    ],
+    "excerpt_sha256": "3d655691ffa63de67f2958d8c0ad91304c6d9a9b0f44e3689e8fad42b50345a1"
+  },
+  {
+    "repo": "SemiAnalysisAI/InferenceX",
+    "commit": "96d6fb58721b9eac4bfd6aec5b6c84e780835d9b",
+    "path": "inferencex-e2e/infx/bench_serving/benchmark_serving.py",
+    "file_sha256": "37fb32baeff1a055caf07bdfff6b9577802479b860ede0667b4299e39015c4e5",
+    "excerpt": "calculate_metrics_96d6fb58.py",
+    "excerpt_lines": [
+      406,
+      503
+    ],
+    "excerpt_sha256": "25478162c349ed435bcb7a5ada0f9618b58b286ef926295f056e4c55c37cadfc"
+  },
+  {
+    "repo": "SemiAnalysisAI/InferenceX",
+    "commit": "96d6fb58721b9eac4bfd6aec5b6c84e780835d9b",
+    "path": "inferencex-e2e/infx/results/fixed_sequence.py",
+    "file_sha256": "fbaaa7610f2bd29696560bb5abe6f4799b1c46a374481dc74e1e16eece4b4983",
+    "excerpt": "writer_unit_mapping_96d6fb58.py",
+    "excerpt_lines": [
+      202,
+      206
+    ],
+    "excerpt_note": "the loop wrapped in a function; nothing else changed",
+    "excerpt_sha256": "2dbe9579b21d66be8ac4019c28df1e683d86ff6cd2e1f3d75ed7f9e8e6f4423a"
+  }
+]

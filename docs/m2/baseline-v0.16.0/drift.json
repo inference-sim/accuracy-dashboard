@@ -1,0 +1,29 @@
+{
+  "frameworks_dropped": [],
+  "points_with_no_unit": {
+    "no_api_row": 95,
+    "not_in_source_revision": 241
+  },
+  "rows_of_those_frameworks": 0,
+  "rows_returned": 6203,
+  "rows_that_differ_from_the_ledger": [
+    "439933",
+    "439934",
+    "439937",
+    "439939",
+    "439940",
+    "439942"
+  ],
+  "snapshot_id": "2026-11-09_blis-v0.15.0_ix-api-2026-11-09",
+  "snapshot_points": 2076,
+  "units": 1740,
+  "units_frozen": 1734,
+  "units_not_frozen": [
+    "4318a4930947a0810f3e256399323e5fcdbb96fce9b1ed9c6c401d4287c3f65d",
+    "60eb2aab0299df38b53e695fdcaaa2e1763a710c0d2689c7417db9ab0725c4ee",
+    "6a411445ff80fec20d42bd7969f777d122e6200ee2a491bb6330cc015ee5cb37",
+    "a534ac1471f70f0adee81ce08137fac28a78672ca8559d698704e3f4ca6291f5",
+    "a74d6dcc6308a5d4a5b4c3406f476441d14e41aa76dc13061996f9262510a7e9",
+    "ca627f53998fca86105b713ab8f474c8111db2e00f522db976c3d7f58751574b"
+  ]
+}

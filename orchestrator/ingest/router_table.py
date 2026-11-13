@@ -1,0 +1,203 @@
+"""The router table (blis-substrate `catalog/routers`) as the dashboard reads it (design §11.3, §11.4;
+dashboard router-table reader).
+
+BLIS hosts llm-d's router only. A run measured behind another router is simulated with an llm-d policy
+only where the table maps that router, mode, session-affinity setting and **build** to a policy, and the
+entry has a measured bound for the regime the point is in; the point then names the router the run used,
+the policy BLIS used, the build, the entry's difference statements and its bound, and is G2 at best
+(`router_differs`), whatever the bound's ratios are: the reader decides from them. Where no entry maps it,
+or the bound says nothing of the point's regime, the point stays G5 `router_unsupported`, with the
+outcome named.
+
+This module reads the substrate's entries and holds none (X7). The shape is the substrate's
+(contracts/spec/routertable): `router`, `mode`, optional `session_affinity_ttl_s`, `revisions` (the router
+builds, as full commits, the entry is shown for), `policy` (an llm-d policy or `none`), `reason`,
+`difference` (statements `{aspect, text, evidence}`), `bound` (`evidence`, `ratios`, `not_measured`) and
+`evidence`. The outcome of looking a run up is the substrate's `Resolve`: `mapped`, `no_policy`,
+`revision_not_covered` or `no_entry`, and a mapped entry adds one more, `no_bound_for_regime`.
+"""
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import yaml
+
+# The router a framework label or a row names, as the table spells it.
+ROUTER_ALIASES = {"dynamo-router": "dynamo"}
+MAPPED, NO_POLICY, REVISION_NOT_COVERED, NO_ENTRY, NO_BOUND = (
+    "mapped", "no_policy", "revision_not_covered", "no_entry", "no_bound_for_regime")
+OUTCOMES = (MAPPED, NO_POLICY, REVISION_NOT_COVERED, NO_ENTRY, NO_BOUND)
+# A ratio above this makes the point's bound wide: the choice of policy can move a figure by a quarter.
+WIDE_RATIO = 1.25
+HEX40 = re.compile(r"^[0-9a-f]{40}$")
+
+# The workloads a bound can name (routertable.WorkloadKinds), by (prompt tokens, output tokens).
+WORKLOADS = {(1024, 1024): "balanced", (8192, 16): "prefill-bound", (256, 2048): "decode-bound"}
+
+
+def router_key(name: str | None) -> str | None:
+    """The table's name for the router a row, a launch configuration or a label names."""
+    if not name:
+        return None
+    n = str(name).split("/", 1)[0]
+    return ROUTER_ALIASES.get(n, n.removesuffix("-router"))
+
+
+def workload_kind(isl, osl) -> str | None:
+    """The workload kind of a point's request lengths, or None where no kind has them."""
+    return WORKLOADS.get((isl, osl))
+
+
+@dataclass
+class Entry:
+    name: str
+    router: str
+    mode: str
+    ttl: int | None
+    policy: str
+    revisions: list = field(default_factory=list)
+    reason: str = ""
+    difference: list = field(default_factory=list)      # [{aspect, text, evidence}]
+    bound: dict | None = None
+    evidence: list = field(default_factory=list)
+
+    def maps(self) -> bool:
+        return self.policy != "none"
+
+    def covers(self, revision: str | None) -> bool:
+        return revision is not None and revision in self.revisions
+
+
+class Table:
+    def __init__(self, entries: list[Entry] | None = None, problems: list[str] | None = None):
+        self.entries = entries or []
+        self.problems = problems or []
+
+    def resolve(self, router: str | None, mode: str | None, ttl: int | None, revision: str | None):
+        """(entry or None, outcome), as the substrate's routertable.Resolve: the entry of this router, mode
+        and session-affinity setting is returned whenever there is one, covered or not."""
+        if router is None or mode is None:
+            return None, NO_ENTRY
+        for e in self.entries:
+            if e.router == router and e.mode == mode and e.ttl == ttl:
+                if not e.covers(revision):
+                    return e, REVISION_NOT_COVERED
+                return e, (NO_POLICY if not e.maps() else MAPPED)
+        return None, NO_ENTRY
+
+
+def load(catalog: Path | None, routers_dir: Path | None = None) -> Table:
+    """The entries of `<catalog>/routers/*.yaml` (or of `routers_dir`, a candidate table for an
+    experiment); none when there is no such directory. A file that is not a RouterMapping, or does not
+    parse, is a problem listed on the table and is not used."""
+    t = Table()
+    d = Path(routers_dir) if routers_dir else (Path(catalog) / "routers" if catalog else None)
+    if d is None or not d.is_dir():
+        return t
+    for f in sorted(d.glob("*.yaml")):
+        try:
+            doc = yaml.safe_load(f.read_text())
+        except yaml.YAMLError:
+            t.problems.append(f"{f.name}: not YAML")
+            continue
+        if not isinstance(doc, dict) or doc.get("kind") != "RouterMapping":
+            t.problems.append(f"{f.name}: not a RouterMapping")
+            continue
+        ttl = doc.get("session_affinity_ttl_s")
+        t.entries.append(Entry(
+            name=f.stem, router=str(doc.get("router")), mode=str(doc.get("mode")),
+            ttl=ttl if isinstance(ttl, int) and not isinstance(ttl, bool) else None, policy=str(doc.get("policy")),
+            revisions=[r for r in (doc.get("revisions") or []) if isinstance(r, str) and HEX40.match(r)],
+            reason=str(doc.get("reason") or "").strip(),
+            difference=[d for d in (doc.get("difference") or []) if isinstance(d, dict)],
+            bound=doc.get("bound") if isinstance(doc.get("bound"), dict) else None,
+            evidence=list(doc.get("evidence") or [])))
+    return t
+
+
+def evidence_text(e: Entry) -> str:
+    """The entry's evidence as one line: each citation `repository@commit:path:lines`."""
+    out = []
+    for c in e.evidence:
+        if isinstance(c, dict):
+            out.append(f"{c.get('repository')}@{c.get('commit')}:{c.get('path')}:{c.get('lines')}")
+    return "; ".join(out) or e.reason
+
+
+POOL_KEYS = ("tp", "pp", "dp", "expert_parallel")
+
+
+def _pool_equal(regime_pool, point_pool) -> bool:
+    """Both name exactly the keys of POOL_KEYS with equal values; anything absent or extra is a mismatch."""
+    if not isinstance(regime_pool, dict) or not isinstance(point_pool, dict):
+        return False
+    for d in (regime_pool, point_pool):
+        if set(d) != set(POOL_KEYS):
+            return False
+    return all(type(regime_pool[k]) is type(point_pool[k]) and regime_pool[k] == point_pool[k] for k in POOL_KEYS)
+
+
+def matched_ratios(e: Entry, *, workload: str | None, conc: int, model: str, hardware: str, shape: str,
+                   engine_version: str | None = None, fabric: str | None = None,
+                   prefill: dict | None = None, decode: dict | None = None) -> list[dict]:
+    """The entry's bound ratios whose regime is exactly the point's, as the substrate's `Regime.Mismatches`
+    states it: the workload kind, the client count LISTED in `regime.concurrencies` (a count between two sampled
+    ones is not covered; nothing is interpolated), the catalog model and hardware part, the engine release, the
+    cluster fabric, the per-instance parallelism of the prefill and the decode pool (`tp`, `pp`, `dp`,
+    `expert_parallel`), and the pool shape (`<n>P<m>D`) in `shapes`. A value the point does not know (None) matches
+    nothing, and a regime that does not state a dimension matches nothing."""
+    kw = dict(workload=workload, conc=conc, model=model, hardware=hardware, shape=shape, engine_version=engine_version,
+              fabric=fabric, prefill=prefill, decode=decode)
+    return [{"metric": r.get("metric"), "against": list(r.get("against") or []), "regime": r.get("regime"),
+             "max_ratio": r.get("max_ratio")}
+            for r in ((e.bound or {}).get("ratios") or []) if regime_holds(r.get("regime") or {}, **kw)]
+
+
+def regime_holds(g: dict, *, workload, conc, model, hardware, shape, engine_version=None, fabric=None, prefill=None, decode=None) -> bool:
+    """Whether the regime `g` is exactly the point's (see matched_ratios)."""
+    if workload is None or g.get("workload") != workload or g.get("model") != model or g.get("hardware") != hardware:
+        return False
+    concs = g.get("concurrencies")
+    if not (isinstance(concs, list) and isinstance(conc, int) and not isinstance(conc, bool)
+            and any(isinstance(c, int) and not isinstance(c, bool) and c == conc for c in concs)):
+        return False
+    return (shape in (g.get("shapes") or []) and isinstance(engine_version, str) and g.get("engine_version") == engine_version
+            and isinstance(fabric, str) and g.get("fabric") == fabric
+            and _pool_equal(g.get("prefill"), prefill) and _pool_equal(g.get("decode"), decode))
+
+
+def carried_bound_covers_point(sub: dict) -> list[str]:
+    """The problems of a router_differs substitution's carried bound against its own regime, as the substrate's
+    `CheckRouterSubstitutions` states them: a ratio whose regime does not hold the point is not carried (the point would
+    have no bound for this regime and stay router_unsupported)."""
+    p = sub.get("regime")
+    if not isinstance(p, dict):
+        return ["a router_differs substitution carries no regime"]
+    out = []
+    for i, r in enumerate((sub.get("bound") or {}).get("ratios") or []):
+        if not regime_holds(r.get("regime") or {}, workload=p.get("workload"), conc=p.get("concurrency"), model=p.get("model"),
+                            hardware=p.get("hardware"), shape=p.get("shape"), engine_version=p.get("engine_version"),
+                            fabric=p.get("fabric"), prefill=p.get("prefill"), decode=p.get("decode")):
+            out.append(f"bound.ratios[{i}] does not hold the point: {NO_BOUND}")
+    return out
+
+
+def substitution(e: Entry, router: str, revision: str, matched: list[dict], point: dict, *, assumed: bool = False) -> dict:
+    """The router_differs substitution of a mapped entry whose bound covers the point: the router, entry, policy,
+    evidence and build, the entry's difference statements (aspect and text), the point's own regime, and the entry's bound
+    cut to the ratios whose regime holds the point (what the substrate's `Entry.BoundFor` carries and its
+    `CheckRouterSubstitutions` recomputes), the rest of the bound as the entry states it."""
+    detail = f"the run's {router} router ran mode {e.mode}; BLIS ran llm-d's {e.policy} policy"
+    if assumed:
+        detail += (f"; the run records its router build as a wheel version, not a commit, and the build {revision} "
+                   f"was ASSUMED for this experiment")
+    return {"kind": "router_differs", "subject": router, "entry": e.name, "policy": e.policy,
+            "evidence": evidence_text(e), "revision": revision,
+            "difference": [{"aspect": d.get("aspect"), "text": d.get("text")} for d in e.difference],
+            "regime": point, "bound": {**(e.bound or {}), "ratios": matched}, "detail": detail}
+
+
+def bound_wide(matched: list[dict]) -> bool:
+    return any(isinstance(m.get("max_ratio"), (int, float)) and m["max_ratio"] > WIDE_RATIO for m in matched)

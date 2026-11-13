@@ -26,26 +26,17 @@ one of them to say nothing it does not already say. harness.LoadBundle reads the
 # What the corpus states, and what it does not
 
 STATED, and written here: tp_size, pp_size, attention_dp_size, moe_ep_size, moe_tp_size,
-framework, precision, serving, gpu, model.
+framework, precision (as the quantization it names), serving, gpu, model.
 
-NOT stated by the artifact corpus, and therefore set here: max_num_seqs, max_model_len,
-gpu_memory_utilization, cudagraph_mode. block_size is never set here: the engine repository owns
-engine defaults and a generator never writes one (X19, VLM-1), so it is written only when the run
-stated it, and otherwise left out for the engine to resolve or refuse (blis-vllm #68). A sweep carrying `stated_config` (the
-InferenceX direct corpus: what the run's own args line passed) supplies
-gpu_memory_utilization, block_size, enable_prefix_caching and the speculative config, which
-are then written as stated. gpu_memory_utilization not stated is vLLM v0.31.0's default,
-0.92 (vllm/config/cache.py:103); prefix caching and speculation not stated are left out, so
-v0.31.0's defaults apply (caching on, no drafting). A stated drafter the catalog graph does
-not describe is not written (see UNPRICED_SPECULATORS), and the file's header says so.
-The rest are NOT vLLM's defaults, and the written header says how each differs:
-max_num_seqs 256 is the default only below 70 GiB or on an A100
-(EngineArgs.get_batch_defaults, vllm/engine/arg_utils.py); cudagraph_mode's default is
-FULL_AND_PIECEWISE (vllm/config/compilation.py). They are held fixed so committed scores stay comparable,
-and the comparison scores the RATIO of step times across concurrency at a fixed deployment,
-which is what a setting held constant affects least. Where a value could NOT be held it is
-derived from the workload instead -- max_model_len must admit the longest sequence the
-workload runs, or the scenario would describe a deployment that cannot serve its own points.
+A sweep carrying `stated_config` (the InferenceX direct corpus: what the run's own args line
+passed) supplies max_model_len, gpu_memory_utilization, block_size, enable_prefix_caching and the
+speculative config, which are written as stated. Nothing else is written (X19): a setting the
+run did not state is left out of the engine block, and the engine resolves it from its own
+defaults or refuses the file, which the scorer reads as value_not_recorded. In particular this
+file holds no default of vLLM's (max_num_seqs, max_num_batched_tokens, cudagraph_mode,
+gpu_memory_utilization, block_size, the KV cache dtype) and sizes nothing from the workload. A
+stated drafter the catalog graph does not describe is not written (see UNPRICED_SPECULATORS), and
+the file's header says so.
 
 # Expert parallelism
 
@@ -72,12 +63,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "ingest"))
 import blis_commands as bc  # noqa: E402
 import stack as sk  # noqa: E402
+import settings as st  # noqa: E402
 import support as sp  # noqa: E402
 
 COEFFICIENTS = (
     "[cost-model-primitives, cost-model-collectives, cost-model-host-overheads, "
     "cost-model-attention, cost-model-recurrent, cost-model-memory]"
 )
+
+# A multi-node scenario also carries the fabric efficiency; without it the handoff is priced 23% fast.
+COEFFICIENTS_MULTINODE = COEFFICIENTS[:-1] + ", cost-model-fabric]"
 
 # Artifact precision -> the engine's quantization name. bf16 means the checkpoint is served
 # unquantised, which the schema spells as an absent quantization rather than a name.
@@ -88,18 +83,10 @@ COEFFICIENTS = (
 # compressed-tensors at group_size 32, which the catalog derives as weight_dtype int4.
 QUANT = {"fp4": "nvfp4", "fp8": "fp8", "bf16": None, "int4": None}
 
-# vLLM v0.31.0's CacheConfig.gpu_memory_utilization default (vllm/config/cache.py:103).
-GPU_MEMORY_UTILIZATION_DEFAULT = 0.92
-
 # Stated drafters the catalog graph does not describe: the kernel refuses a deployment that
 # drafts with a method other than its graph's speculator (liftDraft, draft.go). MiniMax-M3's
 # graph states its own MTP head; EAGLE3 runs a separate draft checkpoint.
 UNPRICED_SPECULATORS = {("minimax-m3", "eagle3")}
-
-# A KV cache dtype is not stated by the corpus. fp8 KV is the default for the fp8 and fp4
-# arms in these frameworks; bf16 serving keeps an unquantised cache.
-CACHE_DTYPE = {"fp4": "fp8", "fp8": "fp8", "bf16": "auto", "int4": "auto"}
-
 
 
 class PackagingError(ValueError):
@@ -122,21 +109,7 @@ def node_size(dep: dict, packaging: dict) -> int:
     return recorded
 
 
-def context_length(workloads: set[str]) -> int:
-    """The smallest power-of-two window that admits every workload in this deployment.
-
-    A workload identity is "<isl>:<osl>"; a request occupies isl+osl tokens at its longest.
-    Rounded up to a power of two because that is how these engines are configured, and kept
-    at least 32768 so a short workload does not produce an implausibly tight window.
-    """
-    longest = max(sum(int(p) for p in w.split(":")) for w in workloads)
-    window = 32768
-    while window < longest:
-        window *= 2
-    return window
-
-
-def emit(dep: dict, workloads: set[str], labels: set[str], packaging: dict, engine_release: str) -> str:
+def emit(dep: dict, labels: set[str], packaging: dict, engine_release: str) -> str:
     """The scenario+deployment file. `packaging` is what the chip's catalog entry fixes:
     {"gpus_per_node", "gpus_per_rack"}, each the entry's value or None (Catalog.packaging).
     The cluster states gpus_per_node only for a chip whose entry fixes none, and never states
@@ -149,14 +122,15 @@ def emit(dep: dict, workloads: set[str], labels: set[str], packaging: dict, engi
     ranks = tp * dp
     per_node = node_size(dep, packaging)
     nodes = max(1, -(-ranks // per_node))
+    fabric = st.fabric_for(None, dep["gpu"])[0] if nodes > 1 else None
     quant = QUANT[dep["precision"]]
     stated = dep.get("stated_config", {})
-    # A stated max_model_len is the run's own (None: left unset, so the engine resolves it, X19);
-    # otherwise it is sized to the longest isl+osl the deployment's workloads run.
-    max_len = stated["max_model_len"] if "max_model_len" in stated else context_length(workloads)
+    # Each engine setting below is written only when the run stated it; an unstated one is left
+    # to the engine (X19). A stated max_model_len of None is a run that recorded none.
+    max_len = stated.get("max_model_len")
     name = dep["scenario"][: -len(".yaml")]
     block_size = stated.get("block_size")        # None: not stated, so left to the engine (X19)
-    gmu = stated.get("gpu_memory_utilization", GPU_MEMORY_UTILIZATION_DEFAULT)
+    gmu = stated.get("gpu_memory_utilization")
     spec = stated.get("speculative_method")
     unpriced_spec = (dep["model"], spec) in UNPRICED_SPECULATORS
 
@@ -171,9 +145,8 @@ def emit(dep: dict, workloads: set[str], labels: set[str], packaging: dict, engi
         f"# moe_ep_size {ep}, moe_tp_size {par['moe_tp_size']}. Workloads scored at this",
         f"# deployment: {', '.join(sorted(labels))}.",
         "#",
-        f"# gpu_memory_utilization {gmu}: "
-        + ("stated by the run." if "gpu_memory_utilization" in stated else
-           "not stated, so vLLM v0.31.0's default (vllm/config/cache.py:103)."),
+        "# gpu_memory_utilization: " + ("stated by the run." if gmu is not None else
+                                         "not stated by the run, so not written; the engine resolves it."),
         "# block_size: " + (f"{block_size}, stated by the run." if block_size is not None else
                            "not stated by the run, so not written; the engine resolves it or refuses the file."),
     ]
@@ -190,15 +163,9 @@ def emit(dep: dict, workloads: set[str], labels: set[str], packaging: dict, engi
         lines.append("# speculative: stated by the run.")
     lines += [
         "#",
-        "# max_num_seqs and cudagraph_mode are not in the corpus, so they are set here -- and not",
-        "# to vLLM's defaults. max_num_seqs 256 is its default only below 70 GiB or on an A100;",
-        "# and its cudagraph_mode",
-        "# default is FULL_AND_PIECEWISE, not PIECEWISE. They are held",
-        "# fixed so committed scores stay comparable; moving them to the engine's defaults is a",
-        "# re-scoring decision. The comparison scores a ratio across concurrency at a fixed",
-        "# deployment, which is what a setting held constant affects least. max_model_len is",
-        "# derived from the workload instead, since a window shorter than isl+osl would describe a",
-        "# deployment that cannot serve its own points.",
+        "# No other engine setting is written: the corpus does not state max_num_seqs,",
+        "# max_num_batched_tokens, the KV cache dtype or the CUDA-graph mode, and a generator writes no",
+        "# engine default (X19).",
     ]
     lines += [
         "kind: Scenario",
@@ -210,7 +177,7 @@ def emit(dep: dict, workloads: set[str], labels: set[str], packaging: dict, engi
         f'  version: "{engine_release}"',
         "",
         f"model: {dep['model']}",
-        f"coefficients: {COEFFICIENTS}",
+        f"coefficients: {COEFFICIENTS_MULTINODE if nodes > 1 and fabric is not None else COEFFICIENTS}",
         "",
         # The hardware inventory lives inside the cluster: it is what the problem is
         # handed and a deployment cannot change it.
@@ -218,7 +185,14 @@ def emit(dep: dict, workloads: set[str], labels: set[str], packaging: dict, engi
         f"  hardware: {dep['gpu']}",
     ]
     if nodes > 1:
-        lines.append("  fabric: ib-400g")
+        # No InferenceX record names a cluster's fabric class (settings.fabric_for): by default none is written
+        # and the file says so (the scorer then reads it as value_not_recorded, X19); under the maintainer's
+        # switch the chip generation's NIC class is ASSUMED and written.
+        if fabric is None:
+            lines.append("  # fabric: NOT WRITTEN. No record names this cluster's fabric class (value_not_recorded:cluster.fabric).")
+        else:
+            lines.append(f"  # fabric: ASSUMED. No record names this cluster's fabric class; {fabric} is the class of the chip's NIC.")
+            lines.append(f"  fabric: {fabric}")
     lines.append(f"  nodes: {nodes}")
     if packaging["gpus_per_node"] is None:
         lines.append(f"  gpus_per_node: {per_node}")
@@ -242,19 +216,9 @@ def emit(dep: dict, workloads: set[str], labels: set[str], packaging: dict, engi
     ]
     if quant is not None:
         lines.append(f"      quantization: {quant}")
-    lines += [
-        f"      cache_dtype: {CACHE_DTYPE[dep['precision']]}",
-        "      max_num_batched_tokens: 8192",
-        "      max_num_seqs: 256",
-    ]
-    if max_len is not None:
-        lines.append(f"      max_model_len: {max_len}")
-    if block_size is not None:
-        lines.append(f"      block_size: {block_size}")
-    lines += [
-        "      cudagraph_mode: PIECEWISE",
-        f"      gpu_memory_utilization: {gmu}",
-    ]
+    for key, value in (("max_model_len", max_len), ("block_size", block_size), ("gpu_memory_utilization", gmu)):
+        if value is not None:
+            lines.append(f"      {key}: {value}")
     if "enable_prefix_caching" in stated:
         pc = str(stated["enable_prefix_caching"]).lower()
         lines.append(f"      enable_prefix_caching: {pc}")
@@ -283,7 +247,6 @@ def main() -> int:
         corpus = json.load(fh)
 
     deps: dict[str, dict] = {}
-    workloads = collections.defaultdict(set)
     labels = collections.defaultdict(set)
     for s in corpus["sweeps"]:
         name = s["scenario"]
@@ -309,7 +272,6 @@ def main() -> int:
         if prior is not None and prior["parallelism"] != par:
             return fail(f"{name}: two deployments share one scenario name")
         deps[name] = s
-        workloads[name].add(s["workload"])
         labels[name].add(s["label"])
 
     os.makedirs(args.out, exist_ok=True)
@@ -318,7 +280,7 @@ def main() -> int:
     cat = sp.Catalog(blis=str(Path(args.blis).resolve()), root=Path(args.catalog))
     for name, dep in sorted(deps.items()):
         try:
-            text = emit(dep, workloads[name], labels[name], cat.packaging(dep["gpu"]), engine_release)
+            text = emit(dep, labels[name], cat.packaging(dep["gpu"]), engine_release)
         except (PackagingError, bc.CommandError) as e:
             return fail(str(e))
         path = os.path.join(args.out, name)

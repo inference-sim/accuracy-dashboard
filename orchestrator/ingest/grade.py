@@ -52,7 +52,19 @@ G5_CODES = (
 # for it yet.
 G2_KINDS = ("coefficient_method", "coefficient_range", "execution_mode", "kernel_hash", "value_class",
             "estimated", "interim_status", "resolved_differs", "client_difference",
-            "later_record")
+            "later_record", "router_differs", "unevaluated")
+# router_differs is §11.3's "the run's router, which BLIS does not host, was replaced by an llm-d
+# policy from the router table" (design change blis-design#1; blis-substrate router table).
+
+# The keys a substitution of a kind names, as blis-substrate's point record requires them: a
+# later_record the record and its date, a router_differs the entry, the policy, the router table's
+# evidence, the router build (a full commit), and the entry's difference and bound (its subject is the router the run used; the
+# difference and bound are copied from the entry as it states them), a client_difference and a resolved_differs
+# the detail. A key belongs to its own kind only.
+KIND_KEYS = {"later_record": ("record", "date"),
+             "router_differs": ("entry", "policy", "evidence", "revision", "difference", "regime", "bound")}
+DETAIL_KINDS = ("client_difference", "resolved_differs")
+_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # Four of design §11.3's G1 conditions cannot be checked yet, because no source carries the
 # datum: a library's kernel hash (the run's server log and launch configuration name library
@@ -60,8 +72,12 @@ G2_KINDS = ("coefficient_method", "coefficient_range", "execution_mode", "kernel
 # file only), a coefficient lookup's extrapolated or unidentified range, a modelled field's value
 # class, and the resolved values the engine would choose. Each is named on every scored point as
 # a G2 substitution of its own kind, so no G1 and no G3 is published for a condition nobody
-# graded. A kind leaves this table when its condition is graded from data.
-NOT_CHECKED_SUBJECT = "not checked"
+# graded. A condition is evaluated from data by g1.py; the point names its kind only when the data
+# is absent for that point (score.evaluate_g1), or when the condition is false.
+# An unevaluated condition is recorded as the substrate records it (pointrecord.SubUnevaluated):
+# kind `unevaluated`, whose subject is the condition, named by the kind that would record its failure.
+# The kind `kernel_hash` (and the other three) is then only ever a condition found false.
+NOT_CHECKED_KIND = "unevaluated"
 UNCHECKED_KINDS = ("coefficient_range", "kernel_hash", "resolved_differs", "value_class")
 G34_KINDS = ("other_release", "changed_functions", "nightly_or_custom", "ported_functions_unpublished")
 
@@ -108,10 +124,11 @@ class Graded:
     g5: dict | None = None                               # {"code", "subject"} when G5
 
 
-def unchecked() -> list[dict]:
-    """The substitutions naming the G1 conditions that are not graded yet (UNCHECKED_KINDS)."""
-    return [{"kind": k, "subject": NOT_CHECKED_SUBJECT, "detail": f"{k} is not graded yet"}
-            for k in UNCHECKED_KINDS]
+def unchecked(kinds=None) -> list[dict]:
+    """The substitutions naming the G1 conditions that are unevaluated: all of UNCHECKED_KINDS, or
+    the given ones, the conditions whose data is not present for the point (g1.evaluate)."""
+    kinds = UNCHECKED_KINDS if kinds is None else tuple(k for k in UNCHECKED_KINDS if k in kinds)
+    return [{"kind": NOT_CHECKED_KIND, "subject": k, "detail": f"{k} is unevaluated"} for k in kinds]
 
 
 def _sorted(subs: list[dict]) -> list[dict]:
@@ -122,6 +139,41 @@ def _sorted(subs: list[dict]) -> list[dict]:
             seen.add(k)
             out.append(s)
     return out
+
+
+# The conditions of G1 a point can leave unevaluated (pointrecord's g1Conditions): the subject of an
+# `unevaluated` substitution is one of these, the kind that would record the condition's failure.
+G1_CONDITIONS = ("coefficient_method", "coefficient_range", "execution_mode", "kernel_hash", "value_class",
+                 "interim_status", "resolved_differs", "client_difference", "other_release")
+
+
+def _check_keys(s: dict) -> None:
+    if s["kind"] == NOT_CHECKED_KIND and s["subject"] not in G1_CONDITIONS:
+        raise GradeError(f"an unevaluated substitution names {s['subject']!r}, which is not a condition of G1 "
+                         f"({', '.join(G1_CONDITIONS)})")
+    need = KIND_KEYS.get(s["kind"], ())
+    for k in need:
+        if not s.get(k):
+            raise GradeError(f"a {s['kind']} substitution on {s['subject']!r} names no {k}")
+    if s["kind"] in DETAIL_KINDS and not s.get("detail"):
+        raise GradeError(f"a {s['kind']} substitution on {s['subject']!r} names no detail")
+    for k in ("record", "date", "entry", "policy", "evidence", "revision", "difference", "regime", "bound"):
+        if s.get(k) is not None and k not in need:
+            raise GradeError(f"{k} is not a key of {s['kind']} (substitution on {s['subject']!r})")
+    if s["kind"] == "router_differs":
+        if s["policy"] in ("", "none"):      # the policy is the router table's own; "none" records that no policy is close enough
+            raise GradeError(f"a router_differs substitution names policy {s['policy']!r}: the router table maps no policy")
+        if not s["entry"].startswith(s["subject"] + "-"):
+            raise GradeError(f"router table entry {s['entry']!r} is not an entry of the router {s['subject']!r}")
+    if s["kind"] == "router_differs":
+        import router_table as _rt
+        bad = _rt.carried_bound_covers_point(s)
+        if bad:
+            raise GradeError(f"router_differs on {s['subject']!r}: {'; '.join(bad)}")
+    if s["kind"] == "router_differs" and not re.match(r"^[0-9a-f]{40}$", str(s["revision"])):
+        raise GradeError(f"a router_differs revision is a full 40-hex commit, got {s['revision']!r}")
+    if s["kind"] == "later_record" and not _DATE.match(s["date"]):
+        raise GradeError(f"a later_record date is YYYY-MM-DD, got {s['date']!r}")
 
 
 def grade(*, engine_version: str, release: Release, substitutions: list[dict],
@@ -142,6 +194,7 @@ def grade(*, engine_version: str, release: Release, substitutions: list[dict],
             raise GradeError(f"substitution kind {s.get('kind')!r} is not a G2 condition")
         if not s.get("subject"):
             raise GradeError(f"a {s['kind']} substitution names no subject")
+        _check_keys(s)
     if g5:
         for r in g5:
             if r.get("code") not in G5_CODES:

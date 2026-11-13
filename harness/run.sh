@@ -9,9 +9,14 @@
 #                       to blis, and reads two facts from them that no blis command prints yet,
 #                       the graph's speculator method and the registry's coefficient scopes
 #                       (orchestrator/ingest/support.py, TEMPORARY).
-#                       --catalog-release TAG and --registry-release TAG name the releases the two
-#                       directories are at. The directories may carry no git history (a container
-#                       mount), so the scorer is told the names, not left to read them.
+#                       --catalog-release PIN and --registry-release PIN name what the two
+#                       directories are at: a release tag (vMAJOR.MINOR.PATCH, with an optional
+#                       pre-release suffix) or a full 40-hex commit, as --sim does ("from any pinned
+#                       release or commit", design §11.7; while a stack is open its pins are
+#                       commits). A branch name or a short hash is refused. The directories may
+#                       carry no git history (a copy of the data), so the scorer is told the
+#                       names, not left to read them, and records each exactly as given. A figure
+#                       whose data is pinned by commit is experimental, as one whose build is.
 #   a set of units      --units FILE, the ledger units to score, and --pull DIR, their frozen
 #                       recorded runs.
 #
@@ -22,17 +27,17 @@
 # release the build runs. TEMPORARY until the M2 substrate release lets the build print its own
 # list through `blis fields`.
 #
-# The harness digest. Every figure records the digest of the harness that produced it (X8). An
-# image cannot hold its own digest, since the digest is known only after the image is built.
-# So the caller states it: a repository that runs the harness pulls it by the digest in its pin
-# file and passes that digest as the environment variable HARNESS_DIGEST (sha256:<64 hex>). When
-# HARNESS_DIGEST is unset the run records "unreleased", and its figures are labelled
-# experimental: they may be posted on a pull request, never published as BLIS's accuracy.
+# The harness commit. Every figure records the commit of the harness that produced it (X8). The
+# harness is this script and the scorer beside it, run from a checkout, so the commit is the
+# checkout's HEAD. A checkout whose harness files (harness/, orchestrator/, schemas/) differ from
+# HEAD is refused: its figures could not be regenerated from any commit. A copy of the tree with
+# no git history (an exported archive) names its commit in the environment variable HARNESS_COMMIT
+# (40 hex); when both exist the variable is checked against HEAD, and a mismatch is refused.
 #
 # Usage:
 #   run.sh --sim <tag|commit> [--sim-repo URL] --units FILE --pull DIR --out DIR
 #          --catalog DIR --registry DIR --corpus-dir DIR
-#          --fields FILE --catalog-release TAG --registry-release TAG [--max-rss-mb N]
+#          --fields FILE --catalog-release PIN --registry-release PIN [--max-rss-mb N]
 #   run.sh --check-args <the same flags>     validate the flags, do nothing else
 #
 # Exit status: 0 on success, 2 for a refused flag or value, otherwise the failing step's status.
@@ -90,14 +95,19 @@ fi
 [ -n "$corpus_dir" ] || refuse "--corpus-dir is required: the directory of AgentX corpora, <workload>/<file>, that resolve_agentic_corpus.py --all fetched"
 [ -n "$fields" ] || refuse "--fields is required: the engine's fields.json for the release the simulator runs (the pinned blis-vllm release's file)"
 
-[ -n "$catalog_release" ] || refuse "--catalog-release is required: the release tag the catalog is at"
-[ -n "$registry_release" ] || refuse "--registry-release is required: the release tag the registry is at"
+[ -n "$catalog_release" ] || refuse "--catalog-release is required: the release tag or full 40-hex commit the catalog is at"
+[ -n "$registry_release" ] || refuse "--registry-release is required: the release tag or full 40-hex commit the registry is at"
+check_pin() {
+  [[ "$2" =~ ^[0-9a-f]{40}$ || "$2" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] ||
+    refuse "$1 $2 is neither a release tag (vMAJOR.MINOR.PATCH) nor a full 40-hex commit; a branch name or a short hash is refused because it names no one tree"
+}
+check_pin --catalog-release "$catalog_release"
+check_pin --registry-release "$registry_release"
 
-digest="${HARNESS_DIGEST:-unreleased}"
-if [ "$digest" != unreleased ] && ! [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-  refuse "HARNESS_DIGEST $digest is not sha256:<64 hex>"
+harness_commit="${HARNESS_COMMIT:-}"
+if [ -n "$harness_commit" ] && ! [[ "$harness_commit" =~ ^[0-9a-f]{40}$ ]]; then
+  refuse "HARNESS_COMMIT $harness_commit is not a full 40-hex commit"
 fi
-
 if [ "$check_only" = 1 ]; then
   echo "run.sh: flags valid (--sim $sim is a $sim_kind)"
   exit 0
@@ -107,6 +117,33 @@ fi
 [ -d "$pull" ] || refuse "--pull $pull is not a directory"
 [ -d "$corpus_dir" ] || refuse "--corpus-dir $corpus_dir is not a directory"
 [ -f "$fields" ] || refuse "--fields $fields is not a file"
+
+# The checkout is this repository only when git's top level is $root itself: a copy unpacked
+# inside some other repository would otherwise record that repository's commit.
+is_checkout() {
+  local top
+  top="$(git -C "$root" rev-parse --show-toplevel 2>/dev/null)" || return 1
+  [ "$(cd "$top" && pwd -P)" = "$(cd "$root" && pwd -P)" ]
+}
+
+# The files that make the figures: the published data beside them changes during a night. An
+# untracked file counts, since a new module in a script directory changes the figures too.
+check_clean() {
+  if [ -n "$(git -C "$root" status --porcelain --untracked-files=normal -- harness orchestrator schemas requirements-ci.txt)" ]; then
+    refuse "the harness files of $root differ from its commit $head_commit; its figures could not be regenerated from a commit (X8)"
+  fi
+}
+
+if is_checkout; then
+  head_commit="$(git -C "$root" rev-parse HEAD)"
+  if [ -n "$harness_commit" ] && [ "$harness_commit" != "$head_commit" ]; then
+    refuse "HARNESS_COMMIT $harness_commit is not the checkout's HEAD $head_commit"
+  fi
+  check_clean
+  harness_commit="$head_commit"
+elif [ -z "$harness_commit" ]; then
+  refuse "the harness at $root is not a git checkout and HARNESS_COMMIT is not set; every figure records the harness commit (X8)"
+fi
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -131,9 +168,14 @@ echo "run.sh: inference-sim $sim at $got" >&2
 ( cd "$src" && go mod download && go build -o "$src/blis" main.go )
 
 args=(score --pull "$pull" --out "$out" --blis "$src/blis" --units "$units"
-      --sim-build "$sim" --harness-digest "$digest" --catalog "$catalog" --registry "$registry"
+      --sim-build "$sim" --harness-commit "$harness_commit" --catalog "$catalog" --registry "$registry"
       --corpus-dir "$corpus_dir" --fields "$fields"
       --catalog-release "$catalog_release" --registry-release "$registry_release")
 # The replay memory ceiling is passed on only when given.
 [ -z "$max_rss_mb" ] || args+=(--max-rss-mb "$max_rss_mb")
+# The clone and the build take minutes: look at the harness again just before it runs.
+if is_checkout; then
+  [ "$(git -C "$root" rev-parse HEAD)" = "$head_commit" ] || refuse "the harness checkout moved from $head_commit while the simulator was built"
+  check_clean
+fi
 python3 "$root/orchestrator/ingest/cli.py" "${args[@]}"

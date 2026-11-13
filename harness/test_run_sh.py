@@ -1,8 +1,8 @@
-"""Tests for the scoring harness's entrypoint (run.sh) and its release workflow.
+"""Tests for the scoring harness's entrypoint (run.sh) and the absence of an image path.
 
 run.sh's flags are checked with --check-args, which validates and exits without cloning or
 building. The real path is run against a local bare git repository standing in for inference-sim,
-with a fake `go`, so these tests need no network. The workflow is checked as YAML.
+with a fake `go`, so these tests need no network. The workflows are checked as YAML.
 """
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -18,7 +19,7 @@ import yaml
 
 HERE = Path(__file__).resolve().parent
 RUN = HERE / "run.sh"
-WORKFLOW = HERE.parent / ".github" / "workflows" / "harness-release.yml"
+WORKFLOWS = sorted((HERE.parent / ".github" / "workflows").glob("*.yml"))
 COMMIT = "0123456789abcdef0123456789abcdef01234567"
 GOOD = ["--units", "units.txt", "--pull", "pull", "--out", "out", "--catalog", "c", "--registry", "r",
         "--corpus-dir", "k", "--fields", "/dev/null", "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0"]
@@ -34,6 +35,22 @@ def test_a_release_tag_and_a_full_commit_are_accepted():
     for sim in ("v0.16.0", "v0.16.0-rc.1", COMMIT):
         p = check("--sim", sim, *GOOD)
         assert p.returncode == 0, p.stderr
+
+
+def test_the_data_pins_are_a_tag_or_a_full_commit_and_nothing_else():
+    flags = ("--catalog-release", "--registry-release")
+
+    def with_pin(flag, value):
+        out = list(GOOD)
+        out[out.index(flag) + 1] = value
+        return out
+    for flag in flags:
+        for ok in ("v0.3.0", "v0.3.0-rc.1", COMMIT):
+            p = check("--sim", "v0.16.0", *with_pin(flag, ok))
+            assert p.returncode == 0, (flag, ok, p.stderr)
+        for bad in ("main", "m2/10-router-table", COMMIT[:7], COMMIT[:12], COMMIT.upper(), "0.3.0", "v1"):
+            p = check("--sim", "v0.16.0", *with_pin(flag, bad))
+            assert p.returncode == 2 and f"{flag} {bad}" in p.stderr and "40-hex commit" in p.stderr, (flag, bad)
 
 
 def test_a_branch_name_is_refused():
@@ -65,7 +82,7 @@ def test_the_field_list_is_a_required_file():
     p = subprocess.run(["bash", str(RUN), "--sim", "v0.16.0", *[("/no/such/file" if GOOD[i - 1] == "--fields" else x)
                                                                for i, x in enumerate(GOOD)]],
                        capture_output=True, text=True)
-    assert p.returncode == 2 and "--fields /no/such/file is not a file" in p.stderr or "--units" in p.stderr
+    assert p.returncode == 2 and ("--fields /no/such/file is not a file" in p.stderr or "--units" in p.stderr)
 
 
 def test_the_data_releases_are_required_and_passed_to_the_scorer():
@@ -93,55 +110,22 @@ def test_the_corpus_directory_is_required_and_the_corpus_file_flags_are_gone():
         assert p.returncode == 2 and f"unknown flag {flag}" in p.stderr, flag
 
 
-def test_a_malformed_harness_digest_is_refused():
-    assert check("--sim", "v0.16.0", *GOOD, env={"HARNESS_DIGEST": "sha256:" + "a" * 64}).returncode == 0
-    p = check("--sim", "v0.16.0", *GOOD, env={"HARNESS_DIGEST": "latest"})
-    assert p.returncode == 2
-    assert "HARNESS_DIGEST latest" in p.stderr
+def test_a_malformed_harness_commit_is_refused():
+    assert check("--sim", "v0.16.0", *GOOD, env={"HARNESS_COMMIT": "a" * 40}).returncode == 0
+    for bad in ("latest", "v0.4.0", "a" * 12, "sha256:" + "a" * 64):
+        p = check("--sim", "v0.16.0", *GOOD, env={"HARNESS_COMMIT": bad})
+        assert p.returncode == 2 and f"HARNESS_COMMIT {bad}" in p.stderr, bad
 
 
-# ------------------------------------------------------------------ the release workflow
-
-def workflow() -> dict:
-    return yaml.safe_load(WORKFLOW.read_text())
-
-
-def triggers(doc: dict) -> dict:
-    # PyYAML reads the bare key `on` as the boolean True.
-    return doc.get("on", doc.get(True))
-
-
-def test_the_workflow_runs_only_on_release_tags_and_dispatch():
-    on = triggers(workflow())
-    assert set(on) == {"push", "workflow_dispatch"}
-    assert on["push"] == {"tags": ["v*"]}
-
-
-def test_every_action_is_pinned_to_a_commit():
-    uses = re.findall(r"^\s*-?\s*uses:\s*(\S+)", WORKFLOW.read_text(), re.M)
-    assert uses
-    for u in uses:
-        assert re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", u), f"{u} is not pinned to a commit SHA"
-
-
-def test_the_image_is_signed_by_digest():
-    steps = [s for j in workflow()["jobs"].values() for s in j["steps"]]
-    signs = [s for s in steps if "cosign sign" in s.get("run", "")]
-    assert len(signs) == 1
-    run, env = signs[0]["run"], signs[0].get("env", {})
-    # Either the digest is written in the command, or the command names $DIGEST and the step
-    # takes DIGEST from the build step's digest output.
-    by_literal = re.search(r"@(sha256:|\$\{\{[^}]*digest[^}]*\}\})", run)
-    by_env = re.search(r"@\$\{?DIGEST\}?", run) and "outputs.digest" in env.get("DIGEST", "")
-    assert by_literal or by_env, run
-    assert any("cosign verify" in s.get("run", "") for s in steps)
-
-
-def test_only_the_release_job_may_request_an_oidc_token():
-    doc = workflow()
-    assert "id-token" not in (doc.get("permissions") or {})
-    holders = [n for n, j in doc["jobs"].items() if (j.get("permissions") or {}).get("id-token") == "write"]
-    assert holders == ["release"]
+def test_no_container_or_signing_path_is_left():
+    # X23, COV-1: the harness is a script. Nothing in the repository builds, signs, pulls or runs an image.
+    for gone in ("harness/Dockerfile", "harness/image.pin", ".github/workflows/harness-release.yml",
+                 "orchestrator/ingest/harness_pin.py"):
+        assert not (HERE.parent / gone).exists(), gone
+    for f in [*WORKFLOWS, RUN, HERE.parent / "orchestrator" / "ingest" / "cli.py", HERE.parent / "README.md"]:
+        text = f.read_text()
+        for word in ("docker", "cosign", "HARNESS_DIGEST", "harness_pin"):
+            assert word not in text, f"{f.name} mentions {word}"
 
 
 # ------------------------------------------------------------------ the real path
@@ -153,7 +137,7 @@ def git(*args, cwd=None):
 
 
 def mounted_dir(path: Path) -> Path:
-    """A data directory as the harness image receives it: mounted, with no .git."""
+    """A data directory as a copy of the data has it, with no .git."""
     path.mkdir(parents=True)
     assert not (path / ".git").exists()
     return path
@@ -183,11 +167,21 @@ def real_setup(tmp: Path, tag: str = "v0.16.0"):
     git("clone", "-q", "--bare", str(work), str(bare))
     bin_ = tmp / "bin"
     bin_.mkdir()
-    # `go mod download` does nothing; `go build -o OUT main.go` writes a fake blis script at OUT.
+    # `go mod download` does nothing; `go build -o OUT main.go` copies a fake blis script to OUT.
+    # The stand-in `blis` is an ordinary file the fake go copies to the output path, so no quoting layer
+    # sits between this test and the shell it runs: like v0.16.0 it answers `metrics` with the
+    # unknown-command error and exits 1, and anything else with success.
+    fake_blis = bin_ / "fake-blis.sh"
+    fake_blis.write_text('#!/bin/sh\n'
+                         'if [ "$1" = metrics ]; then\n'
+                         '  echo "Error: unknown command \\"metrics\\" for \\"blis\\"" >&2\n'
+                         '  exit 1\n'
+                         'fi\n'
+                         'exit 0\n')
     go = bin_ / "go"
     go.write_text('#!/bin/sh\n'
                   'if [ "$1 $2" = "mod download" ]; then exit 0; fi\n'
-                  'if [ "$1 $2" = "build -o" ]; then printf "#!/bin/sh\\nexit 0\\n" > "$3"; chmod +x "$3"; exit 0; fi\n'
+                  f'if [ "$1 $2" = "build -o" ]; then cp "{fake_blis}" "$3"; chmod +x "$3"; exit 0; fi\n'
                   'echo "fake go: unexpected $*" >&2; exit 9\n')
     py = bin_ / "python3"
     log = tmp / "python-args.txt"
@@ -233,21 +227,42 @@ def write_corpora(cat: Path, corpus_dir: Path) -> None:
         (corpus_dir / name / "traces.jsonl").write_bytes(body)
 
 
-def run_real(tmp: Path, sim_of, extra=(), tag="v0.16.0"):
+def harness_checkout(tmp: Path, git_history: bool = True) -> tuple[Path, str]:
+    """A copy of the harness files in a git repository of its own, committed, so run.sh has a clean
+    checkout to read its commit from (the working tree under test may hold uncommitted edits).
+    Returns the copy's run.sh and its HEAD."""
+    root = tmp / "dashboard"
+    for rel in ("harness", "orchestrator", "schemas"):
+        shutil.copytree(HERE.parent / rel, root / rel, ignore=shutil.ignore_patterns("__pycache__", ".pytest_cache"))
+    shutil.copy2(HERE.parent / "requirements-ci.txt", root / "requirements-ci.txt")
+    if not git_history:
+        return root / "harness" / "run.sh", ""
+    git("init", "-q", cwd=root)
+    git("add", ".", cwd=root)
+    git("commit", "-q", "-m", "harness", cwd=root)
+    return root / "harness" / "run.sh", git("rev-parse", "HEAD", cwd=root)
+
+
+def run_real(tmp: Path, sim_of, extra=(), tag="v0.16.0", env_extra=None, history=True, releases=("v0.3.0", "v0.2.0")):
+    """run.sh from a committed copy of the harness files, against the stand-in simulator."""
     bare, commit, bin_, log, pull, units, fields, cat, reg = real_setup(tmp, tag)
+    run_sh, head = harness_checkout(tmp, history)
     out = tmp / "out"
-    env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "HARNESS_DIGEST": "sha256:" + "b" * 64,
-           "FAKE_FIELDS": str(fields)}
-    p = subprocess.run(["bash", str(RUN), "--sim", sim_of(commit), "--sim-repo", str(bare), "--units", str(units),
+    env = {k: v for k, v in os.environ.items() if k != "HARNESS_COMMIT"}
+    env.update({"PATH": f"{bin_}:{os.environ['PATH']}", "FAKE_FIELDS": str(fields), **(env_extra or {})})
+    p = subprocess.run(["bash", str(run_sh), "--sim", sim_of(commit), "--sim-repo", str(bare), "--units", str(units),
                         "--pull", str(pull), "--out", str(out), "--catalog", str(cat), "--registry", str(reg),
                         "--corpus-dir", str(tmp / "corpora"), "--fields", str(fields),
-                        "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0", *extra], capture_output=True, text=True, env=env)
-    return p, out, log, commit
+                        "--catalog-release", releases[0], "--registry-release", releases[1], *extra], capture_output=True, text=True, env=env)
+    return p, out, log, commit, head, run_sh
 
 
 def test_the_real_path_builds_into_the_checkout_and_scores_with_it(tmp_path):
-    p, out, log, commit = run_real(tmp_path, lambda c: "v0.16.0")
+    p, out, log, commit, head, _ = run_real(tmp_path, lambda c: "v0.16.0")
     assert p.returncode == 0, p.stderr
+    # The stand-in answers `blis metrics` as v0.16.0 does, so the scorer's definitions check takes its
+    # fallback, says so, and goes on.
+    assert "this build has no `blis metrics`" in p.stderr, p.stderr
     argv = log.read_text().splitlines()
     assert "score" in argv, argv
     blis = Path(argv[argv.index("--blis") + 1])
@@ -255,15 +270,15 @@ def test_the_real_path_builds_into_the_checkout_and_scores_with_it(tmp_path):
     assert blis.name == "blis" and blis.parent.name == "inference-sim"
     assert set(Path(str(log) + ".ls").read_text().split()) == {"blis", "go.mod", "main.go", "stack.json"}
     assert argv[argv.index("--sim-build") + 1] == "v0.16.0"
-    assert argv[argv.index("--harness-digest") + 1] == "sha256:" + "b" * 64
+    assert argv[argv.index("--harness-commit") + 1] == head and re.fullmatch(r"[0-9a-f]{40}", head)
     prov = json.loads((out / "provenance.json").read_text())
     # The stack.json of the checkout gave the engine release; the checkout gave the build.
     assert prov["engine"] == {"kind": "vllm", "version": "0.32.0"}
     # The data carries no git history; its releases are the names run.sh was given.
     assert (prov["blis"]["catalog"], prov["blis"]["registry"]) == ("v0.3.0", "v0.2.0")
     assert prov["simulator"] == {"build": "v0.16.0", "engine": {"kind": "vllm", "version": "0.32.0"},
-                                 "harness_digest": "sha256:" + "b" * 64}
-    assert prov["harness_digest"] == "sha256:" + "b" * 64
+                                 "harness_commit": head}
+    assert prov["harness_commit"] == head
     assert prov["blis"]["release"] == "v0.16.0" and prov["blis"]["commit_sha"] == commit
     assert prov["blis"]["extractor_version"] == "blis-latency-kernel@v0.3.0"
     assert prov["fields_sha256"] and prov["experimental"] is False and "corpus" not in prov
@@ -271,7 +286,7 @@ def test_the_real_path_builds_into_the_checkout_and_scores_with_it(tmp_path):
 
 
 def test_the_real_path_scores_a_full_commit(tmp_path):
-    p, out, log, commit = run_real(tmp_path, lambda c: c)
+    p, out, log, commit, head, _ = run_real(tmp_path, lambda c: c)
     assert p.returncode == 0, p.stderr
     prov = json.loads((out / "provenance.json").read_text())
     assert prov["simulator"]["build"] == commit and prov["experimental"] is True
@@ -281,7 +296,8 @@ def test_the_real_path_refuses_a_corpus_that_is_not_the_catalog_entrys(tmp_path)
     bare, commit, bin_, log, pull, units, fields, cat, reg = real_setup(tmp_path)
     (tmp_path / "corpora" / "agentx-mvp" / "traces.jsonl").write_bytes(b"other\n")
     env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "FAKE_FIELDS": str(fields)}
-    p = subprocess.run(["bash", str(RUN), "--sim", "v0.16.0", "--sim-repo", str(bare), "--units", str(units),
+    run_sh, _ = harness_checkout(tmp_path)
+    p = subprocess.run(["bash", str(run_sh), "--sim", "v0.16.0", "--sim-repo", str(bare), "--units", str(units),
                         "--pull", str(pull), "--out", str(tmp_path / "out"), "--catalog", str(cat),
                         "--registry", str(reg), "--corpus-dir", str(tmp_path / "corpora"),
                         "--fields", str(fields), "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0"],
@@ -290,20 +306,104 @@ def test_the_real_path_refuses_a_corpus_that_is_not_the_catalog_entrys(tmp_path)
     assert "mismatch" in p.stderr
 
 
+def test_a_checkout_whose_harness_files_differ_from_its_commit_is_refused(tmp_path):
+    # X8: a figure names the commit that produced it, so a tree with edits cannot score.
+    bare, commit, bin_, log, pull, units, fields, cat, reg = real_setup(tmp_path)
+    run_sh, head = harness_checkout(tmp_path)
+    (run_sh.parent.parent / "orchestrator" / "ingest" / "cli.py").write_text("# edited\n")
+    env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "FAKE_FIELDS": str(fields)}
+    env.pop("HARNESS_COMMIT", None)
+    p = subprocess.run(["bash", str(run_sh), "--sim", "v0.16.0", "--sim-repo", str(bare), "--units", str(units),
+                        "--pull", str(pull), "--out", str(tmp_path / "out"), "--catalog", str(cat),
+                        "--registry", str(reg), "--corpus-dir", str(tmp_path / "corpora"),
+                        "--fields", str(fields), "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0"],
+                       capture_output=True, text=True, env=env)
+    assert p.returncode == 2 and "differ from its commit" in p.stderr and head in p.stderr
+    assert not (tmp_path / "out").exists()
+
+
+def test_an_untracked_file_in_a_script_directory_is_refused(tmp_path):
+    # A new module under orchestrator/ingest changes the figures but is not in the commit.
+    bare, commit, bin_, log, pull, units, fields, cat, reg = real_setup(tmp_path)
+    run_sh, head = harness_checkout(tmp_path)
+    (run_sh.parent.parent / "orchestrator" / "ingest" / "shadow.py").write_text("x = 1\n")
+    env = {k: v for k, v in os.environ.items() if k != "HARNESS_COMMIT"}
+    env.update({"PATH": f"{bin_}:{os.environ['PATH']}", "FAKE_FIELDS": str(fields)})
+    p = subprocess.run(["bash", str(run_sh), "--sim", "v0.16.0", "--sim-repo", str(bare), "--units", str(units),
+                        "--pull", str(pull), "--out", str(tmp_path / "out"), "--catalog", str(cat),
+                        "--registry", str(reg), "--corpus-dir", str(tmp_path / "corpora"),
+                        "--fields", str(fields), "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0"],
+                       capture_output=True, text=True, env=env)
+    assert p.returncode == 2 and "differ from its commit" in p.stderr and not (tmp_path / "out").exists()
+
+
+def test_a_copy_unpacked_inside_another_repository_does_not_record_that_repositorys_commit(tmp_path):
+    outer = tmp_path / "outer"
+    outer.mkdir()
+    git("init", "-q", cwd=outer)
+    (outer / "f").write_text("x")
+    git("add", ".", cwd=outer)
+    git("commit", "-q", "-m", "outer", cwd=outer)
+    outer_head = git("rev-parse", "HEAD", cwd=outer)
+    inner = outer / "unpacked"
+    inner.mkdir()
+    run_sh, _ = harness_checkout(inner, git_history=False)       # no .git of its own
+    assert git("rev-parse", "--show-toplevel", cwd=run_sh.parent) == str(outer.resolve())
+    (tmp_path / "w").mkdir()
+    bare, commit, bin_, log, pull, units, fields, cat, reg = real_setup(tmp_path / "w")
+    env = {k: v for k, v in os.environ.items() if k != "HARNESS_COMMIT"}
+    env.update({"PATH": f"{bin_}:{os.environ['PATH']}", "FAKE_FIELDS": str(fields)})
+    p = subprocess.run(["bash", str(run_sh), "--sim", "v0.16.0", "--sim-repo", str(bare), "--units", str(units),
+                        "--pull", str(pull), "--out", str(tmp_path / "out"), "--catalog", str(cat),
+                        "--registry", str(reg), "--corpus-dir", str(tmp_path / "w" / "corpora"),
+                        "--fields", str(fields), "--catalog-release", "v0.3.0", "--registry-release", "v0.2.0"],
+                       capture_output=True, text=True, env=env)
+    assert p.returncode == 2 and "HARNESS_COMMIT is not set" in p.stderr, p.stderr
+    assert outer_head not in p.stderr
+
+
+def test_a_tree_without_history_names_its_commit_in_the_environment(tmp_path):
+    named = "d" * 40
+    (tmp_path / "a").mkdir()
+    p, out, log, commit, head, _ = run_real(tmp_path / "a", lambda c: "v0.16.0", history=False, env_extra={"HARNESS_COMMIT": named})
+    assert p.returncode == 0, p.stderr
+    assert json.loads((out / "provenance.json").read_text())["harness_commit"] == named
+    # With no history and no name there is no commit to record: refused, nothing scored.
+    (tmp_path / "b").mkdir()
+    p, out, *_ = run_real(tmp_path / "b", lambda c: "v0.16.0", history=False)
+    assert p.returncode == 2 and "HARNESS_COMMIT is not set" in p.stderr and not out.exists()
+
+
+def test_a_commit_named_in_the_environment_must_be_the_checkouts_head(tmp_path):
+    p, out, *_ = run_real(tmp_path, lambda c: "v0.16.0", env_extra={"HARNESS_COMMIT": "e" * 40})
+    assert p.returncode == 2 and "is not the checkout's HEAD" in p.stderr and not out.exists()
+
+
 def test_the_real_path_scores_a_pre_release_tag_and_marks_its_figures_experimental(tmp_path):
-    p, out, log, commit = run_real(tmp_path, lambda c: "v0.16.0-rc1", tag="v0.16.0-rc1")
+    p, out, log, commit, head, _ = run_real(tmp_path, lambda c: "v0.16.0-rc1", tag="v0.16.0-rc1")
     assert p.returncode == 0, p.stderr
     prov = json.loads((out / "provenance.json").read_text())
     assert prov["simulator"]["build"] == "v0.16.0-rc1" and prov["experimental"] is True
 
 
+def test_data_pinned_by_commit_is_recorded_as_given_and_marks_the_figures_experimental(tmp_path):
+    cat, reg = "c" * 40, "e" * 40
+    p, out, *_ = run_real(tmp_path, lambda c: "v0.16.0", releases=(cat, reg))
+    assert p.returncode == 0, p.stderr
+    prov = json.loads((out / "provenance.json").read_text())
+    assert prov["blis"]["catalog"] == cat and prov["blis"]["registry"] == reg
+    assert prov["simulator"]["build"] == "v0.16.0" and prov["experimental"] is True
+    # tags for the data and a tag for the build: not experimental, as before
+    (tmp_path / "t").mkdir()
+    p, out, *_ = run_real(tmp_path / "t", lambda c: "v0.16.0")
+    assert p.returncode == 0, p.stderr
+    assert json.loads((out / "provenance.json").read_text())["experimental"] is False
+
+
 # ------------------------------------------------------------------ pinned workflows
 
-WORKFLOWS = sorted((HERE.parent / ".github" / "workflows").glob("*.yml"))
-
-
 def test_every_action_of_every_workflow_is_pinned_to_a_commit_with_its_version_in_a_comment():
-    assert len(WORKFLOWS) >= 4
+    assert len(WORKFLOWS) >= 3
     for wf in WORKFLOWS:
         uses = re.findall(r"^\s*-?\s*uses:\s*(\S+)(.*)$", wf.read_text(), re.M)
         assert uses, wf

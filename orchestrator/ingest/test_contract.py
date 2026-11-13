@@ -133,10 +133,10 @@ def test_the_fixture_holds_g2_and_g4_but_no_g1_while_four_conditions_are_not_gra
     # (another release with no changed function) needs an engine that publishes its ported list.
     recs = _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL)
     assert {r["grade"] for r in recs} == {"G2", "G4"}
-    unchecked = [{"kind": k, "subject": "not checked", "detail": f"{k} is not graded yet"}
+    unchecked = [{"kind": "unevaluated", "subject": k, "detail": f"{k} is unevaluated"}
                  for k in ("coefficient_range", "kernel_hash", "resolved_differs", "value_class")]
     for r in recs:
-        assert [s for s in r["substitutions"] if s["subject"] == "not checked"] == unchecked, r["point_id"]
+        assert [s for s in r["substitutions"] if s["kind"] == "unevaluated"] == unchecked, r["point_id"]
     assert {r["grade"] for r in _lines(FIXTURE / "run-a" / c.NOT_SCORED_JSONL)} == {"G5"}
 
 
@@ -164,12 +164,6 @@ def test_validator_rejects_a_point_id_that_does_not_hash_from_its_identity():
     assert any("hashes to a different id" in p for p in c.validate_dir(d))
 
 
-def test_validator_rejects_an_unknown_match_value():
-    d = _copy("run-a")
-    rows = _lines(d / c.FIDELITY_JSONL)
-    rows[0]["args"][0]["match"] = "close_enough"
-    _write_lines(d / c.FIDELITY_JSONL, rows)
-    assert any("close_enough" in p for p in c.validate_dir(d))
 
 
 def test_validator_rejects_a_scored_point_graded_g5():
@@ -256,7 +250,7 @@ def test_validator_requires_one_simulator_build_for_every_point():
     d = _copy("run-b")
     rows = _lines(d / c.FAILED_JSONL)
     rows[0]["simulator"] = {"build": "v0.11.0", "engine": {"kind": "vllm", "version": "0.32.0"},
-                            "harness_digest": "unreleased"}
+                            "harness_commit": "0123456789abcdef0123456789abcdef01234567"}
     _write_lines(d / c.FAILED_JSONL, rows)
     assert any("COV-6" in p for p in c.validate_dir(d))
     d = _copy("run-b")
@@ -345,30 +339,13 @@ def test_validator_rejects_a_csv_concurrency_or_grade_that_disagrees():
     assert any("its record" in p for p in problems)
 
 
-def test_fidelity_schema_ties_the_grade_to_its_substitutions():
-    import jsonschema
-    v = jsonschema.Draft7Validator(json.loads(c.FIDELITY_SCHEMA.read_text()))
-    recs = [{k: x for k, x in r.items() if k != "point_id"} for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL)]
-    g2 = next(r for r in recs if r["grade"] == "G2")
-    g1 = _as_g1(g2)
-    g4 = next(r for r in recs if r["grade"] == "G4")
-    assert all(v.is_valid(r) for r in (g1, g2, g4))
-    assert not v.is_valid({**g1, "substitutions": g2["substitutions"]})       # G1 names nothing
-    unchecked = [x for x in g2["substitutions"] if x["subject"] == "not checked"]
-    assert len(unchecked) == 4 and not v.is_valid({**g1, "substitutions": unchecked})   # a G1 names none
-    assert not v.is_valid({**g2, "substitutions": []})                         # G2 names something
-    assert not v.is_valid({**g2, "substitutions": g4["substitutions"]})        # another release is not G2
-    assert not v.is_valid({**g4, "substitutions": g2["substitutions"]})        # G4 names the release or build
-    assert not v.is_valid({**g2, "grade": "G1", "substitutions": []})          # a client difference is not G1
-    assert not v.is_valid({**g1, "status": "exact"})                           # the old status field is gone
-    assert not v.is_valid({**g1, "substitutions": [{"kind": "guess", "subject": "x", "detail": ""}]})
 
 
 def test_an_estimated_build_is_scored_and_named():
     recs = [r for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL) if r["build"].get("why") == "custom_build"]
     assert len(recs) == 1 and recs[0]["grade"] == "G4" and recs[0]["run_release"] is None
     assert [s["kind"] for s in recs[0]["substitutions"]] == [
-        "coefficient_range", "kernel_hash", "nightly_or_custom", "resolved_differs", "value_class"]
+        "nightly_or_custom", "unevaluated", "unevaluated", "unevaluated", "unevaluated"]
 
 
 def test_validator_requires_every_provenance_key():
@@ -380,19 +357,6 @@ def test_validator_requires_every_provenance_key():
         assert f"provenance.json: missing {key}" in c.validate_dir(d), key
 
 
-def test_fidelity_schema_ties_match_to_its_fields():
-    import jsonschema
-    v = jsonschema.Draft7Validator(json.loads(c.FIDELITY_SCHEMA.read_text()))
-    rec = _as_g1(next({k: x for k, x in r.items() if k != "point_id"}
-                      for r in _lines(FIXTURE / "run-a" / c.FIDELITY_JSONL) if r["grade"] == "G2"))
-    assert v.is_valid(rec)
-    assert not v.is_valid({**rec, "reasons": ["blis_refused"]})               # a graded point has no reasons
-    mapped = {"arg": "kernel_config.moe_backend", "measured": "x", "blis": "x", "match": "mapped"}
-    assert not v.is_valid({**rec, "args": [mapped]})                          # mapped needs blis_field
-    assert v.is_valid({**rec, "args": [{**mapped, "blis_field": "engine.moe_backend"}]})
-    # The scorer never writes a value of its own: no arg is a BLIS default (X19).
-    dflt = {"arg": "max_num_seqs", "measured": None, "blis": 1024, "match": "blis_default", "rule": "r"}
-    assert not v.is_valid({**rec, "args": [dflt]})
 
 
 def test_validator_rejects_a_facets_record_missing_a_key_the_builder_reads():
@@ -479,7 +443,7 @@ def test_the_v2_schema_still_reads_the_published_snapshot_and_its_frozen_fidelit
 def test_the_v2_fidelity_schema_is_byte_identical_to_the_one_main_published():
     # COV-8: v2 snapshots cite this schema by its $id. The digest is that of
     # orchestrator/ingest/fidelity.schema.json on origin/main before the schemas moved; every
-    # addition belongs in fidelity.v3.json.
+    # change belongs in the substrate's PointRecord (SUB-19); the dashboard has no v3 fidelity schema.
     digest = hashlib.sha256((REPO / "schemas" / "fidelity.v2.json").read_bytes()).hexdigest()
     assert digest == "4a7a95e828051f7fd72148d26cc8e7b82139ec0399cfa366b510cece7cd95f46"
 
@@ -491,9 +455,6 @@ def test_the_v3_schema_requires_a_graded_fidelity_record_on_every_point():
         doc = _v3()
         del _first_point(doc)[field]
         assert not v.is_valid(doc), field
-    doc = _v3()
-    del _first_point(doc)["fidelity"]["grade"]
-    assert not v.is_valid(doc)
     assert not v.is_valid(_published_v2())
 
 

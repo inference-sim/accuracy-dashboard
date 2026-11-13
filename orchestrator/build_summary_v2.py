@@ -359,7 +359,7 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     provenance = {
         "blis": prov_in["blis"],
         "simulator": prov_in["simulator"],
-        "harness_digest": prov_in["harness_digest"],
+        "harness_commit": prov_in["harness_commit"],
         "experimental": prov_in["experimental"],
         "units": prov_in["units"],
         "engine": prov_in["engine"],
@@ -464,6 +464,9 @@ def summary_to_contract(summary: dict, out: Path) -> None:
     for name, key in ((contract.NOT_SCORED_JSONL, "not_scored"), (contract.FAILED_JSONL, "failed")):
         recs = sorted(summary.get(key, []), key=lambda n: n["point_id"])
         (out / name).write_text("".join(contract.canonical_dumps(n) + "\n" for n in recs))
+    # The summary does not carry the substrate point records, so the inverted contract has none: the file
+    # is present and empty, which validate_dir accepts ("or none").
+    (out / contract.POINTRECORDS_JSONL).write_text("")
     (out / contract.PROVENANCE_JSON).write_text(
         contract.canonical_dumps(_prov_out_to_in(summary["provenance"], summary["coverage"])) + "\n")
 
@@ -472,7 +475,7 @@ def _prov_out_to_in(prov: dict, coverage: dict) -> dict:
     """The summary's provenance back to the contract's provenance.json shape build() expects."""
     gt = prov.get("ground_truth", {})
     return {"ingest": "api", "blis": prov["blis"], "simulator": prov["simulator"],
-            "harness_digest": prov["harness_digest"], "experimental": prov["experimental"], "units": prov["units"],
+            "harness_commit": prov["harness_commit"], "experimental": prov["experimental"], "units": prov["units"],
             "engine": prov["engine"],
             "points": coverage["points"],
             "left_out_records": coverage["left_out_records"], "vllm_ref": prov["vllm_ref"],

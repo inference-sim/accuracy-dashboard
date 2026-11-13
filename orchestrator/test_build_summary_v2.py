@@ -7,6 +7,7 @@ Expectations are worked by hand from the committed contract fixture
 Run: python3 orchestrator/test_build_summary_v2.py
 """
 import json
+import pytest
 import shutil
 from collections import Counter
 import sys
@@ -129,8 +130,8 @@ def test_coverage_splits_by_engine_release_chip_and_grade_and_balances():
 
 def test_the_backlog_top_ranks_the_reasons_points_are_not_g1():
     top = _build()["backlog"]["top"]
-    # All nine graded points name the four conditions that are not graded yet, so those rank first.
-    assert top[:4] == [{"reason": f"{k}: not checked", "points": 9}
+    # All nine graded points name the four conditions that are unevaluated, so those rank first.
+    assert top[:4] == [{"reason": f"unevaluated: {k}", "points": 9}
                        for k in ("coefficient_range", "kernel_hash", "resolved_differs", "value_class")]
     assert top[4] == {"reason": "client_difference: send_gap", "points": 3}
     assert {"reason": "G5 not_in_catalog: eagle3", "points": 2} in top and len(top) == 10
@@ -184,13 +185,13 @@ def test_an_invalid_contract_is_refused_not_built():
     shutil.copytree(FIXTURE / "run-a", d)
     lines = (d / "fidelity.jsonl").read_text().splitlines()
     rec = json.loads(lines[0])
-    rec["args"][0]["match"] = "close_enough"
+    rec["grade"] = "G4" if rec["grade"] != "G4" else "G2"      # the record disagrees with points.csv
     lines[0] = json.dumps(rec, sort_keys=True, separators=(",", ":"))
     (d / "fidelity.jsonl").write_text("\n".join(lines) + "\n")
     try:
         b2.build(d, generated_at=STAMP, evaluator_commit="test")
     except b2.ContractError as e:
-        assert "close_enough" in str(e)
+        assert "is graded" in str(e)
         return
     raise AssertionError("built a summary from an invalid contract")
 
@@ -208,9 +209,6 @@ def test_the_validator_catches_coverage_that_doesnt_balance_and_malformed_fideli
     doc = _build()
     doc["coverage"]["g5_reasons"]["not_in_catalog"] = 9
     assert any("g5_reasons" in p for p in vs2.problems(doc))
-    doc = _build()
-    _points(doc)[0]["fidelity"]["build"]["distance"] = "near"
-    assert vs2.problems(doc) != []
     doc = _build()
     doc["schema_version"] = 1
     assert vs2.problems(doc) != []
@@ -255,7 +253,7 @@ def test_a_pull_date_earlier_than_its_newest_measurement_is_refused():
 def test_the_validator_requires_one_simulator_for_every_point_of_a_summary():
     doc = _build()
     _points(doc)[0]["fidelity"]["simulator"] = {"build": "v0.99.0", "engine": {"kind": "vllm", "version": "0.31.0"},
-                                                 "harness_digest": "unreleased"}
+                                                 "harness_commit": "0123456789abcdef0123456789abcdef01234567"}
     assert any("COV-6" in p for p in vs2.problems(doc))
     # Every point names one build, but not the provenance's.
     doc = _build()
@@ -656,6 +654,42 @@ def test_ix_only_merge_of_delta_reproduces_the_full_summary():
         shutil.rmtree(tmp)
 
 
+def test_a_delta_scored_by_another_harness_commit_cannot_be_merged():
+    # build_merged keeps the prior's provenance, so a delta whose points name another harness
+    # commit would give a summary with two. The contract is refused; cli.cmd_nightly rescores the
+    # whole window instead (test_cli_nightly).
+    import contract as c
+    full = _build()
+    ids = [p["point_id"] for p in _points(full)]
+    d = set(ids[:2])
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        prior_c = tmp / "prior"
+        b2.summary_to_contract(full, prior_c)
+        _strip_points(prior_c, d)
+        prior = b2.build(prior_c, generated_at="2026-10-22T00:00:00Z", evaluator_commit="test")
+        delta_c = tmp / "delta"
+        _subset_contract(FIXTURE / "run-a", delta_c, d)
+        other = "b" * 40
+        prov = json.loads((delta_c / c.PROVENANCE_JSON).read_text())
+        prov["harness_commit"] = other
+        prov["simulator"] = {**prov["simulator"], "harness_commit": other}
+        (delta_c / c.PROVENANCE_JSON).write_text(c.canonical_dumps(prov) + "\n")
+        for name in (c.FIDELITY_JSONL, c.NOT_SCORED_JSONL, c.FAILED_JSONL):
+            f = delta_c / name
+            if f.exists():
+                rows = [json.loads(l) for l in f.read_text().splitlines() if l]
+                for r in rows:
+                    if "simulator" in r:
+                        r["simulator"] = {**r["simulator"], "harness_commit": other}
+                f.write_text("".join(c.canonical_dumps(r) + "\n" for r in rows))
+        window = set(ids) | {n["point_id"] for n in full["not_scored"]}
+        with pytest.raises(b2.ContractError, match="COV-6"):
+            b2.build_merged(prior, delta_c, window, generated_at=STAMP, evaluator_commit="test", work=tmp / "wk")
+    finally:
+        shutil.rmtree(tmp)
+
+
 def test_merge_takes_the_pull_date_from_the_delta_not_the_prior():
     # Issue #35: an IX-only merge keeps the prior run's BLIS release, field list and corpus (nothing was re-scored)
     # but a NEW pull fetched the delta, so `pulled_at`/`pull_manifest_sha256` -- the "API pull date"
@@ -742,6 +776,7 @@ def _subset_contract(src: Path, dst: Path, keep: set):
     (dst / c.FACETS_JSON).write_text(c.canonical_dumps(fac) + "\n")
     (dst / c.NOT_SCORED_JSONL).write_text("")
     (dst / c.FAILED_JSONL).write_text("")
+    (dst / c.POINTRECORDS_JSONL).write_text("")      # a subset carries no substrate point records
     shutil.copy(src / c.PROVENANCE_JSON, dst / c.PROVENANCE_JSON)
     _recount(dst)
 

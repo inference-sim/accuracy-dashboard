@@ -264,8 +264,9 @@ def primed_phase(input_lens: list[int], output_lens: list[int], conc: int, copie
     session's pool slot. Main request 0 is in the same prefix group, so its prompt is the
     copy's token for token. Every main request arrives at PRIME_MAIN_START_US. The pool is
     conc + copies, so the first `conc` main requests start together, in order. `copies` is the
-    deployment's dp width: the router places by requests in flight, so each copy lands on its
-    own replica."""
+    client's own warm-up count, WARMUPS_PER_CONCURRENCY x conc: the client sends and drains
+    that many copies of request 0, whatever the deployment's data-parallel width (a data-parallel
+    deployment is one instance whose engine holds the balancer)."""
     _check_lengths(input_lens, output_lens, conc)
     if not isinstance(copies, int) or copies < 1:
         raise ValueError(f"copies {copies!r} is not a positive integer")
@@ -433,6 +434,75 @@ def summarize(rows: list[dict], input_lens: list[int], output_lens: list[int], i
             "mean_tpot_us": tpot_sum / tpot_n if tpot_n else None, "first_ttft_us": first_ttft}
 
 
+# T1 tolerances. BLIS gives a freed lane's next request to the next record in order, but it lands
+# one completion overhead after the request that freed the lane, and that overhead grows with the
+# finished request's output tokens (detokenisation). Two lanes freeing within a few ms of each
+# other can therefore hand their requests over in the other order: measured over the 168 baseline
+# single-turn Results, at most 9.2 ms, or 9 us per output token of the longest request. The
+# client's semaphore wakes waiters in order. Allowed: 1 ms plus 12 us per output token of the
+# longest request. Mean concurrency over the main phase is below conc by the falling load of the
+# last round (measured: at least 0.965 of conc).
+ORDER_SLACK_BASE_US = 1000
+ORDER_SLACK_PER_TOKEN_US = 12
+MEAN_CONCURRENCY_TOLERANCE = 0.10
+
+
+# T10. The InferenceX client is one asyncio process. Parsing a streamed chunk costs about 20 us
+# on a laptop (exp/client_cost.py: about 50,000 chunks/s with server and client sharing the
+# machine), so that is a floor on the ceiling; the real runners' ceiling is not measured. A run
+# whose chunk rate conc / TPOT is above half the floor may have been limited by its client.
+CLIENT_CHUNK_CEILING_PER_S = 50_000
+CLIENT_BOUND_FRACTION = 0.5
+
+
+def chunk_rate(conc: int, mean_tpot_us: float) -> float:
+    """Chunks per second the client had to parse: conc streams, each emitting one chunk per TPOT."""
+    return conc / (mean_tpot_us * 1e-6)
+
+
+def client_bound(conc: int, mean_tpot_us: float) -> bool:
+    return chunk_rate(conc, mean_tpot_us) > CLIENT_BOUND_FRACTION * CLIENT_CHUNK_CEILING_PER_S
+
+
+def check_request_pattern(rows: list[dict], n: int, conc: int, ignore=None) -> dict:
+    """The simulated main phase has the client's request pattern (COV-10): n completed requests
+    request_0..request_{n-1}; the first `conc` arrive together; arrivals follow the request order
+    (within the slack above); no more than `conc` are in flight at any instant (arrival to
+    completion); and the mean number in flight, over the span from the first arrival to the last
+    completion, is within MEAN_CONCURRENCY_TOLERANCE below `conc`. Raises ValueError naming the
+    first violation; returns the achieved concurrency otherwise."""
+    main = {}
+    for r in rows:
+        if r.get("fate") != "completed" or (ignore is not None and ignore(r["id"])):
+            continue
+        try:
+            main[request_index(r["id"])] = r
+        except ValueError:
+            continue
+    if sorted(main) != list(range(n)):
+        raise ValueError(f"the main phase has {len(main)} completed requests, not request_0..request_{n - 1}")
+    arr = [main[i]["arrival_us"] for i in range(n)]
+    if any(a != arr[0] for a in arr[:conc]):
+        raise ValueError(f"the first {conc} requests do not arrive together")
+    slack = ORDER_SLACK_BASE_US + ORDER_SLACK_PER_TOKEN_US * max(main[i].get("output_tokens") or 0 for i in range(n))
+    for i in range(1, n):
+        if arr[i] < arr[i - 1] - slack:
+            raise ValueError(f"request {i} arrived {arr[i - 1] - arr[i]} us before request {i - 1}")
+    events = sorted([(arr[i], 1) for i in range(n)] + [(arr[i] + main[i]["e2e_us"], -1) for i in range(n)],
+                    key=lambda e: (e[0], e[1]))
+    cur = peak = 0
+    for _, step in events:
+        cur += step
+        peak = max(peak, cur)
+    if peak > conc:
+        raise ValueError(f"{peak} requests were in flight at once; the client's concurrency is {conc}")
+    span = events[-1][0] - events[0][0]
+    achieved = sum(main[i]["e2e_us"] for i in range(n)) / span if span > 0 else float(conc)
+    if achieved < conc * (1 - MEAN_CONCURRENCY_TOLERANCE):
+        raise ValueError(f"mean concurrency {achieved:.2f} is below {1 - MEAN_CONCURRENCY_TOLERANCE:.0%} of {conc}")
+    return {"achieved_concurrency": round(achieved, 3)}
+
+
 def main_phase_only(n: int):
     """The ignore function for a primed run: every row that is not main request 0..n-1."""
     def ignore(row_id: str) -> bool:
@@ -446,33 +516,55 @@ def main_phase_only(n: int):
 # ------------------------------------------------------------------ what remains different
 
 CLIENT_SUBJECT = "inferencex benchmark_serving.py"
+# The completion overhead BLIS adds before it releases the next request of a lane (registry
+# coefficient cost-model-host-overheads, post-decode fixed overhead; inference-sim#1913).
+COMPLETION_OVERHEAD_US = 777
+SEND_GAP_DETAIL = (f"BLIS releases the next request at the previous one's completion plus the assumed "
+                   f"completion overhead of {COMPLETION_OVERHEAD_US} us; the real client's gap (usage chunk, "
+                   f"[DONE], session exit, event-loop wake-up) is not measured")
 
 
 def client_differences(verified: bool, why: str, *, flags_assumed: bool = False,
-                       release_unrecorded: bool = False) -> list[dict]:
+                       release_unrecorded: bool = False, population_unrecorded: bool = False,
+                       client_bound: bool = False, benchmark_client: str | None = None,
+                       chat_template_assumed: bool = False) -> list[dict]:
     """Every remaining difference between the run's client and the simulated one, each named on
     the point; any of them makes the point G2 (COV-12). Kind "client_difference" is the
     dashboard's name for design §11.3's G2 condition "the simulated requests differ from the
     ones the run's client sent"; contracts/spec/pointrecord has no kind for it yet.
 
-    Always: the client's send gap. The simulator admits the next request at the engine step
-    that emitted the previous request's last token; the client sends it after the response
-    stream closes and its asyncio semaphore wakes the next task (APPLES-TO-APPLES.md "What else
-    is not reproduced"). When `verified` is false: the sent prompt lengths are not verified
+    Always: the client's send gap. BLIS releases the next request of a closed-loop lane at the
+    request's completion plus an assumed completion overhead (COMPLETION_OVERHEAD_US, the
+    registry's cost-model-host-overheads coefficient; inference-sim#1913). The real client's gap,
+    from the final usage chunk and `[DONE]` through the session exit and the event-loop wake-up
+    to the next send, is not measured (APPLES-TO-APPLES.md "What else is not reproduced"). When `verified` is false: the sent prompt lengths are not verified
     equal to the replayed targets, for the reason `why`. When `flags_assumed`, the run's job log
     is gone and its client flags are taken to be the launcher's defaults. When `release_unrecorded`,
-    the InferenceX commit of the run is not known."""
-    out = [{"kind": "client_difference", "subject": "send_gap",
-            "detail": "the simulator admits the next request at the step that emitted the previous "
-                      "request's last token; the client sends it after the response stream closes and "
-                      "its semaphore wakes the next task, an interval not modelled"}]
+    the InferenceX commit of the run is not known. When `population_unrecorded`, the run's completed
+    and num_prompts are in no pulled file, so requests the client lost cannot be ruled out. When
+    `benchmark_client` is given, the run's benchmark was not InferenceX's client but the one it
+    names (a prefill/decode run's srt-slurm benchmark), and the text says what is assumed equal."""
+    out = [{"kind": "client_difference", "subject": "send_gap", "detail": SEND_GAP_DETAIL}]
+    if benchmark_client:
+        out.append({"kind": "client_difference", "subject": "benchmark_client", "detail": benchmark_client})
     if not verified:
         out.append({"kind": "client_difference", "subject": "sent_prompt_lengths",
                     "detail": f"sent prompt lengths not verified equal to the replayed targets: {why}"})
     if flags_assumed:
         out.append({"kind": "client_difference", "subject": "client_flags",
-                    "detail": "job log expired; the client's flags are assumed to be the launcher's defaults"})
+                    "detail": "job log expired; the client's flags are assumed to be the launcher's defaults"
+                              + ("; the launch scripts of speculative runs pass --use-chat-template, so it is assumed on"
+                                 if chat_template_assumed else "")})
     if release_unrecorded:
         out.append({"kind": "client_difference", "subject": "client_release",
                     "detail": "the InferenceX commit of the run is not recorded"})
+    if population_unrecorded:
+        out.append({"kind": "client_difference", "subject": "failed_requests",
+                    "detail": "the run's completed and num_prompts counts are not in the pulled data; "
+                              "requests the client lost, which would leave a different population, are not ruled out"})
+    if client_bound:
+        out.append({"kind": "client_difference", "subject": "client_saturation",
+                    "detail": f"the run's chunk rate (concurrency over TPOT) is above "
+                              f"{CLIENT_BOUND_FRACTION:.0%} of {CLIENT_CHUNK_CEILING_PER_S} chunks/s, a floor on the "
+                              f"single-process client's ceiling; the measured latencies may include client queueing"})
     return sorted(out, key=lambda d: (d["kind"], d["subject"]))

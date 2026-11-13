@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import base64
 import re
+import urllib.error
 from dataclasses import dataclass, field
 
 import yaml
@@ -41,6 +42,9 @@ class Recipes:
     """The recipes and model staging directories of one InferenceX commit."""
     recipes: list = field(default_factory=list)     # recipe dicts (each has "model", "image", ...)
     dirs: dict = field(default_factory=dict)        # staged directory name -> {HF model names}
+    scripts: dict = field(default_factory=dict)     # path of a benchmark script -> its blob sha
+    entries: list = field(default_factory=list)     # (key, dict) of every master-configuration entry
+    tree: dict = field(default_factory=dict)        # path of every file of the commit -> its blob sha
 
 
 def parse(master_docs: list[str], runners_doc: str | None) -> Recipes:
@@ -52,6 +56,7 @@ def parse(master_docs: list[str], runners_doc: str | None) -> Recipes:
         except yaml.YAMLError:
             continue
         out.recipes += [v for v in doc.values() if isinstance(v, dict) and isinstance(v.get("model"), str)]
+        out.entries += [(k, v) for k, v in doc.items() if isinstance(v, dict) and isinstance(v.get("model"), str)]
     if runners_doc:
         try:
             doc = yaml.safe_load(runners_doc) or {}
@@ -63,6 +68,44 @@ def parse(master_docs: list[str], runners_doc: str | None) -> Recipes:
                 if isinstance(e, dict) and e.get("dir"):
                     out.dirs.setdefault(str(e["dir"]), set()).add(str(name).split("@", 1)[0])
     return out
+
+
+def matching(rc: Recipes, row: dict) -> list:
+    """The recipes whose framework, precision, image and runner hardware are the row's."""
+    return [r for r in rc.recipes
+            if r.get("framework") == row.get("framework") and r.get("precision") == row.get("precision")
+            and _image(r.get("image")) == _image(row.get("image"))
+            and runner_hardware(r.get("runner")) == row.get("hardware")]
+
+
+def conflicting_checkpoint(rc: Recipes, row: dict, served_path: str | None) -> str | None:
+    """The one HF repo the row's recipes serve, when it is not what the served path names: the
+    path's last component is neither that repo's name nor a directory staging it. checkpoint()
+    gives None for that row; this says the recipe and the run disagree, not that nothing is known."""
+    if not served_path or checkpoint(rc, row, served_path):
+        return None
+    models = {r["model"] for r in matching(rc, row)}
+    return next(iter(models)) if len(models) == 1 else None
+
+
+_DRAFT = re.compile(r"""^\s*(?:export\s+)?DRAFT_MODEL=["']?([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)["']?\s*(?:#.*)?$""")
+
+
+def draft_script(rc: Recipes, row: dict) -> str | None:
+    """The benchmark script the row's recipe ran with a draft model, by InferenceX's naming
+    (<model-prefix>_<precision>_<hardware>_mtp.sh), or None unless exactly one script has it."""
+    if row.get("spec_method") in (None, "none"):
+        return None
+    prefixes = {r.get("model-prefix") for r in matching(rc, row)} - {None}
+    names = {f"{p}_{row.get('precision')}_{row.get('hardware')}_mtp.sh" for p in prefixes}
+    paths = [p for p in rc.scripts if p.rsplit("/", 1)[-1] in names]
+    return paths[0] if len(paths) == 1 else None
+
+
+def draft_model(text: str) -> tuple[str, int] | None:
+    """(the HF repo, the line) of the script's DRAFT_MODEL, or None unless it assigns exactly one."""
+    hits = [(m.group(1), i + 1) for i, line in enumerate(text.splitlines()) if (m := _DRAFT.match(line))]
+    return hits[0] if len({h[0] for h in hits}) == 1 else None
 
 
 def checkpoint(rc: Recipes, row: dict, served_path: str | None) -> str | None:
@@ -79,6 +122,11 @@ def checkpoint(rc: Recipes, row: dict, served_path: str | None) -> str | None:
     return hits.pop() if len(hits) == 1 else None
 
 
+class RecipesUnavailable(Exception):
+    """The run's commit or its tree is not readable (HTTP 404: a commit of a fork's pull request, or
+    one the repository no longer holds), so nothing of the commit's recipes is known."""
+
+
 class GitHubRecipes:
     """Reads a run's commit and that commit's recipes through the GitHub REST API, cached."""
 
@@ -86,17 +134,35 @@ class GitHubRecipes:
         self.get, self.repo = get, repo          # get(path) -> parsed JSON
         self._sha: dict = {}
         self._at: dict = {}
+        self._blob: dict = {}
 
     def run_commit(self, run_id: str) -> str:
         if run_id not in self._sha:
             self._sha[run_id] = self.get(f"/repos/{self.repo}/actions/runs/{run_id}")["head_sha"]
         return self._sha[run_id]
 
+    def script(self, rc: Recipes, path: str) -> str:
+        return base64.b64decode(self.get(f"/repos/{self.repo}/git/blobs/{rc.scripts[path]}")["content"]).decode()
+
+    def blob_text(self, blob_sha: str) -> str:
+        # Cached: the pull asks for the launch scripts of a commit once per row of its run.
+        if blob_sha not in self._blob:
+            self._blob[blob_sha] = base64.b64decode(self.get(f"/repos/{self.repo}/git/blobs/{blob_sha}")["content"]).decode()
+        return self._blob[blob_sha]
+
     def at(self, sha: str) -> Recipes:
         if sha not in self._at:
-            tree = self.get(f"/repos/{self.repo}/git/trees/{sha}?recursive=1")["tree"]
+            try:
+                tree = self.get(f"/repos/{self.repo}/git/trees/{sha}?recursive=1")["tree"]
+            except urllib.error.HTTPError as e:
+                if e.code == 404:
+                    raise RecipesUnavailable(sha) from e
+                raise
             blob = lambda t: base64.b64decode(self.get(f"/repos/{self.repo}/git/blobs/{t['sha']}")["content"]).decode()
             masters = [blob(t) for t in sorted(tree, key=lambda t: t["path"]) if _MASTER.search(t["path"])]
             runners = next((blob(t) for t in tree if _RUNNERS.search(t["path"])), None)
-            self._at[sha] = parse(masters, runners)
+            rc = parse(masters, runners)
+            rc.scripts = {t["path"]: t["sha"] for t in tree if t["path"].startswith("benchmarks/") and t["path"].endswith(".sh")}
+            rc.tree = {t["path"]: t["sha"] for t in tree if t.get("type", "blob") == "blob"}
+            self._at[sha] = rc
         return self._at[sha]

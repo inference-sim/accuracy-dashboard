@@ -41,7 +41,6 @@ import contract  # noqa: E402
 import coverage as cv  # noqa: E402
 import engines  # noqa: E402
 import fields as fl  # noqa: E402
-import harness_pin as hp  # noqa: E402
 import ledger as ldg  # noqa: E402
 import pull as pl  # noqa: E402
 import resolve_agentic_corpus as rac  # noqa: E402
@@ -244,10 +243,12 @@ def _go_require(gomod: Path, module: str) -> str | None:
 _SIM_TAG = re.compile(r"^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$")
 _RELEASE_TAG = re.compile(r"^v\d+\.\d+\.\d+$")
 _SIM_COMMIT = re.compile(r"^[0-9a-f]{40}$")
-_DIGEST = re.compile(r"^(sha256:[0-9a-f]{64}|unreleased)$")
+_HARNESS_COMMIT = re.compile(r"^[0-9a-f]{40}$")
+HARNESS_RUN = HERE.parent.parent / "harness" / "run.sh"
 
 
-_DATA_RELEASE = re.compile(r"^[0-9A-Za-z][0-9A-Za-z._+-]*$")
+# What the catalog and the registry are at: a release tag, or a full commit while a stack is open.
+_DATA_PIN = re.compile(r"^(v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?|[0-9a-f]{40})$")
 
 
 def check_blis_inputs(blis: Path, catalog_release: str | None, registry_release: str | None,
@@ -256,7 +257,7 @@ def check_blis_inputs(blis: Path, catalog_release: str | None, registry_release:
     in the inference-sim checkout it was built from. With --sim-build the checkout must be at that
     build: the release tag, or the 40-hex commit. Without it the checkout must be at a release
     tag, which is the build. The catalog and registry are named by the release tags they are at;
-    the caller names them, because the harness image mounts the data without its git history."""
+    the caller names them, because a copy of the data may carry no git history."""
     out = []
     sim = blis.parent
     if not blis.is_file():
@@ -276,18 +277,19 @@ def check_blis_inputs(blis: Path, catalog_release: str | None, registry_release:
         out.append(f"--sim-build {sim_build!r} is neither a tag vX.Y.Z[-suffix] nor a 40-hex commit")
     for release, flag in ((catalog_release, "--catalog-release"), (registry_release, "--registry-release")):
         if release is None:
-            out.append(f"{flag} is required: the release tag the data is at")
-        elif not _DATA_RELEASE.match(release):
-            out.append(f"{flag} {release!r} is not a release tag")
+            out.append(f"{flag} is required: the release tag or full 40-hex commit the data is at")
+        elif not _DATA_PIN.match(release):
+            out.append(f"{flag} {release!r} is neither a release tag nor a full 40-hex commit")
     return out
 
 
-def check_harness_digest(digest: str | None) -> list[str]:
-    """The harness image digest every figure records (design §11.7, X8): sha256:<64 hex>, or
-    unreleased for a harness not run from a released image."""
-    if digest is None:
-        return ["--harness-digest is required: sha256:<64 hex> of the harness image, or unreleased"]
-    return [] if _DIGEST.match(digest) else [f"--harness-digest {digest!r} is neither sha256:<64 hex> nor unreleased"]
+def check_harness_commit(commit: str | None) -> list[str]:
+    """The harness commit every figure records (design §11.7, X8): the full 40-hex commit of the
+    accuracy-dashboard checkout that ran the scorer. A tag, a branch or a short hash names no one
+    tree, so none is accepted."""
+    if commit is None:
+        return ["--harness-commit is required: the full 40-hex commit of the harness checkout"]
+    return [] if _HARNESS_COMMIT.match(commit) else [f"--harness-commit {commit!r} is not a full 40-hex commit"]
 
 
 def select_units(points: list[dict], units_path: str | None) -> tuple[list[dict], dict | None]:
@@ -352,12 +354,29 @@ def read_stack(blis: Path, given: str | None) -> sk.Stack:
     return sk.load(path)
 
 
+def check_metric_definitions(blis: Path) -> list[str]:
+    """Why the simulator's figures cannot be compared with the client's (DEV-8): `blis metrics` gives the
+    registry of the build, and each figure the harness compares (result.COMPARED_FIGURES) must have the
+    client's definition there. A build without the command (the M1 simulator, v0.16.0) has no registry to
+    check; the run says so and goes on, and its figures rest on the definitions the scorer assumes."""
+    try:
+        registry = bc.metrics(str(blis))
+    except bc.CommandError as e:
+        if "unknown command" in str(e):
+            _log("score: this build has no `blis metrics`: the definitions of the figures compared are not checked")
+            return []
+        return [str(e)]
+    return result.check_definitions(registry)
+
+
 def cmd_score(a) -> int:
     pull_dir = Path(a.pull)
     blis = Path(a.blis).resolve()
     sim_build = getattr(a, "sim_build", None)
     bad = check_blis_inputs(blis, getattr(a, "catalog_release", None), getattr(a, "registry_release", None), sim_build)
-    bad += check_harness_digest(getattr(a, "harness_digest", None))
+    bad += check_harness_commit(getattr(a, "harness_commit", None))
+    if not bad:
+        bad += check_metric_definitions(blis)
     try:
         stack = read_stack(blis, getattr(a, "stack", None))
         engine_release = stack.engine("vllm")
@@ -401,11 +420,16 @@ def cmd_score(a) -> int:
         vllm_ref=manifest["vllm_ref"], field_list=field_list, fields_sha256=fields_sha,
         base_models=manifest.get("base_models") or {}, timeout_s=a.timeout, vllm_defaults=vdefaults,
         vllm_defaults_release=st.vllm_defaults_release(),
-        max_rss_mb=getattr(a, "max_rss_mb", 0) or 0, engine_release=engine_release)
+        max_rss_mb=getattr(a, "max_rss_mb", 0) or 0, engine_release=engine_release,
+        routers_dir=Path(a.router_table).resolve() if getattr(a, "router_table", None) else None,
+        assumed_router_revision=getattr(a, "assume_router_revision", None),
+        router_policy_experiment=getattr(a, "router_policy_experiment", None),
+        speculative_fallback_category=getattr(a, "speculative_fallback_category", None),
+        router_checkout=Path(a.router_checkout).resolve() if getattr(a, "router_checkout", None) else None)
     # The build every point records: --sim-build, else the release tag the checkout is at
     # (check_blis_inputs required one), with the engine release its stack.json names (COV-6).
     env.sim_build = sim_build or env.blis_release
-    env.harness_digest = a.harness_digest
+    env.harness_commit = a.harness_commit
     env.catalog_obj = sp.Catalog(blis=str(blis), root=env.catalog)
     env.parts = sp.registry_parts(env.registry)
     # Score serially or across a process pool. BLIS replays are CPU-bound subprocesses, so the
@@ -434,11 +458,12 @@ def cmd_score(a) -> int:
             "blis": {"release": env.blis_release, "commit_sha": env.blis_commit, "catalog": env.catalog_release,
                      "registry": env.registry_release, "extractor_version": f"blis-latency-kernel@{env.kernel}"},
             "simulator": env.simulator(), "engine": {"kind": "vllm", "version": engine_release},
-            "harness_digest": a.harness_digest, "units": units,
+            "harness_commit": a.harness_commit, "units": units,
             # Design §11.7, X8: a figure is experimental unless its build and its data are both
-            # released. check_blis_inputs requires the catalog and registry to be named by release
-            # tags, so the data is released, and the build is released when it is a release tag.
-            "experimental": not _RELEASE_TAG.match(env.sim_build),
+            # released. The build is released when it is a release tag, and the data when the
+            # catalog and the registry are named by release tags, not by commits.
+            "experimental": env.routers_dir is not None or env.assumed_router_revision is not None or env.router_policy_experiment is not None or env.speculative_fallback_category is not None or not all(
+                _RELEASE_TAG.match(x) for x in (env.sim_build, env.catalog_release, env.registry_release)),
             "left_out_records": len((manifest.get("ledger") or {}).get("unlisted") or []),
             "vllm_ref": manifest["vllm_ref"], "vllm_max_distance": manifest["vllm_max_distance"],
             "fields_sha256": fields_sha, "pulled_at": manifest["pulled_at"],
@@ -478,6 +503,18 @@ def _has_legacy_ids(summary: dict) -> bool:
         '"recipe":' in json.dumps(summary.get("matrix", []))
 
 
+def harness_commit_now() -> str:
+    """The commit of the checkout the night's harness runs from (run.sh records the same one)."""
+    return _git(HARNESS_RUN.parent.parent, "rev-parse", "HEAD")
+
+
+def same_harness(prior: dict | None, commit: str) -> bool:
+    """Whether last night's summary was scored by this checkout's harness commit. A figure records
+    the commit that produced it (X8) and a summary names one, so a delta scored by another commit
+    cannot be merged into it: the night rescores the whole window, as for a new BLIS release."""
+    return prior is not None and (prior.get("provenance") or {}).get("harness_commit") == commit
+
+
 def mergeable(prior: dict | None, schema_version: int) -> bool:
     """Whether tonight's delta can be merged into last night's published summary. A summary of
     another schema version (v2, before grades) or one published before point ids were unit ids
@@ -486,9 +523,23 @@ def mergeable(prior: dict | None, schema_version: int) -> bool:
     return prior is not None and prior.get("schema_version") == schema_version and not _has_legacy_ids(prior)
 
 
-def run_image(cmd: list[str]) -> int:
-    """Run the harness image (harness_pin.docker_command) and return its exit status."""
+def run_harness(cmd: list[str]) -> int:
+    """Run harness/run.sh with `cmd` (harness_command) and return its exit status."""
     return subprocess.run(cmd).returncode
+
+
+def harness_command(*, sim: str, units, pull, out, catalog, registry, corpus_dir, fields,
+                    catalog_release: str, registry_release: str, max_rss_mb: int = 0) -> list[str]:
+    """The harness/run.sh command that scores a night (design §11.7). The harness is the script in
+    this checkout, so the commit every figure records is this checkout's HEAD, which run.sh reads."""
+    cmd = ["bash", str(HARNESS_RUN), "--sim", sim, "--units", str(Path(units).resolve()),
+           "--pull", str(Path(pull).resolve()), "--out", str(Path(out).resolve()),
+           "--catalog", str(Path(catalog).resolve()), "--registry", str(Path(registry).resolve()),
+           "--corpus-dir", str(Path(corpus_dir).resolve()), "--fields", str(Path(fields).resolve()),
+           "--catalog-release", catalog_release, "--registry-release", registry_release]
+    if max_rss_mb:
+        cmd += ["--max-rss-mb", str(max_rss_mb)]
+    return cmd
 
 
 def cmd_nightly(a) -> int:
@@ -504,6 +555,7 @@ def cmd_nightly(a) -> int:
     import build_summary_v2 as bsv2  # noqa: E402
 
     today = date.fromisoformat(a.today) if a.today else date.today()
+    harness_now = harness_commit_now()
     work_dir, data_dir, state_path = Path(a.work_dir), Path(a.data_dir), Path(a.state)
     contract_dir = Path(a.work or data_dir.parent / "_contract")
     latest_path = data_dir / "latest" / "summary.json"
@@ -546,7 +598,8 @@ def cmd_nightly(a) -> int:
                                f"rather than publish counts that omit them (COV-1)")
         window_ids = set(anchors)
         prior = json.loads(latest_path.read_text()) if latest_path.is_file() else None
-        whole = blis_changed or not last_ids or not mergeable(prior, bsv2.SCHEMA_VERSION)
+        whole = (blis_changed or not last_ids or not mergeable(prior, bsv2.SCHEMA_VERSION)
+                 or not same_harness(prior, harness_now))
         to_fetch = window_ids if whole else (window_ids - set(last_ids))
         _log(f"nightly: window {len(listed)} units, {len(window_ids)} of them anchor units; "
              f"fetch {'every one' if whole else f'{len(to_fetch)} new'}")
@@ -572,11 +625,12 @@ def cmd_nightly(a) -> int:
         return 2
 
     def score_build_fn(work: Path, blis_tag: str, score_ids, pull_date: str, window_ids: set):
-        # The night scores through the released harness image, named by its digest (design
-        # §11.7): the figures record that digest, and no scorer runs from this source tree.
+        # The night scores by running harness/run.sh from this checkout (design §11.7): the
+        # figures record the checkout's commit, run.sh clones and builds the release `blis_tag`,
+        # and the scorer is not called in this process.
         contract_dir.mkdir(parents=True, exist_ok=True)
-        rc = run_image(hp.docker_command(
-            a.harness_image, sim=blis_tag, units=anchor_path, pull=work, out=contract_dir,
+        rc = run_harness(harness_command(
+            sim=blis_tag, units=anchor_path, pull=work, out=contract_dir,
             catalog=a.catalog, registry=a.registry, corpus_dir=a.corpus_dir, fields=a.fields,
             catalog_release=release, registry_release=release,
             max_rss_mb=a.max_rss_mb))
@@ -588,7 +642,8 @@ def cmd_nightly(a) -> int:
         # IX-only night: merge the delta contract into last night's published summary (summary.json
         # IS the store). A BLIS release (or the seed) rebuilds the whole window from the contract.
         # A prior that is not mergeable was never merged into: pull_fn fetched the whole window.
-        if mergeable(prior, bsv2.SCHEMA_VERSION) and prior["provenance"]["blis"]["release"] == blis_tag:
+        if (mergeable(prior, bsv2.SCHEMA_VERSION) and prior["provenance"]["blis"]["release"] == blis_tag
+                and same_harness(prior, harness_now)):
             summary = bsv2.build_merged(prior, contract_dir, window_ids, generated_at=gen_at,
                                         evaluator_commit=a.evaluator_commit or "local",
                                         work=Path(a.score_work or contract_dir.parent) / "merge")
@@ -633,8 +688,8 @@ def main(argv=None) -> int:
     s.add_argument("--catalog", required=True)
     s.add_argument("--registry", required=True)
     s.add_argument("--catalog-release", required=True,
-                   help="the release tag the catalog is at (the harness image mounts the data without "
-                        "its git history, so it is named)")
+                   help="the release tag the catalog is at (a copy of the data may carry no "
+                        "git history, so it is named)")
     s.add_argument("--registry-release", required=True, help="the release tag the registry is at")
     s.add_argument("--fields", required=True,
                    help="the engine's fields.json for the release stack.json names: the pinned blis-vllm release's "
@@ -643,13 +698,25 @@ def main(argv=None) -> int:
                                     "stack.json, when its checkout has none")
     s.add_argument("--sim-build", help="the simulator build: a release tag or a 40-hex commit; the checkout must be at it "
                                         "(default: the release tag the checkout is at)")
-    s.add_argument("--harness-digest", required=True, help="sha256:<64 hex> of the harness image, or unreleased (X8)")
+    s.add_argument("--harness-commit", required=True, help="the full 40-hex commit of the harness checkout (X8)")
     s.add_argument("--units", help="the ledger units to score: a PublishedUnits list or a file of unit ids "
                                     "(default: every point of the pull)")
     s.add_argument("--corpus-dir", required=True,
                    help="each AgentX corpus at <dir>/<workload>/<file>, as resolve_agentic_corpus.py --all "
                         "fetched it at the revision its catalog replay workload pins")
     s.add_argument("--corpus-cache")
+    s.add_argument("--router-table", help="a directory of router table entries to read in place of <catalog>/routers: for an "
+                                          "experiment with a candidate entry. The run is then experimental.")
+    s.add_argument("--assume-router-revision", help="a 40-hex commit of the router build to assume where a run records only "
+                                                    "a wheel version (an experiment; the point says it was assumed, and the run is experimental)")
+    s.add_argument("--router-policy-experiment", help="an llm-d policy to stand in for a router the table does not map, to measure the prefill/decode writer "
+                        "apart from the router question (an experiment: each such point names it, and the run is experimental)")
+    s.add_argument("--speculative-fallback-category", metavar="CATEGORY",
+                   help="the acceptance profile's category to fall back to where the benchmark states none (design D8: a "
+                        "fallback the caller requested). Without it a speculative point that pins no acceptance length is G5 "
+                        "value_not_recorded:workload_category_not_stated. The point names it, and the run is experimental.")
+    s.add_argument("--router-checkout", metavar="DIR", help="a checkout of llm-d's router fork at a pinned commit: it publishes the "
+                   "endpoint-picker file of each policy, which a prefill/decode point passes to the simulator unchanged")
     s.add_argument("--work")
     s.add_argument("--timeout", type=int, default=7200)
     s.add_argument("--only", nargs="*")
@@ -695,8 +762,6 @@ def main(argv=None) -> int:
     n.add_argument("--evaluator-commit")
     n.add_argument("--ledger", required=True, help="blis-substrate's catalog/ledger (see pull --ledger)")
     n.add_argument("--blis", required=True, help="the blis binary (see score --blis)")
-    n.add_argument("--harness-image", required=True,
-                   help="the harness image by digest (harness/image.pin): the night scores through it")
     n.add_argument("--catalog", required=True)
     n.add_argument("--registry", required=True)
     n.add_argument("--substrate-dir", required=True, help="the blis-substrate checkout --catalog, --registry and --ledger are in")

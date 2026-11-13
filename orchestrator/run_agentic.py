@@ -28,6 +28,13 @@ CSV, so `build_summary.py` scores it with no new scoring code:
                      output, validated (orchestrator/ingest/result.py); its metrics
                      ttft_mean_ms / tpot_mean_ms (the PREDICTED side, DEV-8).
 
+LEGACY. The scored pipeline is ingest/score.py with ingest/replay.py, which reads every replay
+input from the run's own aiperf export and passes it: the seed, the duration, the 300 s
+per-trajectory idle cap (trace_idle_gap_cap_s), the per-lane warm-up (warmup requests per
+lane), the trajectory window, the grace period and the corpus filter. This driver passes none
+of the last four, so its numbers are not comparable with the scored points'. BLIS can state
+the cap and the warm-up (inference-sim #1971, closed); this driver has not been updated to.
+
 A row with a refusal (unsupported model/hardware, or a speculative run with no stated
 synthetic acceptance) is emitted as NOT scored, never run with a guessed value.
 
@@ -218,7 +225,7 @@ def agentic_replay_args(row: dict, server: dict) -> tuple[list[str], list[str]]:
     # (3 of 5 models sampled), so `server` is empty for them. Without this check the row is
     # priced as PLAIN decoding -- a drafting deployment scored with no draft -- and the
     # resulting error is reported as BLIS's, when it is really a dropped speculation setting
-    # (PR #21 review; #24 (c)). This is a WRONG number, worse than a missing one.
+    # (PR #21 review). This is a WRONG number, worse than a missing one.
     row_spec = (row.get("spec_method") or "none")
     if row_spec != "none" and "speculative_method" not in server:
         refusals.append(f"row is speculative (spec_method={row_spec!r}) but its server log "
@@ -288,8 +295,8 @@ def sweep_from_row(row: dict, server: dict | None = None, node_size: int | None 
     scenario = f"{model}-{chip}-{precision}-vllm-{tag}-agentx.yaml"
     # The scenario must draft for the acceptance-length flag to apply. method comes from the
     # server log's speculative_config (its vLLM name, e.g. dspark/mtp/eagle3 -- all priced by
-    # blis, sim/config.go:317); K from num_speculative_tokens. gpu_memory_utilization etc.
-    # are left to emit()'s defaults, as on the single-turn path.
+    # blis, sim/config.go:317); K from num_speculative_tokens. Every other engine setting
+    # is written only when the run stated it, as on the single-turn path (X19).
     stated: dict = dict(engine or {})
     if spec != "none" and server.get("num_speculative_tokens"):
         stated["speculative_method"] = server.get("speculative_method") or spec
@@ -307,8 +314,7 @@ def sweep_from_row(row: dict, server: dict | None = None, node_size: int | None 
                         "moe_ep_size": ep,
                         "moe_tp_size": 1 if ep > 1 else tp},
         "stated_config": stated,
-        # emit() takes an isl:osl pair; an agentic run has none. Its max_model_len is the run's
-        # own (stated_config), so this pair sizes nothing.
+        # An agentic run has no isl:osl pair. Its max_model_len is the run's own (stated_config).
         "workload": "0:0",
         # The GPUs in one node as the run recorded them (settings.recorded_node_size), or None:
         # gen_scenarios.emit() writes it only for a chip whose catalog entry fixes none.
@@ -378,7 +384,7 @@ def facets_corpus(sweep: dict, row: dict) -> dict:
             "model": sweep["model"],
             "gpu": sweep["gpu"],
             # The UI groups a workload by isl_osl; agentic has none, so surface the label
-            # (the emit() sizing pair sweep["workload"] stays internal to the scenario).
+            # (sweep["workload"] is the 0:0 placeholder an agentic run has).
             "workload": AGENTIC_LABEL,
             "framework": sweep["framework"],
             "precision": sweep["precision"],
@@ -547,7 +553,7 @@ def main() -> int:
         packaging = sp.Catalog(blis=blis, root=Path(args.catalog).resolve()).packaging(sweep["gpu"])
         stack_path = Path(args.stack) if args.stack else Path(blis).parent / "stack.json"
         engine_release = sk.load(stack_path).engine("vllm")
-        text = emit(sweep, {sweep["workload"]}, {AGENTIC_LABEL}, packaging, engine_release)
+        text = emit(sweep, {AGENTIC_LABEL}, packaging, engine_release)
     except PackagingError as e:
         # The chip's entry fixes no node size and the row records none: the point is not scored
         # (G5 value_not_recorded), and no size is assumed.

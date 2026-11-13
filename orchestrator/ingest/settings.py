@@ -404,7 +404,7 @@ def read_all(server_log: str, launch_config: dict | None) -> tuple[dict[str, Rea
 # renames that file and blis-substrate's Deployment (contracts/spec/deployment/deployment.go)
 # require: kv_cache_dtype is the block's cache_dtype; the compilation, attention and kernel
 # config fields are the block's top-level ones; speculative_config is its speculative block
-# (num_speculative_tokens is num_spec_tokens); VLLM_USE_RUST_FRONTEND is its frontend; the
+# (num_speculative_tokens is num_spec_tokens); the
 # parallel sizes are the Deployment's parallel layout. kv_transfer_config's connector and CPU
 # bytes are the Deployment's offload block (_write_offload). Every other environment variable is
 # copied into the block's env as the launch gave it. The connector's own options go under the
@@ -412,13 +412,93 @@ def read_all(server_log: str, launch_config: dict | None) -> tuple[dict[str, Rea
 _SAME_NAME = (
     "all2all_backend", "async_scheduling", "block_size", "cp_kv_cache_interleave_size", "dcp_comm_backend",
     "dcp_q_replicate", "disable_cascade_attn", "disable_custom_all_reduce", "disable_hybrid_kv_cache_manager",
-    "enable_prefix_caching", "gpu_memory_utilization", "kv_cache_memory_bytes", "long_prefill_token_threshold",
+    "enable_chunked_prefill", "enable_prefix_caching", "language_model_only", "gpu_memory_utilization", "kv_cache_memory_bytes", "long_prefill_token_threshold",
     "long_prefill_token_threshold_adaptive", "mamba_cache_dtype", "mamba_cache_mode", "mamba_ssm_cache_dtype",
     "max_cpu_loras", "max_cudagraph_capture_size", "max_loras", "max_model_len", "max_num_active_seqs",
     "max_num_batched_tokens", "max_num_scheduled_tokens", "max_num_seqs", "moe_backend",
     "prefill_schedule_interval", "prefix_cache_retention_interval", "prefix_match_unit", "quantization",
     "scheduling_policy", "stream_interval", "swa_bounded_replay", "watermark",
 )
+# Block keys that only a blis-vllm release which models the field has (M2 added them). The value is
+# written only when the engine's field list calls the field modelled; an older engine's block
+# refuses the key, and its field list does not model the field.
+MODELLED_ONLY = ("engine.enable_chunked_prefill", "engine.language_model_only")
+# blis-vllm's engine block takes vLLM's own setting names from the M2 classification on (rules/
+# engineconfig/names.go "moves"): a nested config object under its class's name, the rest flat. The
+# scorer builds the block in the earlier names and translates it once, when the field list is the
+# M2 one (it carries value_classes, which arrive with the rename). TEMPORARY copy of the table.
+VLLM_BLOCK_MOVES = (
+    ("cudagraph_mode", "compilation_config.cudagraph_mode"),
+    ("decoder_replay_cudagraph_capture_sizes", "compilation_config.decoder_replay_cudagraph_capture_sizes"),
+    ("custom_ops", "compilation_config.custom_ops"),
+    ("use_trtllm_attention", "attention_config.use_trtllm_attention"),
+    ("mla_prefill_backend", "attention_config.mla_prefill_backend"),
+    ("indexer_kv_dtype", "attention_config.indexer_kv_dtype"),
+    ("cache_dtype", "kv_cache_dtype"),
+    ("dbo.enable_dbo", "enable_dbo"),
+    ("dbo.dbo_decode_token_threshold", "dbo_decode_token_threshold"),
+    ("dbo.dbo_prefill_token_threshold", "dbo_prefill_token_threshold"),
+    ("eplb.enable_eplb", "enable_eplb"),
+    ("eplb.num_redundant_experts", "eplb_config.num_redundant_experts"),
+    ("eplb.window_size", "eplb_config.window_size"),
+    ("eplb.step_interval", "eplb_config.step_interval"),
+    ("kv_events.enable_kv_cache_events", "kv_events_config.enable_kv_cache_events"),
+    ("kv_events.publisher", "kv_events_config.publisher"),
+    ("kv_events.topic", "kv_events_config.topic"),
+    ("speculative.method", "speculative_config.method"),
+    ("speculative.num_spec_tokens", "speculative_config.num_speculative_tokens"),
+    ("speculative.draft_model", "speculative_config.model"),
+    ("speculative.kv_cache_dtype", "speculative_config.kv_cache_dtype"),
+    ("speculative.draft_sample_method", "speculative_config.draft_sample_method"),
+    ("speculative.rejection_sample_method", "speculative_config.rejection_sample_method"),
+    ("speculative.synthetic_acceptance_length", "speculative_config.synthetic_acceptance_length"),
+    ("speculative.enable_adaptive_verification", "speculative_config.enable_adaptive_verification"),
+)
+
+
+def speculative_block(engine: dict) -> tuple[dict | None, str]:
+    """The engine block's speculation settings and the key that holds the draft length, whichever
+    names the block takes: `speculative` / `num_spec_tokens` (the earlier block) or vLLM's
+    `speculative_config` / `num_speculative_tokens` (the M2 field list, to_vllm_block)."""
+    for key, tokens in (("speculative_config", "num_speculative_tokens"), ("speculative", "num_spec_tokens")):
+        if isinstance(engine.get(key), dict):
+            return engine[key], tokens
+    return None, "num_spec_tokens"
+
+
+def names_are_vllms(field_list) -> bool:
+    """Whether the engine block takes vLLM's own names: the field list is the M2 one."""
+    return any(f.value_classes is not None for f in field_list.fields.values())
+
+
+def vllm_location(loc: str) -> str:
+    """A scenario location in the earlier engine-block names, in vLLM's (engine.cache_dtype is
+    engine.kv_cache_dtype); any other location unchanged."""
+    if loc.startswith("engine."):
+        for internal, external in VLLM_BLOCK_MOVES:
+            if loc[len("engine."):] == internal:
+                return "engine." + external
+    return loc
+
+
+def to_vllm_block(eng: dict) -> dict:
+    """The engine block with its keys in vLLM's names (VLLM_BLOCK_MOVES); a copy."""
+    out = {k: (dict(v) if isinstance(v, dict) else v) for k, v in eng.items()}
+    for internal, external in VLLM_BLOCK_MOVES:
+        grp, _, leaf = internal.partition(".")
+        src = out.get(grp) if leaf else out
+        key = leaf or grp
+        if not isinstance(src, dict) or key not in src:
+            continue
+        value = src.pop(key)
+        if leaf and not src:
+            out.pop(grp, None)
+        dgrp, _, dleaf = external.partition(".")
+        if dleaf:
+            out.setdefault(dgrp, {})[dleaf] = value
+        else:
+            out[dgrp] = value
+    return out
 LOCATIONS = {
     **{f: f"engine.{f}" for f in _SAME_NAME},
     "kv_cache_dtype": "engine.cache_dtype",
@@ -451,7 +531,6 @@ LOCATIONS = {
     "engram_config.cpu_offload": "engine.engram_config.cpu_offload",
     "engram_config.dp_shared_memory": "engine.engram_config.dp_shared_memory",
     "engram_config.use_thp": "engine.engram_config.use_thp",
-    "env.VLLM_USE_RUST_FRONTEND": "engine.frontend",
     "tensor_parallel_size": "parallel.tp",
     "pipeline_parallel_size": "parallel.pp",
     "data_parallel_size": "parallel.dp",
@@ -535,7 +614,16 @@ class Decided:
     roles: dict = field(default_factory=dict)          # role -> value (model, served_model)
 
 
-def decide(settings: dict[str, Setting], field_list) -> Decided:
+def _stated_by_resolution(field_list, path: str) -> bool:
+    """Whether a value the engine only resolved may still be written to the scenario: the engine
+    models the field, or proves it has no effect. Any other field (not modelled, inert but
+    unproven, or unknown to the release) takes only what the run set."""
+    import fields as fl
+    f = field_list.lookup(path)
+    return f is not None and f.status in (fl.MODELLED, fl.PROVEN_INERT)
+
+
+def decide(settings: dict[str, Setting], field_list, part: str | None = None, facts_of=None) -> Decided:
     """Decide every recorded setting by the engine's fields.json (design §11.2, State and Decide).
 
     A setting two same-stage sources disagree on is a conflict (value_conflict). Every recorded
@@ -571,11 +659,21 @@ def decide(settings: dict[str, Setting], field_list) -> Decided:
             if dec.g5:
                 d.reasons.append(f"{dec.g5['code']}:{path}")
                 continue
+            if dec.substitution and dec.substitution["kind"] == "estimated":
+                est = field_list.lookup(path).estimation
+                if "valid_when" in est:
+                    # The engine states when its stand-in is exact; the dashboard supplies the facts and asks the evaluator.
+                    facts = facts_of(st.value, settings) if facts_of else {"value": st.value}
+                    if not fl.exact(est, facts):
+                        d.reasons.append(f"field_not_modelled:{path}")
+                        continue
             if dec.substitution:
                 d.substitutions.append(dec.substitution)
                 if dec.substitution["kind"] == "estimated":
                     estimated = field_list.lookup(path).estimation
         loc = location(path)
+        if loc in MODELLED_ONLY and not ((field_list.lookup(path) or fl.Field("", "", "", {}, {})).status == fl.MODELLED):
+            loc = None      # the engine block of an older release has no such key
         if estimated is not None:
             # The field's estimation rule decides what the scenario states for it, not the run.
             d.args.append({**rec, "blis": None, "match": "approximated",
@@ -592,19 +690,42 @@ def decide(settings: dict[str, Setting], field_list) -> Decided:
             continue    # None is "let the engine decide": nothing to copy
         if loc is None:
             f = field_list.lookup(path)
-            if st.requested and f is not None and f.status == fl.MODELLED and path not in ROLES:
+            if (st.requested or _stated_by_resolution(field_list, path)) and f is not None \
+                    and f.status == fl.MODELLED and path not in ROLES:
+                # The engine models it, so the scenario must state it, whether the run passed it or
+                # the engine only resolved it (design 11.2): a scenario with no place for it lost a setting.
                 d.reasons.append(f"setting_differs:{path}")
-            elif st.requested:
+            elif st.requested or _stated_by_resolution(field_list, path):
                 d.args.append({**rec, "blis": None, "match": "inert"})
+            else:
+                d.args.append({**rec, "blis": None, "match": "resolved_not_stated"})
             continue
-        if loc.startswith("engine.env.") and isinstance(st.value, bool):
+        if not st.requested and not _stated_by_resolution(field_list, path):
+            # The engine printed this value as its own resolution (a default, an architecture's
+            # choice), and the run did not set it. The scenario states only what the run set for a
+            # field the engine does not model: copying the printed default would hand the kernel a
+            # stated value it must refuse or price (design 11.2). The point records the value.
+            d.args.append({**rec, "blis": None, "match": "resolved_not_stated"})
+            continue
+        if loc.startswith("engine.env."):
+            f = field_list.lookup(path)
+            if f is not None and f.status in (fl.PROVEN_INERT, fl.INERT_UNPROVEN):
+                # The engine reads only the environment variables it models and refuses any other key
+                # of the block (blis-vllm: "is not read by this engine"), so a variable the field list
+                # calls inert is recorded on the point and not stated in the scenario.
+                d.args.append({**rec, "blis": None, "match": "inert"})
+                continue
+        if loc.startswith("engine.env.") and isinstance(st.value, bool) and path != FRONTEND_ENV:
             # vLLM's deprecation warning shows the variable was set, not its value.
             d.reasons.append(f"required_setting_missing:{path}")
             continue
         value = _yaml_value(st.value)
-        if loc == "engine.frontend":
+        if path == FRONTEND_ENV:
+            # The engine block states the front end as the variable itself, "1" or "0", as vLLM reads
+            # it (the engine refuses the key `frontend` and asks for this form). The server log's
+            # "Launching Rust frontend" line is the evidence it was 1.
             try:
-                value = _flag(value)
+                value = ENV_FLAG[_flag(value)]
             except ValueError:
                 d.reasons.append(f"conflict:{path}")
                 continue
@@ -622,6 +743,89 @@ def decide(settings: dict[str, Setting], field_list) -> Decided:
 
 
 # ------------------------------------------------------------------ the scenario BLIS is handed
+
+# A scenario of more than one node needs a fabric class (the cluster states it) and the registry's
+# fabric efficiency: without cost-model-fabric the kernel prices a handoff or cross-node collective at
+# the catalog's nominal rate, 23% fast on ib-400g. The class belongs to the user's scenario (design 2.2,
+# SUB-3). No launch configuration, recipe or runners.yaml of InferenceX names it (runners.yaml lists RDMA
+# devices, ports and the GID index of a cluster, not InfiniBand against Ethernet nor a line rate; the
+# srt-slurm recipes set UCX_TLS and NCCL_SOCKET_IFNAME). A class a record states is used as recorded. Otherwise
+# the point carries an `estimated` substitution naming how the class was chosen, from this order:
+#   1. the fabric InferenceX publishes for the chip SKU (DOCUMENTED_FABRIC), cited on the point;
+#   2. the default class, for a chip nothing documents.
+# THE SWITCH. FABRIC_WHEN_UNRECORDED = "refuse" makes the point G5 value_not_recorded:cluster.fabric instead.
+FABRIC_COEFFICIENT = "cost-model-fabric"
+FABRIC_WHEN_UNRECORDED = "assume"          # "assume" (labelled, cited) or "refuse" (G5 value_not_recorded:cluster.fabric)
+FABRIC_SUBJECT = "cluster.fabric"
+DEFAULT_ASSUMED_FABRIC = "ib-400g"
+# What InferenceX documents about its scale-out network per chip SKU: the "Chip Specifications & Comparison" page, columns
+# "Scale-out BW per chip", "Scale-out tech" and "NIC". Fetched 2026-11-12 (sha256 of the HTML below); the page carries no revision.
+DOCUMENTATION = ("https://inferencex.semianalysis.com/gpu-specs (fetched 2026-11-12, sha256 "
+                 "f9ca3c284ebe0c7c8489611996f22ffcedd8fba562b55106f61f1e29a7ab25d8)")
+# chip -> (the documented technology, the documented line rate per chip in Gb/s, the NIC). The page lists the MI300X class
+# too; the catalog names none of them, so they are here only so a later catalog part finds its entry.
+DOCUMENTED_FABRIC = {
+    "h100": ("RoCEv2 Ethernet", 400, "ConnectX-7 2x200GbE"),
+    "h200": ("InfiniBand NDR", 400, "ConnectX-7 400G"),
+    "b200": ("gIB RoCEv2 Ethernet", 400, "ConnectX-7 400GbE"),
+    "b300": ("RoCEv2 Ethernet", 800, "ConnectX-8 2x400GbE"),
+    "gb200-nvl72": ("InfiniBand NDR", 400, "ConnectX-7 400G"),
+    "gb300": ("InfiniBand XDR", 800, "ConnectX-8 800G"),
+    "mi300x": ("RoCEv2 Ethernet", 400, "Pollara 400GbE"),
+    "mi325x": ("RoCEv2 Ethernet", 400, "Pollara 400GbE"),
+    "mi355x": ("RoCEv2 Ethernet", 400, "Pollara 400GbE"),
+}
+# The catalog's fabric classes by (technology family, line rate Gb/s): networks/ib-400g, ib-800g (InfiniBand). A documented
+# fabric of another family at the same line rate (RoCE 400G, 800G) has no class of its own yet (blis-substrate#50/#51).
+CATALOG_FABRIC = {("InfiniBand", 400): "ib-400g", ("InfiniBand", 800): "ib-800g"}
+_EFFICIENCY_NOTE = ("the registry's fabric efficiency for the class is the ib-400g value carried over (assumed, not measured)")
+
+
+def assumed_fabric(hardware: str | None) -> tuple[str, dict]:
+    """The fabric class a chip gets when no record states one, and the `estimated` substitution that names it. The fabric
+    InferenceX documents for the chip is cited; a chip it does not document gets the default class."""
+    doc = DOCUMENTED_FABRIC.get(hardware or "")
+    if doc is None:
+        cls = DEFAULT_ASSUMED_FABRIC
+        why = (f"no source documents the fabric of a {hardware or 'unnamed'} cluster, so the default class {cls} is assumed; the "
+               f"real fabric may be slower or faster, and the class sets the nominal cross-node rate")
+    else:
+        tech, gbps, nic = doc
+        family = "InfiniBand" if tech.startswith("InfiniBand") else "RoCE"
+        exact = CATALOG_FABRIC.get((family, gbps))
+        cls = exact or CATALOG_FABRIC[("InfiniBand", gbps)]
+        if family == "InfiniBand":
+            why = (f"documented by InferenceX: {tech}, {gbps} Gb/s per chip, {nic} ({DOCUMENTATION}); the catalog class {cls} is that "
+                   f"fabric{'; ' + _EFFICIENCY_NOTE if cls == 'ib-800g' else ''}")
+        else:
+            why = (f"documented by InferenceX: {tech}, {gbps} Gb/s per chip, {nic} ({DOCUMENTATION}); the catalog has no RoCE class "
+                   f"of that rate, so {cls}, the class of the same line rate, stands in (assumed, labelled): the nominal rate is the "
+                   f"documented one, and the RoCE efficiency is not measured, so the registry's {cls} value is carried over")
+    return cls, {
+        "kind": "estimated", "subject": FABRIC_SUBJECT,
+        "detail": f"the run's inter-node fabric class is recorded by no launch configuration or recipe; {cls} is assumed ({why}), "
+                  f"so a cross-node transfer is priced at that class's nominal rate times the registry's fabric efficiency"}
+
+
+def fabric_for(recorded: str | None, hardware: str | None) -> tuple[str | None, list[dict], list[str]]:
+    """The fabric class of a multi-node cluster, the substitutions that name how it was found, and the G5 reasons.
+    A recorded class is used as recorded. Otherwise FABRIC_WHEN_UNRECORDED decides: assume (the documented or default class and
+    its named substitution) or refuse (no class, the reason value_not_recorded:cluster.fabric)."""
+    if recorded:
+        return recorded, [], []
+    if FABRIC_WHEN_UNRECORDED == "assume":
+        cls, sub = assumed_fabric(hardware)
+        return cls, [sub], []
+    return None, [], [f"value_not_recorded:{FABRIC_SUBJECT}"]
+
+
+def recorded_fabric(launch: dict | None) -> str | None:
+    """The fabric class a run's launch configuration records (resources.fabric), or None. No
+    InferenceX launch configuration records one today; the reader is here so that a record, when
+    one exists, is used and not overwritten by the assumed class."""
+    f = ((launch or {}).get("resources") or {}).get("fabric") if isinstance(launch, dict) else None
+    return f if isinstance(f, str) and f else None
+
 
 COEFFICIENTS = ["cost-model-primitives", "cost-model-collectives", "cost-model-host-overheads",
                 "cost-model-attention", "cost-model-recurrent", "cost-model-memory"]
@@ -649,9 +853,32 @@ class Built:
     reasons: list = field(default_factory=list)
     substitutions: list = field(default_factory=list)  # estimates of values the run did not record
     node_source: str | None = None                    # where the scenario's gpus_per_node came from
+    vllm_names: bool = False                          # the engine block is written in vLLM's own names
+    thinking: str | None = None                       # the workload's thinking mode where the run recorded it
+    fallback_category: str | None = None              # the acceptance profile's category taken in place of the workload's
+    acceptance_from_log: bool = False                 # acceptance_length is the server log's realised mean, not a run setting
 
 
-FRONTEND = {True: "rust", False: "python"}   # VLLM_USE_RUST_FRONTEND, parsed as a bool
+FRONTEND_ENV = "env.VLLM_USE_RUST_FRONTEND"
+ENV_FLAG = {True: "1", False: "0"}   # a boolean environment variable as the engine block writes it
+
+
+def requested_values(settings: dict) -> dict:
+    """The values the run set, by path, as the G1 value-class check reads them. A boolean environment
+    variable the run wrote as text ("1") is read as vLLM's envs.py reads it, so the check compares the
+    class "true" and not the text."""
+    out = {}
+    for p, s in settings.items():
+        if not s.requested or s.value is None:
+            continue
+        v = s.value
+        if p == FRONTEND_ENV:
+            try:
+                v = _flag(v)
+            except ValueError:
+                pass
+        out[p] = v
+    return out
 
 
 def recorded_node_size(launch: dict | None) -> int | None:
@@ -663,7 +890,8 @@ def recorded_node_size(launch: dict | None) -> int | None:
 
 
 def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str, field_list,
-          catalog_node_size: int | None, node: ir.NodeSize) -> Built:
+          catalog_node_size: int | None, node: ir.NodeSize, draft_model: str | None = None,
+          launch_config: dict | None = None) -> Built:
     """The Scenario + Deployment for one point, from the decided settings.
 
     Only what the run recorded is written, under the engine's own names (LOCATIONS), and the
@@ -695,8 +923,6 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
         if top == "offload":
             offload[loc] = (path, value)
             continue
-        if loc == "engine.frontend":
-            value = FRONTEND[value]
         if loc.startswith("engine.env."):
             pool["engine"].setdefault("env", {})[loc[len("engine.env."):]] = str(value)
             continue
@@ -708,9 +934,23 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
         if k not in par:
             b.reasons.append(f"required_setting_missing:parallel.{k}")
             par[k] = 1
-    par.setdefault("enable_expert_parallel", False)
+    # enable_expert_parallel is written only when the run recorded it (X19): vLLM prints it only
+    # when it differs from the default, so an unrecorded one is left to the engine.
     eng = pool["engine"]
     spec = eng.get("speculative")
+    if spec is not None and draft_model is not None:
+        # The run named a draft checkpoint (speculative_config.model); the engine block names it by
+        # its catalog entry (blis-vllm testdata/scenarios/muse-h100-pp2tp8-dspark.yaml: draft_model).
+        spec["draft_model"] = draft_model
+    if spec is not None and spec.get("rejection_sample_method") == "synthetic":
+        # vLLM takes the acceptance of synthetic rejection sampling from synthetic_acceptance_length
+        # and refuses the method without one (vllm/config/speculative.py:575). The run's length is the
+        # replay's acceptance (LOCATIONS); the engine block states it too, which is the form the engine
+        # accepts the method in.
+        if b.acceptance_length is None:
+            b.reasons.append("required_setting_missing:speculative_config.synthetic_acceptance_length")
+        else:
+            spec["synthetic_acceptance_length"] = float(b.acceptance_length)
     if spec is not None and set(spec) >= {"method"} and "num_spec_tokens" not in spec:
         b.reasons.append("required_setting_missing:speculative_config.num_speculative_tokens")
     if offload:
@@ -731,8 +971,19 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
                 b.substitutions.append(node.substitution)
     cluster["nodes"] = max(1, -(-ranks // per_node))
     pool["nodes"] = cluster["nodes"]
+    coefficients = list(COEFFICIENTS)
+    if cluster["nodes"] > 1:
+        fabric, fabric_subs, fabric_reasons = fabric_for(recorded_fabric(launch_config), cluster["hardware"])
+        b.substitutions.extend(fabric_subs)
+        b.reasons.extend(fabric_reasons)
+        if fabric is not None:
+            cluster["fabric"] = fabric
+            coefficients.append(FABRIC_COEFFICIENT)
     b.scenario = {"kind": "Scenario", "name": name, "engine_version": engine_version.lstrip("v"),
-                  "model": model, "coefficients": COEFFICIENTS, "cluster": cluster}
+                  "model": model, "coefficients": coefficients, "cluster": cluster}
+    if names_are_vllms(field_list):
+        pool["engine"] = to_vllm_block(pool["engine"])
+        b.vllm_names = True
     b.deployment = dep
     return b
 
@@ -837,3 +1088,74 @@ def topology_reasons(launch_config: dict | None, args: "Reading", field_list) ->
         if dec.g5:
             out.append(f"{dec.g5['code']}:{p}")
     return sorted(out)
+
+
+# ------------------------------------------------------------------ the acceptance a run realised
+
+_SPEC_LINE = re.compile(r"SpecDecoding metrics: Mean acceptance length: ([0-9.]+).*?Drafted: ([0-9]+) tokens")
+
+
+def realised_acceptance(log: str) -> dict | None:
+    """The mean acceptance length the vLLM server logged while it served (its periodic
+    "SpecDecoding metrics: Mean acceptance length: X, ... Drafted: D tokens" lines), or None when
+    the log has none. The figure is the mean of the lines' lengths weighted by the tokens each
+    interval drafted, which is the length over all drafts when the draft length is fixed. The log
+    covers the server's whole life, warm-up and any other client included, so it is the run's
+    realised acceptance only to that extent; `lines` and `drafted_tokens` say how much it rests on.
+    Idle intervals (nothing drafted) are skipped."""
+    total = weighted = 0.0
+    lines = 0
+    for m in _SPEC_LINE.finditer(log):
+        drafted = int(m.group(2))
+        if drafted <= 0:
+            continue
+        lines += 1
+        total += drafted
+        weighted += float(m.group(1)) * drafted
+    if not lines:
+        return None
+    return {"mean_acceptance_length": round(weighted / total, 3), "log_lines": lines, "drafted_tokens": int(total)}
+
+
+ACCEPTANCE_FIELD = "speculative_config.synthetic_acceptance_length"
+_THINKING_PATHS = ("default_chat_template_kwargs.thinking_mode", "default_chat_template_kwargs.enable_thinking",
+                   "default_chat_template_kwargs.thinking")
+_THINKING_ON = {"enabled", "enable", "on", "true", "high", "medium", "low"}
+_THINKING_OFF = {"disabled", "disable", "off", "false", "none"}
+
+
+def engine_takes_acceptance(field_list) -> bool:
+    """Whether the engine models the field that states a speculative run's acceptance length, so the
+    log's realised mean may be pinned in its place (dashboard #59). A list that does not model it
+    leaves the acceptance to the registry's profile, and the log's figure is only recorded."""
+    import fields as fl
+    f = field_list.lookup(ACCEPTANCE_FIELD)
+    return f is not None and f.status == fl.MODELLED
+
+
+_REASONING_PARSER_PATHS = ("reasoning_parser", "structured_outputs_config.reasoning_parser")
+
+
+def recorded_reasoning_parser(settings: dict) -> str | None:
+    """The reasoning parser the run's server was started with, or None. Only a value the run passed
+    counts: the resolved configuration prints an empty one for a server that runs none."""
+    for path in _REASONING_PARSER_PATHS:
+        st = settings.get(path)
+        if st is not None and st.requested and st.conflict is None and isinstance(st.value, str) and st.value:
+            return st.value
+    return None
+
+
+def recorded_thinking(settings: dict) -> str | None:
+    """"on" or "off" when the run's server recorded the workload's thinking mode (the chat template
+    kwargs it was started with), else None. Never inferred from a reasoning parser or a model name."""
+    for path in _THINKING_PATHS:
+        st = settings.get(path)
+        if st is None or st.value is None or st.conflict is not None:
+            continue
+        v = str(st.value).strip().lower()
+        if v in _THINKING_ON:
+            return "on"
+        if v in _THINKING_OFF:
+            return "off"
+    return None

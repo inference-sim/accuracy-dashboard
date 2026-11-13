@@ -65,3 +65,14 @@ def chip_packaging(blis: str, catalog: str, chip: str) -> dict | None:
     "gpus_per_rack"}, each the value the chip's catalog entry fixes or None. None when the command
     reports no packaging (a build before inference-sim m1/packaging, or a chip with no entry)."""
     return _catalog_resolve(blis, catalog, None, chip).get("packaging")
+
+
+def metrics(blis: str) -> dict[str, dict]:
+    """`blis metrics --json`: the metric registry of the build, by metric id (DEV-8). The M1 simulator
+    has no such command; the error then says it is an unknown command."""
+    text = _run(blis, ["metrics", "--json"])
+    try:
+        recs = json.loads(text)["metrics"]
+        return {r["id"]: r for r in recs}
+    except (json.JSONDecodeError, KeyError, TypeError) as e:
+        raise CommandError(f"blis metrics --json printed no metric registry: {e}") from None

@@ -59,13 +59,13 @@ def test_a_single_turn_point_is_scored_through_the_real_simulator(monkeypatch):
     entry["row"]["image"] = entry["build"]["image"] = "vllm/vllm-openai:v0.32.0"
     entry["build"]["ref"] = "v0.32.0"
     env = dataclasses.replace(env, blis=blis, catalog=sub / "catalog", registry=sub / "registry",
-                              engine_release="0.32.0")
+                              engine_release="0.32.0", field_list=e2e._vllm_names_fields())
     env.catalog_obj = sp.Catalog(blis=blis, root=sub / "catalog")
     env.parts = {"h100"}
     o = sc._score_one(entry, tmp / "pull", tmp / "work", env)
     prov = {"ingest": "api", "blis": {"release": "v0.12.0", "commit_sha": "b" * 40, "catalog": "0.3.0",
                                       "registry": "v0.2.0", "extractor_version": "blis-latency-kernel@v0.3.0"},
-            "simulator": env.simulator(), "harness_digest": env.harness_digest, "experimental": False, "units": None,
+            "simulator": env.simulator(), "harness_commit": env.harness_commit, "experimental": False, "units": None,
             "engine": {"kind": "vllm", "version": "0.32.0"}, "left_out_records": 0,
             "vllm_ref": "v0.32.0", "vllm_max_distance": 2000, "fields_sha256": "d" * 64,
             "pulled_at": "2026-10-23T00:00:00Z", "corpora": [], "pull_manifest_sha256": "e" * 64,

@@ -92,26 +92,13 @@ jobs:
           restore-keys: |
             ix-artifacts-
 
-      # The scoring runs in the harness image named by its digest in harness/image.pin (design
-      # §11.7, X8), so every figure records the digest of the image that produced it. While the pin
-      # says `unpublished` no image exists and this step FAILS: a gate that does not run is a
-      # failure (X16), and the scorer is never run from this source tree instead. A digest is
-      # verified against the signature harness-release.yml signs with before anything runs it.
-      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
-      - name: Pin and verify the harness image
-        run: |
-          set -euo pipefail
-          IMAGE_REF="$(python3 orchestrator/ingest/harness_pin.py check harness/image.pin)"
-          cosign verify "$IMAGE_REF" \
-            --certificate-identity-regexp '^https://github\.com/inference-sim/accuracy-dashboard/\.github/workflows/harness-release\.yml@refs/(tags/v[0-9].*|heads/main)$' \
-            --certificate-oidc-issuer https://token.actions.githubusercontent.com > /dev/null
-          docker pull -q "$IMAGE_REF"
-          echo "HARNESS_IMAGE=${IMAGE_REF}" >> "$GITHUB_ENV"
-
       # Score the release resolve_blis.sh named: the oldest unscored one, once (COV-9). Build blis
       # FROM SOURCE at the tag (so a per-release score is sound; #15's seed rule), fetch what it
-      # pins, and run one night with it. Every point is scored by `blis replay` on requests the
-      # orchestrator writes (orchestrator/ingest/score.py); no other scorer is built. A release that
+      # pins, and run one night with it. The scoring is harness/run.sh, run from this checkout
+      # (design §11.7, X8): it records this checkout's commit on every figure, and refuses to run
+      # on a checkout whose harness files differ from that commit. No image is built, pulled or
+      # verified. Every point is scored by `blis replay` on requests the harness writes
+      # (orchestrator/ingest/score.py); no other scorer is built. A release that
       # fails publishes nothing and leaves the list as it was (COV-8), so the next run scores it
       # again; the releases before it were published by their own runs.
       - name: Score the release
@@ -126,7 +113,7 @@ jobs:
               "$RUNNER_TEMP/pull" "$RUNNER_TEMP/contract" "$RUNNER_TEMP/scorework"
             SIM="$RUNNER_TEMP/sim"
             git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$SIM"
-            ( cd "$SIM" && GOFLAGS=-mod=mod go build -o blis main.go )
+            ( cd "$SIM" && go build -o blis main.go )
             # Everything else the release runs is named by its stack.json (SIM-3, X8), so a new
             # release is scored with no change to this file: the blis-substrate commit (its
             # catalog/, registry/ and catalog/ledger) and the vLLM tag of the engine release.
@@ -194,7 +181,6 @@ jobs:
               --blis "$SIM/blis" --catalog "$CATALOG" --registry "$REGISTRY" \
               --substrate-dir "$RUNNER_TEMP/substrate" \
               --substrate-version "$substrate_version" --substrate-commit "$substrate_commit" \
-              --harness-image "$HARNESS_IMAGE" \
               --corpus-dir "$RUNNER_TEMP/corpora" --fields "$FIELDS"
             echo "::endgroup::"
           done

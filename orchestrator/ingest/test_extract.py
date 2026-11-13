@@ -167,6 +167,87 @@ def test_a_not_modelled_field_with_a_leave_unset_rule_is_left_unset_and_named():
     assert "engine.indexer_kv_dtype" not in c.mapped                 # left to the engine (X19)
 
 
+def test_a_value_the_engine_only_resolved_is_not_stated_for_a_field_it_does_not_model():
+    # custom_ops "all" and the printed indexer default are the engine's own resolution (the
+    # architecture's breakable-capture default; AttentionConfig printed whole), not run settings.
+    # Stated, the kernel cannot tell them from a request and refuses them (design 11.2, X19).
+    resolved = (RESOLVED[:-1] + ", 'custom_ops': ['all']}, "
+                "attention_config=AttentionConfig(backend=None, indexer_kv_dtype='bf16')")
+    c = _classify(_log("'max_num_seqs': 16", resolved=resolved))
+    assert c.reasons == []
+    assert not {"engine.custom_ops", "engine.indexer_kv_dtype"} & set(c.mapped)
+    rec = {a["arg"]: a for a in c.args}
+    assert rec["compilation_config.custom_ops"]["match"] == "resolved_not_stated"
+    assert rec["compilation_config.custom_ops"]["measured"] == '["all"]'
+
+    assert rec["attention_config.indexer_kv_dtype"]["match"] == "resolved_not_stated"
+    assert "engine.quantization" not in c.mapped and rec["quantization"]["match"] == "resolved_not_stated"
+    assert "match" not in rec["kv_cache_dtype"] and "match" not in rec["enable_prefix_caching"]    # copied: judged later
+    # A modelled field the engine only resolved is still written, as before.
+    assert c.mapped["engine.cache_dtype"][1] == "auto" and c.mapped["engine.enable_prefix_caching"][1] is True
+
+
+def test_a_real_deepseek_log_states_no_custom_ops_the_engine_chose():
+    name = "dsv4-b200-8-1-False-off"            # a real InferenceX server log; custom_ops printed only as resolved
+    launch_path = LOGS / f"{name}.launch.json"
+    launch = json.loads(launch_path.read_text()) if launch_path.exists() else None
+    readings, problems = st.read_all((LOGS / f"{name}.server-log.txt").read_text(), launch)
+    assert problems == []
+    c = st.decide(st.merge(readings, DEFAULTS), FIELDS)
+    rec = {a["arg"]: a for a in c.args}
+    assert rec["compilation_config.custom_ops"]["match"] == "resolved_not_stated"
+    assert "engine.custom_ops" not in c.mapped
+    assert "field_not_modelled:compilation_config.custom_ops" not in c.reasons
+
+
+def test_a_resolved_only_value_with_no_scenario_location_is_never_dropped_silently():
+    def lst(status):
+        ev = {"modelled": {"traces": ["t"]}, "proven_inert": {"proof": "TestInert"}}.get(
+            status, {"issue": "inference-sim/blis-vllm#1"})
+        return fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.31.0"}, "fields": [
+            {"name": "no_such_scenario_key", "source": "config", "status": status, "evidence": ev,
+             "estimation": {"rule": "none"}}]}))
+    def decide(status, requested):
+        s = st.Setting("no_such_scenario_key", 3, "resolved_config", requested=requested)
+        return st.decide({"no_such_scenario_key": s}, lst(status))
+    # The engine models it: the scenario must state it, passed or resolved; with no place for it, a lost setting.
+    assert decide("modelled", False).reasons == ["setting_differs:no_such_scenario_key"]
+    assert decide("modelled", True).reasons == ["setting_differs:no_such_scenario_key"]
+    assert [a["match"] for a in decide("proven_inert", False).args] == ["inert"]
+    # Not modelled and only resolved: recorded on the point, not stated.
+    r = decide("not_modelled", False)
+    assert r.reasons == [] and [a["match"] for a in r.args] == ["resolved_not_stated"]
+
+
+def test_a_resolved_only_value_is_stated_exactly_when_the_field_list_marks_the_field_modelled():
+    """The rule follows the field list, not the field: when blis-vllm marks cudagraph_mode and
+    cudagraph_capture_sizes modelled (the kernel prices them), the engine's resolved value is stated again."""
+    def lst(status):
+        ev = {"modelled": {"traces": ["t"]}}.get(status, {"issue": "inference-sim/blis-vllm#78"})
+        fields = [{"name": n, "source": "config", "status": status, "evidence": ev, "estimation": {"rule": "none"}}
+                  for n in ("compilation_config.cudagraph_capture_sizes", "compilation_config.cudagraph_mode")]
+        return fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"},
+                                    "fields": fields}))
+    def decide(status):
+        s = {"compilation_config.cudagraph_mode": st.Setting("compilation_config.cudagraph_mode", "FULL_DECODE_ONLY",
+                                                              "resolved_config", requested=False),
+             "compilation_config.cudagraph_capture_sizes": st.Setting("compilation_config.cudagraph_capture_sizes",
+                                                                      [1, 2, 4], "resolved_config", requested=False)}
+        return st.decide(s, lst(status))
+    modelled = decide("modelled")
+    assert modelled.mapped["engine.cudagraph_mode"][1] == "FULL_DECODE_ONLY"
+    assert modelled.mapped["engine.cudagraph_capture_sizes"][1] == [1, 2, 4]
+    assert modelled.reasons == [] and not [a for a in modelled.args if a.get("match") == "resolved_not_stated"]
+    unmodelled = decide("not_modelled")
+    assert not {"engine.cudagraph_mode", "engine.cudagraph_capture_sizes"} & set(unmodelled.mapped)
+    assert [a["match"] for a in unmodelled.args] == ["resolved_not_stated"] * 2 and unmodelled.reasons == []
+
+
+def test_a_custom_ops_list_the_run_set_is_still_refused_as_not_modelled():
+    c = _classify(_log("'compilation_config': {'custom_ops': ['+rms_norm']}"))
+    assert c.reasons == ["field_not_modelled:compilation_config.custom_ops"]
+
+
 def test_an_inert_unproven_field_the_run_set_is_named_as_an_interim_status():
     c = _classify(_log("'attention_config': AttentionConfig(backend='FLASHINFER')"))
     assert c.reasons == [] and [(x["kind"], x["subject"]) for x in c.substitutions] == \
@@ -179,14 +260,14 @@ def test_every_recorded_value_is_copied_verbatim_under_the_engines_own_names():
                        "'compilation_config': {'max_cudagraph_capture_size': 512}, "
                        "'speculative_config': {'method': 'mtp', 'num_speculative_tokens': 2}"))
     assert {k: v[1] for k, v in c.mapped.items() if k.startswith("engine.")} == {
-        "engine.max_num_seqs": 16, "engine.cache_dtype": "fp8", "engine.quantization": "fp8",
+        "engine.max_num_seqs": 16, "engine.cache_dtype": "fp8",
         "engine.enable_prefix_caching": True, "engine.cudagraph_mode": "FULL_AND_PIECEWISE",
         "engine.max_cudagraph_capture_size": 512,
         "engine.speculative.method": "mtp", "engine.speculative.num_spec_tokens": 2}
 
 
 def test_every_location_is_a_field_blis_vllm_engine_block_or_the_deployment_names():
-    # The names blis-vllm rules/engineconfig/fieldnames_test.go (origin/m1/vllm) pins, and the
+    # The names blis-vllm rules/engineconfig/fieldnames_test.go (branch m2/7-refusals-and-engine-block-names, which adds enable_chunked_prefill and language_model_only) pins, and the
     # Deployment's parallel and offload fields (blis-substrate contracts/spec/deployment).
     engine = {"all2all_backend", "disable_custom_all_reduce", "cudagraph_mode", "max_cudagraph_capture_size",
               "cudagraph_capture_sizes", "async_scheduling", "frontend", "disable_cascade_attn",
@@ -199,7 +280,7 @@ def test_every_location_is_a_field_blis_vllm_engine_block_or_the_deployment_name
               "disable_hybrid_kv_cache_manager", "kv_cache_memory_bytes", "prefix_match_unit",
               "prefix_cache_retention_interval", "kv_events", "max_loras", "max_cpu_loras",
               "decoder_replay_cudagraph_capture_sizes", "custom_ops", "use_trtllm_attention", "mla_prefill_backend",
-              "indexer_kv_dtype", "linear_backend", "env"}
+              "indexer_kv_dtype", "linear_backend", "enable_chunked_prefill", "language_model_only", "env"}
     parallel = {"tp", "pp", "dp", "dp_local", "enable_expert_parallel", "pcp", "dcp"}
     for path, loc in st.LOCATIONS.items():
         top, _, rest = loc.partition(".")
@@ -327,13 +408,54 @@ def test_moe_backend_is_copied_to_the_engine_blocks_field():
     assert c.mapped["engine.moe_backend"][1] == "deep_gemm_mega_moe"
 
 
-def test_the_rust_frontend_line_maps_to_engine_frontend():
+RUST_ENV = "engine.env.VLLM_USE_RUST_FRONTEND"
+
+
+def test_the_rust_frontend_is_stated_as_the_variable_vllm_reads_not_as_a_frontend_key():
+    # The engine refuses the key `frontend` and asks for env: {VLLM_USE_RUST_FRONTEND: "1"}; the
+    # server log's "Launching Rust frontend" line and the launch configuration's variable both say it.
     c = _classify(_log("'max_num_seqs': 1", extra="INFO Launching Rust frontend: /usr/bin/vllm\n"))
-    assert c.mapped["engine.frontend"][1] is True
+    assert c.mapped[RUST_ENV][1] == "1" and "engine.frontend" not in c.mapped
+    eng = _build(c).deployment["pools"][0]["engine"]
+    assert eng["env"] == {"VLLM_USE_RUST_FRONTEND": "1"} and "frontend" not in eng
     launch = {"roles": {"agg": {"args": {"max-num-seqs": 1}, "env": {"VLLM_USE_RUST_FRONTEND": "1"}}}}
-    assert _classify(_log("'max_num_seqs': 1"), launch).mapped["engine.frontend"][1] is True
+    assert _classify(_log("'max_num_seqs': 1"), launch).mapped[RUST_ENV][1] == "1"
+    launch["roles"]["agg"]["env"]["VLLM_USE_RUST_FRONTEND"] = "0"
+    c0 = _classify(_log("'max_num_seqs': 1"), launch)
+    assert c0.mapped[RUST_ENV][1] == "0"
+    assert _build(c0).deployment["pools"][0]["engine"]["env"] == {"VLLM_USE_RUST_FRONTEND": "0"}
     launch["roles"]["agg"]["env"]["VLLM_USE_RUST_FRONTEND"] = "maybe"
     assert "conflict:env.VLLM_USE_RUST_FRONTEND" in _classify(_log("'max_num_seqs': 1"), launch).reasons
+
+
+def test_the_rust_frontend_the_run_set_is_judged_against_the_class_true_not_the_text_1():
+    import g1
+    FL = fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": [
+        {"name": "VLLM_USE_RUST_FRONTEND", "source": "env", "status": "modelled", "evidence": {"traces": ["t"]},
+         "value_classes": {"type": "boolean", "covered": ["false", "true"]}, "estimation": {"rule": "none"}}]}))
+    launch = {"roles": {"agg": {"args": {"max-num-seqs": 1}, "env": {"VLLM_USE_RUST_FRONTEND": "1"}}}}
+    c = _classify(_log("'max_num_seqs': 1"), launch)
+    requested = st.requested_values(c.settings)
+    assert requested["env.VLLM_USE_RUST_FRONTEND"] is True
+    assert g1.value_class(requested, FL).subs == []
+
+
+SYNTHETIC = ("'tensor_parallel_size': 1, 'speculative_config': {'method': 'dspark', 'num_speculative_tokens': 5, "
+             "'rejection_sample_method': 'synthetic'%s}")
+
+
+def test_synthetic_rejection_sampling_states_the_runs_length_in_the_engine_block():
+    # vLLM takes the acceptance of synthetic sampling from synthetic_acceptance_length, and the engine
+    # accepts the method only with one; the run's length is also the replay's acceptance.
+    b = _build(_classify(_log(SYNTHETIC % ", 'synthetic_acceptance_length': 3.51")))
+    spec, _ = st.speculative_block(b.deployment["pools"][0]["engine"])
+    assert spec["rejection_sample_method"] == "synthetic" and spec["synthetic_acceptance_length"] == 3.51
+    assert b.acceptance_length == "3.51" and b.reasons == []
+
+
+def test_synthetic_rejection_sampling_without_a_recorded_length_is_refused_by_name():
+    b = _build(_classify(_log(SYNTHETIC % "")))
+    assert "required_setting_missing:speculative_config.synthetic_acceptance_length" in b.reasons
 
 
 def test_served_model_name_is_a_list_in_args_and_a_scalar_in_the_launch_config():
@@ -484,10 +606,54 @@ RANKS = ("'tensor_parallel_size': 16, 'max_num_seqs': 16, 'max_num_batched_token
          "'gpu_memory_utilization': 0.9")
 
 
+def test_a_scenario_of_several_nodes_states_a_fabric_class_and_the_fabric_efficiency_and_names_the_assumption():
+    # Without cost-model-fabric a cross-node transfer is priced 23% fast, and a
+    # hardwired class on a cluster of another class is wrong in the nominal rate; no source names the class.
+    c = _classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16")))
+    b = _build(c)
+    assert b.scenario["cluster"]["nodes"] == 2 and b.scenario["cluster"]["fabric"] == "ib-400g"
+    assert b.scenario["coefficients"][-1] == "cost-model-fabric" and "cost-model-fabric" not in st.COEFFICIENTS
+    assert [s for s in b.substitutions if s["subject"] == "cluster.fabric"] == [st.assumed_fabric('h200')[1]]
+    assert st.assumed_fabric("h200")[1]["kind"] == "estimated"
+    # A fabric class the run's launch configuration records is used and is not an assumption.
+    b = _build(c, launch_config={"resources": {"fabric": "roce-200g"}})
+    assert b.scenario["cluster"]["fabric"] == "roce-200g"
+    assert not [s for s in b.substitutions if s["subject"] == "cluster.fabric"]
+    # One node: no fabric, no fabric coefficient, nothing to name.
+    one = _build(_classify(_log("'tensor_parallel_size': 1, 'max_num_seqs': 16, 'max_num_batched_tokens': 4096, 'block_size': 128, "
+                                "'gpu_memory_utilization': 0.9")))
+    assert "fabric" not in one.scenario["cluster"] and "cost-model-fabric" not in one.scenario["coefficients"]
+    assert not [s for s in one.substitutions if s["subject"] == "cluster.fabric"]
+
+
+def test_the_assumed_fabric_class_follows_the_chip_generations_nic():
+    c = _classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16")))
+    seen = {}
+    for chip in ("b300", "gb300", "b200", "gb200-nvl72", "h100", "h200", "a100-80", "l40s", "not-a-chip"):
+        b = st.build(c, name="p", model="m", part=st.Part(name=chip), engine_version="0.32.0", field_list=FIELDS,
+                     catalog_node_size=None, node=NODE8)
+        sub = [x for x in b.substitutions if x["subject"] == "cluster.fabric"]
+        assert len(sub) == 1 and "cost-model-fabric" in b.scenario["coefficients"]
+        seen[chip] = b.scenario["cluster"]["fabric"]
+        # the substitution names the class actually assumed, not a literal
+        assert seen[chip] in sub[0]["detail"]
+        if seen[chip] == "ib-800g":
+            assert "not measured" in sub[0]["detail"]
+        else:
+            assert "ib-800g" not in sub[0]["detail"]
+    assert {k: v for k, v in seen.items() if v == "ib-800g"} == {"b300": "ib-800g", "gb300": "ib-800g"}
+    assert seen["h100"] == seen["h200"] == seen["b200"] == seen["not-a-chip"] == "ib-400g"
+    # a class the launch configuration records still wins over the chip's
+    b = st.build(c, name="p", model="m", part=st.Part(name="b300"), engine_version="0.32.0", field_list=FIELDS,
+                 catalog_node_size=None, node=NODE8, launch_config={"resources": {"fabric": "roce-200g"}})
+    assert b.scenario["cluster"]["fabric"] == "roce-200g"
+    assert not [x for x in b.substitutions if x["subject"] == "cluster.fabric"]
+
+
 def test_a_chip_whose_catalog_entry_fixes_the_node_size_states_none_and_nodes_follow_from_it():
     b = _build(_classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16"))),
                catalog_node_size=4, node=ir.NodeSize())
-    assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 4}
+    assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 4, "fabric": "ib-400g"}
     assert b.reasons == [] and b.node_source is None
 
 
@@ -495,8 +661,8 @@ def test_a_node_size_the_table_supplied_is_written_and_its_later_record_is_named
     sub = {"kind": "later_record", "subject": "cluster.gpus_per_node", "detail": "d"}
     node = ir.NodeSize(8, "cluster.gpus_per_node: InferenceX runners.yaml at 303669b0", sub)
     b = _build(_classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16"))), node=node)
-    assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 2, "gpus_per_node": 8}
-    assert b.node_source == node.provenance and b.substitutions == [sub]
+    assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 2, "gpus_per_node": 8, "fabric": "ib-400g"}
+    assert b.node_source == node.provenance and b.substitutions == [sub, st.assumed_fabric('h200')[1]]
 
 
 def test_a_node_size_nothing_records_or_two_sources_disagree_on_makes_the_point_g5():
@@ -573,7 +739,49 @@ def test_agentx_replays_as_the_mvp_scenario_with_the_runs_own_inputs():
     spec = rp.workload_spec(r, {"repo": "d/c", "revision": "rev", "file": "traces.jsonl", "sha256": "a" * 64})
     assert spec["concurrency"] == 8 and spec["random_seed"] == 42 and spec["benchmark_duration_s"] == 3600.0
     assert spec["trajectory_start"] == {"min_ratio": 0.25, "max_ratio": 0.75}
-    assert "trace_idle_gap_cap_s" not in spec       # inference-sim#1971: not passed
+    # The export's cap and per-lane warm-up reach the scenario (inference-sim#1971, closed).
+    assert spec["trace_idle_gap_cap_s"] == 300.0
+    assert spec["warmup"] == {"mode": "cache_pressure", "requests_per_lane": 10}
+    rec = r.record("a" * 64)
+    assert rec["trace_idle_gap_cap_s"] == 300.0 and rec["warmup_requests_per_lane"] == 10
+    assert rec["system_idle_gap_cap_s"] == 10.0 and rec["grace_period_s"] == 30.0
+
+
+def test_the_cap_and_warmup_are_not_invented_when_the_export_lacks_them():
+    e = _export()
+    del e["input_config"]["phases"][0]["warmup_requests_per_lane"]
+    del e["input_config"]["datasets"][0]["trace_idle_gap_cap_seconds"]
+    r = rp.from_export(e)
+    spec = rp.workload_spec(r, {"repo": "d/c", "revision": "rev", "file": "t.jsonl", "sha256": "a" * 64})
+    assert "trace_idle_gap_cap_s" not in spec and "warmup" not in spec
+    assert "trace_idle_gap_cap_s" not in r.record("a" * 64)
+
+
+def test_the_realised_acceptance_is_the_drafted_token_weighted_mean_of_the_logged_lengths():
+    import settings as st
+    line = ("INFO [metrics.py:120] SpecDecoding metrics: Mean acceptance length: {al}, Accepted throughput: 1 tokens/s, "
+            "Drafted throughput: 1 tokens/s, Accepted: {a} tokens, Drafted: {d} tokens, Per-position acceptance rate: 0.5\n")
+    log = line.format(al="1.50", a=50, d=100) + line.format(al="2.50", a=300, d=300) + line.format(al="1.00", a=0, d=0)
+    assert st.realised_acceptance(log) == {"mean_acceptance_length": 2.25, "log_lines": 2, "drafted_tokens": 400}
+    assert st.realised_acceptance("INFO nothing about speculation\n") is None
+    assert st.realised_acceptance(line.format(al="1.00", a=0, d=0)) is None
+
+
+def test_a_non_positive_or_fractional_cap_or_warmup_refuses_the_point():
+    r = rp.from_export(_export(phase={"warmup_requests_per_lane": 2.5}))
+    assert "client_scenario_not_replayable:warmup_requests_per_lane" in r.reasons
+    e = _export()
+    e["input_config"]["datasets"][0]["trace_idle_gap_cap_seconds"] = 0
+    assert "client_scenario_not_replayable:trace_idle_gap_cap_s" in rp.from_export(e).reasons
+
+
+def test_the_command_line_flags_for_the_cap_and_warmup_must_agree_with_the_export():
+    r = rp.from_export(_export())
+    rp.cross_check(r, "aiperf profile --trace-idle-gap-cap-seconds 60 --warmup-requests-per-lane 3", 8)
+    assert r.reasons == ["conflict:replay.trace_idle_gap_cap_s", "conflict:replay.warmup_requests_per_lane"]
+    r = rp.from_export(_export())
+    rp.cross_check(r, "aiperf profile --trace-idle-gap-cap-seconds 300 --warmup-requests-per-lane 10", 8)
+    assert r.reasons == []
 
 
 def test_a_command_line_or_row_that_disagrees_with_the_export_conflicts():
@@ -743,7 +951,7 @@ APPROX = {"kind": "estimated", "subject": "quantization", "detail": "left unset"
 DEFAULTED = {"kind": "estimated", "subject": "max_num_seqs", "detail": "not recorded; left unset"}
 
 
-UNCHECKED = [{"kind": k, "subject": "not checked", "detail": f"{k} is not graded yet"}
+UNCHECKED = [{"kind": "unevaluated", "subject": k, "detail": f"{k} is unevaluated"}
              for k in ("coefficient_range", "kernel_hash", "resolved_differs", "value_class")]
 
 
@@ -764,9 +972,9 @@ def test_every_estimate_and_client_difference_is_named_and_makes_the_point_g2():
     o = _graded(subs=[APPROX, DEFAULTED], requests={"differences": [gap]})
     assert o.fidelity["grade"] == "G2"
     assert [(s["kind"], s["subject"]) for s in o.fidelity["substitutions"]] == [
-        ("client_difference", "send_gap"), ("coefficient_range", "not checked"), ("estimated", "max_num_seqs"),
-        ("estimated", "quantization"), ("kernel_hash", "not checked"), ("resolved_differs", "not checked"),
-        ("value_class", "not checked")]
+        ("client_difference", "send_gap"), ("estimated", "max_num_seqs"), ("estimated", "quantization"),
+        ("unevaluated", "coefficient_range"), ("unevaluated", "kernel_hash"), ("unevaluated", "resolved_differs"),
+        ("unevaluated", "value_class")]
     assert next(s for s in o.fidelity["substitutions"] if s["subject"] == "quantization")["detail"] == "left unset"
 
 
@@ -778,7 +986,7 @@ def test_another_release_or_a_nightly_build_is_g4_and_says_so():
     o = _graded(image="vllm/vllm-openai:nightly-abc", banner="0.30.1rc1.dev493+gac9126e58")
     assert o.fidelity["grade"] == "G4" and o.fidelity["run_release"] is None
     assert [s["kind"] for s in o.fidelity["substitutions"]] == [
-        "coefficient_range", "kernel_hash", "nightly_or_custom", "resolved_differs", "value_class"]
+        "nightly_or_custom", "unevaluated", "unevaluated", "unevaluated", "unevaluated"]
 
 
 def test_a_point_not_scored_is_g5_with_every_reason_on_the_closed_list():
@@ -1078,7 +1286,7 @@ def test_every_value_a_real_log_records_is_read_and_copied_verbatim():
         d = st.decide(merged, everything)
         for loc, (path, value) in d.mapped.items():
             s_ = merged[path]
-            assert st._canon(value) == st._canon(st._yaml_value(s_.value)) or loc == "engine.frontend", (name, path)
+            assert st._canon(value) == st._canon(st._yaml_value(s_.value)) or loc == RUST_ENV, (name, path)
             # The passed value where the run passed one; the resolved one only where it passed none.
             passed = [v for x in st.PASSED for v in readings[x].values.get(path, []) if v is not None]
             assert s_.source in st.PASSED or not passed, (name, path)
@@ -1167,7 +1375,7 @@ def test_a_gb200_point_with_more_ranks_than_a_tray_spans_nodes_of_the_entrys_siz
                        "'block_size': 128, 'gpu_memory_utilization': 0.9",
                        RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=8")))
     b = _build(c, catalog_node_size=4, node=ir.NodeSize())
-    assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 2}
+    assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 2, "fabric": "ib-400g"}
     assert b.deployment["pools"][0]["nodes"] == 2
 
 
@@ -1177,7 +1385,7 @@ def test_an_h100_point_writes_the_node_size_the_run_recorded():
     # Not the rank count: 4 ranks on a recorded 8-GPU server is one 8-GPU node.
     assert b.scenario["cluster"]["gpus_per_node"] != 4
     b = _build(_dp4(), node=ir.NodeSize(2, "cluster.gpus_per_node: launch_config"))
-    assert b.scenario["cluster"] == {"hardware": "h200", "gpus_per_node": 2, "nodes": 2}
+    assert b.scenario["cluster"] == {"hardware": "h200", "gpus_per_node": 2, "nodes": 2, "fabric": "ib-400g"}
 
 
 def test_packaging_comes_from_blis_catalog_resolve_and_falls_back_to_the_catalog_files_for_an_older_blis():
@@ -1203,3 +1411,48 @@ def test_packaging_comes_from_blis_catalog_resolve_and_falls_back_to_the_catalog
                     "\"packaging\": {\"gpus_per_node\": 0, \"gpus_per_rack\": null}}'\n")
     with pytest.raises(bc.CommandError, match="packaging"):
         sp.Catalog(blis=str(blis), root=tmp).packaging("h100")
+
+
+
+# ---- the fabric class of a multi-node cluster no record states (blis-substrate SUB-3; #72 review): documented, labelled, or refused
+
+def _multi(chip):
+    return st.build(_classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16"))), name="p",
+                    model="m", part=st.Part(name=chip), engine_version="0.32.0", field_list=FIELDS, catalog_node_size=None, node=NODE8)
+
+
+@pytest.mark.parametrize("chip,tech,cls,stands_in", [
+    ("h200", "InfiniBand NDR", "ib-400g", False), ("gb200-nvl72", "InfiniBand NDR", "ib-400g", False),
+    ("gb300", "InfiniBand XDR", "ib-800g", False),
+    ("h100", "RoCEv2 Ethernet", "ib-400g", True), ("b200", "gIB RoCEv2 Ethernet", "ib-400g", True),
+    ("b300", "RoCEv2 Ethernet", "ib-800g", True)])
+def test_a_chip_whose_fabric_inferencex_documents_gets_that_fabric_cited_on_the_point(chip, tech, cls, stands_in):
+    b = _multi(chip)
+    (sub,) = [x for x in b.substitutions if x["subject"] == "cluster.fabric"]
+    assert b.scenario["cluster"]["fabric"] == cls and sub["kind"] == "estimated" and b.reasons == []
+    assert tech in sub["detail"] and "inferencex.semianalysis.com/gpu-specs" in sub["detail"]
+    assert "documented by InferenceX" in sub["detail"]
+    # a RoCE fabric is not an InfiniBand class: the point says a class of the same line rate stands in
+    assert ("stands in" in sub["detail"]) is stands_in
+
+
+def test_a_chip_nothing_documents_gets_the_default_class_and_the_point_says_nothing_documents_it():
+    for chip in ("l40s", "not-a-chip"):
+        b = _multi(chip)
+        (sub,) = [x for x in b.substitutions if x["subject"] == "cluster.fabric"]
+        assert b.scenario["cluster"]["fabric"] == st.DEFAULT_ASSUMED_FABRIC
+        assert "no source documents the fabric" in sub["detail"] and "documented by InferenceX" not in sub["detail"]
+
+
+def test_under_the_refuse_switch_a_multi_node_point_with_no_recorded_fabric_is_g5_value_not_recorded(monkeypatch):
+    monkeypatch.setattr(st, "FABRIC_WHEN_UNRECORDED", "refuse")
+    for chip in ("h200", "b300", "not-a-chip"):
+        b = _multi(chip)
+        assert "value_not_recorded:cluster.fabric" in b.reasons
+        assert "fabric" not in b.scenario["cluster"] and "cost-model-fabric" not in b.scenario["coefficients"]
+        assert not [x for x in b.substitutions if x["subject"] == "cluster.fabric"]
+    # a class a launch configuration records is still used
+    b = st.build(_classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16"))), name="p", model="m",
+                 part=st.Part(name="h200"), engine_version="0.32.0", field_list=FIELDS, catalog_node_size=None, node=NODE8,
+                 launch_config={"resources": {"fabric": "roce-200g"}})
+    assert b.scenario["cluster"]["fabric"] == "roce-200g" and b.reasons == []

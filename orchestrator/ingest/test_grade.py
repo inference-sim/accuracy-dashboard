@@ -105,10 +105,60 @@ def test_check_requires_one_simulator_build_and_engine_release_for_every_point()
     assert any("running '0.31.0'" in x for x in g.check([{**pts[0], "simulator": wrong}], V))
 
 
-def test_the_four_conditions_that_are_not_graded_yet_are_g2_kinds_named_on_a_subject_of_their_own():
+def test_a_condition_that_is_not_graded_yet_is_an_unevaluated_substitution_naming_the_condition():
+    # The substrate's point record has the kind `unevaluated`, whose subject is the condition. The
+    # kind `kernel_hash` and the others mean the condition was decided and is false.
     subs = g.unchecked()
-    assert [s["kind"] for s in subs] == ["coefficient_range", "kernel_hash", "resolved_differs", "value_class"]
-    assert all(s["kind"] in g.G2_KINDS and s["subject"] == "not checked" and s["detail"] == f"{s['kind']} is not graded yet"
-               for s in subs)
+    assert [s["subject"] for s in subs] == ["coefficient_range", "kernel_hash", "resolved_differs", "value_class"]
+    assert all(s["kind"] == "unevaluated" and s["kind"] in g.G2_KINDS for s in subs)
     out = g.grade(engine_version=V, release=REL, substitutions=subs)
     assert out.grade == g.G2 and out.substitutions == subs
+    assert not any(s["kind"] in g.UNCHECKED_KINDS for s in out.substitutions)
+
+
+def test_an_unevaluated_substitution_must_name_a_condition_of_g1():
+    bad = [{"kind": "unevaluated", "subject": "send_gap_typo", "detail": "x"}]
+    with pytest.raises(g.GradeError, match="not a condition of G1"):
+        g.grade(engine_version=V, release=REL, substitutions=bad)
+    ok = [{"kind": "unevaluated", "subject": "client_difference", "detail": "x"}]
+    assert g.grade(engine_version=V, release=REL, substitutions=ok).grade == g.G2
+
+
+# ---- the keys a substitution of a kind names (blis-substrate's point record)
+
+def _g(subs, version="0.32.0"):
+    return g.grade(engine_version="0.32.0", release=g.Release(version=version, nightly_or_custom=False), substitutions=subs)
+
+
+RD = {"difference": [{"aspect": "counter", "text": "the counters differ"}], "bound": {"ratios": []}, "revision": "1" * 40,
+      "regime": {"workload": "balanced", "concurrency": 4, "model": "m", "hardware": "mi355x", "engine_version": "0.32.0",
+                 "fabric": "ib-400g", "shape": "1P2D"}}
+
+
+def test_g1_g2_still_grade_correctly_for_a_run_on_the_simulators_release():
+    # No in-scope InferenceX point runs v0.32.0 today; when one does, the grade must be right.
+    assert _g([]).grade == "G1"
+    sub = {"kind": "router_differs", "subject": "dynamo", "entry": "dynamo-round-robin", "policy": "round-robin", "evidence": "table row 3",
+           **RD}
+    assert _g([sub]).grade == "G2"
+    assert _g([], version="0.31.0").grade == "G4"           # another release, no published diff
+
+
+def test_a_substitution_names_the_keys_of_its_kind_and_no_others():
+    ok = {"kind": "later_record", "subject": "cluster.gpus_per_node", "record": "runners.yaml at abc", "date": "2026-07-02"}
+    assert _g([ok]).grade == "G2"
+    for bad in ({**ok, "date": "2026-7-2"}, {k: v for k, v in ok.items() if k != "record"},
+                {k: v for k, v in ok.items() if k != "date"}, {**ok, "policy": "x"},
+                {"kind": "router_differs", "subject": "r", "policy": "round-robin", "entry": "r-x", **RD},
+                {"kind": "router_differs", "subject": "r", "evidence": "e", "entry": "r-x", **RD},
+                {"kind": "router_differs", "subject": "r", "evidence": "e", "policy": "round-robin", **RD},
+                {"kind": "router_differs", "subject": "r", "evidence": "e", "policy": "round-robin", "entry": "r-x", "bound": RD["bound"]},
+                {"kind": "router_differs", "subject": "r", "evidence": "e", "policy": "round-robin", "entry": "r-x", "difference": RD["difference"]},
+                {"kind": "router_differs", "subject": "dynamo", "entry": "dynamo-round-robin", "policy": "none", "evidence": "e", **RD},
+                {"kind": "router_differs", "subject": "dynamo", "entry": "other-round-robin", "policy": "round-robin", "evidence": "e", **RD},
+                {"kind": "router_differs", "subject": "dynamo", "entry": "dynamo-x", "policy": "none", "evidence": "e", **RD},
+                {"kind": "estimated", "subject": "f", "detail": "d", "record": "x"},
+                {"kind": "client_difference", "subject": "send_gap"}, {"kind": "resolved_differs", "subject": "block_size"}):
+        with pytest.raises(g.GradeError):
+            _g([bad])
+    assert _g([{"kind": "resolved_differs", "subject": "block_size", "detail": "the run resolved 32"}]).grade == "G2"

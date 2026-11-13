@@ -1,0 +1,1487 @@
+{
+ "backlog": [
+  {
+   "alone": 82,
+   "blocks": 538,
+   "demotes": 0,
+   "entry": "not_in_catalog"
+  },
+  {
+   "alone": 28,
+   "blocks": 996,
+   "demotes": 0,
+   "entry": "field_not_modelled:max_cudagraph_capture_size"
+  },
+  {
+   "alone": 12,
+   "blocks": 513,
+   "demotes": 0,
+   "entry": "field_not_modelled:enable_expert_parallel"
+  },
+  {
+   "alone": 10,
+   "blocks": 35,
+   "demotes": 0,
+   "entry": "value_not_recorded"
+  },
+  {
+   "alone": 9,
+   "blocks": 9,
+   "demotes": 0,
+   "entry": "value_not_recorded:api_413"
+  },
+  {
+   "alone": 0,
+   "blocks": 997,
+   "demotes": 0,
+   "entry": "field_not_modelled:kv_cache_dtype"
+  },
+  {
+   "alone": 0,
+   "blocks": 834,
+   "demotes": 0,
+   "entry": "field_not_modelled:language_model_only"
+  },
+  {
+   "alone": 0,
+   "blocks": 771,
+   "demotes": 0,
+   "entry": "field_not_modelled:stream_interval"
+  },
+  {
+   "alone": 0,
+   "blocks": 419,
+   "demotes": 0,
+   "entry": "not_in_catalog:eagle3"
+  },
+  {
+   "alone": 0,
+   "blocks": 382,
+   "demotes": 0,
+   "entry": "value_not_recorded:workload_category_not_stated"
+  },
+  {
+   "alone": 0,
+   "blocks": 226,
+   "demotes": 0,
+   "entry": "field_not_modelled:moe_backend"
+  },
+  {
+   "alone": 0,
+   "blocks": 171,
+   "demotes": 0,
+   "entry": "field_not_modelled:api_server_count"
+  },
+  {
+   "alone": 0,
+   "blocks": 127,
+   "demotes": 0,
+   "entry": "field_not_modelled:quantization"
+  },
+  {
+   "alone": 0,
+   "blocks": 90,
+   "demotes": 0,
+   "entry": "field_not_modelled:linear_backend"
+  },
+  {
+   "alone": 0,
+   "blocks": 65,
+   "demotes": 0,
+   "entry": "field_not_modelled:mm_encoder_tp_mode"
+  },
+  {
+   "alone": 0,
+   "blocks": 37,
+   "demotes": 0,
+   "entry": "field_not_in_release:env.VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8"
+  },
+  {
+   "alone": 0,
+   "blocks": 35,
+   "demotes": 0,
+   "entry": "field_not_in_release:env.VLLM_MXFP4_USE_MARLIN"
+  },
+  {
+   "alone": 0,
+   "blocks": 28,
+   "demotes": 0,
+   "entry": "field_not_modelled:env.VLLM_USE_RUST_FRONTEND"
+  },
+  {
+   "alone": 0,
+   "blocks": 25,
+   "demotes": 0,
+   "entry": "value_not_recorded:no_recipe_fingerprint"
+  },
+  {
+   "alone": 0,
+   "blocks": 23,
+   "demotes": 0,
+   "entry": "value_conflict:model: the log serves /scratch/models/DeepSeek-V4-Pro-NVFP4, the recipe deepseek-ai/DeepSeek-V4-Pro"
+  },
+  {
+   "alone": 0,
+   "blocks": 20,
+   "demotes": 0,
+   "entry": "field_not_modelled:enable_chunked_prefill"
+  },
+  {
+   "alone": 0,
+   "blocks": 12,
+   "demotes": 0,
+   "entry": "field_not_modelled:speculative_config.rejection_sample_method"
+  },
+  {
+   "alone": 0,
+   "blocks": 7,
+   "demotes": 0,
+   "entry": "field_not_in_release:env.PYTHONNOUSERSITE"
+  },
+  {
+   "alone": 0,
+   "blocks": 7,
+   "demotes": 0,
+   "entry": "field_not_modelled:cpu_offload_gb"
+  },
+  {
+   "alone": 0,
+   "blocks": 7,
+   "demotes": 0,
+   "entry": "field_not_modelled:default_chat_template_kwargs.thinking_mode"
+  },
+  {
+   "alone": 0,
+   "blocks": 7,
+   "demotes": 0,
+   "entry": "value_not_recorded:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use"
+  },
+  {
+   "alone": 0,
+   "blocks": 5,
+   "demotes": 0,
+   "entry": "field_not_modelled:dcp_comm_backend"
+  },
+  {
+   "alone": 0,
+   "blocks": 5,
+   "demotes": 0,
+   "entry": "field_not_modelled:decode_context_parallel_size"
+  },
+  {
+   "alone": 0,
+   "blocks": 5,
+   "demotes": 0,
+   "entry": "field_not_modelled:prefix_match_unit"
+  },
+  {
+   "alone": 0,
+   "blocks": 5,
+   "demotes": 0,
+   "entry": "value_not_recorded:speculative_config.model"
+  },
+  {
+   "alone": 0,
+   "blocks": 4,
+   "demotes": 0,
+   "entry": "field_not_modelled:enable_eplb"
+  },
+  {
+   "alone": 0,
+   "blocks": 2,
+   "demotes": 0,
+   "entry": "field_not_in_release:env.MC_ENABLE_DEST_DEVICE_AFFINITY"
+  },
+  {
+   "alone": 0,
+   "blocks": 2,
+   "demotes": 0,
+   "entry": "field_not_in_release:env.MC_SLICE_SIZE"
+  },
+  {
+   "alone": 0,
+   "blocks": 2,
+   "demotes": 0,
+   "entry": "field_not_in_release:env.MC_WORKERS_PER_CTX"
+  },
+  {
+   "alone": 0,
+   "blocks": 2,
+   "demotes": 0,
+   "entry": "field_not_modelled:env.PYTHONHASHSEED"
+  },
+  {
+   "alone": 0,
+   "blocks": 2,
+   "demotes": 0,
+   "entry": "field_not_modelled:kv_transfer_config.kv_connector_extra_config.load_async"
+  },
+  {
+   "alone": 0,
+   "blocks": 1,
+   "demotes": 0,
+   "entry": "value_conflict:kv_transfer_config.engine_id"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "client_difference:client_flags"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "client_difference:failed_requests"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "coefficient_method:cost-model-attention/attention_decode_floor_mla"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "coefficient_method:cost-model-host-overheads/host_admission_per_request"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "coefficient_method:cost-model-host-overheads/host_admission_per_token"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "coefficient_method:cost-model-host-overheads/host_completion"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "coefficient_method:cost-model-host-overheads/host_launch_eager_per_layer"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "coefficient_method:cost-model-host-overheads/host_launch_per_kernel"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "coefficient_method:cost-model-host-overheads/host_output_token"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "coefficient_method:cost-model-host-overheads/host_replay_graph_per_step"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "coefficient_method:cost-model-memory/activation_scratch_floor_bytes"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "coefficient_method:cost-model-memory/cudagraph_capture_bytes_full_and_piecewise"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "coefficient_method:cost-model-primitives/engine_workspace_bytes"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "coefficient_method:cost-model-primitives/hbm_derate"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "estimated:gpu_memory_utilization"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "interim_status:host"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "interim_status:model"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "interim_status:model_tag"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "interim_status:port"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "interim_status:reasoning_parser"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "interim_status:tool_call_parser"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "interim_status:trust_remote_code"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "other_release:engine release"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "ported_functions_unpublished:engine release"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "unevaluated:coefficient_range"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "unevaluated:kernel_hash"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "unevaluated:resolved_differs"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "unevaluated:value_class"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 31,
+   "entry": "interim_status:served_model_name"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 30,
+   "entry": "client_difference:sent_prompt_lengths"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 23,
+   "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_8rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 23,
+   "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_8rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 21,
+   "entry": "later_record:cluster.gpus_per_node"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 18,
+   "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_4rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 18,
+   "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_4rank"
+  }
+ ],
+ "coverage": {
+  "all": {
+   "by_grade": {
+    "G4": 41,
+    "G5": 1683,
+    "failed": 10
+   },
+   "failed": 10,
+   "not_scored": 1683,
+   "points": 1734,
+   "primary_reason": {
+    "blis_refused": 10,
+    "field_not_modelled": 1168,
+    "not_in_catalog": 82,
+    "value_not_recorded": 433
+   },
+   "reasons": {
+    "blis_refused:scenario": {
+     "alone": 10,
+     "blocks": 10
+    },
+    "field_not_in_release:env.MC_ENABLE_DEST_DEVICE_AFFINITY": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_in_release:env.MC_SLICE_SIZE": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_in_release:env.MC_WORKERS_PER_CTX": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_in_release:env.PYTHONNOUSERSITE": {
+     "alone": 0,
+     "blocks": 7
+    },
+    "field_not_in_release:env.VLLM_MXFP4_USE_MARLIN": {
+     "alone": 0,
+     "blocks": 35
+    },
+    "field_not_in_release:env.VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8": {
+     "alone": 0,
+     "blocks": 37
+    },
+    "field_not_modelled:api_server_count": {
+     "alone": 0,
+     "blocks": 171
+    },
+    "field_not_modelled:cpu_offload_gb": {
+     "alone": 0,
+     "blocks": 7
+    },
+    "field_not_modelled:dcp_comm_backend": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "field_not_modelled:decode_context_parallel_size": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "field_not_modelled:default_chat_template_kwargs.thinking_mode": {
+     "alone": 0,
+     "blocks": 7
+    },
+    "field_not_modelled:enable_chunked_prefill": {
+     "alone": 0,
+     "blocks": 20
+    },
+    "field_not_modelled:enable_eplb": {
+     "alone": 0,
+     "blocks": 4
+    },
+    "field_not_modelled:enable_expert_parallel": {
+     "alone": 12,
+     "blocks": 513
+    },
+    "field_not_modelled:env.PYTHONHASHSEED": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_modelled:env.VLLM_USE_RUST_FRONTEND": {
+     "alone": 0,
+     "blocks": 28
+    },
+    "field_not_modelled:kv_cache_dtype": {
+     "alone": 0,
+     "blocks": 997
+    },
+    "field_not_modelled:kv_transfer_config.kv_connector_extra_config.load_async": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_modelled:language_model_only": {
+     "alone": 0,
+     "blocks": 834
+    },
+    "field_not_modelled:linear_backend": {
+     "alone": 0,
+     "blocks": 90
+    },
+    "field_not_modelled:max_cudagraph_capture_size": {
+     "alone": 28,
+     "blocks": 996
+    },
+    "field_not_modelled:mm_encoder_tp_mode": {
+     "alone": 0,
+     "blocks": 65
+    },
+    "field_not_modelled:moe_backend": {
+     "alone": 0,
+     "blocks": 226
+    },
+    "field_not_modelled:prefix_match_unit": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "field_not_modelled:quantization": {
+     "alone": 0,
+     "blocks": 127
+    },
+    "field_not_modelled:speculative_config.rejection_sample_method": {
+     "alone": 0,
+     "blocks": 12
+    },
+    "field_not_modelled:stream_interval": {
+     "alone": 0,
+     "blocks": 771
+    },
+    "not_in_catalog": {
+     "alone": 82,
+     "blocks": 538
+    },
+    "not_in_catalog:eagle3": {
+     "alone": 0,
+     "blocks": 419
+    },
+    "value_conflict:kv_transfer_config.engine_id": {
+     "alone": 0,
+     "blocks": 1
+    },
+    "value_conflict:model: the log serves /scratch/models/DeepSeek-V4-Pro-NVFP4, the recipe deepseek-ai/DeepSeek-V4-Pro": {
+     "alone": 0,
+     "blocks": 23
+    },
+    "value_not_recorded": {
+     "alone": 10,
+     "blocks": 35
+    },
+    "value_not_recorded:api_413": {
+     "alone": 9,
+     "blocks": 9
+    },
+    "value_not_recorded:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use": {
+     "alone": 0,
+     "blocks": 7
+    },
+    "value_not_recorded:no_recipe_fingerprint": {
+     "alone": 0,
+     "blocks": 25
+    },
+    "value_not_recorded:speculative_config.model": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "value_not_recorded:workload_category_not_stated": {
+     "alone": 0,
+     "blocks": 382
+    }
+   },
+   "scored": 41,
+   "share_scored": 0.02364475201845444
+  },
+  "in_scope": {
+   "by_grade": {
+    "G4": 41,
+    "G5": 1137,
+    "failed": 10
+   },
+   "failed": 10,
+   "not_scored": 1137,
+   "points": 1188,
+   "primary_reason": {
+    "blis_refused": 10,
+    "field_not_modelled": 712,
+    "value_not_recorded": 425
+   },
+   "reasons": {
+    "blis_refused:scenario": {
+     "alone": 10,
+     "blocks": 10
+    },
+    "field_not_in_release:env.MC_ENABLE_DEST_DEVICE_AFFINITY": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_in_release:env.MC_SLICE_SIZE": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_in_release:env.MC_WORKERS_PER_CTX": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_in_release:env.PYTHONNOUSERSITE": {
+     "alone": 0,
+     "blocks": 7
+    },
+    "field_not_in_release:env.VLLM_MXFP4_USE_MARLIN": {
+     "alone": 0,
+     "blocks": 35
+    },
+    "field_not_in_release:env.VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8": {
+     "alone": 0,
+     "blocks": 37
+    },
+    "field_not_modelled:api_server_count": {
+     "alone": 0,
+     "blocks": 131
+    },
+    "field_not_modelled:cpu_offload_gb": {
+     "alone": 0,
+     "blocks": 7
+    },
+    "field_not_modelled:dcp_comm_backend": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "field_not_modelled:decode_context_parallel_size": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "field_not_modelled:default_chat_template_kwargs.thinking_mode": {
+     "alone": 0,
+     "blocks": 7
+    },
+    "field_not_modelled:enable_chunked_prefill": {
+     "alone": 0,
+     "blocks": 20
+    },
+    "field_not_modelled:enable_eplb": {
+     "alone": 0,
+     "blocks": 4
+    },
+    "field_not_modelled:enable_expert_parallel": {
+     "alone": 12,
+     "blocks": 422
+    },
+    "field_not_modelled:env.PYTHONHASHSEED": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_modelled:kv_cache_dtype": {
+     "alone": 0,
+     "blocks": 752
+    },
+    "field_not_modelled:kv_transfer_config.kv_connector_extra_config.load_async": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "field_not_modelled:language_model_only": {
+     "alone": 0,
+     "blocks": 607
+    },
+    "field_not_modelled:linear_backend": {
+     "alone": 0,
+     "blocks": 67
+    },
+    "field_not_modelled:max_cudagraph_capture_size": {
+     "alone": 28,
+     "blocks": 996
+    },
+    "field_not_modelled:moe_backend": {
+     "alone": 0,
+     "blocks": 56
+    },
+    "field_not_modelled:prefix_match_unit": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "field_not_modelled:quantization": {
+     "alone": 0,
+     "blocks": 71
+    },
+    "field_not_modelled:speculative_config.rejection_sample_method": {
+     "alone": 0,
+     "blocks": 12
+    },
+    "field_not_modelled:stream_interval": {
+     "alone": 0,
+     "blocks": 771
+    },
+    "not_in_catalog:eagle3": {
+     "alone": 0,
+     "blocks": 296
+    },
+    "value_conflict:kv_transfer_config.engine_id": {
+     "alone": 0,
+     "blocks": 1
+    },
+    "value_conflict:model: the log serves /scratch/models/DeepSeek-V4-Pro-NVFP4, the recipe deepseek-ai/DeepSeek-V4-Pro": {
+     "alone": 0,
+     "blocks": 23
+    },
+    "value_not_recorded": {
+     "alone": 10,
+     "blocks": 35
+    },
+    "value_not_recorded:api_413": {
+     "alone": 1,
+     "blocks": 1
+    },
+    "value_not_recorded:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use": {
+     "alone": 0,
+     "blocks": 7
+    },
+    "value_not_recorded:no_recipe_fingerprint": {
+     "alone": 0,
+     "blocks": 25
+    },
+    "value_not_recorded:speculative_config.model": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "value_not_recorded:workload_category_not_stated": {
+     "alone": 0,
+     "blocks": 382
+    }
+   },
+   "scored": 41,
+   "share_scored": 0.034511784511784514
+  },
+  "out_of_scope": {
+   "by_grade": {
+    "G5": 546
+   },
+   "failed": 0,
+   "not_scored": 546,
+   "points": 546,
+   "primary_reason": {
+    "field_not_modelled": 456,
+    "not_in_catalog": 82,
+    "value_not_recorded": 8
+   },
+   "reasons": {
+    "field_not_modelled:api_server_count": {
+     "alone": 0,
+     "blocks": 40
+    },
+    "field_not_modelled:enable_expert_parallel": {
+     "alone": 0,
+     "blocks": 91
+    },
+    "field_not_modelled:env.VLLM_USE_RUST_FRONTEND": {
+     "alone": 0,
+     "blocks": 28
+    },
+    "field_not_modelled:kv_cache_dtype": {
+     "alone": 0,
+     "blocks": 245
+    },
+    "field_not_modelled:language_model_only": {
+     "alone": 0,
+     "blocks": 227
+    },
+    "field_not_modelled:linear_backend": {
+     "alone": 0,
+     "blocks": 23
+    },
+    "field_not_modelled:mm_encoder_tp_mode": {
+     "alone": 0,
+     "blocks": 65
+    },
+    "field_not_modelled:moe_backend": {
+     "alone": 0,
+     "blocks": 170
+    },
+    "field_not_modelled:quantization": {
+     "alone": 0,
+     "blocks": 56
+    },
+    "not_in_catalog": {
+     "alone": 82,
+     "blocks": 538
+    },
+    "not_in_catalog:eagle3": {
+     "alone": 0,
+     "blocks": 123
+    },
+    "value_not_recorded:api_413": {
+     "alone": 8,
+     "blocks": 8
+    }
+   },
+   "scored": 0,
+   "share_scored": 0.0
+  },
+  "out_of_scope_by_chip": {
+   "mi300x": 95,
+   "mi325x": 171,
+   "mi355x": 280
+  }
+ },
+ "development_split": {
+  "constants": {
+   "freeze_date": "2026-11-09",
+   "salt": "blis-dev-split-2",
+   "train_pct": 60,
+   "validation_pct": 20
+  },
+  "kinds": {
+   "prospective": {
+    "points": 0,
+    "withheld": true
+   },
+   "test": {
+    "points": 446,
+    "withheld": true
+   },
+   "train": {
+    "accuracy": {
+     "noise_floor_pct": 1.6,
+     "noise_floor_source": "fallback; none measured per point",
+     "points": 0,
+     "tpot": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "ttft": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "withheld": 0
+    },
+    "grades": {
+     "G5": 956
+    },
+    "in_scope": 626,
+    "points": 956,
+    "ranking": {
+     "throughput_per_gpu": {
+      "groups": 0,
+      "kendall": "too few groups",
+      "left_out": 0,
+      "regret": "too few groups",
+      "spearman": "too few groups",
+      "top1": "too few groups",
+      "top3": "too few groups",
+      "value": "throughput_per_gpu"
+     }
+    },
+    "scored": 0,
+    "series": 33
+   },
+   "unassigned": {
+    "accuracy": {
+     "noise_floor_pct": 1.6,
+     "noise_floor_source": "fallback; none measured per point",
+     "points": 0,
+     "tpot": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "ttft": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "withheld": 0
+    },
+    "grades": {},
+    "in_scope": 0,
+    "points": 0,
+    "ranking": {
+     "throughput_per_gpu": {
+      "groups": 0,
+      "kendall": "too few groups",
+      "left_out": 0,
+      "regret": "too few groups",
+      "spearman": "too few groups",
+      "top1": "too few groups",
+      "top3": "too few groups",
+      "value": "throughput_per_gpu"
+     }
+    },
+    "scored": 0,
+    "series": 0
+   },
+   "validation": {
+    "accuracy": {
+     "noise_floor_pct": 1.6,
+     "noise_floor_source": "fallback; none measured per point",
+     "points": 11,
+     "tpot": {
+      "mape": {
+       "n": 11,
+       "value": 58.02881797130001
+      },
+      "shape": {
+       "n": 9,
+       "value": "too few points"
+      }
+     },
+     "ttft": {
+      "mape": {
+       "n": 11,
+       "value": 47.10028557982242
+      },
+      "shape": {
+       "n": 9,
+       "value": "too few points"
+      }
+     },
+     "withheld": 0
+    },
+    "grades": {
+     "G4": 11,
+     "G5": 321
+    },
+    "in_scope": 220,
+    "points": 332,
+    "ranking": {
+     "throughput_per_gpu": {
+      "groups": 1,
+      "kendall": "too few groups",
+      "left_out": 0,
+      "regret": "too few groups",
+      "spearman": "too few groups",
+      "top1": "too few groups",
+      "top3": "too few groups",
+      "value": "throughput_per_gpu"
+     }
+    },
+    "scored": 11,
+    "series": 9
+   }
+  },
+  "test_evaluated": false,
+  "text": "Per-split figures use the DEVELOPMENT split of docs/m2/evaluation-protocol.md, not the ledger's held-out: its test set is 'development split, not the ledger's held-out'."
+ },
+ "format": "baseline-compare-1",
+ "grades": {
+  "G1": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "points": 0,
+   "share_of_all": "too few points",
+   "share_of_graded": "too few points"
+  },
+  "G2": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "points": 0,
+   "share_of_all": "too few points",
+   "share_of_graded": "too few points"
+  },
+  "G3": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "points": 0,
+   "share_of_all": "too few points",
+   "share_of_graded": "too few points"
+  },
+  "G4": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 11,
+    "tpot": {
+     "mape": {
+      "n": 11,
+      "value": 58.02881797130001
+     },
+     "shape": {
+      "n": 9,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 11,
+      "value": 47.10028557982242
+     },
+     "shape": {
+      "n": 9,
+      "value": "too few points"
+     }
+    },
+    "withheld": 30
+   },
+   "points": 41,
+   "share_of_all": 0.02364475201845444,
+   "share_of_graded": 1.0
+  },
+  "G5": {
+   "points": 1683,
+   "share_of_all": 0.9705882352941176,
+   "share_of_graded": null
+  },
+  "failed": {
+   "points": 10
+  }
+ },
+ "headline": {
+  "noise_floor_pct": 1.6,
+  "noise_floor_source": "fallback; none measured per point",
+  "points": 11,
+  "tpot": {
+   "mape": {
+    "n": 11,
+    "value": 58.02881797130001
+   },
+   "shape": {
+    "n": 9,
+    "value": "too few points"
+   }
+  },
+  "ttft": {
+   "mape": {
+    "n": 11,
+    "value": 47.10028557982242
+   },
+   "shape": {
+    "n": 9,
+    "value": "too few points"
+   }
+  },
+  "withheld": 30
+ },
+ "identity": {
+  "harness_commit": "0e9627e219c207593de5bc55d997cf3dca707d64",
+  "point_set_sha256": "6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60",
+  "points": 1734,
+  "pull_manifest_sha256": "c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166",
+  "sample": "in_sample",
+  "units_count": 1740,
+  "units_sha256": "d89f860a46c0470a22543dc7fb77b8d1b10e508ce4f5ef5073e96f359f08597e"
+ },
+ "inputs": {
+  "blis": {
+   "catalog": "v0.13.0",
+   "commit_sha": "3f4998e28f922611a2d21d5c7ffe18a5272fe114",
+   "extractor_version": "blis-latency-kernel@unknown",
+   "registry": "v0.13.0",
+   "release": "v0.16.0"
+  },
+  "engine": {
+   "kind": "vllm",
+   "version": "0.32.0"
+  },
+  "experimental": false,
+  "fields_sha256": "d32342c4f9ae5c578ba578fd5e6575aa8db8bce099e0708480d55f7e8de5a6fc",
+  "simulator": {
+   "build": "v0.16.0",
+   "engine": {
+    "kind": "vllm",
+    "version": "0.32.0"
+   },
+   "harness_commit": "0e9627e219c207593de5bc55d997cf3dca707d64"
+  }
+ },
+ "kind": "run",
+ "refusals": [],
+ "sample": "in_sample",
+ "sample_text": "IN-SAMPLE: the points are the ones the model was calibrated on or tuned against; there is no anchor list yet, so no point is held out. These figures say how well the simulator reproduces data it has seen, not how well it predicts new data.",
+ "serving_by_grade": {
+  "aggregated": {
+   "G1": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "G2": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "G3": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "G4": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 11,
+    "tpot": {
+     "mape": {
+      "n": 11,
+      "value": 58.02881797130001
+     },
+     "shape": {
+      "n": 9,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 11,
+      "value": 47.10028557982242
+     },
+     "shape": {
+      "n": 9,
+      "value": "too few points"
+     }
+    },
+    "withheld": 30
+   }
+  }
+ },
+ "unlock": [
+  {
+   "alone": 28,
+   "blocker": "field_not_modelled:max_cudagraph_capture_size",
+   "blocks": 996
+  },
+  {
+   "alone": 12,
+   "blocker": "field_not_modelled:enable_expert_parallel",
+   "blocks": 422
+  },
+  {
+   "alone": 10,
+   "blocker": "value_not_recorded",
+   "blocks": 35
+  },
+  {
+   "alone": 10,
+   "blocker": "blis_refused:scenario",
+   "blocks": 10
+  },
+  {
+   "alone": 1,
+   "blocker": "value_not_recorded:api_413",
+   "blocks": 1
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:stream_interval",
+   "blocks": 771
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:kv_cache_dtype",
+   "blocks": 752
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:language_model_only",
+   "blocks": 607
+  },
+  {
+   "alone": 0,
+   "blocker": "value_not_recorded:workload_category_not_stated",
+   "blocks": 382
+  },
+  {
+   "alone": 0,
+   "blocker": "not_in_catalog:eagle3",
+   "blocks": 296
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:api_server_count",
+   "blocks": 131
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:quantization",
+   "blocks": 71
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:linear_backend",
+   "blocks": 67
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:moe_backend",
+   "blocks": 56
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_in_release:env.VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8",
+   "blocks": 37
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_in_release:env.VLLM_MXFP4_USE_MARLIN",
+   "blocks": 35
+  },
+  {
+   "alone": 0,
+   "blocker": "value_not_recorded:no_recipe_fingerprint",
+   "blocks": 25
+  },
+  {
+   "alone": 0,
+   "blocker": "value_conflict:model: the log serves /scratch/models/DeepSeek-V4-Pro-NVFP4, the recipe deepseek-ai/DeepSeek-V4-Pro",
+   "blocks": 23
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:enable_chunked_prefill",
+   "blocks": 20
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:speculative_config.rejection_sample_method",
+   "blocks": 12
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_in_release:env.PYTHONNOUSERSITE",
+   "blocks": 7
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:cpu_offload_gb",
+   "blocks": 7
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:default_chat_template_kwargs.thinking_mode",
+   "blocks": 7
+  },
+  {
+   "alone": 0,
+   "blocker": "value_not_recorded:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use",
+   "blocks": 7
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:dcp_comm_backend",
+   "blocks": 5
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:decode_context_parallel_size",
+   "blocks": 5
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:prefix_match_unit",
+   "blocks": 5
+  },
+  {
+   "alone": 0,
+   "blocker": "value_not_recorded:speculative_config.model",
+   "blocks": 5
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:enable_eplb",
+   "blocks": 4
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_in_release:env.MC_ENABLE_DEST_DEVICE_AFFINITY",
+   "blocks": 2
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_in_release:env.MC_SLICE_SIZE",
+   "blocks": 2
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_in_release:env.MC_WORKERS_PER_CTX",
+   "blocks": 2
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:env.PYTHONHASHSEED",
+   "blocks": 2
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:kv_transfer_config.kv_connector_extra_config.load_async",
+   "blocks": 2
+  },
+  {
+   "alone": 0,
+   "blocker": "value_conflict:kv_transfer_config.engine_id",
+   "blocks": 1
+  },
+  {
+   "alone": 546,
+   "blocker": "out of scope (AMD, TPU)",
+   "blocks": 546,
+   "out_of_scope": true
+  }
+ ]
+}

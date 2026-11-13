@@ -2,7 +2,7 @@
 
 How accurately BLIS predicts real inference latency, scored nightly against
 [SemiAnalysis InferenceX](https://inferencex.semianalysis.com). v0.1.0 — see
-[`docs/RFC-0001.md`](docs/RFC-0001.md) for the full design.
+[`docs/RFC-0001.md`](docs/RFC-0001.md) for the full design. The methodology (how a point is scored and graded, how to reproduce the baseline, the evaluation protocol, the known limits) is in [`docs/README.md`](docs/README.md).
 
 **BLIS only. End-to-end only. Tables only, no plots.** Every number is a full `blis replay`
 through the whole stack (router/admission → scheduler → batch → kernel), scored against the
@@ -40,37 +40,39 @@ and holds **no other scoring logic**, no copied extractors, no log parsing, and 
 reimplement the scorer's exclusions (RFC §4.3/§4.4). `signedprobe`, `metricscore`, `blis` and the
 extractors are all built/run from source at the CI-resolved release tag.
 
-## Scoring harness image
+## Scoring harness script
 
 The scoring harness is the one place a BLIS simulation is compared with a measured end-to-end
-benchmark (design §2.2, §11.7). It is released as a container image, built from each release
-tag by `.github/workflows/harness-release.yml`, published to
-`ghcr.io/inference-sim/accuracy-dashboard-harness`, and signed by digest with cosign keyless
-signing. The job summary and the `harness-digest` artifact give the digest.
+benchmark (design §2.2, §11.7). It is a script, `harness/run.sh`, run from a checkout of this
+repository on a runner that builds the simulator. It is not a container image. A release or a
+commit of this repository names a harness.
 
-The image takes three inputs, as flags to its entrypoint `harness/run.sh`:
+The script takes three inputs, as flags:
 
 - a simulator build: `--sim`, a release tag or a full 40-hex commit of inference-sim, which the
   harness clones and builds (a branch name is refused, because it moves);
 - the data: `--catalog` and `--registry` (both required until the simulator can report the data it embeds);
 - a set of ledger units: `--units`, with `--pull`, the frozen recorded runs of those units.
 
-The nightly (`.github/workflows/api-nightly.yml`) scores through the image named in `harness/image.pin`: the
-image reference by digest, or the word `unpublished` while no image has been released. The nightly verifies
-the signature with `cosign verify`, then runs the image with `docker run`, `HARNESS_DIGEST` set from the pin
-and the data mounted. With `unpublished` or a malformed line the step fails; the scorer is not run from the
-source tree instead.
+Every figure records the harness commit that produced it (X8): the HEAD of the checkout `run.sh`
+runs from. `run.sh` refuses a checkout whose files under `harness/`, `orchestrator/` or `schemas/`
+differ from HEAD, because figures from such a tree could not be regenerated. A copy of the tree
+without git history states its commit in `HARNESS_COMMIT`; such a figure is labelled by assertion, not checked, so the
+accuracy gate must refuse it unless that commit is released from main. A directory unpacked inside another repository
+is not a checkout: only a git top level equal to the harness directory counts.
 
-A repository whose pull requests run the harness pins one digest in one pin file, as it pins
-any dependency, pulls the image by that digest, and passes it to the run as `HARNESS_DIGEST`.
-The release bot moves the pin. Every figure records the digest of the harness that produced it
-(X8). A run without `HARNESS_DIGEST` records `unreleased`, and its figures are labelled
-experimental: they may be posted on a pull request, never published as BLIS's accuracy.
+The nightly (`.github/workflows/api-nightly.yml`) checks out this repository, builds nothing
+but the simulator, and calls `harness/run.sh`. A repository whose pull requests run the harness
+pins a release or a commit of this repository in one pin file, as it pins any dependency, checks
+it out and runs the script. The release bot moves the pin. A figure is labelled experimental
+unless its simulator build and its data are both releases: it may be posted on a pull request,
+never published as BLIS's accuracy.
 
 ## Layout
 
 | Path | What |
 |---|---|
+| `docs/README.md` | The methodology pages: overview, scoring pipeline, grades, coverage accounting, evaluation protocol, reproducing, limits. |
 | `docs/RFC-0001.md` | The complete v0.1.0 design (the spec). |
 | `docs/mockups/` | The approved Overview mockup (`.png` + `.html`). |
 | `schemas/summary.v1.json` | Local JSON schema `summary.json` is validated against (RFC §4.4). |

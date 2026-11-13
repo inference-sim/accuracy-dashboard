@@ -1,6 +1,6 @@
 """cli.py nightly's wiring (no-storage model): it lists the window, fetches+scores the delta, and
 merges into the published summary. BLIS and the network aren't available here, so api.pull,
-cmd_pull, run_image and build_summary_v2 are monkeypatched to cheap fakes -- this checks the glue
+cmd_pull, run_harness and build_summary_v2 are monkeypatched to cheap fakes -- this checks the glue
 (arg plumbing, work/data/state paths, the pull-failure-stops-the-run rule), not the scoring, which
 test_score_e2e and test_nightly_run cover.
 """
@@ -53,7 +53,6 @@ def resolves(catalog: Path, models: dict) -> dict:
     return out
 
 
-IMAGE = "ghcr.io/inference-sim/accuracy-dashboard-harness@sha256:" + "a" * 64
 
 
 def _head(repo):
@@ -67,7 +66,7 @@ def _args(tmp, **over):
              state=str(tmp / "state.json"), scored=str(tmp / "scored-releases.json"), window_days=180, keep_api=5, today="2026-10-23",
              cache=None, work=str(tmp / "contract"), score_work=str(tmp / "sw"), evaluator_commit="abc",
              blis=str(tmp / "sim" / "blis"), catalog=str(tmp / "cat"), registry=str(tmp / "reg"),
-             corpus_dir=str(tmp / "corpora"), harness_image=IMAGE, corpus_cache=None,
+             corpus_dir=str(tmp / "corpora"), corpus_cache=None,
              timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0, stack=None,
              ledger=str(tmp / "ledger"), substrate_dir=str(tmp / "substrate"), substrate_version="v1.0.0",
              substrate_commit=_head(tmp / "substrate"), fields=str(tmp / "fields.json"))
@@ -119,12 +118,12 @@ class Fakes:
         (tmp / "fields.json").write_text(json.dumps(FIELD_LIST))
         fake_blis(tmp / "sim" / "blis", {**resolves(cat, {"m": "org/m"})})
 
-    def run_image(self, cmd):
-        # The harness image the night scores through: record its command, and write what the
-        # image would write to the mounted output directory.
-        self.image_cmd = cmd
-        self.scored_units = Path(next(v.split(":")[0] for v in cmd if v.endswith(":/data/units.json:ro")))
-        out = Path(next(v.split(":")[0] for v in cmd if v.endswith(":/data/out")))
+    def run_harness(self, cmd):
+        # The harness script the night scores through: record its command, and write what the
+        # script would write to its output directory.
+        self.harness_cmd = cmd
+        self.scored_units = Path(cmd[cmd.index("--units") + 1])
+        out = Path(cmd[cmd.index("--out") + 1])
         out.mkdir(parents=True, exist_ok=True)
         (out / "provenance.json").write_text(json.dumps({"pulled_at": "2026-10-23T00:00:00Z"}))
         return 0
@@ -148,12 +147,13 @@ class Fakes:
 def _install(monkeypatch, fakes, scored_ids):
     monkeypatch.setattr(api, "pull", fakes.api_pull)
     monkeypatch.setattr(cli, "cmd_pull", fakes.cmd_pull)
-    monkeypatch.setattr(cli, "run_image", fakes.run_image)
+    monkeypatch.setattr(cli, "run_harness", fakes.run_harness)
     import build_summary_v2
     def fake_build(contract_dir, *, generated_at, evaluator_commit):
         return {"schema_version": 3, "snapshot_id": "2026-10-23_blis-v0.12.0_ix-api-2026-10-23",
                 "generated_at": generated_at,
                 "provenance": {"ingest": "api", "blis": {"release": "v0.12.0"},
+                               "harness_commit": cli.harness_commit_now(),
                                "simulator": {"build": "v0.12.0", "engine": {"kind": "vllm", "version": "0.32.0"}},
                                "ground_truth": {"release_tag": "api-2026-10-23"}},
                 "coverage": {"graded": len(scored_ids), "not_scored": 0}, "matrix": [], "not_scored": []}
@@ -197,6 +197,36 @@ def test_nightly_ix_only_fetches_only_the_delta(tmp_path, monkeypatch):
                         lambda prior, delta, window_ids, **k: {**prior, "coverage": {"graded": 2, "not_scored": 0}})
     cli.cmd_nightly(_args(tmp_path, today="2026-10-24"))
     assert fakes.pulled_only == [ledger_fake.point_id(new)]   # delta only
+
+
+def test_a_night_scored_by_another_harness_commit_rescores_the_whole_window_and_does_not_merge(tmp_path, monkeypatch):
+    # A summary names one harness commit (X8) and validation refuses a point from another, so a
+    # delta scored by a newer checkout cannot be merged into it: the whole window is rescored.
+    rows = [_row("m", 1, "2026-10-01")]
+    fakes = Fakes(rows)
+    _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
+    fakes.ledger(tmp_path)
+    cli.cmd_nightly(_args(tmp_path))                       # seed, at the checkout's commit
+    latest = tmp_path / "data" / "latest" / "summary.json"
+    doc = json.loads(latest.read_text())
+    doc["provenance"]["harness_commit"] = "f" * 40          # last night was scored by another commit
+    latest.write_text(json.dumps(doc))
+    new = _row("m", 2, "2026-10-02")
+    fakes.rows = rows + [new]
+    fakes.ledger(tmp_path)
+    import build_summary_v2
+    monkeypatch.setattr(build_summary_v2, "build_merged", lambda *a, **k: (_ for _ in ()).throw(AssertionError("merged")))
+    cli.cmd_nightly(_args(tmp_path, today="2026-10-24"))
+    assert sorted(fakes.pulled_only) == sorted(ledger_fake.point_id(r) for r in fakes.rows)   # the whole window
+
+
+def test_same_harness_commit_is_the_only_one_a_summary_can_be_merged_with():
+    here = cli.harness_commit_now()
+    assert len(here) == 40
+    assert cli.same_harness({"provenance": {"harness_commit": here}}, here)
+    assert not cli.same_harness({"provenance": {"harness_commit": "e" * 40}}, here)
+    assert not cli.same_harness({"provenance": {}}, here)
+    assert not cli.same_harness(None, here)
 
 
 def test_a_night_after_a_v2_summary_fetches_and_scores_the_whole_window(tmp_path, monkeypatch):
@@ -323,22 +353,22 @@ def test_nightly_stops_when_the_pull_fails(tmp_path, monkeypatch):
         cli.cmd_nightly(_args(tmp_path))
 
 
-def test_the_nightly_scores_through_the_harness_image_by_digest(tmp_path, monkeypatch):
-    # Design §11.7: the night runs the released image, so every figure records its digest. It
-    # does not call cmd_score (the source tree's scorer).
+def test_the_nightly_scores_by_running_the_harness_script_and_no_container(tmp_path, monkeypatch):
+    # Design §11.7: the night runs harness/run.sh from this checkout, so every figure records the
+    # checkout's commit. It does not call cmd_score in its own process, and starts no container.
     rows = [_row("m", 1, "2026-10-01")]
     fakes = Fakes(rows)
     _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
     monkeypatch.setattr(cli, "cmd_score", lambda a: (_ for _ in ()).throw(AssertionError("scored from source")))
     fakes.ledger(tmp_path)
     assert cli.cmd_nightly(_args(tmp_path)) == 0
-    cmd = fakes.image_cmd
-    assert cmd[:3] == ["docker", "run", "--rm"] and IMAGE in cmd and "HARNESS_DIGEST=sha256:" + "a" * 64 in cmd
-    assert cmd[cmd.index(IMAGE) + 1:cmd.index(IMAGE) + 3] == ["--sim", "v0.12.0"]
-    # The image mounts the data without .git, so the night passes the release stack.json names
-    # for the one substrate checkout the catalog and registry are directories of.
-    tail = cmd[cmd.index(IMAGE) + 1:]
-    assert tail[tail.index("--catalog-release") + 1] == "v1.0.0" and tail[tail.index("--registry-release") + 1] == "v1.0.0"
+    cmd = fakes.harness_cmd
+    assert cmd[0] == "bash" and Path(cmd[1]) == cli.HARNESS_RUN and cmd[1].endswith("harness/run.sh")
+    assert "docker" not in cmd and cmd[2:4] == ["--sim", "v0.12.0"]
+    # The substrate checkout has no tag of its own, so the night passes the release stack.json
+    # names for the one checkout the catalog and registry are directories of.
+    assert cmd[cmd.index("--catalog-release") + 1] == "v1.0.0" and cmd[cmd.index("--registry-release") + 1] == "v1.0.0"
+    assert cmd[cmd.index("--catalog") + 1] == str((tmp_path / "cat").resolve())
 
 
 def _nightly_refused(tmp_path, monkeypatch, **over):
@@ -346,7 +376,7 @@ def _nightly_refused(tmp_path, monkeypatch, **over):
     fakes = Fakes(rows)
     _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
     fakes.ledger(tmp_path)
-    monkeypatch.setattr(cli, "run_image", lambda cmd: (_ for _ in ()).throw(AssertionError("scored")))
+    monkeypatch.setattr(cli, "run_harness", lambda cmd: (_ for _ in ()).throw(AssertionError("scored")))
     msgs = []
     monkeypatch.setattr(cli, "_log", msgs.append)
     assert cli.cmd_nightly(_args(tmp_path, **over)) == 2
@@ -399,7 +429,7 @@ def test_check_blis_inputs_refuses_a_checkout_not_at_a_tag(tmp_path):
 
 
 def test_the_data_releases_are_named_by_the_caller_and_need_no_git_history(tmp_path):
-    # The harness image mounts the catalog and registry without .git (harness_pin.docker_command),
+    # A copy of the catalog and registry may carry no .git,
     # so check_blis_inputs takes the release names.
     sim = tmp_path / "sim"
     _tagged_repo(sim, "v0.16.0")
@@ -408,8 +438,23 @@ def test_the_data_releases_are_named_by_the_caller_and_need_no_git_history(tmp_p
     (bare / "models").mkdir(parents=True)
     assert not (bare / ".git").exists()
     assert cli.check_blis_inputs(sim / "blis", "v1.0.0", "v2.3.4-rc1") == []
-    assert cli.check_blis_inputs(sim / "blis", None, "v1.0.0") == ["--catalog-release is required: the release tag the data is at"]
-    assert cli.check_blis_inputs(sim / "blis", "v1.0.0", "bad tag") == ["--registry-release 'bad tag' is not a release tag"]
+    assert cli.check_blis_inputs(sim / "blis", "a" * 40, "b" * 40) == []
+    assert cli.check_blis_inputs(sim / "blis", None, "v1.0.0") == ["--catalog-release is required: the release tag or full 40-hex commit the data is at"]
+    for bad in ("bad tag", "main", "m2/10-x", "e1a1d97", "A" * 40, "v1"):
+        assert cli.check_blis_inputs(sim / "blis", "v1.0.0", bad) == [
+            f"--registry-release {bad!r} is neither a release tag nor a full 40-hex commit"], bad
+
+
+def test_a_release_build_over_mutable_data_names_is_refused_and_cannot_be_a_released_figure(tmp_path):
+    """A branch name or `latest` names data that moves; with a tagged build it used to make a figure that
+    looked released."""
+    sim = tmp_path / "sim"
+    _tagged_repo(sim, "v0.16.0")
+    (sim / "blis").write_text("")
+    bad = cli.check_blis_inputs(sim / "blis", "main", "latest", "v0.16.0")
+    assert bad == ["--catalog-release 'main' is neither a release tag nor a full 40-hex commit",
+                   "--registry-release 'latest' is neither a release tag nor a full 40-hex commit"]
+    assert cli.check_blis_inputs(sim / "blis", "v0.13.0", "v0.13.0", "v0.16.0") == []
 
 
 FIELD_LIST = {"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": []}
@@ -524,10 +569,11 @@ def test_sim_build_must_be_the_checkouts_tag_or_commit(tmp_path):
     assert check("main") == ["--sim-build 'main' is neither a tag vX.Y.Z[-suffix] nor a 40-hex commit"]
 
 
-def test_harness_digest_is_a_sha256_or_unreleased():
-    assert cli.check_harness_digest("sha256:" + "a" * 64) == [] and cli.check_harness_digest("unreleased") == []
-    assert cli.check_harness_digest("latest") == ["--harness-digest 'latest' is neither sha256:<64 hex> nor unreleased"]
-    assert cli.check_harness_digest(None)[0].startswith("--harness-digest is required")
+def test_the_harness_commit_is_a_full_40_hex_commit():
+    assert cli.check_harness_commit("a" * 40) == []
+    for bad in ("latest", "v0.4.0", "a" * 12, "A" * 40, "sha256:" + "a" * 64, "unreleased"):
+        assert cli.check_harness_commit(bad) == [f"--harness-commit {bad!r} is not a full 40-hex commit"], bad
+    assert cli.check_harness_commit(None)[0].startswith("--harness-commit is required")
 
 
 def test_units_select_the_points_of_the_pull_and_name_those_it_does_not_hold(tmp_path):
@@ -581,7 +627,7 @@ def _agentx_corpora(catalog, corpus_dir):
 
 def _score_inputs(tmp_path, commands: dict):
     """What cmd_score needs, with a fake blis answering `commands` beside a stack.json for vLLM
-    0.32.0, in a checkout at v0.16.0; the catalog and registry as the harness image mounts them,
+    0.32.0, in a checkout at v0.16.0; the catalog and registry as a copy without .git has them,
     plain directories with no .git, named by --catalog-release and --registry-release; and a pull
     of no points."""
     sim = tmp_path / "sim"
@@ -599,7 +645,7 @@ def _score_inputs(tmp_path, commands: dict):
                                           "vllm_ref": "v0.32.0", "vllm_max_distance": 0}, [])
     return types.SimpleNamespace(
         pull=str(tmp_path / "pull"), out=str(tmp_path / "contract"), blis=str(blis), catalog=str(tmp_path / "cat"),
-        registry=str(tmp_path / "reg"), fields=str(tmp_path / "fields.json"), catalog_release="v1.0.0", registry_release="v1.0.0", stack=None, sim_build=None, harness_digest="unreleased", units=None,
+        registry=str(tmp_path / "reg"), fields=str(tmp_path / "fields.json"), catalog_release="v1.0.0", registry_release="v1.0.0", stack=None, sim_build=None, harness_commit="c" * 40, units=None,
         corpus_dir=str(tmp_path / "corpora"),
         corpus_cache=None, work=str(tmp_path / "work"), timeout=60, only=None, workers=1, agentic_workers=1,
         max_rss_mb=0)
@@ -663,7 +709,7 @@ def test_a_score_run_replays_every_agentx_corpus_by_its_catalog_entry(tmp_path, 
     for flag in ("--corpus-dataset", "--corpus-revision", "--corpus-sha256"):
         with pytest.raises(SystemExit):
             cli.main(["score", "--pull", "p", "--out", "o", "--blis", "b", "--catalog", "c", "--registry", "r",
-                      "--catalog-release", "v1", "--registry-release", "v1", "--harness-digest", "unreleased",
+                      "--catalog-release", "v1.0.0", "--registry-release", "v1.0.0", "--harness-commit", "c" * 40,
                       "--corpus-dir", "d", flag, "x"])
 
 

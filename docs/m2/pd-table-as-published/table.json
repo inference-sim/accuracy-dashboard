@@ -1,0 +1,830 @@
+{
+ "backlog": [
+  {
+   "alone": 104,
+   "blocks": 186,
+   "demotes": 0,
+   "entry": "router_unsupported:dynamo-router:revision_not_covered"
+  },
+  {
+   "alone": 0,
+   "blocks": 48,
+   "demotes": 0,
+   "entry": "field_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND"
+  },
+  {
+   "alone": 0,
+   "blocks": 28,
+   "demotes": 0,
+   "entry": "field_not_modelled:attention_config.use_trtllm_attention"
+  },
+  {
+   "alone": 0,
+   "blocks": 20,
+   "demotes": 0,
+   "entry": "field_not_modelled:enforce_eager"
+  },
+  {
+   "alone": 0,
+   "blocks": 14,
+   "demotes": 0,
+   "entry": "value_not_recorded:workload_category_not_stated"
+  },
+  {
+   "alone": 0,
+   "blocks": 9,
+   "demotes": 0,
+   "entry": "field_not_in_release:env.VLLM_MINIMAX_M3_MSA_DECODE_BACKEND"
+  },
+  {
+   "alone": 0,
+   "blocks": 6,
+   "demotes": 0,
+   "entry": "field_not_in_release:env.NCCL_MNNVL_ENABLE"
+  },
+  {
+   "alone": 0,
+   "blocks": 6,
+   "demotes": 0,
+   "entry": "field_not_modelled:all2all_backend"
+  },
+  {
+   "alone": 0,
+   "blocks": 6,
+   "demotes": 0,
+   "entry": "field_not_modelled:env.NCCL_CUMEM_ENABLE"
+  },
+  {
+   "alone": 0,
+   "blocks": 6,
+   "demotes": 0,
+   "entry": "field_not_modelled:env.NCCL_NVLS_ENABLE"
+  },
+  {
+   "alone": 0,
+   "blocks": 6,
+   "demotes": 0,
+   "entry": "field_not_modelled:env.VLLM_USE_NCCL_SYMM_MEM"
+  },
+  {
+   "alone": 0,
+   "blocks": 5,
+   "demotes": 0,
+   "entry": "field_not_in_release:attention_config.use_trtllm_ragged_deepseek_prefill"
+  },
+  {
+   "alone": 0,
+   "blocks": 5,
+   "demotes": 0,
+   "entry": "field_not_in_release:env.VLLM_USE_FLASHINFER_MOE_FP4"
+  },
+  {
+   "alone": 0,
+   "blocks": 5,
+   "demotes": 0,
+   "entry": "field_not_modelled:compilation_config.custom_ops"
+  },
+  {
+   "alone": 0,
+   "blocks": 2,
+   "demotes": 0,
+   "entry": "router_unsupported:dynamo-router"
+  },
+  {
+   "alone": 0,
+   "blocks": 2,
+   "demotes": 0,
+   "entry": "value_not_recorded:no_master_entry"
+  },
+  {
+   "alone": 0,
+   "blocks": 1,
+   "demotes": 0,
+   "entry": "field_not_modelled:compilation_config.mode"
+  },
+  {
+   "alone": 0,
+   "blocks": 1,
+   "demotes": 0,
+   "entry": "field_not_modelled:enable_sleep_mode"
+  },
+  {
+   "alone": 0,
+   "blocks": 1,
+   "demotes": 0,
+   "entry": "field_not_modelled:env.TILELANG_CLEANUP_TEMP_FILES"
+  },
+  {
+   "alone": 0,
+   "blocks": 1,
+   "demotes": 0,
+   "entry": "topology_unsupported:pd_pool_not_recorded"
+  },
+  {
+   "alone": 0,
+   "blocks": 1,
+   "demotes": 0,
+   "entry": "value_not_recorded"
+  },
+  {
+   "alone": 0,
+   "blocks": 1,
+   "demotes": 0,
+   "entry": "value_not_recorded:api_404"
+  }
+ ],
+ "coverage": {
+  "all": {
+   "by_grade": {
+    "G5": 188
+   },
+   "failed": 0,
+   "not_scored": 188,
+   "points": 188,
+   "primary_reason": {
+    "router_unsupported": 188
+   },
+   "reasons": {
+    "field_not_in_release:attention_config.use_trtllm_ragged_deepseek_prefill": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "field_not_in_release:env.NCCL_MNNVL_ENABLE": {
+     "alone": 0,
+     "blocks": 6
+    },
+    "field_not_in_release:env.VLLM_MINIMAX_M3_MSA_DECODE_BACKEND": {
+     "alone": 0,
+     "blocks": 9
+    },
+    "field_not_in_release:env.VLLM_USE_FLASHINFER_MOE_FP4": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "field_not_modelled:all2all_backend": {
+     "alone": 0,
+     "blocks": 6
+    },
+    "field_not_modelled:attention_config.use_trtllm_attention": {
+     "alone": 0,
+     "blocks": 28
+    },
+    "field_not_modelled:compilation_config.custom_ops": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "field_not_modelled:compilation_config.mode": {
+     "alone": 0,
+     "blocks": 1
+    },
+    "field_not_modelled:enable_sleep_mode": {
+     "alone": 0,
+     "blocks": 1
+    },
+    "field_not_modelled:enforce_eager": {
+     "alone": 0,
+     "blocks": 20
+    },
+    "field_not_modelled:env.NCCL_CUMEM_ENABLE": {
+     "alone": 0,
+     "blocks": 6
+    },
+    "field_not_modelled:env.NCCL_NVLS_ENABLE": {
+     "alone": 0,
+     "blocks": 6
+    },
+    "field_not_modelled:env.TILELANG_CLEANUP_TEMP_FILES": {
+     "alone": 0,
+     "blocks": 1
+    },
+    "field_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND": {
+     "alone": 0,
+     "blocks": 48
+    },
+    "field_not_modelled:env.VLLM_USE_NCCL_SYMM_MEM": {
+     "alone": 0,
+     "blocks": 6
+    },
+    "router_unsupported:dynamo-router": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "router_unsupported:dynamo-router:revision_not_covered": {
+     "alone": 104,
+     "blocks": 186
+    },
+    "topology_unsupported:pd_pool_not_recorded": {
+     "alone": 0,
+     "blocks": 1
+    },
+    "value_not_recorded": {
+     "alone": 0,
+     "blocks": 1
+    },
+    "value_not_recorded:api_404": {
+     "alone": 0,
+     "blocks": 1
+    },
+    "value_not_recorded:no_master_entry": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "value_not_recorded:workload_category_not_stated": {
+     "alone": 0,
+     "blocks": 14
+    }
+   },
+   "scored": 0,
+   "share_scored": 0.0
+  },
+  "in_scope": {
+   "by_grade": {
+    "G5": 188
+   },
+   "failed": 0,
+   "not_scored": 188,
+   "points": 188,
+   "primary_reason": {
+    "router_unsupported": 188
+   },
+   "reasons": {
+    "field_not_in_release:attention_config.use_trtllm_ragged_deepseek_prefill": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "field_not_in_release:env.NCCL_MNNVL_ENABLE": {
+     "alone": 0,
+     "blocks": 6
+    },
+    "field_not_in_release:env.VLLM_MINIMAX_M3_MSA_DECODE_BACKEND": {
+     "alone": 0,
+     "blocks": 9
+    },
+    "field_not_in_release:env.VLLM_USE_FLASHINFER_MOE_FP4": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "field_not_modelled:all2all_backend": {
+     "alone": 0,
+     "blocks": 6
+    },
+    "field_not_modelled:attention_config.use_trtllm_attention": {
+     "alone": 0,
+     "blocks": 28
+    },
+    "field_not_modelled:compilation_config.custom_ops": {
+     "alone": 0,
+     "blocks": 5
+    },
+    "field_not_modelled:compilation_config.mode": {
+     "alone": 0,
+     "blocks": 1
+    },
+    "field_not_modelled:enable_sleep_mode": {
+     "alone": 0,
+     "blocks": 1
+    },
+    "field_not_modelled:enforce_eager": {
+     "alone": 0,
+     "blocks": 20
+    },
+    "field_not_modelled:env.NCCL_CUMEM_ENABLE": {
+     "alone": 0,
+     "blocks": 6
+    },
+    "field_not_modelled:env.NCCL_NVLS_ENABLE": {
+     "alone": 0,
+     "blocks": 6
+    },
+    "field_not_modelled:env.TILELANG_CLEANUP_TEMP_FILES": {
+     "alone": 0,
+     "blocks": 1
+    },
+    "field_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND": {
+     "alone": 0,
+     "blocks": 48
+    },
+    "field_not_modelled:env.VLLM_USE_NCCL_SYMM_MEM": {
+     "alone": 0,
+     "blocks": 6
+    },
+    "router_unsupported:dynamo-router": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "router_unsupported:dynamo-router:revision_not_covered": {
+     "alone": 104,
+     "blocks": 186
+    },
+    "topology_unsupported:pd_pool_not_recorded": {
+     "alone": 0,
+     "blocks": 1
+    },
+    "value_not_recorded": {
+     "alone": 0,
+     "blocks": 1
+    },
+    "value_not_recorded:api_404": {
+     "alone": 0,
+     "blocks": 1
+    },
+    "value_not_recorded:no_master_entry": {
+     "alone": 0,
+     "blocks": 2
+    },
+    "value_not_recorded:workload_category_not_stated": {
+     "alone": 0,
+     "blocks": 14
+    }
+   },
+   "scored": 0,
+   "share_scored": 0.0
+  },
+  "out_of_scope": {
+   "by_grade": {},
+   "failed": 0,
+   "not_scored": 0,
+   "points": 0,
+   "primary_reason": {},
+   "reasons": {},
+   "scored": 0,
+   "share_scored": null
+  },
+  "out_of_scope_by_chip": {}
+ },
+ "development_split": {
+  "constants": {
+   "freeze_date": "2026-11-09",
+   "salt": "blis-dev-split-2",
+   "train_pct": 60,
+   "validation_pct": 20
+  },
+  "kinds": {
+   "prospective": {
+    "points": 0,
+    "withheld": true
+   },
+   "test": {
+    "points": 49,
+    "withheld": true
+   },
+   "train": {
+    "accuracy": {
+     "noise_floor_pct": 1.6,
+     "noise_floor_source": "fallback; none measured per point",
+     "points": 0,
+     "tpot": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "ttft": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "withheld": 0
+    },
+    "grades": {
+     "G5": 114
+    },
+    "in_scope": 114,
+    "points": 114,
+    "ranking": {
+     "throughput_per_gpu": {
+      "groups": 0,
+      "kendall": "too few groups",
+      "left_out": 0,
+      "regret": "too few groups",
+      "spearman": "too few groups",
+      "top1": "too few groups",
+      "top3": "too few groups",
+      "value": "throughput_per_gpu"
+     }
+    },
+    "scored": 0,
+    "series": 6
+   },
+   "unassigned": {
+    "accuracy": {
+     "noise_floor_pct": 1.6,
+     "noise_floor_source": "fallback; none measured per point",
+     "points": 0,
+     "tpot": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "ttft": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "withheld": 0
+    },
+    "grades": {},
+    "in_scope": 0,
+    "points": 0,
+    "ranking": {
+     "throughput_per_gpu": {
+      "groups": 0,
+      "kendall": "too few groups",
+      "left_out": 0,
+      "regret": "too few groups",
+      "spearman": "too few groups",
+      "top1": "too few groups",
+      "top3": "too few groups",
+      "value": "throughput_per_gpu"
+     }
+    },
+    "scored": 0,
+    "series": 0
+   },
+   "validation": {
+    "accuracy": {
+     "noise_floor_pct": 1.6,
+     "noise_floor_source": "fallback; none measured per point",
+     "points": 0,
+     "tpot": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "ttft": {
+      "mape": {
+       "n": 0,
+       "value": "too few points"
+      },
+      "shape": {
+       "n": 0,
+       "value": "too few points"
+      }
+     },
+     "withheld": 0
+    },
+    "grades": {
+     "G5": 25
+    },
+    "in_scope": 25,
+    "points": 25,
+    "ranking": {
+     "throughput_per_gpu": {
+      "groups": 0,
+      "kendall": "too few groups",
+      "left_out": 0,
+      "regret": "too few groups",
+      "spearman": "too few groups",
+      "top1": "too few groups",
+      "top3": "too few groups",
+      "value": "throughput_per_gpu"
+     }
+    },
+    "scored": 0,
+    "series": 1
+   }
+  },
+  "test_evaluated": false,
+  "text": "Per-split figures use the DEVELOPMENT split of docs/m2/evaluation-protocol.md, not the ledger's held-out: its test set is 'development split, not the ledger's held-out'."
+ },
+ "format": "baseline-compare-1",
+ "grades": {
+  "G1": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "points": 0,
+   "share_of_all": "too few points",
+   "share_of_graded": null
+  },
+  "G2": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "points": 0,
+   "share_of_all": "too few points",
+   "share_of_graded": null
+  },
+  "G3": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "points": 0,
+   "share_of_all": "too few points",
+   "share_of_graded": null
+  },
+  "G4": {
+   "accuracy": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 0,
+    "tpot": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 0,
+      "value": "too few points"
+     },
+     "shape": {
+      "n": 0,
+      "value": "too few points"
+     }
+    },
+    "withheld": 0
+   },
+   "points": 0,
+   "share_of_all": "too few points",
+   "share_of_graded": null
+  },
+  "G5": {
+   "points": 188,
+   "share_of_all": 1.0,
+   "share_of_graded": null
+  },
+  "failed": {
+   "points": 0
+  }
+ },
+ "headline": {
+  "noise_floor_pct": 1.6,
+  "noise_floor_source": "fallback; none measured per point",
+  "points": 0,
+  "tpot": {
+   "mape": {
+    "n": 0,
+    "value": "too few points"
+   },
+   "shape": {
+    "n": 0,
+    "value": "too few points"
+   }
+  },
+  "ttft": {
+   "mape": {
+    "n": 0,
+    "value": "too few points"
+   },
+   "shape": {
+    "n": 0,
+    "value": "too few points"
+   }
+  },
+  "withheld": 0
+ },
+ "identity": {
+  "harness_commit": "0e9627e219c207593de5bc55d997cf3dca707d64",
+  "point_set_sha256": "10cdb496f9893d88f59f25d2386e26532ad756e21d107ab6c51552d79ef60c18",
+  "points": 188,
+  "pull_manifest_sha256": "bfa74604f84e64aa2f6c44d73fedee45a816c15d11f66da02396913354f5c3d4",
+  "sample": "in_sample",
+  "units_count": 188,
+  "units_sha256": "69533f0e375706c0a0483b4cd79c5f8dd565c6ac206ee49ba2ae74a90e208477"
+ },
+ "inputs": {
+  "blis": {
+   "catalog": "v0.14.0",
+   "commit_sha": "a8bc3085a7c91c50a1d92862943a695c04adfe11",
+   "extractor_version": "blis-latency-kernel@unknown",
+   "registry": "v0.14.0",
+   "release": "unknown"
+  },
+  "engine": {
+   "kind": "vllm",
+   "version": "0.32.0"
+  },
+  "experimental": true,
+  "fields_sha256": "62743b57746f8376b291fdb853eb0eb19edacc5d717e1e7107d6e0f3ed41348d",
+  "simulator": {
+   "build": "a8bc3085a7c91c50a1d92862943a695c04adfe11",
+   "engine": {
+    "kind": "vllm",
+    "version": "0.32.0"
+   },
+   "harness_commit": "0e9627e219c207593de5bc55d997cf3dca707d64"
+  }
+ },
+ "kind": "run",
+ "refusals": [],
+ "sample": "in_sample",
+ "sample_text": "IN-SAMPLE: the points are the ones the model was calibrated on or tuned against; there is no anchor list yet, so no point is held out. These figures say how well the simulator reproduces data it has seen, not how well it predicts new data.",
+ "serving_by_grade": {},
+ "unlock": [
+  {
+   "alone": 104,
+   "blocker": "router_unsupported:dynamo-router:revision_not_covered",
+   "blocks": 186
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND",
+   "blocks": 48
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:attention_config.use_trtllm_attention",
+   "blocks": 28
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:enforce_eager",
+   "blocks": 20
+  },
+  {
+   "alone": 0,
+   "blocker": "value_not_recorded:workload_category_not_stated",
+   "blocks": 14
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_in_release:env.VLLM_MINIMAX_M3_MSA_DECODE_BACKEND",
+   "blocks": 9
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_in_release:env.NCCL_MNNVL_ENABLE",
+   "blocks": 6
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:all2all_backend",
+   "blocks": 6
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:env.NCCL_CUMEM_ENABLE",
+   "blocks": 6
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:env.NCCL_NVLS_ENABLE",
+   "blocks": 6
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:env.VLLM_USE_NCCL_SYMM_MEM",
+   "blocks": 6
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_in_release:attention_config.use_trtllm_ragged_deepseek_prefill",
+   "blocks": 5
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_in_release:env.VLLM_USE_FLASHINFER_MOE_FP4",
+   "blocks": 5
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:compilation_config.custom_ops",
+   "blocks": 5
+  },
+  {
+   "alone": 0,
+   "blocker": "router_unsupported:dynamo-router",
+   "blocks": 2
+  },
+  {
+   "alone": 0,
+   "blocker": "value_not_recorded:no_master_entry",
+   "blocks": 2
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:compilation_config.mode",
+   "blocks": 1
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:enable_sleep_mode",
+   "blocks": 1
+  },
+  {
+   "alone": 0,
+   "blocker": "field_not_modelled:env.TILELANG_CLEANUP_TEMP_FILES",
+   "blocks": 1
+  },
+  {
+   "alone": 0,
+   "blocker": "topology_unsupported:pd_pool_not_recorded",
+   "blocks": 1
+  },
+  {
+   "alone": 0,
+   "blocker": "value_not_recorded",
+   "blocks": 1
+  },
+  {
+   "alone": 0,
+   "blocker": "value_not_recorded:api_404",
+   "blocks": 1
+  },
+  {
+   "alone": 0,
+   "blocker": "out of scope (AMD, TPU)",
+   "blocks": 0,
+   "out_of_scope": true
+  }
+ ]
+}

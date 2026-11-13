@@ -17,8 +17,8 @@ were recorded, or only moved) is listed with records_node_sizes false and contri
 A label has no single size in a version when it is absent, when a runner of the label belongs
 to no cluster, when a cluster records no size, or when its clusters differ in size.
 
-STABILITY CHECK, printed always and verified by --check: for every label, the size and the
-clusters it maps to are the same in every version that records node sizes. A label for which
+STABILITY CHECK, printed always and verified by --check: for every label, the size is the
+same in every version that records node sizes (the clusters it maps to may differ). A label for which
 that fails is `stable: false`, and the scorer does not use it for a row dated before the
 label's first record (inferencex_runners.resolve).
 """
@@ -170,7 +170,7 @@ def render(doc: dict) -> str:
 
 
 def stability_report(doc: dict) -> str:
-    lines = ["STABILITY CHECK (a label is stable when its size and clusters are the same in every version that records sizes)"]
+    lines = ["STABILITY CHECK (a label is stable when its size is the same in every version that records sizes)"]
     for label, d in doc["labels"].items():
         per = ", ".join(f"{c[:8]}: " + (f"{r['gpus_per_node']} on {','.join(k['id'] for k in r['clusters'])}"
                                          if r["gpus_per_node"] is not None else f"none ({r['problem']})")

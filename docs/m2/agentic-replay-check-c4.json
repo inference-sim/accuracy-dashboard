@@ -1,0 +1,189 @@
+{
+ "client_version": "0.12.0",
+ "export_sha256": "14420052955c1fb46c042a795f31fe21d2c0b38566c11dc9df85acf33ba0e230",
+ "inputs_read_from_the_export": {
+  "client": "aiperf",
+  "client_version": "0.12.0",
+  "concurrency": 1,
+  "corpus": "semianalysis_cc_traces_weka_062126",
+  "corpus_sha256": "e39cd2ff3eba21d4a3664be51da743ac3d2149a1933898cafc7bfeac8147eeef",
+  "duration_s": 3600.0,
+  "grace_period_s": 30.0,
+  "replayed_as": "inferencex-agentx-mvp",
+  "scenario": "inferencex-agentx-mvp",
+  "seed": 42,
+  "system_idle_gap_cap_s": 10.0,
+  "trace_idle_gap_cap_s": 300.0,
+  "trajectory_start": {
+   "max_ratio": 0.75,
+   "min_ratio": 0.25
+  },
+  "warmup_requests_per_lane": 10
+ },
+ "runs": {
+  "as_exported": {
+   "frame_replay": {
+    "benchmark_duration_s": 900,
+    "concurrency": 4,
+    "system_idle_gap_cap_s": 10,
+    "trace_idle_gap_cap_s": 300,
+    "warmup": {
+     "mode": "cache_pressure",
+     "requests_per_lane": 10
+    }
+   },
+   "requests": {
+    "completed": 319,
+    "generated": 319,
+    "in_flight_at_horizon": 0,
+    "length_capped": 0,
+    "not_started": 0,
+    "queued_at_horizon": 0,
+    "timed_out": 0
+   },
+   "tpot_mean_ms": {
+    "samples": 276,
+    "value": 4.570818208488332
+   },
+   "ttft_mean_ms": {
+    "samples": 276,
+    "value": 567.1395398550725
+   },
+   "window": {
+    "duration_s": 930,
+    "end_us": 996926389,
+    "requests": 276,
+    "start_us": 66926389
+   }
+  },
+  "neither": {
+   "frame_replay": {
+    "benchmark_duration_s": 900,
+    "concurrency": 4,
+    "system_idle_gap_cap_s": 10,
+    "trace_idle_gap_cap_s": null,
+    "warmup": null
+   },
+   "requests": {
+    "completed": 245,
+    "generated": 245,
+    "in_flight_at_horizon": 0,
+    "length_capped": 0,
+    "not_started": 0,
+    "queued_at_horizon": 0,
+    "timed_out": 0
+   },
+   "tpot_mean_ms": {
+    "samples": 242,
+    "value": 3.850351339803136
+   },
+   "ttft_mean_ms": {
+    "samples": 242,
+    "value": 535.6224628099174
+   },
+   "window": {
+    "duration_s": 930,
+    "end_us": 974212909,
+    "requests": 242,
+    "start_us": 44212909
+   }
+  },
+  "no_cap": {
+   "frame_replay": {
+    "benchmark_duration_s": 900,
+    "concurrency": 4,
+    "system_idle_gap_cap_s": 10,
+    "trace_idle_gap_cap_s": null,
+    "warmup": {
+     "mode": "cache_pressure",
+     "requests_per_lane": 10
+    }
+   },
+   "requests": {
+    "completed": 213,
+    "generated": 213,
+    "in_flight_at_horizon": 0,
+    "length_capped": 0,
+    "not_started": 0,
+    "queued_at_horizon": 0,
+    "timed_out": 0
+   },
+   "tpot_mean_ms": {
+    "samples": 170,
+    "value": 3.3719850732943804
+   },
+   "ttft_mean_ms": {
+    "samples": 170,
+    "value": 538.173805882353
+   },
+   "window": {
+    "duration_s": 930,
+    "end_us": 996926389,
+    "requests": 170,
+    "start_us": 66926389
+   }
+  },
+  "no_warmup": {
+   "frame_replay": {
+    "benchmark_duration_s": 900,
+    "concurrency": 4,
+    "system_idle_gap_cap_s": 10,
+    "trace_idle_gap_cap_s": 300,
+    "warmup": null
+   },
+   "requests": {
+    "completed": 258,
+    "generated": 258,
+    "in_flight_at_horizon": 0,
+    "length_capped": 0,
+    "not_started": 0,
+    "queued_at_horizon": 0,
+    "timed_out": 0
+   },
+   "tpot_mean_ms": {
+    "samples": 255,
+    "value": 3.932912469089392
+   },
+   "ttft_mean_ms": {
+    "samples": 255,
+    "value": 607.4699803921569
+   },
+   "window": {
+    "duration_s": 930,
+    "end_us": 974212909,
+    "requests": 255,
+    "start_us": 44212909
+   }
+  }
+ },
+ "spec_as_exported": {
+  "benchmark_duration_s": 900.0,
+  "concurrency": 4,
+  "corpus": {
+   "encoding": "jsonl",
+   "format": "weka-trace-v7",
+   "loader": "semianalysis_cc_traces_weka_062126",
+   "sha256": "e39cd2ff3eba21d4a3664be51da743ac3d2149a1933898cafc7bfeac8147eeef",
+   "source": {
+    "file": "traces.jsonl",
+    "huggingface": "semianalysisai/cc-traces-weka-062126",
+    "revision": "23f152f6f0f9399a85901b89a6458def0ef16729",
+    "split": "train"
+   }
+  },
+  "grace_period_s": 30.0,
+  "harness_version": "0.12.0",
+  "random_seed": 42,
+  "scenario": "inferencex-agentx-mvp",
+  "system_idle_gap_cap_s": 10.0,
+  "trace_idle_gap_cap_s": 300.0,
+  "trajectory_start": {
+   "max_ratio": 0.75,
+   "min_ratio": 0.25
+  },
+  "warmup": {
+   "mode": "cache_pressure",
+   "requests_per_lane": 10
+  }
+ }
+}

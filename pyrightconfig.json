@@ -1,0 +1,4 @@
+{
+  "extraPaths": ["orchestrator", "orchestrator/ingest"],
+  "pythonVersion": "3.13"
+}

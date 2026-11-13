@@ -20,40 +20,105 @@ import json
 import subprocess
 import tempfile
 
-SCHEMA_VERSION = 2
+# Version 3 requires each metric to state its scope (the substrate since DEV-8); version 2 is what the
+# simulator releases before it write. The metrics the harness reads are the same in both.
+SCHEMA_VERSIONS = (2, 3)
 KIND = "Result"
 TTFT_MEAN_MS = "ttft_mean_ms"
 TPOT_MEAN_MS = "tpot_mean_ms"
 
-# The measured side's definitions (DEV-8): what the InferenceX client reports as mean TTFT and
-# mean TPOT (inferencex_client.summarize). Mean TTFT is the mean over requests of each request's
-# time to first token; mean TPOT is the mean, over requests with two or more output tokens, of
-# each request's (E2E - TTFT) / (output tokens - 1). Both over the measured window, in
-# milliseconds, with requests unfinished at the horizon giving no sample. The keys are the
-# fields blis-substrate contracts/metrics compares (Comparable): two figures are comparable only
-# when all of them are equal.
+# The measured side's figures (DEV-8): what the InferenceX client reports as mean TTFT and mean TPOT
+# (inferencex_client.summarize). Mean TTFT is the mean over requests of each request's time to first
+# token; mean TPOT is the mean, over requests with two or more output tokens, of each request's
+# (E2E - TTFT) / (output tokens - 1). Both over the measured window, in milliseconds, with requests
+# unfinished at the horizon giving no sample.
+#
+# A figure is a definition and a context (blis-substrate contracts/metrics, Compare and
+# ComparableFigures). The definition has eight meaning fields, and two figures are comparable only
+# when every one is equal, an empty optional field included: an empty denominator or percentile method
+# is a statement, not an absence. The context is the scope, the member, and an aggregate with the scope
+# it ranges over. The comparison made here is of the simulator's DIRECT CLUSTER figure with the client's:
+# cluster scope, no member, no aggregate, no scope ranged over.
+MEANING_FIELDS = ("formula", "statistic", "population", "window", "unit", "percentile_method", "unfinished",
+                  "denominator")
+CLIENT_CONTEXT = {"scope": "cluster", "member": "", "aggregate": "", "over": ""}
+_MEAN_MS = {"statistic": "mean", "window": "measured", "unit": "ms", "percentile_method": "",
+            "unfinished": "excluded", "denominator": ""}
 CLIENT_DEFINITIONS = {
-    TTFT_MEAN_MS: {"formula": "ttft", "statistic": "mean", "population": "requests", "window": "measured",
-                   "unit": "ms", "percentile_method": None, "unfinished": "excluded"},
-    TPOT_MEAN_MS: {"formula": "tpot", "statistic": "mean", "population": "requests_min_2_output_tokens",
-                   "window": "measured", "unit": "ms", "percentile_method": None, "unfinished": "excluded"},
+    TTFT_MEAN_MS: {**_MEAN_MS, "formula": "ttft", "population": "requests"},
+    TPOT_MEAN_MS: {**_MEAN_MS, "formula": "tpot", "population": "requests_min_2_output_tokens"},
 }
 
 
-def check_definitions(registry: dict) -> list[str]:
+# The other figures InferenceX reports, with the definition each has there. The dashboard compares
+# none of them yet; one is added to COMPARED_FIGURES only together with a registry metric that has
+# this definition, and check_definitions refuses the registry when it does not. The ids and keys are
+# those blis-substrate#52 shipped in layer 7 (contracts/metrics/metrics.go, 41ae65f):
+#   total_tokens_per_second_per_gpu          InferenceX tput_per_gpu: (input + output tokens/s) / all GPUs
+#   output_tokens_per_second_per_decode_gpu  InferenceX output_tput_per_gpu: output tokens/s / the decode GPUs
+#   interactivity_of_mean_tpot               InferenceX mean_intvty: 1000 / mean(TPOT), the reciprocal of the mean
+# interactivity_mean is the mean of each request's 1/TPOT, a different number (2% to 27% higher on TP8 H200
+# replays); the registry keeps it unchanged and it is not the client's figure. InferenceX's
+# input_tput_per_gpu (input tokens/s over the prefill GPUs) has no registry metric yet.
+_RATE = {"statistic": "rate", "population": "requests", "window": "measured", "unit": "tokens_per_s",
+         "percentile_method": "", "unfinished": "not_applicable"}
+CLIENT_RATE_DEFINITIONS = {
+    "total_tokens_per_second_per_gpu": {**_RATE, "formula": "total_throughput", "denominator": "window_and_gpus"},
+    "output_tokens_per_second_per_decode_gpu": {**_RATE, "formula": "output_throughput",
+                                                "denominator": "window_and_decode_gpus"},
+    "interactivity_of_mean_tpot": {"formula": "interactivity", "statistic": "mean",
+                                   "population": "requests_min_2_output_tokens", "window": "measured",
+                                   "unit": "tokens_per_s_per_user", "percentile_method": "",
+                                   "unfinished": "excluded", "denominator": ""},
+}
+# The figures the harness compares with the client's. check_definitions runs for exactly these, at the
+# start of every scoring run (cli.py cmd_score).
+COMPARED_FIGURES = (TTFT_MEAN_MS, TPOT_MEAN_MS)
+
+
+def check_definitions(registry: dict, compared=COMPARED_FIGURES) -> list[str]:
     """Why the simulator's metric registry (`blis metrics`, an M2 command: the M1 simulator has
-    none, so nothing calls this in M1; inference-sim/accuracy-dashboard#52) cannot be compared with the
-    client, or [] when it can: each metric the harness reads must exist and have the client's
-    definition, field for field (DEV-8)."""
+    none; inference-sim/accuracy-dashboard#52) cannot be compared with the client, or [] when it
+    can. Each figure compared must exist in the registry with the client's definition in EVERY
+    meaning field (an absent optional field reads as empty), and be defined at the cluster scope,
+    where the direct figure the harness reads lives. A per-GPU rate or an interactivity is checked
+    against CLIENT_RATE_DEFINITIONS, so a figure is never compared with another of the same name
+    but another scope, token kind or aggregate (output against total tokens, all GPUs against the
+    decode GPUs, 1/mean(ITL) against the mean of 1/ITL)."""
     out = []
-    for metric, want in CLIENT_DEFINITIONS.items():
+    known = {**CLIENT_DEFINITIONS, **CLIENT_RATE_DEFINITIONS}
+    for metric in compared:
+        want = known.get(metric)
+        if want is None:
+            out.append(f"the harness has no client definition for {metric}: it is not compared")
+            continue
         d = registry.get(metric)
         if d is None:
             out.append(f"the simulator's metric registry has no {metric}")
             continue
-        for k, v in want.items():
-            if d.get(k) != v:
-                out.append(f"the simulator's {metric} has {k} {d.get(k)!r}; the InferenceX client's has {v!r}")
+        for k in MEANING_FIELDS:
+            have = d.get(k) or ""
+            if have != want[k]:
+                out.append(f"the simulator's {metric} has {k} {have!r}; the InferenceX client's has {want[k]!r}")
+        scopes = d.get("scopes")
+        if not isinstance(scopes, list) or CLIENT_CONTEXT["scope"] not in scopes:
+            out.append(f"the simulator's {metric} is not defined at the {CLIENT_CONTEXT['scope']} scope "
+                       f"(scopes {scopes!r}): the figure compared is the direct cluster figure")
+    return out
+
+
+def figure_context_problems(name: str, entry: dict) -> list[str]:
+    """Why the Result's figure `name` is not the direct cluster figure the client's is compared with.
+    A Result of schema version 3 states scope, member, aggregate and over on every figure; an earlier one
+    states none and is the cluster figure by construction. A figure at a pool or an instance, or an
+    aggregate over narrower scopes (the largest p99 over the instances), is another figure."""
+    out = []
+    scope = entry.get("scope")
+    if scope is not None and scope != CLIENT_CONTEXT["scope"]:
+        out.append(f"{name} is at the {scope!r} scope, not the cluster")
+    for k in ("member", "aggregate", "over"):
+        if entry.get(k) not in (None, ""):
+            out.append(f"{name} states {k} {entry[k]!r}; the compared figure has none")
     return out
 
 
@@ -101,9 +166,9 @@ def parse(document: bytes) -> dict:
         raise ResultError(f"the simulator's standard output is not a JSON Result: {e}", "result_unreadable") from e
     if not isinstance(doc, dict) or doc.get("kind") != KIND:
         raise ResultError("the simulator's standard output is not a Result document", "result_unreadable")
-    if doc.get("schema_version") != SCHEMA_VERSION:
-        raise ResultError(f"Result schema_version {doc.get('schema_version')!r}; the harness reads version "
-                          f"{SCHEMA_VERSION}", "result_schema_version")
+    if doc.get("schema_version") not in SCHEMA_VERSIONS:
+        raise ResultError(f"Result schema_version {doc.get('schema_version')!r}; the harness reads versions "
+                          f"{', '.join(map(str, SCHEMA_VERSIONS))}", "result_schema_version")
     return doc
 
 
@@ -128,7 +193,18 @@ def figure(doc: dict, metric: str) -> float:
         failed = [c for c in (doc.get("frame") or {}).get("acceptance") or [] if not c.get("met")]
         why = f"; frame acceptance not met: {failed}" if failed else ""
         raise ResultError(f"the Result reports no {metric}{why}", "metrics_incomplete")
+    bad = figure_context_problems(metric, m)
+    if bad:
+        raise ResultError("; ".join(bad), "figure_not_cluster_direct")
     return float(m["value"])
+
+
+def data_block(doc: dict) -> dict | None:
+    """The Result's `data` block: the catalog and registry the run read, with their content hashes,
+    whether the data is a released one, and the simulator build (contracts/spec/result Data). The point
+    record states it as `simulator.data`. None when the Result carries none."""
+    d = doc.get("data")
+    return d if isinstance(d, dict) and isinstance(d.get("catalog"), dict) and isinstance(d.get("registry"), dict) else None
 
 
 def rows(doc: dict) -> list[dict]:
@@ -185,8 +261,8 @@ def coefficient_substitutions(doc: dict) -> list[dict]:
     (an older build) names the single substitution `coefficient_method` on the report itself, so
     no G1 is published for coefficients nobody read.
 
-    The design's `coefficient_range` (an extrapolated or unidentified lookup) cannot be named
-    yet: the Result carries no range field. When it does, it is read here."""
+    The design's `coefficient_range` (an extrapolated or unidentified lookup) is read from the
+    Result's flags by g1.coefficient_range."""
     report = doc.get("selected_entries")
     if not isinstance(report, dict):
         return [{"kind": "coefficient_method", "subject": REPORT_SUBJECT, "detail": "not read"}]
@@ -205,19 +281,31 @@ def coefficient_substitutions(doc: dict) -> list[dict]:
 ACCEPTANCE_SUBJECT = "speculative_config.acceptance_length"
 
 
-def acceptance_substitution(doc: dict | None) -> dict:
+def _realised_text(realised) -> str:
+    if realised is False:             # the log was not read (a point graded without the simulator)
+        return ""
+    if not realised:
+        return "; the server log reports no mean acceptance length"
+    return (f"; the server log reports mean acceptance length {realised['mean_acceptance_length']} "
+            f"over {realised['log_lines']} interval(s), {realised['drafted_tokens']} drafted tokens")
+
+
+def acceptance_substitution(doc: dict | None, realised=False) -> dict:
     """The G2 substitution for a drafter whose acceptance the run did not record (design D8):
     blis resolves it from the substrate's profile, and the Result's input.workload_properties
     says which. Kind estimated; the detail names the profile (set/key), or says the Result does
     not report it. With no Result yet (doc None, a point graded without the simulator) the detail
-    says the profile is not read."""
+    says the profile is not read. `realised` is settings.realised_acceptance(log): the detail
+    names the acceptance length the run's server logged beside the profile, so the substituted
+    value can be read against it."""
+    tail = _realised_text(realised)
     if doc is None:
-        return {"kind": "estimated", "subject": ACCEPTANCE_SUBJECT, "detail": "profile not read"}
+        return {"kind": "estimated", "subject": ACCEPTANCE_SUBJECT, "detail": "profile not read" + tail}
     for p in (doc.get("input") or {}).get("workload_properties") or []:
         if p.get("name") == "speculative_acceptance":
             if p.get("source") == "profile" and p.get("profile"):
                 detail = f"profile {p['profile']} from the registry"
             else:
                 detail = f"supplied by {p.get('source')}, not a registry profile"
-            return {"kind": "estimated", "subject": ACCEPTANCE_SUBJECT, "detail": detail}
-    return {"kind": "estimated", "subject": ACCEPTANCE_SUBJECT, "detail": "profile not reported"}
+            return {"kind": "estimated", "subject": ACCEPTANCE_SUBJECT, "detail": detail + tail}
+    return {"kind": "estimated", "subject": ACCEPTANCE_SUBJECT, "detail": "profile not reported" + tail}

@@ -21,7 +21,10 @@ INGEST_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(INGEST_DIR))
 import grade as gr  # noqa: E402
 
-FIDELITY_SCHEMA = INGEST_DIR.parent.parent / "schemas" / "fidelity.v3.json"
+# The dashboard defines no schema for a point's fidelity record: the per-point record is the substrate's PointRecord (SUB-19), which
+# the harness writes as pointrecords.jsonl and `blis schema validate point-record` validates (point_record_problems). What the
+# dashboard owns are its own lists, not_scored.jsonl and failed.jsonl, whose definitions live in the summary schema.
+LISTS_SCHEMA = INGEST_DIR.parent.parent / "schemas" / "summary.v3.json"
 
 POINTS_CSV = "points.csv"
 FIDELITY_JSONL = "fidelity.jsonl"
@@ -30,9 +33,11 @@ FACETS_JSON = "facets.json"
 FACET_KEYS = ("framework", "gpu", "identity", "model", "parallelism", "precision", "scenario", "serving",
               "spec_method", "sweep_id", "workload")
 NOT_SCORED_JSONL = "not_scored.jsonl"
+POINTRECORDS_JSONL = "pointrecords.jsonl"
 FAILED_JSONL = "failed.jsonl"
 PROVENANCE_JSON = "provenance.json"
-CONTRACT_FILES = (POINTS_CSV, FIDELITY_JSONL, FACETS_JSON, NOT_SCORED_JSONL, FAILED_JSONL, PROVENANCE_JSON)
+CONTRACT_FILES = (POINTS_CSV, FIDELITY_JSONL, FACETS_JSON, NOT_SCORED_JSONL, FAILED_JSONL, POINTRECORDS_JSONL,
+                  PROVENANCE_JSON)
 
 # The per-point CSV columns build_summary.py reads, with its tier column replaced by the point's
 # grade, then the two the contract adds.
@@ -161,7 +166,7 @@ def points_sort_key(row: dict) -> tuple:
 
 # A row the pull itself failed to read. Never a valid reason in a published contract.
 PULL_ERROR = "artifact_unmatched:pull_error"
-PROVENANCE_KEYS = ("ingest", "blis", "simulator", "harness_digest", "experimental", "units", "engine", "points", "left_out_records", "vllm_ref", "vllm_max_distance",
+PROVENANCE_KEYS = ("ingest", "blis", "simulator", "harness_commit", "experimental", "units", "engine", "points", "left_out_records", "vllm_ref", "vllm_max_distance",
                    "fields_sha256", "pulled_at", "corpora", "pull_manifest_sha256", "source")
 
 
@@ -255,8 +260,7 @@ def validate_dir(directory: str | Path) -> list[str]:
     if problems:
         return problems
 
-    schema = json.loads(FIDELITY_SCHEMA.read_text())
-    validator = jsonschema.Draft7Validator(schema)
+    schema = json.loads(LISTS_SCHEMA.read_text())
     sub = lambda name: jsonschema.Draft7Validator({**schema["definitions"][name], "definitions": schema["definitions"]})  # noqa: E731
     ns_validator, failed_validator = sub("notScored"), sub("failed")
 
@@ -328,9 +332,8 @@ def validate_dir(directory: str | Path) -> list[str]:
     for n, rec in fid_lines:
         pid = rec.get("point_id")
         body = {k: v for k, v in rec.items() if k != "point_id"}
-        for err in validator.iter_errors(body):
-            loc = "/".join(str(p) for p in err.path) or "(root)"
-            problems.append(f"{FIDELITY_JSONL}:{n} at {loc}: {err.message}")
+        if not isinstance(body.get("grade"), str):
+            problems.append(f"{FIDELITY_JSONL}:{n}: no grade")
         if isinstance(body.get("args"), list) and not _sorted_by(body["args"], lambda a: str(a.get("arg"))):
             problems.append(f"{FIDELITY_JSONL}:{n}: args are not sorted by arg")
         if isinstance(body.get("resolved"), list) and not _sorted_by(body["resolved"], lambda q: str(q.get("quantity"))):
@@ -378,6 +381,13 @@ def validate_dir(directory: str | Path) -> list[str]:
             problems.append(f"{NOT_SCORED_JSONL}:{n}: g5_reasons must be sorted by code, subject")
         if isinstance(rs, list) and ns.get("g5_reason") not in rs:
             problems.append(f"{NOT_SCORED_JSONL}:{n}: g5_reason is not one of its g5_reasons")
+    # ---- pointrecords.jsonl: the substrate's record (pointrecord.py), one per scored or G5 point, or none
+    # when no Result gave the run's data block. Its shape is the substrate validator's to check (test_pointrecord.py).
+    pr_lines = _read_jsonl(d / POINTRECORDS_JSONL, problems)
+    pr_ids = [str(x.get("point_id")) for _, x in pr_lines]
+    if pr_ids and (pr_ids != sorted(pr_ids) or set(pr_ids) != scored | {str(x.get("point_id")) for _, x in ns_lines}
+                   or len(pr_ids) != len(set(pr_ids))):
+        problems.append(f"{POINTRECORDS_JSONL}: not one sorted record per scored and per G5 point")
     failed_lines = records(FAILED_JSONL, failed_validator, "failed")
     for n, x in failed_lines:
         fs = x.get("faults")
@@ -441,3 +451,20 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def point_record_problems(directory, blis: str) -> list[str]:
+    """The substrate's own validation of every record of pointrecords.jsonl: `blis schema validate point-record` on each, built from
+    the pinned simulator and substrate (SUB-19). The dashboard checks the record against no schema of its own."""
+    import subprocess
+    import tempfile
+    problems: list[str] = []
+    lines = _read_jsonl(Path(directory) / POINTRECORDS_JSONL, problems)
+    with tempfile.TemporaryDirectory() as t:
+        for n, rec in lines:
+            f = Path(t) / "record.json"
+            f.write_text(json.dumps(rec))
+            p = subprocess.run([blis, "schema", "validate", "point-record", str(f)], capture_output=True, text=True)
+            if p.returncode != 0:
+                problems.append(f"{POINTRECORDS_JSONL}:{n}: {(p.stdout + p.stderr).strip()[:400]}")
+    return problems

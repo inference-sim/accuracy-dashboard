@@ -52,6 +52,22 @@ LOG = (
     "INFO [kv_cache_utils.py:1] GPU KV cache size: 100,000 tokens\n"
     '"POST /v1/completions HTTP/1.1" 200\n')
 
+# Two periodic spec-decode lines of vLLM's metrics logger, and an idle one that drafted nothing.
+# A run whose rejection sampling is not the synthetic kind records no length, and a synthetic run that
+# recorded none is refused by name (test_extract.py: test_synthetic_rejection_sampling_without_a_recorded_length_is_refused_by_name).
+LOG_NO_LENGTH = LOG.replace(", 'synthetic_acceptance_length': 2.4", "").replace("'rejection_sample_method': 'synthetic'", "'rejection_sample_method': 'strict'")
+
+SPEC_LINES = (
+    "(APIServer pid=1) INFO 07-05 02:05:14 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 2.00, "
+    "Accepted throughput: 10.00 tokens/s, Drafted throughput: 20.00 tokens/s, Accepted: 50 tokens, "
+    "Drafted: 100 tokens, Per-position acceptance rate: 0.500\n"
+    "(APIServer pid=1) INFO 07-05 02:05:24 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 3.00, "
+    "Accepted throughput: 30.00 tokens/s, Drafted throughput: 30.00 tokens/s, Accepted: 300 tokens, "
+    "Drafted: 300 tokens, Per-position acceptance rate: 1.000\n"
+    "(APIServer pid=1) INFO 07-05 02:05:34 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 1.00, "
+    "Accepted throughput: 0.00 tokens/s, Drafted throughput: 0.00 tokens/s, Accepted: 0 tokens, "
+    "Drafted: 0 tokens, Per-position acceptance rate: 0.000\n")
+
 # The fake blis. `schema validate result FILE` exits VALIDATE. `replay` records its argv and
 # working directory beside itself, then prints a Result. For a single-turn trace (--trace-data)
 # it writes one request row per trace record: a round-0 record is "request_<request_id>", a
@@ -64,6 +80,7 @@ LOG = (
 FAKE_BLIS = """#!/usr/bin/env python3
 import csv, json, os, sys
 VALIDATE, DROP, EARLY_HOLDER, SHORT, TTFT_US, TPOT_US = {validate}, {drop}, {early_holder}, {short}, 180000, 9000.0
+BURST = {burst}
 METHODS = {methods}
 WP = {wp}
 a = sys.argv[1:]
@@ -77,7 +94,10 @@ with open(os.path.join(here, "blis_saw.json"), "a") as fh:
 def arg(k): return a[a.index(k) + 1]
 counts = {{"generated": 0, "completed": 0, "timed_out": 0, "in_flight_at_horizon": 0,
           "queued_at_horizon": 0, "not_started": 0, "length_capped": 0}}
-doc = {{"kind": "Result", "schema_version": 2, "name": "fake", "requests": counts,
+doc = {{"kind": "Result", "schema_version": 3, "name": "fake", "requests": counts,
+       "data": {{"catalog": {{"source": "embedded", "hash": "a" * 64, "combined_hash": "a" * 64}},
+                "registry": {{"source": "embedded", "hash": "b" * 64, "combined_hash": "b" * 64}},
+                "released_data": True, "build": "v0.16.0"}},
        "metrics": {{"ttft_mean_ms": {{"value": 1500.0, "samples": 10}}, "tpot_mean_ms": {{"value": 4.5, "samples": 10}},
                    "itl_mean_ms": {{"value": 17.0, "samples": 10}}}},
        "reports": {{"engine": {{"cluster": {{"kv_capacity_tokens_per_replica": 100000}}}}, "kernel": {{"pool": "fake"}}}}}}
@@ -107,6 +127,18 @@ if "--trace-data" in a:
             row = {{"id": rid, "fate": "dropped", "drop_reason": "unservable", "arrival_us": arrival,
                    "prompt_tokens": row["prompt_tokens"], "output_tokens": 0}}
         rows.append(row)
+    # The closed loop: the client's `pool` slots each take the next request in order when they
+    # free, one completion overhead after the request they held completed.
+    pool = int(arg("--concurrent-sessions")) - len({{r["session_id"] for r in recs if r["session_id"].startswith("warmup-")}})
+    main_ids = {{f"request_{{r['request_id']}}" for r in recs if r["session_id"].startswith("main-")}}
+    mains = sorted((r for r in rows if r["id"] in main_ids), key=lambda r: int(r["id"][8:]))
+    if mains and not BURST:
+        t0 = mains[0]["arrival_us"]
+        free = [t0] * pool
+        for r in mains:
+            free.sort()
+            r["arrival_us"] = free.pop(0)
+            free.append(r["arrival_us"] + r.get("e2e_us", 0) + 777)
     counts["generated"] = len(rows)
     counts["completed"] = sum(r["fate"] == "completed" for r in rows)
     if DROP:
@@ -123,13 +155,13 @@ def _exe(path: Path, body: str) -> str:
 
 
 def _fake_blis(tmp: Path, *, validate: int = 0, drop: bool = False, early_holder: bool = False,
-               short: bool = False, methods=("measured",), workload_properties=None) -> str:
+               short: bool = False, methods=("measured",), workload_properties=None, burst: bool = False) -> str:
     d = tmp / "sim"
     d.mkdir(exist_ok=True)
     (d / "blis_saw.json").unlink(missing_ok=True)
     return _exe(d / "blis", FAKE_BLIS.format(validate=validate, drop=drop, early_holder=early_holder,
                                                      short=short, methods=repr(methods),
-                                                     wp=repr(workload_properties)))
+                                                     wp=repr(workload_properties), burst=burst))
 
 
 # A blis that answers only `catalog resolve --catalog DIR --model|--chip NAME --json`: a model
@@ -211,7 +243,7 @@ def _setup(tmp: Path, *, log: str = LOG, job_log: str | None = "default", client
         entry["client_args"] = {"job_id": 5, "job_name": "j"}
     else:
         entry["client_args"] = None
-    env = sc.Env(blis=_fake_blis(tmp), blis_release="v0.12.0", blis_commit="b" * 40, catalog=tmp,
+    env = sc.Env(blis=_fake_blis(tmp), blis_release="v0.12.0", blis_commit="b" * 40, harness_commit="c" * 40, catalog=tmp,
                  catalog_release="0.3.0", registry=tmp, registry_release="v0.2.0", kernel="v0.3.0",
                  corpora={}, field_list=FIELDS, vllm_defaults=st.load_vllm_defaults()[0],
                  engine_release="0.31.0", sim_build="v0.12.0")
@@ -225,7 +257,7 @@ def _score(tmp: Path, entry, env, out: Path):
     o = sc._score_one(entry, tmp / "pull", work, env)
     prov = {"ingest": "api", "blis": {"release": "v0.12.0", "commit_sha": "b" * 40, "catalog": "0.3.0",
                                       "registry": "v0.2.0", "extractor_version": "blis-latency-kernel@v0.3.0"},
-            "simulator": env.simulator(), "harness_digest": env.harness_digest, "experimental": False, "units": None,
+            "simulator": env.simulator(), "harness_commit": env.harness_commit, "experimental": False, "units": None,
             "engine": {"kind": "vllm", "version": "0.31.0"}, "left_out_records": 0,
             "vllm_ref": "v0.31.0", "vllm_max_distance": 2000, "fields_sha256": "d" * 64,
             "pulled_at": "2026-10-23T00:00:00Z", "corpora": [], "pull_manifest_sha256": "e" * 64,
@@ -309,8 +341,10 @@ def test_a_drafter_with_no_recorded_acceptance_is_replayed_with_the_profile_and_
     # substrate's profile, and the point names the profile as an estimate.
     tmp = Path(tempfile.mkdtemp())
     try:
-        log = LOG.replace(", 'synthetic_acceptance_length': 2.4", "")
+        log = LOG_NO_LENGTH + SPEC_LINES
         entry, env = _setup(tmp, log=log)
+        env.field_list = _fields_without_acceptance()
+        env.speculative_fallback_category = "coding"     # the benchmark states no category; the caller requested the fallback
         env.blis = _fake_blis(tmp, workload_properties=[
             {"name": "speculative_acceptance", "values": {"acceptance_length": 3.1}, "source": "profile",
              "profile": "mtp/deepseek"}])
@@ -319,12 +353,19 @@ def test_a_drafter_with_no_recorded_acceptance_is_replayed_with_the_profile_and_
         scen = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
         assert "acceptance" not in scen.replace("rejection_sample_method", "")
         sub = next(s for s in o.fidelity["substitutions"] if s["subject"] == "speculative_config.acceptance_length")
+        # The run's own realised acceptance is named beside the profile: (2.0 x 100 + 3.0 x 300) / 400.
         assert sub == {"kind": "estimated", "subject": "speculative_config.acceptance_length",
-                       "detail": "profile mtp/deepseek from the registry"}
+                       "detail": "profile mtp/deepseek from the registry; the server log reports mean acceptance "
+                                 "length 2.75 over 2 interval(s), 400 drafted tokens"}
+        assert o.fidelity["acceptance"] == {"realised": {"mean_acceptance_length": 2.75, "log_lines": 2,
+                                                         "drafted_tokens": 400}, "simulated": "profile"}
+        assert c.validate_dir(tmp / "c1") == []
         env.blis = _fake_blis(tmp)
         o, _ = _score(tmp, entry, env, tmp / "c2")
         assert [s["detail"] for s in o.fidelity["substitutions"]
-                if s["subject"] == "speculative_config.acceptance_length"] == ["profile not reported"]
+                if s["subject"] == "speculative_config.acceptance_length"] == \
+            ["profile not reported; the server log reports mean acceptance length 2.75 over 2 interval(s), "
+             "400 drafted tokens"]
         # A recorded acceptance is passed, pinned, and names no substitution.
         tmp2 = Path(tempfile.mkdtemp())
         try:
@@ -345,6 +386,29 @@ def test_a_row_without_its_isl_is_refused_before_blis():
         o, _ = _score(tmp, entry, env, tmp / "c1")
         assert o.fidelity is None and o.reasons == ["required_setting_missing:replay.isl"]
         assert _saw(env) == []
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_simulated_run_that_is_not_the_clients_closed_loop_is_refused():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        env.blis = _fake_blis(tmp, burst=True)        # every request arrives at once: not conc in flight
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is None and o.reasons == ["blis_refused:request_pattern_not_the_clients"]
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_scored_single_turn_point_records_its_achieved_concurrency_and_client_bound_flag():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        req = o.fidelity["requests"]
+        assert 3.6 <= req["achieved_concurrency"] <= 4.0 and req["client_bound"] is False
+        assert abs(req["chunk_rate_per_s"] - 400.0) < 0.5    # conc 4, measured TPOT 10 ms
     finally:
         shutil.rmtree(tmp)
 
@@ -428,9 +492,12 @@ def test_every_single_turn_point_names_the_send_gap_and_is_g2():
         entry, env = _setup(tmp, repo="openai/gpt-oss-120b", isl=1024, osl=8192, date="2026-02-25")
         o, _ = _score(tmp, entry, env, tmp / "c1")
         assert o.fidelity is not None, o.reasons
-        assert [d["subject"] for d in o.fidelity["requests"]["differences"]] == ["send_gap"]
+        # The pulled data holds neither completed nor num_prompts, so lost requests are not ruled out (T6).
+        assert [d["subject"] for d in o.fidelity["requests"]["differences"]] == ["failed_requests", "send_gap"]
+        assert "777 us" in o.fidelity["requests"]["differences"][1]["detail"]
         assert o.fidelity["grade"] == "G2"
-        assert [s["subject"] for s in o.fidelity["substitutions"] if s["kind"] == "client_difference"] == ["send_gap"]
+        assert [s["subject"] for s in o.fidelity["substitutions"] if s["kind"] == "client_difference"] == \
+            ["failed_requests", "send_gap"]
         # model and served_model_name are inert, unproven in the field list: named, as interim.
         assert {s["subject"] for s in o.fidelity["substitutions"] if s["kind"] == "interim_status"} == \
             {"model", "served_model_name"}
@@ -439,32 +506,136 @@ def test_every_single_turn_point_names_the_send_gap_and_is_g2():
         shutil.rmtree(tmp)
 
 
+def _with_counts(entry, **counts):
+    entry["row"].update(counts)
+    for m in entry.get("measurements") or []:
+        m.setdefault("metrics", {}).update(counts)
+
+
+def _fields_without_acceptance():
+    """The fixture's field list with the acceptance field not modelled, as at the preliminary pins."""
+    doc = json.loads((HERE / "testdata" / "fields" / "fields.json").read_bytes())
+    for f in doc["fields"]:
+        if f["name"] == "speculative_config.synthetic_acceptance_length":
+            f.update(status="not_modelled", estimation={"rule": "leave_unset"})
+            f.pop("evidence", None)
+            f["evidence"] = {"issue": "inference-sim/blis-vllm#1"}
+    return fl.parse(json.dumps(doc).encode())
+
+
+def _vllm_names_fields():
+    """The fixture's field list with value classes on one modelled field: the M2 list, which makes the
+    engine block take vLLM's own names (settings.names_are_vllms)."""
+    doc = json.loads((HERE / "testdata" / "fields" / "fields.json").read_bytes())
+    for f in doc["fields"]:
+        if f["name"] == "enable_prefix_caching":
+            f["value_classes"] = {"type": "boolean", "covered": ["true", "false"]}
+    return fl.parse(json.dumps(doc).encode())
+
+
+def test_the_logged_acceptance_replaces_the_profile_only_when_the_engine_models_the_field():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        log = LOG_NO_LENGTH + SPEC_LINES
+        entry, env = _setup(tmp, log=log)                 # the fixture's list models the acceptance field
+        o, work = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        scen = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
+        assert "acceptance_length: 2.75" in scen
+        sub = next(s for s in o.fidelity["substitutions"] if s["subject"] == "speculative_config.acceptance_length")
+        assert sub["kind"] == "estimated" and "logged, 2.75 over 2 interval(s)" in sub["detail"]
+        assert o.fidelity["acceptance"]["simulated"] == "log" and o.fidelity["acceptance"]["simulated_length"] == 2.75
+        assert c.validate_dir(tmp / "c1") == []
+        # A log with no acceptance line pins nothing.
+        tmp2 = Path(tempfile.mkdtemp())
+        entry, env = _setup(tmp2, log=LOG_NO_LENGTH)
+        env.speculative_fallback_category = "coding"
+        o, work = _score(tmp2, entry, env, tmp2 / "c2")
+        scen = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
+        assert "acceptance:" not in scen.replace("rejection_sample_method", "")
+        assert o.fidelity["acceptance"] == {"realised": None, "simulated": "profile"}
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_the_thinking_mode_is_stated_only_where_the_run_recorded_it():
+    S = st.Setting
+    ok = {"default_chat_template_kwargs.thinking_mode": S("default_chat_template_kwargs.thinking_mode", "enabled")}
+    assert st.recorded_thinking(ok) == "on"
+    off = {"default_chat_template_kwargs.enable_thinking": S("default_chat_template_kwargs.enable_thinking", False)}
+    assert st.recorded_thinking(off) == "off"
+    assert st.recorded_thinking({}) is None
+    assert st.recorded_thinking({"reasoning_parser": S("reasoning_parser", "deepseek_v4")}) is None   # never inferred
+    assert st.recorded_thinking({"default_chat_template_kwargs.thinking_mode": S("x", "auto")}) is None
+    spec = {"pools": [{"engine": {"speculative_config": {"method": "mtp"}}}]}
+    plain = {"pools": [{"engine": {}}]}
+    assert sc.thinking_argv(st.Built(deployment=spec, thinking="on")) == ["--speculative-thinking", "on"]
+    assert sc.thinking_argv(st.Built(deployment=spec)) == []                  # unrecorded: not guessed
+    assert sc.thinking_argv(st.Built(deployment=plain, thinking="on")) == []  # no speculation: nothing to select
+
+
+def test_speculation_is_found_under_vllms_names_so_the_pin_and_the_profile_are_both_stated():
+    # The M2 block is speculative_config / num_speculative_tokens; reading only the earlier
+    # names left the pin never written and the profile never named (score.py read engine["speculative"]).
+    for pinned, log in ((True, LOG), (False, LOG_NO_LENGTH)):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            entry, env = _setup(tmp, log=log)
+            env.speculative_fallback_category = "coding"     # the benchmark states no category; the caller requested the fallback
+            env.field_list = _vllm_names_fields()
+            o, work = _score(tmp, entry, env, tmp / "c1")
+            assert o.fidelity is not None, o.reasons
+            scen = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
+            assert "speculative_config:" in scen and "num_speculative_tokens: 2" in scen
+            subs = [s for s in o.fidelity["substitutions"] if s["subject"] == "speculative_config.acceptance_length"]
+            if pinned:
+                assert "acceptance:" in scen and "acceptance_length: 2.4" in scen and subs == []
+            else:
+                assert "acceptance:" not in scen.replace("rejection_sample_method", "") and len(subs) == 1
+        finally:
+            shutil.rmtree(tmp)
+
+
+def test_a_run_that_recorded_all_its_requests_names_no_failed_requests_difference():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)                     # conc 4: 40 requests
+        _with_counts(entry, completed=40, num_prompts=40, benchmark_outcome="success")
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        assert "failed_requests" not in [d["subject"] for d in o.fidelity["requests"]["differences"]]
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_run_that_lost_requests_or_did_not_succeed_is_g5_not_scored_on_its_survivors():
+    for counts, reason in (({"completed": 38, "num_prompts": 40}, "conflict:measured.completed"),
+                           ({"completed": 40, "num_prompts": 41}, "conflict:measured.completed"),
+                           ({"completed": 40, "num_prompts": 40, "benchmark_outcome": "failed"},
+                            "conflict:measured.benchmark_outcome")):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            entry, env = _setup(tmp)
+            _with_counts(entry, **counts)
+            o, _ = _score(tmp, entry, env, tmp / "c1")
+            assert o.fidelity is None and reason in o.reasons, (counts, o.reasons)
+        finally:
+            shutil.rmtree(tmp)
+
+
 def test_an_unverified_point_names_the_sent_prompt_length_difference():
     tmp = Path(tempfile.mkdtemp())
     try:
         entry, env = _setup(tmp)          # org/m: the evidence holds no such point
         o, _ = _score(tmp, entry, env, tmp / "c1")
         diffs = o.fidelity["requests"]["differences"]
-        assert [d["subject"] for d in diffs] == ["send_gap", "sent_prompt_lengths"]
-        assert "not verified" in diffs[1]["detail"]
+        assert [d["subject"] for d in diffs] == ["failed_requests", "send_gap", "sent_prompt_lengths"]
+        assert "not verified" in diffs[2]["detail"]
         assert o.fidelity["grade"] == "G2"
     finally:
         shutil.rmtree(tmp)
 
 
-def test_the_fidelity_schema_refuses_g1_for_a_point_naming_a_client_difference():
-    import jsonschema
-    tmp = Path(tempfile.mkdtemp())
-    try:
-        entry, env = _setup(tmp)
-        o, _ = _score(tmp, entry, env, tmp / "c1")
-        v = jsonschema.Draft7Validator(json.loads(c.FIDELITY_SCHEMA.read_text()))
-        assert v.is_valid(o.fidelity)
-        assert not v.is_valid({**o.fidelity, "grade": "G1", "substitutions": []})
-        assert not v.is_valid({**o.fidelity, "requests": {**o.fidelity["requests"], "extra": 1}})
-        assert not v.is_valid({**o.fidelity, "requests": {**o.fidelity["requests"], "copies": 1}})  # cold
-    finally:
-        shutil.rmtree(tmp)
 
 
 def test_a_point_behind_a_router_blis_does_not_host_is_g5_and_never_simulated():
@@ -620,6 +791,26 @@ def test_the_agentic_path_reads_the_registry_means_and_the_engine_report():
         shutil.rmtree(tmp)
 
 
+def test_an_agentic_points_cap_and_warmup_reach_the_replay_and_its_client_build_is_named():
+    import yaml
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _agentic(tmp)
+        o, work = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        spec = yaml.safe_load((work / "replay-specs" / f"{entry['point_id']}.yaml").read_text())["replay"]
+        assert spec["trace_idle_gap_cap_s"] == 300.0
+        assert spec["warmup"] == {"mode": "cache_pressure", "requests_per_lane": 10}
+        rec = o.fidelity["replay"]
+        assert rec["trace_idle_gap_cap_s"] == 300.0 and rec["warmup_requests_per_lane"] == 10
+        named = [(d["kind"], d["subject"]) for d in sc.substitutions(o.subs, o.fidelity)]
+        assert ("client_difference", "client_build") in named
+        pts = list(csv.DictReader((tmp / "c1" / c.POINTS_CSV).open()))
+        assert pts[0]["grade"] == "G2"       # a named client difference is never G1
+    finally:
+        shutil.rmtree(tmp)
+
+
 def test_crosscheck_matches_the_contract_to_the_api_rows_and_catches_a_change():
     import crosscheck as xc
     tmp = Path(tempfile.mkdtemp())
@@ -657,16 +848,17 @@ def test_the_scenario_engine_block_holds_the_runs_values_under_the_engines_own_n
         assert scen["engine_version"] == "0.31.0"
         eng = dep["pools"][0]["engine"]
         assert {k: eng[k] for k in ("max_num_seqs", "max_num_batched_tokens", "block_size", "max_model_len",
-                                    "enable_prefix_caching", "quantization", "cache_dtype")} == \
+                                    "enable_prefix_caching", "cache_dtype")} == \
             {"max_num_seqs": 16, "max_num_batched_tokens": 8192, "block_size": 16, "max_model_len": 2304,
-             "enable_prefix_caching": False, "quantization": "fp8", "cache_dtype": "auto"}
+             "enable_prefix_caching": False, "cache_dtype": "auto"}
+        assert "quantization" not in eng       # the engine printed fp8; the fixture's list does not model it
         assert eng["gpu_memory_utilization"] == 0.9 and eng["speculative"] == {
-            "method": "mtp", "num_spec_tokens": 2, "rejection_sample_method": "synthetic"}
-        assert dep["pools"][0]["parallel"] == {"tp": 1, "pp": 1, "dp": 1, "enable_expert_parallel": False}
+            "method": "mtp", "num_spec_tokens": 2, "rejection_sample_method": "synthetic", "synthetic_acceptance_length": 2.4}
+        assert dep["pools"][0]["parallel"] == {"tp": 1, "pp": 1, "dp": 1}   # expert parallelism unstated: left to the engine (X19)
         assert o.fidelity["run_release"] == "0.31.0"
         # Every point records the simulator build and engine release that scored it (COV-6).
         assert o.fidelity["simulator"] == {"build": "v0.12.0", "engine": {"kind": "vllm", "version": "0.31.0"},
-                                           "harness_digest": "unreleased"}
+                                           "harness_commit": "c" * 40}
     finally:
         shutil.rmtree(tmp)
 
@@ -826,6 +1018,8 @@ def test_a_row_before_the_first_record_is_g2_with_the_later_record_substitution(
         o, work = _score(tmp, entry, env, tmp / "c1")
         assert o.fidelity is not None, o.reasons
         later = [s for s in o.fidelity["substitutions"] if s["kind"] == "later_record"]
+        assert len(later) == 1 and later[0].pop("record").startswith("configs/runners.yaml at 303669b0") \
+            and later[0].pop("date") == "2026-07-02"
         assert later == [{"kind": "later_record", "subject": "cluster.gpus_per_node",
                           "detail": "taken from InferenceX runners.yaml at 303669b0, recorded after the run "
                                     "(303669b0 of 2026-07-02)"}]
@@ -841,7 +1035,8 @@ def test_an_unstable_label_before_its_first_record_stays_g5_value_not_recorded()
         entry, env = _setup(tmp, date="2026-06-15")
         env.runner_table = ir.Table(env.runner_table.versions, {
             **env.runner_table.labels,
-            "mi355x": dataclasses.replace(env.runner_table.labels["mi355x"], stable=False, problems=("x: changed",))})
+            "mi355x": dataclasses.replace(env.runner_table.labels["mi355x"], stable=False, problems=("x: changed",),
+                                          label_size=None, relied_on=())})
         o, _ = _score(tmp, entry, env, tmp / "c1")
         assert o.g5 == {"code": "value_not_recorded", "subject": "cluster.gpus_per_node"}
     finally:
@@ -995,9 +1190,11 @@ def test_an_expired_job_log_keeps_the_point_scored_and_names_client_flags_assume
         o, _ = _score(tmp, entry, env, tmp / "c1")
         diffs = o.fidelity["requests"]["differences"]
         assert "client_flags" in [d["subject"] for d in diffs] and o.fidelity["grade"] == "G2"
+        # the record the scorer writes obeys the schema (the enum once lacked client_flags, so a
+        # run with an expired job log failed validation after it was scored)
+        assert c.validate_dir(tmp / "c1") == []
         d = next(d for d in diffs if d["subject"] == "client_flags")
-        assert d["kind"] == "client_difference" and \
-            d["detail"] == "job log expired; the client's flags are assumed to be the launcher's defaults"
+        assert d["kind"] == "client_difference" and d["detail"].startswith("job log expired; the client's flags are assumed")
         tmp = Path(tempfile.mkdtemp())
         entry, env = _setup(tmp)
         o, _ = _score(tmp, entry, env, tmp / "c2")
@@ -1013,6 +1210,7 @@ def test_a_run_with_no_recorded_inferencex_commit_names_client_release_unrecorde
         o, _ = _score(tmp, entry, env, tmp / "c1")
         diffs = o.fidelity["requests"]["differences"]
         assert "client_release" in [d["subject"] for d in diffs] and o.fidelity["grade"] == "G2"
+        assert c.validate_dir(tmp / "c1") == []
         tmp = Path(tempfile.mkdtemp())
         entry, env = _setup(tmp)
         o, _ = _score(tmp, entry, env, tmp / "c2")

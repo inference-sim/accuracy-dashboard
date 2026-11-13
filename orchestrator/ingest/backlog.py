@@ -14,6 +14,21 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 
+# One unmeasured quantity can reach a point under two names. The send gap the replay assumes between a completion and the next send
+# IS the registry's host_completion coefficient (777 us, method assumed): the point names it as a client difference (design COV-12)
+# and, because the coefficient is not measured, as a coefficient_method. Measuring it clears both, so the backlog counts the
+# quantity once, under its canonical cause. Each entry maps a (kind, subject) that is an alias to the (kind, subject-name) of its
+# canonical cause: the canonical subject is "<set>/<name>", matched on its name.
+SAME_CAUSE = {("client_difference", "send_gap"): ("coefficient_method", "host_completion")}
+
+
+def causes(subs: list[dict]) -> list[tuple[str, str]]:
+    """The (kind, subject) of each substitution of one point, an alias dropped when its canonical cause is also named on the point,
+    so the same unmeasured quantity is counted once."""
+    pairs = [(s["kind"], s["subject"]) for s in subs]
+    named = {(k, subj.rsplit("/", 1)[-1]) for k, subj in pairs}
+    return [(k, subj) for k, subj in pairs if SAME_CAUSE.get((k, subj)) not in named]
+
 
 def build(points: list[dict]) -> dict:
     """points: each with "framework", "grade", "g5_reasons" (every G5 reason found, not only the
@@ -29,8 +44,8 @@ def build(points: list[dict]) -> dict:
                 if len(reasons) == 1:
                     e["alone"] += 1
         else:
-            for s in p.get("substitutions") or []:
-                out[eng][f"{s['kind']}:{s['subject']}"]["demotes"] += 1
+            for kind, subject in causes(p.get("substitutions") or []):
+                out[eng][f"{kind}:{subject}"]["demotes"] += 1
     ranked = {}
     for eng, entries in sorted(out.items()):
         ranked[eng] = [{"entry": k, **v} for k, v in sorted(
@@ -50,6 +65,6 @@ def top(points: list[dict], n: int = 10) -> list[tuple[str, int]]:
             for r in {(r["code"], r.get("subject", "")) for r in p.get("g5_reasons") or []}:
                 c[f"G5 {r[0]}" + (f": {r[1]}" if r[1] else "")] += 1
         else:
-            for s in {(s["kind"], s["subject"]) for s in p.get("substitutions") or []}:
+            for s in set(causes(p.get("substitutions") or [])):
                 c[f"{s[0]}: {s[1]}"] += 1
     return sorted(c.items(), key=lambda kv: (-kv[1], kv[0]))[:n]

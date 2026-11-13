@@ -43,6 +43,17 @@ def test_a_413_on_server_log_is_a_data_issue_listed_as_value_not_recorded(tmp_pa
     assert asx.g5_of("server_log_missing:api_413") == {"code": "value_not_recorded", "subject": "api_413"}
 
 
+def test_a_404_on_server_log_is_the_same_fact_not_a_fault_of_the_run(tmp_path):
+    # A prefill/decode row the API holds no log for answers 404; it stopped the whole pull before.
+    import assess as asx
+
+    def fetch(url):
+        raise _http_error(404)
+    entry = _freeze_single_turn(tmp_path, fetch)
+    assert entry["reasons"] == ["server_log_missing:api_404"]
+    assert asx.g5_of("server_log_missing:api_404") == {"code": "value_not_recorded", "subject": "api_404"}
+
+
 def test_the_413_point_is_g5_value_not_recorded_with_one_reason(tmp_path):
     import score as sc
     entry = _freeze_single_turn(tmp_path, lambda url: (_ for _ in ()).throw(_http_error(413)))

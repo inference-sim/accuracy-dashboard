@@ -1,0 +1,14324 @@
+[
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=None cc=''",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": null,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=None cc='8.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=None cc='9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=None cc='10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": null,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=None cc='10.3'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": null,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=None cc='bad'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=1 cc=''",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": 1,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=1 cc='8.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=1 cc='9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=1 cc='10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": 1,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=1 cc='10.3'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": 1,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=1 cc='bad'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=2 cc=''",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": 2,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=2 cc='8.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=2 cc='9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=2 cc='10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": 2,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=2 cc='10.3'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": 2,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=2 cc='bad'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=4 cc=''",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": 4,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=4 cc='8.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=4 cc='9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=4 cc='10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": 4,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=4 cc='10.3'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": 4,
+"value": "auto"
+},
+"name": "fi 'auto' nodes=4 cc='bad'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=None cc=''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": null,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=None cc='8.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=None cc='9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=None cc='10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": null,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=None cc='10.3'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": null,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=None cc='bad'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=1 cc=''",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": 1,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=1 cc='8.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=1 cc='9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=1 cc='10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": 1,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=1 cc='10.3'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": 1,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=1 cc='bad'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=2 cc=''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": 2,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=2 cc='8.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=2 cc='9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=2 cc='10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": 2,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=2 cc='10.3'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": 2,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=2 cc='bad'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=4 cc=''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": 4,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=4 cc='8.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=4 cc='9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=4 cc='10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": 4,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=4 cc='10.3'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": 4,
+"value": "mnnvl"
+},
+"name": "fi 'mnnvl' nodes=4 cc='bad'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=None cc=''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": null,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=None cc='8.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=None cc='9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=None cc='10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": null,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=None cc='10.3'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": null,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=None cc='bad'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=1 cc=''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": 1,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=1 cc='8.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=1 cc='9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=1 cc='10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": 1,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=1 cc='10.3'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": 1,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=1 cc='bad'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=2 cc=''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": 2,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=2 cc='8.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=2 cc='9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=2 cc='10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": 2,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=2 cc='10.3'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": 2,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=2 cc='bad'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=4 cc=''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": 4,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=4 cc='8.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=4 cc='9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=4 cc='10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": 4,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=4 cc='10.3'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": 4,
+"value": "trtllm"
+},
+"name": "fi 'trtllm' nodes=4 cc='bad'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=None cc=''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": null,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=None cc='8.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=None cc='9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=None cc='10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": null,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=None cc='10.3'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": null,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=None cc='bad'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=1 cc=''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": 1,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=1 cc='8.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=1 cc='9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=1 cc='10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": 1,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=1 cc='10.3'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": 1,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=1 cc='bad'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=2 cc=''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": 2,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=2 cc='8.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=2 cc='9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=2 cc='10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": 2,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=2 cc='10.3'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": 2,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=2 cc='bad'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=4 cc=''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": 4,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=4 cc='8.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=4 cc='9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=4 cc='10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": 4,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=4 cc='10.3'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": 4,
+"value": "nccl"
+},
+"name": "fi 'nccl' nodes=4 cc='bad'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=None cc=''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": null,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=None cc='8.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=None cc='9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=None cc='10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": null,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=None cc='10.3'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": null,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=None cc='bad'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=1 cc=''",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": 1,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=1 cc='8.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=1 cc='9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=1 cc='10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": 1,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=1 cc='10.3'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": 1,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=1 cc='bad'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=2 cc=''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": 2,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=2 cc='8.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=2 cc='9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=2 cc='10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": 2,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=2 cc='10.3'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": 2,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=2 cc='bad'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=4 cc=''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.0",
+"tp_group_nodes": 4,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=4 cc='8.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=4 cc='9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=4 cc='10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.3",
+"tp_group_nodes": 4,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=4 cc='10.3'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "auto resolves to the stated backend",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"auto"
+]
+},
+{
+"tp_group_nodes": {
+"eq": 1
+},
+"value_in": [
+"mnnvl"
+]
+},
+{
+"compute_capability": {
+"gte": "10.0"
+},
+"tp_group_nodes": {
+"gte": 2
+},
+"value_in": [
+"mnnvl"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "bad",
+"tp_group_nodes": 4,
+"value": " MNNVL "
+},
+"name": "fi ' MNNVL ' nodes=4 cc='bad'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "vllm sets 1024 itself",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"1024"
+]
+}
+]
+},
+"facts": {
+"value": "1024"
+},
+"name": "rcache '1024'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "vllm sets 1024 itself",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"1024"
+]
+}
+]
+},
+"facts": {
+"value": "0"
+},
+"name": "rcache '0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "vllm sets 1024 itself",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"1024"
+]
+}
+]
+},
+"facts": {
+"value": "inf"
+},
+"name": "rcache 'inf'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "vllm sets 1024 itself",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"1024"
+]
+}
+]
+},
+"facts": {
+"value": " 1024 "
+},
+"name": "rcache ' 1024 '",
+"want": true
+},
+{
+"estimation": {
+"preserves": "vllm sets 1024 itself",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": [
+"1024"
+]
+}
+]
+},
+"facts": {
+"value": "2048"
+},
+"name": "rcache '2048'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "the handoff crosses the NIC",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_any": [
+"rc",
+"rc_x",
+"all",
+"ib"
+],
+"value_not_prefixed": [
+"^"
+]
+}
+]
+},
+"facts": {
+"value": "cuda_copy,rc"
+},
+"name": "tls 'cuda_copy,rc'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "the handoff crosses the NIC",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_any": [
+"rc",
+"rc_x",
+"all",
+"ib"
+],
+"value_not_prefixed": [
+"^"
+]
+}
+]
+},
+"facts": {
+"value": "cuda_copy,cuda_ipc,tcp"
+},
+"name": "tls 'cuda_copy,cuda_ipc,tcp'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "the handoff crosses the NIC",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_any": [
+"rc",
+"rc_x",
+"all",
+"ib"
+],
+"value_not_prefixed": [
+"^"
+]
+}
+]
+},
+"facts": {
+"value": "^rc"
+},
+"name": "tls '^rc'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "the handoff crosses the NIC",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_any": [
+"rc",
+"rc_x",
+"all",
+"ib"
+],
+"value_not_prefixed": [
+"^"
+]
+}
+]
+},
+"facts": {
+"value": "all"
+},
+"name": "tls 'all'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "the handoff crosses the NIC",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_any": [
+"rc",
+"rc_x",
+"all",
+"ib"
+],
+"value_not_prefixed": [
+"^"
+]
+}
+]
+},
+"facts": {
+"value": "tcp"
+},
+"name": "tls 'tcp'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "the handoff crosses the NIC",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_any": [
+"rc",
+"rc_x",
+"all",
+"ib"
+],
+"value_not_prefixed": [
+"^"
+]
+}
+]
+},
+"facts": {
+"value": "RC, tcp"
+},
+"name": "tls 'RC, tcp'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "the handoff crosses the NIC",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_any": [
+"rc",
+"rc_x",
+"all",
+"ib"
+],
+"value_not_prefixed": [
+"^"
+]
+}
+]
+},
+"facts": {
+"value": ""
+},
+"name": "tls ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "the handoff crosses the NIC",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_any": [
+"rc",
+"rc_x",
+"all",
+"ib"
+],
+"value_not_prefixed": [
+"^"
+]
+}
+]
+},
+"facts": {
+"value": "cuda_copy,ib"
+},
+"name": "tls 'cuda_copy,ib'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "no clauses 'a' None ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "no clauses 'a' None '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "no clauses 'a' None '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "no clauses 'a' None '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "no clauses 'a' 1 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "no clauses 'a' 1 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "no clauses 'a' 1 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "no clauses 'a' 1 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "no clauses 'a' 2 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "no clauses 'a' 2 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "no clauses 'a' 2 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "no clauses 'a' 2 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "no clauses 'a' 3 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "no clauses 'a' 3 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "no clauses 'a' 3 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "no clauses 'a' 3 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "no clauses 'a' 4 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "no clauses 'a' 4 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "no clauses 'a' 4 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "no clauses 'a' 4 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' None ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' None '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' None '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' None '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' 1 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' 1 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' 1 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' 1 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' 2 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' 2 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' 2 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' 2 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' 3 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' 3 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' 3 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' 3 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' 4 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' 4 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' 4 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "no clauses 'b,a' 4 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "no clauses 'z' None ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "no clauses 'z' None '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "no clauses 'z' None '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "no clauses 'z' None '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "no clauses 'z' 1 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "no clauses 'z' 1 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "no clauses 'z' 1 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "no clauses 'z' 1 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "no clauses 'z' 2 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "no clauses 'z' 2 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "no clauses 'z' 2 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "no clauses 'z' 2 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "no clauses 'z' 3 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "no clauses 'z' 3 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "no clauses 'z' 3 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "no clauses 'z' 3 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "no clauses 'z' 4 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "no clauses 'z' 4 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "no clauses 'z' 4 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "leave_unset"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "no clauses 'z' 4 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "none rule 'a' None ''",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "none rule 'a' None '8.5'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "none rule 'a' None '9.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "none rule 'a' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "none rule 'a' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "none rule 'a' 1 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "none rule 'a' 1 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "none rule 'a' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "none rule 'a' 2 ''",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "none rule 'a' 2 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "none rule 'a' 2 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "none rule 'a' 2 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "none rule 'a' 3 ''",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "none rule 'a' 3 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "none rule 'a' 3 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "none rule 'a' 3 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "none rule 'a' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "none rule 'a' 4 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "none rule 'a' 4 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "none rule 'a' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "none rule 'b,a' None ''",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "none rule 'b,a' None '8.5'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "none rule 'b,a' None '9.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "none rule 'b,a' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "none rule 'b,a' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "none rule 'b,a' 1 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "none rule 'b,a' 1 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "none rule 'b,a' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "none rule 'b,a' 2 ''",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "none rule 'b,a' 2 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "none rule 'b,a' 2 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "none rule 'b,a' 2 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "none rule 'b,a' 3 ''",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "none rule 'b,a' 3 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "none rule 'b,a' 3 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "none rule 'b,a' 3 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "none rule 'b,a' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "none rule 'b,a' 4 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "none rule 'b,a' 4 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "none rule 'b,a' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "none rule 'z' None ''",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "none rule 'z' None '8.5'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "none rule 'z' None '9.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "none rule 'z' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "none rule 'z' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "none rule 'z' 1 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "none rule 'z' 1 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "none rule 'z' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "none rule 'z' 2 ''",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "none rule 'z' 2 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "none rule 'z' 2 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "none rule 'z' 2 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "none rule 'z' 3 ''",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "none rule 'z' 3 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "none rule 'z' 3 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "none rule 'z' 3 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "none rule 'z' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "none rule 'z' 4 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "none rule 'z' 4 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "none"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "none rule 'z' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "substitute no clauses 'a' None ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "substitute no clauses 'a' None '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "substitute no clauses 'a' None '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "substitute no clauses 'a' None '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "substitute no clauses 'a' 1 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "substitute no clauses 'a' 1 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "substitute no clauses 'a' 1 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "substitute no clauses 'a' 1 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "substitute no clauses 'a' 2 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "substitute no clauses 'a' 2 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "substitute no clauses 'a' 2 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "substitute no clauses 'a' 2 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "substitute no clauses 'a' 3 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "substitute no clauses 'a' 3 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "substitute no clauses 'a' 3 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "substitute no clauses 'a' 3 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "substitute no clauses 'a' 4 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "substitute no clauses 'a' 4 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "substitute no clauses 'a' 4 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "substitute no clauses 'a' 4 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' None ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' None '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' None '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' None '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' 1 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' 1 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' 1 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' 1 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' 2 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' 2 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' 2 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' 2 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' 3 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' 3 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' 3 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' 3 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' 4 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' 4 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' 4 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "substitute no clauses 'b,a' 4 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "substitute no clauses 'z' None ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "substitute no clauses 'z' None '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "substitute no clauses 'z' None '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "substitute no clauses 'z' None '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "substitute no clauses 'z' 1 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "substitute no clauses 'z' 1 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "substitute no clauses 'z' 1 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "substitute no clauses 'z' 1 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "substitute no clauses 'z' 2 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "substitute no clauses 'z' 2 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "substitute no clauses 'z' 2 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "substitute no clauses 'z' 2 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "substitute no clauses 'z' 3 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "substitute no clauses 'z' 3 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "substitute no clauses 'z' 3 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "substitute no clauses 'z' 3 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "substitute no clauses 'z' 4 ''",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "substitute no clauses 'z' 4 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "substitute no clauses 'z' 4 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"rule": "substitute"
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "substitute no clauses 'z' 4 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "empty value_in 'a' None ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "empty value_in 'a' None '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "empty value_in 'a' None '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "empty value_in 'a' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "empty value_in 'a' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "empty value_in 'a' 1 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "empty value_in 'a' 1 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "empty value_in 'a' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "empty value_in 'a' 2 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "empty value_in 'a' 2 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "empty value_in 'a' 2 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "empty value_in 'a' 2 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "empty value_in 'a' 3 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "empty value_in 'a' 3 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "empty value_in 'a' 3 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "empty value_in 'a' 3 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "empty value_in 'a' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "empty value_in 'a' 4 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "empty value_in 'a' 4 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "empty value_in 'a' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' None ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' None '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' None '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' 1 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' 1 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' 2 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' 2 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' 2 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' 2 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' 3 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' 3 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' 3 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' 3 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' 4 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' 4 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "empty value_in 'b,a' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "empty value_in 'z' None ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "empty value_in 'z' None '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "empty value_in 'z' None '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "empty value_in 'z' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "empty value_in 'z' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "empty value_in 'z' 1 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "empty value_in 'z' 1 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "empty value_in 'z' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "empty value_in 'z' 2 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "empty value_in 'z' 2 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "empty value_in 'z' 2 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "empty value_in 'z' 2 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "empty value_in 'z' 3 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "empty value_in 'z' 3 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "empty value_in 'z' 3 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "empty value_in 'z' 3 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "empty value_in 'z' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "empty value_in 'z' 4 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "empty value_in 'z' 4 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_in": []
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "empty value_in 'z' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "has_none 'a' None ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "has_none 'a' None '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "has_none 'a' None '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "has_none 'a' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "has_none 'a' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "has_none 'a' 1 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "has_none 'a' 1 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "has_none 'a' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "has_none 'a' 2 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "has_none 'a' 2 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "has_none 'a' 2 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "has_none 'a' 2 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "has_none 'a' 3 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "has_none 'a' 3 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "has_none 'a' 3 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "has_none 'a' 3 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "has_none 'a' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "has_none 'a' 4 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "has_none 'a' 4 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "has_none 'a' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "has_none 'b,a' None ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "has_none 'b,a' None '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "has_none 'b,a' None '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "has_none 'b,a' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "has_none 'b,a' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "has_none 'b,a' 1 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "has_none 'b,a' 1 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "has_none 'b,a' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "has_none 'b,a' 2 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "has_none 'b,a' 2 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "has_none 'b,a' 2 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "has_none 'b,a' 2 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "has_none 'b,a' 3 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "has_none 'b,a' 3 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "has_none 'b,a' 3 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "has_none 'b,a' 3 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "has_none 'b,a' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "has_none 'b,a' 4 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "has_none 'b,a' 4 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "has_none 'b,a' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "has_none 'z' None ''",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "has_none 'z' None '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "has_none 'z' None '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "has_none 'z' None '10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "has_none 'z' 1 ''",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "has_none 'z' 1 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "has_none 'z' 1 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "has_none 'z' 1 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "has_none 'z' 2 ''",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "has_none 'z' 2 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "has_none 'z' 2 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "has_none 'z' 2 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "has_none 'z' 3 ''",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "has_none 'z' 3 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "has_none 'z' 3 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "has_none 'z' 3 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "has_none 'z' 4 ''",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "has_none 'z' 4 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "has_none 'z' 4 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"value_list_has_none": [
+"a"
+]
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "has_none 'z' 4 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "lt lte 'a' None ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "lt lte 'a' None '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "lt lte 'a' None '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "lt lte 'a' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "lt lte 'a' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "lt lte 'a' 1 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "lt lte 'a' 1 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "lt lte 'a' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "lt lte 'a' 2 ''",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "lt lte 'a' 2 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "lt lte 'a' 2 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "lt lte 'a' 2 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "lt lte 'a' 3 ''",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "lt lte 'a' 3 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "lt lte 'a' 3 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "lt lte 'a' 3 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "lt lte 'a' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "lt lte 'a' 4 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "lt lte 'a' 4 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "lt lte 'a' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' None ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' None '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' None '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' 1 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' 1 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' 2 ''",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' 2 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' 2 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' 2 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' 3 ''",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' 3 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' 3 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' 3 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' 4 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' 4 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "lt lte 'b,a' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "lt lte 'z' None ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "lt lte 'z' None '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "lt lte 'z' None '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "lt lte 'z' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "lt lte 'z' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "lt lte 'z' 1 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "lt lte 'z' 1 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "lt lte 'z' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "lt lte 'z' 2 ''",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "lt lte 'z' 2 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "lt lte 'z' 2 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "lt lte 'z' 2 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "lt lte 'z' 3 ''",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "lt lte 'z' 3 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "lt lte 'z' 3 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "lt lte 'z' 3 '10.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "lt lte 'z' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "lt lte 'z' 4 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "lt lte 'z' 4 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"tp_group_nodes": {
+"gt": 1,
+"lte": 3
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "lt lte 'z' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "cap eq 'a' None ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "cap eq 'a' None '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "cap eq 'a' None '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "cap eq 'a' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "cap eq 'a' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "cap eq 'a' 1 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "cap eq 'a' 1 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "cap eq 'a' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "cap eq 'a' 2 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "cap eq 'a' 2 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "cap eq 'a' 2 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "cap eq 'a' 2 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "cap eq 'a' 3 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "cap eq 'a' 3 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "cap eq 'a' 3 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "cap eq 'a' 3 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "cap eq 'a' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "cap eq 'a' 4 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "cap eq 'a' 4 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "cap eq 'a' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' None ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' None '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' None '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' 1 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' 1 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' 2 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' 2 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' 2 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' 2 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' 3 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' 3 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' 3 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' 3 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' 4 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' 4 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "cap eq 'b,a' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "cap eq 'z' None ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "cap eq 'z' None '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "cap eq 'z' None '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "cap eq 'z' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "cap eq 'z' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "cap eq 'z' 1 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "cap eq 'z' 1 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "cap eq 'z' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "cap eq 'z' 2 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "cap eq 'z' 2 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "cap eq 'z' 2 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "cap eq 'z' 2 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "cap eq 'z' 3 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "cap eq 'z' 3 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "cap eq 'z' 3 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "cap eq 'z' 3 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "cap eq 'z' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "cap eq 'z' 4 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "cap eq 'z' 4 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"eq": "9.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "cap eq 'z' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "cap range 'a' None ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "cap range 'a' None '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "cap range 'a' None '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "cap range 'a' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "cap range 'a' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "cap range 'a' 1 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "cap range 'a' 1 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "cap range 'a' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "cap range 'a' 2 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "cap range 'a' 2 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "cap range 'a' 2 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "cap range 'a' 2 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "cap range 'a' 3 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "cap range 'a' 3 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "cap range 'a' 3 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "cap range 'a' 3 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "cap range 'a' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "cap range 'a' 4 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "cap range 'a' 4 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "cap range 'a' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "cap range 'b,a' None ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "cap range 'b,a' None '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "cap range 'b,a' None '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "cap range 'b,a' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "cap range 'b,a' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "cap range 'b,a' 1 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "cap range 'b,a' 1 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "cap range 'b,a' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "cap range 'b,a' 2 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "cap range 'b,a' 2 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "cap range 'b,a' 2 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "cap range 'b,a' 2 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "cap range 'b,a' 3 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "cap range 'b,a' 3 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "cap range 'b,a' 3 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "cap range 'b,a' 3 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "cap range 'b,a' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "cap range 'b,a' 4 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "cap range 'b,a' 4 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "cap range 'b,a' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "cap range 'z' None ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "cap range 'z' None '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "cap range 'z' None '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "cap range 'z' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "cap range 'z' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "cap range 'z' 1 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "cap range 'z' 1 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "cap range 'z' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "cap range 'z' 2 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "cap range 'z' 2 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "cap range 'z' 2 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "cap range 'z' 2 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "cap range 'z' 3 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "cap range 'z' 3 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "cap range 'z' 3 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "cap range 'z' 3 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "cap range 'z' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "cap range 'z' 4 '8.5'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "cap range 'z' 4 '9.0'",
+"want": true
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "8.0",
+"lt": "10.0"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "cap range 'z' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "cap bad want 'a' None ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "cap bad want 'a' None '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "cap bad want 'a' None '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "a"
+},
+"name": "cap bad want 'a' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "cap bad want 'a' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "cap bad want 'a' 1 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "cap bad want 'a' 1 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "a"
+},
+"name": "cap bad want 'a' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "cap bad want 'a' 2 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "cap bad want 'a' 2 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "cap bad want 'a' 2 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "a"
+},
+"name": "cap bad want 'a' 2 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "cap bad want 'a' 3 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "cap bad want 'a' 3 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "cap bad want 'a' 3 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "a"
+},
+"name": "cap bad want 'a' 3 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "cap bad want 'a' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "cap bad want 'a' 4 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "cap bad want 'a' 4 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "a"
+},
+"name": "cap bad want 'a' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' None ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' None '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' None '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' 1 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' 1 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' 2 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' 2 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' 2 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' 2 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' 3 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' 3 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' 3 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' 3 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' 4 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' 4 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "b,a"
+},
+"name": "cap bad want 'b,a' 4 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "cap bad want 'z' None ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "cap bad want 'z' None '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "cap bad want 'z' None '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": null,
+"value": "z"
+},
+"name": "cap bad want 'z' None '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "cap bad want 'z' 1 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "cap bad want 'z' 1 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "cap bad want 'z' 1 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 1,
+"value": "z"
+},
+"name": "cap bad want 'z' 1 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "cap bad want 'z' 2 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "cap bad want 'z' 2 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "cap bad want 'z' 2 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 2,
+"value": "z"
+},
+"name": "cap bad want 'z' 2 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "cap bad want 'z' 3 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "cap bad want 'z' 3 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "cap bad want 'z' 3 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 3,
+"value": "z"
+},
+"name": "cap bad want 'z' 3 '10.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "cap bad want 'z' 4 ''",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "8.5",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "cap bad want 'z' 4 '8.5'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "9.0",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "cap bad want 'z' 4 '9.0'",
+"want": false
+},
+{
+"estimation": {
+"preserves": "p",
+"rule": "leave_unset",
+"valid_when": [
+{
+"compute_capability": {
+"gte": "x"
+}
+}
+]
+},
+"facts": {
+"compute_capability": "10.0",
+"tp_group_nodes": 4,
+"value": "z"
+},
+"name": "cap bad want 'z' 4 '10.0'",
+"want": false
+}
+]

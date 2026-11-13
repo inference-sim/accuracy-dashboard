@@ -76,10 +76,13 @@ def test_the_stability_check_flags_a_changed_size():
     assert not ok and first == a and len(problems) == 1 and "4 GPUs per node" in problems[0]
 
 
-def test_the_stability_check_flags_a_changed_cluster_and_a_missing_or_ambiguous_label():
+def test_the_stability_check_accepts_other_clusters_of_the_same_size_and_flags_a_missing_or_ambiguous_label():
     a, b = _v("a", "2026-07-02"), _v("b", "2026-09-27")
     ok, problems, _ = ir.stability([a, b], {a.commit: _rec(8, "x"), b.commit: _rec(8, "y")})
-    assert not ok and "on y where" in problems[0]
+    assert ok and problems == []
+    # the same clusters with another size is still refused
+    ok, problems, _ = ir.stability([a, b], {a.commit: _rec(8, "x"), b.commit: _rec(4, "x")})
+    assert not ok and "4 GPUs per node" in problems[0]
     gone = ir.Record(None, "label not in runners.yaml", ())
     ok, problems, first = ir.stability([a, b], {a.commit: _rec(8, "x"), b.commit: gone})
     assert not ok and "label not in runners.yaml" in problems[0]
@@ -87,9 +90,19 @@ def test_the_stability_check_flags_a_changed_cluster_and_a_missing_or_ambiguous_
     assert not ok and first is None
 
 
+def test_a_label_whose_sizes_differ_gets_no_later_record_for_an_earlier_row():
+    a, b = _v("a", "2026-07-02"), _v("b", "2026-09-27")
+    recs = {a.commit: _rec(8, "x"), b.commit: _rec(4, "x")}
+    ok, problems, first = ir.stability([a, b], recs)
+    lab = ir.Label(ok, tuple(problems), first, recs)
+    t = ir.Table((a, b), {"l": lab})
+    r = ir.resolve(t, "l", run_date="2026-06-01", launch_size=None, fixes_packaging=False)
+    assert r.gpus_per_node is None and r.reason == {"code": "value_not_recorded", "subject": ir.SUBJECT}
+
+
 def test_the_stability_result_for_the_committed_table():
     stable = sorted(n for n, lab in T.labels.items() if lab.stable)
-    assert stable == ["gb200", "mi355x"]
+    assert stable == ["b300", "gb200", "h100", "mi300x", "mi325x", "mi355x"]
     assert T.labels["gb300"].first_recorded.commit.startswith("5d06e10c") and not T.labels["gb300"].stable
     assert T.labels["b200"].first_recorded is None
     for n in ("rtx6000pro", "vr200"):
@@ -118,7 +131,7 @@ def test_a_launch_size_that_differs_from_the_table_is_a_value_conflict():
 
 
 def test_a_label_with_no_runner_entry_stays_value_not_recorded():
-    for label in ("rtx6000pro", "vr200", "b200"):
+    for label in ("rtx6000pro", "vr200"):
         r = _res(label, "2026-10-01")
         assert r.reason == {"code": "value_not_recorded", "subject": "cluster.gpus_per_node"}, label
     assert _res("vr200", "2026-10-01", launch=8).gpus_per_node == 8
@@ -127,7 +140,10 @@ def test_a_label_with_no_runner_entry_stays_value_not_recorded():
 def test_a_row_before_the_first_record_takes_it_as_a_later_record():
     r = _res("mi355x", "2026-06-15")
     assert r.gpus_per_node == 8 and r.reason is None
-    assert r.substitution == {"kind": "later_record", "subject": "cluster.gpus_per_node",
+    sub = r.substitution
+    assert sub["record"].startswith("configs/runners.yaml at 303669b0") and sub["date"] == "2026-07-02"
+    assert {k: v for k, v in sub.items() if k not in ("record", "date")} == {
+                              "kind": "later_record", "subject": "cluster.gpus_per_node",
                               "detail": "taken from InferenceX runners.yaml at 303669b0, recorded after the run "
                                         "(303669b0 of 2026-07-02)"}
     assert r.provenance == "cluster.gpus_per_node: InferenceX runners.yaml at 303669b0"
@@ -141,7 +157,7 @@ def test_a_launch_size_before_the_first_record_is_not_a_substitution_and_is_not_
 
 
 def test_an_unstable_label_before_its_first_record_stays_value_not_recorded():
-    unstable = dataclasses.replace(T.labels["mi355x"], stable=False, problems=("x: changed",))
+    unstable = dataclasses.replace(T.labels["mi355x"], stable=False, problems=("x: changed",), label_size=None, relied_on=())
     table = ir.Table(T.versions, {**T.labels, "mi355x": unstable})
     r = _res("mi355x", "2026-06-15", table=table)
     assert r.reason == {"code": "value_not_recorded", "subject": "cluster.gpus_per_node"} and r.substitution is None
@@ -262,3 +278,51 @@ def test_the_generator_refuses_a_version_it_cannot_read(tmp_path, capsys):
     assert gen.main(["--ix", str(d), "--out", str(tmp_path / "t.json"), "--version", "nope"]) == 2
     assert gen.main(["--ix", str(d), "--out", str(tmp_path / "t.json"), "--version", f"{c0}:runners.yaml"]) == 2
     assert "error" in capsys.readouterr().err
+
+
+# ---- the label-record rule (design 11.3): a runner no record lists takes its label's size
+
+def test_b200_and_h200_take_the_size_every_record_of_their_label_states_and_name_it():
+    for label, commits, days in (("b200", ("303669b0", "5d06e10c"), ("2026-06-01", "2026-08-01", "2026-10-01")),
+                                 ("h200", ("303669b0", "5d06e10c", "4a63bf50"), ("2026-06-01", "2026-08-01"))):
+        for day in days:
+            r = _res(label, day)
+            assert r.gpus_per_node == 8 and r.reason is None, (label, day)
+            s = r.substitution
+            assert s["kind"] == "later_record" and s["subject"] == "cluster.gpus_per_node"
+            assert s["record"].startswith(f"label {label} in ") and all(c in s["record"] for c in commits), s
+            assert s["date"] == T.labels[label].relied_on[-1].date and len(s["date"]) == 10
+            assert "no record lists the runner" in s["detail"]
+
+
+def test_a_label_with_one_disagreeing_record_is_refused():
+    b200 = T.labels["b200"]
+    recs = dict(b200.records)
+    last = list(recs)[0]
+    recs[last] = ir.Record(None, "x", (ir.Cluster("b200-odd", 4, "runners.yaml:1"),))
+    size, relied = ir.label_size(list(T.versions), recs)
+    assert size is None                                            # 8 in one record, 4 in another
+    table = ir.Table(T.versions, {**T.labels, "b200": dataclasses.replace(b200, records=recs, label_size=size, relied_on=tuple(relied))})
+    r = _res("b200", "2026-10-01", table=table)
+    assert r.reason == {"code": "value_not_recorded", "subject": "cluster.gpus_per_node"} and r.substitution is None
+
+
+def test_a_runner_a_record_lists_keeps_the_same_runner_rule():
+    # h100 has a single-size record in force: the size is the record's, with no substitution.
+    r = _res("h100", "2026-10-01")
+    assert r.gpus_per_node == 8 and r.substitution is None and "runners.yaml at" in r.provenance
+    # before its first record the same-runner later_record applies, naming the record and its date
+    s = _res("h100", "2026-06-01").substitution
+    assert s["kind"] == "later_record" and s["record"].count(" at ") == 1 and s["date"] == "2026-07-02"
+
+
+def test_the_later_record_substitution_carries_the_keys_the_point_record_requires():
+    import grade
+    for label in ("b200", "h200", "h100"):
+        s = _res(label, "2026-06-01").substitution
+        grade.grade(engine_version="0.32.0", release=grade.Release(version="0.32.0", nightly_or_custom=False), substitutions=[s])
+
+
+def test_h200_from_the_first_complete_record_on_uses_the_record_in_force_without_a_substitution():
+    r = _res("h200", "2026-10-01")
+    assert r.gpus_per_node == 8 and r.substitution is None
