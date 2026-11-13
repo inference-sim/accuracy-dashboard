@@ -42,6 +42,7 @@ import inferencex_runners as ir  # noqa: E402
 import replay as rp  # noqa: E402
 import result  # noqa: E402
 import settings as st  # noqa: E402
+import blis_commands as bc  # noqa: E402
 import support as sp  # noqa: E402
 
 AGENTIC_LABEL = "agentx"
@@ -1224,7 +1225,7 @@ def _facts_of(env: Env, part_name: str, launch_size):
     if cat is not None:
         try:
             gpn = cat.packaging(part_name).get("gpus_per_node") or launch_size
-        except (KeyError, ValueError, OSError):
+        except (KeyError, ValueError, OSError, bc.CommandError):   # a part the catalog has no entry for (an AMD part): the launch's size
             pass
     cap = sif.compute_capability(cat.root, part_name) if cat is not None else None
     return sif.facts_of(gpn, cap)

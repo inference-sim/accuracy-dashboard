@@ -32,3 +32,18 @@ def test_the_capability_is_the_catalogs_and_absent_where_it_states_none(tmp_path
     assert sif.compute_capability(tmp_path, "odd") is None and sif.compute_capability(tmp_path, "nope") is None
     assert sif.facts("auto", capability=sif.compute_capability(tmp_path, "b200"))["compute_capability"] == "10.0"
     assert "compute_capability" not in sif.facts("auto", capability=sif.compute_capability(tmp_path, "odd"))
+
+
+def test_a_part_with_no_catalog_entry_is_sized_by_its_launch_and_does_not_stop_the_run(tmp_path):
+    """An AMD part has no hardware entry: the packaging read fails with the command's error, and the stand-in facts fall back
+    to the launch configuration's node size (the point is refused for its part elsewhere); the run goes on."""
+    import types
+    import blis_commands as bc
+    import score
+
+    class NoEntry:
+        root = tmp_path
+        def packaging(self, chip):
+            raise bc.CommandError(f"blis catalog resolve --chip {chip} reports no packaging")
+    facts_of = score._facts_of(types.SimpleNamespace(catalog_obj=NoEntry()), "mi355x", 8)
+    assert facts_of("auto", {"tensor_parallel_size": types.SimpleNamespace(value=16)})["tp_group_nodes"] == 2
