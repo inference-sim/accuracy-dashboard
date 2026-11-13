@@ -13,7 +13,7 @@
 | Pull, units, point set | as the baseline: manifest `c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166`, 1734 points |
 | Corpora | as the baseline |
 
-Command: `harness/run.sh --sim 81a46ba3e0b14ba828eaa46d21191d03dd17376f --units units.txt --pull <pull> --out <out> --catalog <substrate>/catalog --registry <substrate>/registry --corpus-dir <corpora> --fields fields.json --catalog-release v0.14.0 --registry-release v0.14.0`. The simulator has `blis metrics`, so the scorer checked that its TTFT and TPOT have the InferenceX client's definitions; the baseline's v0.16.0 has none. Cost: about 60 minutes on one laptop with four workers when two other jobs share it.
+Command: `harness/run.sh --sim 81a46ba3e0b14ba828eaa46d21191d03dd17376f --units units.txt --pull <pull> --out <out> --catalog <substrate>/catalog --registry <substrate>/registry --corpus-dir <corpora> --fields fields.json --catalog-release v0.14.0 --registry-release v0.14.0`. The simulator has `blis metrics`, so the scorer checked that its TTFT and TPOT have the InferenceX client's definitions; the baseline's v0.16.0 has none. Cost: 12 minutes on one laptop with four workers while four other runs shared it (the baseline took 1.5 minutes, run B 6, run A 12 seconds, the sixteen H200 rows 27).
 
 ## Result
 

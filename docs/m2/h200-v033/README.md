@@ -90,7 +90,7 @@ python3 orchestrator/baseline/split.py splits --pull PULL --out docs/m2/h200-v03
 python3 orchestrator/baseline/compare.py run --dir docs/m2/h200-v033/contract --sample in_sample --out docs/m2/h200-v033/table
 ```
 
-`FIELDS.json` is blis-vllm `33455e4cb2d52b9fc9fa6cfb36cf5c1f5e509f5b`'s `fields.json`; the corpora are fetched as the baseline's README says. Cost: the freeze is about a minute for sixteen rows (artifacts cached); the scoring takes about an hour with one worker and 2 GB of memory (one replay of an hour-long trace per point; the machine was shared with other jobs).
+`FIELDS.json` is blis-vllm `33455e4cb2d52b9fc9fa6cfb36cf5c1f5e509f5b`'s `fields.json`; the corpora are fetched as the baseline's README says. Cost: the freeze is about a minute for sixteen rows (artifacts cached); the scoring took 27 minutes with one worker and 2 GB of memory (one replay of an hour-long trace per point, simulated; the machine was shared with the four other runs).
 
 ## What this does not show
 
