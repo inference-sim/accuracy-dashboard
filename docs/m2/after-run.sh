@@ -2,7 +2,7 @@
 # The after run of the M2 before/after, in one command once the pins exist.
 #
 #   SIM=<inference-sim commit or release tag>        the simulator with PR 4 (fields, ledger, metrics) and PR 5
-#   SUBSTRATE=<blis-substrate commit>                 catalog, registry and ledger; also the --catalog-release and
+#   SUBSTRATE=<blis-substrate release tag or commit>                 catalog, registry and ledger; also the --catalog-release and
 #                                                     --registry-release the run records (a commit is accepted while
 #                                                     the stack is open)
 #   BLIS_VLLM=<blis-vllm commit>                      the commit whose fields.json the simulator's engine release carries
@@ -25,7 +25,7 @@ need() { [ -n "${!1:-}" ] || { echo "after-run.sh: $1 is required" >&2; exit 2; 
 for v in SIM SUBSTRATE BLIS_VLLM PULL CORPUS WORK; do need "$v"; done
 BASELINE="${BASELINE:-docs/m2/baseline-v0.16.0}"
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-[[ "$SUBSTRATE" =~ ^[0-9a-f]{40}$ && "$BLIS_VLLM" =~ ^[0-9a-f]{40}$ ]] || { echo "after-run.sh: SUBSTRATE and BLIS_VLLM are full 40-hex commits" >&2; exit 2; }
+[[ "$SUBSTRATE" =~ ^([0-9a-f]{40}|v[0-9]+\.[0-9]+\.[0-9]+)$ && "$BLIS_VLLM" =~ ^[0-9a-f]{40}$ ]] || { echo "after-run.sh: SUBSTRATE is a release tag or a full 40-hex commit and BLIS_VLLM a full 40-hex commit" >&2; exit 2; }
 [ -f "$PULL/manifest.json" ] || { echo "after-run.sh: $PULL holds no frozen pull; the baseline's pull is not persisted, so freeze it again with orchestrator/baseline/freeze.py (a new pull is a new point set: rescore the baseline too)" >&2; exit 2; }
 
 mkdir -p "$WORK"
