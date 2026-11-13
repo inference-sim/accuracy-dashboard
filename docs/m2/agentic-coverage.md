@@ -34,7 +34,7 @@ All 47 `agentic_traces` points of the baseline's frozen pull are in scope (h200 
 
 ## The 47 points
 
-Scored with the simulator and the pins of [prefill/decode coverage](pd-coverage.md) (inference-sim `c97c497b`, blis-substrate `6faaccf8`, blis-vllm `28deab08`). The first refusal is the G5 reason of the contract (`not_scored.jsonl`); `value_not_recorded` with no subject is the scorer's `server_log_missing`.
+Scored with the simulator and the pins of [prefill/decode coverage](pd-coverage.md) (inference-sim `81a46ba3`, blis-substrate v0.14.0, blis-vllm `33455e4c`). The first refusal is the G5 reason of the contract (`not_scored.jsonl`); `value_not_recorded` with no subject is the scorer's `server_log_missing`. The first refusal of the ten Kimi-K3 H200 rows (`field_not_modelled:disable_custom_all_reduce`) is from an earlier scoring that had their recipes; the pull of the committed after-run holds no recipe or log for them, so its contract has them as `value_not_recorded`. These rows were not scored again at the final pins, and no agentic point is scored in the committed run.
 
 | Point | Model, chip | Measured | Clients | First refusal |
 |---|---|---|---|---|

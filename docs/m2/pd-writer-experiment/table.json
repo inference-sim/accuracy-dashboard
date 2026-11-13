@@ -7,22 +7,10 @@
    "entry": "field_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND"
   },
   {
-   "alone": 12,
-   "blocks": 48,
-   "demotes": 0,
-   "entry": "field_not_in_release:env.UCX_TLS"
-  },
-  {
    "alone": 0,
    "blocks": 28,
    "demotes": 0,
    "entry": "field_not_modelled:attention_config.use_trtllm_attention"
-  },
-  {
-   "alone": 0,
-   "blocks": 28,
-   "demotes": 0,
-   "entry": "not_in_catalog"
   },
   {
    "alone": 0,
@@ -32,21 +20,15 @@
   },
   {
    "alone": 0,
-   "blocks": 15,
+   "blocks": 14,
    "demotes": 0,
-   "entry": "field_not_modelled:compilation_config.cudagraph_mode"
+   "entry": "value_not_recorded:workload_category_not_stated"
   },
   {
    "alone": 0,
    "blocks": 9,
    "demotes": 0,
    "entry": "field_not_in_release:env.VLLM_MINIMAX_M3_MSA_DECODE_BACKEND"
-  },
-  {
-   "alone": 0,
-   "blocks": 8,
-   "demotes": 0,
-   "entry": "field_not_modelled:env.UCX_RCACHE_MAX_UNRELEASED"
   },
   {
    "alone": 0,
@@ -147,206 +129,212 @@
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "client_difference:benchmark_client"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "client_difference:client_flags"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "client_difference:failed_requests"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "client_difference:sent_prompt_lengths"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "coefficient_method:cost-model-attention/attention_decode_floor_mla"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "coefficient_method:cost-model-fabric/fabric_bandwidth_efficiency"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "coefficient_method:cost-model-host-overheads/host_admission_per_request"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "coefficient_method:cost-model-host-overheads/host_admission_per_token"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "coefficient_method:cost-model-host-overheads/host_completion"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "coefficient_method:cost-model-host-overheads/host_launch_eager_per_layer"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "coefficient_method:cost-model-host-overheads/host_launch_per_kernel"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "coefficient_method:cost-model-host-overheads/host_output_token"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "coefficient_method:cost-model-host-overheads/host_replay_graph_per_step"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_1rank"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "coefficient_method:cost-model-memory/activation_scratch_floor_bytes"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "coefficient_method:cost-model-memory/cudagraph_capture_bytes_full_and_piecewise"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "coefficient_method:cost-model-primitives/engine_workspace_bytes"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "coefficient_method:cost-model-primitives/hbm_derate"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
-   "entry": "coefficient_range:unevaluated"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "estimated:cluster.fabric"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "estimated:engine.decode.recipe"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "estimated:engine.prefill.recipe"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "estimated:gpu_memory_utilization"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "execution_mode:router dynamo (experiment)"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "interim_status:env.VLLM_ENGINE_READY_TIMEOUT_S"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "interim_status:env.VLLM_FLOAT32_MATMUL_PRECISION"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "interim_status:trust_remote_code"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
-   "entry": "kernel_hash:unevaluated"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "other_release:engine release"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
+   "demotes": 104,
    "entry": "ported_functions_unpublished:engine release"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
-   "entry": "resolved_differs:unevaluated"
+   "demotes": 104,
+   "entry": "unevaluated:coefficient_range"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 84,
-   "entry": "value_class:unevaluated"
+   "demotes": 104,
+   "entry": "unevaluated:kernel_hash"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 83,
+   "demotes": 104,
+   "entry": "unevaluated:resolved_differs"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 104,
+   "entry": "unevaluated:value_class"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 102,
    "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_4rank"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 83,
+   "demotes": 102,
    "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_4rank"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 23,
+   "entry": "execution_mode:pool placement"
   },
   {
    "alone": 0,
@@ -357,35 +345,41 @@
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 17,
-   "entry": "execution_mode:pool placement"
+   "demotes": 20,
+   "entry": "estimated:env.UCX_TLS"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 1,
+   "demotes": 8,
+   "entry": "estimated:env.UCX_RCACHE_MAX_UNRELEASED"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 2,
    "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_8rank"
   },
   {
    "alone": 0,
    "blocks": 0,
-   "demotes": 1,
+   "demotes": 2,
    "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_8rank"
   }
  ],
  "coverage": {
   "all": {
    "by_grade": {
-    "G4": 84,
-    "G5": 104
+    "G4": 104,
+    "G5": 84
    },
    "failed": 0,
-   "not_scored": 104,
+   "not_scored": 84,
    "points": 188,
    "primary_reason": {
-    "field_not_in_release": 12,
-    "field_not_modelled": 90,
-    "router_unsupported": 2
+    "field_not_modelled": 68,
+    "router_unsupported": 2,
+    "value_not_recorded": 14
    },
    "reasons": {
     "field_not_in_release:attention_config.use_trtllm_ragged_deepseek_prefill": {
@@ -395,10 +389,6 @@
     "field_not_in_release:env.NCCL_MNNVL_ENABLE": {
      "alone": 0,
      "blocks": 6
-    },
-    "field_not_in_release:env.UCX_TLS": {
-     "alone": 12,
-     "blocks": 48
     },
     "field_not_in_release:env.VLLM_MINIMAX_M3_MSA_DECODE_BACKEND": {
      "alone": 0,
@@ -415,10 +405,6 @@
     "field_not_modelled:attention_config.use_trtllm_attention": {
      "alone": 0,
      "blocks": 28
-    },
-    "field_not_modelled:compilation_config.cudagraph_mode": {
-     "alone": 0,
-     "blocks": 15
     },
     "field_not_modelled:compilation_config.custom_ops": {
      "alone": 0,
@@ -448,10 +434,6 @@
      "alone": 0,
      "blocks": 1
     },
-    "field_not_modelled:env.UCX_RCACHE_MAX_UNRELEASED": {
-     "alone": 0,
-     "blocks": 8
-    },
     "field_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND": {
      "alone": 48,
      "blocks": 48
@@ -459,10 +441,6 @@
     "field_not_modelled:env.VLLM_USE_NCCL_SYMM_MEM": {
      "alone": 0,
      "blocks": 6
-    },
-    "not_in_catalog": {
-     "alone": 0,
-     "blocks": 28
     },
     "router_unsupported:dynamo-router": {
      "alone": 0,
@@ -483,23 +461,27 @@
     "value_not_recorded:no_master_entry": {
      "alone": 0,
      "blocks": 2
+    },
+    "value_not_recorded:workload_category_not_stated": {
+     "alone": 0,
+     "blocks": 14
     }
    },
-   "scored": 84,
-   "share_scored": 0.44680851063829785
+   "scored": 104,
+   "share_scored": 0.5531914893617021
   },
   "in_scope": {
    "by_grade": {
-    "G4": 84,
-    "G5": 104
+    "G4": 104,
+    "G5": 84
    },
    "failed": 0,
-   "not_scored": 104,
+   "not_scored": 84,
    "points": 188,
    "primary_reason": {
-    "field_not_in_release": 12,
-    "field_not_modelled": 90,
-    "router_unsupported": 2
+    "field_not_modelled": 68,
+    "router_unsupported": 2,
+    "value_not_recorded": 14
    },
    "reasons": {
     "field_not_in_release:attention_config.use_trtllm_ragged_deepseek_prefill": {
@@ -509,10 +491,6 @@
     "field_not_in_release:env.NCCL_MNNVL_ENABLE": {
      "alone": 0,
      "blocks": 6
-    },
-    "field_not_in_release:env.UCX_TLS": {
-     "alone": 12,
-     "blocks": 48
     },
     "field_not_in_release:env.VLLM_MINIMAX_M3_MSA_DECODE_BACKEND": {
      "alone": 0,
@@ -529,10 +507,6 @@
     "field_not_modelled:attention_config.use_trtllm_attention": {
      "alone": 0,
      "blocks": 28
-    },
-    "field_not_modelled:compilation_config.cudagraph_mode": {
-     "alone": 0,
-     "blocks": 15
     },
     "field_not_modelled:compilation_config.custom_ops": {
      "alone": 0,
@@ -562,10 +536,6 @@
      "alone": 0,
      "blocks": 1
     },
-    "field_not_modelled:env.UCX_RCACHE_MAX_UNRELEASED": {
-     "alone": 0,
-     "blocks": 8
-    },
     "field_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND": {
      "alone": 48,
      "blocks": 48
@@ -573,10 +543,6 @@
     "field_not_modelled:env.VLLM_USE_NCCL_SYMM_MEM": {
      "alone": 0,
      "blocks": 6
-    },
-    "not_in_catalog": {
-     "alone": 0,
-     "blocks": 28
     },
     "router_unsupported:dynamo-router": {
      "alone": 0,
@@ -597,10 +563,14 @@
     "value_not_recorded:no_master_entry": {
      "alone": 0,
      "blocks": 2
+    },
+    "value_not_recorded:workload_category_not_stated": {
+     "alone": 0,
+     "blocks": 14
     }
    },
-   "scored": 84,
-   "share_scored": 0.44680851063829785
+   "scored": 104,
+   "share_scored": 0.5531914893617021
   },
   "out_of_scope": {
    "by_grade": {},
@@ -634,32 +604,32 @@
     "accuracy": {
      "noise_floor_pct": 1.6,
      "noise_floor_source": "fallback; none measured per point",
-     "points": 41,
+     "points": 51,
      "tpot": {
       "mape": {
-       "n": 41,
-       "value": 5.003436311533608
+       "n": 51,
+       "value": 4.4361324762627055
       },
       "shape": {
-       "n": 24,
-       "value": 5.581630905218724
+       "n": 29,
+       "value": 7.8935209070480985
       }
      },
      "ttft": {
       "mape": {
-       "n": 41,
-       "value": 66.38156887801668
+       "n": 51,
+       "value": 23.811202487455354
       },
       "shape": {
-       "n": 24,
-       "value": 42.19470234660011
+       "n": 29,
+       "value": 13.297008735096107
       }
      },
      "withheld": 0
     },
     "grades": {
-     "G4": 41,
-     "G5": 73
+     "G4": 51,
+     "G5": 63
     },
     "in_scope": 114,
     "points": 114,
@@ -675,7 +645,7 @@
       "value": "throughput_per_gpu"
      }
     },
-    "scored": 41,
+    "scored": 51,
     "series": 6
    },
    "unassigned": {
@@ -727,32 +697,31 @@
     "accuracy": {
      "noise_floor_pct": 1.6,
      "noise_floor_source": "fallback; none measured per point",
-     "points": 19,
+     "points": 25,
      "tpot": {
       "mape": {
-       "n": 19,
-       "value": 4.927351390057275
+       "n": 25,
+       "value": 3.952505444215802
       },
       "shape": {
-       "n": 13,
-       "value": 6.461589023372818
+       "n": 17,
+       "value": 6.116664983268459
       }
      },
      "ttft": {
       "mape": {
-       "n": 19,
-       "value": 105.68005214975632
+       "n": 25,
+       "value": 21.663004083591677
       },
       "shape": {
-       "n": 13,
-       "value": 96.3181022027933
+       "n": 17,
+       "value": 10.458801977616215
       }
      },
      "withheld": 0
     },
     "grades": {
-     "G4": 19,
-     "G5": 6
+     "G4": 25
     },
     "in_scope": 25,
     "points": 25,
@@ -768,7 +737,7 @@
       "value": "throughput_per_gpu"
      }
     },
-    "scored": 19,
+    "scored": 25,
     "series": 1
    }
   },
@@ -874,36 +843,36 @@
    "accuracy": {
     "noise_floor_pct": 1.6,
     "noise_floor_source": "fallback; none measured per point",
-    "points": 60,
+    "points": 76,
     "tpot": {
      "mape": {
-      "n": 60,
-      "value": 4.979342753066103
+      "n": 76,
+      "value": 4.277044636773593
      },
      "shape": {
-      "n": 37,
-      "value": 5.890805379164758
+      "n": 46,
+      "value": 7.236856761303449
      }
     },
     "ttft": {
      "mape": {
-      "n": 60,
-      "value": 78.82608858073424
+      "n": 76,
+      "value": 23.104558275658093
      },
      "shape": {
-      "n": 37,
-      "value": 61.21103202580313
+      "n": 46,
+      "value": 12.248106237766581
      }
     },
-    "withheld": 24
+    "withheld": 28
    },
-   "points": 84,
-   "share_of_all": 0.44680851063829785,
+   "points": 104,
+   "share_of_all": 0.5531914893617021,
    "share_of_graded": 1.0
   },
   "G5": {
-   "points": 104,
-   "share_of_all": 0.5531914893617021,
+   "points": 84,
+   "share_of_all": 0.44680851063829785,
    "share_of_graded": null
   },
   "failed": {
@@ -913,31 +882,31 @@
  "headline": {
   "noise_floor_pct": 1.6,
   "noise_floor_source": "fallback; none measured per point",
-  "points": 60,
+  "points": 76,
   "tpot": {
    "mape": {
-    "n": 60,
-    "value": 4.979342753066103
+    "n": 76,
+    "value": 4.277044636773593
    },
    "shape": {
-    "n": 37,
-    "value": 5.890805379164758
+    "n": 46,
+    "value": 7.236856761303449
    }
   },
   "ttft": {
    "mape": {
-    "n": 60,
-    "value": 78.82608858073424
+    "n": 76,
+    "value": 23.104558275658093
    },
    "shape": {
-    "n": 37,
-    "value": 61.21103202580313
+    "n": 46,
+    "value": 12.248106237766581
    }
   },
-  "withheld": 24
+  "withheld": 28
  },
  "identity": {
-  "harness_commit": "0b8154ccefcb14311cf323e143d8520f59944fbb",
+  "harness_commit": "0e9627e219c207593de5bc55d997cf3dca707d64",
   "point_set_sha256": "10cdb496f9893d88f59f25d2386e26532ad756e21d107ab6c51552d79ef60c18",
   "points": 188,
   "pull_manifest_sha256": "bfa74604f84e64aa2f6c44d73fedee45a816c15d11f66da02396913354f5c3d4",
@@ -947,10 +916,10 @@
  },
  "inputs": {
   "blis": {
-   "catalog": "f70c6c7503a47442c4c5d989f8f17b093c14e069",
-   "commit_sha": "780f661ef9c18a2a9928acf8a63a67667cd597c0",
+   "catalog": "v0.14.0",
+   "commit_sha": "81a46ba3e0b14ba828eaa46d21191d03dd17376f",
    "extractor_version": "blis-latency-kernel@unknown",
-   "registry": "f70c6c7503a47442c4c5d989f8f17b093c14e069",
+   "registry": "v0.14.0",
    "release": "unknown"
   },
   "engine": {
@@ -958,14 +927,14 @@
    "version": "0.32.0"
   },
   "experimental": true,
-  "fields_sha256": "dbe9123a677792edf030a0da584b9fc915c45ec206a5cebbffc3944568b6e879",
+  "fields_sha256": "7432f9f82bf551027233a3aae2387fc585408d77d1c44941d037217aed890f1a",
   "simulator": {
-   "build": "780f661ef9c18a2a9928acf8a63a67667cd597c0",
+   "build": "81a46ba3e0b14ba828eaa46d21191d03dd17376f",
    "engine": {
     "kind": "vllm",
     "version": "0.32.0"
    },
-   "harness_commit": "0b8154ccefcb14311cf323e143d8520f59944fbb"
+   "harness_commit": "0e9627e219c207593de5bc55d997cf3dca707d64"
   }
  },
  "kind": "run",
@@ -1055,28 +1024,28 @@
    "G4": {
     "noise_floor_pct": 1.6,
     "noise_floor_source": "fallback; none measured per point",
-    "points": 60,
+    "points": 76,
     "tpot": {
      "mape": {
-      "n": 60,
-      "value": 4.979342753066103
+      "n": 76,
+      "value": 4.277044636773593
      },
      "shape": {
-      "n": 37,
-      "value": 5.890805379164758
+      "n": 46,
+      "value": 7.236856761303449
      }
     },
     "ttft": {
      "mape": {
-      "n": 60,
-      "value": 78.82608858073424
+      "n": 76,
+      "value": 23.104558275658093
      },
      "shape": {
-      "n": 37,
-      "value": 61.21103202580313
+      "n": 46,
+      "value": 12.248106237766581
      }
     },
-    "withheld": 24
+    "withheld": 28
    }
   }
  },
@@ -1087,18 +1056,8 @@
    "blocks": 48
   },
   {
-   "alone": 12,
-   "blocker": "field_not_in_release:env.UCX_TLS",
-   "blocks": 48
-  },
-  {
    "alone": 0,
    "blocker": "field_not_modelled:attention_config.use_trtllm_attention",
-   "blocks": 28
-  },
-  {
-   "alone": 0,
-   "blocker": "not_in_catalog",
    "blocks": 28
   },
   {
@@ -1108,18 +1067,13 @@
   },
   {
    "alone": 0,
-   "blocker": "field_not_modelled:compilation_config.cudagraph_mode",
-   "blocks": 15
+   "blocker": "value_not_recorded:workload_category_not_stated",
+   "blocks": 14
   },
   {
    "alone": 0,
    "blocker": "field_not_in_release:env.VLLM_MINIMAX_M3_MSA_DECODE_BACKEND",
    "blocks": 9
-  },
-  {
-   "alone": 0,
-   "blocker": "field_not_modelled:env.UCX_RCACHE_MAX_UNRELEASED",
-   "blocks": 8
   },
   {
    "alone": 0,

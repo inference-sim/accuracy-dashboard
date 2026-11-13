@@ -87,20 +87,17 @@ Speculative rows of the frozen pull (600: 553 single-turn, 47 agentic), by outco
 
 | Run | Family | Scored | G5 `workload_category_not_stated` | Other G5 | Refused by the simulator |
 |---|---|---|---|---|---|
-| Preliminary after-run (committed; pins `ece61af0`, blis-vllm `5de11f5`, which does not model the logged acceptance) | InferenceX fixed-sequence, 553 | 0 | 382 | 171 | 0 |
-| | AgentX, 47 | 0 | 0 | 47 | 0 |
-| Head pins (not committed; inference-sim `780f661e`, blis-vllm `96ea750e`, substrate `f70c6c75`) | InferenceX fixed-sequence, 553 | 17 | 51 | 171 | 314 |
+| After-run at the final pins (committed: inference-sim `81a46ba3`, blis-vllm `33455e4c`, substrate v0.14.0) | InferenceX fixed-sequence, 553 | 286 | 51 | 216 (other G5, and the points the simulator refuses) | see below |
 | | AgentX, 47 | 0 | 0 | 47 | 0 |
 
-Of the 553 fixed-sequence rows, 171 are G5 for another reason first (AMD parts out of scope, missing logs and the like).
-The 80 DeepSeek-V4-Pro MTP rows a reasoning-parser rule used to score are 0 scored at the preliminary pins (they pin no
-acceptance length: that engine field is not modelled there) and 17 scored at the head pins, where the server log's realised
-acceptance length is pinned in place of a profile (the log field is cited on the point: the interval count and drafted tokens).
-Of the other 63, the head-pin simulator refuses the scenario: the dashboard states `indexer_kv_dtype` bf16 for the DeepSeek sparse
-indexer and the engine accepts only fp8 or mxfp4 (blis-vllm#84), and the MiniMax-M3 rows name a draft model the target graph
-already states. These are engine-side findings, reported; the dashboard does not hide them by guessing a workload.
+At the final pins 286 of the 553 fixed-sequence rows are scored: the server log's realised acceptance length is pinned in place of
+a profile (the log field is cited on the point: the interval count and drafted tokens). 51 are held by
+`workload_category_not_stated`, and the other 216 are G5 for another reason first (AMD parts out of scope, missing logs and the
+like) or are refused by the simulator: it refuses the scenario of every DeepSeek-V4-Pro point (75 in the run) that states
+`indexer_kv_dtype` bf16 for the DeepSeek sparse indexer, which accepts only fp8 or mxfp4 (blis-vllm#84). These are engine-side
+findings, reported; the dashboard does not hide them by guessing a workload.
 
-Pairs without a profile, by what each would unlock: for the 382 fixed-sequence rows with no pinned acceptance, **no pair** is
+Pairs without a profile, by what each would unlock: for the 51 fixed-sequence rows with no pinned acceptance, **no pair** is
 stated, so none has a profile to miss. If a caller requests the fallback category coding (`--speculative-fallback-category`),
 the pair (coding, on) has a profile for DeepSeek-V4-Pro MTP and MiniMax-M3 EAGLE3 and (coding, off) for the same two; a run with
 thinking mode unstated for MiniMax-M3 would need the mode named too. Kimi-K3 (40 AgentX rows) has no profile and pins the log's

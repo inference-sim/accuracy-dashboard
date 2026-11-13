@@ -20,9 +20,9 @@ Two runs of the same scorer over the same pull, differing in one input:
 | Input | Value |
 |---|---|
 | Harness | accuracy-dashboard commit in each run's `provenance.json` (`harness_commit`) |
-| Simulator | inference-sim `c97c497b104a556515717599a4468352c1234d28` (branch `m2/11-router-configs-command`, the top of the final inference-sim stack), built with Go 1.27.2 |
-| Catalog, registry | blis-substrate `6faaccf8f1a2344918241d6b54fe339de44f7345` (the commit the pinned simulator resolves, `stack.json`), as a 40-hex commit for `--catalog-release` and `--registry-release` |
-| Field list | blis-vllm `28deab082a2fba6762b922c64c7b5b81b7eeac8e` `fields.json` (the commit the pinned simulator resolves), sha256 `2a84767a67027a9237934038a513252d7ed65cf8ff8ee203cad8fc0a8c51cc39` |
+| Simulator | inference-sim `81a46ba3e0b14ba828eaa46d21191d03dd17376f` (the head of its combined pull request, branch `m2/combined-layers`), built with Go 1.27.2 |
+| Catalog, registry | blis-substrate `v0.14.0` (commit `965b05834c47882bc0f9f1a960c90327a756ef3d`; the release the pinned simulator names in `stack.json`), as the release tag for `--catalog-release` and `--registry-release` |
+| Field list | blis-vllm `33455e4cb2d52b9fc9fa6cfb36cf5c1f5e509f5b` `fields.json` (the commit the pinned simulator resolves), sha256 `7432f9f82bf551027233a3aae2387fc585408d77d1c44941d037217aed890f1a` |
 | Pull | `pull_manifest_sha256` `bfa74604f84e64aa2f6c44d73fedee45a816c15d11f66da02396913354f5c3d4`, 188 points; not committed (60 MB of server logs and recipes) |
 | Units | the 188 ledger units (`units.txt` of each run directory) |
 | Corpora | not used (single-turn) |
@@ -37,48 +37,48 @@ Blocks and alone, over the 188 (the full list is `table.md` of the run):
 
 | Reason | Blocks | Alone |
 |---|---|---|
-| `router_unsupported:dynamo-router:revision_not_covered` | 186 | **84** |
+| `router_unsupported:dynamo-router:revision_not_covered` | 186 | **104** |
 | `field_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND` | 48 | 0 |
-| `field_not_in_release:env.UCX_TLS` | 48 | 0 |
-| `field_not_modelled:attention_config.use_trtllm_attention` | 28 | 0 |
-| `not_in_catalog` (MiniMax-M3 is not in the catalog at this pin) | 28 | 0 |
+| `field_not_modelled:attention_config.use_trtllm_attention` (MiniMax-M3) | 28 | 0 |
 | `field_not_modelled:enforce_eager` | 20 | 0 |
-| `field_not_modelled:compilation_config.cudagraph_mode` | 15 | 0 |
-| `field_not_modelled:env.UCX_RCACHE_MAX_UNRELEASED` | 8 | 0 |
-| `field_not_modelled:all2all_backend` | 6 | 0 |
+| `value_not_recorded:workload_category_not_stated` (MiniMax-M3, speculative) | 14 | 0 |
+| `field_not_in_release:env.VLLM_MINIMAX_M3_MSA_DECODE_BACKEND` | 9 | 0 |
+| `field_not_in_release:env.NCCL_MNNVL_ENABLE`, `field_not_modelled:env.NCCL_CUMEM_ENABLE`, `env.NCCL_NVLS_ENABLE`, `env.VLLM_USE_NCCL_SYMM_MEM`, `all2all_backend` | 6 each | 0 |
 | `value_not_recorded:no_master_entry` (no search-space item is the row) | 2 | 0 |
 | `topology_unsupported:pd_pool_not_recorded` (a pool with no workers) | 1 | 0 |
 | `value_not_recorded:api_404` | 1 | 0 |
 
-The router alone holds back 84 points. With the substrate's layer 12 entries (`dynamo-round-robin` to llm-d's round-robin policy, with a bound; `dynamo-random`; `dynamo-kv` with policy `none`) read through `--router-table`, and the build assumed to be the entry's (`--assume-router-revision 1682167d3c97f0fc8cd405dee51f17288eeaeb55`, since the recipes record a wheel), the result is still **no point**: all 186 are `no_bound_for_regime`. The entries' bounds were measured for model `minimax-m2.5` on `gb200-nvl72` at 1024/1024, 16 to 1024 clients, shapes 1P3D, 2P3D, 3P2D and 4P1D; the 84 points that clear every other gate are the NVFP4 model `minimax-m2.5-nvfp4`, 90 of the 188 rows are 8192/1024 (no workload kind), and the rest differ in hardware part or shape. A bound for the NVFP4 model, 8192/1024 and the other chips is what would score them.
+The router alone holds back 104 points. At the earlier pins of this page (before the repin to blis-substrate v0.14.0), with the substrate's layer 12 entries (`dynamo-round-robin` to llm-d's round-robin policy, with a bound; `dynamo-random`; `dynamo-kv` with policy `none`) read through `--router-table`, and the build assumed to be the entry's (`--assume-router-revision 1682167d3c97f0fc8cd405dee51f17288eeaeb55`, since the recipes record a wheel), the result is still **no point**: all 186 are `no_bound_for_regime`. The entries' bounds were measured for model `minimax-m2.5` on `gb200-nvl72` at 1024/1024, 16 to 1024 clients, shapes 1P3D, 2P3D, 3P2D and 4P1D; the 84 points that clear every other gate are the NVFP4 model `minimax-m2.5-nvfp4`, 90 of the 188 rows are 8192/1024 (no workload kind), and the rest differ in hardware part or shape. A bound for the NVFP4 model, 8192/1024 and the other chips is what would score them.
 
 ## Result of the writer alone (an experiment)
 
-Run B stands llm-d's round-robin in for Dynamo's router on every point the table refuses. It scores **84** of the 188 (all G4), refuses 104 and fails none; the contract validates.
+Run B stands llm-d's round-robin in for Dynamo's router on every point the table refuses. It scores **104** of the 188 (all G4), refuses 84 and fails none; the contract validates. At the earlier pins it scored 84: the 20 more are the NVFP4 points whose NIXL transport variables (`UCX_TLS`, `UCX_RCACHE_MAX_UNRELEASED`) the engine's field list now classifies.
 
-| Scored (84) | b200 | b300 | gb200 | gb300 |
+| Scored (104) | b200 | b300 | gb200 | gb300 |
 |---|---|---|---|---|
-| minimaxm2.5 NVFP4, 1k/1k | 16 | 6 | 16 | 9 |
+| minimaxm2.5 NVFP4, 1k/1k | 20 | 12 | 20 | 15 |
 | minimaxm2.5 NVFP4, 8k/1k | 8 | 11 | 8 | 10 |
 
-The 104 refused, by first reason: `field_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND` 48 (the fp8 recipes of MiniMax-M2.5 on b300 and gb300), `attention_config.use_trtllm_attention` 28 (MiniMax-M3 on b200 and b300), `field_not_in_release:env.UCX_TLS` 12 and `field_not_modelled:env.UCX_RCACHE_MAX_UNRELEASED` 8 (NIXL's transport settings, on the NVFP4 recipes that set them), `all2all_backend` 6 (kimik2.5 and one dsv4), and 2 `router_unsupported:dynamo-router` (no recipe). The transport variables are the cheapest to clear: 20 more NVFP4 points score when `blis-vllm` classifies them.
+The 84 refused, by first reason: `field_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND` 48 (the fp8 recipes of MiniMax-M2.5 on b300 and gb300), `attention_config.use_trtllm_attention` 14 and `value_not_recorded:workload_category_not_stated` 14 (MiniMax-M3 on b200 and b300; 29 MiniMax-M3 points in all, none scored), `all2all_backend` 6 (kimik2.5 and one dsv4), and 2 `router_unsupported:dynamo-router` (no recipe). The NIXL transport variables no longer refuse a point.
 
-Every scored point names: the recipe recovery of each pool (`engine.prefill.recipe`, `engine.decode.recipe`), `cluster.fabric` (no recipe states a class; the recipes set `UCX_TLS=cuda_copy,rc`. The class comes from the fabric InferenceX documents for the chip SKU, cited on the point: `ib-400g` for gb200-nvl72 (InfiniBand NDR), `ib-800g` for gb300 (InfiniBand XDR), and, as labelled stand-ins of the same line rate for documented RoCEv2 Ethernet, `ib-400g` for b200 and `ib-800g` for b300; see `docs/comparability.md`), the `benchmark_client` difference, the experiment, `pool placement` for the 17 whose recipe allows prefill and decode workers on one node (the check below), and the usual coefficient, release and G1-condition substitutions.
+Every scored point names: the recipe recovery of each pool (`engine.prefill.recipe`, `engine.decode.recipe`), `cluster.fabric` (no recipe states a class; the recipes set `UCX_TLS=cuda_copy,rc`. The class comes from the fabric InferenceX documents for the chip SKU, cited on the point: `ib-400g` for gb200-nvl72 (InfiniBand NDR), `ib-800g` for gb300 (InfiniBand XDR), and, as labelled stand-ins of the same line rate for documented RoCEv2 Ethernet, `ib-400g` for b200 and `ib-800g` for b300; see `docs/comparability.md`), the `benchmark_client` difference, the experiment, `pool placement` for the 23 whose recipe allows prefill and decode workers on one node (the check below), and the usual coefficient, release and G1-condition substitutions.
 
 ## Accuracy: train and validation points only
 
-Test points are withheld from every figure (the [protocol](evaluation-protocol.md), section 6): 24 of the 84 scored points are test, so the figures below rest on **60** points (41 train, 19 validation). They are in-sample, on the dashboard's development split, and say how well the simulator reproduces data it was not tuned on but which sits in the registry's neighbourhood; they are not held-out results.
+Test points are withheld from every figure (the [protocol](evaluation-protocol.md), section 6): 28 of the 104 scored points are test, so the figures below rest on **76** points (51 train, 25 validation). They are in-sample, on the dashboard's development split, and say how well the simulator reproduces data it was not tuned on but which sits in the registry's neighbourhood; they are not held-out results.
 
 | | n | TTFT MAPE % | TPOT MAPE % |
 |---|---|---|---|
-| all | 60 | 78.8 (median 24.7, bias +54) | 5.0 (median 3.9, bias -2) |
-| 1k/1k | 31 | 128.6 (median 28.3, bias +129) | 5.4 |
-| 8k/1k | 29 | 25.6 (bias -26) | 4.5 |
-| 32 clients or fewer | 24 | 16.3 | 4.4 |
-| 33 to 128 clients | 17 | 27.7 | 4.2 |
-| more than 128 clients | 19 | 203.6 (median 79.0) | 6.5 |
+| all | 76 | 23.1 (median 22.5, bias -23) | 4.3 (median 3.8, bias +0) |
+| 1k/1k | 47 | 21.4 (bias -21) | 4.1 |
+| 8k/1k | 29 | 25.9 (bias -26) | 4.5 |
+| 32 clients or fewer | 34 | 14.0 | 4.0 |
+| 33 to 128 clients | 23 | 25.9 | 4.3 |
+| more than 128 clients | 19 | 36.0 (median 30.5) | 4.8 |
 
-How to read it. **TPOT is close everywhere** (4% to 7%). **TTFT is close at low load and wrong where the prefill pool saturates.** Up to 128 clients it is within 16% to 28% of the measurement: BLIS over-predicts TTFT at 1k/1k by 0 to 30% and under-predicts it by 11% to 33% at 8k/1k, a bias that does not change with load, so the fixed costs of the Dynamo path (frontend tokenisation, the router hop, the NIXL notification), which BLIS does not model, and the handoff priced over an assumed fabric are the likely terms. Above 128 clients, at 1k/1k, the recipes' single one-GPU prefill worker with a chunk of 2048 tokens saturates in the simulation (TTFT 1.5 to 30 s) and does not in the measurement (0.4 to 15 s): the points are 1P3D and 2P3D shapes at the knee of the curve, where a few percent of throughput moves TTFT by seconds. That is the regime in which the ranking of topologies is decided, so the TTFT figures here say nothing good about ranking; no ranking metric is computed on this set (the groups are too few: 4 train series and 2 validation ones; `table.md`).
+At the earlier pins the same run read 78.8 % TTFT MAPE over 60 points, and over 128 clients 203.6 %: the simulator, the field list, the catalog and the registry all moved, and the change is not attributed to one of them; the figures are in-sample on the development split.
+
+How to read it. **TPOT is close everywhere** (4% to 5%). **TTFT is under-predicted, by a bias that grows with load**: 14% MAPE up to 32 clients, 26% from 33 to 128, 36% above 128, and the signed bias equals the error at every load above 32 (BLIS predicts lower than measured in every group). The fixed costs of the Dynamo path (frontend tokenisation, the router hop, the NIXL notification), which BLIS does not model, and the handoff priced over an assumed fabric are the likely terms; the points above 128 clients are 1P3D and 2P3D shapes at the knee of the curve, where a few percent of throughput moves TTFT by seconds. That is the regime in which the ranking of topologies is decided, so the TTFT figures here say little about ranking; no ranking metric is computed on this set (the groups are too few: 4 train series and 2 validation ones; `table.md`).
 
 No grade other than G4 is possible: the engine release differs on every point, and four G1 conditions are unevaluated.
 
@@ -88,9 +88,8 @@ Counts are over the 188 ([run B's `table.md`](pd-writer-experiment/table.md), "W
 
 | Reason | Meaning | Blocks | Alone | Cleared by |
 |---|---|---|---|---|
-| `router_unsupported:...:revision_not_covered` / `no_bound_for_regime` | the table maps nothing for the run's build, or its bound has no regime for the point | 186 | 84 | the substrate: entries for the NVFP4 model and the lengths, and a way to name a wheel's commit |
-| `field_not_modelled` / `field_not_in_release` on 18 environment variables and engine fields | the engine's field list | see table | 48 (`VLLM_FLASHINFER_ALLREDUCE_BACKEND`) | blis-vllm |
-| `not_in_catalog` | MiniMax-M3 is not in the catalog at this pin (layer 11 adds `minimax-m3-nvfp4`) | 28 | 0 | the substrate bump |
+| `router_unsupported:...:revision_not_covered` / `no_bound_for_regime` | the table maps nothing for the run's build, or its bound has no regime for the point | 186 | 104 | the substrate: entries for the NVFP4 model and the lengths, and a way to name a wheel's commit |
+| `field_not_modelled` / `field_not_in_release` on environment variables and engine fields | the engine's field list | see table | 48 (`VLLM_FLASHINFER_ALLREDUCE_BACKEND`) | blis-vllm |
 | `value_not_recorded:no_master_entry` | the master configuration at the run's commit has no search-space item that is the row (one dsv4 GB200 row records no decode workers) | 2 | 0 | not removable |
 | `topology_unsupported:pd_pool_data_parallel`, `pd_unequal_data_parallel` | the 308 DP-attention rows, not in this pull | 308 (not run) | | blis-vllm#47, inference-sim#1952 (M3) |
 
@@ -98,7 +97,7 @@ Counts are over the 188 ([run B's `table.md`](pd-writer-experiment/table.md), "W
 
 * **The surviving log agrees with the recipe.** 40 of the 188 points have the API's server log (b300 only). Each holds one engine core's resolved configuration; in all 40 it is the decode worker's, and its tensor-parallel size, data-parallel size, KV dtype and prefix-caching flag are the recipe's decode pool's and not the prefill pool's. The scorer makes this check on every point with a log (`conflict:server_log_vs_recipe.<field>`).
 * **The recipe is the row.** Workers and GPUs per worker of both pools, sequence lengths, concurrency and precision are compared; none of the 186 recipes disagreed.
-* **Two pools never share a node in BLIS; some recipes allow it.** The recipes of 17 of the 84 scored points allow a prefill and a decode worker on one node (`allow_prefill_decode_colocation`); the handoff is priced over the fabric for all, as the recipes' `UCX_TLS=cuda_copy,rc` also routes it.
+* **Two pools never share a node in BLIS; some recipes allow it.** The recipes of 23 of the 104 scored points allow a prefill and a decode worker on one node (`allow_prefill_decode_colocation`); the handoff is priced over the fabric for all, as the recipes' `UCX_TLS=cuda_copy,rc` also routes it.
 
 ## How to reproduce
 
@@ -108,9 +107,9 @@ python3 orchestrator/baseline/freeze.py --units-file units.txt --ledger SUBSTRAT
   --today 2026-11-09 --out PULL --cache ARTIFACTS
 # 2. run A: the substrate's table
 python3 orchestrator/ingest/cli.py score --pull PULL --out OUT_A --units units.txt \
-  --blis INFERENCE_SIM/blis --sim-build c97c497b104a556515717599a4468352c1234d28 \
+  --blis INFERENCE_SIM/blis --sim-build 81a46ba3e0b14ba828eaa46d21191d03dd17376f \
   --catalog SUBSTRATE/catalog --registry SUBSTRATE/registry \
-  --catalog-release 6faaccf8f1a2344918241d6b54fe339de44f7345 --registry-release 6faaccf8f1a2344918241d6b54fe339de44f7345 \
+  --catalog-release v0.14.0 --registry-release v0.14.0 \
   --fields FIELDS.json --harness-commit HARNESS_COMMIT --corpus-dir CORPORA
 # 3. run B: add  --router-policy-experiment round-robin
 # 4. the table
@@ -118,7 +117,7 @@ python3 orchestrator/baseline/split.py splits --pull PULL --out OUT/../splits.js
 python3 orchestrator/baseline/compare.py run --dir OUT --sample in_sample --out table
 ```
 
-`INFERENCE_SIM` is a checkout at the commit with `go build -o blis .` (about 2 minutes); `SUBSTRATE` a checkout at `6faaccf8f1a2344918241d6b54fe339de44f7345`; `FIELDS.json` is blis-vllm's `fields.json` at `28deab082a2fba6762b922c64c7b5b81b7eeac8e`. The freeze reads the live API and GitHub: the artifacts it needs expire after 90 days, and the server logs of 148 of the 188 rows are already gone (the recipes are not), so a later freeze differs from this one in `server_log` only. Run A takes about 20 s (nothing is simulated) and run B about a minute on an idle laptop (84 simulations; far longer when the machine is loaded), 2 GB. To use the substrate's layer 12 entries: `--router-table SUBSTRATE_L12/catalog/routers --assume-router-revision 1682167d3c97f0fc8cd405dee51f17288eeaeb55`.
+`INFERENCE_SIM` is a checkout at the commit with `go build -o blis .` (about 2 minutes); `SUBSTRATE` a checkout at `v0.14.0` (commit `965b05834c47882bc0f9f1a960c90327a756ef3d`); `FIELDS.json` is blis-vllm's `fields.json` at `33455e4cb2d52b9fc9fa6cfb36cf5c1f5e509f5b`. The freeze reads the live API and GitHub: the artifacts it needs expire after 90 days, and the server logs of 148 of the 188 rows are already gone (the recipes are not), so a later freeze differs from this one in `server_log` only. Run A takes about 20 s (nothing is simulated) and run B about a minute on an idle laptop (84 simulations; far longer when the machine is loaded), 2 GB. To use the substrate's layer 12 entries: `--router-table SUBSTRATE_L12/catalog/routers --assume-router-revision 1682167d3c97f0fc8cd405dee51f17288eeaeb55`.
 
 ## What this does not show
 
@@ -133,7 +132,7 @@ python3 orchestrator/baseline/compare.py run --dir OUT --sample in_sample --out 
 
 | From | What |
 |---|---|
-| blis-vllm | classify `env.UCX_TLS`, `env.UCX_RCACHE_MAX_UNRELEASED` (NIXL's transport; 20 NVFP4 points), `env.VLLM_FLASHINFER_ALLREDUCE_BACKEND` (48), `attention_config.use_trtllm_attention` (28), `enforce_eager`, `cudagraph_mode`, `all2all_backend`; #47 for DP attention in a pool |
+| blis-vllm | classify `env.VLLM_FLASHINFER_ALLREDUCE_BACKEND` (48), `attention_config.use_trtllm_attention` (28), `enforce_eager`, `cudagraph_mode`, `all2all_backend`; #47 for DP attention in a pool |
 | inference-sim | #1952 (pools of unequal data-parallel size) |
-| blis-substrate | router entries for the NVFP4 model, 8192/1024 and the other chips, with a way to name a wheel's commit (or a build map), so a Dynamo point can be mapped; the `minimax-m3-nvfp4` catalog entry (layer 11) |
+| blis-substrate | router entries for the NVFP4 model, 8192/1024 and the other chips, with a way to name a wheel's commit (or a build map), so a Dynamo point can be mapped |
 | InferenceX | the Dynamo build commit of a run (a pinned `hash` in the recipe) |

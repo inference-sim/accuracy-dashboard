@@ -1,16 +1,10 @@
 {
  "backlog": [
   {
-   "alone": 84,
+   "alone": 104,
    "blocks": 186,
    "demotes": 0,
    "entry": "router_unsupported:dynamo-router:revision_not_covered"
-  },
-  {
-   "alone": 0,
-   "blocks": 48,
-   "demotes": 0,
-   "entry": "field_not_in_release:env.UCX_TLS"
   },
   {
    "alone": 0,
@@ -26,33 +20,21 @@
   },
   {
    "alone": 0,
-   "blocks": 28,
-   "demotes": 0,
-   "entry": "not_in_catalog"
-  },
-  {
-   "alone": 0,
    "blocks": 20,
    "demotes": 0,
    "entry": "field_not_modelled:enforce_eager"
   },
   {
    "alone": 0,
-   "blocks": 15,
+   "blocks": 14,
    "demotes": 0,
-   "entry": "field_not_modelled:compilation_config.cudagraph_mode"
+   "entry": "value_not_recorded:workload_category_not_stated"
   },
   {
    "alone": 0,
    "blocks": 9,
    "demotes": 0,
    "entry": "field_not_in_release:env.VLLM_MINIMAX_M3_MSA_DECODE_BACKEND"
-  },
-  {
-   "alone": 0,
-   "blocks": 8,
-   "demotes": 0,
-   "entry": "field_not_modelled:env.UCX_RCACHE_MAX_UNRELEASED"
   },
   {
    "alone": 0,
@@ -171,10 +153,6 @@
      "alone": 0,
      "blocks": 6
     },
-    "field_not_in_release:env.UCX_TLS": {
-     "alone": 0,
-     "blocks": 48
-    },
     "field_not_in_release:env.VLLM_MINIMAX_M3_MSA_DECODE_BACKEND": {
      "alone": 0,
      "blocks": 9
@@ -190,10 +168,6 @@
     "field_not_modelled:attention_config.use_trtllm_attention": {
      "alone": 0,
      "blocks": 28
-    },
-    "field_not_modelled:compilation_config.cudagraph_mode": {
-     "alone": 0,
-     "blocks": 15
     },
     "field_not_modelled:compilation_config.custom_ops": {
      "alone": 0,
@@ -223,10 +197,6 @@
      "alone": 0,
      "blocks": 1
     },
-    "field_not_modelled:env.UCX_RCACHE_MAX_UNRELEASED": {
-     "alone": 0,
-     "blocks": 8
-    },
     "field_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND": {
      "alone": 0,
      "blocks": 48
@@ -235,16 +205,12 @@
      "alone": 0,
      "blocks": 6
     },
-    "not_in_catalog": {
-     "alone": 0,
-     "blocks": 28
-    },
     "router_unsupported:dynamo-router": {
      "alone": 0,
      "blocks": 2
     },
     "router_unsupported:dynamo-router:revision_not_covered": {
-     "alone": 84,
+     "alone": 104,
      "blocks": 186
     },
     "topology_unsupported:pd_pool_not_recorded": {
@@ -262,6 +228,10 @@
     "value_not_recorded:no_master_entry": {
      "alone": 0,
      "blocks": 2
+    },
+    "value_not_recorded:workload_category_not_stated": {
+     "alone": 0,
+     "blocks": 14
     }
    },
    "scored": 0,
@@ -286,10 +256,6 @@
      "alone": 0,
      "blocks": 6
     },
-    "field_not_in_release:env.UCX_TLS": {
-     "alone": 0,
-     "blocks": 48
-    },
     "field_not_in_release:env.VLLM_MINIMAX_M3_MSA_DECODE_BACKEND": {
      "alone": 0,
      "blocks": 9
@@ -305,10 +271,6 @@
     "field_not_modelled:attention_config.use_trtllm_attention": {
      "alone": 0,
      "blocks": 28
-    },
-    "field_not_modelled:compilation_config.cudagraph_mode": {
-     "alone": 0,
-     "blocks": 15
     },
     "field_not_modelled:compilation_config.custom_ops": {
      "alone": 0,
@@ -338,10 +300,6 @@
      "alone": 0,
      "blocks": 1
     },
-    "field_not_modelled:env.UCX_RCACHE_MAX_UNRELEASED": {
-     "alone": 0,
-     "blocks": 8
-    },
     "field_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND": {
      "alone": 0,
      "blocks": 48
@@ -350,16 +308,12 @@
      "alone": 0,
      "blocks": 6
     },
-    "not_in_catalog": {
-     "alone": 0,
-     "blocks": 28
-    },
     "router_unsupported:dynamo-router": {
      "alone": 0,
      "blocks": 2
     },
     "router_unsupported:dynamo-router:revision_not_covered": {
-     "alone": 84,
+     "alone": 104,
      "blocks": 186
     },
     "topology_unsupported:pd_pool_not_recorded": {
@@ -377,6 +331,10 @@
     "value_not_recorded:no_master_entry": {
      "alone": 0,
      "blocks": 2
+    },
+    "value_not_recorded:workload_category_not_stated": {
+     "alone": 0,
+     "blocks": 14
     }
    },
    "scored": 0,
@@ -715,7 +673,7 @@
   "withheld": 0
  },
  "identity": {
-  "harness_commit": "0b8154ccefcb14311cf323e143d8520f59944fbb",
+  "harness_commit": "0e9627e219c207593de5bc55d997cf3dca707d64",
   "point_set_sha256": "10cdb496f9893d88f59f25d2386e26532ad756e21d107ab6c51552d79ef60c18",
   "points": 188,
   "pull_manifest_sha256": "bfa74604f84e64aa2f6c44d73fedee45a816c15d11f66da02396913354f5c3d4",
@@ -725,10 +683,10 @@
  },
  "inputs": {
   "blis": {
-   "catalog": "f70c6c7503a47442c4c5d989f8f17b093c14e069",
-   "commit_sha": "780f661ef9c18a2a9928acf8a63a67667cd597c0",
+   "catalog": "v0.14.0",
+   "commit_sha": "81a46ba3e0b14ba828eaa46d21191d03dd17376f",
    "extractor_version": "blis-latency-kernel@unknown",
-   "registry": "f70c6c7503a47442c4c5d989f8f17b093c14e069",
+   "registry": "v0.14.0",
    "release": "unknown"
   },
   "engine": {
@@ -736,14 +694,14 @@
    "version": "0.32.0"
   },
   "experimental": true,
-  "fields_sha256": "dbe9123a677792edf030a0da584b9fc915c45ec206a5cebbffc3944568b6e879",
+  "fields_sha256": "7432f9f82bf551027233a3aae2387fc585408d77d1c44941d037217aed890f1a",
   "simulator": {
-   "build": "780f661ef9c18a2a9928acf8a63a67667cd597c0",
+   "build": "81a46ba3e0b14ba828eaa46d21191d03dd17376f",
    "engine": {
     "kind": "vllm",
     "version": "0.32.0"
    },
-   "harness_commit": "0b8154ccefcb14311cf323e143d8520f59944fbb"
+   "harness_commit": "0e9627e219c207593de5bc55d997cf3dca707d64"
   }
  },
  "kind": "run",
@@ -753,14 +711,9 @@
  "serving_by_grade": {},
  "unlock": [
   {
-   "alone": 84,
+   "alone": 104,
    "blocker": "router_unsupported:dynamo-router:revision_not_covered",
    "blocks": 186
-  },
-  {
-   "alone": 0,
-   "blocker": "field_not_in_release:env.UCX_TLS",
-   "blocks": 48
   },
   {
    "alone": 0,
@@ -774,28 +727,18 @@
   },
   {
    "alone": 0,
-   "blocker": "not_in_catalog",
-   "blocks": 28
-  },
-  {
-   "alone": 0,
    "blocker": "field_not_modelled:enforce_eager",
    "blocks": 20
   },
   {
    "alone": 0,
-   "blocker": "field_not_modelled:compilation_config.cudagraph_mode",
-   "blocks": 15
+   "blocker": "value_not_recorded:workload_category_not_stated",
+   "blocks": 14
   },
   {
    "alone": 0,
    "blocker": "field_not_in_release:env.VLLM_MINIMAX_M3_MSA_DECODE_BACKEND",
    "blocks": 9
-  },
-  {
-   "alone": 0,
-   "blocker": "field_not_modelled:env.UCX_RCACHE_MAX_UNRELEASED",
-   "blocks": 8
   },
   {
    "alone": 0,

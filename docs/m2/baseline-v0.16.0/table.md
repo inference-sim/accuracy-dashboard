@@ -4,7 +4,7 @@ IN-SAMPLE: the points are the ones the model was calibrated on or tuned against;
 
 **Coverage counts include every point, the test split too, by design. Accuracy figures are over train and validation points only, with N stated.** 446 of the points are test or prospective and 30 of them are scored; those 30 are left out of every accuracy figure, so none can be derived by subtraction (docs/m2/evaluation-protocol.md section 6).
 
-- harness commit `0b8154ccefcb14311cf323e143d8520f59944fbb`
+- harness commit `0e9627e219c207593de5bc55d997cf3dca707d64`
 - units sha256 `d89f860a46c0470a22543dc7fb77b8d1b10e508ce4f5ef5073e96f359f08597e` (1740 units)
 - pull manifest sha256 `c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166`
 - point set sha256 `6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60` (1734 points)
@@ -163,7 +163,6 @@ Blocks: in-scope points held at G5 by the blocker. Alone: points that would be s
 | `coefficient_method:cost-model-memory/cudagraph_capture_bytes_full_and_piecewise` | 0 | 0 | 41 |
 | `coefficient_method:cost-model-primitives/engine_workspace_bytes` | 0 | 0 | 41 |
 | `coefficient_method:cost-model-primitives/hbm_derate` | 0 | 0 | 41 |
-| `coefficient_range:unevaluated` | 0 | 0 | 41 |
 | `estimated:gpu_memory_utilization` | 0 | 0 | 41 |
 | `interim_status:host` | 0 | 0 | 41 |
 | `interim_status:model` | 0 | 0 | 41 |
@@ -172,11 +171,12 @@ Blocks: in-scope points held at G5 by the blocker. Alone: points that would be s
 | `interim_status:reasoning_parser` | 0 | 0 | 41 |
 | `interim_status:tool_call_parser` | 0 | 0 | 41 |
 | `interim_status:trust_remote_code` | 0 | 0 | 41 |
-| `kernel_hash:unevaluated` | 0 | 0 | 41 |
 | `other_release:engine release` | 0 | 0 | 41 |
 | `ported_functions_unpublished:engine release` | 0 | 0 | 41 |
-| `resolved_differs:unevaluated` | 0 | 0 | 41 |
-| `value_class:unevaluated` | 0 | 0 | 41 |
+| `unevaluated:coefficient_range` | 0 | 0 | 41 |
+| `unevaluated:kernel_hash` | 0 | 0 | 41 |
+| `unevaluated:resolved_differs` | 0 | 0 | 41 |
+| `unevaluated:value_class` | 0 | 0 | 41 |
 | `interim_status:served_model_name` | 0 | 0 | 31 |
 | `client_difference:sent_prompt_lengths` | 0 | 0 | 30 |
 | `coefficient_method:cost-model-memory/activation_buffer_count_moe_8rank` | 0 | 0 | 23 |

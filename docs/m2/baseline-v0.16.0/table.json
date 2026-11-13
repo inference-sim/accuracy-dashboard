@@ -310,12 +310,6 @@
    "alone": 0,
    "blocks": 0,
    "demotes": 41,
-   "entry": "coefficient_range:unevaluated"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 41,
    "entry": "estimated:gpu_memory_utilization"
   },
   {
@@ -364,12 +358,6 @@
    "alone": 0,
    "blocks": 0,
    "demotes": 41,
-   "entry": "kernel_hash:unevaluated"
-  },
-  {
-   "alone": 0,
-   "blocks": 0,
-   "demotes": 41,
    "entry": "other_release:engine release"
   },
   {
@@ -382,13 +370,25 @@
    "alone": 0,
    "blocks": 0,
    "demotes": 41,
-   "entry": "resolved_differs:unevaluated"
+   "entry": "unevaluated:coefficient_range"
   },
   {
    "alone": 0,
    "blocks": 0,
    "demotes": 41,
-   "entry": "value_class:unevaluated"
+   "entry": "unevaluated:kernel_hash"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "unevaluated:resolved_differs"
+  },
+  {
+   "alone": 0,
+   "blocks": 0,
+   "demotes": 41,
+   "entry": "unevaluated:value_class"
   },
   {
    "alone": 0,
@@ -1158,7 +1158,7 @@
   "withheld": 30
  },
  "identity": {
-  "harness_commit": "0b8154ccefcb14311cf323e143d8520f59944fbb",
+  "harness_commit": "0e9627e219c207593de5bc55d997cf3dca707d64",
   "point_set_sha256": "6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60",
   "points": 1734,
   "pull_manifest_sha256": "c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166",
@@ -1186,7 +1186,7 @@
     "kind": "vllm",
     "version": "0.32.0"
    },
-   "harness_commit": "0b8154ccefcb14311cf323e143d8520f59944fbb"
+   "harness_commit": "0e9627e219c207593de5bc55d997cf3dca707d64"
   }
  },
  "kind": "run",

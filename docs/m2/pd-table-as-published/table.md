@@ -4,12 +4,12 @@ IN-SAMPLE: the points are the ones the model was calibrated on or tuned against;
 
 **Coverage counts include every point, the test split too, by design. Accuracy figures are over train and validation points only, with N stated.** 49 of the points are test or prospective and 0 of them are scored; those 0 are left out of every accuracy figure, so none can be derived by subtraction (docs/m2/evaluation-protocol.md section 6).
 
-- harness commit `0b8154ccefcb14311cf323e143d8520f59944fbb`
+- harness commit `0e9627e219c207593de5bc55d997cf3dca707d64`
 - units sha256 `69533f0e375706c0a0483b4cd79c5f8dd565c6ac206ee49ba2ae74a90e208477` (188 units)
 - pull manifest sha256 `bfa74604f84e64aa2f6c44d73fedee45a816c15d11f66da02396913354f5c3d4`
 - point set sha256 `10cdb496f9893d88f59f25d2386e26532ad756e21d107ab6c51552d79ef60c18` (188 points)
 
-Simulator `780f661ef9c18a2a9928acf8a63a67667cd597c0`, engine {'kind': 'vllm', 'version': '0.32.0'}, fields sha256 `dbe9123a677792edf030a0da584b9fc915c45ec206a5cebbffc3944568b6e879`.
+Simulator `81a46ba3e0b14ba828eaa46d21191d03dd17376f`, engine {'kind': 'vllm', 'version': '0.32.0'}, fields sha256 `7432f9f82bf551027233a3aae2387fc585408d77d1c44941d037217aed890f1a`.
 
 ## Headline (G1 to G4)
 
@@ -67,15 +67,12 @@ Blocks: in-scope points held at G5 by the blocker. Alone: points that would be s
 
 | Blocker | Blocks | Alone |
 |---|---|---|
-| router_unsupported:dynamo-router:revision_not_covered | 186 | 84 |
-| field_not_in_release:env.UCX_TLS | 48 | 0 |
+| router_unsupported:dynamo-router:revision_not_covered | 186 | 104 |
 | field_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND | 48 | 0 |
 | field_not_modelled:attention_config.use_trtllm_attention | 28 | 0 |
-| not_in_catalog | 28 | 0 |
 | field_not_modelled:enforce_eager | 20 | 0 |
-| field_not_modelled:compilation_config.cudagraph_mode | 15 | 0 |
+| value_not_recorded:workload_category_not_stated | 14 | 0 |
 | field_not_in_release:env.VLLM_MINIMAX_M3_MSA_DECODE_BACKEND | 9 | 0 |
-| field_not_modelled:env.UCX_RCACHE_MAX_UNRELEASED | 8 | 0 |
 | field_not_in_release:env.NCCL_MNNVL_ENABLE | 6 | 0 |
 | field_not_modelled:all2all_backend | 6 | 0 |
 | field_not_modelled:env.NCCL_CUMEM_ENABLE | 6 | 0 |
@@ -98,15 +95,12 @@ Blocks: in-scope points held at G5 by the blocker. Alone: points that would be s
 
 | Entry | Blocks | Alone | Demotes |
 |---|---|---|---|
-| `router_unsupported:dynamo-router:revision_not_covered` | 186 | 84 | 0 |
-| `field_not_in_release:env.UCX_TLS` | 48 | 0 | 0 |
+| `router_unsupported:dynamo-router:revision_not_covered` | 186 | 104 | 0 |
 | `field_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND` | 48 | 0 | 0 |
 | `field_not_modelled:attention_config.use_trtllm_attention` | 28 | 0 | 0 |
-| `not_in_catalog` | 28 | 0 | 0 |
 | `field_not_modelled:enforce_eager` | 20 | 0 | 0 |
-| `field_not_modelled:compilation_config.cudagraph_mode` | 15 | 0 | 0 |
+| `value_not_recorded:workload_category_not_stated` | 14 | 0 | 0 |
 | `field_not_in_release:env.VLLM_MINIMAX_M3_MSA_DECODE_BACKEND` | 9 | 0 | 0 |
-| `field_not_modelled:env.UCX_RCACHE_MAX_UNRELEASED` | 8 | 0 | 0 |
 | `field_not_in_release:env.NCCL_MNNVL_ENABLE` | 6 | 0 | 0 |
 | `field_not_modelled:all2all_backend` | 6 | 0 | 0 |
 | `field_not_modelled:env.NCCL_CUMEM_ENABLE` | 6 | 0 | 0 |
