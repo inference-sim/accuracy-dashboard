@@ -11,7 +11,12 @@ G5 with each grade's share, count and own accuracy (COV-11), and each point's gr
                                --catalog DIR --registry DIR --out LANE.json
     m3_baseline.py issues --fields FIELDS --source TEXT --issues ISSUES.json
     m3_baseline.py report --contract DIR --sglang-lane LANE.json --ported PORTED.json --issues ISSUES.json
-                          --sglang-release X.Y.Z --out PREFIX
+                          --engines ENGINES.json --out PREFIX
+    m3_baseline.py engines --sglang-provenance BLIS_SGLANG/provenance.go --sglang-source TEXT
+                           --routers SUBSTRATE/catalog/routers --routers-source TEXT --out ENGINES.json
+
+`engines` records the SGLang release blis-sglang's provenance names (its `Upstream` Version) and the router table's
+entries (router, mode, policy), with the commits they were read at, so the report reads neither from a flag.
 
 `sglang-lane` grades the SGLang units of the window with the scorer's own code and no simulator (coverage.py's
 offline path), and writes one line per unit: its id, chip, release and G5 reasons, nothing measured. `issues`
@@ -89,6 +94,7 @@ def sglang_lane(*, rows: list[dict], today: str, ledger: Path, fields: Path, sta
             raise BaselineError(f"SGLang unit {o.point_id} was not held at G5; the lane has no engine to score it")
         units.append({"point_id": o.point_id, "framework": o.row["framework"], "hardware": o.row["hardware"],
                       "benchmark_type": o.row["benchmark_type"], "measured_date": str(o.row["date"])[:10],
+                      "image": (images[o.point_id] or "").split("@", 1)[0] or None,
                       "run_release": sglang_release(images[o.point_id]),
                       "g5_reasons": sorted([r["code"], r.get("subject", "")] for r in o.g5_reasons)})
     return {"format": "m3-sglang-lane-1", "window": window, "today": today,
@@ -96,6 +102,26 @@ def sglang_lane(*, rows: list[dict], today: str, ledger: Path, fields: Path, sta
                      "no_unit": dict(sorted(Counter(x["reason"] for x in placed.unlisted).items())),
                      "differs_from_source_revision": len(differing)},
             "units": units}
+
+
+# ------------------------------------------------------------------------------------------- engines
+
+_UPSTREAM_VERSION = re.compile(r"var Upstream = [\w.]+\{[^}]*?Version:\s*\"(\d+\.\d+\.\d+)\"", re.S)
+
+
+def engines_doc(provenance_go: str, sglang_source: str, routers_dir: Path, routers_source: str) -> dict:
+    m = _UPSTREAM_VERSION.search(provenance_go)
+    if not m:
+        raise BaselineError("the SGLang provenance file states no Upstream Version")
+    import yaml
+    entries = []
+    for f in sorted(routers_dir.glob("*.yaml")):
+        d = yaml.safe_load(f.read_text())
+        entries.append({"router": d["router"], "mode": d["mode"], "policy": d.get("policy"), "file": f.name})
+    if not entries:
+        raise BaselineError(f"{routers_dir} holds no router table entry")
+    return {"sglang": {"version": m.group(1), "source": sglang_source},
+            "routers": {"entries": entries, "source": routers_source}}
 
 
 # ------------------------------------------------------------------------------------------- issues
@@ -139,7 +165,29 @@ def issue_for(entry: str, issues: dict) -> str | None:
         if hit:
             return hit
     reasons = issues.get("reasons") or {}
-    return reasons.get(entry) or reasons.get(code)
+    e = reasons.get(entry) or reasons.get(code)
+    if e is None:
+        return None
+    return e.get("issue") or f"{e['limit']}: {e.get('why', '')}".rstrip(": ")
+
+
+def classes_of(issues: dict) -> dict:
+    """Each reason's class for the ceiling (ceiling.CLASSES), from the same entries that name its issue."""
+    return {k: v["limit"] for k, v in (issues.get("reasons") or {}).items()}
+
+
+def check_issue_classes(issues: dict) -> list[str]:
+    """The issue file's two statements about a reason agree: a reason a BLIS issue removes (blis, estimate, router)
+    cites that issue; a limit of the data, or a record the source holds, cites none and says why."""
+    out = []
+    for k, v in sorted((issues.get("reasons") or {}).items()):
+        if v.get("limit") not in cl.CLASSES:
+            out.append(f"{k}: limit {v.get('limit')!r} is not one of {cl.CLASSES}")
+        elif v["limit"] in ("blis", "estimate", "router") and not v.get("issue"):
+            out.append(f"{k}: a {v['limit']} reason cites no issue")
+        elif v["limit"] in ("data", "source") and (v.get("issue") or not v.get("why")):
+            out.append(f"{k}: a {v['limit']} reason cites a BLIS issue or says no why")
+    return out
 
 
 # ------------------------------------------------------------------------------------------- the report
@@ -185,22 +233,14 @@ def refused(points: list[dict], issues: dict) -> list[dict]:
     return [{"reason": k, **v, "issue": cited.get(k) or issue_for(k, issues)} for k, v in rows]
 
 
-def blis_work(points: list[dict], issues: dict) -> frozenset:
-    """The reasons of these points that cite a BLIS issue: work to do, never a limit of the data. A reason the issue
-    file marks as data ("data: ...") or cites nothing for is not among them."""
-    out = set()
-    for p in points:
-        for code, subject in p.get("g5_reasons") or []:
-            key = f"{code}:{subject}" if subject else code
-            issue = issue_for(key, issues)
-            if issue and not issue.startswith("data:"):
-                out.add(key)
-    return frozenset(out)
-
-
-def ceilings(points: list[dict], engine_version: str, ported: dict | None, issues: dict) -> dict[str, dict]:
-    work = blis_work(points, issues)
-    return {p["id"]: cl.ceiling(p, engine_version=engine_version, ported=ported, blis_work=work) for p in points}
+def ceilings(points: list[dict], engine_version: str, ported: dict | None, issues: dict, routers: list[dict],
+             engine: str) -> dict[str, dict]:
+    classes = classes_of(issues)
+    try:
+        return {p["id"]: cl.ceiling(p, engine_version=engine_version, ported=ported, classes=classes, routers=routers,
+                                    engine=engine) for p in points}
+    except cl.CeilingError as e:
+        raise BaselineError(str(e)) from None
 
 
 def ceiling_summary(points: list[dict], ceil: dict[str, dict]) -> dict:
@@ -209,15 +249,16 @@ def ceiling_summary(points: list[dict], ceil: dict[str, dict]) -> dict:
     state, limits = Counter(), Counter()
     for p in ins:
         c = ceil[p["id"]]
-        matrix[c["grade"]][c["ceiling"]] += 1
+        matrix[c["grade"]][c["ceiling"] + ("?" if c["ceiling_is_upper_bound"] else "")] += 1
         state[c["state"]] += 1
         for lim in c["limits"]:
             # a limit is counted by its code, without the free-text subject a value_conflict carries
             limits[(lim["cap"], lim["code"] if not lim["code"].startswith("value_conflict:model") else "value_conflict:model")] += 1
     rows = ("G1", "G2", "G3", "G4", "G5", "failed")
-    return {"points": len(ins),
-            "matrix": {g: {k: matrix[g][k] for k in cl.ORDER} for g in rows if matrix[g]},
-            "by_ceiling": {k: sum(matrix[g][k] for g in matrix) for k in cl.ORDER},
+    cols = [k for g in cl.ORDER for k in (g, g + "?") if k in cl.ORDER or any(matrix[r][k] for r in matrix)]
+    return {"points": len(ins), "columns": cols,
+            "matrix": {g: {k: matrix[g][k] for k in cols} for g in rows if matrix[g]},
+            "by_ceiling": {k: sum(matrix[g][k] for g in matrix) for k in cols},
             "state": {"at_ceiling": state["at_ceiling"], "not_yet": state["not_yet"]},
             "upper_bound_only": sum(1 for p in ins if ceil[p["id"]]["ceiling_is_upper_bound"]),
             "limits": [{"cap": cap, "limit": code, "points": n}
@@ -240,9 +281,9 @@ def substitution_kinds(points: list[dict]) -> list[dict]:
 
 
 def lane_report(points: list[dict], *, issues: dict, engine_version: str, ported: dict | None, source: dict,
-                accuracy: bool) -> tuple[dict, dict]:
+                accuracy: bool, routers: list[dict] = (), engine: str = "vLLM") -> tuple[dict, dict]:
     ins = [p for p in points if cmp.scope(p["hardware"]) == cmp.SCOPE_IN]
-    ceil = ceilings(points, engine_version, ported, issues)
+    ceil = ceilings(points, engine_version, ported, issues, list(routers), engine)
     grades = Counter(p["grade"] for p in ins)
     out = {"source": source, "engine_release": engine_version, "points": len(points), "in_scope": len(ins),
            "out_of_scope": len(points) - len(ins),
@@ -258,10 +299,18 @@ def lane_report(points: list[dict], *, issues: dict, engine_version: str, ported
     return out, ceil
 
 
-def report(*, contract: Path, splits: Path | None, sglang: dict, ported: dict, issues: dict, sglang_release_: str) -> tuple[dict, dict]:
+def report(*, contract: Path, splits: Path | None, sglang: dict, ported: dict, issues: dict, engines: dict) -> tuple[dict, dict]:
+    bad = check_issue_classes(issues)
+    if bad:
+        raise BaselineError("the issue file's reasons disagree with their classes: " + "; ".join(bad))
     run = cmp.Run(contract, splits)
     run.withhold(False)
     engine = (run.prov.get("engine") or {}).get("version")
+    releases = {p.get("run_release") for p in _vllm_points(run)} - {None, engine}
+    missing = sorted(releases - set(ported.get("releases") or {}))
+    if missing:
+        raise BaselineError(f"the ported-function comparison holds no comparison for vLLM {', '.join(missing)}, which "
+                            f"the contract's runs used: generate it with --release for each")
     if ported.get("engine_release") != engine:
         raise BaselineError(f"the ported-function comparison is against vLLM {ported.get('engine_release')}, "
                             f"the run's simulator runs {engine}")
@@ -272,17 +321,19 @@ def report(*, contract: Path, splits: Path | None, sglang: dict, ported: dict, i
             "catalog": (run.prov.get("blis") or {}).get("catalog"), "fields_sha256": run.prov.get("fields_sha256"),
             "pull_manifest_sha256": run.prov.get("pull_manifest_sha256"), "experimental": run.prov.get("experimental"),
             "point_set_sha256": cmp.id_set_sha256(run.points)}
+    routers = engines["routers"]["entries"]
     vllm, vceil = lane_report(_vllm_points(run), issues=issues, engine_version=engine, ported=ported, source=vsrc,
-                              accuracy=True)
+                              accuracy=True, routers=routers, engine="vLLM")
     ssrc = {"window": sglang["window"], "today": sglang["today"], "rows": sglang["rows"],
             "graded_by": "the scorer's offline path (coverage.py: score_points with no simulator)"}
-    sg, sceil = lane_report(_points_of_lane(sglang), issues=issues, engine_version=sglang_release_, ported=None,
-                            source=ssrc, accuracy=False)
+    sg, sceil = lane_report(_points_of_lane(sglang), issues=issues, engine_version=engines["sglang"]["version"],
+                            ported=None, source=ssrc, accuracy=False, routers=routers, engine="SGLang")
     doc = {"format": FORMAT, "lanes": {"vllm": vllm, "sglang": sg},
            "ported_functions": {"engine_release": ported["engine_release"], "port": ported["port"],
                                 "releases": {r: len(e["changed"]) for r, e in ported["releases"].items()},
                                 "cited": len(ported["cited"])},
-           "issues_fields_source": issues["fields"].get("source")}
+           "issues_fields_source": issues["fields"].get("source"),
+           "engines_source": {"sglang": engines["sglang"]["source"], "routers": engines["routers"]["source"]}}
     per_point = {"vllm": vceil, "sglang": sceil}
     return doc, per_point
 
@@ -294,7 +345,8 @@ def _n(x):
 
 
 def _share(n, total):
-    return "too few points" if n < 10 else f"{100 * n / total:.1f}%"
+    import headline as hl
+    return hl.TOO_FEW if n < hl.MIN_POINTS else f"{100 * n / total:.1f}%"
 
 
 def markdown(doc: dict) -> str:
@@ -304,7 +356,7 @@ def markdown(doc: dict) -> str:
          "How to read it: [README.md](README.md).", "",
          "## The two lanes", "",
          "| | vLLM | SGLang |", "|---|---|---|",
-         f"| Engine release BLIS runs (G1 needs a run on it) | {v['engine_release']} | {s['engine_release']} (the release blis-sglang pins; no engine yet) |",
+         f"| Engine release BLIS runs (G1 needs a run on it) | {v['engine_release']} | {s['engine_release']} (the release blis-sglang's provenance names; no engine yet) |",
          f"| Points | {v['points']} | {s['points']} |",
          f"| In scope (not AMD or TPU) | {v['in_scope']} | {s['in_scope']} |",
          f"| Scored, G1 to G4 | {v['scored']} | {s['scored']} |",
@@ -329,16 +381,18 @@ def markdown(doc: dict) -> str:
     L += ["## Grade ceilings", "",
           "The ceiling is the best grade a point's recorded data allows if every piece of BLIS work it needs were done "
           "(`orchestrator/baseline/ceiling.py`). *At ceiling*: only new data raises the point. *Not yet*: BLIS work "
-          "holds it below its ceiling. Rows are the grade today, columns the ceiling; in-scope points.", ""]
+          "holds it below its ceiling. Rows are the grade today, columns the ceiling; in-scope points. A ceiling marked "
+          "`?` is an upper bound: the data cannot decide between it and a worse one (no ported-function comparison "
+          "exists, or a router's mode is not recorded).", ""]
     for name, lane in (("vLLM", v), ("SGLang", s)):
         c = lane["ceilings"]
         ub = (f" For {c['upper_bound_only']} points the ceiling is only an upper bound: no comparison of the ported "
               f"functions exists, so G3 or only G4 is unknown until the port exists." if c["upper_bound_only"] else "")
         L += [f"**{name}**: {c['state']['at_ceiling']} points at their ceiling, {c['state']['not_yet']} not yet.{ub}", "",
-              "| Grade today | " + " | ".join(f"ceiling {k}" for k in cl.ORDER) + " |", "|---|" + "---|" * len(cl.ORDER)]
+              "| Grade today | " + " | ".join(f"ceiling {k}" for k in c["columns"]) + " |", "|---|" + "---|" * len(c["columns"])]
         for g, row in c["matrix"].items():
-            L.append(f"| {g} | " + " | ".join(str(row[k]) for k in cl.ORDER) + " |")
-        L.append("| all | " + " | ".join(str(c["by_ceiling"][k]) for k in cl.ORDER) + " |")
+            L.append(f"| {g} | " + " | ".join(str(row[k]) for k in c["columns"]) + " |")
+        L.append("| all | " + " | ".join(str(c["by_ceiling"][k]) for k in c["columns"]) + " |")
         L += ["", "| Limit (from the data) | Caps at | Points |", "|---|---|---|"]
         L += [f"| `{x['limit']}` | {x['cap']} | {x['points']} |" for x in c["limits"]]
         L.append("")
@@ -397,7 +451,13 @@ def main(argv=None) -> int:
     for k in ("contract", "sglang-lane", "ported", "issues", "out"):
         r.add_argument(f"--{k}", required=True, type=Path)
     r.add_argument("--splits", type=Path)
-    r.add_argument("--sglang-release", required=True)
+    r.add_argument("--engines", required=True, type=Path)
+    e = sub.add_parser("engines")
+    e.add_argument("--sglang-provenance", required=True, type=Path)
+    e.add_argument("--sglang-source", required=True)
+    e.add_argument("--routers", required=True, type=Path)
+    e.add_argument("--routers-source", required=True)
+    e.add_argument("--out", required=True, type=Path)
     a = ap.parse_args(argv)
     try:
         if a.cmd == "sglang-lane":
@@ -405,6 +465,10 @@ def main(argv=None) -> int:
                               stack=a.stack, catalog=a.catalog, registry=a.registry)
             a.out.write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n")
             print(f"wrote {a.out}: {len(doc['units'])} SGLang units")
+        elif a.cmd == "engines":
+            doc = engines_doc(a.sglang_provenance.read_text(), a.sglang_source, a.routers, a.routers_source)
+            a.out.write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n")
+            print(f"wrote {a.out}: SGLang {doc['sglang']['version']}, {len(doc['routers']['entries'])} router entries")
         elif a.cmd == "issues":
             raw = a.fields.read_bytes()
             doc = json.loads(a.issues.read_text()) if a.issues.is_file() else {"reasons": {}}
@@ -416,7 +480,7 @@ def main(argv=None) -> int:
         else:
             doc, per_point = report(contract=a.contract, splits=a.splits, sglang=json.loads(a.sglang_lane.read_text()),
                                     ported=json.loads(a.ported.read_text()), issues=json.loads(a.issues.read_text()),
-                                    sglang_release_=a.sglang_release)
+                                    engines=json.loads(a.engines.read_text()))
             write(a.out, doc, per_point)
             print(f"wrote {a.out}.json, {a.out}.md and ceilings.jsonl")
     except (BaselineError, cmp.CompareError) as e:

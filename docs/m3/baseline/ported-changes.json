@@ -463,7 +463,6 @@
     "vllm/v1/core/sched/scheduler.py:Scheduler.schedule",
     "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.allocate_new_blocks",
     "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.get_num_blocks_to_allocate",
-    "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.get_num_skipped_tokens",
     "vllm/v1/core/single_type_kv_cache_manager.py:SingleTypeKVCacheManager.remove_skipped_blocks",
     "vllm/v1/engine/core.py:EngineCore._initialize_kv_caches",
     "vllm/v1/engine/core.py:EngineCore.step_with_batch_queue",
@@ -484,7 +483,8 @@
     "vllm/model_executor/layers/mamba/mamba_utils.py:MambaStateShapeCalculator.gated_delta_net_state_shape",
     "vllm/model_executor/layers/mamba/mamba_utils.py:MambaStateShapeCalculator.mamba2_state_shape",
     "vllm/v1/core/kv_cache_utils.py:_approximate_gcd",
-    "vllm/v1/core/kv_cache_utils.py:estimate_max_model_len.fits_in_memory"
+    "vllm/v1/core/kv_cache_utils.py:estimate_max_model_len.fits_in_memory",
+    "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.get_num_skipped_tokens"
    ]
   },
   "0.22.0": {
@@ -527,7 +527,6 @@
     "vllm/v1/core/sched/scheduler.py:Scheduler.schedule",
     "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.allocate_new_blocks",
     "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.get_num_blocks_to_allocate",
-    "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.get_num_skipped_tokens",
     "vllm/v1/core/single_type_kv_cache_manager.py:SingleTypeKVCacheManager.remove_skipped_blocks",
     "vllm/v1/engine/core.py:EngineCore._initialize_kv_caches",
     "vllm/v1/engine/core.py:EngineCore.step_with_batch_queue",
@@ -549,7 +548,8 @@
     "vllm/model_executor/layers/mamba/mamba_utils.py:MambaStateShapeCalculator.mamba2_state_shape",
     "vllm/v1/core/kv_cache_utils.py:_approximate_gcd",
     "vllm/v1/core/kv_cache_utils.py:_check_enough_kv_cache_memory",
-    "vllm/v1/core/kv_cache_utils.py:estimate_max_model_len.fits_in_memory"
+    "vllm/v1/core/kv_cache_utils.py:estimate_max_model_len.fits_in_memory",
+    "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.get_num_skipped_tokens"
    ]
   },
   "0.24.0": {
@@ -591,7 +591,6 @@
     "vllm/v1/core/sched/scheduler.py:Scheduler.schedule",
     "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.allocate_new_blocks",
     "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.get_num_blocks_to_allocate",
-    "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.get_num_skipped_tokens",
     "vllm/v1/core/single_type_kv_cache_manager.py:SingleTypeKVCacheManager.remove_skipped_blocks",
     "vllm/v1/engine/core.py:EngineCore._initialize_kv_caches",
     "vllm/v1/engine/core.py:EngineCore.step_with_batch_queue",
@@ -614,7 +613,8 @@
     "vllm/models/minimax_m3/nvidia/model.py:MiniMaxM3SparseAttention.get_kv_cache_spec",
     "vllm/v1/core/kv_cache_utils.py:_approximate_gcd",
     "vllm/v1/core/kv_cache_utils.py:_check_enough_kv_cache_memory",
-    "vllm/v1/core/kv_cache_utils.py:estimate_max_model_len.fits_in_memory"
+    "vllm/v1/core/kv_cache_utils.py:estimate_max_model_len.fits_in_memory",
+    "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.get_num_skipped_tokens"
    ]
   },
   "0.25.0": {
@@ -656,7 +656,6 @@
     "vllm/v1/core/sched/scheduler.py:Scheduler.schedule",
     "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.allocate_new_blocks",
     "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.get_num_blocks_to_allocate",
-    "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.get_num_skipped_tokens",
     "vllm/v1/core/single_type_kv_cache_manager.py:SingleTypeKVCacheManager.remove_skipped_blocks",
     "vllm/v1/engine/core.py:EngineCore._initialize_kv_caches",
     "vllm/v1/engine/core.py:EngineCore.step_with_batch_queue",
@@ -679,7 +678,8 @@
     "vllm/models/minimax_m3/nvidia/model.py:MiniMaxM3SparseAttention.get_kv_cache_spec",
     "vllm/v1/core/kv_cache_utils.py:_approximate_gcd",
     "vllm/v1/core/kv_cache_utils.py:_check_enough_kv_cache_memory",
-    "vllm/v1/core/kv_cache_utils.py:estimate_max_model_len.fits_in_memory"
+    "vllm/v1/core/kv_cache_utils.py:estimate_max_model_len.fits_in_memory",
+    "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.get_num_skipped_tokens"
    ]
   },
   "0.25.1": {
@@ -721,7 +721,6 @@
     "vllm/v1/core/sched/scheduler.py:Scheduler.schedule",
     "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.allocate_new_blocks",
     "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.get_num_blocks_to_allocate",
-    "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.get_num_skipped_tokens",
     "vllm/v1/core/single_type_kv_cache_manager.py:SingleTypeKVCacheManager.remove_skipped_blocks",
     "vllm/v1/engine/core.py:EngineCore._initialize_kv_caches",
     "vllm/v1/engine/core.py:EngineCore.step_with_batch_queue",
@@ -744,8 +743,171 @@
     "vllm/models/minimax_m3/nvidia/model.py:MiniMaxM3SparseAttention.get_kv_cache_spec",
     "vllm/v1/core/kv_cache_utils.py:_approximate_gcd",
     "vllm/v1/core/kv_cache_utils.py:_check_enough_kv_cache_memory",
-    "vllm/v1/core/kv_cache_utils.py:estimate_max_model_len.fits_in_memory"
+    "vllm/v1/core/kv_cache_utils.py:estimate_max_model_len.fits_in_memory",
+    "vllm/v1/core/single_type_kv_cache_manager.py:MambaManager.get_num_skipped_tokens"
    ]
   }
- }
+ },
+ "skipped": [
+  {
+   "by": "compat/kernelmodel/kvlayers.go",
+   "range": "vllm/models/deepseek_v4/compressor.py:139-193",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "compat/kernelmodel/kvlayers.go",
+   "range": "vllm/models/deepseek_v41/compressor.py:136-167",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "compat/kernelmodel/kvlayers.go",
+   "range": "vllm/v1/attention/backends/mla/sparse_swa.py:74-140",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "compat/kernelmodel/kvlayers.go",
+   "range": "indexer.py:118-127",
+   "why": "a short file name other than the header's own"
+  },
+  {
+   "by": "compat/kernelmodel/kvlayers.go",
+   "range": "nvidia/model.py:505-509",
+   "why": "a short file name other than the header's own"
+  },
+  {
+   "by": "compat/kernelmodel/mamba_state.go",
+   "range": "vllm/model_executor/models/config.py:672-733",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "compat/kernelmodel/mamba_state.go",
+   "range": "vllm/model_executor/models/config.py:853-878",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "compat/kernelmodel/mamba_state.go",
+   "range": "mamba_mixer2.py:1098-1108",
+   "why": "a short file name other than the header's own"
+  },
+  {
+   "by": "core/connector/nixl/nixl.go",
+   "range": "vllm/distributed/kv_transfer/kv_connector/factory.py:177-189",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/connector/offloading/offloading.go",
+   "range": "offloading/scheduler.py:563-2101",
+   "why": "a short file name other than the header's own"
+  },
+  {
+   "by": "core/kv/layers.go",
+   "range": "vllm/v1/kv_cache_interface.py:686-760",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/kv/layers.go",
+   "range": "vllm/v1/kv_cache_interface.py:949-1033",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/kv/layers.go",
+   "range": "vllm/v1/kv_cache_interface.py:909-946",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/kv/mamba_manager_none.go",
+   "range": "vllm/v1/core/single_type_kv_cache_manager.py:1415-2112",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/kv/mamba_manager_none.go",
+   "range": "vllm/v1/core/single_type_kv_cache_manager.py:174-251",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/kv/manager.go",
+   "range": "vllm/v1/core/kv_cache_utils.py:2690-2763",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/kv/manager.go",
+   "range": "single_type_kv_cache_manager.py:1173-1260",
+   "why": "a short file name other than the header's own"
+  },
+  {
+   "by": "core/lower/capture.go",
+   "range": "vllm/config/vllm.py:74-100",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/lower/capture.go",
+   "range": "vllm/config/vllm.py:53-110",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/lower/memory.go",
+   "range": "vllm/config/engram.py:56-117",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/lower/memory.go",
+   "range": "vllm/config/engram.py:942-1060",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/lower/memory.go",
+   "range": "vllm/config/engram.py:1045-1052",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/lower/memory.go",
+   "range": "vllm/config/engram.py:178-190",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/lower/memory.go",
+   "range": "vllm/config/engram.py:403-409",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/lower/parallel.go",
+   "range": "vllm/config/parallel.py:140-148",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/lower/parallel.go",
+   "range": "vllm/config/parallel.py:66-70",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/lower/step.go",
+   "range": "vllm/v1/worker/gpu/dp_utils.py:1270-1355",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/lower/step.go",
+   "range": "vllm/v1/worker/gpu/dp_utils.py:815-905",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/lower/step.go",
+   "range": "vllm/v1/worker/gpu/dp_utils.py:967-975",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/lower/step.go",
+   "range": "vllm/v1/worker/gpu/dp_utils.py:569-586",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/lower/step.go",
+   "range": "vllm/v1/worker/gpu/dp_utils.py:470-491",
+   "why": "the first line is in no function"
+  },
+  {
+   "by": "core/vllm/engine.go",
+   "range": "scheduler.py:2649-2712",
+   "why": "a short file name other than the header's own"
+  }
+ ]
 }

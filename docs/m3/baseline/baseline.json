@@ -1,4 +1,8 @@
 {
+ "engines_source": {
+  "routers": "inference-sim/blis-substrate v0.14.0 (965b05834c47882bc0f9f1a960c90327a756ef3d), catalog/routers",
+  "sglang": "inference-sim/blis-sglang provenance.go at 51014dd255e7744ed8bc1bd42f814487a08f392f (branch m3/integration; main holds no port yet)"
+ },
  "format": "m3-baseline-1",
  "issues_fields_source": "inference-sim/blis-vllm v0.32.0-blis.3 (40653dc4a16941ed8a9cc66aa82f5b7995cca461), fields.json",
  "lanes": {
@@ -7,10 +11,19 @@
     "by_ceiling": {
      "G1": 0,
      "G2": 0,
-     "G3": 616,
+     "G3": 0,
+     "G3?": 616,
      "G4": 285,
      "G5": 0
     },
+    "columns": [
+     "G1",
+     "G2",
+     "G3",
+     "G3?",
+     "G4",
+     "G5"
+    ],
     "limits": [
      {
       "cap": "G3",
@@ -37,7 +50,8 @@
      "G5": {
       "G1": 0,
       "G2": 0,
-      "G3": 616,
+      "G3": 0,
+      "G3?": 616,
       "G4": 285,
       "G5": 0
      }
@@ -242,9 +256,16 @@
      "G1": 0,
      "G2": 0,
      "G3": 0,
-     "G4": 1152,
-     "G5": 36
+     "G4": 1148,
+     "G5": 40
     },
+    "columns": [
+     "G1",
+     "G2",
+     "G3",
+     "G4",
+     "G5"
+    ],
     "limits": [
      {
       "cap": "G2",
@@ -297,14 +318,9 @@
       "points": 7
      },
      {
-      "cap": "G2",
+      "cap": "G5",
       "limit": "value_not_recorded:speculative_config.model",
       "points": 5
-     },
-     {
-      "cap": "G5",
-      "limit": "value_not_recorded:api_413",
-      "points": 1
      }
     ],
     "matrix": {
@@ -319,8 +335,8 @@
       "G1": 0,
       "G2": 0,
       "G3": 0,
-      "G4": 254,
-      "G5": 36
+      "G4": 250,
+      "G5": 40
      },
      "failed": {
       "G1": 0,
@@ -332,8 +348,8 @@
     },
     "points": 1188,
     "state": {
-     "at_ceiling": 831,
-     "not_yet": 357
+     "at_ceiling": 835,
+     "not_yet": 353
     },
     "upper_bound_only": 0
    },
@@ -416,7 +432,7 @@
     {
      "alone": 10,
      "blocks": 35,
-     "issue": "data: the run's server log is gone (no BLIS issue)",
+     "issue": "data: the run's server log is gone",
      "reason": "value_not_recorded"
     },
     {
@@ -428,7 +444,7 @@
     {
      "alone": 0,
      "blocks": 25,
-     "issue": "data: the row records no recipe fingerprint (no BLIS issue)",
+     "issue": "data: the row records no recipe fingerprint",
      "reason": "value_not_recorded:no_recipe_fingerprint"
     },
     {
@@ -476,7 +492,7 @@
     {
      "alone": 0,
      "blocks": 5,
-     "issue": "data: no recipe names the run's draft model (no BLIS issue)",
+     "issue": "data: no recipe names the run's draft model",
      "reason": "value_not_recorded:speculative_config.model"
     },
     {
@@ -494,7 +510,7 @@
     {
      "alone": 1,
      "blocks": 1,
-     "issue": "data: the API answered 413 for the run's server log (no BLIS issue)",
+     "issue": "source: the API holds the run's server log and refuses to serve one of its size (HTTP 413)",
      "reason": "value_not_recorded:api_413"
     },
     {
@@ -583,11 +599,11 @@
    "repository": "inference-sim/blis-vllm"
   },
   "releases": {
-   "0.21.0": 51,
-   "0.22.0": 50,
-   "0.24.0": 49,
-   "0.25.0": 49,
-   "0.25.1": 49
+   "0.21.0": 50,
+   "0.22.0": 49,
+   "0.24.0": 48,
+   "0.25.0": 48,
+   "0.25.1": 48
   }
  }
 }

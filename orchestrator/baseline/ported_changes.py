@@ -95,18 +95,48 @@ def cited_ranges(text: str) -> tuple[tuple[str, str, str] | None, list[tuple[str
     return prov, ranges
 
 
+def _strip_docstring(node):
+    body = list(getattr(node, "body", []))
+    if body and isinstance(body[0], ast.Expr) and isinstance(getattr(body[0], "value", None), ast.Constant) \
+            and isinstance(body[0].value.value, str):
+        node.body = body[1:] or [ast.Pass()]
+    return node
+
+
+def _key(node, prefix: str) -> str:
+    """A function's qualified name; a property's setter or deleter is named apart from its getter."""
+    for d in getattr(node, "decorator_list", []):
+        if isinstance(d, ast.Attribute) and d.attr in ("setter", "deleter"):
+            return f"{prefix}{node.name}.{d.attr}"
+    return f"{prefix}{node.name}"
+
+
 def functions(source: str) -> dict[str, tuple[int, int, str]]:
-    """Every function and method of a Python file: qualified name to (first line, last line, normalised tree)."""
+    """Every function and method of a Python file, those under an `if` or a `try` included: qualified name to
+    (first line, last line, normalised tree). The tree is compared without positions, docstrings or type annotations
+    of the function itself, so a reformatting, a move, a docstring or an annotation edit is not a change."""
     tree = ast.parse(source)
     out = {}
 
+    def norm(node) -> str:
+        import copy
+        n = _strip_docstring(copy.deepcopy(node))
+        n.returns = None
+        for a in (*n.args.posonlyargs, *n.args.args, *n.args.kwonlyargs, n.args.vararg, n.args.kwarg):
+            if a is not None:
+                a.annotation = None
+        return ast.dump(n, include_attributes=False)
+
     def walk(node, prefix):
         for child in ast.iter_child_nodes(node):
-            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                name = f"{prefix}{child.name}"
-                if not isinstance(child, ast.ClassDef):
-                    out[name] = (child.lineno, child.end_lineno, ast.dump(child, include_attributes=False))
-                walk(child, name + ".")
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                name = _key(child, prefix)
+                out[name] = (child.lineno, child.end_lineno, norm(child))
+                walk(child, f"{prefix}{child.name}.")
+            elif isinstance(child, ast.ClassDef):
+                walk(child, f"{prefix}{child.name}.")
+            elif isinstance(child, (ast.If, ast.Try, ast.With)) or type(child).__name__ == "TryStar":
+                walk(child, prefix)
     walk(tree, "")
     return out
 
@@ -122,39 +152,65 @@ def port_files(port: Path, commit: str) -> list[str]:
     return sorted(n for n in names if n.endswith(".go") and not n.endswith("_test.go"))
 
 
-def cited_functions(port: Path, port_commit: str, vllm: Path) -> tuple[str, str, list[dict]]:
-    """The engine release (tag, commit) the port derives from and every upstream function its headers cite."""
-    cited, release = {}, None
+def cited_functions(port: Path, port_commit: str, vllm: Path) -> tuple[str, str, list[dict], list[dict]]:
+    """The engine release (tag, commit) the port derives from, every upstream function its headers cite, and every
+    range it could not resolve to one, with the reason (reported, never dropped silently)."""
+    cited, release, skipped = {}, None, []
     sources = {}
     for f in port_files(port, port_commit):
         text = git(port, "show", f"{port_commit}:{f}")
         prov, ranges = cited_ranges(text)
         if prov is None:
             continue
+        extra = [ln for ln in header(text) if _DERIVED.match(ln)][1:]
+        if extra:
+            skipped.append({"by": f, "range": None, "why": f"{len(extra)} further Derived-from line(s) not read"})
         if release is None:
             release = prov[1:]
         elif release != prov[1:]:
             raise PortedError(f"{f} derives from vLLM {prov[1]} ({prov[2]}), another file from {release[0]} ({release[1]})")
-        for path, first, _last in ranges:
+        for path, first, last in ranges:
             if path not in sources:
                 try:
                     sources[path] = functions(git(vllm, "show", f"{release[1]}:{path}"))
-                except (PortedError, SyntaxError):
-                    sources[path] = None
+                except (PortedError, SyntaxError) as e:
+                    sources[path] = f"unreadable at {release[0]}: {str(e)[:80]}"
             funcs = sources[path]
-            name = innermost(funcs, first) if funcs else None
+            if isinstance(funcs, str):
+                skipped.append({"by": f, "range": f"{path}:{first}-{last}", "why": funcs})
+                continue
+            name = innermost(funcs, first)
             if name is None:
+                skipped.append({"by": f, "range": f"{path}:{first}-{last}", "why": "the first line is in no function"})
                 continue
             cited.setdefault((path, name), set()).add(f)
+        skipped += [{"by": f, "range": r, "why": "a short file name other than the header's own"} for r in _ambiguous(text)]
     if release is None:
         raise PortedError(f"no file of {port} at {port_commit} states a vLLM provenance header")
     return release[0], release[1], [{"file": p, "function": n, "cited_by": sorted(by)}
-                                    for (p, n), by in sorted(cited.items())]
+                                    for (p, n), by in sorted(cited.items())], skipped
+
+
+def _ambiguous(text: str) -> list[str]:
+    """The ranges cited_ranges skips because they follow a short file name that is not the header's own."""
+    prov, _ = cited_ranges(text)
+    base = prov[0] if prov else ""
+    body = " ".join(x[2:].strip() for x in header(text))
+    out, current_ok = [], True
+    for m in _RANGE.finditer(body):
+        full, short = m.group(1), m.group(2)
+        if full:
+            current_ok = True
+        elif short:
+            current_ok = short == Path(base).name
+        if not current_ok:
+            out.append(m.group(0).strip())
+    return out
 
 
 def generate(port: Path, vllm: Path, releases: list[str], port_commit: str = "HEAD") -> dict:
     port_commit = git(port, "rev-parse", f"{port_commit}^{{commit}}").strip()
-    tag, commit, cited = cited_functions(port, port_commit, vllm)
+    tag, commit, cited, skipped = cited_functions(port, port_commit, vllm)
     base = {}
     for c in cited:
         if c["file"] not in base:
@@ -179,7 +235,7 @@ def generate(port: Path, vllm: Path, releases: list[str], port_commit: str = "HE
                       "with a changed function cannot reach G3. Generated by orchestrator/baseline/ported_changes.py."),
             "engine_release": tag.lstrip("v"), "engine_commit": commit,
             "port": {"repository": "inference-sim/blis-vllm", "commit": port_commit},
-            "cited": cited, "releases": out}
+            "cited": cited, "skipped": skipped, "releases": out}
 
 
 def changed_functions(doc: dict | None, release: str | None) -> list[str] | None:

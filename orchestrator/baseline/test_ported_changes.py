@@ -85,3 +85,29 @@ def test_a_header_range_in_another_file_is_read_against_that_file():
     assert prov == ("vllm/a/b.py", "v0.32.0", "0" * 40)
     assert ranges == [("vllm/a/b.py", 1, 2), ("vllm/a/c.py", 3, 4), ("vllm/a/c.py", 5, 6),
                       ("vllm/a/b.py", 7, 8), ("vllm/a/b.py", 9, 10)]
+
+
+def test_a_docstring_or_an_annotation_edit_is_not_a_change_and_a_guarded_function_is_seen():
+    a = 'def f(x: int) -> int:\n    """one"""\n    return x\n\n\nif True:\n    def g(y):\n        return y\n'
+    b = 'def f(x: str) -> str:\n    """two"""\n    return x\n\n\nif True:\n    def g(y):\n        return y + 1\n'
+    fa, fb = pc.functions(a), pc.functions(b)
+    assert fa["f"][2] == fb["f"][2] and fa["g"][2] != fb["g"][2]
+
+
+def test_a_property_setter_is_its_own_function():
+    src = "class C:\n    @property\n    def x(self):\n        return 1\n\n    @x.setter\n    def x(self, v):\n        self.v = v\n"
+    assert sorted(pc.functions(src)) == ["C.x", "C.x.setter"]
+
+
+def test_a_range_the_tool_cannot_resolve_is_reported(tmp_path):
+    up = upstream(tmp_path)
+    commit = subprocess.run(["git", "-C", str(up), "rev-parse", "v0.32.0"], capture_output=True, text=True).stdout.strip()
+    repo = port(tmp_path, commit)
+    (repo / "more.go").write_text(f"// Derived from vllm/core/sched.py at vLLM v0.32.0 ({commit}):\n"
+                                  "// a blank line (:3-4) and other.py:1-2, and (vllm/core/none.py:1-2).\n\npackage sched\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "more")
+    doc = pc.generate(repo, up, ["0.31.0"])
+    whys = sorted((x["range"], x["why"].split(":")[0]) for x in doc["skipped"])
+    assert whys == [("other.py:1-2", "a short file name other than the header's own"),
+                    ("vllm/core/none.py:1-2", "unreadable at v0.32.0"), ("vllm/core/sched.py:3-4", "the first line is in no function")]

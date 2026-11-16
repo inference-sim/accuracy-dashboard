@@ -14,7 +14,8 @@ import m3_baseline as mb  # noqa: E402
 ROOT = HERE.parent.parent
 BASE = ROOT / "docs" / "m3" / "baseline"
 ISSUES = {"fields": {"sha256": "x", "issues": {"linear_backend": "o/r#1"}},
-          "reasons": {"value_not_recorded:workload_category_not_stated": "o/r#2", "field_not_in_release": "o/r#3"},
+          "reasons": {"value_not_recorded:workload_category_not_stated": {"issue": "o/r#2", "limit": "estimate"},
+                      "field_not_in_release": {"issue": "o/r#3", "limit": "blis"}},
           "refusals": [{"contains": "indexer_kv_dtype", "class": "indexer", "issue": "o/r#4"}]}
 
 
@@ -51,7 +52,8 @@ def _inputs():
     return dict(contract=ROOT / "docs" / "m2" / "preliminary-after" / "contract", splits=None,
                 sglang=json.loads((BASE / "sglang-lane.json").read_text()),
                 ported=json.loads((BASE / "ported-changes.json").read_text()),
-                issues=json.loads((BASE / "issues.json").read_text()), sglang_release_="0.5.23")
+                issues=json.loads((BASE / "issues.json").read_text()),
+                engines=json.loads((BASE / "engines.json").read_text()))
 
 
 def test_a_field_list_other_than_the_runs_is_refused():
@@ -92,7 +94,41 @@ def test_each_substitution_kind_counts_the_scored_in_scope_points_that_carry_it(
                                           {"kind": "later_record", "points": 1, "subjects": 1}]
 
 
-def test_a_reason_that_cites_an_issue_is_blis_work_and_one_marked_data_is_not():
-    pts = [pt(1, "not_scored", [("value_conflict", "kv"), ("value_not_recorded", "")])]
-    issues = {"fields": {"issues": {}}, "reasons": {"value_conflict:kv": "o/r#9", "value_not_recorded": "data: gone"}}
-    assert mb.blis_work(pts, issues) == frozenset({"value_conflict:kv"})
+def test_an_issue_entry_whose_class_and_citation_disagree_is_found():
+    issues = {"reasons": {"a": {"issue": None, "limit": "blis"}, "b": {"issue": "o/r#1", "limit": "data", "why": "w"},
+                          "c": {"issue": None, "limit": "data", "why": "gone"}, "d": {"issue": "o/r#2", "limit": "estimate"},
+                          "e": {"issue": None, "limit": "perhaps"}}}
+    assert mb.check_issue_classes(issues) == ["a: a blis reason cites no issue", "b: a data reason cites a BLIS issue or says no why",
+                                              "e: limit 'perhaps' is not one of ('blis', 'source', 'estimate', 'data', 'router')"]
+
+
+def test_every_reason_of_the_committed_lists_has_a_class_that_agrees_with_its_issue():
+    issues = json.loads((BASE / "issues.json").read_text())
+    assert mb.check_issue_classes(issues) == []
+    doc = json.loads((BASE / "baseline.json").read_text())
+    classes = mb.classes_of(issues)
+    import ceiling as cl
+    for lane in doc["lanes"].values():
+        for r in lane["refused"]:
+            code, _, subject = r["reason"].partition(":")
+            if code == "blis_refused":
+                continue
+            c = cl.class_of(code, subject, classes)
+            assert (c in ("data", "source")) == r["issue"].startswith(("data:", "source:")), r
+
+
+def test_a_contract_run_on_a_release_the_comparison_does_not_hold_is_refused():
+    kw = _inputs()
+    kw["ported"] = {**kw["ported"], "releases": {k: v for k, v in kw["ported"]["releases"].items() if k != "0.22.0"}}
+    with pytest.raises(mb.BaselineError, match="no comparison for vLLM 0.22.0"):
+        mb.report(**kw)
+
+
+def test_the_sglang_release_is_read_from_blis_sglangs_provenance(tmp_path):
+    (tmp_path / "r").mkdir()
+    (tmp_path / "r" / "a.yaml").write_text("router: dynamo\nmode: kv\npolicy: none\n")
+    go = 'package x\n\nvar Upstream = harness.Upstream{\n\tVersion: "0.5.23",\n\tTag:     "v0.5.23",\n}\n'
+    doc = mb.engines_doc(go, "src", tmp_path / "r", "rsrc")
+    assert doc["sglang"]["version"] == "0.5.23" and doc["routers"]["entries"][0]["policy"] == "none"
+    with pytest.raises(mb.BaselineError, match="no Upstream Version"):
+        mb.engines_doc("package x\n", "src", tmp_path / "r", "rsrc")

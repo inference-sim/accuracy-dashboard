@@ -14,20 +14,66 @@
   "source": "inference-sim/blis-vllm v0.32.0-blis.3 (40653dc4a16941ed8a9cc66aa82f5b7995cca461), fields.json"
  },
  "reasons": {
-  "field_not_in_release": "inference-sim/accuracy-dashboard#63",
-  "field_not_modelled:default_chat_template_kwargs.thinking_mode": "inference-sim/accuracy-dashboard#80",
-  "field_not_modelled:kv_transfer_config.kv_connector_extra_config.load_async": "inference-sim/blis-vllm#89",
-  "field_unclassified:sglang: no field list published": "inference-sim/blis-sglang#2",
-  "router_unsupported:dynamo-router": "inference-sim/blis-substrate#47",
-  "router_unsupported:sglang-router": "inference-sim/blis-substrate#47",
-  "value_conflict:kv_transfer_config.engine_id": "inference-sim/blis-vllm#142",
-  "value_conflict:model: the log serves /scratch/models/DeepSeek-V4-Pro-NVFP4, the recipe deepseek-ai/DeepSeek-V4-Pro": "inference-sim/accuracy-dashboard#63",
-  "value_not_recorded": "data: the run's server log is gone (no BLIS issue)",
-  "value_not_recorded:api_413": "data: the API answered 413 for the run's server log (no BLIS issue)",
-  "value_not_recorded:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use": "inference-sim/blis-vllm#89",
-  "value_not_recorded:no_recipe_fingerprint": "data: the row records no recipe fingerprint (no BLIS issue)",
-  "value_not_recorded:speculative_config.model": "data: no recipe names the run's draft model (no BLIS issue)",
-  "value_not_recorded:workload_category_not_stated": "inference-sim/accuracy-dashboard#80"
+  "field_not_in_release": {
+   "issue": "inference-sim/accuracy-dashboard#63",
+   "limit": "blis"
+  },
+  "field_not_modelled:default_chat_template_kwargs.thinking_mode": {
+   "issue": "inference-sim/accuracy-dashboard#80",
+   "limit": "blis"
+  },
+  "field_not_modelled:kv_transfer_config.kv_connector_extra_config.load_async": {
+   "issue": "inference-sim/blis-vllm#89",
+   "limit": "blis"
+  },
+  "field_unclassified:sglang: no field list published": {
+   "issue": "inference-sim/blis-sglang#2",
+   "limit": "blis"
+  },
+  "router_unsupported:dynamo-router": {
+   "issue": "inference-sim/blis-substrate#47",
+   "limit": "router"
+  },
+  "router_unsupported:sglang-router": {
+   "issue": "inference-sim/blis-substrate#47",
+   "limit": "router"
+  },
+  "value_conflict:kv_transfer_config.engine_id": {
+   "issue": "inference-sim/blis-vllm#142",
+   "limit": "blis"
+  },
+  "value_conflict:model: the log serves /scratch/models/DeepSeek-V4-Pro-NVFP4, the recipe deepseek-ai/DeepSeek-V4-Pro": {
+   "issue": "inference-sim/accuracy-dashboard#63",
+   "limit": "blis"
+  },
+  "value_not_recorded": {
+   "issue": null,
+   "limit": "data",
+   "why": "the run's server log is gone"
+  },
+  "value_not_recorded:api_413": {
+   "issue": null,
+   "limit": "source",
+   "why": "the API holds the run's server log and refuses to serve one of its size (HTTP 413)"
+  },
+  "value_not_recorded:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use": {
+   "issue": "inference-sim/blis-vllm#89",
+   "limit": "estimate"
+  },
+  "value_not_recorded:no_recipe_fingerprint": {
+   "issue": null,
+   "limit": "data",
+   "why": "the row records no recipe fingerprint"
+  },
+  "value_not_recorded:speculative_config.model": {
+   "issue": null,
+   "limit": "data",
+   "why": "no recipe names the run's draft model"
+  },
+  "value_not_recorded:workload_category_not_stated": {
+   "issue": "inference-sim/accuracy-dashboard#80",
+   "limit": "estimate"
+  }
  },
  "refusals": [
   {
