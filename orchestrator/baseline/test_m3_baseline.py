@@ -90,3 +90,9 @@ def test_each_substitution_kind_counts_the_scored_in_scope_points_that_carry_it(
            {"status": "not_scored", "hardware": "b200", "substitutions": []}]
     assert mb.substitution_kinds(pts) == [{"kind": "estimated", "points": 2, "subjects": 2},
                                           {"kind": "later_record", "points": 1, "subjects": 1}]
+
+
+def test_a_reason_that_cites_an_issue_is_blis_work_and_one_marked_data_is_not():
+    pts = [pt(1, "not_scored", [("value_conflict", "kv"), ("value_not_recorded", "")])]
+    issues = {"fields": {"issues": {}}, "reasons": {"value_conflict:kv": "o/r#9", "value_not_recorded": "data: gone"}}
+    assert mb.blis_work(pts, issues) == frozenset({"value_conflict:kv"})

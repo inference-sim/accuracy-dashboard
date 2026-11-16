@@ -185,8 +185,22 @@ def refused(points: list[dict], issues: dict) -> list[dict]:
     return [{"reason": k, **v, "issue": cited.get(k) or issue_for(k, issues)} for k, v in rows]
 
 
-def ceilings(points: list[dict], engine_version: str, ported: dict | None) -> dict[str, dict]:
-    return {p["id"]: cl.ceiling(p, engine_version=engine_version, ported=ported) for p in points}
+def blis_work(points: list[dict], issues: dict) -> frozenset:
+    """The reasons of these points that cite a BLIS issue: work to do, never a limit of the data. A reason the issue
+    file marks as data ("data: ...") or cites nothing for is not among them."""
+    out = set()
+    for p in points:
+        for code, subject in p.get("g5_reasons") or []:
+            key = f"{code}:{subject}" if subject else code
+            issue = issue_for(key, issues)
+            if issue and not issue.startswith("data:"):
+                out.add(key)
+    return frozenset(out)
+
+
+def ceilings(points: list[dict], engine_version: str, ported: dict | None, issues: dict) -> dict[str, dict]:
+    work = blis_work(points, issues)
+    return {p["id"]: cl.ceiling(p, engine_version=engine_version, ported=ported, blis_work=work) for p in points}
 
 
 def ceiling_summary(points: list[dict], ceil: dict[str, dict]) -> dict:
@@ -205,6 +219,7 @@ def ceiling_summary(points: list[dict], ceil: dict[str, dict]) -> dict:
             "matrix": {g: {k: matrix[g][k] for k in cl.ORDER} for g in rows if matrix[g]},
             "by_ceiling": {k: sum(matrix[g][k] for g in matrix) for k in cl.ORDER},
             "state": {"at_ceiling": state["at_ceiling"], "not_yet": state["not_yet"]},
+            "upper_bound_only": sum(1 for p in ins if ceil[p["id"]]["ceiling_is_upper_bound"]),
             "limits": [{"cap": cap, "limit": code, "points": n}
                        for (cap, code), n in sorted(limits.items(), key=lambda kv: (-kv[1], kv[0]))]}
 
@@ -227,7 +242,7 @@ def substitution_kinds(points: list[dict]) -> list[dict]:
 def lane_report(points: list[dict], *, issues: dict, engine_version: str, ported: dict | None, source: dict,
                 accuracy: bool) -> tuple[dict, dict]:
     ins = [p for p in points if cmp.scope(p["hardware"]) == cmp.SCOPE_IN]
-    ceil = ceilings(points, engine_version, ported)
+    ceil = ceilings(points, engine_version, ported, issues)
     grades = Counter(p["grade"] for p in ins)
     out = {"source": source, "engine_release": engine_version, "points": len(points), "in_scope": len(ins),
            "out_of_scope": len(points) - len(ins),
@@ -317,7 +332,9 @@ def markdown(doc: dict) -> str:
           "holds it below its ceiling. Rows are the grade today, columns the ceiling; in-scope points.", ""]
     for name, lane in (("vLLM", v), ("SGLang", s)):
         c = lane["ceilings"]
-        L += [f"**{name}**: {c['state']['at_ceiling']} points at their ceiling, {c['state']['not_yet']} not yet.", "",
+        ub = (f" For {c['upper_bound_only']} points the ceiling is only an upper bound: no comparison of the ported "
+              f"functions exists, so G3 or only G4 is unknown until the port exists." if c["upper_bound_only"] else "")
+        L += [f"**{name}**: {c['state']['at_ceiling']} points at their ceiling, {c['state']['not_yet']} not yet.{ub}", "",
               "| Grade today | " + " | ".join(f"ceiling {k}" for k in cl.ORDER) + " |", "|---|" + "---|" * len(cl.ORDER)]
         for g, row in c["matrix"].items():
             L.append(f"| {g} | " + " | ".join(str(row[k]) for k in cl.ORDER) + " |")
@@ -351,6 +368,7 @@ def ceilings_jsonl(per_point: dict) -> str:
             c = per_point[lane][pid]
             lines.append(json.dumps({"lane": lane, "point_id": pid, "grade": c["grade"], "ceiling": c["ceiling"],
                                      "state": c["state"], "limits": [f"{x['cap']} {x['code']}" for x in c["limits"]],
+                                     "ceiling_is_upper_bound": c["ceiling_is_upper_bound"],
                                      "not_yet": c["not_yet"]}, sort_keys=True))
     return "\n".join(lines) + "\n"
 

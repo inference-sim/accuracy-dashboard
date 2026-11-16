@@ -42,6 +42,7 @@ def test_a_release_with_no_changed_function_or_no_comparison_can_reach_g3_not_ye
     for release in ("0.31.0", "0.24.0"):
         r = c(scored(release, "G4"))
         assert (r["ceiling"], r["state"]) == ("G3", "not_yet"), release
+    assert c(scored("0.24.0", "G4"))["ceiling_is_upper_bound"] is True
     assert c(scored("0.25.0", "G4"), ported=None)["ceiling"] == "G3"
 
 
@@ -91,3 +92,27 @@ def test_a_point_the_simulator_refused_is_not_yet():
          "g5_reasons": [("blis_refused", "scenario")]}
     r = c(p)
     assert (r["ceiling"], r["state"], r["not_yet"]) == ("G4", "not_yet", ["blis_refused:scenario"])
+
+
+def test_a_record_reason_an_open_blis_issue_cites_is_not_yet_not_impossible():
+    conflict = ("value_conflict", "model: the log serves a path, the recipe a checkpoint")
+    work = frozenset({"value_conflict:model: the log serves a path, the recipe a checkpoint"})
+    assert c(g5(None, conflict))["ceiling"] == "G5"
+    r = cl.ceiling(g5(None, conflict), engine_version=ENGINE, ported=PORTED, blis_work=work)
+    assert (r["ceiling"], r["state"]) == ("G4", "not_yet")
+    assert r["not_yet"] == ["value_conflict:model: the log serves a path, the recipe a checkpoint"]
+
+
+def test_a_g2_cap_stays_when_an_issue_removes_the_g5_reason():
+    router = ("router_unsupported", "dynamo-router")
+    r = cl.ceiling(g5(ENGINE, router), engine_version=ENGINE, ported=PORTED,
+                   blis_work=frozenset({"router_unsupported:dynamo-router"}))
+    assert r["ceiling"] == "G2"
+
+
+def test_without_a_ported_function_comparison_g3_is_only_an_upper_bound():
+    r = c(g5("0.5.12", ("field_unclassified", "sglang: no field list published")), ported=None)
+    assert (r["ceiling"], r["ceiling_is_upper_bound"]) == ("G3", True)
+    assert r["limits"][0]["code"] == "other_release_unknown"
+    known = c(scored("0.31.0", "G4"))
+    assert (known["ceiling"], known["ceiling_is_upper_bound"]) == ("G3", False)

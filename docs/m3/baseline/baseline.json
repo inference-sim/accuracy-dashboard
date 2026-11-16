@@ -14,7 +14,7 @@
     "limits": [
      {
       "cap": "G3",
-      "limit": "other_release",
+      "limit": "other_release_unknown",
       "points": 616
      },
      {
@@ -46,7 +46,8 @@
     "state": {
      "at_ceiling": 0,
      "not_yet": 901
-    }
+    },
+    "upper_bound_only": 616
    },
    "engine_release": "0.5.23",
    "grades": {
@@ -241,8 +242,8 @@
      "G1": 0,
      "G2": 0,
      "G3": 0,
-     "G4": 1128,
-     "G5": 60
+     "G4": 1152,
+     "G5": 36
     },
     "limits": [
      {
@@ -291,11 +292,6 @@
       "points": 25
      },
      {
-      "cap": "G5",
-      "limit": "value_conflict:model",
-      "points": 23
-     },
-     {
       "cap": "G2",
       "limit": "value_not_recorded:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use",
       "points": 7
@@ -304,11 +300,6 @@
       "cap": "G2",
       "limit": "value_not_recorded:speculative_config.model",
       "points": 5
-     },
-     {
-      "cap": "G5",
-      "limit": "value_conflict:kv_transfer_config.engine_id",
-      "points": 1
      },
      {
       "cap": "G5",
@@ -328,8 +319,8 @@
       "G1": 0,
       "G2": 0,
       "G3": 0,
-      "G4": 230,
-      "G5": 60
+      "G4": 254,
+      "G5": 36
      },
      "failed": {
       "G1": 0,
@@ -341,9 +332,10 @@
     },
     "points": 1188,
     "state": {
-     "at_ceiling": 855,
-     "not_yet": 333
-    }
+     "at_ceiling": 831,
+     "not_yet": 357
+    },
+    "upper_bound_only": 0
    },
    "engine_release": "0.32.0",
    "grades": {

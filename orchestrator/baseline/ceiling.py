@@ -15,7 +15,9 @@ sets it, and the evidence:
 
   the build     a nightly or custom build is not a release: G1 to G3 need one (G4 at best). A release other
                 than the one the simulator runs cannot be G1 or G2 (G3 at best); and when a function the
-                engine ports changed between the two releases (ported_changes.py), not G3 either (G4).
+                engine ports changed between the two releases (ported_changes.py), not G3 either (G4). Where no
+                such comparison exists (an engine whose port does not exist yet, as SGLang's), G3 is only an upper
+                bound and the point says so (`ceiling_is_upper_bound`).
   the record    a value two records of one stage disagree on (value_conflict), a build no record names
                 (build_unparseable), a record that is gone (the server log, the launch artifact, the recipe),
                 a pool the row does not record: G5, until the source is corrected or the record found.
@@ -23,6 +25,9 @@ sets it, and the evidence:
                 later record, a client whose flags or counts were not recorded, a recipe standing in for the
                 run's lost arguments, a value the run did not record, a router BLIS will never host) caps the
                 point at G2.
+
+A reason an open BLIS issue cites as work to do (the caller passes them as `blis_work`) is never a data limit,
+whatever its code: a value conflict the dashboard's own issue removes is "not yet", not "not possible".
 
 Everything else that holds a point down (a field not modelled, a chip without coefficients, a coefficient that
 is not measured, an unevaluated G1 condition, a refusal by the simulator) is BLIS work: it is listed as
@@ -76,15 +81,30 @@ def build_limit(run_release: str | None, engine_version: str, changed: list[str]
                 "why": (f"the run used vLLM {run_release}; {len(changed)} function(s) the engine ports changed between "
                         f"{run_release} and {engine_version} (first: {sorted(changed)[0]}), so G3 cannot be reached, "
                         f"and G1 and G2 need a run on {engine_version}")}
-    known = changed is not None
-    return {"cap": "G3", "code": "other_release",
-            "why": (f"the run used vLLM {run_release}, not {engine_version}: G1 and G2 need a run on {engine_version}; "
-                    + ("no function the engine ports changed between the two releases" if known else
-                       f"no comparison of the ported functions of {run_release} and {engine_version} is recorded"))}
+    if changed is not None:
+        return {"cap": "G3", "code": "other_release",
+                "why": (f"the run used release {run_release}, not {engine_version}: G1 and G2 need a run on "
+                        f"{engine_version}; no function the engine's port cites changed between the two releases")}
+    # No comparison exists (for SGLang, no port exists to compare): G3 is an upper bound, not a finding. Whether a
+    # ported function changed, which would make it G4, is unknown until the port publishes what it ports.
+    return {"cap": "G3", "code": "other_release_unknown", "bound": True,
+            "why": (f"the run used release {run_release}, not {engine_version}: G1 and G2 need a run on {engine_version}; "
+                    f"G3 is an upper bound: no comparison of the ported functions of {run_release} and {engine_version} "
+                    f"exists, so whether G3 or only G4 can be reached is unknown")}
 
 
-def g5_limit(code: str, subject: str) -> dict | None:
-    """The cap a G5 reason sets when the data, not BLIS, sets it."""
+def g5_limit(code: str, subject: str, blis_work: frozenset = frozenset()) -> dict | None:
+    """The cap a G5 reason sets when the data, not BLIS, sets it. A reason in `blis_work` (one an open BLIS issue
+    cites as work to do) is never a "not possible" limit: it caps the point at G5 only when the data sets it. A G2
+    cap stays, because what removes the reason (a router-table policy, an estimation rule) is itself named on the
+    point as a substitution, so G2 is the best the point can be either way."""
+    lim = _g5_limit(code, subject)
+    if lim and lim["cap"] == "G5" and ((f"{code}:{subject}" if subject else code) in blis_work or code in blis_work):
+        return None
+    return lim
+
+
+def _g5_limit(code: str, subject: str) -> dict | None:
     if code in DATA_G5_CODES:
         return {"cap": "G5", "code": f"{code}:{subject}" if subject else code,
                 "why": "two records of one stage disagree, or no record names the build: the source must be corrected"}
@@ -116,7 +136,7 @@ def substitution_limit(s: dict, recorded: set[str]) -> dict | None:
     return {"cap": "G2", "code": f"{kind}:{subject}", "why": f"named on the point from the data: {s.get('detail') or kind}"}
 
 
-def ceiling(point: dict, *, engine_version: str, ported: dict | None = None) -> dict:
+def ceiling(point: dict, *, engine_version: str, ported: dict | None = None, blis_work: frozenset = frozenset()) -> dict:
     """The ceiling of one point of a contract (compare.Run's record: status, grade, run_release, g5_reasons,
     substitutions, args). Returns {"grade", "ceiling", "state", "limits", "not_yet"}: state is "at_ceiling" or
     "not_yet"; limits are the data's caps, worst first; not_yet the BLIS work between the grade and the ceiling
@@ -140,7 +160,7 @@ def ceiling(point: dict, *, engine_version: str, ported: dict | None = None) -> 
                 not_yet.append(f"{s['kind']}:{s.get('subject', '')}")
     else:
         for code, subject in point.get("g5_reasons") or []:
-            lim = g5_limit(code, subject) if status == "not_scored" else None
+            lim = g5_limit(code, subject, blis_work) if status == "not_scored" else None
             if lim:
                 limits.append(lim)
             if not lim or lim["cap"] != "G5":
@@ -155,5 +175,7 @@ def ceiling(point: dict, *, engine_version: str, ported: dict | None = None) -> 
             seen.add(lim["code"])
             uniq.append(lim)
     state = "at_ceiling" if grade == cap else "not_yet"
+    bound = any(lim.get("bound") and lim["cap"] == cap for lim in uniq)
     return {"grade": point["grade"], "ceiling": cap, "state": state, "limits": uniq,
+            "ceiling_is_upper_bound": bound,
             "not_yet": sorted(set(not_yet)) if state == "not_yet" else []}

@@ -38,14 +38,14 @@ Headline, vLLM lane, every graded in-scope point (G1 to G4): 520 points with fig
 
 The ceiling is the best grade a point's recorded data allows if every piece of BLIS work it needs were done (`orchestrator/baseline/ceiling.py`). *At ceiling*: only new data raises the point. *Not yet*: BLIS work holds it below its ceiling. Rows are the grade today, columns the ceiling; in-scope points.
 
-**vLLM**: 855 points at their ceiling, 333 not yet.
+**vLLM**: 831 points at their ceiling, 357 not yet.
 
 | Grade today | ceiling G1 | ceiling G2 | ceiling G3 | ceiling G4 | ceiling G5 |
 |---|---|---|---|---|---|
 | G4 | 0 | 0 | 0 | 795 | 0 |
-| G5 | 0 | 0 | 0 | 230 | 60 |
+| G5 | 0 | 0 | 0 | 254 | 36 |
 | failed | 0 | 0 | 0 | 103 | 0 |
-| all | 0 | 0 | 0 | 1128 | 60 |
+| all | 0 | 0 | 0 | 1152 | 36 |
 
 | Limit (from the data) | Caps at | Points |
 |---|---|---|
@@ -58,13 +58,11 @@ The ceiling is the best grade a point's recorded data allows if every piece of B
 | `value_not_recorded:workload_category_not_stated` | G2 | 51 |
 | `value_not_recorded` | G5 | 35 |
 | `value_not_recorded:no_recipe_fingerprint` | G5 | 25 |
-| `value_conflict:model` | G5 | 23 |
 | `value_not_recorded:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use` | G2 | 7 |
 | `value_not_recorded:speculative_config.model` | G2 | 5 |
-| `value_conflict:kv_transfer_config.engine_id` | G5 | 1 |
 | `value_not_recorded:api_413` | G5 | 1 |
 
-**SGLang**: 0 points at their ceiling, 901 not yet.
+**SGLang**: 0 points at their ceiling, 901 not yet. For 616 points the ceiling is only an upper bound: no comparison of the ported functions exists, so G3 or only G4 is unknown until the port exists.
 
 | Grade today | ceiling G1 | ceiling G2 | ceiling G3 | ceiling G4 | ceiling G5 |
 |---|---|---|---|---|---|
@@ -73,7 +71,7 @@ The ceiling is the best grade a point's recorded data allows if every piece of B
 
 | Limit (from the data) | Caps at | Points |
 |---|---|---|
-| `other_release` | G3 | 616 |
+| `other_release_unknown` | G3 | 616 |
 | `router_unsupported:dynamo-router` | G2 | 286 |
 | `nightly_or_custom` | G4 | 285 |
 | `router_unsupported:sglang-router` | G2 | 4 |
