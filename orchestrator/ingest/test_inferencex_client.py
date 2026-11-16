@@ -344,6 +344,15 @@ def test_an_unavailable_run_records_no_client_commit_and_the_reason(tmp_path):
     assert entry["client_commit"] is None and entry["client_commit_reason"] == "run_unavailable:HTTP_404"
 
 
+def test_a_run_github_no_longer_holds_reads_no_job_log_and_names_why(tmp_path):
+    class Gone(_GH):
+        def job_logs_cached(self, run_id, attempt):
+            raise AssertionError("a gone run has no jobs to read")
+    entry, frozen = _freeze_client(tmp_path, Gone(_job_log(), None))
+    assert entry["client_args"] is None and entry["client_args_reason"] == "run_unavailable:HTTP_404"
+    assert "job_log" not in frozen.files
+
+
 def test_job_logs_are_found_by_result_file_and_a_410_is_expired(monkeypatch, tmp_path):
     import io
     import urllib.error

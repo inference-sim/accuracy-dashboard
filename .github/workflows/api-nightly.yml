@@ -99,6 +99,52 @@ jobs:
           restore-keys: |
             ix-artifacts-
 
+      # The ledger's own pinned source (design 2.2, COV-1): every anchor unit is scored on the record the ledger was
+      # made from, whatever its age, so the night reads the rows of the dump the release's substrate pins
+      # (catalog/ledger/sources.yaml), not the live API's window. The rows (export.sql over a restore.sh restore,
+      # about 150 MB) are third-party data: cached for the runner only, never committed (X12). They are keyed by the
+      # substrate's source pin and its restore and export scripts, so a new pin restores again.
+      - name: Read the release's ledger source
+        id: src
+        env:
+          BLIS_TAGS: ${{ needs.resolve.outputs.blis_tags }}
+        run: |
+          set -euo pipefail
+          SIM="$RUNNER_TEMP/src-sim"
+          git clone -q --depth 1 --branch "$BLIS_TAGS" https://github.com/inference-sim/inference-sim.git "$SIM"
+          eval "$(python3 orchestrator/resolve_stack.py "$SIM")"
+          git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/src-substrate"
+          git -C "$RUNNER_TEMP/src-substrate" checkout -q "$substrate_ref"
+          key=$(cd "$RUNNER_TEMP/src-substrate" && cat catalog/ledger/sources.yaml ledger/inferencex/restore.sh \
+            ledger/inferencex/export.sql | sha256sum | cut -c1-32)
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+      - name: Restore the ledger source rows from the cache
+        id: src-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/source-rows
+          key: ix-source-rows-${{ steps.src.outputs.key }}
+      - name: Restore the ledger's pinned dump and export its rows
+        if: ${{ steps.src-cache.outputs.cache-hit != 'true' }}
+        run: |
+          set -euo pipefail
+          # PostgreSQL 17 (the dump's), from the PostgreSQL project's apt repository, run as this user in a scratch
+          # cluster. restore.sh streams the dump into it one part at a time; the dump is only restored, never executed.
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
+          sudo apt-get install -y -qq postgresql-17 >/dev/null
+          PG=/usr/lib/postgresql/17/bin
+          "$PG/initdb" -D "$RUNNER_TEMP/pgdata" -U "$USER" --auth=trust >/dev/null
+          "$PG/pg_ctl" -D "$RUNNER_TEMP/pgdata" -o "-p 5499 -k $RUNNER_TEMP -c listen_addresses=''" -w start
+          export PGHOST="$RUNNER_TEMP" PGPORT=5499 PATH="$PG:$PATH"
+          mkdir -p "$RUNNER_TEMP/source-rows"
+          bash "$RUNNER_TEMP/src-substrate/ledger/inferencex/restore.sh" ixdump
+          psql -d ixdump -At -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/src-substrate/ledger/inferencex/export.sql" \
+            > "$RUNNER_TEMP/source-rows/rows.jsonl"
+          "$PG/pg_ctl" -D "$RUNNER_TEMP/pgdata" -m fast stop
+          rm -rf "$RUNNER_TEMP/pgdata"
+          wc -l "$RUNNER_TEMP/source-rows/rows.jsonl"
+          df -h "$RUNNER_TEMP" | tail -1
+
       # Score the release resolve_blis.sh named: the oldest unscored one, once (COV-9). Build blis
       # FROM SOURCE at the tag (so a per-release score is sound; #15's seed rule), fetch what it
       # pins, and run one night with it. The scoring is harness/run.sh, run from this checkout
@@ -188,7 +234,8 @@ jobs:
               --blis "$SIM/blis" --catalog "$CATALOG" --registry "$REGISTRY" \
               --substrate-dir "$RUNNER_TEMP/substrate" \
               --substrate-version "$substrate_version" --substrate-commit "$substrate_commit" \
-              --corpus-dir "$RUNNER_TEMP/corpora" --fields "$FIELDS"
+              --corpus-dir "$RUNNER_TEMP/corpora" --fields "$FIELDS" \
+              --source-rows "$RUNNER_TEMP/source-rows/rows.jsonl"
             echo "::endgroup::"
           done
 

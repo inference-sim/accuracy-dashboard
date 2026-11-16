@@ -219,6 +219,10 @@ def client_release(entry: dict, frozen: "Frozen", gh, run_id: str, attempt: int,
             raise
         entry["client_commit"] = None
         entry["client_commit_reason"] = f"run_unavailable:HTTP_{e.code}"
+        # A run GitHub no longer holds has no job to read a log of either.
+        entry["client_args"] = None
+        entry["client_args_reason"] = f"run_unavailable:HTTP_{e.code}"
+        return
     index, expired = gh.job_logs_cached(run_id, attempt)
     hit = index.get(art.normal_result_name(result_filename or ""))
     if hit is None:
@@ -266,7 +270,15 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
         run_id, attempt = run
         # Thread-safe memoized listing: one HTTP call per run even when a pool freezes many of its
         # points concurrently. (run_artifacts kept as an optional no-op for older callers.)
-        arts = gh.list_cached(run_id)
+        try:
+            arts = gh.list_cached(run_id)
+        except urllib.error.HTTPError as e:
+            # GitHub no longer holds the run (deleted, or past its retention): it has no artifacts to read. A fact
+            # about the source's data, not a fault of the pull. Single-turn still scores from the API's /server-log.
+            if e.code not in (404, 410):
+                raise
+            arts = []
+            join_reasons.append(f"artifact_unmatched:run_gone_{e.code}")
         j = art.join({**row, "_attempt": attempt}, arts,
                      lambda a: art.read_result_json(gh.download(a)), agentic=agentic)
         join_reasons += j.reasons

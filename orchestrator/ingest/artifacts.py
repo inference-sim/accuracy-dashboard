@@ -304,13 +304,23 @@ class GitHubArtifacts:
         self._job_logs: dict = {}
 
     def list_cached(self, run_id: str):
-        """gh.list(run_id), memoized and thread-safe: one HTTP listing per run even under a pool."""
+        """gh.list(run_id), memoized and thread-safe: one HTTP listing per run even under a pool. A run GitHub
+        answers 404 or 410 for (gone) is remembered too, and its HTTPError raised again for every point of it."""
+        import urllib.error
         with self._guard:
             lock = self._list_locks.setdefault(run_id, __import__("threading").Lock())
         with lock:
             if run_id not in self._lists:
-                self._lists[run_id] = self.list(run_id)
-            return self._lists[run_id]
+                try:
+                    self._lists[run_id] = self.list(run_id)
+                except urllib.error.HTTPError as e:
+                    if e.code not in (404, 410):
+                        raise
+                    self._lists[run_id] = e
+            got = self._lists[run_id]
+            if isinstance(got, Exception):
+                raise got
+            return got
 
     def _headers(self):
         h = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
@@ -330,10 +340,26 @@ class GitHubArtifacts:
             page += 1
 
     def run(self, run_id: str) -> dict:
-        """The run's commit: {"sha", "date"} (head_sha and the head commit's timestamp)."""
-        doc = clients._get_json(f"https://api.github.com/repos/{self.repo}/actions/runs/{run_id}",
-                                self._headers(), 120, sleep=self.sleep)
-        return {"sha": doc["head_sha"], "date": (doc.get("head_commit") or {}).get("timestamp")}
+        """The run's commit: {"sha", "date"} (head_sha and the head commit's timestamp). Memoized and thread-safe, as
+        list_cached is, a run GitHub answers 404 or 410 for included: one request per run, not one per point."""
+        import urllib.error
+        with self._guard:
+            lock = self._list_locks.setdefault(("run", run_id), __import__("threading").Lock())
+            runs = self.__dict__.setdefault("_runs", {})
+        with lock:
+            if run_id not in runs:
+                try:
+                    doc = clients._get_json(f"https://api.github.com/repos/{self.repo}/actions/runs/{run_id}",
+                                            self._headers(), 120, sleep=self.sleep)
+                    runs[run_id] = {"sha": doc["head_sha"], "date": (doc.get("head_commit") or {}).get("timestamp")}
+                except urllib.error.HTTPError as e:
+                    if e.code not in (404, 410):
+                        raise
+                    runs[run_id] = e
+            got = runs[run_id]
+            if isinstance(got, Exception):
+                raise got
+            return dict(got)
 
     def _job_log(self, job_id: int) -> str | None:
         """A job's log text, or None when GitHub no longer has it (404 or 410: expired)."""
