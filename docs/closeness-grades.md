@@ -42,6 +42,10 @@ A condition is *unevaluated* when no source records the datum it needs. It is th
 - G3 needs the engine to publish which upstream functions it ports and a function-level diff between releases. None does, so a point on another release is G4 (`ported_functions_unpublished`), never G3.
 - Whatever else is true of a point, one unevaluated condition makes it G2 at best.
 
+## Grade ceilings
+
+A point's grade is how close its comparison is today; its *ceiling* is the best grade its recorded data allows once every piece of BLIS work it needs is done (`orchestrator/baseline/ceiling.py`). A point at its ceiling rises only with new data; a point below it names the BLIS work that holds it there. The rules, the evidence and the M3 baseline's ceilings are in [the M3 baseline](m3/baseline/README.md).
+
 ## The G5 reasons and how each is removed
 
 The list is closed (design §11.4); [grades.md](grades.md) has the table with the scorer's own reason codes. In words:

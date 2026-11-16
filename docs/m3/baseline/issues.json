@@ -1,0 +1,44 @@
+{
+ "fields": {
+  "issues": {
+   "cpu_offload_gb": "inference-sim/blis-vllm#65",
+   "dcp_comm_backend": "inference-sim/blis-vllm#109",
+   "decode_context_parallel_size": "inference-sim/blis-vllm#109",
+   "enable_eplb": "inference-sim/blis-vllm#108",
+   "linear_backend": "inference-sim/blis-vllm#80",
+   "mm_encoder_tp_mode": "inference-sim/blis-vllm#57",
+   "moe_backend": "inference-sim/blis-registry#75",
+   "prefix_match_unit": "inference-sim/blis-vllm#109"
+  },
+  "sha256": "62743b57746f8376b291fdb853eb0eb19edacc5d717e1e7107d6e0f3ed41348d",
+  "source": "inference-sim/blis-vllm v0.32.0-blis.3 (40653dc4a16941ed8a9cc66aa82f5b7995cca461), fields.json"
+ },
+ "reasons": {
+  "field_not_in_release": "inference-sim/accuracy-dashboard#63",
+  "field_not_modelled:default_chat_template_kwargs.thinking_mode": "inference-sim/accuracy-dashboard#80",
+  "field_not_modelled:kv_transfer_config.kv_connector_extra_config.load_async": "inference-sim/blis-vllm#89",
+  "field_unclassified:sglang: no field list published": "inference-sim/blis-sglang#2",
+  "router_unsupported:dynamo-router": "inference-sim/blis-substrate#47",
+  "router_unsupported:sglang-router": "inference-sim/blis-substrate#47",
+  "value_conflict:kv_transfer_config.engine_id": "inference-sim/blis-vllm#142",
+  "value_conflict:model: the log serves /scratch/models/DeepSeek-V4-Pro-NVFP4, the recipe deepseek-ai/DeepSeek-V4-Pro": "inference-sim/accuracy-dashboard#63",
+  "value_not_recorded": "data: the run's server log is gone (no BLIS issue)",
+  "value_not_recorded:api_413": "data: the API answered 413 for the run's server log (no BLIS issue)",
+  "value_not_recorded:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use": "inference-sim/blis-vllm#89",
+  "value_not_recorded:no_recipe_fingerprint": "data: the row records no recipe fingerprint (no BLIS issue)",
+  "value_not_recorded:speculative_config.model": "data: no recipe names the run's draft model (no BLIS issue)",
+  "value_not_recorded:workload_category_not_stated": "inference-sim/accuracy-dashboard#80"
+ },
+ "refusals": [
+  {
+   "class": "indexer_kv_dtype bf16 refused for the DeepSeek sparse indexer",
+   "contains": "indexer_kv_dtype",
+   "issue": "inference-sim/blis-vllm#84"
+  },
+  {
+   "class": "quantization gpt_oss_mxfp4 not priced",
+   "contains": "gpt_oss_mxfp4",
+   "issue": "inference-sim/blis-substrate#102"
+  }
+ ]
+}
