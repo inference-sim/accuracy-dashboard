@@ -9,7 +9,9 @@ checks the committed tree for that:
   - every committed report that says it holds test figures (`test_evaluated` true, at its top or in its
     development split) names log rows (`evaluation`), and each of them is in the log;
   - every committed report that says it does not, and states its split counts, withholds every test, prospective and
-    unknown point.
+    unknown point;
+  - every row of the log is named by a committed report, so no evaluation is logged and then left unpublished, and no
+    report is deleted to hide one.
 
     published_test.py [DOCS_DIR]      exit status 1 on any problem
 """
@@ -61,6 +63,7 @@ def _evaluated(doc: dict) -> bool:
 def problems(docs: Path, log: Path) -> list[str]:
     rows, out = log_rows(log.read_text()) if log.is_file() else ([], [f"{log} does not exist"])
     logged = set(rows)
+    named_all: set[str] = set()
     for p, doc in _reports(docs):
         rel = p.relative_to(docs)
         if _evaluated(doc):
@@ -68,12 +71,14 @@ def problems(docs: Path, log: Path) -> list[str]:
             if not named:
                 out.append(f"{rel} holds test figures and names no evaluation-log row")
             out += [f"{rel} names the evaluation {r!r}, which the log does not hold" for r in named if r not in logged]
+            named_all.update(named)
         elif isinstance(doc.get("splits"), dict):
             for k in HELD:
                 v = doc["splits"].get(k) or {}
                 if v.get("withheld", 0) != v.get("points", 0):
                     out.append(f"{rel} shows the errors of {v.get('points', 0) - v.get('withheld', 0)} {k} points "
                                f"without a logged evaluation")
+    out += [f"the log row {r!r} is named by no committed report" for r in rows if r not in named_all]
     return out
 
 

@@ -129,47 +129,69 @@ def _metric(r: dict, m: str) -> float | None:
     return float(v) if v is not None else None
 
 
+def _fits(m: str, r: dict, base: dict, want: float) -> bool:
+    a, b = _metric(r, m), _metric(base, m)
+    return a is not None and bool(b) and abs(a / b - want) <= REL_TOL * want
+
+
+def run_fit(sw: dict, byc: dict) -> dict | None:
+    """The records of one run that reproduce the sweep's measured curve: for some record b0 at the lowest
+    concurrency, at every concurrency the records whose TPOT and TTFT both stand to b0's as the artifact's measured
+    relatives do. None when the run does not reproduce the curve."""
+    c0 = sw["points"][0]["concurrency"]
+    chosen = defaultdict(set)
+    for b0 in byc.get(c0, []):
+        got = {}
+        for p in sw["points"]:
+            got[p["concurrency"]] = [r for r in byc.get(p["concurrency"], [])
+                                     if all(_fits(m, r, b0, p[f"measured_{m}_relative"]) for m in METRICS)]
+        if all(got.values()):
+            for c, rs in got.items():
+                chosen[c] |= {str(r["id"]) for r in rs}
+    return {c: sorted(ids, key=int) for c, ids in chosen.items()} if chosen else None
+
+
 def match(points: dict, rows: list[dict], slugs: dict[str, str], through: str) -> list[dict]:
-    """Each point of the artifact, with the dump record that measured it, or why there is none."""
+    """Each point of the artifact, with the dump records that measured it, or why there is none, and its split."""
     idx = defaultdict(list)
+    by_id = {}
     for r in rows:
         if (r.get("benchmark_type") == "single_turn" and not r.get("disagg") and (r.get("spec_method") or "none") == "none"
                 and not r.get("error") and str(r.get("date"))[:10] <= through):
             idx[row_key(r)].append(r)
+            by_id[str(r["id"])] = r
     out = []
     for sw in points["sweeps"]:
-        cands = [r for k in sweep_keys(sw, slugs[sw["model"]]) for r in idx.get(k, [])]
+        slug = slugs[sw["model"]]
+        cands = [r for k in sweep_keys(sw, slug) for r in idx.get(k, [])]
         runs = defaultdict(lambda: defaultdict(list))
         for r in cands:
             runs[str(r.get("github_run_id") or r["id"])][int(r["conc"])].append(r)
-        c0 = sw["points"][0]["concurrency"]
-
-        def fits(byc):
-            if c0 not in byc:
-                return False
-            for m in METRICS:
-                base = [_metric(r, m) for r in byc[c0]]
-                for p in sw["points"]:
-                    if p["concurrency"] not in byc:
-                        return False
-                    want = p[f"measured_{m}_relative"]
-                    if not any(b and _metric(r, m) is not None and abs(_metric(r, m) / b - want) <= REL_TOL * want
-                               for b in base for r in byc[p["concurrency"]]):
-                        return False
-            return True
-        hits = [run for run, byc in runs.items() if fits(byc)]
+        fits = {run: f for run, byc in runs.items() if (f := run_fit(sw, byc))} if len(sw["points"]) >= 2 else {}
+        kind = sweep_kind(sw, slug, through)
         for p in sw["points"]:
             e = {"cell": cell(sw), "sweep": f"{sw['topology_id']}|{sw['label']}", "concurrency": p["concurrency"],
-                 "framework": sw["framework"]}
-            if len(hits) == 1:
-                rec = sorted(runs[hits[0]][p["concurrency"]], key=lambda r: int(r["id"]))
-                e["records"] = [str(r["id"]) for r in rec]
-                e["split"] = split_kind(rec[0])
+                 "framework": sw["framework"], "split": kind}
+            if len(fits) == 1:
+                e["records"] = next(iter(fits.values()))[p["concurrency"]]
+                rk = split_kind(by_id[e["records"][0]])
+                if rk != kind:
+                    raise MatchError(f"sweep {e['sweep']}: its record {e['records'][0]} is {rk}, its series {kind}")
             else:
                 e["records"] = []
-                e["why"] = "no_record" if not hits else "several_runs"
+                e["why"] = ("one_point_sweep" if len(sw["points"]) < 2 else "no_record" if not fits else "several_runs")
             out.append(e)
     return out
+
+
+def sweep_kind(sw: dict, slug: str, through: str) -> str:
+    """The development split of every point of a sweep, from its own series (split.py's rule: the InferenceX slug,
+    chip, precision, framework, no speculation, aggregated), whether or not a record is found for it. The artifact's
+    points were measured no later than `through`, before the freeze date, so none is prospective."""
+    import split as dsplit
+    series = {"model": slug, "hardware": sw["gpu"], "precision": sw["precision"], "framework": sw["framework"],
+              "spec_method": "none", "disagg": False}
+    return dsplit.kind_of(dsplit.series_id(series), through)
 
 
 def split_kind(row: dict) -> str:
@@ -179,6 +201,7 @@ def split_kind(row: dict) -> str:
 
 
 UNKNOWN = "unknown"
+FIGS = ("tpot_mape_pct", "ttft_mape_pct", "tpot_shape_pct", "ttft_shape_pct")
 FIGURE_KINDS = ("train", "validation")
 
 
@@ -208,7 +231,11 @@ def freeze(matched: list[dict], rows: list[dict], *, ledger_dir: Path, out: Path
     the pull is made again without them (from the cache), so the report can count them as uncovered."""
     import shutil
     units = sorted({e["unit"] for e in matched if e.get("unit")})
+    if not units:
+        raise MatchError("no matched point has a ledger unit: there is nothing to freeze")
     rc = _pull(matched, rows, units, ledger_dir=ledger_dir, out=out, cache=cache, workers=workers)
+    if not (out / "manifest.json").is_file():
+        raise MatchError(f"the pull wrote no manifest to {out} (exit {rc})")
     manifest = json.loads((out / "manifest.json").read_text())
     bad = {e["point_id"]: (e.get("problems") or ["pull error"])[0] for e in manifest["points"]
            if "artifact_unmatched:pull_error" in e["reasons"]}
@@ -227,6 +254,8 @@ def _pull(matched, rows, units, *, ledger_dir, out, cache, workers) -> int:
     keep = set(units)
     want = {r for e in matched if e.get("unit") in keep for r in e["records"]}
     mine = sorted((r for r in rows if str(r["id"]) in want), key=lambda r: int(r["id"]))
+    if not mine:
+        raise MatchError("none of the units' records is in the dump rows given")
     dates = sorted({str(r["date"])[:10] for r in mine})
 
     def pull(fetch, *, today, window_days):
@@ -244,20 +273,36 @@ def _pull(matched, rows, units, *, ledger_dir, out, cache, workers) -> int:
 
 # ------------------------------------------------------------------------------------------- report
 
-def read_contract(d: Path) -> dict[str, dict]:
+_HTTP = __import__("re").compile(r"HTTPError (\d{3})")
+GONE_STATUSES = ("404", "410")
+
+
+def pull_error_reason(err: str) -> str:
+    """A unit the pull could not read: `record_gone` only when GitHub or the API answered that the record no longer
+    exists (404 or 410); any other error is a `pull_error`, with its text."""
+    m = _HTTP.search(err or "")
+    if m and m.group(1) in GONE_STATUSES:
+        return f"record_gone: HTTP {m.group(1)}"
+    return f"pull_error: {(err or 'no error text')[:60]}"
+
+
+def read_contract(d: Path, splits: Path) -> dict[str, dict]:
+    """The harness's contract, read through compare.Run, with its checks (the point count against provenance.json)."""
+    import compare as cmp
+    try:
+        run = cmp.Run(d, splits)
+    except cmp.CompareError as e:
+        raise MatchError(str(e)) from None
     out = {}
-    with open(d / "points.csv", newline="") as fh:
-        for r in csv.DictReader(fh):
-            out[r["point_id"]] = {"status": "scored", "grade": r["grade"],
-                                  **{k: float(r[k]) for k in ("meas_ttft_us", "pred_ttft_us", "meas_tpot_us", "pred_tpot_us")}}
-    for name, status in (("not_scored.jsonl", "not_scored"), ("failed.jsonl", "failed")):
-        for line in (d / name).read_text().splitlines():
-            if line.strip():
-                n = json.loads(line)
-                g = n.get("g5_reason") or {}
-                reason = (f"{g['code']}:{g['subject']}"[:70] if g.get("subject") else g.get("code")) if g else \
-                    ",".join(n.get("faults") or [])[:70]
-                out[n["point_id"]] = {"status": status, "grade": n.get("grade", "failed"), "reason": reason}
+    for pid, p in run.points.items():
+        if p["status"] == "scored":
+            out[pid] = {"status": "scored", "grade": p["grade"],
+                        **{k: p[k] for k in ("meas_ttft_us", "pred_ttft_us", "meas_tpot_us", "pred_tpot_us")}}
+        else:
+            reasons = sorted(p["g5_reasons"], key=lambda r: (r[0] not in __import__("grade").G5_CODES, r))
+            code, subject = reasons[0] if reasons else ("unknown", "")
+            out[pid] = {"status": p["status"], "grade": p["grade"],
+                        "reason": (f"{code}:{subject}" if subject else code)[:70]}
     return out
 
 
@@ -265,37 +310,45 @@ def _mean(xs):
     return sum(xs) / len(xs) if xs else None
 
 
-def cell_figures(entries: list[dict], side: str) -> dict:
+def cell_figures(entries: list[dict], side: str, only=None) -> dict:
     """MAPE and shape of one estimator over a cell's entries (each with meas_<m>, <side>_<m>, sweep, concurrency,
-    withheld). Coverage counts every entry; errors only those not withheld."""
+    withheld). Coverage counts every entry; errors only those not withheld, and with `only` (a predicate) only the
+    entries it accepts. A shape is taken against each sweep's own lowest concurrency c0, so a sweep whose c0 has no
+    figure, or is not accepted, gives none. A figure over fewer than headline.MIN_POINTS points is "too few points"."""
+    import headline as hl
+    ok = (lambda e: True) if only is None else only
     covered = [e for e in entries if e.get(f"{side}_tpot") is not None]
-    use = [e for e in covered if not e["withheld"]]
+    use = [e for e in covered if not e["withheld"] and ok(e)]
     out = {"points": len(entries), "covered": len(covered), "coverage_pct": 100 * len(covered) / len(entries) if entries else None,
            "with_figures": len(use)}
+    sweeps = defaultdict(list)
+    for e in entries:
+        sweeps[e["sweep"]].append(e)
     for m in METRICS:
-        out[f"{m}_mape_pct"] = _mean([abs(e[f"{side}_{m}"] - e[f"meas_{m}"]) / e[f"meas_{m}"] * 100 for e in use])
-        sweeps = defaultdict(list)
-        for e in entries:
-            sweeps[e["sweep"]].append(e)
+        errs = [abs(e[f"{side}_{m}"] - e[f"meas_{m}"]) / e[f"meas_{m}"] * 100 for e in use]
         sh = []
         for pts in sweeps.values():
             pts = sorted(pts, key=lambda e: e["concurrency"])
             p0 = pts[0]
-            if p0.get(f"{side}_{m}") is None:
+            if p0.get(f"{side}_{m}") is None or p0["withheld"] or not ok(p0):
                 continue
             for e in pts[1:]:
-                if e.get(f"{side}_{m}") is None or e["withheld"] or p0["withheld"]:
+                if e.get(f"{side}_{m}") is None or e["withheld"] or not ok(e):
                     continue
                 mr = e[f"meas_{m}"] / p0[f"meas_{m}"]
                 sh.append(abs(e[f"{side}_{m}"] / p0[f"{side}_{m}"] - mr) / mr * 100)
-        out[f"{m}_shape_pct"] = _mean(sh)
-        out[f"{m}_shape_n"] = len(sh)
+        for key, xs in ((f"{m}_mape_pct", errs), (f"{m}_shape_pct", sh)):
+            out[key] = hl.TOO_FEW if 0 < len(xs) < hl.MIN_POINTS else _mean(xs)
+            out[key.replace("_pct", "_n")] = len(xs)
     return out
 
 
 def won(blis: dict, est: dict) -> bool:
+    """Every figure of BLIS below the estimator's, and at least its coverage. A figure that is absent or over too few
+    points is no win."""
     for k in ("tpot_mape_pct", "ttft_mape_pct", "tpot_shape_pct", "ttft_shape_pct"):
-        if blis[k] is None or est[k] is None or not blis[k] < est[k]:
+        a, b = blis[k], est[k]
+        if not isinstance(a, float) or not isinstance(b, float) or not a < b:
             return False
     return blis["coverage_pct"] >= est["coverage_pct"]
 
@@ -314,6 +367,8 @@ def entries_for(points: dict, matched: list[dict], contract: dict[str, dict], sp
             for k in METRICS:
                 e[f"meas_{k}"] = p[f"measured_{k}_relative"]
                 e[f"est_{k}"] = p.get(f"{estimator}_{k}_relative")
+            if (e["est_tpot"] is None) != (e["est_ttft"] is None):
+                raise MatchError(f"point {m['sweep']} c{p['concurrency']}: the estimator states one of TPOT and TTFT")
             c = contract.get(m.get("unit") or "")
             if c and c["status"] == "scored":
                 for k in METRICS:
@@ -330,6 +385,8 @@ def entries_for(points: dict, matched: list[dict], contract: dict[str, dict], sp
             if sp and sp["kind"] != kind:
                 raise MatchError(f"unit {m['unit']}: the splits file says {sp['kind']}, its record {kind}")
             e["kind"] = kind
+            if kind == UNKNOWN and c and c["status"] == "scored":
+                raise MatchError(f"unit {m['unit']} is scored and has no split; a figure of it could be a test point's")
             # Only train and validation points carry figures, unless a logged evaluation asks for the test and
             # prospective ones. A point of no known split is never shown: it could be a test point.
             e["withheld"] = kind == UNKNOWN or (kind not in FIGURE_KINDS and not evaluate_test)
@@ -367,9 +424,9 @@ def build_report(entries: list[dict], estimator_label: str, provenance: dict, ev
     for fw in sorted({e["framework"] for e in entries}):
         es = [e for e in entries if e["framework"] == fw]
         b, x = cell_figures(es, "blis"), cell_figures(es, "est")
-        both = [e for e in es if e.get("blis_tpot") is not None]
+        blis_has = lambda e: e.get("blis_tpot") is not None  # noqa: E731
         lanes[fw] = {"blis": b, "estimator": x, "won": won(b, x),
-                     "estimator_on_blis_points": cell_figures(both, "est") if both else None,
+                     "estimator_on_blis_points": cell_figures(es, "est", only=blis_has) if any(map(blis_has, es)) else None,
                      "cells": sum(r["framework"] == fw for r in rows), "cells_won": sum(r["won"] for r in rows if r["framework"] == fw)}
     if evaluate_test and not evaluation:
         raise MatchError("a report with test figures needs the evaluation-log rows that logged it")
@@ -379,7 +436,12 @@ def build_report(entries: list[dict], estimator_label: str, provenance: dict, ev
 
 
 def _f(x, d=2):
-    return "-" if x is None else f"{x:.{d}f}"
+    return "-" if x is None else x if isinstance(x, str) else f"{x:.{d}f}"
+
+
+def _fn(fig: dict, key: str) -> str:
+    """A figure with its point count (COV-11)."""
+    return f"{_f(fig[key])} (n={fig[key.replace('_pct', '_n')]})"
 
 
 def markdown(rep: dict) -> str:
@@ -400,12 +462,13 @@ def markdown(rep: dict) -> str:
          "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for fw, ln in rep["lanes"].items():
         b, x = ln["blis"], ln["estimator"]
-        L.append(f"| {fw} | {b['points']} | {_f(b['coverage_pct'], 1)} | {_f(x['coverage_pct'], 1)} | {_f(b['tpot_mape_pct'])} | "
-                 f"{_f(x['tpot_mape_pct'])} | {_f(b['ttft_mape_pct'])} | {_f(x['ttft_mape_pct'])} | {_f(b['tpot_shape_pct'])} | "
-                 f"{_f(x['tpot_shape_pct'])} | {_f(b['ttft_shape_pct'])} | {_f(x['ttft_shape_pct'])} | "
-                 f"{ln['cells_won']} of {ln['cells']} | {'won' if ln['won'] else 'lost'} |")
-    L += ["", f"The same metric over only the points BLIS covers, so the errors compare like with like (coverage aside):", "",
-          f"| Lane | Points both cover | BLIS TPOT MAPE | {est} | BLIS TTFT MAPE | {est} | BLIS TPOT shape | {est} | BLIS TTFT shape | {est} |",
+        L.append(f"| {fw} | {b['points']} | {_f(b['coverage_pct'], 1)} | {_f(x['coverage_pct'], 1)} | "
+                 + " | ".join(f"{_fn(b, k)} | {_fn(x, k)}" for k in FIGS)
+                 + f" | {ln['cells_won']} of {ln['cells']} | {'won' if ln['won'] else 'lost'} |")
+    L += ["", f"The same metric over only the points BLIS covers, so the errors compare like with like (coverage aside); "
+          f"a shape is taken against each sweep's own lowest concurrency, and a sweep whose lowest point BLIS does not "
+          f"cover gives no shape on either side:", "",
+          f"| Lane | Points BLIS covers | BLIS TPOT MAPE | {est} | BLIS TTFT MAPE | {est} | BLIS TPOT shape | {est} | BLIS TTFT shape | {est} |",
           "|---|---|---|---|---|---|---|---|---|---|"]
     for fw, ln in rep["lanes"].items():
         x = ln.get("estimator_on_blis_points")
@@ -413,9 +476,7 @@ def markdown(rep: dict) -> str:
             L.append(f"| {fw} | 0 | - | - | - | - | - | - | - | - |")
             continue
         b = ln["blis"]
-        L.append(f"| {fw} | {x['points']} | {_f(b['tpot_mape_pct'])} | {_f(x['tpot_mape_pct'])} | {_f(b['ttft_mape_pct'])} | "
-                 f"{_f(x['ttft_mape_pct'])} | {_f(b['tpot_shape_pct'])} | {_f(x['tpot_shape_pct'])} | {_f(b['ttft_shape_pct'])} | "
-                 f"{_f(x['ttft_shape_pct'])} |")
+        L.append(f"| {fw} | {x['with_figures']} | " + " | ".join(f"{_fn(b, k)} | {_fn(x, k)}" for k in FIGS) + " |")
     L += ["", "## Every cell", "",
           f"| Framework | Chip | Model | Mode | Points | Withheld | BLIS coverage % | {est} coverage % | BLIS TPOT MAPE | {est} | "
           f"BLIS TTFT MAPE | {est} | BLIS TPOT shape | {est} | BLIS TTFT shape | {est} | Result | BLIS uncovered, by reason |",
@@ -424,10 +485,21 @@ def markdown(rep: dict) -> str:
         b, x = r["blis"], r["estimator"]
         unc = ", ".join(f"{k} {v}" for k, v in r["blis_uncovered"].items()) or "-"
         L.append(f"| {r['framework']} | {r['gpu']} | {r['model']} | {r['mode']} | {b['points']} | {r['withheld']} | "
-                 f"{_f(b['coverage_pct'], 1)} | {_f(x['coverage_pct'], 1)} | {_f(b['tpot_mape_pct'])} | {_f(x['tpot_mape_pct'])} | "
-                 f"{_f(b['ttft_mape_pct'])} | {_f(x['ttft_mape_pct'])} | {_f(b['tpot_shape_pct'])} | {_f(x['tpot_shape_pct'])} | "
-                 f"{_f(b['ttft_shape_pct'])} | {_f(x['ttft_shape_pct'])} | {'won' if r['won'] else 'lost'} | {unc} |")
+                 f"{_f(b['coverage_pct'], 1)} | {_f(x['coverage_pct'], 1)} | "
+                 + " | ".join(f"{_fn(b, k)} | {_fn(x, k)}" for k in FIGS)
+                 + f" | {'won' if r['won'] else 'lost'} | {unc} |")
     return "\n".join(L) + "\n"
+
+
+def tool_commit() -> str:
+    """The commit of this checkout, refused when matched.py differs from it: the report names the code that made it."""
+    root = HERE.parent.parent
+    head = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    dirty = subprocess.run(["git", "-C", str(root), "status", "--porcelain", "--", str(Path(__file__).resolve())],
+                           capture_output=True, text=True).stdout.strip()
+    if not head or dirty:
+        raise MatchError("matched.py is not committed at this checkout's HEAD; commit it before writing a report")
+    return head
 
 
 def log_evaluation(path: Path, commit: str, label: str, entries: list[dict]) -> list[str]:
@@ -437,7 +509,9 @@ def log_evaluation(path: Path, commit: str, label: str, entries: list[dict]) -> 
     for k in ("test", "prospective"):
         es = [e for e in entries if e["kind"] == k]
         kinds[k] = {"points": len(es), "scored": sum(e.get("blis_tpot") is not None for e in es)}
-    return cmp.evaluation_log(path, commit, label, {"kinds": kinds})
+    cmp.evaluation_log(path, commit, label, {"kinds": kinds})
+    # every row of this evaluation's label and commit, a repeat included: a report names all the rows it stands for
+    return [r for r in Path(path).read_text().splitlines() if r.startswith("| ") and f"| {commit} | {label} |" in r]
 
 
 def main(argv=None) -> int:
@@ -489,17 +563,17 @@ def main(argv=None) -> int:
                 raise MatchError("--evaluate-test needs --log and --label: a test evaluation is logged")
             pts = json.loads(a.points.read_text())
             matched_ = json.loads(a.match.read_text())["points"]
-            contract = read_contract(a.contract)
+            contract = read_contract(a.contract, a.splits)
             for unit, err in json.loads(a.pull_errors.read_text()).items():
                 if unit not in contract:
-                    contract[unit] = {"status": "not_frozen", "grade": None,
-                                      "reason": "record_gone: " + ("HTTP 404" if "404" in err else err[:40])}
+                    contract[unit] = {"status": "not_frozen", "grade": None, "reason": pull_error_reason(err)}
             splits = json.loads(a.splits.read_text())
             entries = entries_for(pts, matched_, contract, splits, a.estimator, a.evaluate_test)
             prov = json.loads((a.contract / "provenance.json").read_text())
+            tool = tool_commit()
             provenance = {"harness_commit": prov.get("harness_commit"), "simulator": (prov.get("simulator") or {}).get("build"),
                           "catalog": (prov.get("blis") or {}).get("catalog"), "fields_sha256": prov.get("fields_sha256"),
-                          "experimental": prov.get("experimental"),
+                          "experimental": prov.get("experimental"), "matched_py_commit": tool,
                           "artifact": pts["snapshot"].get("campaign", {}).get("run_id"),
                           "measurement_source_url": pts.get("measurement_source_url")}
             rows = log_evaluation(a.log, prov.get("harness_commit"), a.label, entries) if a.evaluate_test else None

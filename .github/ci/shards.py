@@ -70,6 +70,8 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
 """),
         pytest("Scoring harness entrypoint flags, harness commit and no image path", "harness/test_run_sh.py"),
         script("orchestrator/ingest/test_build.py", "vLLM build resolution + commit-distance gate"),
+        pytest("The matched comparison and the held-out check", "orchestrator/baseline/test_matched.py",
+               "orchestrator/baseline/test_published_test.py"),
     ],
     # The two largest standalone suites.
     "ingest": [
@@ -95,8 +97,7 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
                "orchestrator/ingest/test_pd.py", "orchestrator/ingest/test_thinking_rule.py",
                "orchestrator/baseline/test_compare.py", "orchestrator/baseline/test_split.py",
                "orchestrator/baseline/test_residuals.py", "orchestrator/baseline/test_docs.py",
-               "orchestrator/baseline/test_contracts_current.py", "orchestrator/test_update_index.py",
-               "orchestrator/baseline/test_matched.py", "orchestrator/baseline/test_published_test.py"),
+               "orchestrator/baseline/test_contracts_current.py", "orchestrator/test_update_index.py"),
     ],
     # The two repository-wide checks that were hidden behind earlier failures: they run on their own.
     "boundary": [

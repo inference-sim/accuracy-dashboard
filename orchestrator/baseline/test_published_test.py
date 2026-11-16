@@ -34,8 +34,8 @@ def test_test_figures_whose_evaluation_the_log_does_not_hold_fail(tmp_path):
 
 
 def test_test_figures_that_name_no_evaluation_fail(tmp_path):
-    found = run(tree(tmp_path, [ROW], {"development_split": {"test_evaluated": True}}))
-    assert len(found) == 1 and "names no evaluation-log row" in found[0]
+    found = run(tree(tmp_path, [], {"development_split": {"test_evaluated": True}}))
+    assert found == ["m3/r.json holds test figures and names no evaluation-log row"]
 
 
 def test_a_malformed_log_row_fails(tmp_path):
@@ -43,10 +43,15 @@ def test_a_malformed_log_row_fails(tmp_path):
                 "| 2026-11-16 | " + "a" * 40 + " | e | train | 1 | 1 |", "a note", "| 2026-11-16 | " + "a" * 40 + " |  | test | 1 | 1 |"):
         import hashlib
         found = run(tree(tmp_path / hashlib.sha256(bad.encode()).hexdigest()[:12], [bad]))
-        assert len(found) == 1 and "not a row" in found[0], bad
+        assert any("not a row" in f for f in found), bad
 
 
 def test_an_unlogged_report_that_shows_held_out_errors_fails(tmp_path):
     rep = {"test_evaluated": False, "splits": {"test": {"points": 4, "withheld": 3}, "unknown": {"points": 2, "withheld": 2}}}
     found = run(tree(tmp_path, [], rep))
     assert len(found) == 1 and "1 test points without a logged evaluation" in found[0]
+
+
+def test_a_logged_evaluation_that_no_committed_report_names_fails(tmp_path):
+    found = run(tree(tmp_path, [ROW]))
+    assert found == [f"the log row {ROW!r} is named by no committed report"]

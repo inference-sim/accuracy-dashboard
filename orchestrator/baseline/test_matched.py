@@ -9,9 +9,17 @@ import pytest
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "ingest"))
+import headline as hl  # noqa: E402
 import matched as mt  # noqa: E402
 
 EST = "other"
+
+
+@pytest.fixture(autouse=True)
+def one_point_is_enough(monkeypatch, request):
+    """These sweeps have three points; the minimum point count has a test of its own."""
+    if "minimum" not in request.node.name:
+        monkeypatch.setattr(hl, "MIN_POINTS", 1)
 
 
 def sweep(tid="t1", gpu="h200", model="m", fw="vllm", tpot=(10.0, 12.0, 15.0), ttft=(100.0, 120.0, 200.0),
@@ -106,12 +114,14 @@ def test_test_points_are_withheld_from_errors_and_kept_in_coverage():
     assert (b["covered"], b["with_figures"], b["tpot_mape_pct"]) == (3, 0, None)
 
 
-def test_a_point_of_no_known_split_is_withheld_even_in_a_logged_evaluation():
+def test_a_point_of_no_known_split_is_withheld_even_in_a_logged_evaluation_and_refused_if_scored():
     for ev in (False, True):
-        es = entries(pred=[(1.0, 1.0), (1.2, 1.2), (1.5, 2.0)], kind=None, evaluate_test=ev)
-        b = mt.cell_figures(es, "blis")
-        assert (b["covered"], b["with_figures"], b["tpot_mape_pct"]) == (3, 0, None), ev
-        assert mt.split_counts(es)["unknown"] == {"points": 3, "scored": 3, "withheld": 3}
+        es = entries(pred=None, kind=None, evaluate_test=ev)
+        x = mt.cell_figures(es, "est")
+        assert (x["covered"], x["with_figures"], x["tpot_mape_pct"]) == (3, 0, None), ev
+        assert mt.split_counts(es)["unknown"] == {"points": 3, "scored": 0, "withheld": 3}
+        with pytest.raises(mt.MatchError, match="is scored and has no split"):
+            entries(pred=[(1.0, 1.0), (1.2, 1.2), (1.5, 2.0)], kind=None, evaluate_test=ev)
 
 
 def test_a_logged_evaluation_shows_the_test_points_and_names_its_log_rows():
@@ -151,6 +161,9 @@ def test_a_logged_evaluation_appends_a_row_per_held_out_kind(tmp_path):
     named = mt.log_evaluation(log, "c" * 40, "label", entries(pred=[(1.0, 1.0), (1.2, 1.2), None], kind="test"))
     rows = [x for x in log.read_text().splitlines() if x.startswith("| 2")]
     assert named == rows
+    # a repeat of the same evaluation is logged again, and its report names every row of it
+    again = mt.log_evaluation(log, "c" * 40, "label", entries(pred=[(1.0, 1.0), (1.2, 1.2), None], kind="test"))
+    assert len(again) == 4 and again == [x for x in log.read_text().splitlines() if x.startswith("| 2")]
     assert [r.split(" | ")[2:] for r in rows] == [["label", "test", "3", "2 |"], ["label", "prospective", "0", "0 |"]]
 
 
@@ -170,3 +183,75 @@ def test_a_unit_the_pull_cannot_read_is_listed_and_left_out_of_the_pull(tmp_path
     rc = mt.freeze(matched, [], ledger_dir=tmp_path, out=tmp_path / "pull", cache=tmp_path, workers=1, errors_out=errs)
     assert rc == 0 and calls == [["bad", "good"], ["good"]]
     assert json.loads(errs.read_text()) == {"bad": "<HTTPError 404: 'Not Found'>"}
+
+
+def test_a_figure_under_the_minimum_point_count_is_too_few_points_and_wins_nothing_minimum():
+    es = entries(pred=[(1.0, 1.0), (1.2, 1.2), (1.5, 2.0)])
+    b = mt.cell_figures(es, "blis")
+    assert (b["tpot_mape_pct"], b["tpot_mape_n"], b["tpot_shape_n"]) == (hl.TOO_FEW, 3, 2)
+    assert mt.build_report(es, EST, {}, False)["cells"][0]["won"] is False
+
+
+def test_the_like_for_like_shape_uses_each_sweeps_own_lowest_concurrency():
+    # BLIS does not cover c0: neither side gets a shape from the sweep, though both cover c2 and c4
+    es = entries(pred=[None, (1.2, 1.2), (1.5, 2.0)])
+    x = mt.cell_figures(es, "est", only=lambda e: e.get("blis_tpot") is not None)
+    assert (x["tpot_shape_n"], x["tpot_mape_n"]) == (0, 2)
+    assert mt.cell_figures(es, "blis")["tpot_shape_n"] == 0
+
+
+def test_only_the_records_that_reproduce_both_metrics_against_one_base_are_taken():
+    rows = [row(1, 7, 1, 0.010, 0.100), row(2, 7, 2, 0.012, 0.120), row(3, 7, 4, 0.015, 0.200),
+            row(4, 7, 2, 0.012, 0.300)]          # a second record at c2: its TPOT fits, its TTFT does not
+    got = mt.match({"sweeps": [sweep()]}, rows, {"m": "mslug"}, "2026-09-27")
+    assert [e["records"] for e in got] == [["1"], ["2"], ["3"]]
+    # a curve whose TPOT and TTFT are each reproduced only by a different record is no match
+    rows = [row(1, 7, 1, 0.010, 0.100), row(2, 7, 2, 0.012, 0.300), row(5, 7, 2, 0.050, 0.120), row(3, 7, 4, 0.015, 0.200)]
+    assert {e.get("why") for e in mt.match({"sweeps": [sweep()]}, rows, {"m": "mslug"}, "2026-09-27")} == {"no_record"}
+
+
+def test_a_one_point_sweep_is_not_matched_by_curve():
+    sw = sweep()
+    sw["points"] = sw["points"][:1]
+    got = mt.match({"sweeps": [sw]}, [row(1, 7, 1, 0.010, 0.100)], {"m": "mslug"}, "2026-09-27")
+    assert got[0]["why"] == "one_point_sweep" and got[0]["records"] == []
+
+
+def test_every_point_has_its_series_split_whether_or_not_a_record_is_found():
+    import split as dsplit
+    want = dsplit.split_of(dsplit.series_id({"model": "mslug", "hardware": "h200", "precision": "fp8", "framework": "vllm",
+                                             "spec_method": "none", "disagg": False}))
+    assert {e["split"] for e in mt.match({"sweeps": [sweep()]}, [], {"m": "mslug"}, "2026-09-27")} == {want}
+
+
+def test_a_pull_error_is_a_gone_record_only_for_404_or_410():
+    assert mt.pull_error_reason("<HTTPError 404: 'Not Found'>") == "record_gone: HTTP 404"
+    assert mt.pull_error_reason("<HTTPError 410: 'Gone'>") == "record_gone: HTTP 410"
+    assert mt.pull_error_reason("<HTTPError 502: 'Bad Gateway'>").startswith("pull_error: <HTTPError 502")
+    assert mt.pull_error_reason("TimeoutError()").startswith("pull_error: TimeoutError")
+
+
+def test_an_estimator_point_with_one_of_its_two_figures_is_refused_by_name():
+    sw = sweep()
+    del sw["points"][1][f"{EST}_ttft_relative"]
+    with pytest.raises(mt.MatchError, match="c2: the estimator states one of TPOT and TTFT"):
+        entries(pred=[(1.0, 1.0), (1.2, 1.2), (1.5, 2.0)], sw=sw)
+
+
+def test_a_contract_whose_files_hold_fewer_points_than_its_provenance_is_refused(tmp_path):
+    d = tmp_path / "contract"
+    d.mkdir()
+    (d / "points.csv").write_text("scenario,model,gpu,label,concurrency,meas_tpot_us,pred_tpot_us,meas_ttft_us,"
+                                  "pred_ttft_us,grade,point_id,measured_date\n")
+    for f in ("fidelity.jsonl", "not_scored.jsonl", "failed.jsonl"):
+        (d / f).write_text("")
+    (d / "facets.json").write_text("{}")
+    (d / "provenance.json").write_text(json.dumps({"points": 5}))
+    with pytest.raises(mt.MatchError, match="5 in provenance"):
+        mt.read_contract(d, tmp_path / "splits.json")
+
+
+def test_a_freeze_with_nothing_to_freeze_is_an_error_not_a_crash(tmp_path):
+    with pytest.raises(mt.MatchError, match="nothing to freeze"):
+        mt.freeze([{"unit": None, "records": []}], [], ledger_dir=tmp_path, out=tmp_path / "p", cache=tmp_path,
+                  workers=1, errors_out=tmp_path / "e.json")
