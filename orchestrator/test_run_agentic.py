@@ -39,7 +39,7 @@ SERVER_LOG = (
     "(APIServer pid=1) INFO  version 0.17.2rc1.dev4996+g5894fdf98\n"
     "non-default args: {'model': '/scratch/models/Kimi-K3', 'tensor_parallel_size': 8, "
     "'max_model_len': 262144, "
-    "'speculative_config': {'method': 'dspark', 'num_speculative_tokens': 7, "
+    "'speculative_config': {'method': 'dspark', 'model': 'Inferact/Kimi-K3-DSpark', 'num_speculative_tokens': 7, "
     "'rejection_sample_method': 'synthetic', 'synthetic_acceptance_length': 3.84}}\n"
 )
 # The same run with no max_model_len recorded anywhere in its server log.
@@ -78,6 +78,18 @@ def test_pure_functions():
        sweep["stated_config"].get("speculative_method") == "dspark"
        and sweep["stated_config"].get("num_speculative_tokens") == 7,
        str(sweep["stated_config"]))
+
+    # The draft checkpoint the log names reaches the scenario config, so the generator can name
+    # the catalog drafter (inference-sim/blis-substrate#124); a log that names none adds none.
+    eagle = ra.read_server_log(SERVER_LOG.replace(
+        "{'method': 'dspark', 'model': 'Inferact/Kimi-K3-DSpark', ",
+        "{'method': 'eagle3', 'model': 'Inferact/MiniMax-M3-EAGLE3', "))
+    ck("the log's draft checkpoint is read", eagle.get("draft_model") == "Inferact/MiniMax-M3-EAGLE3", str(eagle))
+    ck("the draft checkpoint is written into the scenario config",
+       ra.sweep_from_row(ROW, server=eagle)["stated_config"].get("draft_model") == "Inferact/MiniMax-M3-EAGLE3")
+    bare = ra.read_server_log(SERVER_LOG.replace("'model': 'Inferact/Kimi-K3-DSpark', ", ""))
+    ck("a log that names no draft checkpoint adds none",
+       "draft_model" not in ra.sweep_from_row(ROW, server=bare)["stated_config"])
 
     mt, mp = ra.measured_us(ROW)  # seconds -> microseconds
     ck("measured TTFT is seconds scaled to microseconds",
@@ -185,6 +197,16 @@ def write_catalog(td: Path, uncapped_sha: str | None = None, capped_sha: str | N
             f"    source:\n      huggingface: {repo}\n      revision: {rev}\n      file: traces.jsonl\n"
             f"      split: train\n    sha256: {sha}\n  random_seed: 42\n  max_context_length: max_model_len\n"
             f"  category: coding\n")
+    # Kimi-K3 and the DSpark drafter its runs serve, which name each other (the run's
+    # speculative_config names the drafter's repository).
+    for name, doc, method in (
+            ("kimi-k3", "source: {repo: moonshotai/Kimi-K3}\ndrafters: [kimi-k3-dspark]\n", None),
+            ("kimi-k3-dspark", "source: {repo: Inferact/Kimi-K3-DSpark}\ntargets: [kimi-k3]\n", "dspark")):
+        d = td / "models" / name
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "model.yaml").write_text(f"name: {name}\n{doc}")
+        if method:
+            (d / "graph.yaml").write_text(f"global: {{}}\nspeculator:\n  method: {method}\n")
 
 
 

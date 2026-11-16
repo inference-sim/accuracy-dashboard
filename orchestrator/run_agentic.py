@@ -65,6 +65,7 @@ Usage:
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -73,9 +74,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "ingest"))
 
 import result  # noqa: E402
 
-from extract_agentic_replay_args import (AGENTX_SCENARIO, parse_job_log,  # noqa: E402
+from extract_agentic_replay_args import (AGENTX_SCENARIO, _nested, parse_job_log,  # noqa: E402
                                          parse_server_log)
-from gen_scenarios import PackagingError, emit  # noqa: E402
+from gen_scenarios import DrafterError, PackagingError, emit, speculative_drafter  # noqa: E402
 import blis_commands as bc  # noqa: E402
 import stack as sk  # noqa: E402
 import support as sp  # noqa: E402
@@ -259,6 +260,19 @@ def _attention_dp_size(row: dict) -> int:
     return 2
 
 
+def read_server_log(server_log: str) -> dict:
+    """parse_server_log's speculative setting, and the draft checkpoint the log's
+    speculative_config names (`draft_model`, as the log spells it), which the scenario's drafter
+    is resolved from (gen_scenarios.speculative_drafter). Read here, not in
+    extract_agentic_replay_args.py, which the contract scorer imports and this does not change."""
+    out = parse_server_log(server_log)
+    i = server_log.find("non-default args: {")
+    spec = _nested(server_log[i:], "speculative_config") if i >= 0 else None
+    if spec is not None and (m := re.search(r"'model':\s*'([^']+)'", spec)):
+        out["draft_model"] = m.group(1)
+    return out
+
+
 def sweep_from_row(row: dict, server: dict | None = None, node_size: int | None = None,
                    engine: dict | None = None) -> dict:
     """A gen_scenarios.emit()-shaped deployment dict from an agentic API row.
@@ -301,6 +315,8 @@ def sweep_from_row(row: dict, server: dict | None = None, node_size: int | None 
     if spec != "none" and server.get("num_speculative_tokens"):
         stated["speculative_method"] = server.get("speculative_method") or spec
         stated["num_speculative_tokens"] = int(server["num_speculative_tokens"])
+        if server.get("draft_model"):
+            stated["draft_model"] = server["draft_model"]
     return {
         "scenario": scenario,
         "model": model,
@@ -485,7 +501,7 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
 
     row = json.loads(Path(args.row).read_text())
-    server = parse_server_log(Path(args.server_log).read_text())
+    server = read_server_log(Path(args.server_log).read_text())
     # The job log is OPTIONAL: the external repo's Actions logs are usually unreadable, and
     # seed/duration are deliberately left to blis's defaults (see agentic_replay_args). When
     # present, its --public-dataset names the corpus and its --max-context-length (the client's
@@ -550,10 +566,18 @@ def main() -> int:
 
     blis = str(Path(args.blis).resolve())
     try:
-        packaging = sp.Catalog(blis=blis, root=Path(args.catalog).resolve()).packaging(sweep["gpu"])
+        cat = sp.Catalog(blis=blis, root=Path(args.catalog).resolve())
+        packaging = cat.packaging(sweep["gpu"])
         stack_path = Path(args.stack) if args.stack else Path(blis).parent / "stack.json"
         engine_release = sk.load(stack_path).engine("vllm")
-        text = emit(sweep, {AGENTIC_LABEL}, packaging, engine_release)
+        text = emit(sweep, {AGENTIC_LABEL}, packaging, engine_release, speculative_drafter(cat, sweep))
+    except DrafterError as e:
+        # The run drafts with a checkpoint the catalog has no drafter entry for: pricing it
+        # without the draft would score a drafting run as plain decoding.
+        (out / "refusals.json").write_text(json.dumps(
+            {"row_id": str(row.get("id")), "refusals": [str(e)]}, indent=2) + "\n")
+        print(f"row {row.get('id')} NOT scored: {e}", file=sys.stderr)
+        return 0
     except PackagingError as e:
         # The chip's entry fixes no node size and the row records none: the point is not scored
         # (G5 value_not_recorded), and no size is assumed.

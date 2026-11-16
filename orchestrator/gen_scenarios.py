@@ -35,8 +35,9 @@ run did not state is left out of the engine block, and the engine resolves it fr
 defaults or refuses the file, which the scorer reads as value_not_recorded. In particular this
 file holds no default of vLLM's (max_num_seqs, max_num_batched_tokens, cudagraph_mode,
 gpu_memory_utilization, block_size, the KV cache dtype) and sizes nothing from the workload. A
-stated drafter the catalog graph does not describe is not written (see UNPRICED_SPECULATORS), and
-the file's header says so.
+run that drafts with a separate draft checkpoint names it as the catalog drafter entry
+(`speculative.draft_model`, see speculative_drafter); a drafter the catalog lacks makes the
+deployment unscoreable (DrafterError), never a scenario that silently does not draft.
 
 # Expert parallelism
 
@@ -83,10 +84,50 @@ COEFFICIENTS_MULTINODE = COEFFICIENTS[:-1] + ", cost-model-fabric]"
 # compressed-tensors at group_size 32, which the catalog derives as weight_dtype int4.
 QUANT = {"fp4": "nvfp4", "fp8": "fp8", "bf16": None, "int4": None}
 
-# Stated drafters the catalog graph does not describe: the kernel refuses a deployment that
-# drafts with a method other than its graph's speculator (liftDraft, draft.go). MiniMax-M3's
-# graph states its own MTP head; EAGLE3 runs a separate draft checkpoint.
-UNPRICED_SPECULATORS = {("minimax-m3", "eagle3")}
+class DrafterError(ValueError):
+    """A run drafts with a checkpoint the catalog holds no drafter entry for (G5
+    drafter_not_in_catalog:<method>, or the resolve_draft reason): writing its deployment without
+    the draft would price a drafting run as plain decoding (inference-sim/blis-substrate#124)."""
+
+
+def speculative_drafter(cat, dep: dict) -> str | None:
+    """The catalog drafter entry a deployment's speculative block names as draft_model, or None
+    when the run does not draft or drafts with the model's own speculator.
+
+    The run's draft checkpoint (stated_config draft_model, from its speculative_config) is matched
+    as support.check matches it: resolve_draft turns a recipe's local path into its repository,
+    and the drafter entry with that repository must name the model as a target, be named by it,
+    and speculate by the run's method. A checkpoint no drafter entry has is the model's own when
+    its graph speculates by the run's method (vLLM names the target as an MTP run's draft). A run
+    whose method is not its graph's speculator and that names no draft checkpoint has none to
+    price. Raises DrafterError when no entry matches."""
+    stated = dep.get("stated_config") or {}
+    spec = stated.get("speculative_method")
+    if not spec:
+        return None
+    model = dep["model"]
+    raw = stated.get("draft_model")
+    own = sp.engine_method(cat.speculator(model)) == spec
+    if raw is None or raw == model:
+        if own:
+            return None
+        raise DrafterError(f"drafter_not_in_catalog:{spec}: the run drafts with {spec}, which "
+                           f"{model}'s graph does not speculate by, and names no draft checkpoint")
+    repo, why = sp.resolve_draft(raw, [], dep)
+    if why:
+        raise DrafterError(why)
+    if repo is None:
+        raise DrafterError(f"drafter_not_in_catalog:{spec}: the draft checkpoint {raw} names no repository")
+    named = cat.drafters_of(repo)
+    if not named and own:
+        # No drafter entry has the repository, and the graph speculates by the run's method:
+        # vLLM names the served model itself as the draft of an MTP run.
+        return None
+    linked = [n for n in named
+              if cat.drafter_links(model, n) and sp.engine_method(cat.speculator(n)) == spec]
+    if not linked:
+        raise DrafterError(f"drafter_not_in_catalog:{spec}: no catalog drafter of {model} is {repo}")
+    return linked[0]
 
 
 class PackagingError(ValueError):
@@ -109,11 +150,14 @@ def node_size(dep: dict, packaging: dict) -> int:
     return recorded
 
 
-def emit(dep: dict, labels: set[str], packaging: dict, engine_release: str) -> str:
+def emit(dep: dict, labels: set[str], packaging: dict, engine_release: str,
+         drafter: str | None = None) -> str:
     """The scenario+deployment file. `packaging` is what the chip's catalog entry fixes:
     {"gpus_per_node", "gpus_per_rack"}, each the entry's value or None (Catalog.packaging).
     The cluster states gpus_per_node only for a chip whose entry fixes none, and never states
-    gpus_per_rack (the scenario takes both from the entry, and a restated value must equal it)."""
+    gpus_per_rack (the scenario takes both from the entry, and a restated value must equal it).
+    `drafter` is the catalog drafter entry the run drafts with (speculative_drafter), written as
+    the speculative block's draft_model; None for the model's own speculator."""
     par = dep["parallelism"]
     tp, ep, dp = par["tp_size"], par["moe_ep_size"], par["attention_dp_size"]
     # A dense model records moe_ep_size as null: it has no expert group, which is a different
@@ -132,7 +176,6 @@ def emit(dep: dict, labels: set[str], packaging: dict, engine_release: str) -> s
     block_size = stated.get("block_size")        # None: not stated, so left to the engine (X19)
     gmu = stated.get("gpu_memory_utilization")
     spec = stated.get("speculative_method")
-    unpriced_spec = (dep["model"], spec) in UNPRICED_SPECULATORS
 
     lines = [
         f"# {dep['model']} on {dep['gpu']}, {dep['precision']} under {dep['framework']},",
@@ -155,10 +198,8 @@ def emit(dep: dict, labels: set[str], packaging: dict, engine_release: str) -> s
     if "max_model_len" in stated:
         lines.append("# max_model_len: " + ("recorded by the run." if max_len is not None else
                                             "not recorded; left unset, so the engine resolves it."))
-    if spec and unpriced_spec:
-        lines += [f"# speculative: the run drafts with {spec} x"
-                  f"{stated['num_speculative_tokens']}, NOT written: the catalog graph",
-                  "# describes no such drafter, so the kernel would refuse the file."]
+    if spec and drafter:
+        lines.append(f"# speculative: stated by the run, drafting with the catalog's {drafter}.")
     elif spec:
         lines.append("# speculative: stated by the run.")
     lines += [
@@ -222,12 +263,14 @@ def emit(dep: dict, labels: set[str], packaging: dict, engine_release: str) -> s
     if "enable_prefix_caching" in stated:
         pc = str(stated["enable_prefix_caching"]).lower()
         lines.append(f"      enable_prefix_caching: {pc}")
-    if spec and not unpriced_spec:
+    if spec:
         lines += [
             "      speculative:",
             f"        method: {stated['speculative_method']}",
             f"        num_spec_tokens: {stated['num_speculative_tokens']}",
         ]
+        if drafter:
+            lines.append(f"        draft_model: {drafter}")
     return "\n".join(lines) + "\n"
 
 
@@ -278,9 +321,16 @@ def main() -> int:
     engine_release = sk.load(args.stack).engine("vllm")
     stale = []
     cat = sp.Catalog(blis=str(Path(args.blis).resolve()), root=Path(args.catalog))
+    unscoreable = []
     for name, dep in sorted(deps.items()):
         try:
-            text = emit(dep, labels[name], cat.packaging(dep["gpu"]), engine_release)
+            drafter = speculative_drafter(cat, dep)
+        except DrafterError as e:
+            # Not written: the sweeps that name it cannot load, and the reason says why.
+            unscoreable.append(f"{name}: {e}")
+            continue
+        try:
+            text = emit(dep, labels[name], cat.packaging(dep["gpu"]), engine_release, drafter)
         except (PackagingError, bc.CommandError) as e:
             return fail(str(e))
         path = os.path.join(args.out, name)
@@ -297,6 +347,8 @@ def main() -> int:
             with open(path, "w") as fh:
                 fh.write(text)
 
+    for line in unscoreable:
+        print(f"not written, unscoreable: {line}", file=sys.stderr)
     if args.check:
         if stale:
             print(f"{len(stale)} scenario(s) stale or missing:", file=sys.stderr)
