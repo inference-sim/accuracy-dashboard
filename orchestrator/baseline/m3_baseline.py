@@ -209,6 +209,21 @@ def ceiling_summary(points: list[dict], ceil: dict[str, dict]) -> dict:
                        for (cap, code), n in sorted(limits.items(), key=lambda kv: (-kv[1], kv[0]))]}
 
 
+def substitution_kinds(points: list[dict]) -> list[dict]:
+    """Per substitution kind, the in-scope scored points that carry it and how many distinct subjects it names, so the
+    fidelity gaps of the scored points are visible (each is also a limit or a piece of not-yet work of the ceiling)."""
+    ins = [p for p in points if p["status"] == "scored" and cmp.scope(p["hardware"]) == cmp.SCOPE_IN]
+    pts, subjects = Counter(), defaultdict(set)
+    for p in ins:
+        kinds = set()
+        for s in p.get("substitutions") or []:
+            kinds.add(s["kind"])
+            subjects[s["kind"]].add(s.get("subject", ""))
+        pts.update(kinds)
+    return [{"kind": k, "points": n, "subjects": len(subjects[k])}
+            for k, n in sorted(pts.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+
 def lane_report(points: list[dict], *, issues: dict, engine_version: str, ported: dict | None, source: dict,
                 accuracy: bool) -> tuple[dict, dict]:
     ins = [p for p in points if cmp.scope(p["hardware"]) == cmp.SCOPE_IN]
@@ -220,7 +235,8 @@ def lane_report(points: list[dict], *, issues: dict, engine_version: str, ported
            "not_scored": sum(p["status"] == "not_scored" for p in ins),
            "refused_by_simulator": sum(p["status"] == "failed" for p in ins),
            "grades": {g: grades.get(g, 0) for g in (*gr.GRADES, "failed")},
-           "refused": refused(points, issues), "ceilings": ceiling_summary(points, ceil)}
+           "refused": refused(points, issues), "ceilings": ceiling_summary(points, ceil),
+           "substitution_kinds": substitution_kinds(points)}
     if accuracy:
         out["by_grade"] = cmp.by_grade(ins)
         out["headline"] = cmp.accuracy([p for p in ins if p["grade"] in gr.GRADED])
@@ -309,6 +325,12 @@ def markdown(doc: dict) -> str:
         L += ["", "| Limit (from the data) | Caps at | Points |", "|---|---|---|"]
         L += [f"| `{x['limit']}` | {x['cap']} | {x['points']} |" for x in c["limits"]]
         L.append("")
+    L += ["## Substitutions on the scored points", "",
+          "Per kind, the in-scope scored points that carry it, and how many subjects it names: what each scored point's "
+          "scenario does not take from the run's own records (design §11.2, §11.3). The SGLang lane has no scored point.", "",
+          "| Kind | Points (of " + str(v["scored"]) + ") | Subjects |", "|---|---|---|"]
+    L += [f"| `{x['kind']}` | {x['points']} | {x['subjects']} |" for x in v["substitution_kinds"]]
+    L.append("")
     pf = doc["ported_functions"]
     L += [f"The ported-function comparison reads {pf['cited']} upstream functions that blis-vllm "
           f"`{pf['port']['commit']}` cites in its provenance headers; between each run release and vLLM "

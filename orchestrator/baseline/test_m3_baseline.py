@@ -80,3 +80,13 @@ def test_every_reason_in_the_committed_refusal_lists_cites_an_issue_or_says_it_i
     doc = json.loads((BASE / "baseline.json").read_text())
     missing = [r["reason"] for lane in doc["lanes"].values() for r in lane["refused"] if not r["issue"]]
     assert missing == []
+
+
+def test_each_substitution_kind_counts_the_scored_in_scope_points_that_carry_it():
+    sub = lambda k, s: {"kind": k, "subject": s, "detail": "d"}  # noqa: E731
+    pts = [{"status": "scored", "hardware": "b200", "substitutions": [sub("estimated", "a"), sub("estimated", "b")]},
+           {"status": "scored", "hardware": "h200", "substitutions": [sub("estimated", "a"), sub("later_record", "x")]},
+           {"status": "scored", "hardware": "mi355x", "substitutions": [sub("later_record", "x")]},
+           {"status": "not_scored", "hardware": "b200", "substitutions": []}]
+    assert mb.substitution_kinds(pts) == [{"kind": "estimated", "points": 2, "subjects": 2},
+                                          {"kind": "later_record", "points": 1, "subjects": 1}]

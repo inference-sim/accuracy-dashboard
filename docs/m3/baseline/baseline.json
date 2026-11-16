@@ -98,7 +98,8 @@
      "2026-05-14",
      "2026-11-09"
     ]
-   }
+   },
+   "substitution_kinds": []
   },
   "vllm": {
    "by_grade": {
@@ -522,7 +523,64 @@
     "point_set_sha256": "6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60",
     "pull_manifest_sha256": "c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166",
     "simulator": "a8bc3085a7c91c50a1d92862943a695c04adfe11"
-   }
+   },
+   "substitution_kinds": [
+    {
+     "kind": "client_difference",
+     "points": 795,
+     "subjects": 5
+    },
+    {
+     "kind": "coefficient_method",
+     "points": 795,
+     "subjects": 23
+    },
+    {
+     "kind": "interim_status",
+     "points": 795,
+     "subjects": 12
+    },
+    {
+     "kind": "unevaluated",
+     "points": 795,
+     "subjects": 2
+    },
+    {
+     "kind": "value_class",
+     "points": 782,
+     "subjects": 6
+    },
+    {
+     "kind": "later_record",
+     "points": 627,
+     "subjects": 1
+    },
+    {
+     "kind": "nightly_or_custom",
+     "points": 575,
+     "subjects": 1
+    },
+    {
+     "kind": "estimated",
+     "points": 344,
+     "subjects": 2
+    },
+    {
+     "kind": "other_release",
+     "points": 220,
+     "subjects": 1
+    },
+    {
+     "kind": "ported_functions_unpublished",
+     "points": 220,
+     "subjects": 1
+    },
+    {
+     "kind": "execution_mode",
+     "points": 58,
+     "subjects": 1
+    }
+   ]
   }
  },
  "ported_functions": {

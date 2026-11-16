@@ -78,6 +78,24 @@ The ceiling is the best grade a point's recorded data allows if every piece of B
 | `nightly_or_custom` | G4 | 285 |
 | `router_unsupported:sglang-router` | G2 | 4 |
 
+## Substitutions on the scored points
+
+Per kind, the in-scope scored points that carry it, and how many subjects it names: what each scored point's scenario does not take from the run's own records (design §11.2, §11.3). The SGLang lane has no scored point.
+
+| Kind | Points (of 795) | Subjects |
+|---|---|---|
+| `client_difference` | 795 | 5 |
+| `coefficient_method` | 795 | 23 |
+| `interim_status` | 795 | 12 |
+| `unevaluated` | 795 | 2 |
+| `value_class` | 782 | 6 |
+| `later_record` | 627 | 1 |
+| `nightly_or_custom` | 575 | 1 |
+| `estimated` | 344 | 2 |
+| `other_release` | 220 | 1 |
+| `ported_functions_unpublished` | 220 | 1 |
+| `execution_mode` | 58 | 1 |
+
 The ported-function comparison reads 58 upstream functions that blis-vllm `40653dc4a16941ed8a9cc66aa82f5b7995cca461` cites in its provenance headers; between each run release and vLLM 0.32.0 this many changed: 0.21.0 51, 0.22.0 50, 0.24.0 49, 0.25.0 49, 0.25.1 49.
 
 ## Why vLLM points are not scored, by points blocked (design §11.6)
