@@ -5,7 +5,10 @@ Catalog identities come from the blis the run scores with (`blis catalog resolve
 so a release that adds a model or part changes the outcome with no code change here:
 
   model     the served checkpoint, or its HuggingFace base_model, is some catalog model's
-            source repository (exact checkpoint first, then the base) -> else model_not_in_catalog;
+            source repository (exact checkpoint first, then the base) -> else model_not_in_catalog.
+            A repository several entries claim is matched to the one entry the run's deployment
+            is (Catalog.model): a drafter is never the served model, and between several served
+            entries the run's speculative method decides -> else catalog_entry_ambiguous;
   hardware  the catalog has the part and the registry scopes coefficients to it
             -> else hardware_no_coefficients;
   drafter   the run's speculative method is the catalog graph's speculator
@@ -37,6 +40,15 @@ def hf_repo(name) -> str | None:
     return name if _HF_REPO.match(name) else None
 
 
+class EntryAmbiguous(Exception):
+    """A source repository several catalog entries claim, and the run's deployment matches not exactly one of them."""
+
+    def __init__(self, repo: str, entries: list[str]):
+        super().__init__(f"{repo} is the source repository of {len(entries)} catalog entries ({', '.join(entries)}), "
+                         f"and the run's deployment matches not exactly one")
+        self.repo, self.entries = repo, entries
+
+
 @dataclass
 class Catalog:
     """The catalog the scoring build reads, asked through `blis catalog resolve`. Each answer is
@@ -46,12 +58,47 @@ class Catalog:
     _models: dict = field(default_factory=dict)       # source repository -> identity | None
     _chips: dict = field(default_factory=dict)        # chip name -> identity | None
     _packaging: dict = field(default_factory=dict)    # chip name -> {"gpus_per_node", "gpus_per_rack"}
+    _claim_map: dict | None = None                     # see _claims
 
-    def model(self, repo: str) -> str | None:
-        """The catalog model whose source repository is `repo`, or None."""
+    def model(self, repo: str, spec_method: str | None = None) -> str | None:
+        """The catalog model a run serving `repo` (an entry name or a source repository) is, or None.
+
+        `blis catalog resolve` refuses a repository several entries claim, so such a repository is matched here to
+        the one entry the run's deployment is, from the entries' own fields, and that entry is then resolved by its
+        name: a drafter entry (one naming `targets`) is never the served model, and between several served entries
+        the one whose graph speculates by the run's method (`spec_method`, as the deployment states it; None for a
+        run that does not speculate) is. Raises EntryAmbiguous when not exactly one entry is left."""
+        c = self._claims()
+        claims = [] if repo in c["entries"] else c["repos"].get(repo.casefold(), [])
+        if len(claims) > 1:
+            served = [n for n, drafter in claims if not drafter]
+            if len(served) > 1:
+                served = [n for n in served if engine_method(self.speculator(n)) == spec_method]
+            if len(served) != 1:
+                raise EntryAmbiguous(repo, [n for n, _ in claims])
+            repo = served[0]
         if repo not in self._models:
-            self._models[repo] = bc.catalog_resolve(self.blis, str(self.root), model=repo)
+            self._models[repo] = self._ask_model(repo)
         return self._models[repo]
+
+    def _ask_model(self, query: str) -> str | None:
+        return bc.catalog_resolve(self.blis, str(self.root), model=query)
+
+    def _claims(self) -> dict:
+        """The catalog's entry names, and for each source repository (compared without regard to case) the entries
+        that name it, each with whether it is a drafter. TEMPORARY until a command lists the catalog's models: read
+        from <catalog>/models/*/model.yaml."""
+        if self._claim_map is None:
+            import yaml
+            entries, repos = set(), {}
+            for m in sorted((Path(self.root) / "models").glob("*/model.yaml")):
+                doc = yaml.safe_load(m.read_text()) or {}
+                entries.add(m.parent.name)
+                repo = ((doc.get("source") if isinstance(doc, dict) else None) or {}).get("repo")
+                if repo:
+                    repos.setdefault(repo.casefold(), []).append((m.parent.name, _is_drafter(doc)))
+            self._claim_map = {"entries": entries, "repos": repos}
+        return self._claim_map
 
     def chip(self, name: str) -> str | None:
         """The catalog chip of that name, or None."""
@@ -81,21 +128,16 @@ class Catalog:
             self._packaging[chip] = pk
         return self._packaging[chip]
 
-    def check_unambiguous(self) -> None:
-        """Ask `blis catalog resolve` for every model entry name and every source repository the
-        catalog's entries name, so a repository two entries claim is refused by the command before
-        any point is scored. Raises the command's CommandError, which quotes its message naming
-        both entries. TEMPORARY until a command lists the catalog's models: the entry names and
-        their source repositories are read from <catalog>/models/*/model.yaml."""
-        import yaml
-        for d in sorted((Path(self.root) / "models").iterdir()):
-            m = d / "model.yaml"
-            if not m.is_file():
-                continue
-            doc = yaml.safe_load(m.read_text()) or {}
-            self.model(d.name)
-            repo = ((doc.get("source")) or {}).get("repo")
-            if repo and not _is_drafter(doc):
+    def check_readable(self) -> None:
+        """Ask `blis catalog resolve` for every model entry name, and for every source repository exactly one entry
+        names, so a catalog the build cannot read stops the night before any point is scored. Raises the command's
+        CommandError. A repository several entries claim is not asked: each run is matched to its own entry
+        (model), and a run that matches none is G5 catalog_entry_ambiguous, not a stopped night."""
+        c = self._claims()
+        for name in sorted(c["entries"]):
+            self.model(name)
+        for repo, claims in sorted(c["repos"].items()):
+            if len(claims) == 1 and not claims[0][1]:
                 self.model(repo)
 
     def speculator(self, model: str) -> str | None:
@@ -192,15 +234,13 @@ class CheckoutCatalog(Catalog):
                           "repos": repos, "chips": chips}
         return self._read
 
-    def model(self, repo: str) -> str | None:
-        if repo not in self._models:
-            c = self._checkout()
-            names = [repo] if repo in c["entries"] else c["repos"].get(repo.casefold(), [])
-            if len(names) > 1:
-                raise bc.CommandError(f"model {repo!r} is the source repository of {len(names)} catalog entries "
-                                      f"({', '.join(names)}); name the entry instead")
-            self._models[repo] = names[0] if names else None
-        return self._models[repo]
+    def _ask_model(self, query: str) -> str | None:
+        c = self._checkout()
+        names = [query] if query in c["entries"] else c["repos"].get(query.casefold(), [])
+        if len(names) > 1:
+            raise bc.CommandError(f"model {query!r} is the source repository of {len(names)} catalog entries "
+                                  f"({', '.join(names)}); name the entry instead")
+        return names[0] if names else None
 
     def chip(self, name: str) -> str | None:
         return name if name in self._checkout()["chips"] else None
@@ -325,29 +365,43 @@ def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models:
     entries claim is refused by `blis catalog resolve`, and raises its CommandError."""
     s = Support()
     lookup_failed = False
+    ambiguous = None
     for ck in checkpoints:
         bm = base_models.get(ck)
         if isinstance(bm, dict):     # the pull couldn't read its HF card
             lookup_failed = True
             bm = None
         for how, repo in (("checkpoint", ck), ("base_model", bm)):
-            hit = cat.model(repo) if repo else None
+            try:
+                hit = cat.model(repo, spec_method) if repo else None
+            except EntryAmbiguous as e:
+                ambiguous = e
+                break
             if hit is not None:
                 s.model, s.matched_by, s.checkpoint = hit, how, ck
                 break
-        if s.model:
+        if s.model or ambiguous:
             break
-    if not s.model and lookup_failed:
+    if ambiguous:
+        # The catalog has the repository, more than once, and nothing the run recorded picks one entry.
+        s.reasons.append(f"catalog_entry_ambiguous:{ambiguous.repo}: {', '.join(ambiguous.entries)}")
+    elif not s.model and lookup_failed:
         # Only a reason when it could have mattered: a checkpoint that matched needs no base.
         s.reasons.append("model_not_in_catalog:base_model_lookup_failed")
-    if not s.model:
+    if not s.model and not ambiguous:
         s.reasons.append("model_not_in_catalog")
     s.chip = cat.chip(hardware)
     if s.chip is None or hardware not in parts:
         s.reasons.append("hardware_no_coefficients")
     if s.model and spec_method:
-        d = cat.model(draft_checkpoint) if draft_checkpoint else None
         named = cat.drafters_of(draft_checkpoint) if draft_checkpoint else []
+        d = None
+        if draft_checkpoint and not named:
+            try:
+                d = cat.model(draft_checkpoint)
+            except EntryAmbiguous as e:
+                s.reasons.append(f"catalog_entry_ambiguous:{e.repo}: {', '.join(e.entries)}")
+                return s
         if named:
             # The checkpoint is a drafter entry's repository (maybe the served model's own, told
             # apart by the entry): one the served model and it name each other, speculating by the run's method.

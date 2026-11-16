@@ -703,25 +703,31 @@ def test_a_failed_catalog_resolve_stops_the_score_run(tmp_path, monkeypatch):
     assert any(want in m for m in msgs), msgs
 
 
-def test_an_ambiguous_catalog_repository_stops_the_night_before_any_fetch(tmp_path, monkeypatch):
-    # Two entries claim org/m. `blis catalog resolve` refuses it; the night checks the catalog
-    # once, before the pull, and exits with the message naming both entries (audit finding 14),
-    # instead of crashing mid-score.
+def test_a_repository_two_catalog_entries_claim_does_not_stop_the_night(tmp_path, monkeypatch):
+    # Two entries claim org/m, and `blis catalog resolve --model org/m` refuses it. The night's catalog check asks
+    # each entry by name and does not ask that repository: each run is matched to the entry its deployment is, and a
+    # run that matches none is G5 catalog_entry_ambiguous (test_drafter.py). So the night goes on to the pull.
     fakes = Fakes([_row("m", 1, "2026-10-01")])
     _install(monkeypatch, fakes, [])
     fakes.ledger(tmp_path)
     models = {"a": "org/m", "b": "org/m"}
     cat = write_catalog(tmp_path / "cat", models)
-    refusal = "model 'org/m' is the source repository of 2 catalog entries: a, b"
-    answers = {**resolves(cat, models),
+    refusal = 'Error: model "org/m" is the source repository of 2 catalog entries (a, b); name the entry instead'
+    present = {d.name: d.name for d in (cat / "models").iterdir() if d.name not in models}   # the fixture's own entries
+    answers = {**resolves(cat, present), **resolves(cat, models),
                f"catalog resolve --catalog {cat} --model org/m --json": [1, "", refusal]}
     fake_blis(tmp_path / "sim" / "blis", answers)
-    monkeypatch.setattr(cli, "cmd_pull", lambda a: (_ for _ in ()).throw(AssertionError("pulled")))
+    pulled = []
+    monkeypatch.setattr(cli, "cmd_pull", lambda a: pulled.append(a) or 1)
     msgs = []
     monkeypatch.setattr(cli, "_log", msgs.append)
-    assert cli.cmd_nightly(_args(tmp_path)) == 2
-    assert any("FATAL" in m and "a, b" in m and "--model org/m" in m for m in msgs), msgs
-    assert not (tmp_path / "data" / "latest").exists()
+    import pytest
+    with pytest.raises(RuntimeError, match="pull failed"):     # the fake pull fails: the night got past the check
+        cli.cmd_nightly(_args(tmp_path))
+    assert pulled, msgs
+    assert not any("catalog" in m and "FATAL" in m for m in msgs), msgs
+    saw = [json.loads(x) for x in (tmp_path / "sim" / "blis.saw").read_text().splitlines()]
+    assert ["catalog", "resolve", "--catalog", str(cat), "--model", "org/m", "--json"] not in saw
 
 
 def test_a_score_run_replays_every_agentx_corpus_by_its_catalog_entry(tmp_path, monkeypatch):

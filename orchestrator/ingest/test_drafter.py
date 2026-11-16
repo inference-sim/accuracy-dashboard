@@ -197,7 +197,7 @@ def test_the_served_model_lookup_skips_a_drafter_that_shares_its_repository():
     cat = _flash_catalog()
     assert cat.model("MiniMaxAI/MiniMax-M3.1-Flash") == "flash"        # not ambiguous
     assert cat.drafters_of("minimaxai/minimax-m3.1-flash") == ["flash-dspark"]
-    cat.check_unambiguous()
+    cat.check_readable()
 
 
 def test_a_dspark_run_naming_the_served_repo_as_its_draft_model_finds_the_drafter_entry():
@@ -208,3 +208,95 @@ def test_a_dspark_run_naming_the_served_repo_as_its_draft_model_finds_the_drafte
     s = sp.check(cat, {"h200"}, checkpoints=["MiniMaxAI/MiniMax-M3.1-Flash"], base_models={}, hardware="h200",
                  spec_method="eagle3", draft_checkpoint="MiniMaxAI/MiniMax-M3.1-Flash")
     assert s.reasons == ["drafter_not_in_catalog:eagle3"]
+
+
+# ------------------------------------------------------------------ a repository several entries claim
+# inference-sim v0.17.1's `blis catalog resolve --model <repo>` refuses a repository that several entries name, drafters
+# included (blis-substrate v0.14.1's minimax-m3.1-flash and its DSpark head minimax-m3.1-flash-dspark both name
+# MiniMaxAI/MiniMax-M3.1-Flash), and resolves an entry by its name. This fake blis answers as that build does.
+FAKE_RESOLVE = r'''#!/usr/bin/env python3
+import json, sys, pathlib, yaml
+a = sys.argv[1:]
+assert a[:2] == ["catalog", "resolve"] and a[-1] == "--json", a
+root = pathlib.Path(a[a.index("--catalog") + 1])
+if "--chip" in a:
+    q = a[a.index("--chip") + 1]
+    print(json.dumps({"query": q, "identity": q if (root / "hardware" / f"{q}.yaml").is_file() else None, "reason": "fake",
+                      "packaging": {"gpus_per_node": 8, "gpus_per_rack": None}}))
+    sys.exit(0)
+q = a[a.index("--model") + 1]
+names = sorted(m.parent.name for m in root.glob("models/*/model.yaml"))
+if q in names:
+    print(json.dumps({"query": q, "identity": q, "reason": "a catalog entry has this name"})); sys.exit(0)
+hits = [n for n in names if ((yaml.safe_load((root / "models" / n / "model.yaml").read_text()).get("source") or {})
+                             .get("repo") or "").casefold() == q.casefold()]
+if len(hits) > 1:
+    sys.stderr.write(f'Error: model "{q}" is the source repository of {len(hits)} catalog entries ({", ".join(hits)}); name the entry instead\n')
+    sys.exit(1)
+print(json.dumps({"query": q, "identity": hits[0] if hits else None, "reason": "fake"}))
+'''
+
+FLASH = "MiniMaxAI/MiniMax-M3.1-Flash"
+
+
+def _blis_catalog(entries):
+    """A catalog of `entries` (name -> (repo, graph speculator method or None, extra model.yaml keys)) read through
+    the fake v0.17.1 blis."""
+    import yaml
+    root = Path(tempfile.mkdtemp())
+    for name, (repo, method, extra) in entries.items():
+        d = root / "models" / name
+        d.mkdir(parents=True)
+        (d / "model.yaml").write_text(yaml.safe_dump({"name": name, "source": {"repo": repo}, **extra}))
+        (d / "graph.yaml").write_text("global: {}\n" + (f"speculator:\n  method: {method}\n" if method else ""))
+    (root / "hardware").mkdir()
+    (root / "hardware" / "h200.yaml").write_text("GPUsPerNode: 8\n")
+    blis = root / "blis"
+    blis.write_text(FAKE_RESOLVE.replace("#!/usr/bin/env python3", f"#!{sys.executable}"))
+    blis.chmod(0o755)
+    return sp.Catalog(blis=str(blis), root=root)
+
+
+def _flash_with_head():
+    return _blis_catalog({"flash": (FLASH, None, {"drafters": ["flash-dspark"]}),
+                          "flash-dspark": (FLASH, "dspark", {"targets": ["flash"], "source_path": "dspark/config.json"})})
+
+
+def _served(cat, repo=FLASH, spec=None, draft=None):
+    return sp.check(cat, {"h200"}, checkpoints=[repo], base_models={}, hardware="h200", spec_method=spec,
+                    draft_checkpoint=draft)
+
+
+def test_a_run_with_no_speculation_serving_a_repository_its_drafter_shares_is_the_plain_entry():
+    s = _served(_flash_with_head())
+    assert (s.model, s.drafter, s.reasons) == ("flash", None, [])
+
+
+def test_a_dspark_run_on_that_repository_is_the_plain_entry_with_the_dspark_head_as_its_drafter():
+    s = _served(_flash_with_head(), spec="dspark", draft=FLASH)
+    assert (s.model, s.drafter, s.reasons) == ("flash", "flash-dspark", [])
+
+
+def test_between_two_served_entries_of_one_repository_the_runs_speculative_method_decides():
+    cat = _blis_catalog({"m": ("org/m", None, {}), "m-mtp": ("org/m", "deepseek_mtp", {})})
+    assert (_served(cat, "org/m").model, _served(cat, "org/m").reasons) == ("m", [])
+    s = _served(cat, "org/m", spec="mtp")
+    assert (s.model, s.reasons) == ("m-mtp", [])
+
+
+def test_a_run_its_deployment_cannot_match_to_one_entry_is_g5_by_name_and_not_a_stopped_night():
+    import assess
+    cat = _blis_catalog({"a": ("org/m", None, {}), "b": ("org/m", None, {})})
+    s = _served(cat, "org/m")
+    assert s.model is None and s.reasons == ["catalog_entry_ambiguous:org/m: a, b"]
+    assert assess.g5_of(s.reasons[0]) == {"code": "value_not_recorded", "subject": "org/m: a, b"}
+    cat.check_readable()                    # the night's check does not stop on it
+
+
+def test_the_nights_catalog_check_still_stops_on_a_catalog_the_build_cannot_read():
+    import blis_commands as bc
+    import pytest
+    cat = _flash_with_head()
+    Path(cat.blis).write_text(f"#!{sys.executable}\nimport sys\nsys.stderr.write('Error: catalog unreadable')\nsys.exit(1)\n")
+    with pytest.raises(bc.CommandError, match="unreadable"):
+        cat.check_readable()

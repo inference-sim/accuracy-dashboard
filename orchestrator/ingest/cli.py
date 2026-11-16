@@ -570,13 +570,13 @@ def cmd_nightly(a) -> int:
         _log(f"FATAL: {e}")
         return 2
 
-    # The catalog is checked once, before any artifact is fetched: a source repository two
-    # entries claim makes `blis catalog resolve` refuse, and the night stops here, not
-    # mid-score.
+    # The catalog is checked once, before any artifact is fetched: a catalog the build cannot read stops the
+    # night here, not mid-score. A source repository several entries claim does not: each run is matched to the
+    # entry its deployment is, and a run that matches none is G5 catalog_entry_ambiguous (support.Catalog.model).
     try:
-        sp.Catalog(blis=str(Path(a.blis).resolve()), root=Path(a.catalog)).check_unambiguous()
+        sp.Catalog(blis=str(Path(a.blis).resolve()), root=Path(a.catalog)).check_readable()
     except (bc.CommandError, OSError, ValueError) as e:
-        _log(f"FATAL: the catalog is ambiguous or unreadable: {e}")
+        _log(f"FATAL: the catalog is unreadable: {e}")
         return 2
 
     def pull_fn(work: Path, today_: date, last_ids: set, blis_changed: bool):
