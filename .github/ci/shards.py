@@ -96,7 +96,7 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
                "orchestrator/baseline/test_compare.py", "orchestrator/baseline/test_split.py",
                "orchestrator/baseline/test_residuals.py", "orchestrator/baseline/test_docs.py",
                "orchestrator/baseline/test_contracts_current.py", "orchestrator/test_update_index.py",
-               "orchestrator/baseline/test_matched.py"),
+               "orchestrator/baseline/test_matched.py", "orchestrator/baseline/test_published_test.py"),
     ],
     # The two repository-wide checks that were hidden behind earlier failures: they run on their own.
     "boundary": [

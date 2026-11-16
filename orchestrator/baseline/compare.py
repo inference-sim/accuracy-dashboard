@@ -712,7 +712,7 @@ Every evaluation of the development split's test set (and the prospective set) i
 """
 
 
-def evaluation_log(path, commit, estimator, ds: dict, today: str | None = None) -> None:
+def evaluation_log(path, commit, estimator, ds: dict, today: str | None = None) -> list[str]:
     """Append one row per evaluated split (test, prospective) to the log: date, harness commit,
     estimator, split, points and scored points."""
     import datetime
@@ -720,10 +720,11 @@ def evaluation_log(path, commit, estimator, ds: dict, today: str | None = None) 
     if not p.is_file():
         p.write_text(LOG_HEADER)
     day = today or datetime.date.today().isoformat()
-    rows = "".join(f"| {day} | {commit} | {estimator} | {k} | {v['points']} | {v['scored']} |\n"
-                   for k, v in ds["kinds"].items() if k in ("test", "prospective") and not v.get("withheld"))
+    rows = [f"| {day} | {commit} | {estimator} | {k} | {v['points']} | {v['scored']} |"
+            for k, v in ds["kinds"].items() if k in ("test", "prospective") and not v.get("withheld")]
     with p.open("a") as fh:
-        fh.write(rows)
+        fh.write("".join(r + "\n" for r in rows))
+    return rows
 
 
 def main(argv=None) -> int:
@@ -762,13 +763,15 @@ def main(argv=None) -> int:
             run = Run(a.dir, a.splits)
             t = run_report(run, a.sample, a.evaluate_test)
             if a.evaluate_test:
-                evaluation_log(a.log, run.prov.get("harness_commit"), a.estimator, t["development_split"])
+                # the table names the log rows it was evaluated as (published_test.py checks them against the log)
+                t["evaluation"] = evaluation_log(a.log, run.prov.get("harness_commit"), a.estimator, t["development_split"])
             _write(t, run_markdown(t), a.out)
         elif a.cmd == "pair":
             before, after = Run(a.before, a.before_splits), Run(a.after, a.after_splits)
             t = pair_report(before, after, a.sample, a.evaluate_test)
             if a.evaluate_test:
-                evaluation_log(a.log, after.prov.get("harness_commit"), a.estimator, t["after"]["development_split"])
+                t["evaluation"] = evaluation_log(a.log, after.prov.get("harness_commit"), a.estimator,
+                                                 t["after"]["development_split"])
             _write(t, pair_markdown(t), a.out)
         else:
             bad = 0

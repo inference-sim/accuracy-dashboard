@@ -790,19 +790,19 @@
     "coverage_pct": 100.0,
     "covered": 44,
     "points": 44,
-    "tpot_mape_pct": 15.158710749877201,
-    "tpot_shape_n": 34,
-    "tpot_shape_pct": 10.698612600302743,
-    "ttft_mape_pct": 41.96172414145753,
-    "ttft_shape_n": 34,
-    "ttft_shape_pct": 23.32608410374078,
-    "with_figures": 44
+    "tpot_mape_pct": 14.557207866301562,
+    "tpot_shape_n": 32,
+    "tpot_shape_pct": 8.730959762009377,
+    "ttft_mape_pct": 39.426032194328386,
+    "ttft_shape_n": 32,
+    "ttft_shape_pct": 18.988850956638778,
+    "with_figures": 41
    },
    "framework": "vllm",
    "gpu": "b200",
    "mode": "aggregated",
    "model": "minimax-m2.5",
-   "withheld": 0,
+   "withheld": 3,
    "won": false
   },
   {
@@ -961,19 +961,19 @@
     "coverage_pct": 100.0,
     "covered": 25,
     "points": 25,
-    "tpot_mape_pct": 26.789881922623536,
-    "tpot_shape_n": 21,
-    "tpot_shape_pct": 14.632759621721432,
-    "ttft_mape_pct": 23.903807800926593,
-    "ttft_shape_n": 21,
-    "ttft_shape_pct": 21.17637305222522,
-    "with_figures": 25
+    "tpot_mape_pct": 29.508258537339078,
+    "tpot_shape_n": 18,
+    "tpot_shape_pct": 14.344169447830796,
+    "ttft_mape_pct": 21.171090332676222,
+    "ttft_shape_n": 18,
+    "ttft_shape_pct": 20.060786714974363,
+    "with_figures": 21
    },
    "framework": "vllm",
    "gpu": "b300",
    "mode": "aggregated",
    "model": "minimax-m3",
-   "withheld": 0,
+   "withheld": 4,
    "won": false
   },
   {
@@ -1154,6 +1154,10 @@
   }
  ],
  "estimator": "aisimulate",
+ "evaluation": [
+  "| 2026-11-16 | 26c22e3b1868fa8311eef3bd32ce194b359c629a | BLIS v0.17.0 on the matched points | test | 155 | 71 |",
+  "| 2026-11-16 | 26c22e3b1868fa8311eef3bd32ce194b359c629a | BLIS v0.17.0 on the matched points | prospective | 0 | 0 |"
+ ],
  "format": "matched-comparison-1",
  "lanes": {
   "sglang": {
@@ -1235,13 +1239,13 @@
     "coverage_pct": 100.0,
     "covered": 573,
     "points": 573,
-    "tpot_mape_pct": 15.388059779783022,
-    "tpot_shape_n": 460,
-    "tpot_shape_pct": 10.430059670553542,
-    "ttft_mape_pct": 38.28179957182759,
-    "ttft_shape_n": 460,
-    "ttft_shape_pct": 23.67909649599398,
-    "with_figures": 573
+    "tpot_mape_pct": 15.365983894978747,
+    "tpot_shape_n": 455,
+    "tpot_shape_pct": 10.251367978974596,
+    "ttft_mape_pct": 38.07883447767417,
+    "ttft_shape_n": 455,
+    "ttft_shape_pct": 23.347980408824828,
+    "with_figures": 566
    },
    "estimator_on_blis_points": {
     "coverage_pct": 100.0,
@@ -1267,6 +1271,33 @@
   "harness_commit": "26c22e3b1868fa8311eef3bd32ce194b359c629a",
   "measurement_source_url": "https://github.com/SemiAnalysisAI/InferenceX-app/releases/tag/db-dump/2026-09-28",
   "simulator": "v0.17.0"
+ },
+ "splits": {
+  "prospective": {
+   "points": 0,
+   "scored": 0,
+   "withheld": 0
+  },
+  "test": {
+   "points": 155,
+   "scored": 71,
+   "withheld": 0
+  },
+  "train": {
+   "points": 652,
+   "scored": 79,
+   "withheld": 0
+  },
+  "unknown": {
+   "points": 7,
+   "scored": 0,
+   "withheld": 7
+  },
+  "validation": {
+   "points": 252,
+   "scored": 39,
+   "withheld": 0
+  }
  },
  "test_evaluated": true
 }

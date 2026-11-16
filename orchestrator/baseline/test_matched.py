@@ -53,11 +53,12 @@ def test_two_runs_with_the_same_curve_are_not_guessed_between_and_no_run_is_no_r
     assert {e.get("why") for e in mt.match({"sweeps": [sweep()]}, [], {"m": "mslug"}, "2026-09-27")} == {"no_record"}
 
 
-def entries(pred=None, kind="train", est_missing=False, sw=None):
-    """One sweep's entries, BLIS predicting `pred` (relatives) or nothing."""
+def entries(pred=None, kind="train", est_missing=False, sw=None, evaluate_test=False, splits_kind=None):
+    """One sweep's entries, BLIS predicting `pred` (relatives) or nothing; `kind` the split the match found (None:
+    no record, so no split); `splits_kind` what the harness's splits file says."""
     sw = sw or sweep(est=((1.0, 1.0), (1.3, 1.1), None) if est_missing else ((1.0, 1.0), (1.3, 1.1), (1.4, 2.4)))
-    matched = [{"sweep": f"{sw['topology_id']}|1k1k", "concurrency": p["concurrency"], "unit": f"u{i}", "records": ["x"]}
-               for i, p in enumerate(sw["points"])]
+    matched = [{"sweep": f"{sw['topology_id']}|1k1k", "concurrency": p["concurrency"], "unit": f"u{i}", "records": ["x"],
+                **({"split": kind} if kind else {})} for i, p in enumerate(sw["points"])]
     contract = {}
     for i, p in enumerate(sw["points"]):
         if pred and pred[i] is not None:
@@ -66,8 +67,8 @@ def entries(pred=None, kind="train", est_missing=False, sw=None):
                                  "pred_ttft_us": 1000 * pred[i][1]}
         else:
             contract[f"u{i}"] = {"status": "not_scored", "grade": "G5", "reason": "field_not_modelled"}
-    splits = {f"u{i}": {"kind": kind} for i in range(3)}
-    return mt.entries_for({"sweeps": [sw]}, matched, contract, splits, EST, evaluate_test=False)
+    splits = {f"u{i}": {"kind": splits_kind or kind} for i in range(3)} if (splits_kind or kind) else {}
+    return mt.entries_for({"sweeps": [sw]}, matched, contract, splits, EST, evaluate_test=evaluate_test)
 
 
 def test_the_metric_is_the_artifacts_mape_and_shape():
@@ -105,6 +106,36 @@ def test_test_points_are_withheld_from_errors_and_kept_in_coverage():
     assert (b["covered"], b["with_figures"], b["tpot_mape_pct"]) == (3, 0, None)
 
 
+def test_a_point_of_no_known_split_is_withheld_even_in_a_logged_evaluation():
+    for ev in (False, True):
+        es = entries(pred=[(1.0, 1.0), (1.2, 1.2), (1.5, 2.0)], kind=None, evaluate_test=ev)
+        b = mt.cell_figures(es, "blis")
+        assert (b["covered"], b["with_figures"], b["tpot_mape_pct"]) == (3, 0, None), ev
+        assert mt.split_counts(es)["unknown"] == {"points": 3, "scored": 3, "withheld": 3}
+
+
+def test_a_logged_evaluation_shows_the_test_points_and_names_its_log_rows():
+    es = entries(pred=[(1.0, 1.0), (1.2, 1.2), (1.5, 2.0)], kind="test", evaluate_test=True)
+    assert mt.cell_figures(es, "blis")["with_figures"] == 3
+    with pytest.raises(mt.MatchError, match="evaluation-log rows"):
+        mt.build_report(es, EST, {}, True)
+    rep = mt.build_report(es, EST, {}, True, ["| row |"])
+    assert rep["evaluation"] == ["| row |"] and rep["splits"]["test"]["withheld"] == 0
+
+
+def test_a_split_the_record_and_the_splits_file_disagree_on_is_refused():
+    with pytest.raises(mt.MatchError, match="the splits file says"):
+        entries(pred=[(1.0, 1.0), (1.2, 1.2), (1.5, 2.0)], kind="train", splits_kind="test")
+
+
+def test_a_matched_record_carries_its_development_split():
+    import split as dsplit
+    rows = [row(1, 7, 1, 0.010, 0.100), row(2, 7, 2, 0.012, 0.120), row(3, 7, 4, 0.015, 0.200)]
+    got = mt.match({"sweeps": [sweep()]}, rows, {"m": "mslug"}, "2026-09-27")
+    want = dsplit.kind_of(dsplit.series_id(dsplit.from_row(rows[0])), "2026-09-01")
+    assert {e["split"] for e in got} == {want}
+
+
 def test_a_zip_other_than_the_pinned_one_is_refused(tmp_path):
     z = tmp_path / "a.zip"
     with zipfile.ZipFile(z, "w") as f:
@@ -117,8 +148,9 @@ def test_a_zip_other_than_the_pinned_one_is_refused(tmp_path):
 
 def test_a_logged_evaluation_appends_a_row_per_held_out_kind(tmp_path):
     log = tmp_path / "log.md"
-    mt.log_evaluation(log, "c" * 40, "label", entries(pred=[(1.0, 1.0), (1.2, 1.2), None], kind="test"))
+    named = mt.log_evaluation(log, "c" * 40, "label", entries(pred=[(1.0, 1.0), (1.2, 1.2), None], kind="test"))
     rows = [x for x in log.read_text().splitlines() if x.startswith("| 2")]
+    assert named == rows
     assert [r.split(" | ")[2:] for r in rows] == [["label", "test", "3", "2 |"], ["label", "prospective", "0", "0 |"]]
 
 

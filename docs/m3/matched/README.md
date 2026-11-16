@@ -20,7 +20,7 @@ A cell is framework × chip × model × serving mode. BLIS wins a cell when both
 
 ## The result (inference-sim v0.17.0)
 
-Scored by the harness at accuracy-dashboard `26c22e3b1868fa8311eef3bd32ce194b359c629a`, inference-sim v0.17.0 (`c79c745619b16a8019339e3bbc79ee5e2923b258`), blis-substrate v0.14.0, blis-vllm v0.32.0-blis.3's field list. The figures are a logged test evaluation (the evaluation log's row of 2026-11-16), so every point's error is in them. AISimulate's own figures, recomputed here from its points, are its published ones: vLLM TPOT 15.39 and TTFT 38.28, SGLang 15.29 and 64.08.
+Scored by the harness at accuracy-dashboard `26c22e3b1868fa8311eef3bd32ce194b359c629a`, inference-sim v0.17.0 (`c79c745619b16a8019339e3bbc79ee5e2923b258`), blis-substrate v0.14.0, blis-vllm v0.32.0-blis.3's field list. The figures are a logged test evaluation, so the development split's test points' errors are in them; the report names the evaluation-log rows it was logged as, and `published_test.py` fails the tree if a committed report shows a held-out point's error that the log does not hold. The evaluation was run three times on 2026-11-16 while the tool was fixed (the log has a pair of rows for each: one pair was first removed in error and has been put back). The 7 points with no matching record have no split assignment: they are counted as `unknown` and withheld from every error, the estimator's included, because they could be test points. Over all 1066 points AISimulate's own figures, recomputed here from its points, are its published ones (vLLM TPOT 15.39 and TTFT 38.28, SGLang 15.29 and 64.08); with the 7 withheld, its vLLM figures are 15.37 and 38.08.
 
 - **vLLM lane, 573 points: lost.** BLIS covers 189 (33.0 %; AISimulate 100 %). On them its TPOT MAPE is 18.56 and TTFT MAPE 27.38, its shape errors 18.82 and 20.79; over the same 189 points AISimulate's are 22.08, 43.12, 12.84 and 30.77. So on the points both score BLIS is closer in TPOT, TTFT and TTFT shape, and further in TPOT shape; and its coverage is a third. No cell is won: every cell has less coverage, or one metric worse.
 - **SGLang lane, 219 points, and TensorRT-LLM, 274: lost, 0 % coverage.** BLIS has no engine for either.
@@ -41,7 +41,7 @@ The full per-cell table, with each cell's uncovered points by reason, is [matche
 
 ## The test split
 
-Accuracy over the development split's test and prospective points is evaluated only through the logged path (docs/m2/evaluation-protocol.md): `matched.py report --evaluate-test --log docs/m2/evaluation-log.md --label ...` appends a row per split. Without it, errors leave those points out (the Withheld column) and coverage counts every point.
+Accuracy over the development split's test and prospective points is evaluated only through the logged path (docs/m2/evaluation-protocol.md): `matched.py report --evaluate-test --log docs/m2/evaluation-log.md --label ...` appends a row per split and records those rows in the report. Without it, errors leave those points out (the Withheld column) and coverage counts every point. Each point's split is computed from its dump record by `split.py`'s rule and checked against the harness's splits file; a point with no record has none, and is withheld from every figure in either case.
 
 ## Commands
 
