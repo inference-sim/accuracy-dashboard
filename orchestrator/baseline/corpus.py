@@ -304,7 +304,10 @@ def measured_figures(metrics: dict, gpus: int) -> dict:
 def rows_figures(rows: list[dict]) -> dict:
     """The five figures from a client's own per-request rows (an adapted client's measured side), by the registry's
     definitions: the same computation as the simulated side's, ITL pooled over every recorded gap."""
-    return simulated_figures(rows, None)
+    out = simulated_figures(rows, None)
+    if not any("cached_local_tokens" in r or "cached_external_tokens" in r for r in rows):
+        out["cache_hit_rate"] = None        # the client records no cached tokens: no measured figure, not zero
+    return out
 
 
 def simulated_figures(rows: list[dict], n_main: int | None) -> dict:

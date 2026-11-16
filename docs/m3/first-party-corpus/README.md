@@ -47,6 +47,11 @@ python3 orchestrator/baseline/corpus.py score --corpus /outside/corpus --work /o
   --private-names /outside/names.txt
 ```
 
+## Dry run (2026-11-16, inference-sim v0.17.0, blis-substrate v0.14.0)
+
+- **The five GLM-5.3 H200 cells of inference-sim#2094** (inference-perf, 2 to 16 concurrent sessions): 0 of 5 scored, all G5 `value_not_recorded`. The cells keep the client's records but no vLLM server log and no launch configuration, so the scenario cannot be built from the run's own records; the replay scenario they were simulated with was written by hand, which this path does not take. The adapter itself reads them: one cell gives 8,547 requests over 1,082 sessions, replayed as a pool of 8. The server's log, kept with each cell, would let them score.
+- **The private internal runs**: none in a client's raw format was found at the private path this work was given. It holds scenario files and summaries, not run records. Each needs its server log and its client's export to be scored.
+
 ## Not done here
 
 No corpus has been scored: none in this format exists yet. The private internal-experiment data needs an adapter to this format, run where that data lives; the configiq dataset needs its ingest issue. accuracy-dashboard#91 stays open until a corpus is scored and its grade counts are published.

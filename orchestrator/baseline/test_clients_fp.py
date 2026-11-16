@@ -186,6 +186,7 @@ def test_a_run_of_each_adapted_client_is_scored_on_the_scorers_scenario(tmp_path
     assert ("unevaluated", "kernel_hash") in kinds
     assert r["simulated"]["ttft_p99_ms"] == pytest.approx(180)
     assert r["measured"]["ttft_p99_ms"] is not None and r["measured"]["itl_p50_ms"] is not None
+    assert r["measured"]["cache_hit_rate"] is None          # neither client records cached tokens
 
 
 def test_an_adapted_run_whose_server_log_sets_an_unknown_field_is_g5_by_the_scorer(tmp_path):
