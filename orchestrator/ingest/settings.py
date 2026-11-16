@@ -979,7 +979,10 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
         if fabric is not None:
             cluster["fabric"] = fabric
             coefficients.append(FABRIC_COEFFICIENT)
-    b.scenario = {"kind": "Scenario", "name": name, "engine_version": engine_version.lstrip("v"),
+    # The engine the scenario runs, as engine: {kind, version} (SIM-1): inference-sim v0.18.0
+    # refuses the engine_version field this replaced.
+    b.scenario = {"kind": "Scenario", "name": name,
+                  "engine": {"kind": "vllm", "version": engine_version.lstrip("v")},
                   "model": model, "coefficients": coefficients, "cluster": cluster}
     if names_are_vllms(field_list):
         pool["engine"] = to_vllm_block(pool["engine"])

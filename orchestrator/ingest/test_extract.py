@@ -581,12 +581,14 @@ def test_a_setting_nothing_recorded_is_left_unset_and_no_list_of_required_settin
     assert not hasattr(st, "REQUIRED")
 
 
-def test_a_built_scenario_holds_only_recorded_values_and_states_engine_version_from_stack_json():
-    # X19: nothing the run did not record is written; engine_version is the release passed in.
+def test_a_built_scenario_holds_only_recorded_values_and_states_the_engine_from_stack_json():
+    # X19: nothing the run did not record is written; the engine is vllm at the release passed in,
+    # stated as engine: {kind, version} (SIM-1), never the removed engine_version.
     c = _classify(_log("'tensor_parallel_size': 1, 'max_num_batched_tokens': 4096"))
     b = st.build(c, name="p", model="m", part=PART_H200, engine_version="0.32.0", field_list=FIELDS,
                  catalog_node_size=None, node=NODE8)
-    assert b.scenario["engine_version"] == "0.32.0"
+    assert b.scenario["engine"] == {"kind": "vllm", "version": "0.32.0"}
+    assert "engine_version" not in b.scenario
     recorded = {loc.split(".", 1)[1] for loc in c.mapped if loc.startswith("engine.")}
     assert set(b.deployment["pools"][0]["engine"]) == recorded
 
@@ -597,7 +599,7 @@ def test_the_cluster_states_the_node_size_and_holds_the_runs_own_gpus():
                        RESOLVED.replace("data_parallel_size=1", "data_parallel_size=2")))
     b = _build(c)
     assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 1, "gpus_per_node": 8}
-    assert b.scenario["engine_version"] == "0.31.0"
+    assert b.scenario["engine"] == {"kind": "vllm", "version": "0.31.0"}
     par = b.deployment["pools"][0]["parallel"]
     assert (par["tp"], par["dp"], par["enable_expert_parallel"]) == (1, 2, True)
 

@@ -845,7 +845,7 @@ def test_the_scenario_engine_block_holds_the_runs_values_under_the_engines_own_n
         import yaml
         docs = list(yaml.safe_load_all(scen_text))
         scen, dep = docs[0], docs[1]
-        assert scen["engine_version"] == "0.31.0"
+        assert scen["engine"] == {"kind": "vllm", "version": "0.31.0"} and "engine_version" not in scen
         eng = dep["pools"][0]["engine"]
         assert {k: eng[k] for k in ("max_num_seqs", "max_num_batched_tokens", "block_size", "max_model_len",
                                     "enable_prefix_caching", "cache_dtype")} == \
