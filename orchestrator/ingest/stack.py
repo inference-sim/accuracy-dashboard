@@ -164,7 +164,8 @@ SUPERSEDED = {"v0.16.0": "v0.17.1", "v0.17.0": "v0.17.1"}
 def unscored_releases(tags_in_tag_order: list[str], scored: set[str], first: str,
                       superseded: dict[str, str] = SUPERSEDED) -> list[str]:
     """The releases a nightly run scores (COV-9): every stable release at or after `first`, in
-    the order they were tagged, that has no scores yet. Each is scored exactly once. A tag that is
+    the order they were tagged, that has no scores yet. Each is scored exactly once, except a release in
+    `superseded`, which is never scored: its replacement is scored in its place (CONTRACT.md). A tag that is
     not vX.Y.Z (a pre-release) is not a release to score. A release in `superseded` is left out once
     the release that replaces it is tagged. Empty when no such release exists yet."""
     floor = _version(first)
