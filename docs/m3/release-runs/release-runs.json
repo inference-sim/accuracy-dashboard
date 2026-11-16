@@ -1,0 +1,1155 @@
+{
+ "format": "release-runs-1",
+ "records": {
+  "on_target_in_scope": 74,
+  "on_target_or_near": 813,
+  "read": 11160
+ },
+ "records_by_release": [
+  {
+   "engine": "vllm",
+   "records": 37,
+   "release": "0.11.0",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 23,
+   "release": "0.11.2",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 54,
+   "release": "0.13.0",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 30,
+   "release": "0.14.1",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 30,
+   "release": "0.16.0",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 5,
+   "release": "0.17.0",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 10,
+   "release": "0.17.1",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 97,
+   "release": "0.18.0",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 50,
+   "release": "0.19.0",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 66,
+   "release": "0.19.1",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 50,
+   "release": "0.20.0",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 22,
+   "release": "0.20.2",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 99,
+   "release": "0.21.0",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 40,
+   "release": "0.22.0",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 45,
+   "release": "0.23.0",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 371,
+   "release": "0.24.0",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 326,
+   "release": "0.26.0",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 102,
+   "release": "0.27.0",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 404,
+   "release": "0.28.0",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 304,
+   "release": "0.29.0",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 254,
+   "release": "0.30.0",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 40,
+   "release": "0.31.0",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 153,
+   "release": "0.32.0",
+   "source": "configiq"
+  },
+  {
+   "engine": "vllm",
+   "records": 197,
+   "release": "0.33.0",
+   "source": "configiq"
+  },
+  {
+   "engine": null,
+   "records": 2018,
+   "release": null,
+   "source": "inferencex"
+  },
+  {
+   "engine": "sglang",
+   "records": 90,
+   "release": "0.5.11",
+   "source": "inferencex"
+  },
+  {
+   "engine": "sglang",
+   "records": 455,
+   "release": "0.5.12",
+   "source": "inferencex"
+  },
+  {
+   "engine": "sglang",
+   "records": 86,
+   "release": "0.5.12.post1",
+   "source": "inferencex"
+  },
+  {
+   "engine": "sglang",
+   "records": 61,
+   "release": "0.5.13.post1",
+   "source": "inferencex"
+  },
+  {
+   "engine": "sglang",
+   "records": 214,
+   "release": "0.5.14",
+   "source": "inferencex"
+  },
+  {
+   "engine": "sglang",
+   "records": 29,
+   "release": "0.5.15",
+   "source": "inferencex"
+  },
+  {
+   "engine": "sglang",
+   "records": 74,
+   "release": "0.5.16",
+   "source": "inferencex"
+  },
+  {
+   "engine": "sglang",
+   "records": 71,
+   "release": "0.5.19",
+   "source": "inferencex"
+  },
+  {
+   "engine": "sglang",
+   "records": 59,
+   "release": "0.5.20",
+   "source": "inferencex"
+  },
+  {
+   "engine": "sglang",
+   "records": 92,
+   "release": "0.5.21",
+   "source": "inferencex"
+  },
+  {
+   "engine": "sglang",
+   "records": 343,
+   "release": "0.5.22",
+   "source": "inferencex"
+  },
+  {
+   "engine": "sglang",
+   "records": 32,
+   "release": "0.5.23",
+   "source": "inferencex"
+  },
+  {
+   "engine": "sglang",
+   "records": 59,
+   "release": "0.5.8",
+   "source": "inferencex"
+  },
+  {
+   "engine": "sglang",
+   "records": 103,
+   "release": "0.5.8.post1",
+   "source": "inferencex"
+  },
+  {
+   "engine": "sglang",
+   "records": 77,
+   "release": "0.5.9",
+   "source": "inferencex"
+  },
+  {
+   "engine": "sglang",
+   "records": 992,
+   "release": null,
+   "source": "inferencex"
+  },
+  {
+   "engine": "vllm",
+   "records": 24,
+   "release": "0.15.1",
+   "source": "inferencex"
+  },
+  {
+   "engine": "vllm",
+   "records": 25,
+   "release": "0.16.0",
+   "source": "inferencex"
+  },
+  {
+   "engine": "vllm",
+   "records": 80,
+   "release": "0.17.0",
+   "source": "inferencex"
+  },
+  {
+   "engine": "vllm",
+   "records": 80,
+   "release": "0.18.0",
+   "source": "inferencex"
+  },
+  {
+   "engine": "vllm",
+   "records": 281,
+   "release": "0.20.1",
+   "source": "inferencex"
+  },
+  {
+   "engine": "vllm",
+   "records": 144,
+   "release": "0.21.0",
+   "source": "inferencex"
+  },
+  {
+   "engine": "vllm",
+   "records": 324,
+   "release": "0.22.0",
+   "source": "inferencex"
+  },
+  {
+   "engine": "vllm",
+   "records": 8,
+   "release": "0.23.0",
+   "source": "inferencex"
+  },
+  {
+   "engine": "vllm",
+   "records": 56,
+   "release": "0.24.0",
+   "source": "inferencex"
+  },
+  {
+   "engine": "vllm",
+   "records": 115,
+   "release": "0.25.0",
+   "source": "inferencex"
+  },
+  {
+   "engine": "vllm",
+   "records": 83,
+   "release": "0.25.1",
+   "source": "inferencex"
+  },
+  {
+   "engine": "vllm",
+   "records": 20,
+   "release": "0.32.0",
+   "source": "inferencex"
+  },
+  {
+   "engine": "vllm",
+   "records": 28,
+   "release": "0.33.0",
+   "source": "inferencex"
+  },
+  {
+   "engine": "vllm",
+   "records": 2228,
+   "release": null,
+   "source": "inferencex"
+  }
+ ],
+ "revisions": {
+  "configiq": {
+   "commit": "21cc6eb06b1934485a83b17a93e634ef38b5799e",
+   "manifest_sha256": "ceb8e5a853a41b87a57a353f37634c86ddcc68fcca7e76ea78ef295f301036b4",
+   "pairs": 14,
+   "rows": 2809
+  },
+  "inferencex": {
+   "availability_sha256": "4f2dab52f09b3a4f135dc0ca002d31b28f90d11d7cb90634fae5bad3ba9a5c3a",
+   "first_date": "2025-10-29",
+   "last_date": "2026-11-16",
+   "ledger_revision": "db-dump/2026-09-28",
+   "newest_dump": "db-dump/2026-09-28",
+   "read_at": "2026-11-16T12:07Z",
+   "rows": 8351
+  }
+ },
+ "runs": [
+  {
+   "benchmark_type": "multi_turn",
+   "conditions": {
+    "client_requests": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "coefficients": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "engine_release": "false: 0.31.0",
+    "fields_modelled": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded"
+   },
+   "engine": "vllm",
+   "framework": "vllm",
+   "hardware": "h200",
+   "ledger": {
+    "source_not_in_ledger": 40
+   },
+   "nearness": "near",
+   "records": 40,
+   "release": "0.31.0",
+   "scope": "in_scope",
+   "source": "configiq"
+  },
+  {
+   "benchmark_type": "multi_turn",
+   "conditions": {
+    "client_requests": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "coefficients": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "engine_release": "true",
+    "fields_modelled": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded"
+   },
+   "engine": "vllm",
+   "framework": "vllm",
+   "hardware": "b200",
+   "ledger": {
+    "source_not_in_ledger": 36
+   },
+   "nearness": "target",
+   "records": 36,
+   "release": "0.32.0",
+   "scope": "in_scope",
+   "source": "configiq"
+  },
+  {
+   "benchmark_type": "single_turn",
+   "conditions": {
+    "client_requests": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "coefficients": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "engine_release": "true",
+    "fields_modelled": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded"
+   },
+   "engine": "vllm",
+   "framework": "vllm",
+   "hardware": "b200",
+   "ledger": {
+    "source_not_in_ledger": 15
+   },
+   "nearness": "target",
+   "records": 15,
+   "release": "0.32.0",
+   "scope": "in_scope",
+   "source": "configiq"
+  },
+  {
+   "benchmark_type": "multi_turn",
+   "conditions": {
+    "client_requests": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "coefficients": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "engine_release": "true",
+    "fields_modelled": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded"
+   },
+   "engine": "vllm",
+   "framework": "vllm",
+   "hardware": "mi355x",
+   "ledger": {
+    "source_not_in_ledger": 72
+   },
+   "nearness": "target",
+   "records": 72,
+   "release": "0.32.0",
+   "scope": "out_of_scope",
+   "source": "configiq"
+  },
+  {
+   "benchmark_type": "single_turn",
+   "conditions": {
+    "client_requests": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "coefficients": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "engine_release": "true",
+    "fields_modelled": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded"
+   },
+   "engine": "vllm",
+   "framework": "vllm",
+   "hardware": "mi355x",
+   "ledger": {
+    "source_not_in_ledger": 30
+   },
+   "nearness": "target",
+   "records": 30,
+   "release": "0.32.0",
+   "scope": "out_of_scope",
+   "source": "configiq"
+  },
+  {
+   "benchmark_type": "multi_turn",
+   "conditions": {
+    "client_requests": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "coefficients": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "engine_release": "false: 0.33.0",
+    "fields_modelled": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded"
+   },
+   "engine": "vllm",
+   "framework": "vllm",
+   "hardware": "b200",
+   "ledger": {
+    "source_not_in_ledger": 36
+   },
+   "nearness": "near",
+   "records": 36,
+   "release": "0.33.0",
+   "scope": "in_scope",
+   "source": "configiq"
+  },
+  {
+   "benchmark_type": "single_turn",
+   "conditions": {
+    "client_requests": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "coefficients": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "engine_release": "false: 0.33.0",
+    "fields_modelled": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded"
+   },
+   "engine": "vllm",
+   "framework": "vllm",
+   "hardware": "b200",
+   "ledger": {
+    "source_not_in_ledger": 15
+   },
+   "nearness": "near",
+   "records": 15,
+   "release": "0.33.0",
+   "scope": "in_scope",
+   "source": "configiq"
+  },
+  {
+   "benchmark_type": "multi_turn",
+   "conditions": {
+    "client_requests": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "coefficients": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "engine_release": "false: 0.33.0",
+    "fields_modelled": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded"
+   },
+   "engine": "vllm",
+   "framework": "vllm",
+   "hardware": "mi355x",
+   "ledger": {
+    "source_not_in_ledger": 103
+   },
+   "nearness": "near",
+   "records": 103,
+   "release": "0.33.0",
+   "scope": "out_of_scope",
+   "source": "configiq"
+  },
+  {
+   "benchmark_type": "single_turn",
+   "conditions": {
+    "client_requests": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "coefficients": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "engine_release": "false: 0.33.0",
+    "fields_modelled": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scorable as recorded: the dataset keeps no runtime arguments and no per-request rows, so the fields the run set and the requests it sent are not recorded"
+   },
+   "engine": "vllm",
+   "framework": "vllm",
+   "hardware": "mi355x",
+   "ledger": {
+    "source_not_in_ledger": 43
+   },
+   "nearness": "near",
+   "records": 43,
+   "release": "0.33.0",
+   "scope": "out_of_scope",
+   "source": "configiq"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "dynamo-sglang",
+   "hardware": "b200",
+   "ledger": {
+    "newer_than_source_revision": 14
+   },
+   "nearness": "near",
+   "records": 14,
+   "release": "0.5.22",
+   "scope": "in_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "dynamo-sglang",
+   "hardware": "b300",
+   "ledger": {
+    "newer_than_source_revision": 9
+   },
+   "nearness": "near",
+   "records": 9,
+   "release": "0.5.22",
+   "scope": "in_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "dynamo-sglang",
+   "hardware": "gb200",
+   "ledger": {
+    "newer_than_source_revision": 11
+   },
+   "nearness": "near",
+   "records": 11,
+   "release": "0.5.22",
+   "scope": "in_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "single_turn",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "dynamo-sglang",
+   "hardware": "gb300",
+   "ledger": {
+    "newer_than_source_revision": 11
+   },
+   "nearness": "near",
+   "records": 11,
+   "release": "0.5.22",
+   "scope": "in_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "mori-sglang",
+   "hardware": "mi355x",
+   "ledger": {
+    "newer_than_source_revision": 8
+   },
+   "nearness": "near",
+   "records": 8,
+   "release": "0.5.22",
+   "scope": "out_of_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "sglang",
+   "hardware": "b200",
+   "ledger": {
+    "newer_than_source_revision": 49
+   },
+   "nearness": "near",
+   "records": 49,
+   "release": "0.5.22",
+   "scope": "in_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "sglang",
+   "hardware": "b300",
+   "ledger": {
+    "newer_than_source_revision": 18
+   },
+   "nearness": "near",
+   "records": 18,
+   "release": "0.5.22",
+   "scope": "in_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "single_turn",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "sglang",
+   "hardware": "b300",
+   "ledger": {
+    "newer_than_source_revision": 19
+   },
+   "nearness": "near",
+   "records": 19,
+   "release": "0.5.22",
+   "scope": "in_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "sglang",
+   "hardware": "gb200",
+   "ledger": {
+    "newer_than_source_revision": 16
+   },
+   "nearness": "near",
+   "records": 16,
+   "release": "0.5.22",
+   "scope": "in_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "sglang",
+   "hardware": "gb300",
+   "ledger": {
+    "newer_than_source_revision": 18
+   },
+   "nearness": "near",
+   "records": 18,
+   "release": "0.5.22",
+   "scope": "in_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "sglang",
+   "hardware": "h100",
+   "ledger": {
+    "newer_than_source_revision": 6
+   },
+   "nearness": "near",
+   "records": 6,
+   "release": "0.5.22",
+   "scope": "in_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "sglang",
+   "hardware": "h200",
+   "ledger": {
+    "newer_than_source_revision": 11
+   },
+   "nearness": "near",
+   "records": 11,
+   "release": "0.5.22",
+   "scope": "in_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "single_turn",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "sglang",
+   "hardware": "h200",
+   "ledger": {
+    "newer_than_source_revision": 10
+   },
+   "nearness": "near",
+   "records": 10,
+   "release": "0.5.22",
+   "scope": "in_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "sglang",
+   "hardware": "mi300x",
+   "ledger": {
+    "newer_than_source_revision": 9
+   },
+   "nearness": "near",
+   "records": 9,
+   "release": "0.5.22",
+   "scope": "out_of_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "single_turn",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "sglang",
+   "hardware": "mi300x",
+   "ledger": {
+    "newer_than_source_revision": 5
+   },
+   "nearness": "near",
+   "records": 5,
+   "release": "0.5.22",
+   "scope": "out_of_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "sglang",
+   "hardware": "mi325x",
+   "ledger": {
+    "newer_than_source_revision": 40
+   },
+   "nearness": "near",
+   "records": 40,
+   "release": "0.5.22",
+   "scope": "out_of_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "single_turn",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "sglang",
+   "hardware": "mi325x",
+   "ledger": {
+    "newer_than_source_revision": 15
+   },
+   "nearness": "near",
+   "records": 15,
+   "release": "0.5.22",
+   "scope": "out_of_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "sglang",
+   "hardware": "mi355x",
+   "ledger": {
+    "newer_than_source_revision": 62
+   },
+   "nearness": "near",
+   "records": 62,
+   "release": "0.5.22",
+   "scope": "out_of_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "single_turn",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "false: 0.5.22",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "sglang",
+   "hardware": "mi355x",
+   "ledger": {
+    "newer_than_source_revision": 12
+   },
+   "nearness": "near",
+   "records": 12,
+   "release": "0.5.22",
+   "scope": "out_of_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "true",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "sglang",
+   "hardware": "b200",
+   "ledger": {
+    "newer_than_source_revision": 5
+   },
+   "nearness": "target",
+   "records": 5,
+   "release": "0.5.23",
+   "scope": "in_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "true",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "sglang",
+   "hardware": "h200",
+   "ledger": {
+    "newer_than_source_revision": 7
+   },
+   "nearness": "target",
+   "records": 7,
+   "release": "0.5.23",
+   "scope": "in_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "true",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "sglang",
+   "hardware": "mi325x",
+   "ledger": {
+    "newer_than_source_revision": 7
+   },
+   "nearness": "target",
+   "records": 7,
+   "release": "0.5.23",
+   "scope": "out_of_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "coefficients": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "engine_release": "true",
+    "fields_modelled": "not scored: BLIS has no SGLang engine (blis-sglang#2)",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: BLIS has no SGLang engine (blis-sglang#2)"
+   },
+   "engine": "sglang",
+   "framework": "sglang",
+   "hardware": "mi355x",
+   "ledger": {
+    "newer_than_source_revision": 13
+   },
+   "nearness": "target",
+   "records": 13,
+   "release": "0.5.23",
+   "scope": "out_of_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: newer than source revision",
+    "coefficients": "not scored: newer than source revision",
+    "engine_release": "true",
+    "fields_modelled": "not scored: newer than source revision",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: newer than source revision"
+   },
+   "engine": "vllm",
+   "framework": "dynamo-vllm",
+   "hardware": "b200",
+   "ledger": {
+    "newer_than_source_revision": 11
+   },
+   "nearness": "target",
+   "records": 11,
+   "release": "0.32.0",
+   "scope": "in_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: newer than source revision",
+    "coefficients": "not scored: newer than source revision",
+    "engine_release": "true",
+    "fields_modelled": "not scored: newer than source revision",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: newer than source revision"
+   },
+   "engine": "vllm",
+   "framework": "vllm",
+   "hardware": "mi325x",
+   "ledger": {
+    "newer_than_source_revision": 9
+   },
+   "nearness": "target",
+   "records": 9,
+   "release": "0.32.0",
+   "scope": "out_of_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "decided when the point is scored",
+    "coefficients": "decided when the point is scored",
+    "engine_release": "false: 0.33.0",
+    "fields_modelled": "decided when the point is scored",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "decided when the point is scored"
+   },
+   "engine": "vllm",
+   "framework": "vllm",
+   "hardware": "h200",
+   "ledger": {
+    "unit": 16
+   },
+   "nearness": "near",
+   "records": 16,
+   "release": "0.33.0",
+   "scope": "in_scope",
+   "source": "inferencex"
+  },
+  {
+   "benchmark_type": "agentic_traces",
+   "conditions": {
+    "client_requests": "not scored: newer than source revision",
+    "coefficients": "not scored: newer than source revision",
+    "engine_release": "false: 0.33.0",
+    "fields_modelled": "not scored: newer than source revision",
+    "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)",
+    "resolved_values": "not scored: newer than source revision"
+   },
+   "engine": "vllm",
+   "framework": "vllm",
+   "hardware": "mi300x",
+   "ledger": {
+    "newer_than_source_revision": 12
+   },
+   "nearness": "near",
+   "records": 12,
+   "release": "0.33.0",
+   "scope": "out_of_scope",
+   "source": "inferencex"
+  }
+ ],
+ "targets": {
+  "sglang": "0.5.23",
+  "vllm": "0.32.0"
+ }
+}
