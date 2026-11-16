@@ -48,6 +48,8 @@ SHARDS: dict[str, list[Cmd]] = {
         script("orchestrator/test_gen_direct_corpus.py"),
         script("orchestrator/test_run_agentic.py"),
         pytest("Agentic corpus pinned by its catalog workload's revision and full sha256", "orchestrator/test_resolve_agentic_corpus.py"),
+        pytest("The first-party corpus scorer and its client adapters", "orchestrator/baseline/test_corpus.py",
+               "orchestrator/baseline/test_clients_fp.py"),
         Cmd("Schema validates the committed render fixture", argv=[
             "python3", "orchestrator/validate_summary.py", "--schema", "schemas/summary.v1.json", "web/testdata/render-fixture.summary.json"]),
         Cmd("summary.json v3 builder + validator; the committed v3 web fixtures rebuild byte-for-byte; the frozen v2 ones validate",
