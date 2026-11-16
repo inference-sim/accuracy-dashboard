@@ -65,6 +65,7 @@ Usage:
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -73,7 +74,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "ingest"))
 
 import result  # noqa: E402
 
-from extract_agentic_replay_args import (AGENTX_SCENARIO, parse_job_log,  # noqa: E402
+from extract_agentic_replay_args import (AGENTX_SCENARIO, _nested, parse_job_log,  # noqa: E402
                                          parse_server_log)
 from gen_scenarios import DrafterError, PackagingError, emit, speculative_drafter  # noqa: E402
 import blis_commands as bc  # noqa: E402
@@ -257,6 +258,19 @@ def _attention_dp_size(row: dict) -> int:
     if gpus and tp and gpus % tp == 0 and gpus // tp > 1:
         return gpus // tp
     return 2
+
+
+def read_server_log(server_log: str) -> dict:
+    """parse_server_log's speculative setting, and the draft checkpoint the log's
+    speculative_config names (`draft_model`, as the log spells it), which the scenario's drafter
+    is resolved from (gen_scenarios.speculative_drafter). Read here, not in
+    extract_agentic_replay_args.py, which the contract scorer imports and this does not change."""
+    out = parse_server_log(server_log)
+    i = server_log.find("non-default args: {")
+    spec = _nested(server_log[i:], "speculative_config") if i >= 0 else None
+    if spec is not None and (m := re.search(r"'model':\s*'([^']+)'", spec)):
+        out["draft_model"] = m.group(1)
+    return out
 
 
 def sweep_from_row(row: dict, server: dict | None = None, node_size: int | None = None,
@@ -487,7 +501,7 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
 
     row = json.loads(Path(args.row).read_text())
-    server = parse_server_log(Path(args.server_log).read_text())
+    server = read_server_log(Path(args.server_log).read_text())
     # The job log is OPTIONAL: the external repo's Actions logs are usually unreadable, and
     # seed/duration are deliberately left to blis's defaults (see agentic_replay_args). When
     # present, its --public-dataset names the corpus and its --max-context-length (the client's

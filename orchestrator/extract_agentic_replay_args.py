@@ -134,8 +134,7 @@ def parse_server_log(server_log: str) -> dict:
     """The vLLM version and speculative setting recorded in a server log.
 
     Keys present only when the log states them: vllm_version, speculative_method,
-    num_speculative_tokens, draft_model (the speculative_config's model, as the log names it),
-    rejection_sample_method, synthetic_acceptance_length.
+    num_speculative_tokens, rejection_sample_method, synthetic_acceptance_length.
     """
     out: dict = {}
     # Anchored on vLLM's own engine line, as the kernel's engine-settings parser is: a 180 KB
@@ -152,8 +151,6 @@ def parse_server_log(server_log: str) -> dict:
             out["speculative_method"] = mm.group(1)
         if (mm := re.search(r"'num_speculative_tokens':\s*(\d+)", spec)):
             out["num_speculative_tokens"] = int(mm.group(1))
-        if (mm := re.search(r"'model':\s*'([^']+)'", spec)):
-            out["draft_model"] = mm.group(1)
         if (mm := re.search(r"'rejection_sample_method':\s*'([A-Za-z_0-9]+)'", spec)):
             out["rejection_sample_method"] = mm.group(1)
         if (mm := re.search(r"'synthetic_acceptance_length':\s*([0-9.]+)", spec)):

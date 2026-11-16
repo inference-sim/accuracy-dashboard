@@ -81,13 +81,13 @@ def test_pure_functions():
 
     # The draft checkpoint the log names reaches the scenario config, so the generator can name
     # the catalog drafter (inference-sim/blis-substrate#124); a log that names none adds none.
-    eagle = ra.parse_server_log(SERVER_LOG.replace(
+    eagle = ra.read_server_log(SERVER_LOG.replace(
         "{'method': 'dspark', 'model': 'Inferact/Kimi-K3-DSpark', ",
         "{'method': 'eagle3', 'model': 'Inferact/MiniMax-M3-EAGLE3', "))
     ck("the log's draft checkpoint is read", eagle.get("draft_model") == "Inferact/MiniMax-M3-EAGLE3", str(eagle))
     ck("the draft checkpoint is written into the scenario config",
        ra.sweep_from_row(ROW, server=eagle)["stated_config"].get("draft_model") == "Inferact/MiniMax-M3-EAGLE3")
-    bare = ra.parse_server_log(SERVER_LOG.replace("'model': 'Inferact/Kimi-K3-DSpark', ", ""))
+    bare = ra.read_server_log(SERVER_LOG.replace("'model': 'Inferact/Kimi-K3-DSpark', ", ""))
     ck("a log that names no draft checkpoint adds none",
        "draft_model" not in ra.sweep_from_row(ROW, server=bare)["stated_config"])
 
