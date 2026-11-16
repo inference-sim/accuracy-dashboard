@@ -94,8 +94,13 @@ import ranking as rk  # noqa: E402
 
 FORMAT = "first-party-corpus-2"
 SOURCE = "first-party"
+# The clients score.py replays itself (by benchmark type), and the ones clients_fp.py adapts (any benchmark type).
 CLIENTS = {"inferencex": "single_turn", "agentx": "agentic_traces"}
-ROLES = ("server_log", "launch_config", "job_log", "result_json", "client_export", "client_command")
+ADAPTED = ("aiperf", "inference-perf")
+ROLES = ("server_log", "launch_config", "job_log", "result_json", "client_export", "client_command",
+         "client_records", "client_config", "otel_traces")
+# The scorer's own reasons about its InferenceX or AgentX client, which an adapted client's replay replaces.
+REPLACED_REASONS = ("artifact_unmatched:client_export", "required_setting_missing:replay.")
 MIN_UNITS = 10          # design D7: no published aggregate of a non-public corpus over fewer than 10 units
 FEW = "fewer than 10"
 LABEL = re.compile(r"^[a-z0-9][a-z0-9-]{2,39}$")
@@ -203,6 +208,11 @@ def point_id(ident: dict) -> str:
 def client_reasons(run: dict) -> list[str]:
     """The scorer's reason for a client whose requests the harness cannot recompute."""
     name = (run.get("client") or {}).get("name")
+    if name in ADAPTED:
+        need = {"aiperf": ("client_records", "client_config"),
+                "inference-perf": ("client_records", "client_config", "otel_traces")}[name]
+        missing = [k for k in need if k not in run["files"]]
+        return [f"client_scenario_not_replayable:{name}_records_missing_{'_'.join(missing)}"] if missing else []
     if name not in CLIENTS:
         return [f"client_scenario_not_replayable:{name or 'unstated'}"]
     if CLIENTS[name] != run["row"]["benchmark_type"]:
@@ -224,6 +234,8 @@ def freeze(corpus: Path, out: Path, resolve_build) -> dict:
         pdir.mkdir(parents=True, exist_ok=True)
         files, server_log = {}, None
         for role, rel in sorted(run["files"].items()):
+            if role in ("client_records", "client_config", "otel_traces"):
+                continue            # read by the client adapter from the corpus itself (clients_fp.py)
             raw = (corpus / rel).read_bytes()
             if role == "server_log":
                 server_log = raw.decode("utf-8", "replace")
@@ -289,13 +301,21 @@ def measured_figures(metrics: dict, gpus: int) -> dict:
             "ttft_p99_ms": ms("p99_ttft"), "itl_p50_ms": ms("median_itl"), "cache_hit_rate": None}
 
 
+def rows_figures(rows: list[dict]) -> dict:
+    """The five figures from a client's own per-request rows (an adapted client's measured side), by the registry's
+    definitions: the same computation as the simulated side's, ITL pooled over every recorded gap."""
+    return simulated_figures(rows, None)
+
+
 def simulated_figures(rows: list[dict], n_main: int | None) -> dict:
     """The five figures from a Result's request rows: the main phase's completed requests (request_0 to
     request_<n-1>; a warm-up copy or holder round is not one)."""
     import inferencex_client as ix
     def main(r):
+        if n_main is None:
+            return True
         try:
-            return n_main is None or ix.request_index(r["id"]) < n_main
+            return ix.request_index(r["id"]) < n_main
         except ValueError:
             return False
     done = [r for r in rows if r.get("fate") == "completed" and main(r)]
@@ -343,8 +363,72 @@ def score(*, corpus: Path, work: Path, env, resolve_build, workers: int = 1) -> 
     outside(corpus, work)
     pull = work / "pull"
     manifest = freeze(corpus, pull, resolve_build)
-    outcomes = sc.score_points(manifest["points"], pull, work / "score", env, workers=workers)
-    return report(corpus=corpus, outcomes=outcomes, pull=pull, work=work / "score", env=env), outcomes
+    doc = load(corpus)
+    adapted = {pid: run for run in doc["runs"] if run["client"].get("name") in ADAPTED
+               for pid in [json.loads((pull / "runs.json").read_text())[run["id"]]]}
+    plain = [e for e in manifest["points"] if e["point_id"] not in adapted]
+    outcomes = sc.score_points(plain, pull, work / "score", env, workers=workers) if plain else []
+    extra = {}
+    for e in manifest["points"]:
+        if e["point_id"] in adapted:
+            extra[e["point_id"]] = score_adapted(e, adapted[e["point_id"]], corpus, pull, work / "adapted", env)
+    return report(corpus=corpus, outcomes=outcomes, pull=pull, work=work / "score", env=env, adapted=extra), outcomes
+
+
+def score_adapted(entry: dict, run: dict, corpus: Path, pull: Path, work: Path, env) -> dict:
+    """A run of an adapted client: its scenario is the scorer's, built by score.score_point from the run's own
+    records (design §11.2) with the simulator call left out; its requests are the client adapter's (clients_fp.py);
+    the simulator's Result is validated as the scorer validates one, and the grade is grade.grade's over the
+    scorer's substitutions, the adapter's client differences, the Result's coefficient methods and the unevaluated
+    G1 conditions."""
+    import assess as asx
+    import clients_fp as cf
+    import result
+    import score as sc
+    import yaml
+    o = sc._score_one(entry, pull, work, env, simulate=False)
+    reasons = [r for r in o.reasons if not r.startswith(REPLACED_REASONS)]
+    rel = gr.run_release(entry.get("build") or {"image": entry["row"].get("image")}, o.banner)
+    base = {"status": "not_scored", "run_release": rel.version, "substitutions": [], "result": None, "measured": None}
+    if reasons:
+        faults = [r for r in reasons if asx.is_fault(r)]
+        if faults:
+            return {**base, "status": "failed", "grade": "failed", "reasons": faults}
+        g5 = [asx.g5_of(r) for r in sorted(set(reasons))]
+        g = gr.grade(engine_version=env.engine_release, release=rel, substitutions=[], g5=g5)
+        return {**base, "grade": g.grade, "reasons": g5}
+    scen = sorted((work / "scenarios").glob(f"p-{entry['point_id'][:16]}.yaml"))
+    if len(scen) != 1:
+        raise CorpusError(f"run {run['id']}: the scorer wrote no scenario for it")
+    name = run["client"]["name"]
+    try:
+        if name == "aiperf":
+            recs = [json.loads(x) for x in (corpus / run["files"]["client_records"]).read_text().splitlines() if x.strip()]
+            rp = cf.aiperf(recs, json.loads((corpus / run["files"]["client_config"]).read_text()), work / "trace" / run["id"])
+        else:
+            rp = cf.inference_perf(corpus / run["files"]["otel_traces"],
+                                   json.loads((corpus / run["files"]["client_records"]).read_text()),
+                                   yaml.safe_load((corpus / run["files"]["client_config"]).read_text()),
+                                   work / "trace" / run["id"], env.blis)
+    except cf.ClientError as e:
+        g = gr.grade(engine_version=env.engine_release, release=rel, substitutions=[],
+                     g5=[{"code": "value_not_recorded", "subject": f"client:{name}"}])
+        return {**base, "grade": g.grade, "reasons": [{"code": "value_not_recorded", "subject": f"client:{name}"}],
+                "why": str(e)}
+    argv = [env.blis, "replay", "--scenario", scen[0].name, "--scenarios", str(scen[0].parent),
+            "--trace-header", str(rp.header), "--trace-data", str(rp.data), *rp.flags,
+            "--catalog", str(env.catalog), "--registry", str(env.registry), "--seed", "42", "--format", "json", "--log", "error"]
+    try:
+        doc, raw, _ = result.run(argv, blis=env.blis, cwd=str(Path(env.blis).parent), timeout=7200)
+        if (doc.get("requests") or {}).get("completed") != rp.requests or (doc.get("requests") or {}).get("length_capped"):
+            raise result.ResultError(f"the replay completed {(doc.get('requests') or {}).get('completed')} of the "
+                                     f"{rp.requests} requests the client sent", "requests_incomplete")
+    except (result.ResultError, subprocess.SubprocessError, OSError) as e:
+        return {**base, "status": "failed", "grade": "failed", "reasons": [f"blis_refused:{getattr(e, 'slug', 'replay')}"]}
+    subs = list(o.subs) + rp.differences + result.coefficient_substitutions(doc) + gr.unchecked()
+    g = gr.grade(engine_version=env.engine_release, release=rel, substitutions=subs)
+    return {**base, "status": "scored", "grade": g.grade, "substitutions": g.substitutions, "result": doc,
+            "measured_rows": rp.measured, "scenario": scen[0].read_text()}
 
 
 def result_of(work: Path, pid: str, benchmark_type: str) -> dict | None:
@@ -353,13 +437,28 @@ def result_of(work: Path, pid: str, benchmark_type: str) -> dict | None:
     return json.loads(p.read_text()) if p.is_file() else None
 
 
-def report(*, corpus: Path, outcomes: list, pull: Path, work: Path, env) -> dict:
+def report(*, corpus: Path, outcomes: list, pull: Path, work: Path, env, adapted: dict | None = None) -> dict:
     doc = load(corpus)
     by = {o.point_id: o for o in outcomes}
     pids = json.loads((pull / "runs.json").read_text())
     runs = []
+    adapted = adapted or {}
     for run in doc["runs"]:
         row, pid = run["row"], pids[run["id"]]
+        if pid in adapted:
+            a = adapted[pid]
+            gpus = int(row.get("num_decode_gpu") or row.get("decode_tp") or 1)
+            base = {"id": run["id"], "point_id": pid, "workload": run["workload"], "concurrency": int(row["conc"]),
+                    "gpus": gpus, "row": {k: v for k, v in row.items() if k != "metrics"}, "client": run["client"],
+                    "status": a["status"], "grade": a["grade"], "run_release": a["run_release"]}
+            if a["status"] != "scored":
+                runs.append({**base, "reasons": a.get("reasons"), **({"why": a["why"]} if a.get("why") else {})})
+                continue
+            meas = rows_figures(a["measured_rows"])
+            sim = simulated_figures(a["result"].get("request_rows") or [], None)
+            runs.append({**base, "substitutions": a["substitutions"], "measured": meas, "simulated": sim,
+                         "errors_pct": errors(meas, sim)})
+            continue
         o = by[pid]
         gpus = int(row.get("num_decode_gpu") or row.get("decode_tp") or 1)
         status = "failed" if o.faults else "scored" if o.fidelity is not None else "not_scored"
