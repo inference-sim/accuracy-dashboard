@@ -153,12 +153,24 @@ def _version(tag: str) -> tuple[int, int, int]:
     return tuple(int(x) for x in m.groups())
 
 
-def unscored_releases(tags_in_tag_order: list[str], scored: set[str], first: str) -> list[str]:
+# Releases that can never be scored, each with the patch release that scores its code in its
+# place. The night scores a release's anchor units from the substrate its stack.json pins (COV-2),
+# and these pin blis-substrate v0.13.0 and v0.14.0, which publish no anchor list. A tag names one
+# commit forever (LIF-1), so only a patch release that repins the substrate can be scored. Such a
+# release is skipped only once its patch release exists, and it is never recorded as scored.
+SUPERSEDED = {"v0.16.0": "v0.17.1", "v0.17.0": "v0.17.1"}
+
+
+def unscored_releases(tags_in_tag_order: list[str], scored: set[str], first: str,
+                      superseded: dict[str, str] = SUPERSEDED) -> list[str]:
     """The releases a nightly run scores (COV-9): every stable release at or after `first`, in
     the order they were tagged, that has no scores yet. Each is scored exactly once. A tag that is
-    not vX.Y.Z (a pre-release) is not a release to score. Empty when no such release exists yet."""
+    not vX.Y.Z (a pre-release) is not a release to score. A release in `superseded` is left out once
+    the release that replaces it is tagged. Empty when no such release exists yet."""
     floor = _version(first)
-    return [t for t in tags_in_tag_order if _TAG.match(t) and _version(t) >= floor and t not in scored]
+    tagged = set(tags_in_tag_order)
+    return [t for t in tags_in_tag_order if _TAG.match(t) and _version(t) >= floor and t not in scored
+            and superseded.get(t) not in tagged]
 
 
 SCORED_KIND = "ScoredReleases"
