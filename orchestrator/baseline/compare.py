@@ -707,24 +707,50 @@ LOG_HEADER = """# Evaluation log
 
 Every evaluation of the development split's test set (and the prospective set) is one row, so repeated peeking is visible. A candidate release is evaluated once. See evaluation-protocol.md.
 
-| Date | Commit | Estimator | Split | Points | Scored |
-|---|---|---|---|---|---|
+| Date | Commit | Release | Estimator | Split | Points | Scored |
+|---|---|---|---|---|---|---|
 """
+# A release is the simulator release a test evaluation scored with: a tag (v0.17.0) or, for a build pinned by commit,
+# its full commit.
+RELEASE = re.compile(r"^(v\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?|[0-9a-f]{40})$")
 
 
-def evaluation_log(path, commit, estimator, ds: dict, today: str | None = None) -> list[str]:
-    """Append one row per evaluated split (test, prospective) to the log: date, harness commit,
-    estimator, split, points and scored points."""
+def logged_test_releases(text: str) -> Counter:
+    """How many test rows the log holds for each release (the third column)."""
+    out = Counter()
+    for line in text.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if line.startswith("| ") and len(cells) == 7 and cells[4] == "test":
+            out[cells[2]] += 1
+    return out
+
+
+def evaluation_log(path, commit, release, estimator, ds: dict, today: str | None = None) -> list[str]:
+    """Append one row per evaluated split (test, prospective) to the log: date, harness commit, the simulator release
+    evaluated, estimator, split, points and scored points. A release is evaluated on the test set once: a second
+    evaluation of a release the log already holds a test row for is refused (docs/m2/evaluation-protocol.md, section
+    4), and a release that is not a tag or a full commit is refused."""
     import datetime
+    if not RELEASE.match(str(release or "")):
+        raise CompareError(f"the release {release!r} is not a release tag or a full 40-hex commit")
     p = Path(path)
     if not p.is_file():
         p.write_text(LOG_HEADER)
+    if logged_test_releases(p.read_text())[release]:
+        raise CompareError(f"the log already holds a test evaluation of {release}: a release is evaluated once")
     day = today or datetime.date.today().isoformat()
-    rows = [f"| {day} | {commit} | {estimator} | {k} | {v['points']} | {v['scored']} |"
+    rows = [f"| {day} | {commit} | {release} | {estimator} | {k} | {v['points']} | {v['scored']} |"
             for k, v in ds["kinds"].items() if k in ("test", "prospective") and not v.get("withheld")]
     with p.open("a") as fh:
         fh.write("".join(r + "\n" for r in rows))
     return rows
+
+
+def release_of(prov: dict) -> str | None:
+    """The simulator release a contract was scored with: its tag, else its build's commit."""
+    blis = prov.get("blis") or {}
+    rel = blis.get("release")
+    return rel if rel and rel != "unknown" else blis.get("commit_sha") or (prov.get("simulator") or {}).get("build")
 
 
 def main(argv=None) -> int:
@@ -764,13 +790,14 @@ def main(argv=None) -> int:
             t = run_report(run, a.sample, a.evaluate_test)
             if a.evaluate_test:
                 # the table names the log rows it was evaluated as (published_test.py checks them against the log)
-                t["evaluation"] = evaluation_log(a.log, run.prov.get("harness_commit"), a.estimator, t["development_split"])
+                t["evaluation"] = evaluation_log(a.log, run.prov.get("harness_commit"), release_of(run.prov), a.estimator,
+                                                 t["development_split"])
             _write(t, run_markdown(t), a.out)
         elif a.cmd == "pair":
             before, after = Run(a.before, a.before_splits), Run(a.after, a.after_splits)
             t = pair_report(before, after, a.sample, a.evaluate_test)
             if a.evaluate_test:
-                t["evaluation"] = evaluation_log(a.log, after.prov.get("harness_commit"), a.estimator,
+                t["evaluation"] = evaluation_log(a.log, after.prov.get("harness_commit"), release_of(after.prov), a.estimator,
                                                  t["after"]["development_split"])
             _write(t, pair_markdown(t), a.out)
         else:

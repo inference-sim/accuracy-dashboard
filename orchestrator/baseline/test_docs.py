@@ -135,4 +135,5 @@ def test_the_log_is_a_table_that_compare_py_can_append_to():
     assert pt.problems(DOCS, DOCS / "m2" / "evaluation-log.md") == []
     sys.path.insert(0, str(HERE))
     import compare as c
-    assert "| Date | Commit | Estimator | Split | Points | Scored |" in text and "| Date | Commit | Estimator | Split | Points | Scored |" in c.LOG_HEADER
+    header = "| Date | Commit | Release | Estimator | Split | Points | Scored |"
+    assert header in text and header in c.LOG_HEADER and header == pt.HEADER

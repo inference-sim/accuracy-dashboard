@@ -1287,14 +1287,14 @@
  ],
  "estimator": "aisimulate",
  "evaluation": [
-  "| 2026-11-16 | 26c22e3b1868fa8311eef3bd32ce194b359c629a | BLIS v0.17.0 on the matched points | test | 155 | 71 |",
-  "| 2026-11-16 | 26c22e3b1868fa8311eef3bd32ce194b359c629a | BLIS v0.17.0 on the matched points | prospective | 0 | 0 |",
-  "| 2026-11-16 | 26c22e3b1868fa8311eef3bd32ce194b359c629a | BLIS v0.17.0 on the matched points | test | 155 | 71 |",
-  "| 2026-11-16 | 26c22e3b1868fa8311eef3bd32ce194b359c629a | BLIS v0.17.0 on the matched points | prospective | 0 | 0 |",
-  "| 2026-11-16 | 26c22e3b1868fa8311eef3bd32ce194b359c629a | BLIS v0.17.0 on the matched points | test | 155 | 71 |",
-  "| 2026-11-16 | 26c22e3b1868fa8311eef3bd32ce194b359c629a | BLIS v0.17.0 on the matched points | prospective | 0 | 0 |",
-  "| 2026-11-16 | 26c22e3b1868fa8311eef3bd32ce194b359c629a | BLIS v0.17.0 on the matched points | test | 159 | 71 |",
-  "| 2026-11-16 | 26c22e3b1868fa8311eef3bd32ce194b359c629a | BLIS v0.17.0 on the matched points | prospective | 0 | 0 |"
+  "| 2026-11-16 | 26c22e3b1868fa8311eef3bd32ce194b359c629a | v0.17.0 | BLIS v0.17.0 on the matched points | test | 155 | 71 |",
+  "| 2026-11-16 | 26c22e3b1868fa8311eef3bd32ce194b359c629a | v0.17.0 | BLIS v0.17.0 on the matched points | prospective | 0 | 0 |",
+  "| 2026-11-16 | 26c22e3b1868fa8311eef3bd32ce194b359c629a | v0.17.0 | BLIS v0.17.0 on the matched points | test | 155 | 71 |",
+  "| 2026-11-16 | 26c22e3b1868fa8311eef3bd32ce194b359c629a | v0.17.0 | BLIS v0.17.0 on the matched points | prospective | 0 | 0 |",
+  "| 2026-11-16 | 26c22e3b1868fa8311eef3bd32ce194b359c629a | v0.17.0 | BLIS v0.17.0 on the matched points | test | 155 | 71 |",
+  "| 2026-11-16 | 26c22e3b1868fa8311eef3bd32ce194b359c629a | v0.17.0 | BLIS v0.17.0 on the matched points | prospective | 0 | 0 |",
+  "| 2026-11-16 | 26c22e3b1868fa8311eef3bd32ce194b359c629a | v0.17.0 | BLIS v0.17.0 on the matched points | test | 159 | 71 |",
+  "| 2026-11-16 | 26c22e3b1868fa8311eef3bd32ce194b359c629a | v0.17.0 | BLIS v0.17.0 on the matched points | prospective | 0 | 0 |"
  ],
  "format": "matched-comparison-1",
  "lanes": {

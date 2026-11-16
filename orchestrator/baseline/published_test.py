@@ -5,7 +5,8 @@ The development split's test and prospective points are evaluated only through t
 row of docs/m2/evaluation-log.md, and the report that carries the figures names the rows it was logged as. This module
 checks the committed tree for that:
 
-  - every row of the log is a well-formed row (date, full harness commit, estimator, split, points, scored);
+  - every row of the log is a well-formed row (date, full harness commit, the release evaluated, estimator, split,
+    points, scored), and a release has one test evaluation, or the log's own note says why it has more;
   - every committed report that says it holds test figures (`test_evaluated` true, at its top or in its
     development split) names log rows (`evaluation`), and each of them is in the log;
   - every committed report that says it does not, and states its split counts, withholds every test, prospective and
@@ -23,8 +24,13 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-HEADER = "| Date | Commit | Estimator | Split | Points | Scored |"
-ROW = re.compile(r"^\| \d{4}-\d{2}-\d{2} \| [0-9a-f]{40} \| [^|]*\S[^|]* \| (test|prospective) \| \d+ \| \d+ \|$")
+HEADER = "| Date | Commit | Release | Estimator | Split | Points | Scored |"
+ROW = re.compile(r"^\| \d{4}-\d{2}-\d{2} \| [0-9a-f]{40} \| (v\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?|[0-9a-f]{40}) "
+                 r"\| [^|]*\S[^|]* \| (test|prospective) \| \d+ \| \d+ \|$")
+# A release the log holds more than one test evaluation of is a violation of the protocol unless the log says so,
+# above its table, in one line per release: "- Repeated: <release>, <n> test evaluations: <why>". The count must be
+# the log's own; a row is never deleted to hide a repeat.
+REPEATED = re.compile(r"^- Repeated: (\S+), (\d+) test evaluations: \S")
 HELD = ("test", "prospective", "unknown")
 
 
@@ -40,7 +46,21 @@ def log_rows(text: str) -> tuple[list[str], list[str]]:
     rows, problems = lines[h + 2:], []
     for r in rows:
         if not ROW.match(r):
-            problems.append(f"the log row {r!r} is not a row of date, full commit, estimator, split, points, scored")
+            problems.append(f"the log row {r!r} is not a row of date, full commit, release, estimator, split, points, "
+                            f"scored")
+    tests = {}
+    for r in rows:
+        m = ROW.match(r)
+        if m and m.group(2) == "test":
+            tests[m.group(1)] = tests.get(m.group(1), 0) + 1
+    noted = {m.group(1): int(m.group(2)) for m in map(REPEATED.match, lines[:h]) if m}
+    for rel, n in sorted(tests.items()):
+        if n > 1 and noted.get(rel) != n:
+            problems.append(f"the log holds {n} test evaluations of {rel}; a release is evaluated once, and a repeat "
+                            f"the log keeps needs its own line above the table ('- Repeated: {rel}, {n} test "
+                            f"evaluations: why')")
+    for rel in sorted(set(noted) - {r for r, n in tests.items() if n > 1}):
+        problems.append(f"the log notes repeats of {rel} it does not hold")
     return rows, problems
 
 

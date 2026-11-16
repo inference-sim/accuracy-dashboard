@@ -502,16 +502,19 @@ def tool_commit() -> str:
     return head
 
 
-def log_evaluation(path: Path, commit: str, label: str, entries: list[dict]) -> list[str]:
+def log_evaluation(path: Path, commit: str, release: str, label: str, entries: list[dict]) -> list[str]:
     """Append the evaluation's rows to the log and return them, so the report can name the rows it was logged as."""
     import compare as cmp
     kinds = {}
     for k in ("test", "prospective"):
         es = [e for e in entries if e["kind"] == k]
         kinds[k] = {"points": len(es), "scored": sum(e.get("blis_tpot") is not None for e in es)}
-    cmp.evaluation_log(path, commit, label, {"kinds": kinds})
-    # every row of this evaluation's label and commit, a repeat included: a report names all the rows it stands for
-    return [r for r in Path(path).read_text().splitlines() if r.startswith("| ") and f"| {commit} | {label} |" in r]
+    try:
+        cmp.evaluation_log(path, commit, release, label, {"kinds": kinds})
+    except cmp.CompareError as e:
+        raise MatchError(str(e)) from None
+    # every row of this evaluation's commit, release and label, a recorded repeat included: the report names them all
+    return [r for r in Path(path).read_text().splitlines() if r.startswith("| ") and f"| {commit} | {release} | {label} |" in r]
 
 
 def main(argv=None) -> int:
@@ -576,7 +579,9 @@ def main(argv=None) -> int:
                           "experimental": prov.get("experimental"), "matched_py_commit": tool,
                           "artifact": pts["snapshot"].get("campaign", {}).get("run_id"),
                           "measurement_source_url": pts.get("measurement_source_url")}
-            rows = log_evaluation(a.log, prov.get("harness_commit"), a.label, entries) if a.evaluate_test else None
+            import compare as cmp
+            rows = log_evaluation(a.log, prov.get("harness_commit"), cmp.release_of(prov), a.label, entries) \
+                if a.evaluate_test else None
             rep = build_report(entries, a.estimator, provenance, a.evaluate_test, rows)
             Path(f"{a.out}.json").write_text(json.dumps(rep, indent=1, sort_keys=True) + "\n")
             Path(f"{a.out}.md").write_text(markdown(rep))

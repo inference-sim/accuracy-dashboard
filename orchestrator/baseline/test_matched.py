@@ -158,13 +158,13 @@ def test_a_zip_other_than_the_pinned_one_is_refused(tmp_path):
 
 def test_a_logged_evaluation_appends_a_row_per_held_out_kind(tmp_path):
     log = tmp_path / "log.md"
-    named = mt.log_evaluation(log, "c" * 40, "label", entries(pred=[(1.0, 1.0), (1.2, 1.2), None], kind="test"))
+    named = mt.log_evaluation(log, "c" * 40, "v0.17.0", "label", entries(pred=[(1.0, 1.0), (1.2, 1.2), None], kind="test"))
     rows = [x for x in log.read_text().splitlines() if x.startswith("| 2")]
-    assert named == rows
-    # a repeat of the same evaluation is logged again, and its report names every row of it
-    again = mt.log_evaluation(log, "c" * 40, "label", entries(pred=[(1.0, 1.0), (1.2, 1.2), None], kind="test"))
-    assert len(again) == 4 and again == [x for x in log.read_text().splitlines() if x.startswith("| 2")]
-    assert [r.split(" | ")[2:] for r in rows] == [["label", "test", "3", "2 |"], ["label", "prospective", "0", "0 |"]]
+    assert named == rows and all("| v0.17.0 | label |" in r for r in rows)
+    # a second test evaluation of the same release is refused
+    with pytest.raises(mt.MatchError, match="a release is evaluated once"):
+        mt.log_evaluation(log, "c" * 40, "v0.17.0", "label", entries(pred=[(1.0, 1.0), (1.2, 1.2), None], kind="test"))
+    assert [r.split(" | ")[3:] for r in rows] == [["label", "test", "3", "2 |"], ["label", "prospective", "0", "0 |"]]
 
 
 def test_a_unit_the_pull_cannot_read_is_listed_and_left_out_of_the_pull(tmp_path, monkeypatch):
