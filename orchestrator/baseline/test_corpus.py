@@ -1,0 +1,147 @@
+"""Tests of the first-party corpus scorer (corpus.py), on a synthetic corpus written here and a fake simulator."""
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parent / "ingest"))
+import corpus as cp  # noqa: E402
+
+COEF = {"selected_entries": {"coefficients": [{"set": "s", "name": "n", "method": "measured"}]}}
+
+
+def req(i, arrival_s, ttft_ms, tpot_ms, out=101, prompt=1000, cached=0, fate="completed"):
+    return {"id": f"request_{i}", "fate": fate, "arrival_us": int(arrival_s * 1e6), "ttft_us": int(ttft_ms * 1000),
+            "tpot_us": tpot_ms * 1000, "e2e_us": int((ttft_ms + (out - 1) * tpot_ms) * 1000),
+            "prompt_tokens": prompt, "output_tokens": out, "cached_local_tokens": cached}
+
+
+def rows(scale=1.0, n=11):
+    """n requests one second apart, 100 ms TTFT and 10 ms TPOT, times `scale`; half the prompt cached."""
+    return [req(i, i, 100 * scale, 10 * scale, cached=500) for i in range(n)]
+
+
+def test_the_figures_are_taken_over_the_steady_middle_window():
+    rs = rows()
+    rs[0] = req(0, 0, 5000, 50)          # the ramp: a slow first request
+    rs[-1] = req(10, 10, 5000, 50)       # the drain
+    f = cp.figures(rs, 0.1)
+    assert f["requests"] == 9
+    assert f["ttft_p99_ms"] == pytest.approx(100)
+    assert f["itl_p50_ms"] == pytest.approx(10)
+    assert f["interactivity_p50_tps"] == pytest.approx(100)
+    assert f["cache_read_rate"] == pytest.approx(0.5)
+    # 9 requests of 101 tokens between the first arrival (1 s) and the last completion (9 s + 1.1 s)
+    assert f["output_throughput_tps"] == pytest.approx(9 * 101 / 9.1)
+
+
+def test_a_request_that_did_not_complete_is_not_counted():
+    rs = rows()
+    rs[5] = {**rs[5], "fate": "dropped"}
+    assert cp.figures(rs, 0.1)["requests"] == 8
+
+
+def write_corpus(root: Path, visibility="private", image="vllm/vllm-openai:v0.32.0", runs=3):
+    root.mkdir(parents=True)
+    doc = {"format": cp.FORMAT, "label": "lab", "visibility": visibility, "runs": []}
+    for k in range(runs):
+        rid = f"r{k}"
+        (root / rid).mkdir()
+        (root / rid / "requests.jsonl").write_text("\n".join(json.dumps(r) for r in rows(1 + k)) + "\n")
+        doc["runs"].append({"id": rid, "workload": "w", "concurrency": 8, "gpus": 8, "configuration": {"tp": 8, "k": k},
+                            "build": {"image": image, "banner": image.rsplit(":v", 1)[-1]}, "measured_requests": f"{rid}/requests.jsonl",
+                            "replay": ["replay", "--scenario", f"{rid}/scenario.yaml"], "differences": []})
+    (root / "corpus.json").write_text(json.dumps(doc))
+    return root
+
+
+def fake_simulate(scales):
+    def sim(run):
+        s = scales[run["id"]]
+        if s is None:
+            raise cp.CorpusError("blis exited 1: refused")
+        return {**COEF, "request_rows": rows(s)}
+    return sim
+
+
+def test_a_run_on_the_engine_release_is_graded_g2_with_the_unevaluated_conditions_named(tmp_path):
+    c = write_corpus(tmp_path / "c")
+    rep = cp.score(corpus=c, simulate=fake_simulate({"r0": 1.0, "r1": 2.2, "r2": None}), engine_release="0.32.0")
+    by = {r["id"]: r for r in rep["runs"]}
+    assert by["r0"]["grade"] == "G2"
+    assert {s["kind"] for s in by["r0"]["substitutions"]} == {"unevaluated"}
+    assert by["r0"]["errors_pct"]["ttft_p99_ms"] == pytest.approx(0)
+    assert by["r1"]["errors_pct"]["itl_p50_ms"] == pytest.approx(10)       # 22 ms simulated against 20 measured
+    assert by["r2"]["status"] == "failed"
+    assert rep["grades"] == {"G1": 0, "G2": 2, "G3": 0, "G4": 0, "failed": 1}
+
+
+def test_another_release_is_graded_as_an_inferencex_point_would_be(tmp_path):
+    c = write_corpus(tmp_path / "c", image="vllm/vllm-openai:v0.31.0", runs=1)
+    rep = cp.score(corpus=c, simulate=fake_simulate({"r0": 1.0}), engine_release="0.32.0")
+    assert rep["runs"][0]["grade"] == "G4"
+
+
+def test_the_ranking_says_whether_blis_orders_the_configurations_as_the_runs_do(tmp_path):
+    c = write_corpus(tmp_path / "c")
+    # measured: r0 fastest, then r1, then r2; BLIS swaps r0 and r1
+    rep = cp.score(corpus=c, simulate=fake_simulate({"r0": 2.5, "r1": 1.5, "r2": 3.5}), engine_release="0.32.0")
+    m = rep["ranking"]["w"]
+    assert (m["configs"], m["top1"]) == (3, 0)
+    assert m["spearman"] == pytest.approx(0.5)
+    assert 0 < m["regret"] < 1
+
+
+def test_a_private_corpus_publishes_only_its_grade_counts(tmp_path):
+    c = write_corpus(tmp_path / "c")
+    rep = cp.score(corpus=c, simulate=fake_simulate({"r0": 1.0, "r1": 1.0, "r2": 1.0}), engine_release="0.32.0")
+    pub = cp.public_summary(rep)
+    assert set(pub) == {"format", "label", "engine_release", "runs", "grades"}
+    assert "configuration" not in json.dumps(pub)
+    full = cp.markdown(rep)
+    assert '"k": 2' in full          # the full report shows each configuration beside its numbers
+
+
+def test_a_corpus_or_a_private_report_inside_the_checkout_is_refused(tmp_path):
+    with pytest.raises(cp.CorpusError, match="inside this checkout"):
+        cp.load(cp.ROOT / "docs")
+    c = write_corpus(tmp_path / "c")
+    assert cp.main(["score", "--corpus", str(c), "--blis", "/bin/false", "--catalog", "x", "--registry", "y",
+                    "--engine-release", "0.32.0", "--out", str(cp.ROOT / "docs" / "tmp-report")]) == 2
+    assert not (cp.ROOT / "docs" / "tmp-report").exists()
+
+
+def test_a_run_states_exactly_one_kind_of_measurement(tmp_path):
+    c = write_corpus(tmp_path / "c", runs=1)
+    doc = json.loads((c / "corpus.json").read_text())
+    doc["runs"][0]["measured_figures"] = {"ttft_p99_ms": 1}
+    (c / "corpus.json").write_text(json.dumps(doc))
+    with pytest.raises(cp.CorpusError, match="exactly one"):
+        cp.load(c)
+
+
+def test_aggregate_figures_are_compared_as_stated(tmp_path):
+    c = write_corpus(tmp_path / "c", runs=1)
+    doc = json.loads((c / "corpus.json").read_text())
+    del doc["runs"][0]["measured_requests"]
+    doc["runs"][0]["measured_figures"] = {"ttft_p99_ms": 50.0, "itl_p50_ms": 10.0, "window": "the client's"}
+    (c / "corpus.json").write_text(json.dumps(doc))
+    rep = cp.score(corpus=c, simulate=fake_simulate({"r0": 1.0}), engine_release="0.32.0")
+    r = rep["runs"][0]
+    assert r["errors_pct"]["ttft_p99_ms"] == pytest.approx(100)
+    assert r["errors_pct"]["output_throughput_tps"] is None
+    assert r["measured_window"] == "the source's own: the client's"
+
+
+def test_the_replay_command_reads_the_runs_files_and_sets_the_data_itself(tmp_path):
+    c = write_corpus(tmp_path / "c", runs=1)
+    (c / "r0" / "scenario.yaml").write_text("x")
+    run = cp.load(c)["runs"][0]
+    argv = cp.replay_argv(run, c, blis="B", catalog=Path("C"), registry=Path("R"))
+    assert argv == ["B", "replay", "--scenario", str(c / "r0" / "scenario.yaml"), "--catalog", "C", "--registry", "R",
+                    "--format", "json"]
+    with pytest.raises(cp.CorpusError, match="the harness sets it"):
+        cp.replay_argv({**run, "replay": ["replay", "--catalog", "mine"]}, c, blis="B", catalog=Path("C"), registry=Path("R"))

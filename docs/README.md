@@ -38,5 +38,6 @@ The dashboard asks one question of every InferenceX benchmark point it can read:
 | [DeepSeek-V4.1-Flash on H200, vLLM v0.33.0](m2/h200-v033/README.md) | Sixteen rows newer than the ledger: how they are pinned and split, what BLIS refuses for them by name, and a dry run of their accuracy. |
 | [Dynamo router evidence](m2/dynamo-router-evidence.md) | What router the Dynamo runs used. |
 | [The dashboard against the final substrate](m2/final-catalog-check.md) | Names the code reads, checked at the audited substrate stack. |
+| [Scoring a first-party corpus](m3/first-party-corpus/README.md) | M3: how a corpus of runs on vLLM v0.32.0, read from a path given at run time, is scored, compared and ranked, and what of it is published. |
 
 Design terms (D7, COV-2, X8, X19 and the like) are the numbered rules of the BLIS design document; the pages say what each one means where it is used.
