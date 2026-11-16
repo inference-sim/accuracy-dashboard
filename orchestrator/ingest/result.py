@@ -75,6 +75,51 @@ CLIENT_RATE_DEFINITIONS = {
 # start of every scoring run (cli.py cmd_score).
 COMPARED_FIGURES = (TTFT_MEAN_MS, TPOT_MEAN_MS)
 
+# What each benchmark client's latency field is, as a definition (DEV-8; inference-sim#2128). The clients
+# call three different figures ITL, and under speculative decoding, where one step streams several tokens
+# in one chunk, they differ by the tokens per chunk. A client field is matched to a simulator metric by
+# these meaning fields, never by its name (blis-substrate contracts/metrics, docs/contracts/reference/
+# metrics.md, which cites the code of each):
+#   tpot: per request, (latency - TTFT) / (output tokens - 1). InferenceX's mean_tpot (vllm bench serve's
+#         TPOT), aiperf's inter_token_latency, inference-perf's time_per_output_token.
+#   itl:  pooled, one gap per output token, zero between tokens of one chunk. inference-perf's
+#         inter_token_latency when it re-tokenizes the stream (a tokenizer configured).
+#   icl:  pooled, one gap per streamed chunk. vllm bench serve's ITL (InferenceX's mean_itl), aiperf's
+#         inter_chunk_latency, inference-perf's inter_token_latency without a tokenizer.
+# The scored comparison uses tpot only. aiperf's inter_chunk_latency percentiles are t-digest estimates,
+# a different percentile method, so only its mean has a simulator metric.
+_TPOT = {"formula": "tpot", "population": "requests_min_2_output_tokens"}
+_ITL = {"formula": "itl", "population": "tokens"}
+_ICL = {"formula": "icl", "population": "chunks"}
+CLIENT_FIELDS = {
+    ("vllm bench serve", "tpot"): _TPOT,
+    ("vllm bench serve", "itl"): _ICL,
+    ("aiperf", "inter_token_latency"): _TPOT,
+    ("aiperf", "inter_chunk_latency"): {**_ICL, "statistics": ("mean",)},
+    ("inference-perf", "time_per_output_token"): _TPOT,
+    ("inference-perf", "inter_token_latency, tokenizer"): _ITL,
+    ("inference-perf", "inter_token_latency, no tokenizer"): _ICL,
+}
+
+
+def client_field_problems(client: str, field: str, metric: str, registry: dict) -> list[str]:
+    """Why the simulator's `metric` cannot be compared with `client`'s `field`, or [] when it can. The
+    simulator's definition is read from its registry; the client's from CLIENT_FIELDS. aiperf's ITL
+    (inter_token_latency) is per request, so it is the simulator's tpot and never its itl or icl."""
+    want = CLIENT_FIELDS.get((client, field))
+    if want is None:
+        return [f"{client} {field} has no definition here: it is not compared"]
+    d = registry.get(metric)
+    if d is None:
+        return [f"the simulator's metric registry has no {metric}"]
+    out = [f"{client} {field} has {k} {want[k]!r}; the simulator's {metric} has {d.get(k)!r}"
+           for k in ("formula", "population") if d.get(k) != want[k]]
+    stats = want.get("statistics")
+    if stats and d.get("statistic") not in stats:
+        out.append(f"{client} {field} states only {', '.join(stats)} with the simulator's percentile method; "
+                   f"{metric} is a {d.get('statistic')}")
+    return out
+
 
 def check_definitions(registry: dict, compared=COMPARED_FIGURES) -> list[str]:
     """Why the simulator's metric registry (`blis metrics`, an M2 command: the M1 simulator has
