@@ -39,6 +39,7 @@ The dashboard asks one question of every InferenceX benchmark point it can read:
 | [Dynamo router evidence](m2/dynamo-router-evidence.md) | What router the Dynamo runs used. |
 | [The dashboard against the final substrate](m2/final-catalog-check.md) | Names the code reads, checked at the audited substrate stack. |
 | [Scoring a first-party corpus](m3/first-party-corpus/README.md) | M3: how a corpus of runs on vLLM v0.32.0, read from a path given at run time, is scored, compared and ranked, and what of it is published. |
+| [BLIS on AISimulate's points](m3/matched/README.md) | M3: BLIS scored on exactly the points of AISimulate's pinned artifact, with its metric, every cell won or lost ([the table](m3/matched/matched.md)). |
 
 ## Reports under `m3/`
 

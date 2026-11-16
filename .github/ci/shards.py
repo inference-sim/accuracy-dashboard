@@ -72,6 +72,8 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
 """),
         pytest("Scoring harness entrypoint flags, harness commit and no image path", "harness/test_run_sh.py"),
         script("orchestrator/ingest/test_build.py", "vLLM build resolution + commit-distance gate"),
+        pytest("The matched comparison and the held-out check", "orchestrator/baseline/test_matched.py",
+               "orchestrator/baseline/test_published_test.py"),
     ],
     # The two largest standalone suites.
     "ingest": [
