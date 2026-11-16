@@ -126,7 +126,10 @@ def test_the_evaluation_protocol_states_the_constants_and_the_split_sizes():
 
 def test_the_log_is_a_table_that_compare_py_can_append_to():
     text = (DOCS / "m2" / "evaluation-log.md").read_text()
-    assert text.rstrip().splitlines()[-1].startswith("|---")       # the header is last: rows append below it
+    lines = text.rstrip().splitlines()
+    sep = next(i for i, x in enumerate(lines) if x.startswith("|---"))
+    # the table is last: rows append below its header, each a row of the six columns
+    assert all(x.startswith("| ") and x.count(" | ") == 5 for x in lines[sep + 1:]), lines[sep + 1:]
     sys.path.insert(0, str(HERE))
     import compare as c
     assert "| Date | Commit | Estimator | Split | Points | Scored |" in text and "| Date | Commit | Estimator | Split | Points | Scored |" in c.LOG_HEADER

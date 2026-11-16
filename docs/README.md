@@ -38,5 +38,6 @@ The dashboard asks one question of every InferenceX benchmark point it can read:
 | [DeepSeek-V4.1-Flash on H200, vLLM v0.33.0](m2/h200-v033/README.md) | Sixteen rows newer than the ledger: how they are pinned and split, what BLIS refuses for them by name, and a dry run of their accuracy. |
 | [Dynamo router evidence](m2/dynamo-router-evidence.md) | What router the Dynamo runs used. |
 | [The dashboard against the final substrate](m2/final-catalog-check.md) | Names the code reads, checked at the audited substrate stack. |
+| [BLIS on AISimulate's points](m3/matched/README.md) | M3: BLIS scored on exactly the points of AISimulate's pinned artifact, with its metric, every cell won or lost ([the table](m3/matched/matched.md)). |
 
 Design terms (D7, COV-2, X8, X19 and the like) are the numbered rules of the BLIS design document; the pages say what each one means where it is used.
