@@ -594,6 +594,65 @@ def test_the_workflow_scores_one_release_and_starts_the_next_only_after_publishi
     assert score["env"]["BLIS_TAGS"] == "${{ needs.resolve.outputs.blis_tags }}"
 
 
+def _publish_step(tmp_path, dry_run):
+    """Run the publish job's publish step as the runner would, in a scratch checkout holding a night's incoming data,
+    with a fake git that records its calls. Returns (exit status, output, git calls, GITHUB_OUTPUT)."""
+    import re
+    import subprocess
+    import yaml
+    wf = yaml.safe_load((Path(__file__).resolve().parent.parent.parent / ".github" / "workflows" / "api-nightly.yml").read_text())
+    step = next(s for s in wf["jobs"]["publish"]["steps"] if s.get("id") == "pub")
+    env_expr = step["env"]["DRY_RUN"]
+    assert env_expr == "${{ inputs.dry_run && 'true' || 'false' }}", env_expr
+    script = re.sub(r"\$\{\{[^}]*\}\}", "v0.17.1", step["run"])
+    work = tmp_path / "checkout"
+    (work / "newdata" / "latest").mkdir(parents=True)
+    (work / "newdata" / "index.json").write_text("{}")
+    (work / "newdata" / "latest" / "summary.json").write_text(json.dumps(
+        {"snapshot_id": "2026-11-17_blis-v0.17.1_ix-api-2026-11-17", "coverage": {"points": 3, "graded": 2, "by_grade": {"G4": 2, "G5": 1}}}))
+    (work / "incoming" / "state").mkdir(parents=True)
+    (work / "incoming" / "state" / "last-run-api.json").write_text("{}")
+    (work / "incoming" / "state" / "scored-releases.json").write_text(json.dumps({"kind": "ScoredReleases", "releases": ["v0.17.1"]}))
+    bin_ = tmp_path / "bin"
+    bin_.mkdir()
+    (bin_ / "git").write_text(f"#!/bin/sh\necho \"$@\" >> {tmp_path / 'git.calls'}\n")
+    (bin_ / "git").chmod(0o755)
+    import sys as _sys
+    (bin_ / "python3").symlink_to(_sys.executable)
+    out = tmp_path / "gh_output"
+    r = subprocess.run(["bash", "-c", script], cwd=work, capture_output=True, text=True,
+                       env={"PATH": f"{bin_}:/usr/bin:/bin", "GITHUB_OUTPUT": str(out), "GITHUB_REF_NAME": "main",
+                            "DRY_RUN": "true" if dry_run else "false", "RELEASE": "v0.17.1"})
+    calls = (tmp_path / "git.calls").read_text().splitlines() if (tmp_path / "git.calls").exists() else []
+    return r.returncode, r.stdout + r.stderr, calls, out.read_text() if out.exists() else ""
+
+
+def test_a_dry_run_validates_prints_what_it_would_publish_and_pushes_nothing(tmp_path):
+    rc, text, calls, output = _publish_step(tmp_path, dry_run=True)
+    assert rc == 0, text
+    assert calls == [] and "pushed=false" in output
+    for want in ("DRY RUN: would publish", "snapshot_id: 2026-11-17_blis-v0.17.1_ix-api-2026-11-17", "release: v0.17.1",
+                 "points: 3, graded: 2", '"G4": 2', '"G5": 1'):
+        assert want in text, (want, text)
+
+
+def test_a_run_that_is_not_a_dry_run_commits_and_pushes_as_before(tmp_path):
+    rc, text, calls, output = _publish_step(tmp_path, dry_run=False)
+    assert rc == 0, text
+    assert any(c.startswith("commit ") for c in calls) and "push" in calls and "pushed=true" in output
+    assert "DRY RUN" not in text
+
+
+def test_the_pages_deploy_and_the_next_run_follow_only_a_push():
+    import yaml
+    wf = yaml.safe_load((Path(__file__).resolve().parent.parent.parent / ".github" / "workflows" / "api-nightly.yml").read_text())
+    steps = {s.get("name"): s for s in wf["jobs"]["publish"]["steps"]}
+    for name in ("Deploy the published data to Pages", "Score the next unscored release"):
+        assert "steps.pub.outputs.pushed == 'true'" in steps[name]["if"], name
+    assert wf[True]["workflow_dispatch"]["inputs"]["dry_run"] == {
+        "description": "Validate and print what would be published, and publish nothing", "type": "boolean", "default": False}
+
+
 def test_sim_build_must_be_the_checkouts_tag_or_commit(tmp_path):
     import subprocess
     sim = tmp_path / "sim"

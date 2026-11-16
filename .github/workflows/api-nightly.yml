@@ -30,6 +30,13 @@ on:
         description: "Ignore the artifact-download cache and re-download everything"
         type: boolean
         default: false
+      # A rehearsal: resolve and run-night as always, and publish runs every validation, then prints what it would
+      # publish and stops before the commit, the push, the Pages deploy and the next run. The schedule and a normal
+      # dispatch publish as before.
+      dry_run:
+        description: "Validate and print what would be published, and publish nothing"
+        type: boolean
+        default: false
 
 # Least privilege: read-only by default. Only `publish` gets contents: write.
 permissions:
@@ -281,6 +288,10 @@ jobs:
       # cleaner long-term design) -- out of scope here. See PR notes.
       - name: Publish data/ to main (index + latest + API snapshots; dump snapshots untouched)
         id: pub
+        env:
+          # A scheduled run has no inputs: it is never a dry run.
+          DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+          RELEASE: ${{ needs.resolve.outputs.blis_tags }}
         run: |
           set -euo pipefail
           if [ ! -f newdata/index.json ]; then
@@ -307,6 +318,22 @@ jobs:
             exit 1
           fi
           mkdir -p state; cp "$STATE_IN" state/last-run-api.json; cp "$SCORED_IN" state/scored-releases.json
+          if [ "$DRY_RUN" = true ]; then
+            # Every validation above passed; print what would be published, and publish nothing.
+            python3 - <<'PY'
+          import json, os
+          s = json.load(open("data/latest/summary.json"))
+          cov = s.get("coverage") or {}
+          scored = json.load(open("state/scored-releases.json")).get("releases")
+          print("DRY RUN: would publish")
+          print(f"  snapshot_id: {s.get('snapshot_id')}")
+          print(f"  release: {os.environ['RELEASE']}")
+          print(f"  points: {cov.get('points')}, graded: {cov.get('graded')}")
+          print(f"  by_grade: {json.dumps(cov.get('by_grade'), sort_keys=True)}")
+          print(f"  scored-releases: {scored}")
+          PY
+            echo "pushed=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A data state/last-run-api.json state/scored-releases.json
