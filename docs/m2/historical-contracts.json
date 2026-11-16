@@ -1,0 +1,35 @@
+{
+ "about": "The M2 contracts, frozen as historical records. Each was scored by the harness commit it names, over the frozen pull whose manifest SHA-256 it names, and that pull is gone, so none can be re-scored. The contract-currency gate (test_contracts_current.py) exempts exactly these paths, named one by one; it exempts nothing by pattern and no current contract. Every other contract is current: it is scored again whenever the scorer changes (docs/reproducing.md).",
+ "historical": [
+  {
+   "harness_commit": "0e9627e219c207593de5bc55d997cf3dca707d64",
+   "path": "docs/m2/baseline-v0.16.0/contract",
+   "pull_manifest_sha256": "c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166",
+   "reason": "scored from a frozen pull kept on the machine that froze it; that pull is no longer held, so this contract can never be scored again at a later scorer"
+  },
+  {
+   "harness_commit": "0e9627e219c207593de5bc55d997cf3dca707d64",
+   "path": "docs/m2/h200-v033/contract",
+   "pull_manifest_sha256": "e650d510ccde4b9027c194d9ca52bd40a03a8b7846f81b8e5a21fb615b052bac",
+   "reason": "scored from a frozen pull kept on the machine that froze it; that pull is no longer held, so this contract can never be scored again at a later scorer"
+  },
+  {
+   "harness_commit": "0e9627e219c207593de5bc55d997cf3dca707d64",
+   "path": "docs/m2/pd-table-as-published/contract",
+   "pull_manifest_sha256": "bfa74604f84e64aa2f6c44d73fedee45a816c15d11f66da02396913354f5c3d4",
+   "reason": "scored from a frozen pull kept on the machine that froze it; that pull is no longer held, so this contract can never be scored again at a later scorer"
+  },
+  {
+   "harness_commit": "0e9627e219c207593de5bc55d997cf3dca707d64",
+   "path": "docs/m2/pd-writer-experiment/contract",
+   "pull_manifest_sha256": "bfa74604f84e64aa2f6c44d73fedee45a816c15d11f66da02396913354f5c3d4",
+   "reason": "scored from a frozen pull kept on the machine that froze it; that pull is no longer held, so this contract can never be scored again at a later scorer"
+  },
+  {
+   "harness_commit": "0e9627e219c207593de5bc55d997cf3dca707d64",
+   "path": "docs/m2/preliminary-after/contract",
+   "pull_manifest_sha256": "c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166",
+   "reason": "scored from a frozen pull kept on the machine that froze it; that pull is no longer held, so this contract can never be scored again at a later scorer"
+  }
+ ]
+}

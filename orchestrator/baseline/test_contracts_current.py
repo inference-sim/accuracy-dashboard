@@ -8,11 +8,19 @@ under orchestrator/ except orchestrator/baseline/ and the boundary lint (the tab
 contract; none writes one). A change to any of them means the contract describes another scorer's output,
 and the run is made again (docs/m2/after-run.md).
 
+The gate holds every current contract. A historical contract, one scored from a pull that is no longer held and so can
+never be scored again, is exempt only by its exact path in docs/m2/historical-contracts.json, with its harness commit,
+pull manifest and reason (contract_currency.py checks the list).
+
 CI checks the repository out in full (fetch-depth 0): the harness commit must be in the history.
 """
 import json
 import subprocess
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import contract_currency  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 SCORER_PATHS = ["harness", "orchestrator", "schemas", "requirements-ci.txt"]
@@ -37,20 +45,27 @@ def scorer_changes(repo, harness_commit: str, head: str = "HEAD") -> list[str]:
     return r.stdout.split()
 
 
-def contracts():
-    return sorted((ROOT / "docs" / "m2").glob("*/contract/provenance.json"))
+def stale_contracts(repo, head: str = "HEAD") -> dict[str, list[str]]:
+    """Each current contract (every committed one not listed as historical) whose scorer files changed between its
+    harness commit and `head`, with the files that changed."""
+    out = {}
+    for c in contract_currency.current(Path(repo)):
+        h = json.loads((Path(repo) / c / "provenance.json").read_text())["harness_commit"]
+        changed = scorer_changes(repo, h, head)
+        if changed:
+            out[c] = changed
+    return out
 
 
 def test_there_are_committed_contracts_to_check():
-    assert len(contracts()) >= 2
+    assert len(contract_currency.contracts(ROOT)) >= 2
 
 
-def test_every_committed_contract_was_made_by_the_scorer_at_head():
-    for path in contracts():
-        h = json.loads(path.read_text())["harness_commit"]
-        changed = scorer_changes(ROOT, h)
-        assert not changed, (f"{path.relative_to(ROOT)} was scored at {h}, and these scoring files changed "
-                             f"since: {changed[:8]}; score the run again at the current scorer")
+def test_every_current_contract_was_made_by_the_scorer_at_head():
+    stale = stale_contracts(ROOT)
+    assert not stale, "; ".join(f"{c} was scored at another scorer, and these scoring files changed since: "
+                                f"{changed[:8]}; score it again at the current scorer"
+                                for c, changed in stale.items())
 
 
 def test_the_check_sees_a_changed_scorer_file_and_ignores_tests_and_docs(tmp_path):
