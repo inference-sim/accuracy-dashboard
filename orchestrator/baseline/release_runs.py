@@ -214,7 +214,7 @@ def conditions(r: dict, status: str, targets: dict, routers: list[dict]) -> dict
     topo = "true" if r.get("topology") != "disaggregated" else \
         "true only if the harness writes the run's prefill/decode pools (topology_unsupported otherwise)"
     out = {"engine_release": rel, "router": router, "topology": topo,
-           "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (blis-registry#73)"}
+           "kernel_hash": "unevaluated: no source maps a library version to a kernel hash (inference-sim/blis-substrate#149)"}
     if r["engine"] == "sglang":
         rest = "not scored: BLIS has no SGLang engine (blis-sglang#2)"
     elif status != "unit":
