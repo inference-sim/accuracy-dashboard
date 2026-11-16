@@ -29,11 +29,13 @@ def entry(path, harness_commit, manifest="m" * 64, reason="its pull is no longer
 
 
 class Repo:
-    """A scratch repository with a scorer file, a doc and two contracts."""
+    """A scratch repository with a scorer file, a doc and two contracts. score.py is a scorer
+    file because the entry point imports it (the gate's import closure)."""
 
     def __init__(self, root):
         self.root = root
         gate.git(root, "init", "-q")
+        self.write(gate.ENTRY, "import score\n")
         self.write("orchestrator/ingest/score.py", "X = 1\n")
         self.write("docs/a.md", "a\n")
         self.base = self.commit("scored")
