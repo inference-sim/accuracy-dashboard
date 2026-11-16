@@ -1,0 +1,29 @@
+{
+ "routers": {
+  "entries": [
+   {
+    "file": "dynamo-kv.yaml",
+    "mode": "kv",
+    "policy": "none",
+    "router": "dynamo"
+   },
+   {
+    "file": "dynamo-random.yaml",
+    "mode": "random",
+    "policy": "random-picker",
+    "router": "dynamo"
+   },
+   {
+    "file": "dynamo-round-robin.yaml",
+    "mode": "round-robin",
+    "policy": "round-robin",
+    "router": "dynamo"
+   }
+  ],
+  "source": "inference-sim/blis-substrate v0.14.0 (965b05834c47882bc0f9f1a960c90327a756ef3d), catalog/routers"
+ },
+ "sglang": {
+  "source": "inference-sim/blis-sglang provenance.go at 51014dd255e7744ed8bc1bd42f814487a08f392f (branch m3/integration; main holds no port yet)",
+  "version": "0.5.23"
+ }
+}

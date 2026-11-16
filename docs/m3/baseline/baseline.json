@@ -1,0 +1,609 @@
+{
+ "engines_source": {
+  "routers": "inference-sim/blis-substrate v0.14.0 (965b05834c47882bc0f9f1a960c90327a756ef3d), catalog/routers",
+  "sglang": "inference-sim/blis-sglang provenance.go at 51014dd255e7744ed8bc1bd42f814487a08f392f (branch m3/integration; main holds no port yet)"
+ },
+ "format": "m3-baseline-1",
+ "issues_fields_source": "inference-sim/blis-vllm v0.32.0-blis.3 (40653dc4a16941ed8a9cc66aa82f5b7995cca461), fields.json",
+ "lanes": {
+  "sglang": {
+   "ceilings": {
+    "by_ceiling": {
+     "G1": 0,
+     "G2": 0,
+     "G3": 0,
+     "G3?": 616,
+     "G4": 285,
+     "G5": 0
+    },
+    "columns": [
+     "G1",
+     "G2",
+     "G3",
+     "G3?",
+     "G4",
+     "G5"
+    ],
+    "limits": [
+     {
+      "cap": "G3",
+      "limit": "other_release_unknown",
+      "points": 616
+     },
+     {
+      "cap": "G2",
+      "limit": "router_unsupported:dynamo-router",
+      "points": 286
+     },
+     {
+      "cap": "G4",
+      "limit": "nightly_or_custom",
+      "points": 285
+     },
+     {
+      "cap": "G2",
+      "limit": "router_unsupported:sglang-router",
+      "points": 4
+     }
+    ],
+    "matrix": {
+     "G5": {
+      "G1": 0,
+      "G2": 0,
+      "G3": 0,
+      "G3?": 616,
+      "G4": 285,
+      "G5": 0
+     }
+    },
+    "points": 901,
+    "state": {
+     "at_ceiling": 0,
+     "not_yet": 901
+    },
+    "upper_bound_only": 616
+   },
+   "engine_release": "0.5.23",
+   "grades": {
+    "G1": 0,
+    "G2": 0,
+    "G3": 0,
+    "G4": 0,
+    "G5": 901,
+    "failed": 0
+   },
+   "in_scope": 901,
+   "not_scored": 901,
+   "out_of_scope": 457,
+   "points": 1358,
+   "refused": [
+    {
+     "alone": 611,
+     "blocks": 901,
+     "issue": "inference-sim/blis-sglang#2",
+     "reason": "field_unclassified:sglang: no field list published"
+    },
+    {
+     "alone": 0,
+     "blocks": 286,
+     "issue": "inference-sim/blis-substrate#47",
+     "reason": "router_unsupported:dynamo-router"
+    },
+    {
+     "alone": 0,
+     "blocks": 4,
+     "issue": "inference-sim/blis-substrate#47",
+     "reason": "router_unsupported:sglang-router"
+    }
+   ],
+   "refused_by_simulator": 0,
+   "scored": 0,
+   "source": {
+    "graded_by": "the scorer's offline path (coverage.py: score_points with no simulator)",
+    "rows": {
+     "differs_from_source_revision": 0,
+     "in_a_unit": 1358,
+     "in_window": 2273,
+     "no_unit": {
+      "not_in_source_revision": 915
+     }
+    },
+    "today": "2026-11-09",
+    "window": [
+     "2026-05-14",
+     "2026-11-09"
+    ]
+   },
+   "substitution_kinds": []
+  },
+  "vllm": {
+   "by_grade": {
+    "G1": {
+     "accuracy": {
+      "noise_floor_pct": 1.6,
+      "noise_floor_source": "fallback; none measured per point",
+      "points": 0,
+      "tpot": {
+       "mape": {
+        "n": 0,
+        "value": "too few points"
+       },
+       "shape": {
+        "n": 0,
+        "value": "too few points"
+       }
+      },
+      "ttft": {
+       "mape": {
+        "n": 0,
+        "value": "too few points"
+       },
+       "shape": {
+        "n": 0,
+        "value": "too few points"
+       }
+      },
+      "withheld": 0
+     },
+     "points": 0,
+     "share_of_all": "too few points",
+     "share_of_graded": "too few points"
+    },
+    "G2": {
+     "accuracy": {
+      "noise_floor_pct": 1.6,
+      "noise_floor_source": "fallback; none measured per point",
+      "points": 0,
+      "tpot": {
+       "mape": {
+        "n": 0,
+        "value": "too few points"
+       },
+       "shape": {
+        "n": 0,
+        "value": "too few points"
+       }
+      },
+      "ttft": {
+       "mape": {
+        "n": 0,
+        "value": "too few points"
+       },
+       "shape": {
+        "n": 0,
+        "value": "too few points"
+       }
+      },
+      "withheld": 0
+     },
+     "points": 0,
+     "share_of_all": "too few points",
+     "share_of_graded": "too few points"
+    },
+    "G3": {
+     "accuracy": {
+      "noise_floor_pct": 1.6,
+      "noise_floor_source": "fallback; none measured per point",
+      "points": 0,
+      "tpot": {
+       "mape": {
+        "n": 0,
+        "value": "too few points"
+       },
+       "shape": {
+        "n": 0,
+        "value": "too few points"
+       }
+      },
+      "ttft": {
+       "mape": {
+        "n": 0,
+        "value": "too few points"
+       },
+       "shape": {
+        "n": 0,
+        "value": "too few points"
+       }
+      },
+      "withheld": 0
+     },
+     "points": 0,
+     "share_of_all": "too few points",
+     "share_of_graded": "too few points"
+    },
+    "G4": {
+     "accuracy": {
+      "noise_floor_pct": 1.6,
+      "noise_floor_source": "fallback; none measured per point",
+      "points": 520,
+      "tpot": {
+       "mape": {
+        "n": 520,
+        "value": 19.70774435312402
+       },
+       "shape": {
+        "n": 353,
+        "value": 15.821490729290755
+       }
+      },
+      "ttft": {
+       "mape": {
+        "n": 520,
+        "value": 27.413260596200384
+       },
+       "shape": {
+        "n": 353,
+        "value": 17.576887670694372
+       }
+      },
+      "withheld": 275
+     },
+     "points": 795,
+     "share_of_all": 0.6691919191919192,
+     "share_of_graded": 1.0
+    },
+    "G5": {
+     "points": 290,
+     "share_of_all": 0.2441077441077441,
+     "share_of_graded": null
+    },
+    "failed": {
+     "points": 103
+    }
+   },
+   "ceilings": {
+    "by_ceiling": {
+     "G1": 0,
+     "G2": 0,
+     "G3": 0,
+     "G4": 1148,
+     "G5": 40
+    },
+    "columns": [
+     "G1",
+     "G2",
+     "G3",
+     "G4",
+     "G5"
+    ],
+    "limits": [
+     {
+      "cap": "G2",
+      "limit": "client_difference:client_flags",
+      "points": 795
+     },
+     {
+      "cap": "G2",
+      "limit": "client_difference:failed_requests",
+      "points": 795
+     },
+     {
+      "cap": "G4",
+      "limit": "nightly_or_custom",
+      "points": 732
+     },
+     {
+      "cap": "G2",
+      "limit": "later_record:cluster.gpus_per_node",
+      "points": 627
+     },
+     {
+      "cap": "G4",
+      "limit": "changed_functions",
+      "points": 456
+     },
+     {
+      "cap": "G2",
+      "limit": "estimated:speculative_config.acceptance_length",
+      "points": 286
+     },
+     {
+      "cap": "G2",
+      "limit": "value_not_recorded:workload_category_not_stated",
+      "points": 51
+     },
+     {
+      "cap": "G5",
+      "limit": "value_not_recorded",
+      "points": 35
+     },
+     {
+      "cap": "G5",
+      "limit": "value_not_recorded:no_recipe_fingerprint",
+      "points": 25
+     },
+     {
+      "cap": "G2",
+      "limit": "value_not_recorded:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use",
+      "points": 7
+     },
+     {
+      "cap": "G5",
+      "limit": "value_not_recorded:speculative_config.model",
+      "points": 5
+     }
+    ],
+    "matrix": {
+     "G4": {
+      "G1": 0,
+      "G2": 0,
+      "G3": 0,
+      "G4": 795,
+      "G5": 0
+     },
+     "G5": {
+      "G1": 0,
+      "G2": 0,
+      "G3": 0,
+      "G4": 250,
+      "G5": 40
+     },
+     "failed": {
+      "G1": 0,
+      "G2": 0,
+      "G3": 0,
+      "G4": 103,
+      "G5": 0
+     }
+    },
+    "points": 1188,
+    "state": {
+     "at_ceiling": 835,
+     "not_yet": 353
+    },
+    "upper_bound_only": 0
+   },
+   "engine_release": "0.32.0",
+   "grades": {
+    "G1": 0,
+    "G2": 0,
+    "G3": 0,
+    "G4": 795,
+    "G5": 290,
+    "failed": 103
+   },
+   "headline": {
+    "noise_floor_pct": 1.6,
+    "noise_floor_source": "fallback; none measured per point",
+    "points": 520,
+    "tpot": {
+     "mape": {
+      "n": 520,
+      "value": 19.70774435312402
+     },
+     "shape": {
+      "n": 353,
+      "value": 15.821490729290755
+     }
+    },
+    "ttft": {
+     "mape": {
+      "n": 520,
+      "value": 27.413260596200384
+     },
+     "shape": {
+      "n": 353,
+      "value": 17.576887670694372
+     }
+    },
+    "withheld": 275
+   },
+   "in_scope": 1188,
+   "not_scored": 290,
+   "out_of_scope": 546,
+   "points": 1734,
+   "refused": [
+    {
+     "alone": 75,
+     "blocks": 75,
+     "issue": "inference-sim/blis-vllm#84",
+     "reason": "blis_refused:scenario: indexer_kv_dtype bf16 refused for the DeepSeek sparse indexer"
+    },
+    {
+     "alone": 67,
+     "blocks": 67,
+     "issue": "inference-sim/blis-vllm#80",
+     "reason": "field_not_modelled:linear_backend"
+    },
+    {
+     "alone": 25,
+     "blocks": 56,
+     "issue": "inference-sim/blis-registry#75",
+     "reason": "field_not_modelled:moe_backend"
+    },
+    {
+     "alone": 38,
+     "blocks": 51,
+     "issue": "inference-sim/accuracy-dashboard#80",
+     "reason": "value_not_recorded:workload_category_not_stated"
+    },
+    {
+     "alone": 37,
+     "blocks": 37,
+     "issue": "inference-sim/accuracy-dashboard#63",
+     "reason": "field_not_in_release:env.VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8"
+    },
+    {
+     "alone": 35,
+     "blocks": 35,
+     "issue": "inference-sim/accuracy-dashboard#63",
+     "reason": "field_not_in_release:env.VLLM_MXFP4_USE_MARLIN"
+    },
+    {
+     "alone": 10,
+     "blocks": 35,
+     "issue": "data: the run's server log is gone",
+     "reason": "value_not_recorded"
+    },
+    {
+     "alone": 28,
+     "blocks": 28,
+     "issue": "inference-sim/blis-substrate#102",
+     "reason": "blis_refused:scenario: quantization gpt_oss_mxfp4 not priced"
+    },
+    {
+     "alone": 0,
+     "blocks": 25,
+     "issue": "data: the row records no recipe fingerprint",
+     "reason": "value_not_recorded:no_recipe_fingerprint"
+    },
+    {
+     "alone": 9,
+     "blocks": 23,
+     "issue": "inference-sim/accuracy-dashboard#63",
+     "reason": "value_conflict:model: the log serves /scratch/models/DeepSeek-V4-Pro-NVFP4, the recipe deepseek-ai/DeepSeek-V4-Pro"
+    },
+    {
+     "alone": 0,
+     "blocks": 7,
+     "issue": "inference-sim/blis-vllm#65",
+     "reason": "field_not_modelled:cpu_offload_gb"
+    },
+    {
+     "alone": 0,
+     "blocks": 7,
+     "issue": "inference-sim/accuracy-dashboard#80",
+     "reason": "field_not_modelled:default_chat_template_kwargs.thinking_mode"
+    },
+    {
+     "alone": 0,
+     "blocks": 7,
+     "issue": "inference-sim/blis-vllm#89",
+     "reason": "value_not_recorded:kv_transfer_config.kv_connector_extra_config.cpu_bytes_to_use"
+    },
+    {
+     "alone": 0,
+     "blocks": 5,
+     "issue": "inference-sim/blis-vllm#109",
+     "reason": "field_not_modelled:dcp_comm_backend"
+    },
+    {
+     "alone": 0,
+     "blocks": 5,
+     "issue": "inference-sim/blis-vllm#109",
+     "reason": "field_not_modelled:decode_context_parallel_size"
+    },
+    {
+     "alone": 0,
+     "blocks": 5,
+     "issue": "inference-sim/blis-vllm#109",
+     "reason": "field_not_modelled:prefix_match_unit"
+    },
+    {
+     "alone": 0,
+     "blocks": 5,
+     "issue": "data: no recipe names the run's draft model",
+     "reason": "value_not_recorded:speculative_config.model"
+    },
+    {
+     "alone": 0,
+     "blocks": 4,
+     "issue": "inference-sim/blis-vllm#108",
+     "reason": "field_not_modelled:enable_eplb"
+    },
+    {
+     "alone": 0,
+     "blocks": 2,
+     "issue": "inference-sim/blis-vllm#89",
+     "reason": "field_not_modelled:kv_transfer_config.kv_connector_extra_config.load_async"
+    },
+    {
+     "alone": 1,
+     "blocks": 1,
+     "issue": "source: the API holds the run's server log and refuses to serve one of its size (HTTP 413)",
+     "reason": "value_not_recorded:api_413"
+    },
+    {
+     "alone": 0,
+     "blocks": 1,
+     "issue": "inference-sim/blis-vllm#142",
+     "reason": "value_conflict:kv_transfer_config.engine_id"
+    }
+   ],
+   "refused_by_simulator": 103,
+   "scored": 795,
+   "source": {
+    "catalog": "v0.14.0",
+    "contract": "docs/m2/preliminary-after/contract",
+    "experimental": true,
+    "fields_sha256": "62743b57746f8376b291fdb853eb0eb19edacc5d717e1e7107d6e0f3ed41348d",
+    "harness_commit": "0e9627e219c207593de5bc55d997cf3dca707d64",
+    "point_set_sha256": "6818482f91e308ee2b6f844d347de68fef6e90cbc27c22b41d21643d580e5c60",
+    "pull_manifest_sha256": "c8f2ea928b0d4582afdc3fbf11ef9d6847a359791a520f497ee146e806a96166",
+    "simulator": "a8bc3085a7c91c50a1d92862943a695c04adfe11"
+   },
+   "substitution_kinds": [
+    {
+     "kind": "client_difference",
+     "points": 795,
+     "subjects": 5
+    },
+    {
+     "kind": "coefficient_method",
+     "points": 795,
+     "subjects": 23
+    },
+    {
+     "kind": "interim_status",
+     "points": 795,
+     "subjects": 12
+    },
+    {
+     "kind": "unevaluated",
+     "points": 795,
+     "subjects": 2
+    },
+    {
+     "kind": "value_class",
+     "points": 782,
+     "subjects": 6
+    },
+    {
+     "kind": "later_record",
+     "points": 627,
+     "subjects": 1
+    },
+    {
+     "kind": "nightly_or_custom",
+     "points": 575,
+     "subjects": 1
+    },
+    {
+     "kind": "estimated",
+     "points": 344,
+     "subjects": 2
+    },
+    {
+     "kind": "other_release",
+     "points": 220,
+     "subjects": 1
+    },
+    {
+     "kind": "ported_functions_unpublished",
+     "points": 220,
+     "subjects": 1
+    },
+    {
+     "kind": "execution_mode",
+     "points": 58,
+     "subjects": 1
+    }
+   ]
+  }
+ },
+ "ported_functions": {
+  "cited": 58,
+  "engine_release": "0.32.0",
+  "port": {
+   "commit": "40653dc4a16941ed8a9cc66aa82f5b7995cca461",
+   "repository": "inference-sim/blis-vllm"
+  },
+  "releases": {
+   "0.21.0": 50,
+   "0.22.0": 49,
+   "0.24.0": 48,
+   "0.25.0": 48,
+   "0.25.1": 48
+  }
+ }
+}

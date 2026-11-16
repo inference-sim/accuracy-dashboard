@@ -39,4 +39,10 @@ The dashboard asks one question of every InferenceX benchmark point it can read:
 | [Dynamo router evidence](m2/dynamo-router-evidence.md) | What router the Dynamo runs used. |
 | [The dashboard against the final substrate](m2/final-catalog-check.md) | Names the code reads, checked at the audited substrate stack. |
 
+## Reports under `m3/`
+
+| Page | Content |
+|---|---|
+| [The M3 InferenceX baseline](m3/baseline/README.md) | The vLLM and SGLang lanes: points in scope, scored, refused by reason and issue, G1 to G5, and every point's grade ceiling with its reason ([the table](m3/baseline/baseline.md)). |
+
 Design terms (D7, COV-2, X8, X19 and the like) are the numbered rules of the BLIS design document; the pages say what each one means where it is used.
