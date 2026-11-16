@@ -15,6 +15,10 @@ The scorer files are derived, not listed by hand:
   orchestrator/vllm_defaults.json, and harness/run.sh itself), schemas/ and requirements-ci.txt.
 A Python file outside the closure, such as a scenario generator no contract reads, is not one.
 
+The gate holds every current contract. A historical contract, one scored from a pull that is no longer held and so can
+never be scored again, is exempt only by its exact path in docs/m2/historical-contracts.json, with its harness commit,
+pull manifest and reason (contract_currency.py checks the list).
+
 CI checks the repository out in full (fetch-depth 0): the harness commit must be in the history.
 """
 import ast
