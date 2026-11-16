@@ -4,7 +4,7 @@ InferenceX alone gives no G1 point: none of its in-scope runs used vLLM v0.32.0 
 
 ## The corpus is never in this repository
 
-A corpus is read from a path given at run time. The tool refuses a corpus directory inside this checkout, and for a private corpus it refuses an output directory inside it. The full report of a private corpus, with every configuration, goes only to `--out`; what may be published (`--public-out`) is the corpus's label and its grade counts. A public corpus publishes its whole report.
+A corpus is read from a path given at run time. The tool refuses a corpus directory inside this checkout, and for a private corpus it refuses an output directory inside it. The full report of a private corpus, with every configuration, goes only to `--out`; what may be published (`--public-out`) is the corpus's label and its grade counts, and only under design D7's minimum: nothing for a corpus of fewer than 10 runs, and a grade held by fewer than 10 runs shown as "fewer than 10". The label is checked before anything is written: a short slug of lower-case letters, digits and hyphens, sharing no word with the corpus's path (which may carry a private name), and holding none of the names in `--private-names` (a file kept with the corpus); the public summary is checked for those names too. A public corpus publishes its whole report.
 
 ## What a corpus holds
 
@@ -17,13 +17,13 @@ The measurement is one of:
 
 ## What is compared
 
-Per configuration and concurrency, over the steady middle window and across the whole cluster: output throughput, interactivity (output tokens per second per user, p50), TTFT p99, ITL p50, and the prompt cache-read rate. Both sides use one window rule: the requests that arrived inside the middle of the run's arrival span, a stated fraction (0.1 unless the corpus says otherwise) trimmed at each end, so the ramp and the drain are out of both. The Result's request rows carry no per-token times, so ITL p50 is the median over requests of each request's mean inter-token latency, on both sides (DEV-8).
+Per configuration and concurrency, over the steady middle window and across the whole cluster: output throughput, interactivity (output tokens per second per user, p50), TTFT p99, ITL p50, and the prompt cache-read rate. Both sides use one window rule: the requests that arrived inside the middle of the run's arrival span, a stated fraction (0.1 unless the corpus says otherwise) trimmed at each end, so the ramp and the drain are out of both. ITL p50 is the client's: the median of every inter-token latency of the window's requests, pooled (each request row's `itl_us`). BLIS's Result rows carry no per-token times yet (inference-sim#2128), so the simulated ITL p50 is absent, not stood in for by the median TPOT: a measured and a simulated value are compared only under one definition (DEV-8).
 
 For each workload's set of configurations: Spearman and Kendall concordance of output throughput per GPU between BLIS and the runs, whether BLIS's top choice is the measured best, and the regret of its top choice (`ranking.group_metrics`, the measure the development split uses).
 
 ## Grades
 
-A run is graded as an InferenceX point is (`grade.grade`): its release read from its build (`grade.run_release`), the Result's coefficient methods (`result.coefficient_substitutions`), every G1 condition the harness does not yet evaluate named `unevaluated`, and the corpus's stated differences as `client_difference`. A run on v0.32.0 is therefore G2 today, and G1 once the conditions are evaluated from data and nothing is substituted.
+The engine release BLIS runs is read from the field list of the build it scores with (`--fields`), never given as a flag. A run is scored only on a Result that `blis schema validate result` accepts and that holds a completed request row; anything else is a failed run. A run is graded as an InferenceX point is (`grade.grade`): its release read from its build (`grade.run_release`), the Result's coefficient methods (`result.coefficient_substitutions`), every G1 condition the harness does not yet evaluate named `unevaluated`, and the corpus's stated differences as `client_difference`. A run on v0.32.0 is therefore G2 today, and G1 once the conditions are evaluated from data and nothing is substituted.
 
 ## Changes to accuracy
 
@@ -33,7 +33,8 @@ The tool scores and reports; it fits nothing. Every accuracy change judged on a 
 
 ```
 python3 orchestrator/baseline/corpus.py score --corpus /path/outside/the/checkout --blis BIN \
-  --catalog SUBSTRATE/catalog --registry SUBSTRATE/registry --engine-release 0.32.0 \
+  --catalog SUBSTRATE/catalog --registry SUBSTRATE/registry --fields FIELDS_V0_32_0.json \
+  --private-names /path/outside/the/checkout/names.txt \
   --out /path/outside/the/checkout/report --public-out grades.json
 ```
 

@@ -9,9 +9,11 @@ concurrency, over the steady middle window of each run and across the whole clus
   output throughput     output tokens of the window's completed requests over the window's length (tokens/s)
   interactivity p50     the median over the window's requests of 1 / TPOT (output tokens per second per user)
   TTFT p99              the 99th percentile of the window's TTFTs (ms)
-  ITL p50               the median over the window's requests of TPOT, the request's mean inter-token latency (ms):
-                        the Result's request rows carry no per-token times, so both sides use the per-request mean
-                        (one definition on both sides, DEV-8)
+  ITL p50               the median of every inter-token latency of the window's requests, pooled (ms): the client's
+                        definition (each request's `itl_us`, the gaps between its successive output chunks). A side
+                        whose rows carry no `itl_us` has no ITL figure. BLIS's Result rows do not carry them yet
+                        (inference-sim#2128), so the simulated ITL p50 is absent until they do; no stand-in is used
+                        (DEV-8: a measured and a simulated value are compared only under one definition)
   cache-read rate       cached prompt tokens over prompt tokens, over the window's requests
 
 and, for each set of configurations measured on one workload, whether BLIS orders them as the runs do: Spearman and
@@ -42,7 +44,8 @@ A source that publishes aggregates and no per-request rows (the configiq dataset
 names; such a run's window is the source's, not the rule above, and the report says so per run.
 
 `measured_requests` holds one JSON object per request with the Result's request-row names: id, fate, arrival_us,
-ttft_us, tpot_us, e2e_us, prompt_tokens, output_tokens, cached_local_tokens, cached_external_tokens. `replay` is the
+ttft_us, tpot_us, e2e_us, prompt_tokens, output_tokens, cached_local_tokens, cached_external_tokens, and the client's
+`itl_us`, the list of the request's inter-token latencies. `replay` is the
 `blis` command that replays the run's requests, without the binary; the harness runs it with the build it scores
 (`--blis`) and adds `--catalog`, `--registry` and `--format json`; a path argument is read relative to the run's
 corpus. `differences` names every way the replayed requests differ from the ones the run sent (COV-12); each is a
@@ -55,13 +58,20 @@ A run is graded by the same rules as an InferenceX point (grade.grade): its rele
 Every accuracy change scored on such a corpus follows design §12.3: it is pre-registered, fitted on the fit split
 and judged once on held-out data; this tool scores and reports, it fits nothing.
 
-    corpus.py score --corpus DIR --blis BIN --catalog DIR --registry DIR --engine-release 0.32.0 --out DIR
-                    [--public-out FILE]
+    corpus.py score --corpus DIR --blis BIN --catalog DIR --registry DIR --fields FIELDS.json --out DIR
+                    [--public-out FILE] [--private-names FILE]
+
+The engine release BLIS runs is read from the field list of the build it scores with, never given as a flag; each
+run's own release is read from its recorded build. A run is scored only on a Result that validates (`blis schema
+validate result`) and holds a completed request row; anything else is a failed run. A non-public corpus publishes its
+grade counts only over at least 10 runs, and a grade held by fewer than 10 as "fewer than 10" (design D7). Its label
+must be a short slug that shares no word with the corpus's path and holds none of the private names given at run time.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import math
 import subprocess
 import sys
@@ -76,6 +86,10 @@ import grade as gr  # noqa: E402
 import ranking as rk  # noqa: E402
 
 FORMAT = "first-party-corpus-1"
+MIN_UNITS = 10          # design D7: no published aggregate of a non-public corpus over fewer than 10 units
+FEW = "fewer than 10"
+# A label is a short public-safe slug: lower-case letters, digits and hyphens.
+LABEL = re.compile(r"^[a-z0-9][a-z0-9-]{2,39}$")
 METRICS = ("output_throughput_tps", "interactivity_p50_tps", "ttft_p99_ms", "itl_p50_ms", "cache_read_rate")
 DEFAULT_TRIM = 0.1
 
@@ -113,9 +127,10 @@ def figures(rows: list[dict], trim: float) -> dict:
     start = min(r["arrival_us"] for r in done)
     end = max(r["arrival_us"] + (r.get("e2e_us") or 0) for r in done)
     tpots = [r["tpot_us"] for r in done if r.get("tpot_us")]
+    itls = [x for r in done for x in (r.get("itl_us") or [])]
     prompt = sum(r.get("prompt_tokens") or 0 for r in done)
     cached = sum((r.get("cached_local_tokens") or 0) + (r.get("cached_external_tokens") or 0) for r in done)
-    p50 = percentile(tpots, 50)
+    p50 = percentile(itls, 50)
     return {"requests": len(done),
             "output_throughput_tps": sum(r.get("output_tokens") or 0 for r in done) / ((end - start) / 1e6) if end > start else None,
             "interactivity_p50_tps": percentile([1e6 / t for t in tpots], 50),
@@ -157,7 +172,22 @@ def inside_repo(path: Path) -> bool:
     return p == ROOT or ROOT in p.parents
 
 
-def load(corpus: Path) -> dict:
+def check_label(label, corpus: Path, private_names: list[str]) -> None:
+    """The label is what a private corpus publishes under, so it must name nothing private: a short slug, sharing no
+    word with the corpus's path (which may carry a private name), and holding none of the private names the caller
+    gives at run time (a file never committed)."""
+    if not isinstance(label, str) or not LABEL.match(label):
+        raise CorpusError(f"the corpus label {label!r} is not a short slug of lower-case letters, digits and hyphens")
+    words = {w for part in corpus.resolve().parts for w in re.split(r"[^a-z0-9]+", part.lower()) if len(w) >= 3}
+    shared = sorted(words & set(label.split("-")))
+    if shared:
+        raise CorpusError(f"the corpus label {label!r} shares {shared} with the corpus's path; choose a label of its own")
+    hit = [n for n in private_names if n and n.lower() in label]
+    if hit:
+        raise CorpusError(f"the corpus label {label!r} holds a private name")
+
+
+def load(corpus: Path, private_names: list[str] = ()) -> dict:
     if inside_repo(corpus):
         raise CorpusError(f"{corpus} is inside this checkout; a corpus is read from a path given at run time and never committed")
     doc = json.loads((corpus / "corpus.json").read_text())
@@ -165,6 +195,7 @@ def load(corpus: Path) -> dict:
         raise CorpusError(f"corpus.json format {doc.get('format')!r}, want {FORMAT}")
     if doc.get("visibility") not in ("private", "public"):
         raise CorpusError("corpus.json must say whether it is private or public (visibility)")
+    check_label(doc.get("label"), corpus, private_names)
     ids = [r["id"] for r in doc["runs"]]
     if len(set(ids)) != len(ids):
         raise CorpusError("two runs share an id")
@@ -195,6 +226,19 @@ def replay_argv(run: dict, corpus: Path, *, blis: str, catalog: Path, registry: 
     return [blis, *argv, "--catalog", str(catalog), "--registry", str(registry), "--format", "json"]
 
 
+def check_result(doc) -> None:
+    """A run counts as scored only on a Result: the Result kind at a schema version the harness reads, with request
+    rows of which at least one completed. Anything else is a failed run, not a score."""
+    import result
+    if not isinstance(doc, dict) or doc.get("kind") != result.KIND:
+        raise CorpusError("the replay printed no Result document")
+    if doc.get("schema_version") not in result.SCHEMA_VERSIONS:
+        raise CorpusError(f"Result schema_version {doc.get('schema_version')!r} is not one the harness reads")
+    rows = doc.get("request_rows")
+    if not isinstance(rows, list) or not any(isinstance(r, dict) and r.get("fate") == "completed" for r in rows):
+        raise CorpusError("the Result has no completed request row")
+
+
 def grade_run(run: dict, doc: dict | None, engine_release: str) -> dict:
     import result
     build = run["build"]
@@ -206,9 +250,10 @@ def grade_run(run: dict, doc: dict | None, engine_release: str) -> dict:
     return {"grade": g.grade, "run_release": rel.version, "substitutions": g.substitutions}
 
 
-def score(*, corpus: Path, simulate, engine_release: str) -> dict:
-    """simulate(run) -> the Result document of the run's replay, or raises (the point is then failed)."""
-    doc = load(corpus)
+def score(*, corpus: Path, simulate, engine_release: str, private_names: list[str] = ()) -> dict:
+    """simulate(run) -> the Result document of the run's replay, or raises (the point is then failed).
+    engine_release is the release BLIS runs, read from the scoring build's field list (engine_from_fields)."""
+    doc = load(corpus, private_names)
     trim = float(doc.get("window_trim_fraction", DEFAULT_TRIM))
     runs = []
     for r in doc["runs"]:
@@ -216,6 +261,7 @@ def score(*, corpus: Path, simulate, engine_release: str) -> dict:
                 else {m: r["measured_figures"].get(m) for m in METRICS} | {"requests": r["measured_figures"].get("requests")})
         try:
             res = simulate(r)
+            check_result(res)
         except (CorpusError, subprocess.SubprocessError, OSError, ValueError) as e:
             runs.append({**_public(r), "status": "failed", "fault": str(e)[:300], "measured": meas,
                          "measured_window": _window_of(r, trim)})
@@ -245,8 +291,21 @@ def public_summary(rep: dict) -> dict:
     """What may be published of a corpus: its label and its grade counts; for a public corpus, the report itself."""
     if rep["visibility"] == "public":
         return rep
+    n = len(rep["runs"])
+    if n < MIN_UNITS:
+        raise CorpusError(f"the corpus has {n} runs; a non-public corpus publishes nothing over fewer than {MIN_UNITS} (D7)")
     return {"format": "first-party-corpus-grades-1", "label": rep["label"], "engine_release": rep["engine_release"],
-            "runs": len(rep["runs"]), "grades": rep["grades"]}
+            "runs": n, "min_units": MIN_UNITS,
+            "grades": {g: (c if c == 0 or c >= MIN_UNITS else FEW) for g, c in rep["grades"].items()}}
+
+
+def engine_from_fields(path: Path) -> str:
+    """The engine release BLIS runs: the one the scoring build's field list is for (fields.json's engine block)."""
+    import fields as fl
+    f = fl.parse(Path(path).read_bytes())
+    if f.engine.get("kind") != "vllm":
+        raise CorpusError(f"{path} is the field list of {f.engine}; a first-party corpus is scored on vLLM")
+    return f.engine["version"]
 
 
 def markdown(rep: dict) -> str:
@@ -278,27 +337,42 @@ def main(argv=None) -> int:
     s.add_argument("--blis", required=True)
     s.add_argument("--catalog", required=True, type=Path)
     s.add_argument("--registry", required=True, type=Path)
-    s.add_argument("--engine-release", required=True)
+    s.add_argument("--fields", required=True, type=Path,
+                   help="the engine's fields.json at the release the scoring build runs: the engine release is read from it")
+    s.add_argument("--private-names", type=Path, help="names the label and public output must not hold, one per line "
+                   "(a file kept with the corpus, never committed)")
     s.add_argument("--out", required=True, type=Path, help="the full report's directory")
     s.add_argument("--public-out", type=Path, help="what may be published: the label and the grade counts")
     a = ap.parse_args(argv)
     try:
-        doc = load(a.corpus)
+        names = [x.strip() for x in a.private_names.read_text().splitlines() if x.strip()] if a.private_names else []
+        if a.private_names and inside_repo(a.private_names):
+            raise CorpusError(f"{a.private_names} is inside this checkout; it is never committed")
+        engine_release = engine_from_fields(a.fields)
+        doc = load(a.corpus, names)
         if doc["visibility"] == "private" and inside_repo(a.out):
             raise CorpusError(f"{a.out} is inside this checkout; a private corpus's report never is")
 
         def simulate(run):
             argv_ = replay_argv(run, a.corpus, blis=a.blis, catalog=a.catalog, registry=a.registry)
+            import result
             out = subprocess.run(argv_, capture_output=True, text=True, timeout=7200)
             if out.returncode != 0:
                 raise CorpusError(f"blis exited {out.returncode}: {out.stderr.strip()[-300:]}")
-            return json.loads(out.stdout)
-        rep = score(corpus=a.corpus, simulate=simulate, engine_release=a.engine_release)
+            try:
+                result.validate(a.blis, out.stdout.encode())
+                return result.parse(out.stdout.encode())
+            except result.ResultError as e:
+                raise CorpusError(str(e)) from None
+        rep = score(corpus=a.corpus, simulate=simulate, engine_release=engine_release, private_names=names)
         a.out.mkdir(parents=True, exist_ok=True)
         (a.out / "report.json").write_text(json.dumps(rep, indent=1, sort_keys=True) + "\n")
         (a.out / "report.md").write_text(markdown(rep))
         if a.public_out:
-            a.public_out.write_text(json.dumps(public_summary(rep), indent=1, sort_keys=True) + "\n")
+            text = json.dumps(public_summary(rep), indent=1, sort_keys=True) + "\n"
+            if any(n.lower() in text.lower() for n in names):
+                raise CorpusError("the public summary would hold a private name")
+            a.public_out.write_text(text)
         print(f"scored {len(rep['runs'])} runs: " + ", ".join(f"{g} {n}" for g, n in rep["grades"].items()))
     except CorpusError as e:
         print(f"corpus: {e}", file=sys.stderr)
