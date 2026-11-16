@@ -676,6 +676,9 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     work = work.resolve()
     o = Outcome(point_id=pid, identity=ident, row=row, reasons=list(entry["reasons"]),
                 measurements=entry.get("measurements") or [], build=entry.get("build"))
+    if "value_not_recorded:anchor_not_in_source" in o.reasons:
+        # The ledger's pinned source holds no record of the unit (cli.add_unsourced): nothing to build a scenario from.
+        return o
     fw = engines.lookup(row["framework"])
     if not engines.scored(fw):
         # Nothing was fetched and BLIS is not asked: G5 for the label's reasons and its router.

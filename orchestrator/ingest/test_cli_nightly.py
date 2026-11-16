@@ -69,7 +69,8 @@ def _args(tmp, **over):
              corpus_dir=str(tmp / "corpora"), corpus_cache=None,
              timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0, stack=None,
              ledger=str(tmp / "ledger"), substrate_dir=str(tmp / "substrate"), substrate_version="v1.0.0",
-             substrate_commit=_head(tmp / "substrate"), fields=str(tmp / "fields.json"))
+             substrate_commit=_head(tmp / "substrate"), fields=str(tmp / "fields.json"),
+             source_rows=str(tmp / "source-rows.jsonl"))
     a.update(over)
     if not Path(a["scored"]).exists():
         Path(a["scored"]).write_text(json.dumps({"kind": "ScoredReleases", "releases": []}))
@@ -102,6 +103,7 @@ class Fakes:
         self.rows = rows
         self.pulled_only = None   # the --only list cmd_pull got
         self.anchors = None       # the anchor list blis prints; None = every row's unit
+        self.unsourced = []       # rows the ledger holds a unit for and the pinned source file does not hold
 
     def api_pull(self, fetch, *, today, window_days, framework="vllm"):
         return types.SimpleNamespace(rows=self.rows)
@@ -109,8 +111,11 @@ class Fakes:
     def ledger(self, tmp):
         # The ledger the night reads: one unit per row, written before each night, and the blis
         # that prints the anchor list of the substrate release it pins.
-        ledger_fake.write(tmp / "ledger", self.rows)
-        anchors = [ledger_fake.point_id(r) for r in self.rows] if self.anchors is None else self.anchors
+        ledger_fake.write(tmp / "ledger", self.rows + self.unsourced)
+        # The ledger's pinned source: its rows, as export.sql prints them.
+        (tmp / "source-rows.jsonl").write_text("".join(json.dumps(r) + "\n" for r in self.rows))
+        anchors = ([ledger_fake.point_id(r) for r in self.rows + self.unsourced] if self.anchors is None
+                   else self.anchors)
         if not (tmp / "substrate" / ".git").exists():
             _tagged_repo(tmp / "substrate", "v1.0.0")
         cat = write_catalog(tmp / "cat", {"m": "org/m"})
@@ -296,18 +301,58 @@ def test_an_anchor_unit_of_a_framework_no_engine_models_stays_in_the_window(tmp_
     assert fakes.pulled_only == both
 
 
-def test_a_night_fails_naming_the_count_when_an_anchor_unit_is_not_in_the_window(tmp_path, monkeypatch):
-    # An anchor unit with no row in the window is neither pulled nor listed with a reason, so
-    # the counts would omit it without a word (COV-1). The night stops before any fetch.
+def test_an_anchor_unit_the_pinned_source_holds_no_record_of_is_g5_by_name_and_the_night_goes_on(tmp_path, monkeypatch):
+    # COV-1: every anchor unit is graded or G5 with a reason. A unit of the ledger whose record the source file lacks
+    # is not fetched; the pull lists it with value_not_recorded:anchor_not_in_source, and the night scores the rest.
+    rows, gone = [_row("m", 1, "2026-10-01")], _row("m", 2, "2026-10-01")
+    fakes = Fakes(rows)
+    fakes.unsourced = [gone]
+    _install(monkeypatch, fakes, [ledger_fake.point_id(rows[0])])
+    fakes.ledger(tmp_path)
+    assert cli.cmd_nightly(_args(tmp_path)) == 0
+    assert fakes.pulled_only == [ledger_fake.point_id(rows[0])]
+    entries = {e["point_id"]: e for e in json.loads((tmp_path / "work" / "manifest.json").read_text())["points"]}
+    assert entries[ledger_fake.point_id(gone)]["reasons"] == [cli.UNSOURCED]
+    assert set(entries) == {ledger_fake.point_id(r) for r in rows + [gone]}
+
+
+def test_an_anchor_unit_the_ledger_does_not_hold_stops_the_night_before_any_fetch(tmp_path, monkeypatch):
+    # The anchor list names units the ledger lacks: the list and the ledger are not one release's, so the ledger is
+    # unreadable for this night. It stops, naming the count, before any fetch.
     rows = [_row("m", 1, "2026-10-01")]
     fakes = Fakes(rows)
     fakes.anchors = [ledger_fake.point_id(rows[0]), "e" * 64, "f" * 64]
     _install(monkeypatch, fakes, [])
     fakes.ledger(tmp_path)
     monkeypatch.setattr(cli, "cmd_pull", lambda a: (_ for _ in ()).throw(AssertionError("pulled")))
-    with pytest.raises(RuntimeError, match=r"2 of the 3 anchor units are neither a point of the window nor listed"):
+    import ledger as ldg
+    with pytest.raises(ldg.LedgerError, match=r"2 anchor units are not units of the ledger"):
         cli.cmd_nightly(_args(tmp_path))
     assert not (tmp_path / "data" / "latest").exists()
+
+
+def test_the_night_reads_its_rows_from_the_pinned_source_and_lists_newer_live_rows_as_later_ledger_candidates(
+        tmp_path, monkeypatch):
+    # The ledger was made from the pinned source; the live API now serves a newer version of the record (another
+    # configuration). The night scores the source's version, and the backlog lists the live row as a candidate for a
+    # ledger pinned to a newer snapshot; it is not G5.
+    old = _row("m", 1, "2026-10-01")
+    fakes = Fakes([old])
+    _install(monkeypatch, fakes, [ledger_fake.point_id(old)])
+    fakes.ledger(tmp_path)
+    seen = {}
+
+    def pull(a):
+        seen["rows"] = a.rows
+        return fakes.cmd_pull(a)
+    monkeypatch.setattr(cli, "cmd_pull", pull)
+    # The live API's version of the record differs from the source's.
+    monkeypatch.setattr(api, "pull", lambda fetch, **k: types.SimpleNamespace(rows=[{**old, "precision": "fp4"}]))
+    assert cli.cmd_nightly(_args(tmp_path)) == 0
+    assert [r["precision"] for r in seen["rows"]] == ["fp8"]
+    backlog = json.loads((tmp_path / "data" / "latest" / "backlog.json").read_text())
+    assert backlog["later_ledger_candidates"]["count"] == 1
+    assert backlog["later_ledger_candidates"]["records"] == [old["id"]]
 
 
 def test_a_night_whose_build_publishes_no_anchor_unit_fails_and_scores_nothing(tmp_path, monkeypatch):
