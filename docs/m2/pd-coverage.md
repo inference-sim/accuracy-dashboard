@@ -123,7 +123,7 @@ python3 orchestrator/baseline/compare.py run --dir OUT --sample in_sample --out 
 
 * **Not a ranking result.** Throughput per GPU is not scored and the ranking evaluator is not built; the saturated points show the TTFT error is largest where topologies are compared.
 * **Not a Dynamo result.** The router is a stand-in in run B and the substrate maps none in run A. TTFT's definition under Dynamo (the prefill worker's sampled token or the decode worker's) is not established; BLIS reports the decode leg's.
-* **The handoff's price is an assumption.** `ib-400g` at the registry's efficiency for a point-to-point pull, with the expert all-to-all floor standing in for a base latency; no KV-pull measurement exists (blis-registry#78).
+* **The handoff's price is an assumption.** `ib-400g` at the registry's efficiency for a point-to-point pull, with the expert all-to-all floor standing in for a base latency; no KV-pull measurement exists (inference-sim/blis-substrate#153).
 * **The client differs.** The recipes' benchmark is srt-slurm's `sa-bench`, not InferenceX's client; the replay sends the InferenceX client's seed-0 lengths. The point names it.
 * **Engine arguments are the recipe's** (the launcher's intent), checked against the one surviving log only for 40 points.
 * **Only 2 of the 4 chips' fp8 or MiniMax-M3 rows score**, and only dp-free rows; the flagship dsv4 and Kimi shapes are DP attention.
