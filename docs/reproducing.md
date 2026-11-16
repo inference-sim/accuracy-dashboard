@@ -61,7 +61,9 @@ python3 orchestrator/baseline/compare.py pair --before OUT --after OUT_AFTER --s
 
 The units file for step 3 is committed; `split.py splits --pull PULL --out splits.json` makes the splits file (committed beside each contract directory).
 
-**A contract is made by the scorer it sits beside.** The harness commit in each `contract/provenance.json` is the checkout `run.sh` ran from; the results are committed after it, so it is not the head. `orchestrator/baseline/test_contracts_current.py` fails if any scoring file (`harness/`, `schemas/`, `requirements-ci.txt`, a non-test file under `orchestrator/` except the boundary lint and `build_summary_v2.py`, which write no contract) differs between that commit and the head: a change to the scorer means every committed contract is scored again and the tables regenerated. CI checks out the full history for this.
+**A contract is made by the scorer it sits beside.** The harness commit in each `contract/provenance.json` is the checkout `run.sh` ran from; the results are committed after it, so it is not the head. `orchestrator/baseline/test_contracts_current.py` fails if any scoring file (`harness/`, `schemas/`, `requirements-ci.txt`, a non-test file under `orchestrator/` except the boundary lint and `build_summary_v2.py`, which write no contract) differs between that commit and the head: a change to the scorer means every current contract is scored again and its tables regenerated. CI checks out the full history for this.
+
+**Historical contracts.** The five M2 contracts above (`docs/m2/*/contract`) were scored at harness `0e9627e219c207593de5bc55d997cf3dca707d64` from pulls frozen on one machine, and those pulls are no longer held, so they cannot be scored again. They are listed, each by its exact path with its harness commit, pull manifest sha256 and reason, in `docs/m2/historical-contracts.json`, and the gate exempts exactly those (`orchestrator/baseline/contract_currency.py` checks that each entry names an existing contract at its own provenance, by path and never by pattern). Every other committed contract is current.
 
 ## Expected results
 

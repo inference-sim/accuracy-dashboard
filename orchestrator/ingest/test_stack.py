@@ -213,3 +213,14 @@ def test_the_nightly_resolves_through_stack_json_and_not_through_installation_md
     for gone in ("resolve_versions", "installation.md", "go doc", "blis-catalog", "blis-registry", "go.mod"):
         assert gone not in text.replace("# ", ""), gone
     assert not (ROOT / "resolve_versions.sh").exists()
+
+
+def test_a_release_whose_substrate_publishes_no_anchor_list_gives_way_to_its_patch_release():
+    # v0.16.0 and v0.17.0 pin substrates with no anchor list, so they can never be scored. Once
+    # v0.17.1 is tagged, the night scores it and skips them, and never records them as scored.
+    tags = ["v0.15.0", "v0.16.0", "v0.17.0", "v0.17.1"]
+    assert sk.unscored_releases(tags, {"v0.15.0"}, "v0.16.0") == ["v0.17.1"]
+    # Before the patch release exists nothing is skipped, so the gap stays visible.
+    assert sk.unscored_releases(tags[:3], {"v0.15.0"}, "v0.16.0") == ["v0.16.0", "v0.17.0"]
+    # A release not in the table is never skipped.
+    assert sk.unscored_releases(tags, {"v0.15.0"}, "v0.16.0", superseded={}) == ["v0.16.0", "v0.17.0", "v0.17.1"]

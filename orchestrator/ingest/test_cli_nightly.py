@@ -537,6 +537,44 @@ def test_resolve_blis_names_every_unscored_release_oldest_first_else_the_newest(
     assert run() == {"blis_tags": "v0.17.0", "blis_tag": "v0.17.0", "more": "false"}
 
 
+def test_resolve_blis_skips_a_superseded_release_once_its_patch_release_is_tagged(tmp_path):
+    # COV-9 with stack.SUPERSEDED, through resolve_blis.sh and the real table: v0.16.0 and v0.17.0 can never be
+    # scored (their substrates publish no anchor list). Until v0.17.1 is tagged the night keeps naming v0.16.0, so the
+    # gap stays visible; once it is tagged, the night scores v0.17.1 and never lists the two it replaces.
+    import shutil
+    import subprocess
+    import sys as _sys
+    root = Path(__file__).resolve().parent.parent
+    bin_ = tmp_path / "bin"
+    bin_.mkdir()
+    (bin_ / "python3").symlink_to(_sys.executable)
+    shutil.copytree(root, tmp_path / "repo" / "orchestrator", ignore=shutil.ignore_patterns("testdata", "__pycache__"))
+    state = tmp_path / "repo" / "state"
+    state.mkdir()
+
+    def run(tags, scored):
+        rel = [{"tagName": t, "createdAt": f"2026-11-{10 + k:02d}"} for k, t in enumerate(tags)]
+        (bin_ / "gh").write_text("#!/usr/bin/env python3\nimport json, sys\nrel = " + json.dumps(rel) + "\n"
+                                 "print('\\n'.join(r['tagName'] for r in sorted(rel, key=lambda r: r['createdAt'])))\n")
+        (bin_ / "gh").chmod(0o755)
+        (state / "scored-releases.json").write_text(json.dumps({"kind": "ScoredReleases", "releases": scored}))
+        out = tmp_path / "out"
+        out.unlink(missing_ok=True)
+        r = subprocess.run(["bash", str(tmp_path / "repo" / "orchestrator" / "resolve_blis.sh")],
+                           env={"PATH": f"{bin_}:/usr/bin:/bin", "GITHUB_OUTPUT": str(out)}, capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr
+        return dict(line.split("=", 1) for line in out.read_text().splitlines())
+
+    before = ["v0.15.0", "v0.16.0", "v0.17.0"]
+    assert run(before, ["v0.15.0"]) == {"blis_tags": "v0.16.0", "blis_tag": "v0.17.0", "more": "true"}
+    after = before + ["v0.17.1"]
+    assert run(after, ["v0.15.0"]) == {"blis_tags": "v0.17.1", "blis_tag": "v0.17.1", "more": "false"}
+    # v0.17.1 published and listed: nothing is left, so the night scores the newest release's delta; the two it
+    # replaced are still not listed as scored.
+    assert run(after, ["v0.15.0", "v0.17.1"]) == {"blis_tags": "v0.17.1", "blis_tag": "v0.17.1", "more": "false"}
+    assert json.loads((state / "scored-releases.json").read_text())["releases"] == ["v0.15.0", "v0.17.1"]
+
+
 def test_the_workflow_scores_one_release_and_starts_the_next_only_after_publishing_it():
     import yaml
     wf = yaml.safe_load((Path(__file__).resolve().parent.parent.parent / ".github" / "workflows" / "api-nightly.yml").read_text())
