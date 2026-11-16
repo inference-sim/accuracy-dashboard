@@ -48,6 +48,7 @@ SHARDS: dict[str, list[Cmd]] = {
         script("orchestrator/test_gen_direct_corpus.py"),
         script("orchestrator/test_run_agentic.py"),
         pytest("Agentic corpus pinned by its catalog workload's revision and full sha256", "orchestrator/test_resolve_agentic_corpus.py"),
+        pytest("The first-party corpus scorer", "orchestrator/baseline/test_corpus.py"),
         Cmd("Schema validates the committed render fixture", argv=[
             "python3", "orchestrator/validate_summary.py", "--schema", "schemas/summary.v1.json", "web/testdata/render-fixture.summary.json"]),
         Cmd("summary.json v3 builder + validator; the committed v3 web fixtures rebuild byte-for-byte; the frozen v2 ones validate",
@@ -95,8 +96,7 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
                "orchestrator/ingest/test_pd.py", "orchestrator/ingest/test_thinking_rule.py",
                "orchestrator/baseline/test_compare.py", "orchestrator/baseline/test_split.py",
                "orchestrator/baseline/test_residuals.py", "orchestrator/baseline/test_docs.py",
-               "orchestrator/baseline/test_contracts_current.py", "orchestrator/test_update_index.py",
-               "orchestrator/baseline/test_corpus.py"),
+               "orchestrator/baseline/test_contracts_current.py", "orchestrator/test_update_index.py"),
     ],
     # The two repository-wide checks that were hidden behind earlier failures: they run on their own.
     "boundary": [
