@@ -20,7 +20,7 @@ A cell is framework × chip × model × serving mode. BLIS wins a cell when both
 
 ## The result (inference-sim v0.17.0)
 
-Scored by the harness at accuracy-dashboard `26c22e3b1868fa8311eef3bd32ce194b359c629a`, inference-sim v0.17.0 (`c79c745619b16a8019339e3bbc79ee5e2923b258`), blis-substrate v0.14.0, blis-vllm v0.32.0-blis.3's field list. The figures are a logged test evaluation, so the development split's test points' errors are in them; the report names the evaluation-log rows it was logged as, and `published_test.py` fails the tree if a committed report shows a held-out point's error that the log does not hold. The evaluation was run three times on 2026-11-16 while the tool was fixed (the log has a pair of rows for each: one pair was first removed in error and has been put back). The 7 points with no matching record have no split assignment: they are counted as `unknown` and withheld from every error, the estimator's included, because they could be test points. Over all 1066 points AISimulate's own figures, recomputed here from its points, are its published ones (vLLM TPOT 15.39 and TTFT 38.28, SGLang 15.29 and 64.08); with the 7 withheld, its vLLM figures are 15.37 and 38.08.
+Scored by the harness at accuracy-dashboard `26c22e3b1868fa8311eef3bd32ce194b359c629a`, inference-sim v0.17.0 (`c79c745619b16a8019339e3bbc79ee5e2923b258`), blis-substrate v0.14.0, blis-vllm v0.32.0-blis.3's field list. The figures are a logged test evaluation, so the development split's test points' errors are in them. Every one of the 1066 points has a split, computed from its own series by `split.py`'s rule (and, where a record is found, checked against the record's): 652 train, 255 validation, 159 test, none prospective (the artifact's points were measured by 2026-09-27, before the freeze date). The report names every evaluation-log row it stands for, and `published_test.py` fails the tree on a committed report whose test figures the log does not hold, on a log row no committed report names, and on a malformed row. The evaluation was run four times on 2026-11-16 while the tool was being fixed; the log keeps a pair of rows for each run (one pair was first removed in error and has been put back), and the first three counted 155 test points because the 220 unfrozen or unmatched points then had no split. **v0.17.0's evaluation of the development split's test set is spent**: a full test evaluation of v0.17.0 over InferenceX (its 446 test points of the M2 pull) can no longer be run as a first look, and any later one is a repeat that the log shows. AISimulate's own figures, recomputed here from its points, are its published ones: vLLM TPOT 15.39 and TTFT 38.28, SGLang 15.29 and 64.08. Every figure shows its point count, and one over fewer than 10 points is shown as "too few points" (COV-11); such a cell cannot be won.
 
 - **vLLM lane, 573 points: lost.** BLIS covers 189 (33.0 %; AISimulate 100 %). On them its TPOT MAPE is 18.56 and TTFT MAPE 27.38, its shape errors 18.82 and 20.79; over the same 189 points AISimulate's are 22.08, 43.12, 12.84 and 30.77. So on the points both score BLIS is closer in TPOT, TTFT and TTFT shape, and further in TPOT shape; and its coverage is a third. No cell is won: every cell has less coverage, or one metric worse.
 - **SGLang lane, 219 points, and TensorRT-LLM, 274: lost, 0 % coverage.** BLIS has no engine for either.
@@ -29,7 +29,7 @@ Why BLIS does not cover the other 384 vLLM points, with the issue that removes e
 
 | Points | Reason | Removed by |
 |---|---|---|
-| 213 | `record_gone`: the Llama-3.1-70B runs of October 2025. GitHub no longer holds their workflow runs and the InferenceX API no longer serves their server logs (HTTP 404), so the harness has no record to build a scenario from | data: not BLIS work |
+| 213 | `record_gone: HTTP 404`: the Llama-3.1-70B runs of October 2025. GitHub answers 404 for their workflow runs and the InferenceX API for their server logs, so the harness has no record to build a scenario from. Their unit ids are in `unfrozen-units.json`; a pull error other than a 404 or 410 would be listed as `pull_error`, not as gone | data: not BLIS work |
 | 56 | `blis_refused:scenario`: 28 gpt-oss-120b (`gpt_oss_mxfp4` not priced) and 28 DeepSeek-V4-Pro (the indexer KV dtype) | inference-sim/blis-substrate#102, inference-sim/blis-vllm#84 |
 | 68 | `field_not_in_release`: removed vLLM environment variables on gpt-oss-120b | inference-sim/accuracy-dashboard#63 |
 | 22 | `field_not_modelled:linear_backend` (Kimi-K2.5) | inference-sim/blis-vllm#80 |
@@ -45,6 +45,8 @@ Accuracy over the development split's test and prospective points is evaluated o
 
 ## Commands
 
+The committed table is reproduced by these, in order (each path is a scratch directory; none is committed):
+
 ```
 python3 orchestrator/baseline/matched.py points --zip ARTIFACT.zip --pin SUBSTRATE/kernel/scripts/aisimulate_e2e.pin.json \
   --extractor SUBSTRATE/kernel/scripts/extract_aisimulate_e2e.py --out POINTS.json
@@ -53,13 +55,18 @@ python3 orchestrator/baseline/matched.py match --points POINTS.json --dump-rows 
   --ledger SUBSTRATE_V0_14_0/catalog/ledger --extractor SUBSTRATE/kernel/scripts/extract_aisimulate_e2e.py \
   --out MATCH.json --units-out UNITS.txt
 python3 orchestrator/baseline/matched.py freeze --match MATCH.json --dump-rows ROWS.jsonl \
-  --ledger SUBSTRATE_V0_14_0/catalog/ledger --out PULL --cache CACHE
-bash harness/run.sh --sim v0.17.0 --units UNITS.txt --pull PULL --out CONTRACT --catalog SUBSTRATE_V0_14_0/catalog \
+  --ledger SUBSTRATE_V0_14_0/catalog/ledger --out PULL --cache CACHE --errors-out PULL_ERRORS.json
+python3 -c "import json; print('\\n'.join(e['point_id'] for e in json.load(open('PULL/manifest.json'))['points']))" > FROZEN.txt
+python3 orchestrator/resolve_agentic_corpus.py --all --catalog SUBSTRATE_V0_14_0/catalog -o CORPUS
+bash harness/run.sh --sim v0.17.0 --units FROZEN.txt --pull PULL --out CONTRACT --catalog SUBSTRATE_V0_14_0/catalog \
   --registry SUBSTRATE_V0_14_0/registry --corpus-dir CORPUS --fields FIELDS_V0_32_0_BLIS_3.json \
   --catalog-release v0.14.0 --registry-release v0.14.0
 python3 orchestrator/baseline/split.py splits --pull PULL --out SPLITS.json
 python3 orchestrator/baseline/matched.py report --points POINTS.json --match MATCH.json --contract CONTRACT \
-  --splits SPLITS.json --estimator aisimulate --out docs/m3/matched/matched
+  --splits SPLITS.json --pull-errors PULL_ERRORS.json --estimator aisimulate --out docs/m3/matched/matched \
+  --evaluate-test --log docs/m2/evaluation-log.md --label "BLIS v0.17.0 on the matched points"
 ```
+
+`report` refuses to run unless `matched.py` is committed at the checkout's HEAD, and records that commit (`matched_py_commit`) beside the harness commit that scored the contract.
 
 The artifact, the dump, the pull and the contract are third-party data or derived from it record by record, and are not committed (X12); the report holds aggregates per cell.
