@@ -1461,7 +1461,7 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
                              field_list=env.field_list, catalog_node_size=catalog_size, node=node,
                              draft_model=sup.drafter, launch_config=launches[role]) for role in pools}
     b = pdm.build_pd(builts, recipe, pools, taken, name=name, policy=policy, per_node=catalog_size or node.gpus_per_node)
-    o.reasons += ss.parallel_reasons(b.reasons, c, kit.field_list) if sglang else b.reasons
+    o.reasons += b.reasons
     o.subs += b.substitutions
     b.thinking = st.recorded_thinking({**decided["prefill"].settings, **decided["decode"].settings})
     require_workload_category(o, b, env.speculative_fallback_category)
