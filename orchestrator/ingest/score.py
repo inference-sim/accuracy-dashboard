@@ -795,7 +795,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
         readings, problems = {src: st.Reading() for src in st.SOURCES}, []
         readings["launch_config"] = st.read_launch_config(launch)
     elif sglang:
-        readings, problems = ss.read_all(log, cmd_b.decode("utf-8", "replace") if cmd_b else None, kit.declarations)
+        readings, problems = ss.read_all(log, cmd_b.decode("utf-8", "replace") if cmd_b else None, kit.declarations, kit.field_list)
         o.reasons += ss.unresolved_env(readings)
         if cmd_b is None:
             # The printout resolves every field, so only the launch command says which the run set (sglang_settings).
@@ -875,7 +875,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     b = st.build(c, name=name, model=sup.model, part=part, engine_version=kit.release,
                  field_list=kit.field_list, catalog_node_size=catalog_size, node=node,
                  draft_model=sup.drafter, launch_config=launch, engine_kind=fw.engine)
-    o.reasons += b.reasons
+    o.reasons += ss.parallel_reasons(b.reasons, c, kit.field_list) if sglang else b.reasons
     o.subs += b.substitutions
     b.thinking = st.recorded_thinking(c.settings)
     header = [f"point {pid}", f"InferenceX row {row['id']} ({row['run_url']})",
@@ -1461,7 +1461,7 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
                              field_list=env.field_list, catalog_node_size=catalog_size, node=node,
                              draft_model=sup.drafter, launch_config=launches[role]) for role in pools}
     b = pdm.build_pd(builts, recipe, pools, taken, name=name, policy=policy, per_node=catalog_size or node.gpus_per_node)
-    o.reasons += b.reasons
+    o.reasons += ss.parallel_reasons(b.reasons, c, kit.field_list) if sglang else b.reasons
     o.subs += b.substitutions
     b.thinking = st.recorded_thinking({**decided["prefill"].settings, **decided["decode"].settings})
     require_workload_category(o, b, env.speculative_fallback_category)

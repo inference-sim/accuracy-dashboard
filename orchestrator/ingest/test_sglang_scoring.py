@@ -372,3 +372,39 @@ def test_the_launch_script_is_the_single_turn_script_of_the_rows_model_framework
     assert rcp.launch_script(rc, _row(model="m", spec_method="mtp")) == "benchmarks/single_node/m_fp8_h200_mtp.sh"
     assert rcp.launch_script(rc, _row(model="unknown")) is None
     assert rcp.launch_script(rc, _row(model="m", framework="vllm")) is None
+
+
+def test_a_parallel_size_the_list_does_not_model_is_refused_as_that_field_not_as_a_missing_value():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        fields = json.loads(json.dumps({"kind": "FieldList", "engine": {"kind": "sglang", "version": RELEASE},
+                                        "fields": [{**_field(f.name, f.status, f.source)} for f in FIELDS.fields.values()]}))
+        for f in fields["fields"]:
+            if f["name"] == "dp_size":
+                f.update(_field("dp_size", "not_modelled"))
+        env.sglang = sc.EngineKit("sglang", RELEASE, fl.parse(json.dumps(fields).encode()), "f" * 64, ss.load_declarations())
+        o, _ = _score(tmp, entry, env)
+        assert o.g5 == {"code": "field_not_modelled", "subject": "dp_size"}
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_an_unlisted_sglang_variable_is_refused_by_name():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp, command="export MODEL_PATH=/models/m\nexport SGLANG_NOT_IN_THIS_RELEASE=1\n" + COMMAND)
+        o, _ = _score(tmp, entry, env)
+        assert o.g5 == {"code": "field_not_in_release", "subject": "env.SGLANG_NOT_IN_THIS_RELEASE"}
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_launch_scripts_own_helper_variables_are_not_the_engines():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp, command="export MODEL_PATH=$MODEL\nexport LOG_DIR=/workspace\n" + COMMAND)
+        o, _ = _score(tmp, entry, env)
+        assert o.fidelity is not None, o.reasons
+    finally:
+        shutil.rmtree(tmp)

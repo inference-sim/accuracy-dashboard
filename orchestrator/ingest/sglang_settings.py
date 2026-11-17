@@ -203,9 +203,24 @@ def unresolved_env(readings: dict) -> list[str]:
                   if p.startswith("env.") and all(v is None for v in vs))
 
 
-def read_all(server_log: str, launch_text: str | None, decl: dict) -> tuple[dict, list]:
+ENGINE_ENV_PREFIX = "SGLANG_"
+
+
+def drop_foreign_env(reading: st.Reading, field_list) -> None:
+    """Remove the environment variables of a launch script that SGLang does not read: a script exports its own helper
+    variables (MODEL_PATH, a log directory) beside the engine's. A variable is the engine's when its field list names it
+    (every variable the release reads, with its libraries') or it is spelled as SGLang's own (SGLANG_*): an unlisted
+    SGLANG_* variable is one this release lacks, and the run is refused for it by name."""
+    for path in [p for p in reading.values if p.startswith("env.")]:
+        if field_list.lookup(path) is None and not path[len("env."):].startswith(ENGINE_ENV_PREFIX):
+            del reading.values[path]
+
+
+def read_all(server_log: str, launch_text: str | None, decl: dict, field_list=None) -> tuple[dict, list]:
     readings = {"launch_config": read_launch_command(launch_text, decl),
                 "resolved_config": read_server_args(server_log)}
+    if field_list is not None:
+        drop_foreign_env(readings["launch_config"], field_list)
     problems = [p for r in readings.values() for p in r.problems]
     if not readings["resolved_config"].values:
         problems.append("server log has no `server_args=ServerArgs(...)` line")
@@ -253,3 +268,19 @@ def make_names(decl: dict) -> st.Names:
             return f"engine.env.{path[4:]}"
         return f"engine.{path}" if path in decl["fields"] else None
     return st.Names(roles=ROLES, pool_role={}, derived=("frontend.router",), frontend_env=None, location=location)
+
+
+def parallel_reasons(reasons: list[str], c: st.Decided, field_list) -> list[str]:
+    """A parallel size the scenario lacks because its field is not modelled is that field's refusal, not a missing value:
+    SGLang prints tp_size, pp_size and dp_size on every run, but the scenario states only what the engine models or the run
+    set. The reason then names the field (field_not_modelled:dp_size)."""
+    by_loc = {loc: name for name, loc in PARALLEL.items()}
+    out = []
+    for r in reasons:
+        name = by_loc.get(r.removeprefix("required_setting_missing:")) if r.startswith("required_setting_missing:parallel.") else None
+        f = field_list.lookup(name) if name else None
+        if name and name in c.settings and c.settings[name].value is not None and f is not None and f.status == "not_modelled":
+            out.append(f"field_not_modelled:{name}")
+        else:
+            out.append(r)
+    return out
