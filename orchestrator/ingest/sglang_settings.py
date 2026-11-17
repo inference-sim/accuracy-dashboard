@@ -133,7 +133,13 @@ def read_launch_command(text: str | None, decl: dict) -> st.Reading:
         if not line:
             continue
         if not _LAUNCH.search(line):
-            for tok in (shlex.split(line.removeprefix("export "), comments=True) if line else []):
+            try:
+                toks = shlex.split(line.removeprefix("export "), comments=True)
+            except ValueError as e:
+                # A malformed environment line is this run's problem, named as a G5 (COV-1), not the night's.
+                r.problems.append(f"launch_config: {e}")
+                continue
+            for tok in toks:
                 if _ASSIGN.match(tok):
                     k, _, v = tok.partition("=")
                     r.add(f"env.{k}", None if "$" in v else v)

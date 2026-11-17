@@ -183,6 +183,25 @@ def test_an_environment_variable_left_to_the_shell_is_refused_by_name():
         shutil.rmtree(tmp)
 
 
+def test_a_malformed_environment_line_is_this_runs_problem_not_the_nights():
+    # COV-1: an unbalanced quote in an export line must become a named problem on the run, not an exception that
+    # aborts the scoring of every run after it.
+    decl = ss.load_declarations()
+    r = ss.read_launch_command("export FOO='\npython3 -m sglang.launch_server --tensor-parallel-size 8\n", decl)
+    assert any(p.startswith("launch_config:") for p in r.problems), r.problems
+    assert r.values["tp_size"] == [8]                    # the lines after it are still read
+
+
+def test_a_run_with_a_malformed_environment_line_is_graded_g5_and_the_night_goes_on():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp, command="export FOO='\n" + COMMAND)
+        o, _ = _score(tmp, entry, env)                  # raised ValueError before the fix
+        assert o.g5 == {"code": "value_conflict", "subject": "server_log_unreadable"}, o.g5
+    finally:
+        shutil.rmtree(tmp)
+
+
 def test_without_an_sglang_field_list_the_points_stay_g5_field_unclassified():
     tmp = Path(tempfile.mkdtemp())
     try:
