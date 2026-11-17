@@ -703,7 +703,26 @@ def decide(settings: dict[str, Setting], field_list, part: str | None = None, fa
         if st.requested:
             dec = fl.decide(field_list, path, set_by_run=True)
             if dec.g5:
-                d.reasons.append(f"{dec.g5['code']}:{path}")
+                # A field with no exact stand-in may name the execution mode it is priced as, for named values and parts
+                # (estimation.approximates): the point is priced with that mode and names the substitution.
+                f_ = field_list.lookup(path)
+                appr = None
+                if dec.g5["code"] == "field_not_modelled" and f_ is not None and f_.estimation.get("approximates"):
+                    facts = facts_of(st.value, settings) if facts_of else {"value": st.value}
+                    appr = fl.approximate(f_.estimation, facts)
+                if appr is None:
+                    d.reasons.append(f"{dec.g5['code']}:{path}")
+                    continue
+                mode = json.dumps(appr["mode"], sort_keys=True)
+                d.substitutions.append({"kind": "execution_mode", "subject": path,
+                                        "detail": f"priced as {mode}: {appr['differs']} ({appr['evidence']})"})
+                d.args.append({**rec, "blis": None, "match": "approximated", "note": d.substitutions[-1]["detail"]})
+                for f2, v2 in sorted(appr["mode"].items()):
+                    sub = location(f2)
+                    if sub is None:
+                        d.reasons.append(f"setting_differs:{f2}")
+                    else:
+                        d.mapped[sub] = (f2, v2)
                 continue
             if dec.substitution and dec.substitution["kind"] == "estimated":
                 est = field_list.lookup(path).estimation
