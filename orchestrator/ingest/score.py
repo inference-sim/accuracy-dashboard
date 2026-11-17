@@ -78,6 +78,22 @@ class EngineKit:
     declarations: dict | None = None
 
 
+def read_sglang_kit(fields_path: Path, stack: "Stack", declarations: Path | None = None) -> "EngineKit":
+    """The SGLang engine's kit (score.EngineKit): the release stack.json names, blis-sglang's field list for it, and
+    blis-sglang's declarations (the flag-to-field map). Both files must be for that release (LIF-6)."""
+    release = stack.engine("sglang")
+    raw = Path(fields_path).read_bytes()
+    field_list = fl.parse(raw)
+    if field_list.engine != {"kind": "sglang", "version": release}:
+        raise fl.FieldsError(f"{fields_path} is the field list of {field_list.engine}, but the simulator "
+                             f"runs sglang {release} (stack.json)")
+    decl = ss.load_declarations(declarations) if declarations else ss.load_declarations()
+    if decl.get("engine") != {"kind": "sglang", "version": release}:
+        raise fl.FieldsError(f"the SGLang declarations are for {decl.get('engine')}, but the simulator runs sglang {release} "
+                             f"(stack.json): regenerate them with gen_sglang_declarations.py")
+    return EngineKit("sglang", release, field_list, hashlib.sha256(raw).hexdigest(), decl)
+
+
 @dataclass
 class Env:
     """What scoring runs against: one BLIS release and its pinned repos. blis is the path of

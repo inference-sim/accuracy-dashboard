@@ -316,3 +316,18 @@ def test_a_run_that_scores_two_engines_holds_each_point_to_its_own_release():
     assert gr.check(pts, {"vllm": "0.32.0", "sglang": RELEASE}) == []
     pts[1]["build"]["release"] = "0.5.12"
     assert any("graded G2" in p for p in gr.check(pts, {"vllm": "0.32.0", "sglang": RELEASE}))
+
+
+def test_a_field_list_or_declarations_of_another_release_than_the_stack_runs_is_refused(tmp_path):
+    import stack as sk
+    stack = types.SimpleNamespace(engine=lambda kind: "0.5.24")
+    f = tmp_path / "fields.json"
+    f.write_text(json.dumps({"kind": "FieldList", "engine": {"kind": "sglang", "version": RELEASE}, "fields": []}))
+    with pytest.raises(fl.FieldsError, match="runs sglang 0.5.24"):
+        sc.read_sglang_kit(f, stack)
+    stack = types.SimpleNamespace(engine=lambda kind: RELEASE)
+    assert sc.read_sglang_kit(f, stack).release == RELEASE
+    d = tmp_path / "decl.json"
+    d.write_text(json.dumps({"engine": {"kind": "sglang", "version": "0.5.12"}, "fields": {}}))
+    with pytest.raises(fl.FieldsError, match="declarations are for"):
+        sc.read_sglang_kit(f, stack, d)

@@ -103,7 +103,8 @@ def manifest_entries(manifest: dict) -> tuple[dict, Counter]:
     return by_row, dropped
 
 
-def entries_for(placed: pl.Placed, by_row: dict, overlay: Path, pull_dir: Path) -> tuple[list[dict], list[dict]]:
+def entries_for(placed: pl.Placed, by_row: dict, overlay: Path, pull_dir: Path,
+                scoring=engines.DEFAULT_SCORING) -> tuple[list[dict], list[dict]]:
     """(entries to grade, units with no artifacts in the pull). A unit of a framework the harness
     does not score has none to fetch. Every other unit takes the entry of its rows in the manifest,
     its artifact directory linked into `overlay` under the unit's id."""
@@ -112,7 +113,7 @@ def entries_for(placed: pl.Placed, by_row: dict, overlay: Path, pull_dir: Path) 
     for p in placed.points:
         base = {"point_id": p.point_id, "identity": dict(p.unit.identity), "row": p.row, "records": p.records,
                 "measurements": p.measurements}
-        if not engines.scored(engines.lookup(p.row["framework"])):
+        if not engines.scored(engines.lookup(p.row["framework"]), scoring):
             entries.append({**base, "reasons": [], "files": {}, "build": None})
             continue
         old = next((by_row[r] for r in p.records if r in by_row), None)
@@ -126,11 +127,13 @@ def entries_for(placed: pl.Placed, by_row: dict, overlay: Path, pull_dir: Path) 
     return entries, missing
 
 
-def make_env(*, fields_path: Path, stack_path: Path, catalog: Path, registry: Path, base_models: dict) -> sc.Env:
+def make_env(*, fields_path: Path, stack_path: Path, catalog: Path, registry: Path, base_models: dict,
+             sglang_fields_path: Path | None = None, sglang_declarations: Path | None = None) -> sc.Env:
     """The scorer's inputs with no simulator: the field list, the engine release, the catalog read
     from its checkout (support.CheckoutCatalog) and the registry's parts. The corpora are the
     catalog's replay workloads, with no corpus file: nothing is replayed."""
-    release = sk.load(stack_path).engine("vllm")
+    stack = sk.load(stack_path)
+    release = stack.engine("vllm")
     field_list = fl.parse(Path(fields_path).read_bytes())
     if field_list.engine != {"kind": "vllm", "version": release}:
         raise CoverageError(f"{fields_path} is the field list of {field_list.engine}, but the stack runs vllm {release}")
@@ -144,6 +147,11 @@ def make_env(*, fields_path: Path, stack_path: Path, catalog: Path, registry: Pa
                  registry=Path(registry), registry_release="", kernel="", corpora=corpora, field_list=field_list,
                  base_models=base_models, vllm_defaults=vdefaults, vllm_defaults_release=st.vllm_defaults_release(),
                  engine_release=release)
+    if sglang_fields_path is not None:
+        try:
+            env.sglang = sc.read_sglang_kit(Path(sglang_fields_path), stack, sglang_declarations)
+        except fl.FieldsError as e:
+            raise CoverageError(str(e)) from None
     env.catalog_obj = sp.CheckoutCatalog(blis="", root=Path(catalog))
     env.parts = sp.registry_parts(registry)
     return env
@@ -231,7 +239,8 @@ def report(*, rows: list[dict], placed: pl.Placed, records: list[dict], missing:
 
 
 def run(*, pull_dir: Path, ledger: Path, fields_path: Path, stack_path: Path, catalog: Path, registry: Path,
-        rows_path: Path | None = None, units_path: Path | None = None, workers: int = 1, work: Path | None = None) -> dict:
+        rows_path: Path | None = None, units_path: Path | None = None, workers: int = 1, work: Path | None = None,
+        sglang_fields_path: Path | None = None, sglang_declarations: Path | None = None) -> dict:
     """The report for a frozen pull. `rows_path` holds every row of the window (a JSON list of API
     rows); without it the rows are the manifest's own, which are one row per unit."""
     manifest = json.loads((pull_dir / "manifest.json").read_text())
@@ -244,10 +253,11 @@ def run(*, pull_dir: Path, ledger: Path, fields_path: Path, stack_path: Path, ca
     placed, differing = place_all(rows, lg)
     by_row, dropped = manifest_entries(manifest)
     env = make_env(fields_path=fields_path, stack_path=stack_path, catalog=catalog, registry=registry,
-                   base_models=manifest.get("base_models") or {})
+                   base_models=manifest.get("base_models") or {}, sglang_fields_path=sglang_fields_path,
+                   sglang_declarations=sglang_declarations)
     with tempfile.TemporaryDirectory() as tmp:
         overlay = Path(tmp)
-        entries, missing = entries_for(placed, by_row, overlay, pull_dir)
+        entries, missing = entries_for(placed, by_row, overlay, pull_dir, env.scoring())
         outcomes = sc.score_points(entries, overlay, Path(work) if work else overlay / "work", env,
                                    workers=workers, simulate=False)
     anchor = ldg.read_unit_set(units_path) if units_path else None

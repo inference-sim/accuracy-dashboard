@@ -48,7 +48,6 @@ import recipes as rcp  # noqa: E402
 import result  # noqa: E402
 import score as sc  # noqa: E402
 import settings as st  # noqa: E402
-import sglang_settings as sgs  # noqa: E402
 import stack as sk  # noqa: E402
 import support as sp  # noqa: E402
 
@@ -326,22 +325,6 @@ def read_fields(path: Path, engine_release: str) -> tuple["fl.FieldList", str]:
     return field_list, art.sha256(raw)
 
 
-def read_sglang_kit(fields_path: Path, stack: "sk.Stack", declarations: Path | None = None) -> "sc.EngineKit":
-    """The SGLang engine's kit (score.EngineKit): the release stack.json names, blis-sglang's field list for it, and
-    blis-sglang's declarations (the flag-to-field map). Both files must be for that release (LIF-6)."""
-    release = stack.engine("sglang")
-    raw = Path(fields_path).read_bytes()
-    field_list = fl.parse(raw)
-    if field_list.engine != {"kind": "sglang", "version": release}:
-        raise fl.FieldsError(f"{fields_path} is the field list of {field_list.engine}, but the simulator "
-                             f"runs sglang {release} (stack.json)")
-    decl = sgs.load_declarations(declarations) if declarations else sgs.load_declarations()
-    if decl.get("engine") != {"kind": "sglang", "version": release}:
-        raise fl.FieldsError(f"the SGLang declarations are for {decl.get('engine')}, but the simulator runs sglang {release} "
-                             f"(stack.json): regenerate them with gen_sglang_declarations.py")
-    return sc.EngineKit("sglang", release, field_list, art.sha256(raw), decl)
-
-
 def read_anchor_units(substrate_dir: Path, out: Path) -> set[str]:
     """The anchor units of the substrate release the scoring build pins (COV-2): the published list
     at catalog/ledger/published/anchor.yaml in the blis-substrate checkout stack.json names,
@@ -406,7 +389,7 @@ def cmd_score(a) -> int:
         engine_release = stack.engine("vllm")
         field_list, fields_sha = read_fields(Path(a.fields), engine_release)
         if getattr(a, "sglang_fields", None):
-            sglang_kit = read_sglang_kit(Path(a.sglang_fields), stack, getattr(a, "sglang_declarations", None))
+            sglang_kit = sc.read_sglang_kit(Path(a.sglang_fields), stack, getattr(a, "sglang_declarations", None))
     except (sk.StackError, fl.FieldsError, bc.CommandError, OSError, ValueError) as e:
         bad.append(str(e))
     # Every date-pinned AgentX corpus, by the catalog replay workload of its alias, checked against
@@ -515,7 +498,9 @@ def cmd_coverage(a) -> int:
         doc = cv.run(pull_dir=Path(a.pull), ledger=Path(a.ledger), fields_path=Path(a.fields), stack_path=Path(a.stack),
                      catalog=Path(a.catalog), registry=Path(a.registry), rows_path=Path(a.rows) if a.rows else None,
                      units_path=Path(a.units) if a.units else None, workers=a.workers or 1,
-                     work=Path(a.work) if a.work else None)
+                     work=Path(a.work) if a.work else None,
+                     sglang_fields_path=Path(a.sglang_fields) if a.sglang_fields else None,
+                     sglang_declarations=Path(a.sglang_declarations) if a.sglang_declarations else None)
     except (cv.CoverageError, ldg.LedgerError, fl.FieldsError, sk.StackError, bc.CommandError, OSError, KeyError,
             ValueError) as e:
         _log(f"FATAL: {e}")
@@ -789,6 +774,8 @@ def main(argv=None) -> int:
                    help="a catalog checkout, read as `blis catalog resolve` answers it (TEMPORARY, support.CheckoutCatalog); "
                         "it must hold the replay workload of each AgentX corpus alias")
     c.add_argument("--registry", required=True)
+    c.add_argument("--sglang-fields", help="blis-sglang's fields.json (see score --sglang-fields): SGLang units are then graded")
+    c.add_argument("--sglang-declarations", help="see score --sglang-declarations")
     c.add_argument("--rows", help="a JSON list of the API rows (every framework); those in the pull's window are placed")
     c.add_argument("--units", help="a PublishedUnits list or a file of unit ids (the anchor list): adds the `anchor` section")
     c.add_argument("--work")
