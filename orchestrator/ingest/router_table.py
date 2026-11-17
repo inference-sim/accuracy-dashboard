@@ -34,7 +34,8 @@ WIDE_RATIO = 1.25
 HEX40 = re.compile(r"^[0-9a-f]{40}$")
 
 # The workloads a bound can name (routertable.WorkloadKinds), by (prompt tokens, output tokens).
-WORKLOADS = {(1024, 1024): "balanced", (8192, 16): "prefill-bound", (256, 2048): "decode-bound"}
+WORKLOADS = {(1024, 1024): "balanced", (8192, 16): "prefill-bound", (256, 2048): "decode-bound",
+             (8192, 1024): "long-prompt"}
 
 
 def router_key(name: str | None) -> str | None:

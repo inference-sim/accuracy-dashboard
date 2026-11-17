@@ -1457,6 +1457,15 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
     catalog_size = cat.packaging(sup.chip)["gpus_per_node"]
     node = ir.resolve(env.runner_table, row["hardware"], run_date=ident["measured_date"],
                       launch_size=recipe.gpus_per_node, fixes_packaging=catalog_size is not None)
+    for role, c in decided.items():
+        if "engine.max_model_len" not in c.mapped and cat is not None:
+            # The recipe states no --max-model-len, so vLLM served the checkpoint's own window; the engine needs it stated.
+            win = pdm.model_window(cat.root, sup.model)
+            if win is not None:
+                c.mapped["engine.max_model_len"] = ("max_model_len", win)
+                o.subs.append({"kind": "estimated", "subject": f"engine.{role}.max_model_len",
+                               "detail": f"not stated by the recipe; vLLM resolves it to the checkpoint's max_position_embeddings, "
+                                         f"{win} (the catalog model {sup.model}'s config.json)"})
     builts = {role: st.build(decided[role], name=name, model=sup.model, part=part, engine_version=env.engine_release,
                              field_list=env.field_list, catalog_node_size=catalog_size, node=node,
                              draft_model=sup.drafter, launch_config=launches[role]) for role in pools}
