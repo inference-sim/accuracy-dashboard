@@ -419,7 +419,12 @@ def validate_dir(directory: str | Path) -> list[str]:
         # Failed points carry no grade, but were scored by the same simulator (COV-6).
         sims = [{"point_id": f.get("point_id"), "simulator": f.get("simulator"), "grade": gr.G5,
                  "g5_reason": {"code": gr.G5_CODES[0]}} for _, f in failed_lines]
-        problems += [f"grade: {p}" for p in gr.check(points + sims, engine)]
+        # A run that scores more than one engine lists them all in provenance `engines`; each point is held to its own.
+        listed = (prov or {}).get("engines")
+        by_kind = {e.get("kind"): e.get("version") for e in listed} if isinstance(listed, list) else None
+        if by_kind is not None and by_kind.get(((prov or {}).get("engine") or {}).get("kind")) != engine:
+            problems.append(f"{PROVENANCE_JSON}: engines does not list the engine {engine!r} the run is named by")
+        problems += [f"grade: {p}" for p in gr.check(points + sims, by_kind if by_kind else engine)]
         sim_build = ((prov or {}).get("simulator") or {}).get("build")
         if any((p.get("simulator") or {}).get("build") != sim_build for p in points + sims):
             problems.append(f"{PROVENANCE_JSON}: simulator.build {sim_build!r} is not the build every point names (COV-6)")

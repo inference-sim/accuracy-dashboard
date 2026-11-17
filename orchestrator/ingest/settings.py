@@ -267,14 +267,18 @@ def _one(values: list):
     return values[0], len(values), None
 
 
-def merge(readings: dict[str, Reading], vllm_defaults: dict) -> dict[str, Setting]:
+def merge(readings: dict[str, Reading], vllm_defaults: dict, requested=None) -> dict[str, Setting]:
     """One Setting per path: the first source in SOURCES order that states a value.
 
     A source that states a path as None ("let the engine decide") doesn't hide a later
     source's value for it: the first non-None value wins. Repeats within one source that
     disagree, and the two passed sources (launch_config, args) disagreeing, are conflicts
     (design §11.2, value_conflict). A resolved value that differs from a passed one is the
-    engine's resolution, never a conflict."""
+    engine's resolution, never a conflict.
+
+    `requested(path, readings, defaults)` decides whether the run set a path (_requested, vLLM's rule, when
+    omitted); another engine passes its own (sglang_settings.requested)."""
+    requested = requested or _requested
     paths = set()
     for r in readings.values():
         paths |= set(r.values)
@@ -285,7 +289,7 @@ def merge(readings: dict[str, Reading], vllm_defaults: dict) -> dict[str, Settin
         s, vals = (stated or found)[0]
         value, occ, conflict = _one([x for x in vals if x is not None] or vals)
         st = Setting(path=path, value=value, source=s, occurrences=occ, conflict=conflict,
-                     requested=_requested(path, readings, vllm_defaults))
+                     requested=requested(path, readings, vllm_defaults))
         if conflict is None and s in PASSED:
             for s2, vals2 in stated[1:]:
                 if s2 not in PASSED:
@@ -626,6 +630,17 @@ def _flag(v) -> bool:
     raise ValueError(f"{v!r} is not a boolean")
 
 
+@dataclass(frozen=True)
+class Names:
+    """What decide() takes from an engine's naming: the roles its settings play, the readings it derives,
+    the pool role a field states, the front-end variable, and where a recorded field goes in the scenario."""
+    roles: dict
+    pool_role: dict
+    derived: tuple
+    frontend_env: str | None
+    location: object
+
+
 @dataclass
 class Decided:
     """One point's recorded settings, decided by the engine's field list."""
@@ -637,6 +652,9 @@ class Decided:
     roles: dict = field(default_factory=dict)          # role -> value (model, served_model)
 
 
+VLLM_NAMES = Names(ROLES, POOL_ROLE, DERIVED, "env.VLLM_USE_RUST_FRONTEND", location)
+
+
 def _stated_by_resolution(field_list, path: str) -> bool:
     """Whether a value the engine only resolved may still be written to the scenario: the engine
     models the field, or proves it has no effect. Any other field (not modelled, inert but
@@ -646,7 +664,8 @@ def _stated_by_resolution(field_list, path: str) -> bool:
     return f is not None and f.status in (fl.MODELLED, fl.PROVEN_INERT)
 
 
-def decide(settings: dict[str, Setting], field_list, part: str | None = None, facts_of=None) -> Decided:
+def decide(settings: dict[str, Setting], field_list, part: str | None = None, facts_of=None,
+           names: "Names | None" = None) -> Decided:
     """Decide every recorded setting by the engine's fields.json (design §11.2, State and Decide).
 
     A setting two same-stage sources disagree on is a conflict (value_conflict). Every recorded
@@ -658,6 +677,8 @@ def decide(settings: dict[str, Setting], field_list, part: str | None = None, fa
     set that the field list calls modelled, but the scenario has no place for, is a setting the
     written scenario lost (setting_differs): the harness cannot state what the run did."""
     import fields as fl
+    nm = names or VLLM_NAMES
+    ROLES, POOL_ROLE, DERIVED, FRONTEND_ENV, location = nm.roles, nm.pool_role, nm.derived, nm.frontend_env, nm.location
     d = Decided(settings=settings)
     for path, st in sorted(settings.items()):
         if path in DERIVED:
@@ -916,7 +937,7 @@ def recorded_node_size(launch: dict | None) -> int | None:
 
 def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str, field_list,
           catalog_node_size: int | None, node: ir.NodeSize, draft_model: str | None = None,
-          launch_config: dict | None = None) -> Built:
+          launch_config: dict | None = None, engine_kind: str = "vllm") -> Built:
     """The Scenario + Deployment for one point, from the decided settings.
 
     Only what the run recorded is written, under the engine's own names (LOCATIONS), and the
@@ -932,7 +953,12 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
     chip the scenario states `node.gpus_per_node`, decided by inferencex_runners.resolve: the
     launch configuration's, else InferenceX's runner table. If it is unknown the point is G5
     value_not_recorded, or value_conflict where the two sources differ, and no size is invented.
-    A later record the table supplied is named as a G2 substitution."""
+    A later record the table supplied is named as a G2 substitution.
+
+    engine_kind is the engine the run executed. A vLLM scenario names its release by engine_version, as
+    before; any other engine's names it by engine: {kind, version}, the form the scenario takes for an
+    engine other than the first. The ranks of an SGLang run are tp x pp (x dp when attention is not
+    data-parallel): with enable_dp_attention the data-parallel groups divide the tensor-parallel ranks."""
     import fields as fl
     b = Built()
     acc = d.mapped.get("replay.acceptance_length")
@@ -981,6 +1007,8 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
     if offload:
         b.reasons += _write_offload(dep, offload, d, par)
     ranks = par["tp"] * par["pp"] * par["dp"] * par.get("pcp", 1)
+    if engine_kind == "sglang" and eng.get("enable_dp_attention") is True:
+        ranks = par["tp"] * par["pp"]
     b.gpus = ranks
     cluster = {"hardware": part.name}
     per_node = catalog_node_size
@@ -1004,9 +1032,14 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
         if fabric is not None:
             cluster["fabric"] = fabric
             coefficients.append(FABRIC_COEFFICIENT)
-    b.scenario = {"kind": "Scenario", "name": name, "engine_version": engine_version.lstrip("v"),
-                  "model": model, "coefficients": coefficients, "cluster": cluster}
-    if names_are_vllms(field_list):
+    if engine_kind == "vllm":
+        b.scenario = {"kind": "Scenario", "name": name, "engine_version": engine_version.lstrip("v"),
+                      "model": model, "coefficients": coefficients, "cluster": cluster}
+    else:
+        b.scenario = {"kind": "Scenario", "name": name,
+                      "engine": {"kind": engine_kind, "version": engine_version.lstrip("v")},
+                      "model": model, "coefficients": coefficients, "cluster": cluster}
+    if engine_kind == "vllm" and names_are_vllms(field_list):
         pool["engine"] = to_vllm_block(pool["engine"])
         b.vllm_names = True
     b.deployment = dep

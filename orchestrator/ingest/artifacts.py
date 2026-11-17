@@ -45,7 +45,8 @@ RESULT_PREFIXES = ("bmk_agentic_", "bmk_")
 SERVER_LOGS_PREFIX = "server_logs_"
 AGENTIC_PREFIX = "agentic_"
 
-_SERVER_LOG_MARKERS = (b"non-default args:", b"Initializing a V1 LLM engine")
+# vLLM prints the first two; SGLang prints its whole ServerArgs once, as `server_args=ServerArgs(`.
+_SERVER_LOG_MARKERS = (b"non-default args:", b"Initializing a V1 LLM engine", b"server_args=ServerArgs(")
 _MAX_MEMBER = 2 * 1024 ** 3
 
 
@@ -234,7 +235,7 @@ def is_server_log(data: bytes) -> bool:
 
 
 def find_server_logs(files: list[tuple[str, bytes]]) -> list[tuple[str, bytes]]:
-    """Every vLLM engine log among the files. One per engine process host (a multi-node or
+    """Every vLLM or SGLang engine log among the files. One per engine process host (a multi-node or
     multi-worker run has several); the caller requires them to agree."""
     return [(p, d) for p, d in files if is_server_log(d)]
 
