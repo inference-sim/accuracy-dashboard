@@ -351,7 +351,8 @@ def test_a_bound_holds_a_point_only_in_its_regime(tmp_path):
     for change in bad:
         assert rt.matched_ratios(e, **{**ok, **change}) == [], change
     assert rt.workload_kind(1024, 1024) == "balanced" and rt.workload_kind(8192, 16) == "prefill-bound"
-    assert rt.workload_kind(256, 2048) == "decode-bound" and rt.workload_kind(8192, 1024) is None
+    assert rt.workload_kind(256, 2048) == "decode-bound" and rt.workload_kind(8192, 1024) == "long-prompt"
+    assert rt.workload_kind(4096, 1024) is None and rt.workload_kind(8192, 512) is None
 
 
 def test_the_old_range_form_of_a_regime_covers_no_point(tmp_path):
