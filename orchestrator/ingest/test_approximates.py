@@ -102,4 +102,4 @@ def test_a_stated_trtllm_attention_is_priced_as_auto_and_the_key_is_left_unset()
     r.add("attention_config.use_trtllm_attention", True)
     c = st.decide(st.merge({"launch_config": r}, {}), flist, "b200", sif.facts_of(8, "10.0"))
     assert c.reasons == [] and [x["kind"] for x in c.substitutions] == ["execution_mode"]
-    assert c.mapped["engine.use_trtllm_attention"][1] is None
+    assert "engine.use_trtllm_attention" not in c.mapped

@@ -665,6 +665,48 @@ def _stated_by_resolution(field_list, path: str) -> bool:
     return f is not None and f.status in (fl.MODELLED, fl.PROVEN_INERT)
 
 
+# A setting the simulated release removed, written as the setting that replaced it: the run ran an earlier vLLM, and the
+# name it used is not a field of the release BLIS models. Each entry is (successor field, successor value, the release
+# fact it rests on). The point names it a resolved_differs substitution; the successor is then decided like any other.
+def _is_true(v) -> bool:
+    try:
+        return _flag(v) is True
+    except ValueError:
+        return False
+
+
+RELEASE_TRANSLATIONS = {
+    "attention_config.use_trtllm_ragged_deepseek_prefill": (
+        "attention_config.mla_prefill_backend", "TRTLLM_RAGGED", lambda v: _is_true(v),
+        "vLLM #42555 (9898f94abe00, 2026-05-14) removed the flag; before it AttentionConfig.__post_init__ migrated a stated "
+        "true to mla_prefill_backend TRTLLM_RAGGED when that was unset (vllm/config/attention.py at 9898f94abe00^)"),
+    "env.VLLM_USE_FLASHINFER_MOE_FP4": (
+        "moe_backend", "flashinfer_trtllm", lambda v: _is_true(v),
+        "vLLM #44992 (03878d1c2, deprecations for v0.23 and v0.24) removed the variable; before it a true value on a NVFP4 MoE chose "
+        "get_flashinfer_moe_backend(), which maps VLLM_FLASHINFER_MOE_BACKEND latency, the default, to the TRT-LLM kernels on "
+        "SM100 (fused_moe/oracle/nvfp4.py:90-102 and quantization/utils/flashinfer_utils.py:233-252 at 42135d689^); "
+        "VLLM_FLASHINFER_MOE_BACKEND is not stated by these recipes"),
+}
+
+
+def translate_removed(settings: dict, field_list) -> tuple:
+    """The settings with each removed name replaced by its successor, and the substitutions that say so. A name is translated
+    only when the release's field list lacks it and the successor is not already stated."""
+    out, subs = dict(settings), []
+    for path, (new, value, applies, why) in RELEASE_TRANSLATIONS.items():
+        st = settings.get(path)
+        if st is None or field_list.lookup(path) is not None or st.conflict is not None:
+            continue
+        if not applies(st.value) or new in settings:
+            continue
+        del out[path]
+        out[new] = Setting(path=new, value=value, source=st.source, requested=True)
+        subs.append({"kind": "resolved_differs", "subject": path,
+                     "detail": f"the run's vLLM release has {path}={st.value!r}; the modelled release removed it and states "
+                               f"{new}={value} for it: {why}"})
+    return out, subs
+
+
 def decide(settings: dict[str, Setting], field_list, part: str | None = None, facts_of=None,
            names: "Names | None" = None) -> Decided:
     """Decide every recorded setting by the engine's fields.json (design §11.2, State and Decide).
@@ -680,7 +722,9 @@ def decide(settings: dict[str, Setting], field_list, part: str | None = None, fa
     import fields as fl
     nm = names or VLLM_NAMES
     ROLES, POOL_ROLE, DERIVED, FRONTEND_ENV, location = nm.roles, nm.pool_role, nm.derived, nm.frontend_env, nm.location
+    settings, translated = translate_removed(settings, field_list)
     d = Decided(settings=settings)
+    d.substitutions.extend(translated)
     for path, st in sorted(settings.items()):
         if path in DERIVED:
             continue
@@ -719,6 +763,8 @@ def decide(settings: dict[str, Setting], field_list, part: str | None = None, fa
                                         "detail": f"priced as {mode}: {appr['differs']} ({appr['evidence']})"})
                 d.args.append({**rec, "blis": None, "match": "approximated", "note": d.substitutions[-1]["detail"]})
                 for f2, v2 in sorted(appr["mode"].items()):
+                    if v2 is None:
+                        continue    # the mode is the field left unset, as the engine's own choice
                     sub = location(f2)
                     if sub is None:
                         d.reasons.append(f"setting_differs:{f2}")

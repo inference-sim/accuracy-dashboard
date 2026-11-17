@@ -93,7 +93,7 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
                "orchestrator/ingest/test_recipe_checkpoints.py", "orchestrator/ingest/test_locations.py",
                "orchestrator/ingest/test_value_refusal.py", "orchestrator/ingest/test_g1.py",
                "orchestrator/ingest/test_pd.py", "orchestrator/ingest/test_thinking_rule.py",
-               "orchestrator/ingest/test_sglang_scoring.py", "orchestrator/ingest/test_approximates.py",
+               "orchestrator/ingest/test_sglang_scoring.py", "orchestrator/ingest/test_approximates.py", "orchestrator/ingest/test_release_translation.py",
                "orchestrator/baseline/test_compare.py", "orchestrator/baseline/test_split.py",
                "orchestrator/baseline/test_residuals.py", "orchestrator/baseline/test_docs.py",
                "orchestrator/baseline/test_contracts_current.py", "orchestrator/baseline/test_contract_currency.py",
