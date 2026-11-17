@@ -71,3 +71,32 @@ def test_a_kernel_refusal_is_g5_engine_unsupported_naming_the_kernels_code_not_a
 def test_a_refusal_that_merely_mentions_a_kernel_code_inside_a_word_is_not_a_kernel_refusal(tmp_path):
     err = 'level=fatal msg="scenario \\"p-1.yaml\\" states no max_model_len: see my_draft_passes_unstated: x"'
     assert sc.value_refusal(err, tmp_path, None) == "required_setting_missing:max_model_len"
+
+
+# The refusal of inference-sim v0.18.0 for a Kimi K2.5 point (accuracy-dashboard#126): the run's recorded vLLM default was
+# stated for a model that has no indexer cache. The simulator's message, as blis wrote it, with the path removed.
+NOT_READ = ('time="2026-11-17T18:21:21-05:00" level=fatal msg="scenario \\"p-d6687daeb9104dec.yaml\\": '
+            'indexer_kv_dtype=\\"bf16\\" is read only for MiniMax-M3\'s indexer cache, and this model has none, so a '
+            'stated value would be dropped (https://github.com/inference-sim/blis-substrate/issues/1)"')
+
+
+def test_a_value_stated_for_a_part_the_model_lacks_is_a_named_g5_not_the_slug_scenario(tmp_path):
+    # Cut to 80 characters after the scenario's name, this message was the bare slug "scenario", and a failure that is
+    # not a runner limit stops the whole night (COV-8). It names the field now (COV-1: a bad row is a G5, never an abort).
+    assert sc._blis_refusal(NOT_READ, tmp_path) == "blis_refused:scenario"       # what it used to be
+    assert sc.value_refusal(NOT_READ, tmp_path, None) == "field_not_modelled:indexer_kv_dtype"
+
+
+def test_the_field_is_named_by_its_path_in_the_field_list(tmp_path):
+    import fields as fl
+    import json
+    fls = fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.33.0"}, "fields": [
+        {"name": "attention_config.indexer_kv_dtype", "source": "config", "status": "modelled",
+         "evidence": {"traces": ["t"]}, "estimation": {"rule": "none"}}]}))
+    assert sc.value_refusal(NOT_READ, tmp_path, fls) == "field_not_modelled:attention_config.indexer_kv_dtype"
+
+
+def test_a_refusal_that_is_not_about_an_unread_part_is_not_taken_for_one(tmp_path):
+    other = ('level=fatal msg="scenario \\"p-1.yaml\\": cache_dtype=\\"fp4\\" is read only for the draft, in a graph that '
+             'is shared"')
+    assert sc.value_refusal(other, tmp_path, None) is None
