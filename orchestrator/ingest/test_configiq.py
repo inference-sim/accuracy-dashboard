@@ -177,3 +177,22 @@ def test_a_downloaded_file_that_differs_from_its_pin_is_refused(tmp_path):
     (tmp_path / "d" / "manifest.json").write_text("{ }")
     with pytest.raises(cq.ConfigiqError, match="manifest.json"):
         cq.check_files(lg, tmp_path / "d")
+
+
+def test_the_export_is_read_against_the_pins(tmp_path):
+    d = tmp_path / "d"
+    (d / "pairs" / "x").mkdir(parents=True)
+    pq = "pairs/x/ground_truth.parquet"
+    (d / pq).write_bytes(b"parquet")
+    lg = cq.Ledger(assets={pq: hashlib.sha256(b"parquet").hexdigest()})
+    exp = tmp_path / "rows.jsonl"
+    exp.write_text("".join(json.dumps({"file": pq, "row": i, "columns": row(concurrency=float(i + 1))}) + "\n"
+                           for i in range(2)))
+    rows = cq.read_export(exp, d, lg)
+    assert sorted(rows) == [f"{pq}:0", f"{pq}:1"] and rows[f"{pq}:1"]["concurrency"] == 2.0
+    exp.write_text(json.dumps({"file": pq, "row": 1, "columns": row()}) + "\n")
+    with pytest.raises(cq.ConfigiqError, match="out of order"):
+        cq.read_export(exp, d, lg)
+    exp.write_text(json.dumps({"file": "pairs/y/ground_truth.parquet", "row": 0, "columns": row()}) + "\n")
+    with pytest.raises(cq.ConfigiqError, match="not a Parquet file the ledger pins"):
+        cq.read_export(exp, d, lg)

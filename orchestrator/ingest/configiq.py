@@ -285,6 +285,27 @@ def read_rows(data_dir: Path, lg: Ledger) -> dict:
     return rows
 
 
+def read_export(export_path: Path, data_dir: Path, lg: Ledger) -> dict:
+    """Every row of the pinned revision, by "path:row", from the JSON lines blis-substrate's ledger/configiq/export.py
+    prints from the downloaded files ({"file", "row", "columns"}). The files are checked against their pins first,
+    and every pinned Parquet file must be in the export, rows numbered from 0. Needs no Parquet reader."""
+    check_files(lg, data_dir)
+    rows, count = {}, {}
+    for n, line in enumerate(Path(export_path).read_text(encoding="utf-8").splitlines(), 1):
+        obj = _strict(json.loads(line), {"file", "row", "columns"}, f"{export_path}:{n}")
+        f, i = obj["file"], obj["row"]
+        if f not in lg.assets or not f.endswith(".parquet"):
+            raise ConfigiqError(f"{export_path}:{n}: {f} is not a Parquet file the ledger pins")
+        if i != count.get(f, 0):
+            raise ConfigiqError(f"{export_path}:{n}: {f} row {i} is out of order")
+        count[f] = i + 1
+        rows[f"{f}:{i}"] = obj["columns"]
+    missing = sorted(a for a in lg.assets if a.endswith(".parquet") and a not in count)
+    if missing:
+        raise ConfigiqError(f"{export_path}: no rows for pinned file {missing[0]}")
+    return rows
+
+
 def _num(v):
     if v is None:
         return None
