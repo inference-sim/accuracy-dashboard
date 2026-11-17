@@ -74,6 +74,52 @@ NO_COMMAND, AMBIGUOUS_COMMAND, SHELL_EXPANSION = "no_launch_command", "several_l
 _EXPANSION = re.compile(r"\$\(|`|\$\{[^}]*:[-+=?]")
 
 
+LEFT_TO_THE_LOG = "$LEFT_TO_THE_LOG"
+_FLAG_BEFORE_VALUE = re.compile(r"--[A-Za-z0-9][A-Za-z0-9-]*(?:=|\s+)$")
+
+
+def _hide_computed_values(cmd: str) -> str:
+    """The command with each `$(...)` or `$((...))` that is a flag's whole value replaced by a variable the reader
+    leaves to the log. The flag is still named, and the printout of the resolved arguments holds its value; an
+    expansion anywhere else (it may decide whether a flag is set at all) is left, and the command is refused."""
+    out, i = [], 0
+    while i < len(cmd):
+        j = cmd.find("$(", i)
+        if j < 0:
+            break
+        depth, k = 0, j + 1
+        while k < len(cmd):
+            depth += {"(": 1, ")": -1}.get(cmd[k], 0)
+            k += 1
+            if depth == 0:
+                break
+        if depth != 0 or not _FLAG_BEFORE_VALUE.search(cmd[:j]) or (k < len(cmd) and not cmd[k].isspace()):
+            break
+        out.append(cmd[i:j] + LEFT_TO_THE_LOG)
+        i = k
+    return "".join(out) + cmd[i:]
+
+
+def _merge_branches(cmds: list[str]) -> str | None:
+    """One command for the several a script launches by branch, when they differ only in the values of the flags they
+    all name: each differing value becomes a variable left to the log. Commands that name different flags, or are
+    laid out differently, are not merged (None): which flags the run set is then unknown."""
+    split = [shlex.split(c, comments=True) for c in cmds]
+    if len({len(t) for t in split}) != 1:
+        return None
+    merged = []
+    for col in zip(*split):
+        if len(set(col)) == 1:
+            merged.append(col[0])
+            continue
+        heads = {t.partition("=")[0] for t in col}
+        if any(t.startswith("--") and "=" not in t for t in col) or len(heads) != 1 and any("=" in t for t in col):
+            return None
+        merged.append(f"{heads.pop()}={LEFT_TO_THE_LOG}" if all("=" in t for t in col) and next(iter(heads)).startswith("--")
+                      else LEFT_TO_THE_LOG)
+    return " ".join(shlex.quote(t) if t != LEFT_TO_THE_LOG and not t.startswith("--") else t for t in merged)
+
+
 def launch_command_of(text: str) -> tuple[str | None, str | None]:
     """(the launch command with the environment it ran with, None) from a CI job log or a script, or (None, why).
 
@@ -95,11 +141,14 @@ def launch_command_of(text: str) -> tuple[str | None, str | None]:
                 cmd = cmd[:-1].rstrip() + " " + lines[i].strip()
             cmds.append(cmd)
         i += 1
-    distinct = sorted(set(cmds))
+    distinct = sorted({_hide_computed_values(c) for c in cmds})
     if not distinct:
         return None, NO_COMMAND
     if len(distinct) > 1:
-        return None, AMBIGUOUS_COMMAND
+        merged = None if any(_EXPANSION.search(c) for c in distinct) else _merge_branches(distinct)
+        if merged is None:
+            return None, AMBIGUOUS_COMMAND
+        distinct = [merged]
     if _EXPANSION.search(distinct[0]):
         return None, SHELL_EXPANSION
     return "\n".join(env + distinct), None

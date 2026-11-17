@@ -222,7 +222,7 @@ def test_a_vllm_point_is_unchanged_when_sglang_is_scored_too():
 def test_a_launch_script_that_launches_by_branch_or_by_expansion_is_refused_by_name():
     one = "python3 -m sglang.launch_server --tp-size 8\n"
     assert ss.launch_command_of(one) == (one.strip(), None)
-    assert ss.launch_command_of(one + "if x; then\n  python3 -m sglang.launch_server --tp-size 4\nfi\n") == (None, ss.AMBIGUOUS_COMMAND)
+    assert ss.launch_command_of(one + "if x; then\n  python3 -m sglang.launch_server --tp-size 4 --enable-dp-attention\nfi\n") == (None, ss.AMBIGUOUS_COMMAND)
     assert ss.launch_command_of('python3 -m sglang.launch_server ${EP:+--ep-size $EP}\n') == (None, ss.SHELL_EXPANSION)
     assert ss.launch_command_of("echo hi\n") == (None, ss.NO_COMMAND)
 
@@ -478,3 +478,43 @@ def test_a_scenario_states_the_checkpoints_context_length_when_the_run_set_none_
         assert not [s for s in o.fidelity["substitutions"] if s["subject"] == "context_length"]
     finally:
         shutil.rmtree(tmp)
+
+
+BRANCHING = """if [[ $ISL -eq 1024 && $OSL -eq 1024 ]]; then
+    python3 -m sglang.launch_server --model-path $MODEL --tensor-parallel-size=$TP \\
+    --max-running-requests 512 --cuda-graph-max-bs 512 --stream-interval 10 $EVAL_CONTEXT_ARGS > $SERVER_LOG 2>&1 &
+else
+    python3 -m sglang.launch_server --model-path $MODEL --tensor-parallel-size=$TP \\
+    --max-running-requests 256 --cuda-graph-max-bs 256 --stream-interval 10 $EVAL_CONTEXT_ARGS > $SERVER_LOG 2>&1 &
+fi
+"""
+EXPANDING = """python3 -m sglang.launch_server --model-path=$MODEL --stream-interval 50 \\
+  --scheduler-recv-interval $( [[ $CONC -gt 4 ]] && echo 30 || echo 10 ) \\
+  --context-length $((ISL + OSL + 20)) > $SERVER_LOG 2>&1 &
+"""
+
+
+def test_a_script_whose_branches_name_the_same_flags_is_read_with_the_branched_values_left_to_the_log():
+    cmd, why = ss.launch_command_of(BRANCHING)
+    assert why is None
+    r = ss.read_launch_command(cmd, ss.load_declarations())
+    assert r.values["max_running_requests"] == [None] and r.values["cuda_graph_max_bs"] == [None]   # the log says which
+    assert r.values["stream_interval"] == [10]                                                       # the same in both
+
+
+def test_a_script_whose_branches_name_different_flags_is_still_refused():
+    other = BRANCHING.replace("--stream-interval 10 $EVAL", "--disable-radix-cache $EVAL", 1)
+    assert ss.launch_command_of(other) == (None, ss.AMBIGUOUS_COMMAND)
+
+
+def test_a_flag_whose_value_the_shell_computes_is_named_with_its_value_left_to_the_log():
+    cmd, why = ss.launch_command_of(EXPANDING)
+    assert why is None
+    r = ss.read_launch_command(cmd, ss.load_declarations())
+    assert r.values["scheduler_recv_interval"] == [None] and r.values["context_length"] == [None]
+    assert r.values["stream_interval"] == [50]
+
+
+def test_an_expansion_that_decides_whether_a_flag_is_set_is_still_refused():
+    assert ss.launch_command_of("python3 -m sglang.launch_server $( [[ $X ]] && echo --ep-size 4 ) --tp-size 2\n") == (None, ss.SHELL_EXPANSION)
+
