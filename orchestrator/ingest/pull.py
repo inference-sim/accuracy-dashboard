@@ -219,6 +219,10 @@ def client_release(entry: dict, frozen: "Frozen", gh, run_id: str, attempt: int,
             raise
         entry["client_commit"] = None
         entry["client_commit_reason"] = f"run_unavailable:HTTP_{e.code}"
+        # A run GitHub no longer holds has no job to read a log of either.
+        entry["client_args"] = None
+        entry["client_args_reason"] = f"run_unavailable:HTTP_{e.code}"
+        return
     index, expired = gh.job_logs_cached(run_id, attempt)
     hit = index.get(art.normal_result_name(result_filename or ""))
     if hit is None:
@@ -228,6 +232,30 @@ def client_release(entry: dict, frozen: "Frozen", gh, run_id: str, attempt: int,
     job_id, job_name, text = hit
     frozen.put("job_log", text.encode(), f"{gh.repo}/actions/jobs/{job_id}")
     entry["client_args"] = {"job_id": job_id, "job_name": job_name}
+
+
+# The G5 reasons of an anchor unit the night's pull holds no usable row of (cli.cmd_nightly): none in the window, or
+# one whose content now differs from the ledger's record (ledger.RowDiffers). Nothing is fetched or simulated for it.
+NOT_IN_WINDOW = "value_not_recorded:not_in_pull_window"
+ROW_DIFFERS = "value_not_recorded:row_differs_from_ledger"
+NOT_PULLED = (NOT_IN_WINDOW, ROW_DIFFERS)
+
+
+def add_unpulled(out: Path, reasons: dict, lg) -> None:
+    """Add to the pull's manifest a G5 entry for each unit in `reasons` (unit id -> reason): its identity is the
+    ledger's, and its row holds the identity's fields only. It is counted (COV-1); nothing is fetched for it."""
+    if not reasons:
+        return
+    m = json.loads((out / "manifest.json").read_text())
+    for u, why in sorted(reasons.items()):
+        ident = dict(lg.units[u].identity)
+        row = {"id": None, "model": ident["model"], "hardware": ident["hardware"], "precision": ident["precision"],
+               "framework": ident["framework"], "benchmark_type": ident["benchmark_type"], "conc": ident["conc"],
+               "date": ident["measured_date"], "metrics": {}}
+        m["points"].append({"point_id": u, "identity": ident, "row": row, "records": [], "measurements": [],
+                            "reasons": [why], "files": {}, "build": None})
+    meta = {k: v for k, v in m.items() if k != "points"}
+    write_manifest(out, meta, sorted(m["points"], key=lambda e: e["point_id"]))
 
 
 def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArtifacts, fetch, out: Path,
@@ -266,7 +294,15 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
         run_id, attempt = run
         # Thread-safe memoized listing: one HTTP call per run even when a pool freezes many of its
         # points concurrently. (run_artifacts kept as an optional no-op for older callers.)
-        arts = gh.list_cached(run_id)
+        try:
+            arts = gh.list_cached(run_id)
+        except urllib.error.HTTPError as e:
+            # GitHub no longer holds the run (deleted, or past its retention): it has no artifacts to read. A fact
+            # about the source's data, not a fault of the pull. Single-turn still scores from the API's /server-log.
+            if e.code not in (404, 410):
+                raise
+            arts = []
+            join_reasons.append(f"artifact_unmatched:run_gone_{e.code}")
         j = art.join({**row, "_attempt": attempt}, arts,
                      lambda a: art.read_result_json(gh.download(a)), agentic=agentic)
         join_reasons += j.reasons

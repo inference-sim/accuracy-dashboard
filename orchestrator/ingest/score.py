@@ -36,6 +36,7 @@ import g1  # noqa: E402
 import grade as gr  # noqa: E402
 import pd as pdm  # noqa: E402
 import pd_recipe as pdr  # noqa: E402
+import pull as pl  # noqa: E402
 import router_table as rt  # noqa: E402
 import inferencex_client as ix  # noqa: E402
 import inferencex_runners as ir  # noqa: E402
@@ -676,6 +677,9 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     work = work.resolve()
     o = Outcome(point_id=pid, identity=ident, row=row, reasons=list(entry["reasons"]),
                 measurements=entry.get("measurements") or [], build=entry.get("build"))
+    if any(r in pl.NOT_PULLED for r in o.reasons):
+        # The night's pull holds no usable row of the unit (pull.add_unpulled): nothing to build a scenario from.
+        return o
     fw = engines.lookup(row["framework"])
     if not engines.scored(fw):
         # Nothing was fetched and BLIS is not asked: G5 for the label's reasons and its router.

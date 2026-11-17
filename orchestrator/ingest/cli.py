@@ -81,8 +81,9 @@ def cmd_pull(a) -> int:
     # records the ledger joins are one point (design §10.2). Rows the ledger holds no unit for
     # are listed with why, in the manifest, and counted in coverage.
     lg = ldg.load(Path(a.ledger))
-    placed = pl.place(p.rows, lg)
-    pl.check_placed(p.rows, placed)
+    # A row whose content differs from the ledger's record is listed with that reason, not placed: the night lists
+    # its unit G5 (cmd_nightly), and the rest of the pull goes on.
+    placed, _ = cv.place_all(p.rows, lg)
     _log(f"pull: {len(placed.points)} points (ledger units) from {len(p.rows)} rows; "
          f"{len(placed.unlisted)} rows hold no unit of {lg.revision}")
     points_in = placed.points
@@ -579,6 +580,8 @@ def cmd_nightly(a) -> int:
         _log(f"FATAL: the catalog is unreadable: {e}")
         return 2
 
+    missing: dict = {}
+
     def pull_fn(work: Path, today_: date, last_ids: set, blis_changed: bool):
         # List the whole window (cheap -- api.pull hits only the REST API, no artifacts); its points
         # are the anchor units, all of which its rows must hold. Then fetch inputs for the points
@@ -586,16 +589,19 @@ def cmd_nightly(a) -> int:
         # the new points. A row the pull itself can't read fails the run (cmd_pull returns
         # non-zero).
         p = api.pull(api.http_fetch, today=today_, window_days=a.window_days)
-        listed = {x.point_id for x in pl.place(p.rows, ldg.load(Path(a.ledger))).points}
-        # Every anchor unit must be in this window's pull, whatever its engine: a unit of a
-        # framework no BLIS engine models is a point too, and engines.py gives it its G5 reason
-        # without an artifact. An anchor unit with no row in the window would be dropped from the
-        # counts without a word, so the night fails (COV-1, COV-2).
-        missing = anchors - listed
-        if missing:
-            raise RuntimeError(f"{len(missing)} of the {len(anchors)} anchor units are neither a point of the "
-                               f"window nor listed with a reason (first: {sorted(missing)[0]}); the run stops "
-                               f"rather than publish counts that omit them (COV-1)")
+        lg = ldg.load(Path(a.ledger))
+        placed, differing = cv.place_all(p.rows, lg)
+        listed = {x.point_id for x in placed.points}
+        # Every anchor unit is counted (COV-1): one the window's pull holds no row of, or whose row now differs from
+        # the ledger's record, is G5 with that reason, and the rest are scored. An anchor the ledger does not hold
+        # stops the night: the anchor list and the ledger are then not one release's.
+        unknown = sorted(u for u in anchors if u not in lg.units)
+        if unknown:
+            raise ldg.LedgerError(f"{len(unknown)} anchor units are not units of the ledger {lg.revision} "
+                                  f"(first: {unknown[0]}); the anchor list and the ledger are not one release's")
+        changed = {lg.by_record[str(r["id"])].unit.unit_id for r in differing if str(r["id"]) in lg.by_record}
+        missing.clear()
+        missing.update({u: pl.ROW_DIFFERS if u in changed else pl.NOT_IN_WINDOW for u in anchors - listed})
         window_ids = set(anchors)
         prior = json.loads(latest_path.read_text()) if latest_path.is_file() else None
         whole = (blis_changed or not last_ids or not mergeable(prior, bsv2.SCHEMA_VERSION)
@@ -603,12 +609,16 @@ def cmd_nightly(a) -> int:
         to_fetch = window_ids if whole else (window_ids - set(last_ids))
         _log(f"nightly: window {len(listed)} units, {len(window_ids)} of them anchor units; "
              f"fetch {'every one' if whole else f'{len(to_fetch)} new'}")
+        _log(f"nightly: {len(missing)} anchor units are G5 without a pull: "
+             f"{sum(v == pl.NOT_IN_WINDOW for v in missing.values())} not in the window, "
+             f"{sum(v == pl.ROW_DIFFERS for v in missing.values())} whose row differs from the ledger")
         rc = cmd_pull(types.SimpleNamespace(out=str(work), today=today_.isoformat(),
                                             window_days=a.window_days, cache=a.cache, prior=None,
-                                            only=sorted(to_fetch), download_workers=a.download_workers,
+                                            only=sorted(to_fetch & listed), download_workers=a.download_workers,
                                             ledger=a.ledger))
         if rc != 0:
             raise RuntimeError(f"pull failed (rc={rc}); the run stops rather than publish a partial pull")
+        pl.add_unpulled(work, {u: r for u, r in missing.items() if u in to_fetch}, lg)
         return json.loads((work / "manifest.json").read_text())["pulled_at"][:10], window_ids
 
     # The catalog and registry are directories of the one substrate checkout, so both are at the

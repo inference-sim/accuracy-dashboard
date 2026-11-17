@@ -296,18 +296,55 @@ def test_an_anchor_unit_of_a_framework_no_engine_models_stays_in_the_window(tmp_
     assert fakes.pulled_only == both
 
 
-def test_a_night_fails_naming_the_count_when_an_anchor_unit_is_not_in_the_window(tmp_path, monkeypatch):
-    # An anchor unit with no row in the window is neither pulled nor listed with a reason, so
-    # the counts would omit it without a word (COV-1). The night stops before any fetch.
+def test_an_anchor_unit_the_window_holds_no_usable_row_of_is_g5_by_name_and_the_night_goes_on(tmp_path, monkeypatch):
+    # COV-1: every anchor unit is graded or G5 with a reason. One the window's pull holds no row of is G5
+    # not_in_pull_window; one whose row now differs from the ledger's record is G5 row_differs_from_ledger. Neither is
+    # fetched, and the rest are scored and published.
+    import pull as pl
+    kept, gone, changed = _row("m", 1, "2026-10-01"), _row("m", 2, "2026-10-01"), _row("m", 4, "2026-10-01")
+    fakes = Fakes([kept, gone, changed])
+    _install(monkeypatch, fakes, [ledger_fake.point_id(kept)])
+    fakes.ledger(tmp_path)
+    fakes.rows = [kept, {**changed, "precision": "fp4"}]          # the window: one row gone, one changed
+    real = fakes.cmd_pull
+
+    def pull(a):
+        fakes.rows = [kept]
+        return real(a)
+    monkeypatch.setattr(cli, "cmd_pull", pull)
+    assert cli.cmd_nightly(_args(tmp_path)) == 0
+    assert fakes.pulled_only == [ledger_fake.point_id(kept)]
+    entries = {e["point_id"]: e["reasons"] for e in json.loads((tmp_path / "work" / "manifest.json").read_text())["points"]}
+    assert entries == {ledger_fake.point_id(kept): [], ledger_fake.point_id(gone): [pl.NOT_IN_WINDOW],
+                       ledger_fake.point_id(changed): [pl.ROW_DIFFERS]}
+
+
+def test_an_anchor_unit_the_ledger_does_not_hold_stops_the_night_before_any_fetch(tmp_path, monkeypatch):
+    # The anchor list names units the ledger lacks: the list and the ledger are not one release's, so the ledger is
+    # unreadable for this night. It stops, naming the count, before any fetch.
     rows = [_row("m", 1, "2026-10-01")]
     fakes = Fakes(rows)
     fakes.anchors = [ledger_fake.point_id(rows[0]), "e" * 64, "f" * 64]
     _install(monkeypatch, fakes, [])
     fakes.ledger(tmp_path)
     monkeypatch.setattr(cli, "cmd_pull", lambda a: (_ for _ in ()).throw(AssertionError("pulled")))
-    with pytest.raises(RuntimeError, match=r"2 of the 3 anchor units are neither a point of the window nor listed"):
+    import ledger as ldg
+    with pytest.raises(ldg.LedgerError, match=r"2 anchor units are not units of the ledger"):
         cli.cmd_nightly(_args(tmp_path))
     assert not (tmp_path / "data" / "latest").exists()
+
+
+def test_an_unpulled_anchor_is_g5_in_the_contract_without_a_simulation(tmp_path):
+    import pull as pl
+    import score as sc
+    entry = {"point_id": "u", "identity": {}, "row": {"framework": "vllm", "benchmark_type": "single_turn"},
+             "reasons": [pl.NOT_IN_WINDOW], "files": {}}
+    o = sc.score_point(entry, tmp_path, tmp_path / "w", sc.Env(
+        blis="x", blis_release="v0.17.1", blis_commit="a" * 40, catalog=tmp_path, catalog_release="c",
+        registry=tmp_path, registry_release="r", kernel="k", corpora={}))
+    import assess as asx
+    assert o.fidelity is None and o.reasons == [pl.NOT_IN_WINDOW]
+    assert asx.g5_of(o.reasons[0]) == {"code": "value_not_recorded", "subject": "not_in_pull_window"}
 
 
 def test_a_night_whose_build_publishes_no_anchor_unit_fails_and_scores_nothing(tmp_path, monkeypatch):
