@@ -194,13 +194,14 @@ def test_without_an_sglang_field_list_the_points_stay_g5_field_unclassified():
         shutil.rmtree(tmp)
 
 
-def test_a_prefill_decode_sglang_point_is_not_scored_yet_and_says_so():
+def test_a_prefill_decode_sglang_point_with_no_recipe_is_refused_for_its_missing_recipe_not_for_being_sglang():
     tmp = Path(tempfile.mkdtemp())
     try:
         entry, env = _setup(tmp)
         entry["row"]["disagg"] = True
         o, _ = _score(tmp, entry, env)
-        assert o.g5 == {"code": "topology_unsupported", "subject": "sglang_disaggregated"}
+        assert not any(r["subject"] == "sglang_disaggregated" for r in o.g5_reasons)
+        assert {"code": "value_not_recorded", "subject": "not_frozen"} in o.g5_reasons, o.g5_reasons      # recipe_unresolved:not_frozen
     finally:
         shutil.rmtree(tmp)
 
