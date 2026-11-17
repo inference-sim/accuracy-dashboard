@@ -71,3 +71,19 @@ def test_an_approximation_beside_a_stand_in_rule_is_refused():
     est["rule"] = "leave_unset"
     with pytest.raises(fl.FieldsError):
         _list(est)
+
+
+EAGER = {"rule": "none", "approximates": {
+    "mode": {"enforce_eager": True}, "evidence": "no graph, per-kernel rates",
+    "differs": "no torch.compile fusion runs", "when": [{"value_in": ["true"]}]}}
+
+
+def test_enforce_eager_true_is_written_to_the_engine_and_names_the_substitution():
+    row = {"name": "enforce_eager", "source": "config", "status": "not_modelled", "evidence": {"issue": "o/r#59"}, "estimation": EAGER}
+    flist = fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.33.0"}, "fields": [row]}))
+    r = st.Reading()
+    r.add("enforce_eager", True)
+    c = st.decide(st.merge({"launch_config": r}, {}), flist, "b200", sif.facts_of(8, "10.0"))
+    assert c.reasons == []
+    assert c.mapped["engine.enforce_eager"][1] is True
+    assert [x["kind"] for x in c.substitutions] == ["execution_mode"]

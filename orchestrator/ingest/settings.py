@@ -530,6 +530,7 @@ LOCATIONS = {
     **{f: f"engine.{f}" for f in _SAME_NAME},
     "kv_cache_dtype": "engine.cache_dtype",
     "compilation_config.cudagraph_mode": "engine.cudagraph_mode",
+    "enforce_eager": "engine.enforce_eager",
     "compilation_config.max_cudagraph_capture_size": "engine.max_cudagraph_capture_size",
     "compilation_config.cudagraph_capture_sizes": "engine.cudagraph_capture_sizes",
     "compilation_config.decoder_replay_cudagraph_capture_sizes": "engine.decoder_replay_cudagraph_capture_sizes",
