@@ -115,6 +115,23 @@ def pseudo_launch(recipe: "pdr.Recipe", role: str, row: dict, pool: Pool) -> dic
     return cfg
 
 
+def model_window(catalog_root, model: str) -> "int | None":
+    """The context window vLLM serves a model at when the run states no --max-model-len: the checkpoint's
+    max_position_embeddings (vllm/config/model.py, get_and_verify_max_len, with no rope scaling to multiply it by),
+    read from the catalog model's config.json. None when the entry carries no config, the config has no such key,
+    or it scales its positions (the derived length then depends on the scaling, which is not read here)."""
+    import json
+    f = Path(catalog_root) / "models" / model / "config.json"
+    if not f.is_file():
+        return None
+    cfg = json.loads(f.read_text())
+    cfg = cfg.get("text_config", cfg) if isinstance(cfg, dict) else {}
+    if cfg.get("rope_scaling") or cfg.get("rope_parameters"):
+        return None
+    n = cfg.get("max_position_embeddings")
+    return n if isinstance(n, int) and not isinstance(n, bool) and n > 0 else None
+
+
 def read_pool(launch: dict) -> "tuple[st.Reading, dict]":
     """The pool's settings reading, without its KV-transfer connector and role, which are the
     deployment's `pd_transfer` and the pool's role and not engine settings: (reading, {path: value})."""
