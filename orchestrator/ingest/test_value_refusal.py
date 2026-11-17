@@ -48,3 +48,26 @@ def test_a_value_the_engine_says_it_does_not_model_is_g5_field_not_modelled_by_t
          "evidence": {"traces": ["t"]}, "estimation": {"rule": "none"}}]}))
     assert sc.value_refusal(NOT_MODELLED, tmp_path, fls) == "field_not_modelled:attention_config.indexer_kv_dtype"
     assert sc.value_refusal(NOT_MODELLED, tmp_path, None) == "field_not_modelled:indexer_kv_dtype"
+
+
+# The kernel's refusals begin with their own code (blis-substrate kernel/draft.go).
+DRAFT_UNSTATED = ('time="2026-11-17T08:00:00-05:00" level=fatal msg="kernelmodel: draft_passes_unstated: the \\"mtp\\" drafter '
+                  'drafts autoregressively and the engine states no DraftPassRequests, so its first pass over the step\'s '
+                  'tokens would be priced by guess; the pool\'s plan must state it (sampling or all)"')
+
+
+def test_a_kernel_refusal_is_g5_engine_unsupported_naming_the_kernels_code_not_a_missing_field(tmp_path):
+    import fields as fl
+    import json
+    fls = fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": []}))
+    # It used to read "states no DraftPassRequests" as a field of the engine's list: field_not_in_release:DraftPassRequests
+    # with a list, required_setting_missing:DraftPassRequests without one.
+    assert sc.value_refusal(DRAFT_UNSTATED, tmp_path, fls) == "engine_unsupported:draft_passes_unstated"
+    assert sc.value_refusal(DRAFT_UNSTATED, tmp_path, None) == "engine_unsupported:draft_passes_unstated"
+    unknown = 'level=fatal msg="kernelmodel: draft_passes_unknown: DraftPassRequests is \\"some\\" for the mtp drafter; it is sampling or all"'
+    assert sc.value_refusal(unknown, tmp_path, None) == "engine_unsupported:draft_passes_unknown"
+
+
+def test_a_refusal_that_merely_mentions_a_kernel_code_inside_a_word_is_not_a_kernel_refusal(tmp_path):
+    err = 'level=fatal msg="scenario \\"p-1.yaml\\" states no max_model_len: see my_draft_passes_unstated: x"'
+    assert sc.value_refusal(err, tmp_path, None) == "required_setting_missing:max_model_len"
