@@ -87,3 +87,19 @@ def test_enforce_eager_true_is_written_to_the_engine_and_names_the_substitution(
     assert c.reasons == []
     assert c.mapped["engine.enforce_eager"][1] is True
     assert [x["kind"] for x in c.substitutions] == ["execution_mode"]
+
+
+TRT = {"rule": "none", "approximates": {
+    "mode": {"attention_config.use_trtllm_attention": None}, "evidence": "pooled attention lanes",
+    "differs": "prefill kernel may differ", "when": [{"value_in": ["true"], "compute_capability": {"gte": "10.0", "lt": "11.0"}}]}}
+
+
+def test_a_stated_trtllm_attention_is_priced_as_auto_and_the_key_is_left_unset():
+    row = {"name": "attention_config.use_trtllm_attention", "source": "config", "status": "not_modelled",
+           "evidence": {"issue": "o/r#80"}, "estimation": TRT}
+    flist = fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.33.0"}, "fields": [row]}))
+    r = st.Reading()
+    r.add("attention_config.use_trtllm_attention", True)
+    c = st.decide(st.merge({"launch_config": r}, {}), flist, "b200", sif.facts_of(8, "10.0"))
+    assert c.reasons == [] and [x["kind"] for x in c.substitutions] == ["execution_mode"]
+    assert c.mapped["engine.use_trtllm_attention"][1] is None
