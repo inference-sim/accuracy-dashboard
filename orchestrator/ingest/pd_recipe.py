@@ -154,6 +154,7 @@ class Recipe:
     benchmark: dict
     dynamo: dict
     fabric: str | None = None       # resources.fabric, the inter-node fabric class, when a recipe states one
+    engine: str | None = None       # a schema 2 recipe's `engine` (sglang); None for the vLLM form
 
 
 def parse(text: str) -> Recipe:
@@ -164,6 +165,8 @@ def parse(text: str) -> Recipe:
     doc = yaml.safe_load(text)
     if not isinstance(doc, dict) or not isinstance(doc.get("resources"), dict):
         raise ValueError("recipe has no resources block")
+    if isinstance(doc.get("roles"), dict):
+        return _parse_roles(doc)
     res, be = doc["resources"], doc.get("backend") or {}
     cfg = be.get("vllm_config") or {}
     pools = {}
@@ -185,6 +188,30 @@ def parse(text: str) -> Recipe:
                   colocation=be.get("allow_prefill_decode_colocation"), frontend=dict(doc.get("frontend") or {}),
                   benchmark=dict(doc.get("benchmark") or {}), dynamo=dict(doc.get("dynamo") or {}),
                   fabric=res.get("fabric") if isinstance(res.get("fabric"), str) and res.get("fabric") else None)
+
+
+def _parse_roles(doc: dict) -> Recipe:
+    """A schema 2 recipe (SGLang's): `roles.<role>` holds `nodes`, `workers`, optionally `gpus` per worker, `args` (the
+    engine's flags) and `env`. A worker's GPUs are `gpus` when stated, else the role's nodes' GPUs over its workers."""
+    res, roles, pools = doc["resources"], doc["roles"], {}
+    per_node = _int(res.get("gpus_per_node"))
+    for role in ("prefill", "decode", "aggregated", "agg"):
+        spec = roles.get(role)
+        if not isinstance(spec, dict):
+            continue
+        workers, nodes, gpus = _int(spec.get("workers")), _int(spec.get("nodes")), _int(spec.get("gpus"))
+        if gpus is None and workers and nodes and per_node and (nodes * per_node) % workers == 0:
+            gpus = nodes * per_node // workers
+        pools["aggregated" if role == "agg" else role] = PoolSpec(
+            role="aggregated" if role == "agg" else role, workers=workers, gpus=gpus, nodes=nodes,
+            flags=dict(spec.get("args") or {}), env={str(k): str(v) for k, v in (spec.get("env") or {}).items()})
+    model = doc.get("model") or {}
+    return Recipe(name=doc.get("name"), image=model.get("container"), model_alias=model.get("path"),
+                  precision=model.get("precision"), gpu_type=res.get("gpu_type"), gpus_per_node=per_node, pools=pools,
+                  connector=None, colocation=None, frontend=dict(doc.get("frontend") or {}),
+                  benchmark=dict(doc.get("benchmark") or {}), dynamo=dict(doc.get("dynamo") or {}),
+                  fabric=res.get("fabric") if isinstance(res.get("fabric"), str) and res.get("fabric") else None,
+                  engine=doc.get("engine"))
 
 
 def concurrencies(r: Recipe) -> list[int]:
