@@ -33,7 +33,8 @@ _CLASS_KEYS = {"type", "covered", "values", "thresholds", "covered_classes"}
 _THRESHOLD_KEYS = {"value", "closed"}
 CLASS_TYPES = ("boolean", "enumerated", "numeric")
 _EVIDENCE_KEYS = {"traces", "proof", "issue", "note"}
-_ESTIMATION_KEYS = {"rule", "setting", "reason", "preserves", "valid_when"}
+_ESTIMATION_KEYS = {"rule", "setting", "reason", "preserves", "valid_when", "approximates"}
+_APPROX_KEYS = {"mode", "evidence", "differs", "when"}
 
 
 
@@ -68,6 +69,29 @@ def _check_valid_when(est: dict, where: str) -> None:
         raise FieldsError(f"{at}.valid_when: must list at least one clause; omit it to apply the rule to every value")
     for i, c in enumerate(vw):
         _check_clause(c, f"{at}.valid_when[{i}]")
+
+
+def _check_approximates(est: dict, where: str) -> None:
+    """The substrate's validation of estimation.approximates (contracts/spec/fields validate.go), ported: only with rule none, a
+    non-empty mode, the evidence, the sentence on what differs, and at least one clause."""
+    a = est.get("approximates")
+    if a is None:
+        return
+    at = f"{where}.estimation.approximates"
+    if est.get("rule") != NONE:
+        raise FieldsError(f"{at}: only with rule 'none': an approximation is for a field with no exact stand-in, got rule {est.get('rule')!r}")
+    if not isinstance(a, dict):
+        raise FieldsError(f"{at}: must be an object")
+    _no_keys_outside(a, _APPROX_KEYS, at)
+    if not isinstance(a.get("mode"), dict) or not a["mode"] or any(not k for k in a["mode"]):
+        raise FieldsError(f"{at}.mode: required: the setting the point is priced with instead")
+    for key in ("evidence", "differs"):
+        if not isinstance(a.get(key), str) or not a[key].strip():
+            raise FieldsError(f"{at}.{key}: required")
+    if not isinstance(a.get("when"), list) or not a["when"]:
+        raise FieldsError(f"{at}.when: must list at least one clause: an approximation covers named values and parts, never every value")
+    for i, c in enumerate(a["when"]):
+        _check_clause(c, f"{at}.when[{i}]")
 
 
 def _no_keys_outside(obj: dict, allowed, at: str) -> None:
@@ -132,6 +156,16 @@ def _compare(cmp: dict, have, parse) -> bool:
         if k not in ok or w is None or not ok[k]((have > w) - (have < w)):
             return False
     return True
+
+
+def approximate(estimation: dict, facts: dict) -> dict | None:
+    """The approximation that covers a recorded value, or None: the substrate's evaluator (contracts/spec/fields Approximate),
+    ported. A covered point is priced with the approximation's mode and carries the substitution kind execution_mode (design
+    11.3, "an execution mode is substituted"); it is never exact. The clauses are read as valid_when's."""
+    a = estimation.get("approximates")
+    if not a:
+        return None
+    return a if exact({"rule": LEAVE_UNSET, "valid_when": a["when"]}, facts) else None
 
 
 def exact(estimation: dict, facts: dict) -> bool:
@@ -312,6 +346,7 @@ def parse(data: bytes | str) -> FieldList:
         else:
             raise FieldsError(f"{where}.estimation.rule: must be one of leave_unset, substitute, none, got {rule!r}")
         _check_valid_when(est, where)
+        _check_approximates(est, where)
         key = (name, source)
         if prev is not None and not prev < key:
             raise FieldsError(f"{where}: out of order or repeated: {key} must sort after {prev}")
