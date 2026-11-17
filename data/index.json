@@ -1,9 +1,17 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-09T13:41:47Z",
+  "generated_at": "2026-11-17T22:31:47Z",
   "keep_api": 5,
-  "latest": "2026-10-31_blis-v0.15.0_ix-api-2026-10-31",
+  "latest": "2026-11-17_blis-v0.17.1_ix-api-2026-11-17",
   "runs": [
+    {
+      "snapshot_id": "2026-11-17_blis-v0.17.1_ix-api-2026-11-17",
+      "generated_at": "2026-11-17T22:25:49Z",
+      "blis_release": "v0.17.1",
+      "ix_release": "api-2026-11-17",
+      "ingest": "api",
+      "path": "snapshots/2026-11-17_blis-v0.17.1_ix-api-2026-11-17/summary.json"
+    },
     {
       "snapshot_id": "2026-10-31_blis-v0.15.0_ix-api-2026-10-31",
       "generated_at": "2026-10-31T11:00:52Z",
@@ -35,14 +43,6 @@
       "ix_release": "api-2026-10-23",
       "ingest": "api",
       "path": "snapshots/2026-10-23_blis-v0.12.0_ix-api-2026-10-23/summary.json"
-    },
-    {
-      "snapshot_id": "2026-10-23_blis-v0.11.0_ix-api-2026-10-23",
-      "generated_at": "2026-10-23T15:31:41Z",
-      "blis_release": "v0.11.0",
-      "ix_release": "api-2026-10-23",
-      "ingest": "api",
-      "path": "snapshots/2026-10-23_blis-v0.11.0_ix-api-2026-10-23/summary.json"
     },
     {
       "snapshot_id": "2026-10-22_blis-v0.12.0_ix-2026-09-28",
