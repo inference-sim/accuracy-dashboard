@@ -128,10 +128,11 @@ def log_ids(rows: list[dict], lg, anchors: set[str]) -> list[int]:
                   and engines.scored(engines.lookup(r["framework"])))
 
 
-def write_extract(dump_lines, logs, out: Path, supplements: list[dict] = ()) -> dict:
+def write_extract(dump_lines, logs, out: Path, supplements: list[dict] = (), heads: dict | None = None) -> dict:
     """Write the extract. `dump_lines` is export.sql's output, one JSON object per row, kept as its text (the dump's
     numbers as the dump prints them); `logs` yields (row id, log text) in id order; `supplements` are the pinned
-    supplement rows. Each line gets "server_log" (null when there is none), and lines are in row-id order. gzip with
+    supplement rows; `heads` maps a row id to the head commit of its workflow run (workflow_runs.head_sha). Each line
+    gets "server_log" and "run_head_sha" (null when there is none), and lines are in row-id order. gzip with
     no name and no time, so the bytes depend only on the content."""
     lines, seen = [], set()
     for line in dump_lines:
@@ -161,7 +162,9 @@ def write_extract(dump_lines, logs, out: Path, supplements: list[dict] = ()) -> 
                     log, nxt = nxt[1], next(logs, None)
                     n_logs += 1
                 assert text.endswith("}"), rid
-                gz.write((text[:-1] + ',"server_log":' + json.dumps(log, ensure_ascii=False) + "}\n").encode("utf-8"))
+                head = (heads or {}).get(rid)
+                gz.write((text[:-1] + ',"run_head_sha":' + json.dumps(head) + ',"server_log":'
+                          + json.dumps(log, ensure_ascii=False) + "}\n").encode("utf-8"))
     return {"sha256": sha256(out), "bytes": out.stat().st_size, "rows": len(lines), "logs": n_logs}
 
 
@@ -182,6 +185,7 @@ def read(path: Path, keep_log=None) -> tuple[list[dict], dict[str, str]]:
                 continue
             r = json.loads(line)
             log = r.pop("server_log", None)
+            r.pop("run_head_sha", None)
             if log is not None and (keep_log is None or keep_log(str(r["id"]))):
                 logs[str(r["id"])] = log
             rows.append(r)
@@ -199,6 +203,21 @@ def check_units(rows: list[dict], lg, *, exact: bool = True) -> int:
         raise ExtractError(f"the extract places {len(got)} units and the ledger {lg.revision} holds {len(want)}: "
                            f"{len(want - got)} missing, {len(got - want)} not the ledger's")
     return len(got)
+
+
+def run_heads(path: Path) -> dict[str, str]:
+    """The head commit of each workflow run the extract's rows name, by GitHub run id: the commit the run checked
+    out, as the dump records it (workflow_runs.head_sha), so the pull reads it with no REST request."""
+    out = {}
+    with gzip.open(path, "rt", encoding="utf-8") as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            h, run = r.get("run_head_sha"), r.get("github_run_id")
+            if h and run is not None:
+                out[str(run)] = h
+    return out
 
 
 def check(extract: Path, pin: dict, lg, keep_log=None) -> tuple[list[dict], dict[str, str]]:
@@ -261,7 +280,10 @@ def main(argv=None) -> int:
         proc = subprocess.Popen([a.psql, "-d", a.db, "-At", "-v", "ON_ERROR_STOP=1", "-c", sql], stdout=subprocess.PIPE)
         text = io.TextIOWrapper(proc.stdout, encoding="utf-8", newline="")      # csv reads the quoted newlines itself
         csv.field_size_limit(1 << 31)          # a server log is one field, up to tens of MB
-        info = write_extract(dump_lines, ((int(i), t) for i, t in csv.reader(text)), Path(a.out), supp)
+        heads = {int(i): h for i, h in (ln.split("|") for ln in _psql(a.psql, a.db, sql=(
+            "select br.id, wr.head_sha from benchmark_results br join workflow_runs wr on wr.id = br.workflow_run_id "
+            "where wr.head_sha is not null")).splitlines() if ln)}
+        info = write_extract(dump_lines, ((int(i), t) for i, t in csv.reader(text)), Path(a.out), supp, heads)
         if proc.wait() != 0:
             raise ExtractError(f"psql exited {proc.returncode} reading the server logs")
         del rows

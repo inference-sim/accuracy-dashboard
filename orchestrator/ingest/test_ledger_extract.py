@@ -98,9 +98,9 @@ def test_the_restore_reads_the_parts_sources_yaml_pins_and_refuses_one_whose_has
 def test_a_dump_row_keeps_its_text_and_only_the_logs_the_night_wants_are_read(tmp_path):
     # The dump's numbers are kept as the dump prints them (the ledger hashes that text); the log joins by row id.
     line = '{"id" : 7, "metrics" : {"mean_ttft": 0.10000000000000000555}}'
-    lx.write_extract([line], [(7, "the log")], tmp_path / "x.gz")
+    lx.write_extract([line], [(7, "the log")], tmp_path / "x.gz", heads={7: "a" * 40})
     import gzip
-    assert gzip.open(tmp_path / "x.gz", "rt").read() == line[:-1] + ',"server_log":"the log"}\n'
+    assert gzip.open(tmp_path / "x.gz", "rt").read() == line[:-1] + ',"run_head_sha":"' + "a" * 40 + '","server_log":"the log"}\n'
     assert lx.read(tmp_path / "x.gz", keep_log=lambda rid: False)[1] == {}
     assert lx.read(tmp_path / "x.gz", keep_log=lambda rid: rid == "7")[1] == {"7": "the log"}
 

@@ -164,6 +164,72 @@ jobs:
               sys.exit(f"the extract built from {pin['substrate_ref']} has sha256 {got['sha256']} ({got['bytes']} bytes); "
                        f".github/ledger-extract.json pins {pin['sha256']} ({pin['bytes']} bytes)")
           PY
+      # The ledger's frozen pull (freeze_ledger.py): every anchor's GitHub inputs (artifact listings, agentic exports,
+      # launch configs, client job logs, P/D recipes, the build resolver's lookups), frozen once per extract and
+      # replayed every night, so a night asks GitHub almost nothing. It is third-party data: cached only (X12).
+      - name: Restore the frozen pull
+        id: lpc
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/ledger-pull.tar.gz
+          key: ledger-pull-${{ steps.lx.outputs.key }}
+      # On a miss the freeze runs here, on this run's own token at most 900 requests an hour, and continues from the
+      # last run's partial freeze. A run that does not finish it keeps its partial freeze and fails; the next continues.
+      - name: Restore a partial freeze
+        if: ${{ steps.lpc.outputs.cache-hit != 'true' }}
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/ledger-pull
+          key: ledger-pull-partial-${{ steps.lx.outputs.key }}-${{ github.run_id }}
+          restore-keys: |
+            ledger-pull-partial-${{ steps.lx.outputs.key }}-
+      - name: Freeze the ledger's pull (cache miss)
+        if: ${{ steps.lpc.outputs.cache-hit != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ref=$(python3 -c 'import json; print(json.load(open(".github/ledger-extract.json"))["substrate_ref"])')
+          git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/lp-substrate"
+          git -C "$RUNNER_TEMP/lp-substrate" checkout -q "$ref"
+          git clone -q --filter=tree:0 --no-checkout https://github.com/vllm-project/vllm.git "$RUNNER_TEMP/vllm"
+          git clone -q --filter=blob:none --no-checkout https://github.com/SemiAnalysisAI/InferenceX.git "$RUNNER_TEMP/ix"
+          # Leave two hours of this job for the scoring.
+          until=$(( $(date +%s) + 3 * 3600 ))
+          rc=0
+          python3 orchestrator/ingest/freeze_ledger.py freeze --extract "$RUNNER_TEMP/extract/ledger-extract.jsonl.gz" \
+            --ledger "$RUNNER_TEMP/lp-substrate/catalog/ledger" --out "$RUNNER_TEMP/ledger-pull" \
+            --cache "$RUNNER_TEMP/artifacts" --vllm-clone "$RUNNER_TEMP/vllm" --ix-clone "$RUNNER_TEMP/ix" \
+            --per-hour 900 --floor 100 --until "$until" || rc=$?
+          if [ "$rc" = 3 ]; then
+            echo "::error::the ledger's pull is not yet frozen; the next run continues from this run's partial freeze"
+            exit 1
+          fi
+          [ "$rc" = 0 ]
+          python3 orchestrator/ingest/freeze_ledger.py pack --pull "$RUNNER_TEMP/ledger-pull" \
+            --out "$RUNNER_TEMP/ledger-pull.tar.gz" | tee "$RUNNER_TEMP/ledger-pull.json"
+          { echo "### The ledger's frozen pull"; echo '```json'; cat "$RUNNER_TEMP/ledger-pull.json"; echo '```';
+            echo 'Pin it as "pull" in .github/ledger-extract.json.'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Name the frozen pull
+        run: |
+          set -euo pipefail
+          if [ ! -f "$RUNNER_TEMP/ledger-pull.json" ]; then
+            # Restored from the cache: its pin is the committed one, or its sha256 as found.
+            python3 - <<'PY'
+          import json, os, sys
+          sys.path.insert(0, "orchestrator/ingest")
+          import ledger_extract as lx
+          t = os.environ["RUNNER_TEMP"]
+          a = os.path.join(t, "ledger-pull.tar.gz")
+          pin = json.load(open(".github/ledger-extract.json")).get("pull")
+          got = {"sha256": lx.sha256(a), "bytes": os.path.getsize(a)}
+          if pin and (pin["sha256"], pin["bytes"]) != (got["sha256"], got["bytes"]):
+              sys.exit(f"the cached frozen pull is {got['sha256']}; .github/ledger-extract.json pins {pin['sha256']}")
+          json.dump(pin or got, open(os.path.join(t, "ledger-pull.json"), "w"))
+          PY
+          fi
+          cat "$RUNNER_TEMP/ledger-pull.json"
+
       # Score the release resolve_blis.sh named: the oldest unscored one, once (COV-9). Build blis
       # FROM SOURCE at the tag (so a per-release score is sound; #15's seed rule), fetch what it
       # pins, and run one night with it. The scoring is harness/run.sh, run from this checkout
@@ -257,6 +323,7 @@ jobs:
               --corpus-dir "$RUNNER_TEMP/corpora" --fields "$FIELDS" \
               --ledger-extract "$RUNNER_TEMP/extract/ledger-extract.jsonl.gz" \
               --ledger-extract-pin .github/ledger-extract.json \
+              --ledger-pull "$RUNNER_TEMP/ledger-pull.tar.gz" --ledger-pull-pin "$RUNNER_TEMP/ledger-pull.json" \
               --sample "$SAMPLE"
             echo "::endgroup::"
           done

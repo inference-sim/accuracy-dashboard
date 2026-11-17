@@ -339,6 +339,12 @@ class GitHubArtifacts:
                 return out
             page += 1
 
+    def prefill_runs(self, runs: dict) -> None:
+        """Answer run(run_id) from `runs` ({run id: {"sha", "date"}}), as the pinned source records each run's head
+        commit, with no request."""
+        with self._guard:
+            self.__dict__.setdefault("_runs", {}).update({str(k): dict(v) for k, v in runs.items()})
+
     def run(self, run_id: str) -> dict:
         """The run's commit: {"sha", "date"} (head_sha and the head commit's timestamp). Memoized and thread-safe, as
         list_cached is, a run GitHub answers 404 or 410 for included: one request per run, not one per point."""

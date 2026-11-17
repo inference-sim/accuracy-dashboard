@@ -62,6 +62,12 @@ DATA_READS = {
         "prints only the published unit ids",
     ("orchestrator/ingest/ledger_fake.py", "write"):
         "TEMPORARY with ledger.load: writes, for tests, the ledger layout ledger.load reads",
+    ("orchestrator/ingest/ledger_extract.py", "main"):
+        "TEMPORARY with cli.read_anchor_units: the extract's build reads catalog/ledger/published/anchor.yaml, whose "
+        "records' logs it carries, until `blis ledger --list anchor` prints the published list",
+    ("orchestrator/ingest/freeze_ledger.py", "freeze"):
+        "TEMPORARY with cli.read_anchor_units: the freeze reads catalog/ledger/published/anchor.yaml, the units it "
+        "freezes, until `blis ledger --list anchor` prints the published list",
     ("orchestrator/ingest/support.py", "Catalog._claims"):
         "TEMPORARY until a command lists the catalog's models with their source repositories and whether "
         "each is a drafter: `blis catalog resolve` refuses a repository several entries claim, and the run's "

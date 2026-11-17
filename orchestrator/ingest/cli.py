@@ -122,10 +122,29 @@ def cmd_pull(a) -> int:
     # nothing resolved falls back to build.VLLM_REF. Resolved once here, used in both places.
     import os
     vllm_ref = os.environ.get("VLLM_REF") or build.VLLM_REF
-    resolver = build.Resolver(registry=clients.DockerHubRegistry(), github=clients.GitHubREST(token),
+    # With clones of vLLM and InferenceX (the ledger extract's freeze), the build resolver's commit questions and
+    # the recipes' trees and blobs are read from them, and each run's head commit from the pinned source, with no
+    # REST request (gitlocal.py); only the run's artifacts and job logs are asked of GitHub.
+    import gitlocal
+    vllm_clone, ix_clone = getattr(a, "vllm_clone", None), getattr(a, "ix_clone", None)
+    resolver = build.Resolver(registry=clients.DockerHubRegistry(),
+                              github=gitlocal.LocalGit(Path(vllm_clone)) if vllm_clone else clients.GitHubREST(token),
                               ref=vllm_ref)
+    lookup_store = getattr(a, "lookups", None)
+    if lookup_store is not None:
+        import lookups as lkp
+        lkp.wrap(resolver, lookup_store)
     gh = art.GitHubArtifacts(pl.IX_REPO, token, Path(a.cache or out / "_artifacts"))
-    recipes = rcp.GitHubRecipes(clients.GitHubREST(token)._get, pl.IX_REPO)
+    rest_get = clients.GitHubREST(token)._get
+    recipes = rcp.GitHubRecipes(gitlocal.local_get(Path(ix_clone), pl.IX_REPO, rest_get) if ix_clone else rest_get,
+                                pl.IX_REPO)
+    heads = getattr(a, "run_heads", None) or {}
+    if heads:
+        wanted = {str(api.run_of(x.row)[0]) for x in points_in if api.run_of(x.row)}
+        recipes._sha.update({r: h for r, h in heads.items() if r in wanted})
+        if ix_clone:
+            gh.prefill_runs({r: {"sha": h, "date": gitlocal.commit_date(Path(ix_clone), h)}
+                             for r, h in heads.items() if r in wanted})
     points = []
     # Reused points: carry over the manifest entry and copy the frozen files (unless out IS prior).
     for pid, e in sorted(inc.reuse.items()):
@@ -709,12 +728,25 @@ def cmd_nightly(a) -> int:
         to_fetch = window_ids if whole else (window_ids - set(last_ids))
         _log(f"nightly: window {len(listed)} units, {len(window_ids)} of them anchor units; "
              f"fetch {'every one' if whole else f'{len(to_fetch)} new'}")
-        rc = cmd_pull(types.SimpleNamespace(out=str(work), today=today_.isoformat(),
-                                            window_days=a.window_days, cache=a.cache, prior=None,
-                                            only=sorted(to_fetch & listed), download_workers=a.download_workers,
-                                            ledger=a.ledger, rows=rows, source_logs=logs))
-        if rc != 0:
-            raise RuntimeError(f"pull failed (rc={rc}); the run stops rather than publish a partial pull")
+        pin = json.loads(Path(a.ledger_extract_pin).read_text())
+        if getattr(a, "ledger_pull_pin", None):
+            # The pull this run's freeze packed (its sha256 printed for the pin), when the pin names none yet.
+            pin["pull"] = json.loads(Path(a.ledger_pull_pin).read_text())
+        if pin.get("pull"):
+            # The ledger's frozen pull (freeze_ledger.py): every anchor's GitHub inputs, frozen once per ledger version;
+            # the night asks GitHub nothing but the lookups a new engine release adds, and counts them.
+            import os
+            import freeze_ledger as fz
+            asked = fz.replay(Path(a.ledger_pull), pin["pull"], work, to_fetch & listed,
+                              os.environ.get("VLLM_REF") or build.VLLM_REF, os.environ.get("GH_TOKEN") or None)
+            _log(f"nightly: replayed the frozen pull ({pin['pull']['sha256'][:12]}); {asked} GitHub requests")
+        else:
+            rc = cmd_pull(types.SimpleNamespace(out=str(work), today=today_.isoformat(),
+                                                window_days=a.window_days, cache=a.cache, prior=None,
+                                                only=sorted(to_fetch & listed), download_workers=a.download_workers,
+                                                ledger=a.ledger, rows=rows, source_logs=logs))
+            if rc != 0:
+                raise RuntimeError(f"pull failed (rc={rc}); the run stops rather than publish a partial pull")
         add_unsourced(work, [u for u in unsourced if u in to_fetch], lg)
         return json.loads((work / "manifest.json").read_text())["pulled_at"][:10], window_ids
 
@@ -873,6 +905,8 @@ def main(argv=None) -> int:
     n.add_argument("--sample-seed", type=int, default=1)
     n.add_argument("--ledger-extract", required=True,
                    help="the ledger's pinned source as ledger_extract.py builds it (never committed: X12)")
+    n.add_argument("--ledger-pull-pin", help="the pull's own pin, when .github/ledger-extract.json names none yet")
+    n.add_argument("--ledger-pull", help="the ledger's frozen pull archive the pin's \"pull\" names (freeze_ledger.py)")
     n.add_argument("--ledger-extract-pin", required=True,
                    help="the pin naming the extract's sha256, size and ledger revision (.github/ledger-extract.json)")
     n.add_argument("--blis", required=True, help="the blis binary (see score --blis)")
