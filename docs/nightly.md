@@ -39,6 +39,17 @@ The nightly runs the same script when its cache misses, and refuses a result who
 
 **Redistribution (X12).** `sources.yaml` records the InferenceX data's licence as NOASSERTION. The extract is therefore never committed, never a release asset and never published. It lives only in this repository's Actions cache (keyed by its sha256) and in the build's 90-day artifact. A lost entry is rebuilt by running the workflow again.
 
+## The frozen pull
+
+The extract holds the rows and the logs. Everything else a point needs came from GitHub run by run: artifact listings, agentic exports, launch configs, the client job logs, the P/D recipes at the run's commit, and the build resolver's vLLM commit lookups. A night that asked for all of these each time spent the REST budget every agent and workflow shares, and broke when an artifact expired.
+
+`orchestrator/ingest/freeze_ledger.py` freezes these inputs once per extract into a pull of every anchor unit. It uses the harness's own pull, `cli.cmd_pull`, and packs the result into one archive whose bytes depend only on its files. The night replays the archive, filters it to its anchors, and remakes each build record for the engine release it scores. Every build lookup is answered from the lookups recorded at the freeze, so a night asks GitHub nothing except what a new engine release adds. The night logs that count.
+
+- **Fewer requests.** The P/D recipes and the resolver's commit questions are read from blobless clones of InferenceX and vLLM (`gitlocal.py`), and each run's head commit from the extract (`run_head_sha`). Only artifact listings, artifact downloads and the job-log archives use REST: one archive per run, not one request per job.
+- **Resumable and throttled.** A point already frozen is kept, and the freeze reads the REST budget before each batch (`GET /rate_limit` spends none). It never spends more than a set number of requests an hour, and waits for the reset below a floor. In Actions, run-night freezes on a cache miss at 900 an hour on its own token. A run that does not finish keeps its partial freeze, and the next run continues from it.
+- **Decided once.** A unit whose inputs GitHub no longer held at the freeze is G5 with the reason the pull names it, such as `artifact_unmatched:run_gone_404` or `server_log_missing:not_in_source`.
+- **Pinned.** The archive's sha256 and size go beside the extract's, as `pull` in `.github/ledger-extract.json`, and the night checks them before it unpacks. It refuses an entry that is not a file inside the pull. Like the extract, the archive is third-party data: it is kept in the Actions cache only.
+
 ## Rehearsals
 
 `api-nightly.yml` has a `dry_run` input. With it, resolve and run-night run as always, and the publish job runs every validation:
