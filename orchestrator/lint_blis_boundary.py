@@ -62,8 +62,16 @@ DATA_READS = {
         "prints only the published unit ids",
     ("orchestrator/ingest/ledger_fake.py", "write"):
         "TEMPORARY with ledger.load: writes, for tests, the ledger layout ledger.load reads",
-    ("orchestrator/ingest/support.py", "Catalog.check_unambiguous"):
-        "TEMPORARY until a command lists the catalog's models with their source repositories",
+    ("orchestrator/ingest/support.py", "Catalog._claims"):
+        "TEMPORARY until a command lists the catalog's models with their source repositories and whether "
+        "each is a drafter: `blis catalog resolve` refuses a repository several entries claim, and the run's "
+        "own entry is chosen from those fields, then resolved by name",
+    ("orchestrator/ingest/pd.py", "model_window"):
+        "TEMPORARY until a command prints a catalog model's context window: a prefill/decode recipe that states no "
+        "--max-model-len runs at the checkpoint's own window, which the catalog entry's config.json holds",
+    ("orchestrator/ingest/sglang_settings.py", "context_window"):
+        "TEMPORARY until a command prints a catalog model's context window (see pd.model_window): SGLang derives the "
+        "context length of a run that sets none from the checkpoint's config.json, which the catalog entry holds",
     ("orchestrator/ingest/cli.py", "read_anchor_units"):
         "TEMPORARY until the M2 substrate release lets `blis ledger --list anchor` print the published "
         "anchor list, which the M1 simulator does not have (inference-sim/accuracy-dashboard#52)",

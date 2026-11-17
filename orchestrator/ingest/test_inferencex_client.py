@@ -145,26 +145,24 @@ def test_the_primed_trace_caches_request_zeros_prompt_and_nothing_else():
     conc, n, copies = 3, 7, 2
     ins, outs = _lengths(n)
     run = ix.primed_phase(ins, outs, conc, copies)
-    assert (run.pool, run.sessions) == (conc + copies, n + copies)
-    warm, main = run.records[:2 * copies], run.records[2 * copies:]
-    for j in range(copies):
-        copy, holder = warm[2 * j], warm[2 * j + 1]
-        # The copy is request 0's prompt (its prefix group, no further tokens) and output, at t=0.
-        assert copy["session_id"] == holder["session_id"] == f"warmup-{j}"
+    assert (run.pool, run.sessions) == (conc, n + copies)
+    # Two drain-gated phases, each sending at most `conc` requests at a time.
+    assert run.header["phases"] == [{"name": "warmup", "concurrency": conc},
+                                    {"name": "main", "start": "after_drain", "concurrency": conc}]
+    warm, main = run.records[:copies], run.records[copies:]
+    for j, copy in enumerate(warm):
+        # The copy is request 0's prompt (its prefix group, no further tokens) and output; no holder round follows.
+        assert copy["session_id"] == f"warmup-{j}" and copy["phase"] == "warmup" and copy["request_id"] == n + j
         assert (copy["round_index"], copy["prefix_group"], copy["prefix_length"], copy["input_tokens"],
-                copy["output_tokens"], copy["arrival_time_us"]) == (0, ix.PRIME_PREFIX_GROUP, ins[0], 0, outs[0], 0)
-        # The holder keeps the slot until long after any main phase.
-        assert (holder["round_index"], holder["input_tokens"], holder["output_tokens"],
-                holder["think_time_us"]) == (1, 1, 1, ix.PRIME_HOLD_US)
-        assert (copy["request_id"], holder["request_id"]) == (n + 2 * j, n + 2 * j + 1)
+                copy["output_tokens"]) == (0, ix.PRIME_PREFIX_GROUP, ins[0], 0, outs[0])
+        assert copy["think_time_us"] is None
     # Main request 0 is the copies' prompt token for token; no other main request shares it.
     assert (main[0]["prefix_group"], main[0]["prefix_length"], main[0]["input_tokens"]) == \
         (ix.PRIME_PREFIX_GROUP, ins[0], 0)
     for i, r in enumerate(main):
-        assert (r["request_id"], r["session_id"], r["arrival_time_us"]) == (i, f"main-{i}", ix.PRIME_MAIN_START_US)
+        assert (r["request_id"], r["session_id"], r["phase"]) == (i, f"main-{i}", "main")
         if i:
             assert (r["prefix_group"], r["prefix_length"], r["input_tokens"]) == ("", 0, ins[i])
-    assert ix.PRIME_MAIN_START_US < ix.PRIME_HOLD_US
 
 
 def test_write_trace_writes_the_substrate_trace_format(tmp_path):
@@ -177,8 +175,11 @@ def test_write_trace_writes_the_substrate_trace_format(tmp_path):
     assert rows[1][15] == "0" and rows[1][-1] == "ok"
     h, d = ix.write_trace(ix.primed_phase(ins, outs, 2, 1), tmp_path / "b")
     rows = list(csv.reader(d.open()))
-    assert rows[0] == ix.TRACE_COLUMNS + ["think_time_us"]
-    assert rows[1][-1] == "" and rows[2][-1] == str(ix.PRIME_HOLD_US)
+    assert rows[0] == ix.TRACE_COLUMNS + ["phase"]
+    assert rows[1][-1] == "warmup" and rows[2][-1] == "main"
+    assert h.read_text() == ("trace_version: 4\ntime_unit: microseconds\nmode: generated\nphases:\n"
+                             "  - name: warmup\n    concurrency: 2\n"
+                             "  - name: main\n    start: after_drain\n    concurrency: 2\n")
 
 
 def test_the_replay_command_is_a_users_blis_replay():
@@ -190,6 +191,12 @@ def test_the_replay_command_is_a_users_blis_replay():
     assert not any("metrics-path" in a or "results-path" in a for a in argv)
 
 
+def test_a_trace_with_phases_replays_in_fixed_mode_gated_by_its_phases():
+    argv = ix.replay_argv("/b/blis", "s.yaml", "/d", "/d/trace.yaml", "/d/trace.csv", 12, 5, 42, phased=True)
+    assert argv[argv.index("--session-mode") + 1] == "fixed"
+    assert "--concurrent-sessions" not in argv and "--total-sessions" not in argv
+
+
 def test_the_router_config_places_by_requests_in_flight():
     text = ix.router_config_bytes().decode()
     assert "active-request-scorer" in text and "kind: EndpointPickerConfig" in text
@@ -197,15 +204,11 @@ def test_the_router_config_places_by_requests_in_flight():
 
 # ------------------------------------------------------------------ reading the rows back
 
-T = ix.PRIME_MAIN_START_US
-
-
 def _primed_rows():
     return [
-        {"id": "request_2", "fate": "completed", "arrival_us": 0, "e2e_us": 5_000_000},             # the copy
-        {"id": "request_0", "fate": "completed", "arrival_us": T, "e2e_us": 3_000_000},             # main 0
-        {"id": "request_1", "fate": "completed", "arrival_us": T, "e2e_us": 4_000_000},             # main 1
-        {"id": "session_warmup-0_round_1_1", "fate": "completed", "arrival_us": T + 3_600_000_000, "e2e_us": 1},
+        {"id": "request_2", "fate": "completed", "arrival_us": 0, "e2e_us": 5_000_000, "phase": "warmup"},   # the copy
+        {"id": "request_0", "fate": "completed", "arrival_us": 5_100_000, "e2e_us": 3_000_000, "phase": "main"},
+        {"id": "request_1", "fate": "completed", "arrival_us": 5_100_000, "e2e_us": 4_000_000, "phase": "main"},
     ]
 
 
@@ -214,9 +217,9 @@ def test_check_primed_accepts_a_drained_warmup():
 
 
 @pytest.mark.parametrize("name,mutate", [
-    ("a copy still running at the main-phase start", lambda r: r[0].update(e2e_us=T + 1)),
-    ("main request 0 starting late", lambda r: r[1].update(arrival_us=T + 1_000_000)),
-    ("a holder round inside the main phase", lambda r: r[3].update(arrival_us=T + 2_000_000)),
+    ("a main request starting before the copy ended", lambda r: r[1].update(arrival_us=4_000_000)),
+    ("a copy that did not complete", lambda r: r[0].update(fate="dropped")),
+    ("a row in no phase of the trace", lambda r: r[2].pop("phase")),
 ])
 def test_check_primed_refuses_an_undrained_warmup(name, mutate):
     rows = [dict(r) for r in _primed_rows()]
@@ -344,26 +347,68 @@ def test_an_unavailable_run_records_no_client_commit_and_the_reason(tmp_path):
     assert entry["client_commit"] is None and entry["client_commit_reason"] == "run_unavailable:HTTP_404"
 
 
-def test_job_logs_are_found_by_result_file_and_a_410_is_expired(monkeypatch, tmp_path):
+def test_a_run_github_no_longer_holds_reads_no_job_log_and_names_why(tmp_path):
+    class Gone(_GH):
+        def job_logs_cached(self, run_id, attempt):
+            raise AssertionError("a gone run has no jobs to read")
+    entry, frozen = _freeze_client(tmp_path, Gone(_job_log(), None))
+    assert entry["client_args"] is None and entry["client_args_reason"] == "run_unavailable:HTTP_404"
+    assert "job_log" not in frozen.files
+
+
+def _archive(files: dict) -> bytes:
     import io
-    import urllib.error
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        for name, text in files.items():
+            z.writestr(name, text)
+    return buf.getvalue()
+
+
+def test_job_logs_are_read_from_the_runs_log_archive_in_one_request_and_found_by_result_file(monkeypatch, tmp_path):
+    # A run has hundreds of jobs: its job logs come from the attempt's one log archive, not one request per job, and
+    # each job's id comes from the jobs listing by its name (the archive writes "/" as "_").
     import artifacts as art
     import clients
-    jobs = {"total_count": 2, "jobs": [{"id": 1, "name": "a"}, {"id": 2, "name": "b"}]}
+    jobs = {"total_count": 4, "jobs": [{"id": 1, "name": "setup"}, {"id": 2, "name": "bench / c4"},
+                                       {"id": 3, "name": "bench / c8"}, {"id": 4, "name": "a very long job name / c16"}]}
+    calls = []
 
     def get_json(url, headers, timeout=60, **k):
+        calls.append(url)
         assert url.endswith("/actions/runs/9001/attempts/1/jobs?per_page=100&page=1")
         return jobs
 
     def get_bytes(url, headers, timeout=60, **k):
-        if url.endswith("/jobs/1/logs"):
-            raise urllib.error.HTTPError(url, 410, "gone", {}, io.BytesIO(b""))
-        return _job_log().encode()
+        calls.append(url)
+        assert url.endswith("/actions/runs/9001/attempts/1/logs"), url
+        return _archive({"0_setup.txt": "no client here", "1_bench _ c4.txt": _job_log(),
+                         "bench _ c4/3_run.txt": _job_log(), "2_bench _ c8.txt": "the c8 job ran nothing",
+                         "3_a very...c16.txt": _job_log().replace("x.json", "y.json")})
     monkeypatch.setattr(clients, "_get_json", get_json)
     monkeypatch.setattr(clients, "_get_bytes", get_bytes)
     gh = art.GitHubArtifacts("SemiAnalysisAI/InferenceX", None, tmp_path)
     index, expired = gh.job_logs_cached("9001", 1)
-    assert expired == 1 and list(index) == ["x"] and index["x"][:2] == (2, "b")
+    assert expired == 0 and sorted(index) == ["x", "y"] and index["x"][:2] == (2, "bench / c4")
+    assert index["y"][0] == 4                                 # a shortened name, matched by its two ends
+    assert len(calls) == 2
+    gh.job_logs_cached("9001", 1)
+    assert len(calls) == 2                                    # memoized per run attempt
+
+
+def test_a_log_archive_github_no_longer_holds_means_every_job_log_expired(monkeypatch, tmp_path):
+    import io
+    import urllib.error
+    import artifacts as art
+    import clients
+
+    def get_bytes(url, headers, timeout=60, **k):
+        raise urllib.error.HTTPError(url, 410, "gone", {}, io.BytesIO(b""))
+    monkeypatch.setattr(clients, "_get_bytes", get_bytes)
+    monkeypatch.setattr(clients, "_get_json", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no listing")))
+    index, expired = art.GitHubArtifacts("SemiAnalysisAI/InferenceX", None, tmp_path).job_logs_cached("9001", 1)
+    assert index == {} and expired == 1
 
 
 def _regime_of(commit_date):
@@ -388,3 +433,31 @@ def test_each_client_regime_draws_the_committed_seed0_requests_and_matches_the_e
         assert ix.target_lengths(p["isl"], p["osl"], p["concurrency"]) == (p["input_lens"], p["output_lens"]), regime
     for regime, dates in seen.items():
         assert {_regime_of(d) for d in dates} == {regime}, (regime, sorted(dates))
+
+
+# ---- a simulator that reads no trace phases (an older release tag) still gets a trace it parses
+
+def _probe_blis(tmp_path, schema_text):
+    exe = tmp_path / "blis"
+    exe.write_text("#!/bin/sh\n" + (f"echo '{schema_text}'\n" if schema_text is not None else "exit 2\n"))
+    exe.chmod(0o755)
+    return str(exe)
+
+
+def test_the_phases_header_is_written_only_for_a_simulator_whose_trace_contract_has_phases(tmp_path):
+    for name, text, want in (("new", '{"properties": {"phases": {}}}', True), ("old", '{"properties": {}}', False),
+                             ("none", None, False)):
+        d = tmp_path / name
+        d.mkdir()
+        assert ix.supports_phases(_probe_blis(d, text)) is want, name
+
+
+def test_a_primed_trace_for_an_older_simulator_has_no_phases_key_or_phase_column_and_the_new_one_has_both(tmp_path):
+    ins, outs = _lengths(3)
+    old = ix.primed_phase(ins, outs, 2, 1, phased=False)
+    h, d = ix.write_trace(old, tmp_path / "old")
+    assert "phases" not in h.read_text() and "phase" not in next(csv.reader(d.open()))
+    assert all(r["arrival_time_us"] == ix.PRIME_MAIN_START_US for r in old.records if r["session_id"].startswith("main-"))
+    new = ix.primed_phase(ins, outs, 2, 1, phased=True)
+    h, d = ix.write_trace(new, tmp_path / "new")
+    assert "phases:" in h.read_text() and "phase" in next(csv.reader(d.open()))

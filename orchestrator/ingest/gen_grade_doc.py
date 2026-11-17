@@ -88,10 +88,6 @@ KIND_TEXT = {
     "later_record": "A fact of the cluster the run's own record lacks was taken from the benchmark's later record of the same runner.",
 }
 TOPOLOGY_SUBJECT_TEXT = {
-    pdm.POOL_DP: ("A prefill or decode pool runs data-parallel attention (data-parallel size above 1).",
-                  "The engine refuses a KV transfer with data parallelism: blis-vllm#47 (M3)."),
-    pdm.UNEQUAL_DP: ("The two pools differ in data-parallel size (a DEP prefill pool with a TEP decode pool, or the reverse).",
-                     "The placement refuses pools of different data-parallel size: inference-sim#1952 (M3)."),
     pdm.NOT_RECORDED: ("The row records a pool with no workers or no GPUs.", "Not removable: the row does not describe a prefill/decode run."),
     pdm.AGENTIC: ("An agentic replay of a prefill/decode deployment is not written.",
                   "Write the agentic replay for two pools, with the router's session affinity (accuracy-dashboard#64, M3)."),

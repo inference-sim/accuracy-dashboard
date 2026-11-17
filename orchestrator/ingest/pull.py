@@ -25,6 +25,7 @@ import build  # noqa: E402
 import contract  # noqa: E402
 import engines  # noqa: E402
 import pd_recipe as pdr  # noqa: E402
+import sglang_settings as sgs  # noqa: E402
 import recipes as rcp  # noqa: E402
 
 IX_REPO = "SemiAnalysisAI/InferenceX"
@@ -205,12 +206,13 @@ def freeze_pd_recipe(row: dict, recipes, frozen: "Frozen") -> dict:
                        "paths_tried": paths}}
 
 
-def client_release(entry: dict, frozen: "Frozen", gh, run_id: str, attempt: int, result_filename: str | None) -> None:
+def client_release(entry: dict, frozen: "Frozen", gh, run_id: str, attempt: int, result_filename: str | None) -> str | None:
     """Record the InferenceX commit of a single-turn run (`client_commit`: sha and date, or None with
     `client_commit_reason`) and freeze the log of the job that ran the client (role job_log), whose
     benchmark_serving.py command names the point's result file. GitHub expires logs (404 or 410):
     `client_args` is then None with the reason, and the point is still scored, its flags assumed
-    (COV-12). A log that is not found among the run's jobs is recorded the same way."""
+    (COV-12). A log that is not found among the run's jobs is recorded the same way. Returns the job log's text, or
+    None when there is none."""
     try:
         run = gh.run(run_id)
         entry["client_commit"] = {"repo": gh.repo, "sha": run["sha"], "date": run["date"]}
@@ -219,19 +221,88 @@ def client_release(entry: dict, frozen: "Frozen", gh, run_id: str, attempt: int,
             raise
         entry["client_commit"] = None
         entry["client_commit_reason"] = f"run_unavailable:HTTP_{e.code}"
+        # A run GitHub no longer holds has no job to read a log of either.
+        entry["client_args"] = None
+        entry["client_args_reason"] = f"run_unavailable:HTTP_{e.code}"
+        return
     index, expired = gh.job_logs_cached(run_id, attempt)
     hit = index.get(art.normal_result_name(result_filename or ""))
     if hit is None:
         entry["client_args"] = None
         entry["client_args_reason"] = "job_log_expired" if expired else "job_not_found"
-        return
+        return None
     job_id, job_name, text = hit
     frozen.put("job_log", text.encode(), f"{gh.repo}/actions/jobs/{job_id}")
     entry["client_args"] = {"job_id": job_id, "job_name": job_name}
+    return text
+
+
+def freeze_launch_command(row: dict, entry: dict, frozen: "Frozen", recipes, job_log: str | None) -> None:
+    """The command that launched an SGLang run's server, frozen as the role `launch_command`, or why there is none
+    (`launch_command_reason`). SGLang's log prints every ServerArgs field resolved, so only the command says which
+    the run set (sglang_settings). It is read from the run's CI job log when GitHub still holds it (the shell's
+    `set -x` trace shows the command expanded), else from the benchmark script of the run's own commit
+    (recipes.launch_script); a script that launches by branch or by shell expansion is refused by name."""
+    why = None
+    if job_log:
+        cmd, why = sgs.launch_command_of(job_log)
+        if cmd:
+            frozen.put("launch_command", cmd.encode(), "job_log")
+            entry["launch_command"] = {"from": "job_log"}
+            return
+    run = api.run_of(row)
+    if recipes is None or run is None or run_repo(row) != recipes.repo:
+        entry["launch_command_reason"] = why or pdr.NO_COMMIT
+        return
+    try:
+        sha = recipes.run_commit(run[0])
+        rc = recipes.at(sha)
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise
+        entry["launch_command_reason"] = pdr.NO_COMMIT
+        return
+    except rcp.RecipesUnavailable:
+        entry["launch_command_reason"] = pdr.NO_COMMIT
+        return
+    path = rcp.launch_script(rc, row)
+    if path is None:
+        entry["launch_command_reason"] = "script_not_found"
+        return
+    cmd, why = sgs.launch_command_of(recipes.script(rc, path))
+    if cmd is None:
+        entry["launch_command_reason"] = why
+        return
+    frozen.put("launch_command", cmd.encode(), f"{recipes.repo}@{sha}:{path}")
+    entry["launch_command"] = {"from": "script", "repo": recipes.repo, "commit": sha, "path": path}
+
+
+# The G5 reasons of an anchor unit the night's pull holds no usable row of (cli.cmd_nightly): none in the window, or
+# one whose content now differs from the ledger's record (ledger.RowDiffers). Nothing is fetched or simulated for it.
+NOT_IN_WINDOW = "value_not_recorded:not_in_pull_window"
+ROW_DIFFERS = "value_not_recorded:row_differs_from_ledger"
+NOT_PULLED = (NOT_IN_WINDOW, ROW_DIFFERS)
+
+
+def add_unpulled(out: Path, reasons: dict, lg) -> None:
+    """Add to the pull's manifest a G5 entry for each unit in `reasons` (unit id -> reason): its identity is the
+    ledger's, and its row holds the identity's fields only. It is counted (COV-1); nothing is fetched for it."""
+    if not reasons:
+        return
+    m = json.loads((out / "manifest.json").read_text())
+    for u, why in sorted(reasons.items()):
+        ident = dict(lg.units[u].identity)
+        row = {"id": None, "model": ident["model"], "hardware": ident["hardware"], "precision": ident["precision"],
+               "framework": ident["framework"], "benchmark_type": ident["benchmark_type"], "conc": ident["conc"],
+               "date": ident["measured_date"], "metrics": {}}
+        m["points"].append({"point_id": u, "identity": ident, "row": row, "records": [], "measurements": [],
+                            "reasons": [why], "files": {}, "build": None})
+    meta = {k: v for k, v in m.items() if k != "points"}
+    write_manifest(out, meta, sorted(m["points"], key=lambda e: e["point_id"]))
 
 
 def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArtifacts, fetch, out: Path,
-                 recipes=None) -> dict:
+                 recipes=None, scoring=engines.DEFAULT_SCORING) -> dict:
     """Freeze one point's inputs. The point is one ledger unit; its inputs are the kept
     record's (the smallest row id the window holds), and its measured values are each
     measurement's, so the score is against their mean (design §10.2)."""
@@ -243,7 +314,7 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
     entry = {"point_id": pid, "identity": ident, "row": row, "records": point.records,
              "measurements": point.measurements, "reasons": [], "files": {}}
     fw = engines.lookup(row["framework"])
-    if not engines.scored(fw):
+    if not engines.scored(fw, scoring):
         # No BLIS engine scores this framework, so nothing is fetched: the point is G5 for the
         # reasons the label gives (engines.py), plus its router at scoring time.
         entry.update(reasons=sorted(engines.reasons(fw)), build=None)
@@ -256,6 +327,7 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
     # add the launch config, so a run with none (no fingerprint, expired, another repository)
     # still scores. An agentic point needs its artifacts: the server log and the client export.
     join_reasons = entry["reasons"] if agentic else entry.setdefault("artifact_notes", [])
+    job_text = None
     if run is None:
         join_reasons.append("artifact_unmatched:no_run_url")
     elif run_repo(row) != gh.repo:
@@ -266,7 +338,15 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
         run_id, attempt = run
         # Thread-safe memoized listing: one HTTP call per run even when a pool freezes many of its
         # points concurrently. (run_artifacts kept as an optional no-op for older callers.)
-        arts = gh.list_cached(run_id)
+        try:
+            arts = gh.list_cached(run_id)
+        except urllib.error.HTTPError as e:
+            # GitHub no longer holds the run (deleted, or past its retention): it has no artifacts to read. A fact
+            # about the source's data, not a fault of the pull. Single-turn still scores from the API's /server-log.
+            if e.code not in (404, 410):
+                raise
+            arts = []
+            join_reasons.append(f"artifact_unmatched:run_gone_{e.code}")
         j = art.join({**row, "_attempt": attempt}, arts,
                      lambda a: art.read_result_json(gh.download(a)), agentic=agentic)
         join_reasons += j.reasons
@@ -307,7 +387,7 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
                 frozen.put("launch_config", json.dumps(cfg, sort_keys=True, default=str).encode(),
                            f"{j.server_logs.name}:{p}")
         if not agentic:
-            client_release(entry, frozen, gh, run_id, attempt, j.result_filename)
+            job_text = client_release(entry, frozen, gh, run_id, attempt, j.result_filename)
         if agentic and j.agentic is not None:
             try:
                 files = read_needed(gh.download(j.agentic), entry,
@@ -342,6 +422,8 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
                 server_log = text
             else:
                 entry["reasons"].append("server_log_missing")
+    if fw.engine == engines.SGLANG and not agentic and not row.get("disagg"):
+        freeze_launch_command(row, entry, frozen, recipes, job_text)
     b = resolver.resolve(row.get("image") or "", server_log)
     # The build never refuses a point; it makes it estimated unless it's the build BLIS models.
     entry["build"] = b.record()

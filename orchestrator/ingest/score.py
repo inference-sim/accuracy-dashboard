@@ -36,16 +36,22 @@ import g1  # noqa: E402
 import grade as gr  # noqa: E402
 import pd as pdm  # noqa: E402
 import pd_recipe as pdr  # noqa: E402
+import pull as pl  # noqa: E402
 import router_table as rt  # noqa: E402
 import inferencex_client as ix  # noqa: E402
 import inferencex_runners as ir  # noqa: E402
 import replay as rp  # noqa: E402
 import result  # noqa: E402
 import settings as st  # noqa: E402
+import sglang_settings as ss  # noqa: E402
 import blis_commands as bc  # noqa: E402
 import support as sp  # noqa: E402
 
 AGENTIC_LABEL = "agentx"
+
+# A prefill/decode SGLang point: the writer of a prefill/decode scenario (score_pd) reads vLLM's recipe flags, so
+# an SGLang one is not scored yet (dashboard#110, the part after the aggregated path).
+SGLANG_PD_UNSCORED = "topology_unsupported:sglang_disaggregated"
 
 # The API row fields that vary from point to point within one InferenceX curve. Every other
 # field is the curve's (run, model, part, parallelism, drafter, DP attention, offload, ...), so
@@ -59,6 +65,33 @@ def sweep_id(row: dict, scenario: str, label: str) -> str:
     curve = {k: v for k, v in row.items() if k not in PER_POINT_ROW_FIELDS}
     h = hashlib.sha256(contract.canonical_dumps(curve).encode()).hexdigest()[:12]
     return f"{row.get('curve_workflow_run_id')}|{scenario}|{label}|{h}"
+
+
+@dataclass
+class EngineKit:
+    """What scoring a point of one engine needs of that engine: the release the scoring simulator runs, its field
+    list and the field list's sha256, and, for SGLang, blis-sglang's declarations (the flag-to-field map)."""
+    kind: str
+    release: str
+    field_list: object
+    fields_sha256: str = ""
+    declarations: dict | None = None
+
+
+def read_sglang_kit(fields_path: Path, stack: "Stack", declarations: Path | None = None) -> "EngineKit":
+    """The SGLang engine's kit (score.EngineKit): the release stack.json names, blis-sglang's field list for it, and
+    blis-sglang's declarations (the flag-to-field map). Both files must be for that release (LIF-6)."""
+    release = stack.engine("sglang")
+    raw = Path(fields_path).read_bytes()
+    field_list = fl.parse(raw)
+    if field_list.engine != {"kind": "sglang", "version": release}:
+        raise fl.FieldsError(f"{fields_path} is the field list of {field_list.engine}, but the simulator "
+                             f"runs sglang {release} (stack.json)")
+    decl = ss.load_declarations(declarations) if declarations else ss.load_declarations()
+    if decl.get("engine") != {"kind": "sglang", "version": release}:
+        raise fl.FieldsError(f"the SGLang declarations are for {decl.get('engine')}, but the simulator runs sglang {release} "
+                             f"(stack.json): regenerate them with gen_sglang_declarations.py")
+    return EngineKit("sglang", release, field_list, hashlib.sha256(raw).hexdigest(), decl)
 
 
 @dataclass
@@ -122,10 +155,23 @@ class Env:
     # The checkout of the router (llm-d's router fork) at a pinned commit, which publishes the endpoint-picker file of each
     # policy (cli score --router-checkout). A prefill/decode point passes the router's file for its policy unchanged.
     router_checkout: Path | None = None
+    # The SGLang engine the scoring simulator runs, when stack.json names one and a published field list is given
+    # (cli score --sglang-fields). Without it SGLang points are not scored (engines.scored).
+    sglang: EngineKit | None = None
 
-    def simulator(self) -> dict:
-        """The simulator block every point of this run records: its build and engine release."""
-        return {"build": self.sim_build, "engine": {"kind": "vllm", "version": self.engine_release},
+    def scoring(self) -> frozenset:
+        """The engines this run scores: vLLM's always, SGLang's once its release and field list are held."""
+        return engines.DEFAULT_SCORING | ({engines.SGLANG} if self.sglang is not None else frozenset())
+
+    def kit(self, kind: str) -> EngineKit:
+        """The engine's kit: the vLLM one is this Env's own fields."""
+        if kind == engines.SGLANG and self.sglang is not None:
+            return self.sglang
+        return EngineKit(engines.VLLM, self.engine_release, self.field_list, self.fields_sha256)
+
+    def simulator(self, kind: str = engines.VLLM) -> dict:
+        """The simulator block every point of this run records: its build and the engine release it ran the point on."""
+        return {"build": self.sim_build, "engine": {"kind": kind, "version": self.kit(kind).release},
                 "harness_commit": self.harness_commit}
 
 
@@ -243,10 +289,28 @@ def _blis_refusal(stderr: str, work: Path) -> str:
 # "... no profile for <model>/<method>/k<n>/thinking-<mode>/<category> in <sets>". The pair named is the gap.
 _NO_PROFILE = re.compile(r"acceptance: no profile for \S+/\S+/k\d+/thinking-(\w+)/(\S+) in ")
 _STATES_NO = re.compile(r"\bstates no ([A-Za-z_][A-Za-z0-9_.]*)")
+# The engine's refusal of a value it does not model: '<field> "<value>" ... is not modelled' (blis-vllm states the field,
+# the value and why, and links the issue that would model it).
+_NOT_MODELLED = re.compile(r'\b([a-z_][a-z0-9_]*) "[^"]*"[^"]*?\bis not modelled\b')
 # "the workload states no thinking mode": the simulator wants a statement about the WORKLOAD (it
 # selects the acceptance profile), not a field of the engine's list. The reason names the workload
 # statement, so it is not looked up in fields.json (where it would read as a missing field).
 _WORKLOAD_STATES_NO = re.compile(r"\bthe workload states no ([A-Za-z_][A-Za-z0-9_ ]*?)(?: mode)?\s*[,;.:]")
+
+
+# The latency kernel's own refusals: each message begins with its code and a colon (blis-substrate kernel/draft.go,
+# kernel/..., documented in docs/kernel/reference/refusals.md). The kernel will not price what the engine's plan does not
+# state, or states outside its list: that is a gap of the engine BLIS runs, not a value the run failed to record, so the
+# point is G5 engine_unsupported naming the kernel's code. (Before, "the engine states no DraftPassRequests" was read as a
+# missing field, and the point came out field_not_in_release:DraftPassRequests.)
+KERNEL_REFUSALS = ("draft_passes_unstated", "draft_passes_unknown", "served_weights_mismatch", "switch_group_collective_crosses")
+_KERNEL_REFUSAL = re.compile(r"(?<![A-Za-z0-9_])(" + "|".join(KERNEL_REFUSALS) + r"):")
+
+
+def kernel_refusal(stderr: str) -> str | None:
+    """engine_unsupported:<code> when the simulator's refusal is one of the kernel's, else None."""
+    m = _KERNEL_REFUSAL.search(re.sub(r"\s+", " ", stderr).replace('\\"', '"'))
+    return f"engine_unsupported:{m.group(1)}" if m else None
 
 
 def value_refusal(stderr: str, work: Path, field_list) -> str | None:
@@ -256,8 +320,21 @@ def value_refusal(stderr: str, work: Path, field_list) -> str | None:
     a rule that would leave it unset or substitute another setting cannot help here, and the
     reason is value_not_recorded in every case (design 11.4). A refusal that says "states no"
     but names no parseable field takes the refusal's slug as the subject."""
+    kernel = kernel_refusal(stderr)
+    if kernel:
+        return kernel
     slug = _blis_refusal(stderr, work)
     text = slug.partition(":")[2]
+    nm = _NOT_MODELLED.search(re.sub(r"\s+", " ", stderr).replace('\\"', '"'))
+    if nm:
+        # The engine states that the scenario's value of a field is not modelled: the release's own classification
+        # of the run's setting (design 11.4, field_not_modelled), named by the field's path in the field list.
+        name = nm.group(1)
+        path = name
+        if field_list is not None and field_list.lookup(name) is None:
+            hits = [f for f in field_list.fields if f.endswith("." + name)]
+            path = hits[0] if len(hits) == 1 else name
+        return f"field_not_modelled:{path}"
     miss = _NO_PROFILE.search(re.sub(r"\s+", " ", stderr))
     if miss:
         return f"value_not_recorded:profile_not_available:{miss.group(2)}/{miss.group(1)}"
@@ -423,6 +500,15 @@ def _diff_args(args: list, dep: dict, b: st.Built) -> list[str]:
         a["blis_field"] = f
         if f == "replay.acceptance_length":
             got, want = b.acceptance_length, str(want)
+            if got is None:
+                # A prefill/decode scenario states the run's synthetic acceptance in each pool's engine block (the
+                # form the engine takes the synthetic method in), not as the replay's flag: one value in every pool
+                # is the recorded value, as written.
+                stated = {(((p.get("engine") or {}).get(k) or {}).get("synthetic_acceptance_length"))
+                          for p in dep.get("pools") or [] for k in ("speculative", "speculative_config")
+                          if ((p.get("engine") or {}).get(k))}
+                if len(stated) == 1 and None not in stated:
+                    got = f"{float(stated.pop()):g}"
         elif f.startswith("offload."):
             # The offload writer converts units (per-rank bytes -> the engine's tier); its own
             # checks refused any disagreement, so the arg records what BLIS was given.
@@ -460,6 +546,7 @@ class Outcome:
     fidelity: dict | None = None
     facets: dict | None = None
     csv_row: list | None = None
+    engine: str = "vllm"            # the engine kind the point's run executed (engines.py), once it is scored
     banner: str | None = None       # the vLLM version the server log's banner prints
     build: dict | None = None       # the run's recorded build (build.py), from the pull
     # The substitutions the field list names (an estimate, an interim status), from settings.
@@ -495,7 +582,7 @@ def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env, simulate: bool
         o = Outcome(point_id=entry["point_id"], identity=entry["identity"], row=entry["row"],
                     reasons=sorted(set(entry["reasons"] + ["blis_refused:extractor_error"])),
                     measurements=entry.get("measurements") or [], build=entry.get("build"))
-    grade_outcome(o, env.engine_release, env.simulator() if simulate else None)
+    grade_outcome(o, env.kit(o.engine).release, env.simulator(o.engine) if simulate else None)
     return o
 
 
@@ -676,16 +763,27 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     work = work.resolve()
     o = Outcome(point_id=pid, identity=ident, row=row, reasons=list(entry["reasons"]),
                 measurements=entry.get("measurements") or [], build=entry.get("build"))
+    if any(r in pl.NOT_PULLED for r in o.reasons):
+        # The night's pull holds no usable row of the unit (pull.add_unpulled): nothing to build a scenario from.
+        return o
     fw = engines.lookup(row["framework"])
-    if not engines.scored(fw):
+    if not engines.scored(fw, env.scoring()):
         # Nothing was fetched and BLIS is not asked: G5 for the label's reasons and its router.
         o.reasons = sorted(set(o.reasons + engines.reasons(fw) + asx.router_reason(row, fw.router)))
         return o
+    sglang = fw.engine == engines.SGLANG
+    kit = env.kit(fw.engine)
+    o.engine = fw.engine
     pdir = pull_dir / "points" / pid
     if row.get("disagg"):
+        if sglang:
+            # The prefill/decode writer reads vLLM's recipe flags and launches two vLLM pools (score_pd); SGLang's is
+            # not written yet, and BLIS is not asked.
+            o.reasons = sorted(set(o.reasons + [SGLANG_PD_UNSCORED] + asx.router_reason(row, fw.router)))
+            return o
         return score_pd(o, entry, pdir, env, work, fw, simulate=simulate)
     log_b = _read(pdir, entry["files"], "server_log")
-    agg = aggregated_recipe(entry, pdir) if log_b is None else None
+    agg = aggregated_recipe(entry, pdir) if log_b is None and not sglang else None
     if log_b is None and agg is None:
         # The pull may already have said why (the API answered 413 or 404): that reason stands alone.
         bare = [] if any(r.startswith("server_log_missing:api_") for r in o.reasons) else ["server_log_missing"]
@@ -695,6 +793,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     o.banner = _banner_version(log)
     lc_b = _read(pdir, entry["files"], "launch_config")
     launch = json.loads(lc_b) if lc_b else None
+    cmd_b = _read(pdir, entry["files"], "launch_command") if sglang else None
     recovery = []
     if agg is not None:
         # A colocated multi-node run whose log is gone: its arguments are its aggregated recipe's
@@ -713,6 +812,12 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     if agg is not None:
         readings, problems = {src: st.Reading() for src in st.SOURCES}, []
         readings["launch_config"] = st.read_launch_config(launch)
+    elif sglang:
+        readings, problems = ss.read_all(log, cmd_b.decode("utf-8", "replace") if cmd_b else None, kit.declarations, kit.field_list)
+        o.reasons += ss.unresolved_env(readings)
+        if cmd_b is None:
+            # The printout resolves every field, so only the launch command says which the run set (sglang_settings).
+            o.reasons.append(f"required_setting_missing:{ss.LAUNCH_COMMAND_SUBJECT}")
     else:
         readings, problems = st.read_all(log, launch)
     # The API row's router is its own source: it states the frontend, nothing about the engine.
@@ -726,8 +831,12 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     # stays what the row is shown and keyed by.
     part_name = (sp.catalog_part(env.catalog_obj, env.parts, row["hardware"]) if env.catalog_obj else None) \
         or row["hardware"]
-    defaults = st.defaults_for(o.banner, env.vllm_defaults, env.vllm_defaults_release)
-    c = st.decide(st.merge(readings, defaults), env.field_list, part_name, _facts_of(env, part_name, st.recorded_node_size(launch)))
+    if sglang:
+        c = st.decide(st.merge(readings, {}, ss.make_requested(kit.declarations)), kit.field_list, part_name,
+                      _facts_of(env, part_name, st.recorded_node_size(launch)), names=ss.make_names(kit.declarations))
+    else:
+        defaults = st.defaults_for(o.banner, env.vllm_defaults, env.vllm_defaults_release)
+        c = st.decide(st.merge(readings, defaults), env.field_list, part_name, _facts_of(env, part_name, st.recorded_node_size(launch)))
     o.reasons += c.reasons
     o.subs = recovery + list(c.substitutions)
     o.reasons += row_vs_run(row, c)
@@ -754,6 +863,15 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
         o.reasons.append(conflict)
         sup.reasons = [r for r in sup.reasons if r != "model_not_in_catalog"]
     o.reasons += sup.reasons
+    if sglang and sup.model and f"engine.{ss.CONTEXT_LENGTH_FIELD}" not in c.mapped and env.catalog_obj is not None:
+        # The run did not set the context length, and the catalog's graph carries no window; the SGLang host refuses a
+        # scenario that states none. SGLang derives it from the checkpoint's config, so that is the value stated.
+        window = ss.context_window(env.catalog_obj.root, sup.model)
+        if window is not None:
+            c.mapped[f"engine.{ss.CONTEXT_LENGTH_FIELD}"] = (ss.CONTEXT_LENGTH_FIELD, window)
+            o.subs.append({"kind": "estimated", "subject": ss.CONTEXT_LENGTH_FIELD,
+                           "detail": f"the run set no context length; SGLang derives {window} from the checkpoint's config "
+                                     f"(get_context_length), which the catalog graph does not carry"})
 
     agentic = row["benchmark_type"] == "agentic_traces"
     r = None
@@ -781,10 +899,10 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     catalog_size = cat.packaging(sup.chip)["gpus_per_node"]
     node = ir.resolve(env.runner_table, row["hardware"], run_date=ident["measured_date"],
                       launch_size=st.recorded_node_size(launch), fixes_packaging=catalog_size is not None)
-    b = st.build(c, name=name, model=sup.model, part=part, engine_version=env.engine_release,
-                 field_list=env.field_list, catalog_node_size=catalog_size, node=node,
-                 draft_model=sup.drafter, launch_config=launch)
-    o.reasons += b.reasons
+    b = st.build(c, name=name, model=sup.model, part=part, engine_version=kit.release,
+                 field_list=kit.field_list, catalog_node_size=catalog_size, node=node,
+                 draft_model=sup.drafter, launch_config=launch, engine_kind=fw.engine)
+    o.reasons += ss.parallel_reasons(b.reasons, c, kit.field_list) if sglang else b.reasons
     o.subs += b.substitutions
     b.thinking = st.recorded_thinking(c.settings)
     header = [f"point {pid}", f"InferenceX row {row['id']} ({row['run_url']})",
@@ -794,7 +912,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     spec, tokens_key = st.speculative_block(b.deployment["pools"][0]["engine"])
     spec = spec or {}
     realised = st.realised_acceptance(log)
-    if spec and b.acceptance_length is None and realised and st.engine_takes_acceptance(env.field_list):
+    if spec and b.acceptance_length is None and realised and st.engine_takes_acceptance(kit.field_list):
         # The run set no acceptance length, but its server logged the one it realised; the engine
         # states acceptance by that field, so the log's figure stands in for the registry's profile
         # (which would need a thinking mode and a category the run does not record).
@@ -945,7 +1063,7 @@ def _run_result(o: Outcome, argv: list[str], key: str, cache: Path, env: Env, wo
         return None
     except result.RunFailed as e:
         (logs / f"{o.point_id}.err").write_text(e.stderr[-20000:])
-        o.reasons = [value_refusal(e.stderr, work, env.field_list) or _blis_refusal(e.stderr, work)]
+        o.reasons = [value_refusal(e.stderr, work, env.kit(o.engine).field_list) or _blis_refusal(e.stderr, work)]
         return None
     except result.ResultError as e:
         (logs / f"{o.point_id}.err").write_text(str(e)[-20000:])
@@ -1042,7 +1160,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     # primes with copies of request 0 and a single-turn point is primed unless prefix caching is off.
     primed = pd_run is None and any((p["engine"] or {}).get("enable_prefix_caching") is not False for p in dep["pools"])
     copies = ix.WARMUPS_PER_CONCURRENCY * conc if primed else 0
-    replay = ix.primed_phase(ins, outs, conc, copies) if primed else ix.main_phase(ins, outs, conc)
+    replay = ix.primed_phase(ins, outs, conc, copies, phased=ix.supports_phases(env.blis)) if primed else ix.main_phase(ins, outs, conc)
 
     pdir = (work / "single_turn" / pid).resolve()
     pdir.mkdir(parents=True, exist_ok=True)
@@ -1057,7 +1175,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     (pdir / router_name).write_bytes(router)
     header_path, data_path = ix.write_trace(replay, pdir)
     argv = ix.replay_argv(env.blis, f"{name}.yaml", pdir, header_path, data_path, replay.sessions, replay.pool,
-                          SINGLE_TURN_SEED)
+                          SINGLE_TURN_SEED, phased=bool(replay.header.get("phases")))
     if env.catalog:
         argv += ["--catalog", str(env.catalog)]
     if env.registry:
@@ -1096,7 +1214,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
         return o
     try:
         if primed:
-            ix.check_primed(rows, len(ins))
+            ix.check_primed(rows, len(ins), phased=bool(replay.header.get("phases")))
     except ValueError:
         o.reasons = ["blis_refused:warmup_not_drained"]
         return o
@@ -1131,7 +1249,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     o.samples = (len(ins), len(ins))       # the client's num-prompts: 10 x concurrency requests
     ep = (par["tp"] * par["dp"]) if par.get("enable_expert_parallel") else 1
     label = _single_turn_label(isl, osl)
-    scen = f"{model}-{row['hardware']}-{row['precision']}-vllm-tp{par['tp']}-dp{par['dp']}-ep{ep}"
+    scen = f"{model}-{row['hardware']}-{row['precision']}-{o.engine}-tp{par['tp']}-dp{par['dp']}-ep{ep}"
     parallelism = {"tp": par["tp"], "pp": par["pp"], "dp": par["dp"], "ep": ep}
     if pd_run is not None:
         scen = f"{model}-{row['hardware']}-{row['precision']}-vllm-{pd_run.label}"
@@ -1139,7 +1257,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     o.facets = {"identity": ident, "sweep_id": sweep_id(row, scen, label),
                 "scenario": scen, "label": label, "workload": f"{isl}:{osl}",
                 "model": model, "gpu": row["hardware"], "precision": row["precision"],
-                "framework": "vllm" if pd_run is None else row["framework"],
+                "framework": o.engine if pd_run is None else row["framework"],
                 "serving": "aggregated" if pd_run is None else "disaggregated",
                 "spec_method": row.get("spec_method") or "none",
                 "parallelism": parallelism,
@@ -1366,6 +1484,15 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
     catalog_size = cat.packaging(sup.chip)["gpus_per_node"]
     node = ir.resolve(env.runner_table, row["hardware"], run_date=ident["measured_date"],
                       launch_size=recipe.gpus_per_node, fixes_packaging=catalog_size is not None)
+    for role, c in decided.items():
+        if "engine.max_model_len" not in c.mapped and cat is not None:
+            # The recipe states no --max-model-len, so vLLM served the checkpoint's own window; the engine needs it stated.
+            win = pdm.model_window(cat.root, sup.model)
+            if win is not None:
+                c.mapped["engine.max_model_len"] = ("max_model_len", win)
+                o.subs.append({"kind": "estimated", "subject": f"engine.{role}.max_model_len",
+                               "detail": f"not stated by the recipe; vLLM resolves it to the checkpoint's max_position_embeddings, "
+                                         f"{win} (the catalog model {sup.model}'s config.json)"})
     builts = {role: st.build(decided[role], name=name, model=sup.model, part=part, engine_version=env.engine_release,
                              field_list=env.field_list, catalog_node_size=catalog_size, node=node,
                              draft_model=sup.drafter, launch_config=launches[role]) for role in pools}
@@ -1508,6 +1635,8 @@ def _row_topology_vs_run(row: dict, c: st.Decided) -> list[str]:
     tp, dp, pp, pcp = logged("parallel.tp", 0), logged("parallel.dp"), logged("parallel.pp"), logged("parallel.pcp")
     if not tp:
         return []
+    if c.mapped.get("engine.enable_dp_attention", (None, None))[1] is True:
+        dp = 1      # SGLang: with DP attention the data-parallel groups divide tp_size, which already counts every GPU
     world = tp * dp * pp * pcp
     out = []
     # A colocated engine over several nodes is recorded in the row's prefill fields (the decode ones are 0).

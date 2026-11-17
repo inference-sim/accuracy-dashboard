@@ -377,3 +377,50 @@ def test_a_figure_that_is_not_the_direct_cluster_figure_is_refused(extra, text):
     with pytest.raises(result.ResultError) as e:
         result.figure(_doc_with({"value": 12.5, **extra}), "ttft_mean_ms")
     assert text in str(e.value) and e.value.slug == "figure_not_cluster_direct"
+
+
+# ---- the clients' three ITLs (inference-sim#2128): a client field is matched by definition, not name
+
+def _latency(metric, formula, population, statistic):
+    return {"id": metric, "formula": formula, "statistic": statistic, "population": population,
+            "window": "measured", "unit": "ms", "unfinished": "excluded", **SCOPES}
+
+
+ITL_REGISTRY = {
+    **{f"tpot_{s}_ms": _latency(f"tpot_{s}_ms", "tpot", "requests_min_2_output_tokens", s) for s in ("mean", "p50")},
+    **{f"itl_{s}_ms": _latency(f"itl_{s}_ms", "itl", "tokens", s) for s in ("mean", "p50")},
+    **{f"icl_{s}_ms": _latency(f"icl_{s}_ms", "icl", "chunks", s) for s in ("mean", "p50")},
+}
+
+
+@pytest.mark.parametrize("client,field,metric", [
+    ("aiperf", "inter_token_latency", "tpot_p50_ms"),
+    ("vllm bench serve", "tpot", "tpot_mean_ms"),
+    ("vllm bench serve", "itl", "icl_p50_ms"),
+    ("aiperf", "inter_chunk_latency", "icl_mean_ms"),
+    ("inference-perf", "time_per_output_token", "tpot_mean_ms"),
+    ("inference-perf", "inter_token_latency, tokenizer", "itl_p50_ms"),
+    ("inference-perf", "inter_token_latency, no tokenizer", "icl_mean_ms"),
+])
+def test_each_client_field_is_comparable_with_the_metric_of_its_definition(client, field, metric):
+    assert result.client_field_problems(client, field, metric, ITL_REGISTRY) == []
+
+
+def test_aiperf_itl_against_the_simulators_itl_is_refused():
+    # Under speculative decoding itl_p50_ms reads 0 while aiperf's ITL p50 reads 4 to 25 ms: different figures.
+    assert result.client_field_problems("aiperf", "inter_token_latency", "itl_p50_ms", ITL_REGISTRY) == [
+        "aiperf inter_token_latency has formula 'tpot'; the simulator's itl_p50_ms has 'itl'",
+        "aiperf inter_token_latency has population 'requests_min_2_output_tokens'; "
+        "the simulator's itl_p50_ms has 'tokens'"]
+    assert result.client_field_problems("aiperf", "inter_token_latency", "icl_p50_ms", ITL_REGISTRY) != []
+
+
+@pytest.mark.parametrize("client,field,metric", [
+    ("vllm bench serve", "itl", "itl_p50_ms"),         # per chunk against per token
+    ("vllm bench serve", "itl", "tpot_p50_ms"),        # pooled against per request
+    ("inference-perf", "inter_token_latency, tokenizer", "icl_p50_ms"),
+    ("aiperf", "inter_chunk_latency", "icl_p50_ms"),   # t-digest percentiles against numpy_linear
+    ("aiperf", "ITL", "tpot_p50_ms"),                  # a field named only by its label has no definition
+])
+def test_a_client_field_against_another_definition_is_refused(client, field, metric):
+    assert result.client_field_problems(client, field, metric, ITL_REGISTRY) != []

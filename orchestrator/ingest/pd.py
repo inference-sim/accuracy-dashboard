@@ -7,13 +7,13 @@ DP attention runs data-parallel size above one. The row spells that as `tp` equa
 GPUs per worker; the recipe states it (`data-parallel-size`), and where it does, the recipe's value
 decides.
 
+A pool on DP attention, and pools of different data-parallel size, are written: the engine runs a KV
+transfer with data parallelism (blis-vllm#47, #206) and the placement allows unequal pools (inference-sim#1952, #2162).
+Their tensor, pipeline and data-parallel sizes are stated from the recipe (`pseudo_launch`).
+
 Named refusals (all are G5 `topology_unsupported`, design §11.4, with the part of the layout the stack
 cannot express as the subject, so the reader sees a missing engine feature and not a missing writer):
 
-  pd_pool_data_parallel      a pool runs data-parallel size above one: the engine refuses a KV
-                             transfer with data parallelism (blis-vllm#47, M3);
-  pd_unequal_data_parallel   the two pools differ in data-parallel size: the placement refuses it
-                             (inference-sim#1952, M3);
   pd_pool_not_recorded       a pool has no workers or no GPUs in the row;
   pd_agentic                 an agentic replay of a P/D deployment is not written (dashboard#64).
 
@@ -32,11 +32,9 @@ import settings as st
 NIXL = ("NixlConnector", "NixlPullConnector", "NixlPushConnector")
 TRANSFER_PATHS = ("kv_transfer_config.kv_connector", "kv_transfer_config.kv_role")
 
-POOL_DP = "pd_pool_data_parallel"
-UNEQUAL_DP = "pd_unequal_data_parallel"
 NOT_RECORDED = "pd_pool_not_recorded"
 AGENTIC = "pd_agentic"
-TOPOLOGY_SLUGS = (POOL_DP, UNEQUAL_DP, NOT_RECORDED, AGENTIC)
+TOPOLOGY_SLUGS = (NOT_RECORDED, AGENTIC)
 
 
 @dataclass
@@ -86,11 +84,6 @@ def topology_reasons(row: dict, pools: dict | None) -> list[str]:
     if pools is None:
         return [f"topology_unsupported:{NOT_RECORDED}"]
     out = []
-    dps = {p.dp for p in pools.values()}
-    if max(dps) > 1:
-        out.append(f"topology_unsupported:{POOL_DP}")
-    if len(dps) > 1:
-        out.append(f"topology_unsupported:{UNEQUAL_DP}")
     if row.get("benchmark_type") == "agentic_traces":
         out.append(f"topology_unsupported:{AGENTIC}")
     return out
@@ -100,21 +93,43 @@ def pseudo_launch(recipe: "pdr.Recipe", role: str, row: dict, pool: Pool) -> dic
     """A launch configuration of one pool in the form settings.read_launch_config reads: the recipe's
     flags of that pool (CLI spelling) and its environment, plus the tensor, pipeline and data
     parallel sizes the recipe leaves at vLLM's default where the pool's GPUs equal their product
-    (otherwise the pool's size is left unstated and the build names it)."""
+    (otherwise the pool's size is left unstated and the build names it). A pool on DP attention runs
+    tensor-parallel size 1 per rank unless the recipe states one, and its data-parallel size is the
+    recipe's, else the pool's GPUs divided by the tensor and pipeline sizes."""
     spec = recipe.pools[role]
     args = dict(spec.flags)
-    if not pool.dp_attention:
+    pp = _flag_int(args, "pipeline-parallel-size") or 1
+    if pool.dp_attention:
+        tp = _flag_int(args, "tensor-parallel-size") or 1
+        dp = _flag_int(args, "data-parallel-size") or (pool.gpus // (tp * pp) if pool.gpus % (tp * pp) == 0 else 0)
+    else:
         tp = _flag_int(args, "tensor-parallel-size") or pool.tp
-        pp = _flag_int(args, "pipeline-parallel-size") or 1
         dp = _flag_int(args, "data-parallel-size") or 1
-        if tp * pp * dp == pool.gpus:
-            args.setdefault("tensor-parallel-size", tp)
-            args.setdefault("pipeline-parallel-size", pp)
-            args.setdefault("data-parallel-size", dp)
+    if dp and tp * pp * dp == pool.gpus:
+        args.setdefault("tensor-parallel-size", tp)
+        args.setdefault("pipeline-parallel-size", pp)
+        args.setdefault("data-parallel-size", dp)
     cfg = {"roles": {role: {"args": args, "env": dict(spec.env)}}}
     if recipe.gpus_per_node:
         cfg["resources"] = {"gpus_per_node": recipe.gpus_per_node}
     return cfg
+
+
+def model_window(catalog_root, model: str) -> "int | None":
+    """The context window vLLM serves a model at when the run states no --max-model-len: the checkpoint's
+    max_position_embeddings (vllm/config/model.py, get_and_verify_max_len, with no rope scaling to multiply it by),
+    read from the catalog model's config.json. None when the entry carries no config, the config has no such key,
+    or it scales its positions (the derived length then depends on the scaling, which is not read here)."""
+    import json
+    f = Path(catalog_root) / "models" / model / "config.json"
+    if not f.is_file():
+        return None
+    cfg = json.loads(f.read_text())
+    cfg = cfg.get("text_config", cfg) if isinstance(cfg, dict) else {}
+    if cfg.get("rope_scaling") or cfg.get("rope_parameters"):
+        return None
+    n = cfg.get("max_position_embeddings")
+    return n if isinstance(n, int) and not isinstance(n, bool) and n > 0 else None
 
 
 def read_pool(launch: dict) -> "tuple[st.Reading, dict]":

@@ -1,0 +1,3798 @@
+{
+ "engine": {
+  "kind": "sglang",
+  "version": "0.5.23"
+ },
+ "fields": {
+  "abort_on_priority_when_disabled": {
+   "default": false,
+   "flags": [
+    "--abort-on-priority-when-disabled"
+   ],
+   "type": "bool"
+  },
+  "admin_api_key": {
+   "default": null,
+   "flags": [
+    "--admin-api-key"
+   ],
+   "type": "Optional[str]"
+  },
+  "allow_auto_truncate": {
+   "default": false,
+   "flags": [
+    "--allow-auto-truncate"
+   ],
+   "type": "bool"
+  },
+  "allowed_media_domains": {
+   "default": [],
+   "flags": [
+    "--allowed-media-domains"
+   ],
+   "type": "List[str]"
+  },
+  "api_key": {
+   "default": null,
+   "flags": [
+    "--api-key"
+   ],
+   "type": "Optional[str]"
+  },
+  "asr_max_buffer_seconds": {
+   "default": 60,
+   "flags": [
+    "--asr-max-buffer-seconds"
+   ],
+   "type": "int"
+  },
+  "asr_max_concurrent_sessions": {
+   "default": 32,
+   "flags": [
+    "--asr-max-concurrent-sessions"
+   ],
+   "type": "int"
+  },
+  "attention_backend": {
+   "default": null,
+   "flags": [
+    "--attention-backend"
+   ],
+   "type": "Optional[str]"
+  },
+  "attn_cp_size": {
+   "default": 1,
+   "flags": [
+    "--attention-context-parallel-size",
+    "--attn-cp-size"
+   ],
+   "type": "int"
+  },
+  "attn_dp_size": {
+   "default": 1,
+   "flags": [
+    "--attention-data-parallel-size",
+    "--attn-dp-size"
+   ],
+   "type": "int"
+  },
+  "aux_hidden_state_capture": {
+   "default": null,
+   "flags": [],
+   "type": "Optional[str]"
+  },
+  "base_gpu_id": {
+   "default": 0,
+   "flags": [
+    "--base-gpu-id"
+   ],
+   "type": "int"
+  },
+  "batch_notify_size": {
+   "default": 16,
+   "flags": [
+    "--batch-notify-size"
+   ],
+   "type": "int"
+  },
+  "bf16_gemm_backend": {
+   "default": "auto",
+   "flags": [
+    "--bf16-gemm-backend"
+   ],
+   "type": "str"
+  },
+  "boundary_reduction": {
+   "default": "auto",
+   "flags": [
+    "--boundary-reduction"
+   ],
+   "type": "Literal['auto', 'ar', 'rs', 'rsv', 'rs+rsv']"
+  },
+  "bucket_e2e_request_latency": {
+   "default": null,
+   "flags": [
+    "--bucket-e2e-request-latency"
+   ],
+   "type": "Optional[List[float]]"
+  },
+  "bucket_inter_token_latency": {
+   "default": null,
+   "flags": [
+    "--bucket-inter-token-latency"
+   ],
+   "type": "Optional[List[float]]"
+  },
+  "bucket_time_to_first_token": {
+   "default": null,
+   "flags": [
+    "--bucket-time-to-first-token"
+   ],
+   "type": "Optional[List[float]]"
+  },
+  "c128_page_size": {
+   "default": 16,
+   "flags": [
+    "--c128-page-size"
+   ],
+   "type": "int"
+  },
+  "chat_template": {
+   "default": null,
+   "flags": [
+    "--chat-template"
+   ],
+   "type": "Optional[str]"
+  },
+  "checkpoint_engine_wait_weights_before_ready": {
+   "default": false,
+   "flags": [
+    "--checkpoint-engine-wait-weights-before-ready"
+   ],
+   "type": "bool"
+  },
+  "chunked_prefill_size": {
+   "default": null,
+   "flags": [
+    "--chunked-prefill-size"
+   ],
+   "type": "Optional[int]"
+  },
+  "completion_template": {
+   "default": null,
+   "flags": [
+    "--completion-template"
+   ],
+   "type": "Optional[str]"
+  },
+  "constrained_json_disable_any_whitespace": {
+   "default": false,
+   "flags": [
+    "--constrained-json-disable-any-whitespace"
+   ],
+   "type": "bool"
+  },
+  "constrained_json_max_whitespace_cnt": {
+   "default": null,
+   "flags": [
+    "--constrained-json-max-whitespace-cnt"
+   ],
+   "type": "Optional[int]"
+  },
+  "constrained_json_whitespace_pattern": {
+   "default": null,
+   "flags": [
+    "--constrained-json-whitespace-pattern"
+   ],
+   "type": "Optional[str]"
+  },
+  "context_length": {
+   "default": null,
+   "flags": [
+    "--context-length"
+   ],
+   "type": "Optional[int]"
+  },
+  "cp_strategy": {
+   "default": null,
+   "flags": [
+    "--cp-strategy"
+   ],
+   "type": "Optional[str]"
+  },
+  "cpu_offload_gb": {
+   "default": 0,
+   "flags": [
+    "--cpu-offload-gb"
+   ],
+   "type": "int"
+  },
+  "crash_dump_folder": {
+   "default": null,
+   "flags": [
+    "--crash-dump-folder"
+   ],
+   "type": "Optional[str]"
+  },
+  "cuda_graph_backend_decode": {
+   "default": null,
+   "flags": [
+    "--cuda-graph-backend-decode"
+   ],
+   "type": "Optional[Literal['full', 'breakable', 'disabled']]"
+  },
+  "cuda_graph_backend_prefill": {
+   "default": null,
+   "flags": [
+    "--cuda-graph-backend-prefill"
+   ],
+   "type": "Optional[Literal['full', 'breakable', 'disabled']]"
+  },
+  "cuda_graph_bs_decode": {
+   "default": null,
+   "flags": [
+    "--cuda-graph-bs-decode"
+   ],
+   "type": "Optional[List[int]]"
+  },
+  "cuda_graph_bs_prefill": {
+   "default": null,
+   "flags": [
+    "--cuda-graph-bs-prefill"
+   ],
+   "type": "Optional[List[int]]"
+  },
+  "cuda_graph_config": {
+   "default": null,
+   "flags": [
+    "--cuda-graph-config"
+   ],
+   "type": "Optional[CudaGraphConfig]"
+  },
+  "cuda_graph_max_bs_decode": {
+   "default": null,
+   "flags": [
+    "--cuda-graph-max-bs-decode"
+   ],
+   "type": "Optional[int]"
+  },
+  "cuda_graph_max_bs_prefill": {
+   "default": null,
+   "flags": [
+    "--cuda-graph-max-bs-prefill"
+   ],
+   "type": "Optional[int]"
+  },
+  "cuda_graph_max_seq_len_prefill": {
+   "default": null,
+   "flags": [
+    "--cuda-graph-max-seq-len-prefill"
+   ],
+   "type": "Optional[int]"
+  },
+  "cuda_graph_prefill_max_context": {
+   "default": null,
+   "flags": [
+    "--context-bucket",
+    "--cuda-graph-prefill-max-context"
+   ],
+   "type": "Optional[int]"
+  },
+  "custom_sigquit_handler": {
+   "default": null,
+   "flags": [],
+   "type": "Optional[Callable]"
+  },
+  "custom_weight_loader": {
+   "default": null,
+   "flags": [
+    "--custom-weight-loader"
+   ],
+   "type": "Optional[List[str]]"
+  },
+  "dcp_comm_backend": {
+   "default": null,
+   "flags": [
+    "--dcp-comm-backend"
+   ],
+   "type": "Optional[str]"
+  },
+  "dcp_replicate_q_proj": {
+   "default": null,
+   "flags": [
+    "--dcp-replicate-q-proj"
+   ],
+   "type": "Optional[bool]"
+  },
+  "dcp_size": {
+   "default": 1,
+   "flags": [
+    "--dcp-size",
+    "--decode-context-parallel-size"
+   ],
+   "type": "int"
+  },
+  "debug_cuda_graph": {
+   "default": false,
+   "flags": [
+    "--debug-cuda-graph"
+   ],
+   "type": "bool"
+  },
+  "debug_tensor_dump_input_file": {
+   "default": null,
+   "flags": [
+    "--debug-tensor-dump-input-file"
+   ],
+   "type": "Optional[str]"
+  },
+  "debug_tensor_dump_layers": {
+   "default": null,
+   "flags": [
+    "--debug-tensor-dump-layers"
+   ],
+   "type": "Optional[List[int]]"
+  },
+  "debug_tensor_dump_output_folder": {
+   "default": null,
+   "flags": [
+    "--debug-tensor-dump-output-folder"
+   ],
+   "type": "Optional[str]"
+  },
+  "decode_attention_backend": {
+   "default": null,
+   "flags": [
+    "--decode-attention-backend"
+   ],
+   "type": "Optional[str]"
+  },
+  "decode_log_interval": {
+   "default": 40,
+   "flags": [
+    "--decode-log-interval"
+   ],
+   "type": "int"
+  },
+  "decoupled_spec_bind_endpoint": {
+   "default": null,
+   "flags": [
+    "--decoupled-spec-bind-endpoint"
+   ],
+   "type": "Optional[str]"
+  },
+  "decoupled_spec_connect_endpoints": {
+   "default": null,
+   "flags": [
+    "--decoupled-spec-connect-endpoints"
+   ],
+   "type": "Optional[List[str]]"
+  },
+  "decoupled_spec_rank": {
+   "default": null,
+   "flags": [
+    "--decoupled-spec-rank"
+   ],
+   "type": "Optional[int]"
+  },
+  "decoupled_spec_role": {
+   "default": "null",
+   "flags": [
+    "--decoupled-spec-role"
+   ],
+   "type": "Literal['null', 'verifier', 'drafter']"
+  },
+  "decrypted_config_file": {
+   "default": null,
+   "flags": [
+    "--decrypted-config-file"
+   ],
+   "type": "Optional[str]"
+  },
+  "decrypted_draft_config_file": {
+   "default": null,
+   "flags": [
+    "--decrypted-draft-config-file"
+   ],
+   "type": "Optional[str]"
+  },
+  "deepep_config": {
+   "default": null,
+   "flags": [
+    "--deepep-config"
+   ],
+   "type": "Optional[str]"
+  },
+  "deepep_dispatcher_output_dtype": {
+   "default": "auto",
+   "flags": [
+    "--deepep-dispatcher-output-dtype"
+   ],
+   "type": "Literal['auto', 'bf16', 'fp8', 'int8', 'nvfp4']"
+  },
+  "deepep_mode": {
+   "default": "auto",
+   "flags": [
+    "--deepep-mode"
+   ],
+   "type": "Literal['auto', 'normal', 'low_latency']"
+  },
+  "deepep_v2_mode": {
+   "default": "direct",
+   "flags": [
+    "--deepep-v2-mode"
+   ],
+   "type": "Literal['direct', 'hybrid']"
+  },
+  "default_chat_template_kwargs": {
+   "default": null,
+   "flags": [
+    "--default-chat-template-kwargs"
+   ],
+   "type": "Optional[Dict[str, Any]]"
+  },
+  "default_priority_value": {
+   "default": null,
+   "flags": [
+    "--default-priority-value"
+   ],
+   "type": "Optional[int]"
+  },
+  "delete_ckpt_after_loading": {
+   "default": false,
+   "flags": [
+    "--delete-ckpt-after-loading"
+   ],
+   "type": "bool"
+  },
+  "detokenizer_worker_num": {
+   "default": 1,
+   "flags": [
+    "--detokenizer-worker-num"
+   ],
+   "type": "int"
+  },
+  "device": {
+   "default": null,
+   "flags": [
+    "--device"
+   ],
+   "type": "Optional[str]"
+  },
+  "disable_aiter_allreduce_fusion_in_decode": {
+   "default": false,
+   "flags": [
+    "--disable-aiter-allreduce-fusion-in-decode"
+   ],
+   "type": "bool"
+  },
+  "disable_aiter_allreduce_fusion_in_prefill": {
+   "default": false,
+   "flags": [
+    "--disable-aiter-allreduce-fusion-in-prefill"
+   ],
+   "type": "bool"
+  },
+  "disable_attn_tp_gather": {
+   "default": false,
+   "flags": [
+    "--disable-attn-tp-gather"
+   ],
+   "type": "bool"
+  },
+  "disable_chunked_prefix_cache": {
+   "default": false,
+   "flags": [
+    "--disable-chunked-prefix-cache"
+   ],
+   "type": "bool"
+  },
+  "disable_cuda_graph": {
+   "default": false,
+   "flags": [
+    "--disable-cuda-graph"
+   ],
+   "type": "bool"
+  },
+  "disable_cuda_graph_padding": {
+   "default": false,
+   "flags": [
+    "--disable-cuda-graph-padding"
+   ],
+   "type": "bool"
+  },
+  "disable_custom_all_reduce": {
+   "default": false,
+   "flags": [
+    "--disable-custom-all-reduce"
+   ],
+   "type": "bool"
+  },
+  "disable_decode_cuda_graph": {
+   "default": false,
+   "flags": [
+    "--disable-decode-cuda-graph"
+   ],
+   "type": "bool"
+  },
+  "disable_fast_image_processor": {
+   "default": false,
+   "flags": [
+    "--disable-fast-image-processor"
+   ],
+   "type": "bool"
+  },
+  "disable_flashinfer_autotune": {
+   "default": false,
+   "flags": [
+    "--disable-flashinfer-autotune"
+   ],
+   "type": "bool"
+  },
+  "disable_flashinfer_cutlass_moe_fp4_allgather": {
+   "default": false,
+   "flags": [
+    "--disable-flashinfer-cutlass-moe-fp4-allgather"
+   ],
+   "type": "bool"
+  },
+  "disable_hybrid_swa_memory": {
+   "default": false,
+   "flags": [
+    "--disable-hybrid-swa-memory"
+   ],
+   "type": "bool"
+  },
+  "disable_outlines_disk_cache": {
+   "default": false,
+   "flags": [
+    "--disable-outlines-disk-cache"
+   ],
+   "type": "bool"
+  },
+  "disable_overlap_schedule": {
+   "default": false,
+   "flags": [
+    "--disable-overlap-schedule"
+   ],
+   "type": "bool"
+  },
+  "disable_prefill_cuda_graph": {
+   "default": false,
+   "flags": [
+    "--disable-prefill-cuda-graph"
+   ],
+   "type": "bool"
+  },
+  "disable_priority_preemption": {
+   "default": false,
+   "flags": [
+    "--disable-priority-preemption"
+   ],
+   "type": "bool"
+  },
+  "disable_radix_cache": {
+   "default": false,
+   "flags": [
+    "--disable-radix-cache"
+   ],
+   "type": "bool"
+  },
+  "disable_shared_experts_fusion": {
+   "default": false,
+   "flags": [
+    "--disable-shared-experts-fusion"
+   ],
+   "type": "bool"
+  },
+  "disable_tokenizer_batch_decode": {
+   "default": false,
+   "flags": [
+    "--disable-tokenizer-batch-decode"
+   ],
+   "type": "bool"
+  },
+  "disaggregation_bootstrap_port": {
+   "default": 8998,
+   "flags": [
+    "--disaggregation-bootstrap-port"
+   ],
+   "type": "int"
+  },
+  "disaggregation_decode_allocation_policy": {
+   "default": "early",
+   "flags": [
+    "--disaggregation-decode-allocation-policy"
+   ],
+   "type": "Literal['early', 'prefill_complete']"
+  },
+  "disaggregation_decode_enable_offload_kvcache": {
+   "default": false,
+   "flags": [
+    "--disaggregation-decode-enable-offload-kvcache"
+   ],
+   "type": "bool"
+  },
+  "disaggregation_decode_enable_radix_cache": {
+   "default": false,
+   "flags": [
+    "--disaggregation-decode-enable-radix-cache"
+   ],
+   "type": "bool"
+  },
+  "disaggregation_decode_extra_slots": {
+   "default": null,
+   "flags": [
+    "--disaggregation-decode-extra-slots"
+   ],
+   "type": "Optional[int]"
+  },
+  "disaggregation_decode_host_receive_threshold": {
+   "default": 1.0,
+   "flags": [
+    "--disaggregation-decode-host-receive-threshold"
+   ],
+   "type": "float"
+  },
+  "disaggregation_decode_polling_interval": {
+   "default": 1,
+   "flags": [
+    "--disaggregation-decode-polling-interval"
+   ],
+   "type": "int"
+  },
+  "disaggregation_decode_retraction_backup": {
+   "default": null,
+   "flags": [
+    "--disaggregation-decode-retraction-backup"
+   ],
+   "type": "Optional[str]"
+  },
+  "disaggregation_enable_kv_checksum": {
+   "default": false,
+   "flags": [
+    "--disaggregation-enable-kv-checksum"
+   ],
+   "type": "bool"
+  },
+  "disaggregation_ib_device": {
+   "default": null,
+   "flags": [
+    "--disaggregation-ib-device"
+   ],
+   "type": "Optional[str]"
+  },
+  "disaggregation_mode": {
+   "default": "null",
+   "flags": [
+    "--disaggregation-mode"
+   ],
+   "type": "Literal['null', 'prefill', 'decode']"
+  },
+  "disaggregation_transfer_backend": {
+   "default": "mooncake",
+   "flags": [
+    "--disaggregation-transfer-backend"
+   ],
+   "type": "str"
+  },
+  "dist_init_addr": {
+   "default": null,
+   "flags": [
+    "--dist-init-addr",
+    "--nccl-init-addr"
+   ],
+   "type": "Optional[str]"
+  },
+  "dist_timeout": {
+   "default": null,
+   "flags": [
+    "--dist-timeout"
+   ],
+   "type": "Optional[int]"
+  },
+  "dllm_algorithm": {
+   "default": null,
+   "flags": [
+    "--dllm-algorithm"
+   ],
+   "type": "Optional[str]"
+  },
+  "dllm_algorithm_config": {
+   "default": null,
+   "flags": [
+    "--dllm-algorithm-config"
+   ],
+   "type": "Optional[str]"
+  },
+  "dllm_fdfo": {
+   "default": true,
+   "flags": [
+    "--dllm-fdfo"
+   ],
+   "type": "bool"
+  },
+  "download_dir": {
+   "default": null,
+   "flags": [
+    "--download-dir"
+   ],
+   "type": "Optional[str]"
+  },
+  "dp_size": {
+   "default": 1,
+   "flags": [
+    "--data-parallel-size",
+    "--dp-size"
+   ],
+   "type": "int"
+  },
+  "dsa_decode_backend": {
+   "default": null,
+   "flags": [
+    "--dsa-decode-backend"
+   ],
+   "type": "Optional[str]"
+  },
+  "dsa_paged_mqa_logits_backend": {
+   "default": "auto",
+   "flags": [
+    "--dsa-paged-mqa-logits-backend"
+   ],
+   "type": "str"
+  },
+  "dsa_prefill_backend": {
+   "default": null,
+   "flags": [
+    "--dsa-prefill-backend"
+   ],
+   "type": "Optional[str]"
+  },
+  "dsa_topk_backend": {
+   "default": "sgl-kernel",
+   "flags": [
+    "--dsa-topk-backend"
+   ],
+   "type": "str"
+  },
+  "dsa_triton_union": {
+   "default": 0,
+   "flags": [
+    "--dsa-triton-union"
+   ],
+   "type": "int"
+  },
+  "dsv4_attn_backend": {
+   "default": "auto",
+   "flags": [
+    "--dsv4-attn-backend"
+   ],
+   "type": "str"
+  },
+  "dsv4_prefill_backend": {
+   "default": "auto",
+   "flags": [
+    "--dsv4-prefill-backend"
+   ],
+   "type": "str"
+  },
+  "dtype": {
+   "default": "auto",
+   "flags": [
+    "--dtype"
+   ],
+   "type": "str"
+  },
+  "dwdp_size": {
+   "default": 1,
+   "flags": [
+    "--dwdp-size"
+   ],
+   "type": "int"
+  },
+  "dynamic_batch_tokenizer_batch_size": {
+   "default": 32,
+   "flags": [
+    "--dynamic-batch-tokenizer-batch-size"
+   ],
+   "type": "int"
+  },
+  "dynamic_batch_tokenizer_batch_timeout": {
+   "default": 0.002,
+   "flags": [
+    "--dynamic-batch-tokenizer-batch-timeout"
+   ],
+   "type": "float"
+  },
+  "elastic_ep_backend": {
+   "default": null,
+   "flags": [
+    "--elastic-ep-backend"
+   ],
+   "type": "Literal[None, 'mooncake', 'nixl']"
+  },
+  "elastic_ep_initial_size": {
+   "default": null,
+   "flags": [
+    "--elastic-ep-initial-size"
+   ],
+   "type": "Optional[int]"
+  },
+  "elastic_ep_scale_timeout": {
+   "default": 600,
+   "flags": [
+    "--elastic-ep-scale-timeout"
+   ],
+   "type": "float"
+  },
+  "enable_adaptive_dispatch_to_encoder": {
+   "default": false,
+   "flags": [
+    "--enable-adaptive-dispatch-to-encoder"
+   ],
+   "type": "bool"
+  },
+  "enable_aiter_allreduce_fusion": {
+   "default": false,
+   "flags": [
+    "--enable-aiter-allreduce-fusion"
+   ],
+   "type": "bool"
+  },
+  "enable_amd_monokernel": {
+   "default": false,
+   "flags": [
+    "--enable-amd-monokernel",
+    "--monokernel-backend"
+   ],
+   "type": "bool"
+  },
+  "enable_attn_tp_input_scattered": {
+   "default": false,
+   "flags": [
+    "--enable-attn-tp-input-scattered"
+   ],
+   "type": "bool"
+  },
+  "enable_broadcast_mm_inputs_process": {
+   "default": false,
+   "flags": [
+    "--enable-broadcast-mm-inputs-process"
+   ],
+   "type": "bool"
+  },
+  "enable_cache_report": {
+   "default": false,
+   "flags": [
+    "--enable-cache-report"
+   ],
+   "type": "bool"
+  },
+  "enable_cp_decode_attn_tp": {
+   "default": false,
+   "flags": [
+    "--enable-cp-decode-attn-tp"
+   ],
+   "type": "bool"
+  },
+  "enable_cp_tp_group_sharing": {
+   "default": false,
+   "flags": [],
+   "type": "bool"
+  },
+  "enable_cudagraph_gc": {
+   "default": false,
+   "flags": [
+    "--enable-cudagraph-gc"
+   ],
+   "type": "bool"
+  },
+  "enable_custom_logit_processor": {
+   "default": false,
+   "flags": [
+    "--enable-custom-logit-processor"
+   ],
+   "type": "bool"
+  },
+  "enable_decoder_swa_bounded_replay": {
+   "default": null,
+   "flags": [
+    "--enable-decoder-swa-bounded-replay"
+   ],
+   "type": "Optional[bool]"
+  },
+  "enable_deepseek_v4_fp4_indexer": {
+   "default": false,
+   "flags": [
+    "--enable-deepseek-v4-fp4-indexer"
+   ],
+   "type": "bool"
+  },
+  "enable_dense_mlp_attn_tp": {
+   "default": false,
+   "flags": [
+    "--enable-dense-mlp-attn-tp"
+   ],
+   "type": "bool"
+  },
+  "enable_deterministic_inference": {
+   "default": false,
+   "flags": [
+    "--enable-deterministic-inference"
+   ],
+   "type": "bool"
+  },
+  "enable_dp_attention": {
+   "default": false,
+   "flags": [
+    "--enable-dp-attention"
+   ],
+   "type": "bool"
+  },
+  "enable_dp_attention_local_control_broadcast": {
+   "default": false,
+   "flags": [
+    "--enable-dp-attention-local-control-broadcast"
+   ],
+   "type": "bool"
+  },
+  "enable_dp_lm_head": {
+   "default": false,
+   "flags": [
+    "--enable-dp-lm-head"
+   ],
+   "type": "bool"
+  },
+  "enable_draft_weights_cpu_backup": {
+   "default": false,
+   "flags": [
+    "--enable-draft-weights-cpu-backup"
+   ],
+   "type": "bool"
+  },
+  "enable_dsa_cache_layer_split": {
+   "default": false,
+   "flags": [
+    "--enable-dsa-cache-layer-split"
+   ],
+   "type": "bool"
+  },
+  "enable_dsa_fused_indexer": {
+   "default": null,
+   "flags": [
+    "--enable-dsa-fused-indexer"
+   ],
+   "type": "Optional[bool]"
+  },
+  "enable_dynamic_batch_tokenizer": {
+   "default": false,
+   "flags": [
+    "--enable-dynamic-batch-tokenizer"
+   ],
+   "type": "bool"
+  },
+  "enable_dynamic_chunking": {
+   "default": false,
+   "flags": [
+    "--enable-dynamic-chunking"
+   ],
+   "type": "bool"
+  },
+  "enable_elastic_expert_backup": {
+   "default": false,
+   "flags": [
+    "--enable-elastic-expert-backup"
+   ],
+   "type": "bool"
+  },
+  "enable_encoder_swa_bounded_replay": {
+   "default": false,
+   "flags": [
+    "--enable-encoder-swa-bounded-replay"
+   ],
+   "type": "bool"
+  },
+  "enable_eplb": {
+   "default": false,
+   "flags": [
+    "--enable-eplb"
+   ],
+   "type": "bool"
+  },
+  "enable_flashinfer_allreduce_fusion": {
+   "default": false,
+   "flags": [
+    "--enable-flashinfer-allreduce-fusion"
+   ],
+   "type": "bool"
+  },
+  "enable_flexkv": {
+   "default": false,
+   "flags": [
+    "--enable-flexkv"
+   ],
+   "type": "bool"
+  },
+  "enable_forward_pass_metrics": {
+   "default": false,
+   "flags": [
+    "--enable-forward-pass-metrics"
+   ],
+   "type": "bool"
+  },
+  "enable_fp32_lm_head": {
+   "default": false,
+   "flags": [
+    "--enable-fp32-lm-head"
+   ],
+   "type": "bool"
+  },
+  "enable_fused_moe_sum_all_reduce": {
+   "default": false,
+   "flags": [
+    "--enable-fused-moe-sum-all-reduce"
+   ],
+   "type": "bool"
+  },
+  "enable_fused_qk_norm_rope": {
+   "default": null,
+   "flags": [
+    "--enable-fused-qk-norm-rope"
+   ],
+   "type": "Optional[bool]"
+  },
+  "enable_hierarchical_cache": {
+   "default": false,
+   "flags": [
+    "--enable-hicache",
+    "--enable-hierarchical-cache"
+   ],
+   "type": "bool"
+  },
+  "enable_hisparse": {
+   "default": false,
+   "flags": [
+    "--enable-hisparse"
+   ],
+   "type": "bool"
+  },
+  "enable_http2": {
+   "default": false,
+   "flags": [
+    "--enable-http2"
+   ],
+   "type": "bool"
+  },
+  "enable_http_worker_reuseport": {
+   "default": false,
+   "flags": [
+    "--enable-http-worker-reuseport"
+   ],
+   "type": "bool"
+  },
+  "enable_int8_mamba_checkpoint": {
+   "default": false,
+   "flags": [
+    "--enable-int8-mamba-checkpoint"
+   ],
+   "type": "bool"
+  },
+  "enable_kv_cache_sharding": {
+   "default": false,
+   "flags": [
+    "--enable-kv-cache-sharding"
+   ],
+   "type": "bool"
+  },
+  "enable_layernorm_sp": {
+   "default": false,
+   "flags": [
+    "--enable-layernorm-sp"
+   ],
+   "type": "bool"
+  },
+  "enable_layerwise_nvtx_marker": {
+   "default": false,
+   "flags": [
+    "--enable-layerwise-nvtx-marker"
+   ],
+   "type": "bool"
+  },
+  "enable_lean_attention": {
+   "default": null,
+   "flags": [
+    "--enable-lean-attention"
+   ],
+   "type": "Optional[bool]"
+  },
+  "enable_linear_replayssm": {
+   "default": false,
+   "flags": [
+    "--enable-linear-replayssm"
+   ],
+   "type": "bool"
+  },
+  "enable_linear_replayssm_spec": {
+   "default": false,
+   "flags": [
+    "--enable-linear-replayssm-spec"
+   ],
+   "type": "bool"
+  },
+  "enable_linker_mla_dedup": {
+   "default": false,
+   "flags": [
+    "--enable-linker-mla-dedup"
+   ],
+   "type": "bool"
+  },
+  "enable_lmcache": {
+   "default": false,
+   "flags": [
+    "--enable-lmcache"
+   ],
+   "type": "bool"
+  },
+  "enable_lora": {
+   "default": null,
+   "flags": [
+    "--enable-lora"
+   ],
+   "type": "Optional[bool]"
+  },
+  "enable_lora_overlap_loading": {
+   "default": null,
+   "flags": [
+    "--enable-lora-overlap-loading"
+   ],
+   "type": "Optional[bool]"
+  },
+  "enable_mamba_cache_stochastic_rounding": {
+   "default": false,
+   "flags": [
+    "--enable-mamba-cache-stochastic-rounding"
+   ],
+   "type": "bool"
+  },
+  "enable_megamoe_for_layernorm_sp": {
+   "default": false,
+   "flags": [
+    "--enable-megamoe-for-layernorm-sp"
+   ],
+   "type": "bool"
+  },
+  "enable_memory_saver": {
+   "default": false,
+   "flags": [
+    "--enable-memory-saver"
+   ],
+   "type": "bool"
+  },
+  "enable_metrics": {
+   "default": false,
+   "flags": [
+    "--enable-metrics"
+   ],
+   "type": "bool"
+  },
+  "enable_metrics_for_all_schedulers": {
+   "default": false,
+   "flags": [
+    "--enable-metrics-for-all-schedulers"
+   ],
+   "type": "bool"
+  },
+  "enable_mfu_metrics": {
+   "default": false,
+   "flags": [
+    "--enable-mfu-metrics"
+   ],
+   "type": "bool"
+  },
+  "enable_mis": {
+   "default": false,
+   "flags": [
+    "--enable-mis"
+   ],
+   "type": "bool"
+  },
+  "enable_mixed_chunk": {
+   "default": false,
+   "flags": [
+    "--enable-mixed-chunk"
+   ],
+   "type": "bool"
+  },
+  "enable_mm_global_cache": {
+   "default": false,
+   "flags": [
+    "--enable-mm-global-cache"
+   ],
+   "type": "bool"
+  },
+  "enable_mscclpp": {
+   "default": false,
+   "flags": [
+    "--enable-mscclpp"
+   ],
+   "type": "bool"
+  },
+  "enable_multi_layer_eagle": {
+   "default": false,
+   "flags": [
+    "--enable-multi-layer-eagle"
+   ],
+   "type": "bool"
+  },
+  "enable_multimodal": {
+   "default": null,
+   "flags": [
+    "--enable-multimodal"
+   ],
+   "type": "Optional[bool]"
+  },
+  "enable_nccl_nvls": {
+   "default": false,
+   "flags": [
+    "--enable-nccl-nvls"
+   ],
+   "type": "bool"
+  },
+  "enable_nvidia_megakernel": {
+   "default": false,
+   "flags": [
+    "--enable-nvidia-megakernel"
+   ],
+   "type": "bool"
+  },
+  "enable_p2p_check": {
+   "default": false,
+   "flags": [
+    "--enable-p2p-check"
+   ],
+   "type": "bool"
+  },
+  "enable_page_major_kv_layout": {
+   "default": false,
+   "flags": [
+    "--enable-page-major-kv-layout"
+   ],
+   "type": "bool"
+  },
+  "enable_paged_experts": {
+   "default": false,
+   "flags": [
+    "--enable-paged-experts"
+   ],
+   "type": "bool"
+  },
+  "enable_pd_role_switch": {
+   "default": false,
+   "flags": [
+    "--enable-pd-role-switch"
+   ],
+   "type": "bool"
+  },
+  "enable_pdmux": {
+   "default": false,
+   "flags": [
+    "--enable-pdmux"
+   ],
+   "type": "bool"
+  },
+  "enable_precise_embedding_interpolation": {
+   "default": false,
+   "flags": [
+    "--enable-precise-embedding-interpolation"
+   ],
+   "type": "bool"
+  },
+  "enable_prefill_cp": {
+   "default": false,
+   "flags": [
+    "--enable-prefill-cp"
+   ],
+   "type": "bool"
+  },
+  "enable_prefill_delayer": {
+   "default": false,
+   "flags": [
+    "--enable-prefill-delayer"
+   ],
+   "type": "bool"
+  },
+  "enable_prefix_mm_cache": {
+   "default": false,
+   "flags": [
+    "--enable-prefix-mm-cache"
+   ],
+   "type": "bool"
+  },
+  "enable_priority_scheduling": {
+   "default": false,
+   "flags": [
+    "--enable-priority-scheduling"
+   ],
+   "type": "bool"
+  },
+  "enable_profile_cuda_graph": {
+   "default": false,
+   "flags": [
+    "--enable-profile-cuda-graph"
+   ],
+   "type": "bool"
+  },
+  "enable_quant_communications": {
+   "default": false,
+   "flags": [
+    "--enable-quant-communications"
+   ],
+   "type": "Optional[bool]"
+  },
+  "enable_request_time_stats_logging": {
+   "default": false,
+   "flags": [
+    "--enable-request-time-stats-logging"
+   ],
+   "type": "bool"
+  },
+  "enable_response_store": {
+   "default": false,
+   "flags": [
+    "--enable-response-store"
+   ],
+   "type": "bool"
+  },
+  "enable_return_aux_hidden_states": {
+   "default": false,
+   "flags": [
+    "--enable-return-aux-hidden-states"
+   ],
+   "type": "bool"
+  },
+  "enable_return_hidden_states": {
+   "default": false,
+   "flags": [
+    "--enable-return-hidden-states"
+   ],
+   "type": "bool"
+  },
+  "enable_return_indexer_topk": {
+   "default": false,
+   "flags": [
+    "--enable-return-indexer-topk"
+   ],
+   "type": "bool"
+  },
+  "enable_return_routed_experts": {
+   "default": false,
+   "flags": [
+    "--enable-return-routed-experts"
+   ],
+   "type": "bool"
+  },
+  "enable_scattered_sconv": {
+   "default": false,
+   "flags": [
+    "--enable-scattered-sconv"
+   ],
+   "type": "bool"
+  },
+  "enable_session_radix_cache": {
+   "default": false,
+   "flags": [
+    "--enable-session-radix-cache"
+   ],
+   "type": "bool"
+  },
+  "enable_shared_experts_attn_tp": {
+   "default": false,
+   "flags": [
+    "--enable-shared-experts-attn-tp"
+   ],
+   "type": "bool"
+  },
+  "enable_single_batch_overlap": {
+   "default": false,
+   "flags": [
+    "--enable-single-batch-overlap"
+   ],
+   "type": "bool"
+  },
+  "enable_ssl_refresh": {
+   "default": false,
+   "flags": [
+    "--enable-ssl-refresh"
+   ],
+   "type": "bool"
+  },
+  "enable_streaming_session": {
+   "default": false,
+   "flags": [
+    "--enable-streaming-session"
+   ],
+   "type": "bool"
+  },
+  "enable_strict_thinking": {
+   "default": false,
+   "flags": [
+    "--enable-strict-thinking"
+   ],
+   "type": "bool"
+  },
+  "enable_symm_mem": {
+   "default": false,
+   "flags": [
+    "--enable-symm-mem"
+   ],
+   "type": "bool"
+  },
+  "enable_tf32_matmul": {
+   "default": null,
+   "flags": [
+    "--enable-tf32-matmul"
+   ],
+   "type": "Optional[bool]"
+  },
+  "enable_tokenizer_batch_encode": {
+   "default": false,
+   "flags": [
+    "--enable-tokenizer-batch-encode"
+   ],
+   "type": "bool"
+  },
+  "enable_torch_compile": {
+   "default": false,
+   "flags": [
+    "--enable-torch-compile"
+   ],
+   "type": "bool"
+  },
+  "enable_torch_compile_debug_mode": {
+   "default": false,
+   "flags": [
+    "--enable-torch-compile-debug-mode"
+   ],
+   "type": "bool"
+  },
+  "enable_torch_symm_mem": {
+   "default": false,
+   "flags": [
+    "--enable-torch-symm-mem"
+   ],
+   "type": "bool"
+  },
+  "enable_tp_lm_head_all_to_all": {
+   "default": null,
+   "flags": [
+    "--enable-tp-lm-head-all-to-all"
+   ],
+   "type": "Optional[bool]"
+  },
+  "enable_trace": {
+   "default": false,
+   "flags": [
+    "--enable-trace"
+   ],
+   "type": "bool"
+  },
+  "enable_two_batch_overlap": {
+   "default": false,
+   "flags": [
+    "--enable-two-batch-overlap"
+   ],
+   "type": "bool"
+  },
+  "enable_unified_cache_external_linker": {
+   "default": false,
+   "flags": [
+    "--enable-unified-cache-external-linker"
+   ],
+   "type": "bool"
+  },
+  "enable_unified_memory": {
+   "default": false,
+   "flags": [
+    "--enable-unified-memory"
+   ],
+   "type": "bool"
+  },
+  "enable_w4a4_mxfp4_megamoe": {
+   "default": false,
+   "flags": [
+    "--enable-w4a4-mxfp4-megamoe"
+   ],
+   "type": "bool"
+  },
+  "enable_waterfill": {
+   "default": false,
+   "flags": [
+    "--enable-waterfill"
+   ],
+   "type": "bool"
+  },
+  "enable_watermark": {
+   "default": false,
+   "flags": [
+    "--enable-watermark"
+   ],
+   "type": "bool"
+  },
+  "enable_weights_cpu_backup": {
+   "default": false,
+   "flags": [
+    "--enable-weights-cpu-backup"
+   ],
+   "type": "bool"
+  },
+  "encoder_bootstrap_port": {
+   "default": 8997,
+   "flags": [
+    "--encoder-bootstrap-port"
+   ],
+   "type": "int"
+  },
+  "encoder_only": {
+   "default": false,
+   "flags": [
+    "--encoder-only"
+   ],
+   "type": "bool"
+  },
+  "encoder_register_urls": {
+   "default": [],
+   "flags": [
+    "--encoder-register-urls"
+   ],
+   "type": "List[str]"
+  },
+  "encoder_transfer_backend": {
+   "default": "auto",
+   "flags": [
+    "--encoder-transfer-backend"
+   ],
+   "type": "str"
+  },
+  "encoder_urls": {
+   "default": [],
+   "flags": [
+    "--encoder-urls"
+   ],
+   "type": "List[str]"
+  },
+  "enforce_disable_flashinfer_allreduce_fusion": {
+   "default": false,
+   "flags": [
+    "--enforce-disable-flashinfer-allreduce-fusion"
+   ],
+   "type": "bool"
+  },
+  "enforce_shared_experts_fusion": {
+   "default": false,
+   "flags": [
+    "--enforce-shared-experts-fusion"
+   ],
+   "type": "bool"
+  },
+  "engine_info_bootstrap_port": {
+   "default": 6789,
+   "flags": [
+    "--engine-info-bootstrap-port"
+   ],
+   "type": "int"
+  },
+  "ep_dispatch_algorithm": {
+   "default": null,
+   "flags": [
+    "--ep-dispatch-algorithm"
+   ],
+   "type": "Optional[Literal['static', 'dynamic', 'fake', 'lp']]"
+  },
+  "ep_join_mode": {
+   "default": null,
+   "flags": [
+    "--elastic-ep-join-mode"
+   ],
+   "type": "Optional[Literal['scale', 'recover']]"
+  },
+  "ep_join_rank_offset": {
+   "default": 0,
+   "flags": [
+    "--elastic-ep-join-rank-offset"
+   ],
+   "type": "int"
+  },
+  "ep_num_redundant_experts": {
+   "default": 0,
+   "flags": [
+    "--ep-num-redundant-experts"
+   ],
+   "type": "int"
+  },
+  "ep_size": {
+   "default": 1,
+   "flags": [
+    "--ep",
+    "--ep-size",
+    "--expert-parallel-size"
+   ],
+   "type": "int"
+  },
+  "eplb_algorithm": {
+   "default": "auto",
+   "flags": [
+    "--eplb-algorithm"
+   ],
+   "type": "str"
+  },
+  "eplb_min_rebalancing_utilization_threshold": {
+   "default": 1.0,
+   "flags": [
+    "--eplb-min-rebalancing-utilization-threshold"
+   ],
+   "type": "float"
+  },
+  "eplb_rebalance_layers_per_chunk": {
+   "default": null,
+   "flags": [
+    "--eplb-rebalance-layers-per-chunk"
+   ],
+   "type": "Optional[int]"
+  },
+  "eplb_rebalance_num_iterations": {
+   "default": 1000,
+   "flags": [
+    "--eplb-rebalance-num-iterations"
+   ],
+   "type": "int"
+  },
+  "expert_balancedness_report_mode": {
+   "default": "off",
+   "flags": [
+    "--expert-balancedness-report-mode"
+   ],
+   "type": "Literal['off', 'server_log', 'prometheus', 'both']"
+  },
+  "expert_distribution_recorder_buffer_size": {
+   "default": null,
+   "flags": [
+    "--expert-distribution-recorder-buffer-size"
+   ],
+   "type": "Optional[int]"
+  },
+  "expert_distribution_recorder_mode": {
+   "default": null,
+   "flags": [
+    "--expert-distribution-recorder-mode"
+   ],
+   "type": "Optional[Literal['stat', 'stat_approx', 'per_pass', 'per_token']]"
+  },
+  "experts_shared_outer_loras": {
+   "default": null,
+   "flags": [
+    "--experts-shared-outer-loras"
+   ],
+   "type": "Optional[bool]"
+  },
+  "export_metrics_to_file": {
+   "default": false,
+   "flags": [
+    "--export-metrics-to-file"
+   ],
+   "type": "bool"
+  },
+  "export_metrics_to_file_dir": {
+   "default": null,
+   "flags": [
+    "--export-metrics-to-file-dir"
+   ],
+   "type": "Optional[str]"
+  },
+  "extra_metric_labels": {
+   "default": null,
+   "flags": [
+    "--extra-metric-labels"
+   ],
+   "type": "Optional[Dict[str, str]]"
+  },
+  "fastapi_root_path": {
+   "default": "",
+   "flags": [
+    "--fastapi-root-path"
+   ],
+   "type": "str"
+  },
+  "file_storage_path": {
+   "default": null,
+   "flags": [
+    "--file-storage-path"
+   ],
+   "type": "Optional[str]"
+  },
+  "flashinfer_a2a_dispatch_type": {
+   "default": null,
+   "flags": [
+    "--flashinfer-a2a-dispatch-type"
+   ],
+   "type": "Optional[Literal['auto', 'bf16', 'nvfp4', 'mxfp8']]"
+  },
+  "flashinfer_allreduce_fusion_backend": {
+   "default": null,
+   "flags": [
+    "--flashinfer-allreduce-fusion-backend"
+   ],
+   "type": "Optional[Literal['auto', 'trtllm', 'mnnvl', 'cutedsl']]"
+  },
+  "flashinfer_autotune_skip_ops": {
+   "default": null,
+   "flags": [
+    "--flashinfer-autotune-skip-ops"
+   ],
+   "type": "Optional[List[str]]"
+  },
+  "flashinfer_mla_disable_ragged": {
+   "default": false,
+   "flags": [
+    "--flashinfer-mla-disable-ragged"
+   ],
+   "type": "bool"
+  },
+  "flashinfer_mxfp4_moe_precision": {
+   "default": "default",
+   "flags": [
+    "--flashinfer-mxfp4-moe-precision"
+   ],
+   "type": "Literal['default', 'bf16', 'fp8']"
+  },
+  "flexkv_config_file": {
+   "default": null,
+   "flags": [
+    "--flexkv-config-file"
+   ],
+   "type": "Optional[str]"
+  },
+  "forward_hooks": {
+   "default": null,
+   "flags": [
+    "--forward-hooks"
+   ],
+   "type": "Optional[List[dict[str, Any]]]"
+  },
+  "forward_pass_metrics_ipc_name": {
+   "default": null,
+   "flags": [
+    "--forward-pass-metrics-ipc-name"
+   ],
+   "type": "Optional[str]"
+  },
+  "forward_pass_metrics_worker_id": {
+   "default": "",
+   "flags": [
+    "--forward-pass-metrics-worker-id"
+   ],
+   "type": "str"
+  },
+  "fp4_gemm_runner_backend": {
+   "default": "auto",
+   "flags": [
+    "--fp4-gemm-backend"
+   ],
+   "type": "str"
+  },
+  "fp8_gemm_runner_backend": {
+   "default": "auto",
+   "flags": [
+    "--fp8-gemm-backend"
+   ],
+   "type": "str"
+  },
+  "fuseep_mode": {
+   "default": 2,
+   "flags": [
+    "--fuseep-mode"
+   ],
+   "type": "Literal[1, 2]"
+  },
+  "gated_launch_port": {
+   "default": null,
+   "flags": [
+    "--gated-launch-port"
+   ],
+   "type": "Optional[int]"
+  },
+  "gc_threshold": {
+   "default": null,
+   "flags": [
+    "--gc-threshold"
+   ],
+   "type": "Optional[List[int]]"
+  },
+  "gc_warning_threshold_secs": {
+   "default": 0.0,
+   "flags": [
+    "--gc-warning-threshold-secs"
+   ],
+   "type": "float"
+  },
+  "generation_tokens_buckets": {
+   "default": null,
+   "flags": [
+    "--generation-tokens-buckets"
+   ],
+   "type": "Optional[List[str]]"
+  },
+  "gpu_id_step": {
+   "default": 1,
+   "flags": [
+    "--gpu-id-step"
+   ],
+   "type": "int"
+  },
+  "grammar_backend": {
+   "default": null,
+   "flags": [
+    "--grammar-backend"
+   ],
+   "type": "Optional[str]"
+  },
+  "grpc_mode": {
+   "default": false,
+   "flags": [
+    "--grpc-mode"
+   ],
+   "type": "bool"
+  },
+  "grpc_port": {
+   "default": null,
+   "flags": [
+    "--grpc-port"
+   ],
+   "type": "Optional[int]"
+  },
+  "grpc_response_timeout_secs": {
+   "default": 300,
+   "flags": [
+    "--grpc-response-timeout-secs"
+   ],
+   "type": "int"
+  },
+  "grpc_worker_threads": {
+   "default": null,
+   "flags": [],
+   "type": "Optional[int]"
+  },
+  "hf_chat_template_name": {
+   "default": null,
+   "flags": [
+    "--hf-chat-template-name"
+   ],
+   "type": "Optional[str]"
+  },
+  "hicache_host_memory_fraction": {
+   "default": 0.8,
+   "flags": [
+    "--hicache-host-memory-fraction"
+   ],
+   "type": "Optional[float]"
+  },
+  "hicache_host_memory_mode": {
+   "default": "cache",
+   "flags": [
+    "--hicache-host-memory-mode"
+   ],
+   "type": "str"
+  },
+  "hicache_io_backend": {
+   "default": "kernel",
+   "flags": [
+    "--hicache-io-backend"
+   ],
+   "type": "str"
+  },
+  "hicache_mem_layout": {
+   "default": "page_first",
+   "flags": [
+    "--hicache-mem-layout"
+   ],
+   "type": "str"
+  },
+  "hicache_ratio": {
+   "default": null,
+   "flags": [
+    "--hicache-ratio"
+   ],
+   "type": "Optional[float]"
+  },
+  "hicache_size": {
+   "default": 0,
+   "flags": [
+    "--hicache-size"
+   ],
+   "type": "int"
+  },
+  "hicache_storage_backend": {
+   "default": null,
+   "flags": [
+    "--hicache-storage-backend"
+   ],
+   "type": "Optional[str]"
+  },
+  "hicache_storage_backend_extra_config": {
+   "default": null,
+   "flags": [
+    "--hicache-storage-backend-extra-config"
+   ],
+   "type": "Optional[str]"
+  },
+  "hicache_storage_prefetch_policy": {
+   "default": "timeout",
+   "flags": [
+    "--hicache-storage-prefetch-policy"
+   ],
+   "type": "str"
+  },
+  "hicache_storage_prefetch_retry_max_attempts": {
+   "default": 8,
+   "flags": [
+    "--hicache-storage-prefetch-retry-max-attempts"
+   ],
+   "type": "int"
+  },
+  "hicache_storage_prefetch_retry_poll_interval": {
+   "default": 8,
+   "flags": [
+    "--hicache-storage-prefetch-retry-poll-interval"
+   ],
+   "type": "int"
+  },
+  "hicache_write_policy": {
+   "default": "write_through",
+   "flags": [
+    "--hicache-write-policy"
+   ],
+   "type": "str"
+  },
+  "hisparse_config": {
+   "default": null,
+   "flags": [
+    "--hierarchical-sparse-attention-extra-config",
+    "--hisparse-config"
+   ],
+   "type": "Optional[str]"
+  },
+  "host": {
+   "default": "127.0.0.1",
+   "flags": [
+    "--host"
+   ],
+   "type": "str"
+  },
+  "http2_initial_connection_window_size": {
+   "flags": [
+    "--http2-initial-connection-window-size"
+   ],
+   "type": "int"
+  },
+  "http2_max_concurrent_streams": {
+   "default": 200,
+   "flags": [
+    "--http2-max-concurrent-streams"
+   ],
+   "type": "int"
+  },
+  "image_processor_backend": {
+   "default": "auto",
+   "flags": [
+    "--image-processor-backend"
+   ],
+   "type": "Literal['auto', 'torchvision', 'pil']"
+  },
+  "incremental_streaming_output": {
+   "default": false,
+   "flags": [
+    "--incremental-streaming-output"
+   ],
+   "type": "bool"
+  },
+  "init_expert_location": {
+   "default": "trivial",
+   "flags": [
+    "--init-expert-location"
+   ],
+   "type": "str"
+  },
+  "int8_mamba_ckpt_size": {
+   "default": null,
+   "flags": [
+    "--int8-mamba-ckpt-size"
+   ],
+   "type": "Optional[int]"
+  },
+  "is_embedding": {
+   "default": false,
+   "flags": [
+    "--is-embedding"
+   ],
+   "type": "bool"
+  },
+  "json_model_override_args": {
+   "default": "{}",
+   "flags": [
+    "--json-model-override-args"
+   ],
+   "type": "str"
+  },
+  "kt_cpuinfer": {
+   "default": null,
+   "flags": [
+    "--kt-cpuinfer"
+   ],
+   "type": "Optional[int]"
+  },
+  "kt_max_deferred_experts_per_token": {
+   "default": null,
+   "flags": [
+    "--kt-max-deferred-experts-per-token"
+   ],
+   "type": "Optional[int]"
+  },
+  "kt_method": {
+   "default": "AMXINT4",
+   "flags": [
+    "--kt-method"
+   ],
+   "type": "str"
+  },
+  "kt_num_gpu_experts": {
+   "default": null,
+   "flags": [
+    "--kt-num-gpu-experts"
+   ],
+   "type": "Optional[int]"
+  },
+  "kt_threadpool_count": {
+   "default": 2,
+   "flags": [
+    "--kt-threadpool-count"
+   ],
+   "type": "int"
+  },
+  "kt_weight_path": {
+   "default": null,
+   "flags": [
+    "--kt-weight-path"
+   ],
+   "type": "Optional[str]"
+  },
+  "kv_cache_dtype": {
+   "default": "auto",
+   "flags": [
+    "--kv-cache-dtype"
+   ],
+   "type": "str"
+  },
+  "kv_canary": {
+   "default": "none",
+   "flags": [
+    "--kv-canary"
+   ],
+   "type": "str"
+  },
+  "kv_canary_real_data": {
+   "default": "none",
+   "flags": [
+    "--kv-canary-real-data"
+   ],
+   "type": "str"
+  },
+  "kv_canary_sweep_interval": {
+   "default": 0,
+   "flags": [
+    "--kv-canary-sweep-interval"
+   ],
+   "type": "int"
+  },
+  "kv_events_config": {
+   "default": null,
+   "flags": [
+    "--kv-events-config"
+   ],
+   "type": "Optional[str]"
+  },
+  "language_model_only": {
+   "default": false,
+   "flags": [
+    "--language-model-only"
+   ],
+   "type": "bool"
+  },
+  "language_only": {
+   "default": false,
+   "flags": [
+    "--language-only"
+   ],
+   "type": "bool"
+  },
+  "limit_mm_data_per_request": {
+   "default": null,
+   "flags": [
+    "--limit-mm-data-per-request"
+   ],
+   "type": "Optional[Union[str, Dict[str, int]]]"
+  },
+  "linear_attn_backend": {
+   "default": "triton",
+   "flags": [
+    "--linear-attn-backend"
+   ],
+   "type": "str"
+  },
+  "linear_attn_decode_backend": {
+   "default": null,
+   "flags": [
+    "--linear-attn-decode-backend"
+   ],
+   "type": "Optional[str]"
+  },
+  "linear_attn_prefill_backend": {
+   "default": null,
+   "flags": [
+    "--linear-attn-prefill-backend"
+   ],
+   "type": "Optional[str]"
+  },
+  "linear_attn_verify_backend": {
+   "default": null,
+   "flags": [
+    "--linear-attn-verify-backend"
+   ],
+   "type": "Optional[str]"
+  },
+  "linear_replayssm_cache_len": {
+   "default": 16,
+   "flags": [
+    "--linear-replayssm-cache-len"
+   ],
+   "type": "int"
+  },
+  "lmcache_config_file": {
+   "default": null,
+   "flags": [
+    "--lmcache-config-file"
+   ],
+   "type": "Optional[str]"
+  },
+  "load_balance_method": {
+   "default": "auto",
+   "flags": [
+    "--load-balance-method"
+   ],
+   "type": "str"
+  },
+  "load_format": {
+   "default": "auto",
+   "flags": [
+    "--load-format"
+   ],
+   "type": "str"
+  },
+  "load_publish_endpoint": {
+   "default": null,
+   "flags": [
+    "--load-publish-endpoint"
+   ],
+   "type": "Optional[str]"
+  },
+  "load_snapshot_publish_interval": {
+   "default": 15,
+   "flags": [
+    "--load-snapshot-publish-interval"
+   ],
+   "type": "int"
+  },
+  "log_level": {
+   "default": "info",
+   "flags": [
+    "--log-level"
+   ],
+   "type": "str"
+  },
+  "log_level_http": {
+   "default": null,
+   "flags": [
+    "--log-level-http"
+   ],
+   "type": "Optional[str]"
+  },
+  "log_requests": {
+   "default": false,
+   "flags": [
+    "--log-requests"
+   ],
+   "type": "bool"
+  },
+  "log_requests_format": {
+   "default": "text",
+   "flags": [
+    "--log-requests-format"
+   ],
+   "type": "str"
+  },
+  "log_requests_level": {
+   "default": 2,
+   "flags": [
+    "--log-requests-level"
+   ],
+   "type": "int"
+  },
+  "log_requests_target": {
+   "default": null,
+   "flags": [
+    "--log-requests-target"
+   ],
+   "type": "Optional[List[str]]"
+  },
+  "lora_backend": {
+   "default": "csgmv",
+   "flags": [
+    "--lora-backend"
+   ],
+   "type": "str"
+  },
+  "lora_drain_wait_threshold": {
+   "default": 0.0,
+   "flags": [
+    "--lora-drain-wait-threshold"
+   ],
+   "type": "float"
+  },
+  "lora_eviction_policy": {
+   "default": "lru",
+   "flags": [
+    "--lora-eviction-policy"
+   ],
+   "type": "str"
+  },
+  "lora_paths": {
+   "default": null,
+   "flags": [
+    "--lora-paths"
+   ],
+   "type": "Optional[Union[dict[str, str], List[dict[str, str]], List[str], List[LoRARef]]]"
+  },
+  "lora_strict_loading": {
+   "default": false,
+   "flags": [
+    "--lora-strict-loading"
+   ],
+   "type": "bool"
+  },
+  "lora_target_modules": {
+   "default": null,
+   "flags": [
+    "--lora-target-modules"
+   ],
+   "type": "Optional[Union[set[str], List[str]]]"
+  },
+  "lora_use_virtual_experts": {
+   "default": false,
+   "flags": [
+    "--lora-use-virtual-experts"
+   ],
+   "type": "bool"
+  },
+  "mamba_backend": {
+   "default": "triton",
+   "flags": [
+    "--mamba-backend"
+   ],
+   "type": "str"
+  },
+  "mamba_cache_philox_rounds": {
+   "default": 0,
+   "flags": [
+    "--mamba-cache-philox-rounds"
+   ],
+   "type": "int"
+  },
+  "mamba_full_memory_ratio": {
+   "default": null,
+   "flags": [
+    "--mamba-full-memory-ratio"
+   ],
+   "type": "Optional[float]"
+  },
+  "mamba_max_states_per_path": {
+   "default": -1,
+   "flags": [
+    "--mamba-max-states-per-path"
+   ],
+   "type": "int"
+  },
+  "mamba_radix_cache_strategy": {
+   "default": "auto",
+   "flags": [
+    "--mamba-radix-cache-strategy"
+   ],
+   "type": "str"
+  },
+  "mamba_ssm_dtype": {
+   "default": null,
+   "flags": [
+    "--mamba-ssm-dtype"
+   ],
+   "type": "Optional[str]"
+  },
+  "mamba_track_interval": {
+   "default": 256,
+   "flags": [
+    "--mamba-track-interval"
+   ],
+   "type": "int"
+  },
+  "max_ep_size": {
+   "default": null,
+   "flags": [
+    "--max-ep-size"
+   ],
+   "type": "Optional[int]"
+  },
+  "max_loaded_loras": {
+   "default": null,
+   "flags": [
+    "--max-loaded-loras"
+   ],
+   "type": "Optional[int]"
+  },
+  "max_lora_chunk_size": {
+   "default": 16,
+   "flags": [
+    "--max-lora-chunk-size"
+   ],
+   "type": "Optional[int]"
+  },
+  "max_lora_rank": {
+   "default": null,
+   "flags": [
+    "--max-lora-rank"
+   ],
+   "type": "Optional[int]"
+  },
+  "max_loras_per_batch": {
+   "default": 8,
+   "flags": [
+    "--max-loras-per-batch"
+   ],
+   "type": "int"
+  },
+  "max_mamba_cache_size": {
+   "default": null,
+   "flags": [
+    "--max-mamba-cache-size"
+   ],
+   "type": "Optional[int]"
+  },
+  "max_prefill_tokens": {
+   "default": 16384,
+   "flags": [
+    "--max-prefill-tokens"
+   ],
+   "type": "int"
+  },
+  "max_queued_requests": {
+   "default": null,
+   "flags": [
+    "--max-queued-requests"
+   ],
+   "type": "Optional[int]"
+  },
+  "max_running_requests": {
+   "default": null,
+   "flags": [
+    "--max-running-requests"
+   ],
+   "type": "Optional[int]"
+  },
+  "max_total_tokens": {
+   "default": null,
+   "flags": [
+    "--max-total-tokens"
+   ],
+   "type": "Optional[int]"
+  },
+  "media_url_max_file_size_mb": {
+   "default": 64,
+   "flags": [
+    "--media-url-max-file-size-mb"
+   ],
+   "type": "int"
+  },
+  "mem_fraction_static": {
+   "default": null,
+   "flags": [
+    "--mem-fraction-static"
+   ],
+   "type": "Optional[float]"
+  },
+  "min_free_slots_delay": {
+   "default": null,
+   "flags": [
+    "--min-free-slots-delay"
+   ],
+   "type": "Optional[int]"
+  },
+  "mlx_enable_sampling": {
+   "default": false,
+   "flags": [
+    "--mlx-enable-sampling"
+   ],
+   "type": "bool"
+  },
+  "mm_attention_backend": {
+   "default": null,
+   "flags": [
+    "--mm-attention-backend"
+   ],
+   "type": "Optional[str]"
+  },
+  "mm_enable_dp_encoder": {
+   "default": null,
+   "flags": [
+    "--mm-enable-dp-encoder"
+   ],
+   "type": "Optional[bool]"
+  },
+  "mm_feature_transport": {
+   "default": null,
+   "flags": [
+    "--mm-feature-transport"
+   ],
+   "type": "Optional[Literal['cpu', 'cuda_ipc', 'cuda_vmm']]"
+  },
+  "mm_global_cache_backend": {
+   "default": "mooncake",
+   "flags": [
+    "--mm-global-cache-backend"
+   ],
+   "type": "str"
+  },
+  "mm_io_worker_num": {
+   "default": 0,
+   "flags": [
+    "--mm-io-worker-num"
+   ],
+   "type": "int"
+  },
+  "mm_preprocess_cache_size_mb": {
+   "default": null,
+   "flags": [
+    "--mm-preprocess-cache-size-mb"
+   ],
+   "type": "Optional[int]"
+  },
+  "mm_process_config": {
+   "default": null,
+   "flags": [
+    "--mm-process-config"
+   ],
+   "type": "Optional[Dict[str, Any]]"
+  },
+  "mm_processor_worker_num": {
+   "default": 0,
+   "flags": [
+    "--mm-processor-worker-num"
+   ],
+   "type": "int"
+  },
+  "model_checksum": {
+   "default": null,
+   "flags": [
+    "--model-checksum"
+   ],
+   "type": "Optional[str]"
+  },
+  "model_config_parser": {
+   "default": "auto",
+   "flags": [
+    "--model-config-parser"
+   ],
+   "type": "str"
+  },
+  "model_impl": {
+   "default": "auto",
+   "flags": [
+    "--model-impl"
+   ],
+   "type": "str"
+  },
+  "model_loader_extra_config": {
+   "default": "{}",
+   "flags": [
+    "--model-loader-extra-config"
+   ],
+   "type": "str"
+  },
+  "model_path": {
+   "flags": [
+    "--model",
+    "--model-path"
+   ],
+   "type": "str"
+  },
+  "modelexpress_config": {
+   "default": null,
+   "flags": [
+    "--modelexpress-config"
+   ],
+   "type": "Optional[str]"
+  },
+  "modelopt_checkpoint_restore_path": {
+   "default": null,
+   "flags": [
+    "--modelopt-checkpoint-restore-path"
+   ],
+   "type": "Optional[str]"
+  },
+  "modelopt_checkpoint_save_path": {
+   "default": null,
+   "flags": [
+    "--modelopt-checkpoint-save-path"
+   ],
+   "type": "Optional[str]"
+  },
+  "modelopt_export_path": {
+   "default": null,
+   "flags": [
+    "--modelopt-export-path"
+   ],
+   "type": "Optional[str]"
+  },
+  "modelopt_quant": {
+   "default": null,
+   "flags": [
+    "--modelopt-quant"
+   ],
+   "type": "Optional[Union[str, Dict]]"
+  },
+  "moe_a2a_backend": {
+   "default": "none",
+   "flags": [
+    "--moe-a2a-backend"
+   ],
+   "type": "Literal['none', 'deepep', 'mooncake', 'nixl', 'mori', 'ascend_fuseep', 'flashinfer', 'megamoe', 'deepep_v2', 'ascend_tp', 'pplx', 'flashinfer_megamoe']"
+  },
+  "moe_dense_tp_size": {
+   "default": null,
+   "flags": [
+    "--moe-dense-tp-size"
+   ],
+   "type": "Optional[int]"
+  },
+  "moe_dp_size": {
+   "default": 1,
+   "flags": [
+    "--moe-data-parallel-size",
+    "--moe-dp-size"
+   ],
+   "type": "int"
+  },
+  "moe_runner_backend": {
+   "default": "auto",
+   "flags": [
+    "--moe-runner-backend"
+   ],
+   "type": "str"
+  },
+  "mooncake_ib_device": {
+   "default": null,
+   "flags": [
+    "--mooncake-ib-device"
+   ],
+   "type": "Optional[str]"
+  },
+  "msprobe_dump_config": {
+   "default": null,
+   "flags": [
+    "--msprobe-dump-config"
+   ],
+   "type": "Optional[str]"
+  },
+  "nccl_port": {
+   "default": null,
+   "flags": [
+    "--nccl-port"
+   ],
+   "type": "Optional[int]"
+  },
+  "nnodes": {
+   "default": 1,
+   "flags": [
+    "--nnodes"
+   ],
+   "type": "int"
+  },
+  "node_rank": {
+   "default": 0,
+   "flags": [
+    "--node-rank"
+   ],
+   "type": "int"
+  },
+  "num_continuous_decode_steps": {
+   "default": 1,
+   "flags": [
+    "--num-continuous-decode-steps"
+   ],
+   "type": "int"
+  },
+  "num_reserved_decode_tokens": {
+   "default": 512,
+   "flags": [
+    "--num-reserved-decode-tokens"
+   ],
+   "type": "int"
+  },
+  "numa_node": {
+   "default": null,
+   "flags": [
+    "--numa-node"
+   ],
+   "type": "Optional[List[int]]"
+  },
+  "offload_group_size": {
+   "default": -1,
+   "flags": [
+    "--offload-group-size"
+   ],
+   "type": "int"
+  },
+  "offload_mode": {
+   "default": "cpu",
+   "flags": [
+    "--offload-mode"
+   ],
+   "type": "str"
+  },
+  "offload_num_in_group": {
+   "default": 1,
+   "flags": [
+    "--offload-num-in-group"
+   ],
+   "type": "int"
+  },
+  "offload_prefetch_step": {
+   "default": 1,
+   "flags": [
+    "--offload-prefetch-step"
+   ],
+   "type": "int"
+  },
+  "optimistic_prefill_attempts": {
+   "default": 0,
+   "flags": [
+    "--optimistic-prefill-attempts"
+   ],
+   "type": "int"
+  },
+  "otlp_service_name": {
+   "default": null,
+   "flags": [
+    "--otlp-service-name"
+   ],
+   "type": "Optional[str]"
+  },
+  "otlp_traces_endpoint": {
+   "default": "localhost:4317",
+   "flags": [
+    "--otlp-traces-endpoint"
+   ],
+   "type": "str"
+  },
+  "page_size": {
+   "default": null,
+   "flags": [
+    "--page-size"
+   ],
+   "type": "Optional[int]"
+  },
+  "paged_experts_num_resident": {
+   "default": null,
+   "flags": [
+    "--paged-experts-num-resident"
+   ],
+   "type": "Optional[int]"
+  },
+  "pdmux_config_path": {
+   "default": null,
+   "flags": [
+    "--pdmux-config-path"
+   ],
+   "type": "Optional[str]"
+  },
+  "ple_offload_backend": {
+   "default": "pinned",
+   "flags": [
+    "--ple-offload-backend"
+   ],
+   "type": "str"
+  },
+  "ple_offload_dir": {
+   "default": null,
+   "flags": [
+    "--ple-offload-dir"
+   ],
+   "type": "Optional[str]"
+  },
+  "ple_offload_embedding": {
+   "default": null,
+   "flags": [
+    "--ple-offload-embedding"
+   ],
+   "type": "Optional[bool]"
+  },
+  "port": {
+   "default": 30000,
+   "flags": [
+    "--port"
+   ],
+   "type": "int"
+  },
+  "pp_async_batch_depth": {
+   "default": 0,
+   "flags": [
+    "--pp-async-batch-depth"
+   ],
+   "type": "int"
+  },
+  "pp_max_micro_batch_size": {
+   "default": null,
+   "flags": [
+    "--pp-max-micro-batch-size"
+   ],
+   "type": "Optional[int]"
+  },
+  "pp_size": {
+   "default": 1,
+   "flags": [
+    "--pipeline-parallel-size",
+    "--pp-size"
+   ],
+   "type": "int"
+  },
+  "pre_warm_nccl": {
+   "default": false,
+   "flags": [
+    "--pre-warm-nccl"
+   ],
+   "type": "bool"
+  },
+  "preferred_sampling_params": {
+   "default": null,
+   "flags": [
+    "--preferred-sampling-params"
+   ],
+   "type": "Optional[str]"
+  },
+  "prefill_attention_backend": {
+   "default": null,
+   "flags": [
+    "--prefill-attention-backend"
+   ],
+   "type": "Optional[str]"
+  },
+  "prefill_decode_interval": {
+   "default": null,
+   "flags": [
+    "--prefill-decode-interval"
+   ],
+   "type": "Optional[int]"
+  },
+  "prefill_decode_interval_min_bs": {
+   "default": 0,
+   "flags": [
+    "--prefill-decode-interval-min-bs"
+   ],
+   "type": "int"
+  },
+  "prefill_delayer_forward_passes_buckets": {
+   "default": null,
+   "flags": [
+    "--prefill-delayer-forward-passes-buckets"
+   ],
+   "type": "Optional[List[float]]"
+  },
+  "prefill_delayer_max_delay_ms": {
+   "default": null,
+   "flags": [
+    "--prefill-delayer-max-delay-ms"
+   ],
+   "type": "Optional[float]"
+  },
+  "prefill_delayer_max_delay_passes": {
+   "default": 30,
+   "flags": [
+    "--prefill-delayer-max-delay-passes"
+   ],
+   "type": "int"
+  },
+  "prefill_delayer_queue_min_ratio": {
+   "default": null,
+   "flags": [
+    "--prefill-delayer-queue-min-ratio"
+   ],
+   "type": "Optional[float]"
+  },
+  "prefill_delayer_token_usage_low_watermark": {
+   "default": null,
+   "flags": [
+    "--prefill-delayer-token-usage-low-watermark"
+   ],
+   "type": "Optional[float]"
+  },
+  "prefill_delayer_wait_seconds_buckets": {
+   "default": null,
+   "flags": [
+    "--prefill-delayer-wait-seconds-buckets"
+   ],
+   "type": "Optional[List[float]]"
+  },
+  "prefill_kv_cache_dequant_dtype": {
+   "default": "auto",
+   "flags": [
+    "--prefill-kv-cache-dequant-dtype"
+   ],
+   "type": "str"
+  },
+  "prefill_max_requests": {
+   "default": null,
+   "flags": [
+    "--prefill-max-requests"
+   ],
+   "type": "Optional[int]"
+  },
+  "prefill_only_disable_kv_cache": {
+   "default": false,
+   "flags": [
+    "--prefill-only-disable-kv-cache"
+   ],
+   "type": "bool"
+  },
+  "priority_scheduling_preemption_threshold": {
+   "default": 10,
+   "flags": [
+    "--priority-scheduling-preemption-threshold"
+   ],
+   "type": "int"
+  },
+  "prompt_tokens_buckets": {
+   "default": null,
+   "flags": [
+    "--prompt-tokens-buckets"
+   ],
+   "type": "Optional[List[str]]"
+  },
+  "qsa_indexer_dtype": {
+   "default": "auto",
+   "flags": [
+    "--qsa-indexer-dtype"
+   ],
+   "type": "str"
+  },
+  "quantization": {
+   "default": null,
+   "flags": [
+    "--quantization"
+   ],
+   "type": "Optional[str]"
+  },
+  "quantization_param_path": {
+   "default": null,
+   "flags": [
+    "--quantization-param-path"
+   ],
+   "type": "Optional[str]"
+  },
+  "quantize_and_serve": {
+   "default": false,
+   "flags": [
+    "--quantize-and-serve"
+   ],
+   "type": "bool"
+  },
+  "radix_cache_backend": {
+   "default": null,
+   "flags": [
+    "--radix-cache-backend"
+   ],
+   "type": "Optional[str]"
+  },
+  "radix_eviction_policy": {
+   "default": "lru",
+   "flags": [
+    "--radix-eviction-policy"
+   ],
+   "type": "str"
+  },
+  "radix_eviction_policy_config": {
+   "default": null,
+   "flags": [
+    "--radix-eviction-policy-config"
+   ],
+   "type": "Optional[Dict[str, Any]]"
+  },
+  "random_seed": {
+   "default": null,
+   "flags": [
+    "--random-seed"
+   ],
+   "type": "Optional[int]"
+  },
+  "reasoning_parser": {
+   "default": null,
+   "flags": [
+    "--reasoning-parser"
+   ],
+   "type": "Optional[str]"
+  },
+  "remote_instance_weight_loader_backend": {
+   "default": "nccl",
+   "flags": [
+    "--remote-instance-weight-loader-backend"
+   ],
+   "type": "Literal['transfer_engine', 'nccl', 'modelexpress']"
+  },
+  "remote_instance_weight_loader_seed_instance_ip": {
+   "default": null,
+   "flags": [
+    "--remote-instance-weight-loader-seed-instance-ip"
+   ],
+   "type": "Optional[str]"
+  },
+  "remote_instance_weight_loader_seed_instance_service_port": {
+   "default": null,
+   "flags": [
+    "--remote-instance-weight-loader-seed-instance-service-port"
+   ],
+   "type": "Optional[int]"
+  },
+  "remote_instance_weight_loader_send_weights_group_ports": {
+   "default": null,
+   "flags": [
+    "--remote-instance-weight-loader-send-weights-group-ports"
+   ],
+   "type": "Optional[List[int]]"
+  },
+  "remote_instance_weight_loader_start_seed_via_transfer_engine": {
+   "default": false,
+   "flags": [
+    "--remote-instance-weight-loader-start-seed-via-transfer-engine"
+   ],
+   "type": "bool"
+  },
+  "retraction_policy": {
+   "default": "length",
+   "flags": [
+    "--retraction-policy"
+   ],
+   "type": "str"
+  },
+  "return_aux_hidden_state_layer_ids": {
+   "default": null,
+   "flags": [
+    "--return-aux-hidden-state-layer-ids"
+   ],
+   "type": "Optional[List[int]]"
+  },
+  "return_hidden_states_mode": {
+   "default": null,
+   "flags": [
+    "--return-hidden-states-mode"
+   ],
+   "type": "Optional[str]"
+  },
+  "return_input_ids": {
+   "default": false,
+   "flags": [
+    "--return-input-ids"
+   ],
+   "type": "bool"
+  },
+  "return_output_ids": {
+   "default": false,
+   "flags": [
+    "--return-output-ids"
+   ],
+   "type": "bool"
+  },
+  "revision": {
+   "default": null,
+   "flags": [
+    "--revision"
+   ],
+   "type": "Optional[str]"
+  },
+  "rl_on_policy_target": {
+   "default": null,
+   "flags": [
+    "--rl-on-policy-target"
+   ],
+   "type": "Optional[str]"
+  },
+  "rl_quant_profile": {
+   "default": null,
+   "flags": [
+    "--rl-quant-profile"
+   ],
+   "type": "Optional[str]"
+  },
+  "sampling_backend": {
+   "default": null,
+   "flags": [
+    "--sampling-backend"
+   ],
+   "type": "Optional[str]"
+  },
+  "sampling_defaults": {
+   "default": "model",
+   "flags": [
+    "--sampling-defaults"
+   ],
+   "type": "str"
+  },
+  "sampling_mask_max_tokens": {
+   "default": 4096,
+   "flags": [
+    "--sampling-mask-max-tokens"
+   ],
+   "type": "int"
+  },
+  "schedule_conservativeness": {
+   "default": 1.0,
+   "flags": [
+    "--schedule-conservativeness"
+   ],
+   "type": "float"
+  },
+  "schedule_low_priority_values_first": {
+   "default": false,
+   "flags": [
+    "--schedule-low-priority-values-first"
+   ],
+   "type": "bool"
+  },
+  "schedule_policy": {
+   "default": "fcfs",
+   "flags": [
+    "--schedule-policy"
+   ],
+   "type": "str"
+  },
+  "scheduler_recv_interval": {
+   "default": 1,
+   "flags": [
+    "--scheduler-recv-interval"
+   ],
+   "type": "int"
+  },
+  "served_model_name": {
+   "default": null,
+   "flags": [
+    "--served-model-name"
+   ],
+   "type": "Optional[str]"
+  },
+  "shared_experts_tp_size": {
+   "default": null,
+   "flags": [
+    "--shared-experts-tp-size"
+   ],
+   "type": "Optional[int]"
+  },
+  "show_time_cost": {
+   "default": false,
+   "flags": [
+    "--show-time-cost"
+   ],
+   "type": "bool"
+  },
+  "sidecar": {
+   "default": null,
+   "flags": [
+    "--sidecar"
+   ],
+   "type": "Optional[str]"
+  },
+  "sidecar_args": {
+   "default": null,
+   "flags": [
+    "--sidecar-args"
+   ],
+   "type": "Optional[List[str]]"
+  },
+  "skip_server_warmup": {
+   "default": false,
+   "flags": [
+    "--skip-server-warmup"
+   ],
+   "type": "bool"
+  },
+  "skip_tokenizer_init": {
+   "default": false,
+   "flags": [
+    "--skip-tokenizer-init"
+   ],
+   "type": "bool"
+  },
+  "sleep_on_idle": {
+   "default": false,
+   "flags": [
+    "--sleep-on-idle"
+   ],
+   "type": "bool"
+  },
+  "sm_group_num": {
+   "default": 8,
+   "flags": [
+    "--sm-group-num"
+   ],
+   "type": "int"
+  },
+  "smg_grpc_mode": {
+   "default": false,
+   "flags": [
+    "--smg-grpc-mode"
+   ],
+   "type": "bool"
+  },
+  "smg_http_sidecar_port": {
+   "default": null,
+   "flags": [
+    "--grpc-http-sidecar-port",
+    "--smg-http-sidecar-port"
+   ],
+   "type": "Optional[int]"
+  },
+  "soft_watchdog_timeout": {
+   "default": null,
+   "flags": [
+    "--soft-watchdog-timeout"
+   ],
+   "type": "Optional[float]"
+  },
+  "spec_trace_dir": {
+   "default": null,
+   "flags": [
+    "--spec-trace-dir"
+   ],
+   "type": "Optional[str]"
+  },
+  "speculative_accept_threshold_acc": {
+   "default": 1.0,
+   "flags": [
+    "--speculative-accept-threshold-acc"
+   ],
+   "type": "float"
+  },
+  "speculative_accept_threshold_single": {
+   "default": 1.0,
+   "flags": [
+    "--speculative-accept-threshold-single"
+   ],
+   "type": "float"
+  },
+  "speculative_adaptive": {
+   "default": false,
+   "flags": [
+    "--speculative-adaptive"
+   ],
+   "type": "bool"
+  },
+  "speculative_adaptive_config": {
+   "default": null,
+   "flags": [
+    "--speculative-adaptive-config"
+   ],
+   "type": "Optional[str]"
+  },
+  "speculative_algorithm": {
+   "default": null,
+   "flags": [
+    "--speculative-algorithm"
+   ],
+   "type": "Optional[str]"
+  },
+  "speculative_attention_mode": {
+   "default": "prefill",
+   "flags": [
+    "--speculative-attention-mode"
+   ],
+   "type": "str"
+  },
+  "speculative_boundary_reduction": {
+   "default": "rs+rsv",
+   "flags": [],
+   "type": "Literal['ar', 'rs', 'rsv', 'rs+rsv']"
+  },
+  "speculative_dflash_block_size": {
+   "default": null,
+   "flags": [
+    "--speculative-dflash-block-size"
+   ],
+   "type": "Optional[int]"
+  },
+  "speculative_domino_candidate_pool_size": {
+   "default": 2048,
+   "flags": [
+    "--speculative-domino-candidate-pool-size"
+   ],
+   "type": "int"
+  },
+  "speculative_draft_attention_backend": {
+   "default": null,
+   "flags": [
+    "--speculative-draft-attention-backend"
+   ],
+   "type": "Optional[str]"
+  },
+  "speculative_draft_kv_cache_dtype": {
+   "default": null,
+   "flags": [
+    "--speculative-draft-kv-cache-dtype"
+   ],
+   "type": "Optional[str]"
+  },
+  "speculative_draft_load_format": {
+   "default": null,
+   "flags": [
+    "--speculative-draft-load-format"
+   ],
+   "type": "Optional[str]"
+  },
+  "speculative_draft_model_path": {
+   "default": null,
+   "flags": [
+    "--speculative-draft-model",
+    "--speculative-draft-model-path"
+   ],
+   "type": "Optional[str]"
+  },
+  "speculative_draft_model_quantization": {
+   "default": null,
+   "flags": [
+    "--speculative-draft-model-quantization"
+   ],
+   "type": "Optional[str]"
+  },
+  "speculative_draft_model_revision": {
+   "default": null,
+   "flags": [
+    "--speculative-draft-model-revision"
+   ],
+   "type": "Optional[str]"
+  },
+  "speculative_draft_sink_size": {
+   "default": null,
+   "flags": [
+    "--speculative-draft-sink-size"
+   ],
+   "type": "Optional[int]"
+  },
+  "speculative_draft_window_size": {
+   "default": null,
+   "flags": [
+    "--speculative-draft-window-size"
+   ],
+   "type": "Optional[int]"
+  },
+  "speculative_dsa_topk_backend": {
+   "default": "sgl-kernel",
+   "flags": [
+    "--speculative-dsa-topk-backend"
+   ],
+   "type": "str"
+  },
+  "speculative_dspark_align_verify_tokens_to_graph_tier": {
+   "default": false,
+   "flags": [
+    "--speculative-dspark-align-verify-tokens-to-graph-tier"
+   ],
+   "type": "bool"
+  },
+  "speculative_dspark_block_size": {
+   "default": null,
+   "flags": [
+    "--speculative-dspark-block-size"
+   ],
+   "type": "Optional[int]"
+  },
+  "speculative_dspark_confidence_sts_path": {
+   "default": null,
+   "flags": [
+    "--speculative-dspark-confidence-sts-path"
+   ],
+   "type": "Optional[str]"
+  },
+  "speculative_dspark_sps_table_path": {
+   "default": null,
+   "flags": [
+    "--speculative-dspark-sps-table-path"
+   ],
+   "type": "Optional[str]"
+  },
+  "speculative_eagle_topk": {
+   "default": null,
+   "flags": [
+    "--speculative-eagle-topk"
+   ],
+   "type": "Optional[int]"
+  },
+  "speculative_enable_w4a4_mxfp4_megamoe": {
+   "default": null,
+   "flags": [
+    "--speculative-enable-w4a4-mxfp4-megamoe"
+   ],
+   "type": "Optional[bool]"
+  },
+  "speculative_moe_a2a_backend": {
+   "default": null,
+   "flags": [
+    "--speculative-moe-a2a-backend"
+   ],
+   "type": "Optional[str]"
+  },
+  "speculative_moe_runner_backend": {
+   "default": null,
+   "flags": [
+    "--speculative-moe-runner-backend"
+   ],
+   "type": "Optional[str]"
+  },
+  "speculative_ngram_capacity": {
+   "flags": [
+    "--speculative-ngram-capacity"
+   ],
+   "type": "int"
+  },
+  "speculative_ngram_external_corpus_max_tokens": {
+   "default": 10000000,
+   "flags": [
+    "--speculative-ngram-external-corpus-max-tokens"
+   ],
+   "type": "int"
+  },
+  "speculative_ngram_external_corpus_path": {
+   "default": null,
+   "flags": [
+    "--speculative-ngram-external-corpus-path"
+   ],
+   "type": "Optional[str]"
+  },
+  "speculative_ngram_external_sam_budget": {
+   "default": 0,
+   "flags": [
+    "--speculative-ngram-external-sam-budget"
+   ],
+   "type": "int"
+  },
+  "speculative_ngram_match_type": {
+   "default": "BFS",
+   "flags": [
+    "--speculative-ngram-match-type"
+   ],
+   "type": "Literal['BFS', 'PROB']"
+  },
+  "speculative_ngram_max_bfs_breadth": {
+   "default": 10,
+   "flags": [
+    "--speculative-ngram-max-bfs-breadth"
+   ],
+   "type": "int"
+  },
+  "speculative_ngram_max_trie_depth": {
+   "default": 18,
+   "flags": [
+    "--speculative-ngram-max-trie-depth"
+   ],
+   "type": "int"
+  },
+  "speculative_ngram_min_bfs_breadth": {
+   "default": 1,
+   "flags": [
+    "--speculative-ngram-min-bfs-breadth"
+   ],
+   "type": "int"
+  },
+  "speculative_num_draft_tokens": {
+   "default": null,
+   "flags": [
+    "--speculative-num-draft-tokens"
+   ],
+   "type": "Optional[int]"
+  },
+  "speculative_num_steps": {
+   "default": null,
+   "flags": [
+    "--speculative-num-steps"
+   ],
+   "type": "Optional[int]"
+  },
+  "speculative_token_map": {
+   "default": null,
+   "flags": [
+    "--speculative-token-map"
+   ],
+   "type": "Optional[str]"
+  },
+  "speculative_use_block_verification": {
+   "default": false,
+   "flags": [
+    "--speculative-use-block-verification"
+   ],
+   "type": "bool"
+  },
+  "speculative_use_rejection_sampling": {
+   "default": false,
+   "flags": [
+    "--speculative-use-rejection-sampling"
+   ],
+   "type": "bool"
+  },
+  "ssl_ca_certs": {
+   "default": null,
+   "flags": [
+    "--ssl-ca-certs"
+   ],
+   "type": "Optional[str]"
+  },
+  "ssl_certfile": {
+   "default": null,
+   "flags": [
+    "--ssl-certfile"
+   ],
+   "type": "Optional[str]"
+  },
+  "ssl_keyfile": {
+   "default": null,
+   "flags": [
+    "--ssl-keyfile"
+   ],
+   "type": "Optional[str]"
+  },
+  "ssl_keyfile_password": {
+   "default": null,
+   "flags": [
+    "--ssl-keyfile-password"
+   ],
+   "type": "Optional[str]"
+  },
+  "startup_weight_load_mode": {
+   "default": "serial",
+   "flags": [
+    "--startup-weight-load-mode"
+   ],
+   "type": "Literal['serial', 'overlap']"
+  },
+  "stat_loggers": {
+   "default": null,
+   "flags": [],
+   "type": "Optional[Dict[str, type]]"
+  },
+  "stream_interval": {
+   "default": 1,
+   "flags": [
+    "--stream-interval"
+   ],
+   "type": "int"
+  },
+  "stream_response_default_include_usage": {
+   "default": false,
+   "flags": [
+    "--stream-response-default-include-usage"
+   ],
+   "type": "bool"
+  },
+  "strip_thinking_cache": {
+   "default": false,
+   "flags": [
+    "--strip-thinking-cache"
+   ],
+   "type": "bool"
+  },
+  "swa_full_tokens_ratio": {
+   "default": null,
+   "flags": [
+    "--swa-full-tokens-ratio"
+   ],
+   "type": "Optional[float]"
+  },
+  "swa_prefix_tails": {
+   "default": null,
+   "flags": [
+    "--swa-prefix-tails"
+   ],
+   "type": "Optional[int]"
+  },
+  "tbo_token_distribution_threshold": {
+   "default": 0.48,
+   "flags": [
+    "--tbo-token-distribution-threshold"
+   ],
+   "type": "float"
+  },
+  "tokenizer_backend": {
+   "default": "huggingface",
+   "flags": [
+    "--tokenizer-backend"
+   ],
+   "type": "str"
+  },
+  "tokenizer_metrics_allowed_custom_labels": {
+   "default": null,
+   "flags": [
+    "--tokenizer-metrics-allowed-custom-labels"
+   ],
+   "type": "Optional[List[str]]"
+  },
+  "tokenizer_metrics_custom_labels_header": {
+   "default": "x-custom-labels",
+   "flags": [
+    "--tokenizer-metrics-custom-labels-header"
+   ],
+   "type": "str"
+  },
+  "tokenizer_mode": {
+   "default": "auto",
+   "flags": [
+    "--tokenizer-mode"
+   ],
+   "type": "str"
+  },
+  "tokenizer_path": {
+   "default": null,
+   "flags": [
+    "--tokenizer-path"
+   ],
+   "type": "Optional[str]"
+  },
+  "tokenizer_worker_num": {
+   "default": 1,
+   "flags": [
+    "--tokenizer-worker-num"
+   ],
+   "type": "int"
+  },
+  "tool_call_parser": {
+   "default": null,
+   "flags": [
+    "--tool-call-parser"
+   ],
+   "type": "Optional[str]"
+  },
+  "tool_server": {
+   "default": null,
+   "flags": [
+    "--tool-server"
+   ],
+   "type": "Optional[str]"
+  },
+  "torch_compile_max_bs": {
+   "default": 32,
+   "flags": [
+    "--torch-compile-max-bs"
+   ],
+   "type": "int"
+  },
+  "tp_size": {
+   "default": 1,
+   "flags": [
+    "--tensor-parallel-size",
+    "--tp-size"
+   ],
+   "type": "int"
+  },
+  "trace_modules": {
+   "default": "request",
+   "flags": [
+    "--trace-modules"
+   ],
+   "type": "str"
+  },
+  "triton_attention_num_kv_splits": {
+   "default": 8,
+   "flags": [
+    "--triton-attention-num-kv-splits"
+   ],
+   "type": "int"
+  },
+  "triton_attention_reduce_in_fp32": {
+   "default": false,
+   "flags": [
+    "--triton-attention-reduce-in-fp32"
+   ],
+   "type": "bool"
+  },
+  "triton_attention_split_tile_size": {
+   "default": null,
+   "flags": [
+    "--triton-attention-split-tile-size"
+   ],
+   "type": "Optional[int]"
+  },
+  "trust_mm_content_hashes": {
+   "default": false,
+   "flags": [
+    "--trust-mm-content-hashes"
+   ],
+   "type": "bool"
+  },
+  "trust_remote_code": {
+   "default": false,
+   "flags": [
+    "--trust-remote-code"
+   ],
+   "type": "bool"
+  },
+  "trust_request_chat_template": {
+   "default": false,
+   "flags": [
+    "--trust-request-chat-template"
+   ],
+   "type": "bool"
+  },
+  "unified_cache_external_linker_backend": {
+   "default": "mooncake",
+   "flags": [
+    "--unified-cache-external-linker-backend"
+   ],
+   "type": "str"
+  },
+  "unified_cache_external_linker_config": {
+   "default": null,
+   "flags": [
+    "--unified-cache-external-linker-config"
+   ],
+   "type": "Optional[Dict[str, Any]]"
+  },
+  "uno_lora_path": {
+   "default": null,
+   "flags": [
+    "--uno-lora-path"
+   ],
+   "type": "Optional[str]"
+  },
+  "use_ray": {
+   "default": false,
+   "flags": [
+    "--use-ray"
+   ],
+   "type": "bool"
+  },
+  "uses_mamba_radix_cache": {
+   "default": false,
+   "flags": [],
+   "type": "bool"
+  },
+  "uvicorn_access_log_exclude_prefixes": {
+   "default": [],
+   "flags": [
+    "--uvicorn-access-log-exclude-prefixes"
+   ],
+   "type": "List[str]"
+  },
+  "warmups": {
+   "default": null,
+   "flags": [
+    "--warmups"
+   ],
+   "type": "Optional[str]"
+  },
+  "watchdog_timeout": {
+   "default": 300,
+   "flags": [
+    "--watchdog-timeout"
+   ],
+   "type": "float"
+  },
+  "watermark_config": {
+   "default": null,
+   "flags": [
+    "--watermark-config"
+   ],
+   "type": "Optional[str]"
+  },
+  "watermark_context_window": {
+   "default": 4,
+   "flags": [],
+   "type": "int"
+  },
+  "watermark_default_enabled": {
+   "default": false,
+   "flags": [],
+   "type": "bool"
+  },
+  "watermark_enforce_all": {
+   "default": false,
+   "flags": [],
+   "type": "bool"
+  },
+  "watermark_key": {
+   "default": null,
+   "flags": [],
+   "type": "Optional[str]"
+  },
+  "watermark_key_b": {
+   "default": null,
+   "flags": [],
+   "type": "Optional[str]"
+  },
+  "watermark_max_probability": {
+   "default": 1.0,
+   "flags": [],
+   "type": "float"
+  },
+  "watermark_mixing_probability": {
+   "default": 0.5,
+   "flags": [],
+   "type": "float"
+  },
+  "weight_cache_mode": {
+   "default": "off",
+   "flags": [
+    "--weight-cache-mode"
+   ],
+   "type": "str"
+  },
+  "weight_cache_socket": {
+   "default": null,
+   "flags": [
+    "--weight-cache-socket"
+   ],
+   "type": "Optional[str]"
+  },
+  "weight_cache_timeout": {
+   "default": 1800,
+   "flags": [
+    "--weight-cache-timeout"
+   ],
+   "type": "int"
+  },
+  "weight_loader_disable_mmap": {
+   "default": false,
+   "flags": [
+    "--weight-loader-disable-mmap"
+   ],
+   "type": "bool"
+  },
+  "weight_loader_drop_cache_after_load": {
+   "default": false,
+   "flags": [
+    "--weight-loader-drop-cache-after-load"
+   ],
+   "type": "bool"
+  },
+  "weight_loader_prefetch_checkpoints": {
+   "default": false,
+   "flags": [
+    "--weight-loader-prefetch-checkpoints"
+   ],
+   "type": "bool"
+  },
+  "weight_loader_prefetch_num_threads": {
+   "default": 4,
+   "flags": [
+    "--weight-loader-prefetch-num-threads"
+   ],
+   "type": "int"
+  },
+  "weight_version": {
+   "default": "default",
+   "flags": [
+    "--weight-version"
+   ],
+   "type": "str"
+  }
+ },
+ "kind": "SGLangDeclarations",
+ "source": "blis-sglang c3c14e2a fields/declarations.json",
+ "source_sha256": "7293901364d789598a608e43776cd5246454c53057b653bda5f08916bec78e50"
+}

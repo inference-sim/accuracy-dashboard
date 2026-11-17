@@ -16,7 +16,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from gen_scenarios import PackagingError, emit  # noqa: E402
+from gen_scenarios import DrafterError, PackagingError, emit, speculative_drafter  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "ingest"))
+import support as sp  # noqa: E402
 
 # What a chip's catalog entry fixes (`blis catalog resolve --chip` packaging): an 8-GPU HGX part
 # fixes nothing; GB200 NVL72 fixes 4 GPUs per node and 72 per rack.
@@ -95,6 +98,83 @@ def stated_values_only():
                      Path(sys.modules["gen_scenarios"].__file__).read_text().split('"""', 2)[2]))
 
 
+def drafter_catalog():
+    """A catalog fixture of the schema: MiniMax-M3 lists its MTP head and an EAGLE3 drafter, which
+    names it; the GQA drafter names another target; DeepSeek-V4-Pro has only its MTP head."""
+    import tempfile
+    import yaml
+    root = Path(tempfile.mkdtemp())
+    entries = {
+        "minimax-m3": ({"source": {"repo": "MiniMaxAI/MiniMax-M3"},
+                        "drafters": ["speculator", "minimax-m3-eagle3"]}, "minimax_m3_mtp"),
+        "minimax-m3-eagle3": ({"source": {"repo": "Inferact/MiniMax-M3-EAGLE3"},
+                               "targets": ["minimax-m3"]}, "eagle3"),
+        "minimax-m3-eagle3-gqa": ({"source": {"repo": "Inferact/MiniMax-M3-EAGLE3-GQA"},
+                                   "targets": ["minimax-m3-mxfp8"]}, "eagle3"),
+        "deepseek-v4-pro": ({"source": {"repo": "deepseek-ai/DeepSeek-V4-Pro"},
+                             "drafters": ["speculator"]}, "deepseek_mtp"),
+    }
+    for name, (doc, method) in entries.items():
+        d = root / "models" / name
+        d.mkdir(parents=True)
+        (d / "model.yaml").write_text(yaml.safe_dump({"name": name, **doc}))
+        (d / "graph.yaml").write_text(f"global: {{}}\nspeculator:\n  method: {method}\n")
+    return sp.Catalog(blis=str(root / "no-blis"), root=root)
+
+
+def speculative_block(text):
+    """The key: value lines of the Deployment's engine.speculative block."""
+    dep = text.split("\n---\n", 1)[1]
+    if "      speculative:\n" not in dep:
+        return {}
+    block = dep.split("      speculative:\n", 1)[1]
+    return dict(re.findall(r"^        (\w+): (\S+)$", block, re.M))
+
+
+def eagle3(draft):
+    return sweep("minimax-m3", stated={"speculative_method": "eagle3", "num_speculative_tokens": 3,
+                                       "draft_model": draft})
+
+
+def refusal(cat, dep) -> str:
+    try:
+        speculative_drafter(cat, dep)
+    except DrafterError as e:
+        return str(e)
+    return ""
+
+
+def drafters():
+    """inference-sim/blis-substrate#124: a run that drafts with a separate checkpoint names the
+    catalog's drafter entry as draft_model, and one whose drafter the catalog lacks is refused
+    rather than written as a deployment that does not draft."""
+    cat = drafter_catalog()
+    dep = eagle3("Inferact/MiniMax-M3-EAGLE3")
+    name = speculative_drafter(cat, dep)
+    ck("an EAGLE3 run names the catalog drafter its draft checkpoint is", name == "minimax-m3-eagle3", repr(name))
+    block = speculative_block(emit(dep, {"1k1k"}, OPEN, "0.32.0", name))
+    ck("its deployment drafts with that drafter",
+       (block.get("method"), block.get("draft_model")) == ("eagle3", "minimax-m3-eagle3"), repr(block))
+    local = eagle3("/data/models/MiniMax-M3-EAGLE3")
+    local["draft_checkpoint"] = {"repo": "Inferact/MiniMax-M3-EAGLE3"}
+    ck("a local draft path is the drafter its recipe names", speculative_drafter(cat, local) == "minimax-m3-eagle3")
+    ck("a local draft path with no recipe is value_not_recorded",
+       refusal(cat, eagle3("/data/models/MiniMax-M3-EAGLE3")).startswith("value_not_recorded:speculative_config.model"))
+    ck("a drafter that does not name the model is refused",
+       refusal(cat, eagle3("Inferact/MiniMax-M3-EAGLE3-GQA")).startswith("drafter_not_in_catalog:eagle3"))
+    ck("a drafter the catalog lacks is refused",
+       refusal(cat, eagle3("Org/Unknown-EAGLE3")).startswith("drafter_not_in_catalog:eagle3"))
+    bare = sweep("minimax-m3", stated={"speculative_method": "eagle3", "num_speculative_tokens": 3})
+    ck("a method the graph does not speculate by, with no draft checkpoint, is refused",
+       refusal(cat, bare).startswith("drafter_not_in_catalog:eagle3"))
+    mtp = sweep("deepseek-v4-pro", stated={"speculative_method": "mtp", "num_speculative_tokens": 2,
+                                           "draft_model": "deepseek-ai/DeepSeek-V4-Pro"})
+    ck("an MTP run that names the served model as its draft drafts with its own speculator",
+       speculative_drafter(cat, mtp) is None
+       and "draft_model" not in speculative_block(emit(mtp, {"1k1k"}, OPEN, "0.32.0")))
+    ck("a run that does not draft names no drafter", speculative_drafter(cat, sweep(stated={})) is None)
+
+
 def main() -> int:
     ck("a GB200 NVL72 deployment writes neither gpus_per_node nor gpus_per_rack",
        cluster_of(sweep(gpu="gb200-nvl72", node=8), GB200) == {"hardware": "gb200-nvl72", "nodes": "1"},
@@ -165,6 +245,7 @@ def main() -> int:
        engine(sweep("deepseek-v4-pro", stated={}), "method") is None)
 
     stated_values_only()
+    drafters()
 
     # The relocation reworded comments but must emit valid Scenario + Deployment docs.
     text = emit(sweep(stated={}), {"1k1k"}, OPEN, "0.32.0")

@@ -138,7 +138,7 @@ def test_a_library_that_ships_several_variants_is_compared_variant_by_variant():
 
 
 def test_with_no_published_map_from_a_version_to_a_hash_the_condition_stays_unevaluated():
-    # No source exists today (blis-registry#73); the scorer passes none.
+    # No source exists today (inference-sim/blis-substrate#149); the scorer passes none.
     assert not g1.kernel_hash(doc(), LIBS).evaluated
     assert not g1.kernel_hash(doc(), LIBS, {}).evaluated
 

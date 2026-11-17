@@ -84,8 +84,6 @@ The list is closed (design §11.4). The scorer's own reason codes map onto it (`
 
 | Subject | Meaning | Removed by |
 |---|---|---|
-| `pd_pool_data_parallel` | A prefill or decode pool runs data-parallel attention (data-parallel size above 1). | The engine refuses a KV transfer with data parallelism: blis-vllm#47 (M3). |
-| `pd_unequal_data_parallel` | The two pools differ in data-parallel size (a DEP prefill pool with a TEP decode pool, or the reverse). | The placement refuses pools of different data-parallel size: inference-sim#1952 (M3). |
 | `pd_pool_not_recorded` | The row records a pool with no workers or no GPUs. | Not removable: the row does not describe a prefill/decode run. |
 | `pd_agentic` | An agentic replay of a prefill/decode deployment is not written. | Write the agentic replay for two pools, with the router's session affinity (accuracy-dashboard#64, M3). |
 
@@ -116,6 +114,7 @@ The scorer's reasons and the G5 reason each becomes:
 | `model_not_in_catalog` | `not_in_catalog` |
 | `hardware_no_coefficients` | `not_in_catalog` |
 | `drafter_not_in_catalog` | `not_in_catalog` |
+| `catalog_entry_ambiguous` | `value_not_recorded` |
 | `conflict` | `value_conflict` |
 | `required_setting_missing` | `value_not_recorded` |
 | `server_log_missing` | `value_not_recorded` |

@@ -28,7 +28,7 @@ LOG = (
     "INFO [api_utils.py:286] non-default args: {'model': 'openai/gpt-oss-120b', 'tensor_parallel_size': 1, "
     "'max_num_seqs': 16, 'max_num_batched_tokens': 8192, 'block_size': 16, 'gpu_memory_utilization': 0.9, "
     "'max_model_len': 4096, 'enable_prefix_caching': False}\n"
-    "INFO [core.py:129] Initializing a V1 LLM engine (v0.32.0) with config: model='openai/gpt-oss-120b', "
+    "INFO [core.py:129] Initializing a V1 LLM engine (v0.33.0) with config: model='openai/gpt-oss-120b', "
     "tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, quantization=mxfp4, "
     "kv_cache_dtype=fp8, enable_prefix_caching=False\n"
     "INFO [kv_cache_utils.py:1] GPU KV cache size: 400,000 tokens\n"
@@ -56,18 +56,18 @@ def test_a_single_turn_point_is_scored_through_the_real_simulator(monkeypatch):
     tmp = Path(tempfile.mkdtemp())
     entry, env = e2e._setup(tmp, log=LOG, repo="openai/gpt-oss-120b", hardware="h100", conc=4, isl=1024, osl=128,
                             spec="none", chips={"h100": (8, 8)})
-    entry["row"]["image"] = entry["build"]["image"] = "vllm/vllm-openai:v0.32.0"
-    entry["build"]["ref"] = "v0.32.0"
+    entry["row"]["image"] = entry["build"]["image"] = "vllm/vllm-openai:v0.33.0"
+    entry["build"]["ref"] = "v0.33.0"
     env = dataclasses.replace(env, blis=blis, catalog=sub / "catalog", registry=sub / "registry",
-                              engine_release="0.32.0", field_list=e2e._vllm_names_fields())
+                              engine_release="0.33.0", field_list=e2e._vllm_names_fields())
     env.catalog_obj = sp.Catalog(blis=blis, root=sub / "catalog")
     env.parts = {"h100"}
     o = sc._score_one(entry, tmp / "pull", tmp / "work", env)
     prov = {"ingest": "api", "blis": {"release": "v0.12.0", "commit_sha": "b" * 40, "catalog": "0.3.0",
                                       "registry": "v0.2.0", "extractor_version": "blis-latency-kernel@v0.3.0"},
             "simulator": env.simulator(), "harness_commit": env.harness_commit, "experimental": False, "units": None,
-            "engine": {"kind": "vllm", "version": "0.32.0"}, "left_out_records": 0,
-            "vllm_ref": "v0.32.0", "vllm_max_distance": 2000, "fields_sha256": "d" * 64,
+            "engine": {"kind": "vllm", "version": "0.33.0"}, "left_out_records": 0,
+            "vllm_ref": "v0.33.0", "vllm_max_distance": 2000, "fields_sha256": "d" * 64,
             "pulled_at": "2026-10-23T00:00:00Z", "corpora": [], "pull_manifest_sha256": "e" * 64,
             "source": {"name": "test", "url": "https://example.invalid/"}}
     sc.write_contract(tmp / "c1", [o], prov)

@@ -30,7 +30,7 @@ A condition is *unevaluated* when no source records the datum it needs. It is th
 | Condition | Read from | Evaluated when |
 |---|---|---|
 | `coefficient_range` | each selected coefficient in `selected_entries` | `closeness_version` is 1 or 2 and every coefficient states a `fit_range` (for *extrapolated*) and a `ci95` (for *unidentified*). A true flag is evidence and is always named. |
-| `kernel_hash` | the coefficient's `priced` implementations (not its `kernel_impls`, the builds it is valid for), its `kernel_match`, and a map from a library version and variant to a kernel hash | `closeness_version` is 2, every entry that prices a kernel is `exact`, the run recorded the library's version, and a source maps that version and variant to a hash. An `unkeyed` entry that prices a kernel leaves the condition unevaluated; one that prices no kernel (a host overhead) is passed over. No hash source exists yet (blis-registry#73), so this condition is unevaluated on every point. |
+| `kernel_hash` | the coefficient's `priced` implementations (not its `kernel_impls`, the builds it is valid for), its `kernel_match`, and a map from a library version and variant to a kernel hash | `closeness_version` is 2, every entry that prices a kernel is `exact`, the run recorded the library's version, and a source maps that version and variant to a hash. An `unkeyed` entry that prices a kernel leaves the condition unevaluated; one that prices no kernel (a host overhead) is passed over. No hash source exists yet (inference-sim/blis-substrate#149), so this condition is unevaluated on every point. |
 | `value_class` | each modelled or proven-inert field's `value_classes` in `fields.json` | every field the run set carries its classes; a value outside every covered class is named |
 | `resolved_differs` | the Result's `resolutions` (setting, pool, host, engine value) against the run's logged value | the Result lists resolutions; each is compared with the run's value for that setting and pool. `all_reduce_backend` is not compared at tensor-parallel width 1, where no tensor-parallel all-reduce group exists. |
 
@@ -41,6 +41,10 @@ A condition is *unevaluated* when no source records the datum it needs. It is th
 - A point is G1 or G2 only if the run's engine release is the release the simulator models. No in-scope InferenceX point runs vLLM 0.32.0 as an official release: they run other releases or nightly and custom images. So every scored point so far is **G4**, and `grade.py` is tested to grade a point on the modelled release G1 or G2 correctly for when one exists.
 - G3 needs the engine to publish which upstream functions it ports and a function-level diff between releases. None does, so a point on another release is G4 (`ported_functions_unpublished`), never G3.
 - Whatever else is true of a point, one unevaluated condition makes it G2 at best.
+
+## Grade ceilings
+
+A point's grade is how close its comparison is today; its *ceiling* is the best grade its recorded data allows once every piece of BLIS work it needs is done (`orchestrator/baseline/ceiling.py`). A point at its ceiling rises only with new data; a point below it names the BLIS work that holds it there. The rules, the evidence and the M3 baseline's ceilings are in [the M3 baseline](m3/baseline/README.md).
 
 ## The G5 reasons and how each is removed
 

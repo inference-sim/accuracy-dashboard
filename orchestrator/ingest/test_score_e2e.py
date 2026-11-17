@@ -73,14 +73,15 @@ SPEC_LINES = (
 # it writes one request row per trace record: a round-0 record is "request_<request_id>", a
 # holder round "session_<session>_round_1_0"; each runs its prompt (prefix plus input tokens)
 # and output tokens, with TTFT TTFT_US and TPOT TPOT_US, and arrives at its trace arrival
-# time. With DROP set, the last main-phase request is dropped; with EARLY_HOLDER set, a holder
-# round arrives at 0, inside the main phase; with SHORT set, main request 0 emits one token
+# time. With DROP set, the last main-phase request is dropped; with EARLY_HOLDER set, a phased
+# trace's main phase starts at 0, inside the warm-up (the drain gate is not kept); with SHORT set, main request 0 emits one token
 # fewer than its target. An agentic replay gets the
 # fixed metrics and reports below.
 FAKE_BLIS = """#!/usr/bin/env python3
 import csv, json, os, sys
 VALIDATE, DROP, EARLY_HOLDER, SHORT, TTFT_US, TPOT_US = {validate}, {drop}, {early_holder}, {short}, 180000, 9000.0
 BURST = {burst}
+PHASES = {phases}
 METHODS = {methods}
 WP = {wp}
 a = sys.argv[1:]
@@ -88,6 +89,9 @@ here = os.path.dirname(os.path.abspath(__file__))
 if a[:3] == ["schema", "validate", "result"]:
     json.load(open(a[3]))
     sys.exit(VALIDATE)
+if a[:2] == ["schema", "trace"]:
+    print('{{"properties": {{"phases": {{}}}}}}' if PHASES else '{{"properties": {{}}}}')
+    sys.exit(0)
 assert a[0] == "replay", a
 with open(os.path.join(here, "blis_saw.json"), "a") as fh:
     fh.write(json.dumps({{"argv": a, "cwd": os.getcwd()}}) + "\\n")
@@ -121,6 +125,8 @@ if "--trace-data" in a:
         row = {{"id": rid, "fate": "completed", "arrival_us": arrival, "ttft_us": TTFT_US,
                "e2e_us": int(TTFT_US + TPOT_US * (out - 1)),
                "prompt_tokens": int(r["prefix_length"]) + int(r["input_tokens"]), "output_tokens": out}}
+        if r.get("phase"):
+            row["phase"] = r["phase"]
         if out > 1:
             row["tpot_us"] = TPOT_US
         if DROP and r is main[-1]:
@@ -129,7 +135,9 @@ if "--trace-data" in a:
         rows.append(row)
     # The closed loop: the client's `pool` slots each take the next request in order when they
     # free, one completion overhead after the request they held completed.
-    pool = int(arg("--concurrent-sessions")) - len({{r["session_id"] for r in recs if r["session_id"].startswith("warmup-")}})
+    phased = "phase" in recs[0]
+    pool = (int(arg("--concurrent-sessions")) - len({{r["session_id"] for r in recs if r["session_id"].startswith("warmup-")}})
+            if not phased else 4)
     main_ids = {{f"request_{{r['request_id']}}" for r in recs if r["session_id"].startswith("main-")}}
     mains = sorted((r for r in rows if r["id"] in main_ids), key=lambda r: int(r["id"][8:]))
     if mains and not BURST:
@@ -139,6 +147,11 @@ if "--trace-data" in a:
             free.sort()
             r["arrival_us"] = free.pop(0)
             free.append(r["arrival_us"] + r.get("e2e_us", 0) + 777)
+    if phased and not EARLY_HOLDER:
+        # Drain-gated phases: the main phase starts once every warm-up copy has ended.
+        warm_end = max([r["arrival_us"] + r["e2e_us"] for r in rows if r.get("phase") == "warmup"] or [0])
+        for r in mains:
+            r["arrival_us"] += warm_end + 777
     counts["generated"] = len(rows)
     counts["completed"] = sum(r["fate"] == "completed" for r in rows)
     if DROP:
@@ -155,13 +168,13 @@ def _exe(path: Path, body: str) -> str:
 
 
 def _fake_blis(tmp: Path, *, validate: int = 0, drop: bool = False, early_holder: bool = False,
-               short: bool = False, methods=("measured",), workload_properties=None, burst: bool = False) -> str:
+               short: bool = False, methods=("measured",), workload_properties=None, burst: bool = False, phases: bool = True) -> str:
     d = tmp / "sim"
     d.mkdir(exist_ok=True)
     (d / "blis_saw.json").unlink(missing_ok=True)
     return _exe(d / "blis", FAKE_BLIS.format(validate=validate, drop=drop, early_holder=early_holder,
                                                      short=short, methods=repr(methods),
-                                                     wp=repr(workload_properties), burst=burst))
+                                                     wp=repr(workload_properties), burst=burst, phases=phases))
 
 
 # A blis that answers only `catalog resolve --catalog DIR --model|--chip NAME --json`: a model
@@ -437,9 +450,9 @@ def test_prefix_caching_on_replays_the_main_phase_primed():
         assert o.fidelity is not None, o.reasons
         tr = _trace(work, entry["point_id"])
         warm = [r for r in tr if r["session_id"].startswith("warmup-")]
-        # The client's own warm-up (conc 4): 2*CONC = 8 copies of request 0, each with its holder round.
-        assert len(warm) == 16 and len(tr) == 56
-        assert all(r["arrival_time_us"] == str(ix.PRIME_MAIN_START_US) for r in tr if r["session_id"].startswith("main-"))
+        # The client's own warm-up (conc 4): 2*CONC = 8 copies of request 0, each in the warm-up phase, with no holder round.
+        assert len(warm) == 8 and len(tr) == 48
+        assert {r["phase"] for r in tr if r["session_id"].startswith("main-")} == {"main"} and {r["phase"] for r in warm} == {"warmup"}
         req = o.fidelity["requests"]
         assert (req["start"], req["copies"]) == ("primed", 8)
         pts = list(csv.DictReader((tmp / "c1" / c.POINTS_CSV).open()))
@@ -845,7 +858,7 @@ def test_the_scenario_engine_block_holds_the_runs_values_under_the_engines_own_n
         import yaml
         docs = list(yaml.safe_load_all(scen_text))
         scen, dep = docs[0], docs[1]
-        assert scen["engine_version"] == "0.31.0"
+        assert scen["engine"] == {"kind": "vllm", "version": "0.31.0"} and "engine_version" not in scen
         eng = dep["pools"][0]["engine"]
         assert {k: eng[k] for k in ("max_num_seqs", "max_num_batched_tokens", "block_size", "max_model_len",
                                     "enable_prefix_caching", "cache_dtype")} == \
@@ -1258,5 +1271,34 @@ def test_a_point_with_no_recorded_node_size_on_a_chip_that_fixes_none_is_g5_valu
         o, _ = _score(tmp, entry, env, tmp / "c1")
         assert o.fidelity is None
         assert o.g5 == {"code": "value_not_recorded", "subject": "cluster.gpus_per_node"}
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_point_the_kernel_refuses_is_g5_engine_unsupported_by_its_code_not_failed_or_a_missing_field():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        env.blis = _refusing_blis(tmp, 'time=t level=fatal msg="kernelmodel: draft_passes_unstated: the \\"mtp\\" drafter drafts '
+                                       'autoregressively and the engine states no DraftPassRequests, so ..."\n')
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is None and not o.faults
+        assert o.g5 == {"code": "engine_unsupported", "subject": "draft_passes_unstated"}
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_primed_point_scored_on_a_simulator_without_trace_phases_replays_the_pooled_form():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp, log=LOG.replace("'enable_prefix_caching': False", "'enable_prefix_caching': True")
+                            .replace("enable_prefix_caching=False", "enable_prefix_caching=True"))
+        env.blis = _fake_blis(tmp, phases=False)
+        o, work = _score(tmp, entry, env, tmp / "c1")
+        tr = _trace(work, entry["point_id"])
+        assert not (work / "single_turn" / entry["point_id"] / "trace.yaml").read_text().count("phases:")
+        assert "phase" not in tr[0]
+        argv = _saw(env)[-1]["argv"]
+        assert "--concurrent-sessions" in argv
     finally:
         shutil.rmtree(tmp)

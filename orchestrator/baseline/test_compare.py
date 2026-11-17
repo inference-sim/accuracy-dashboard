@@ -274,14 +274,28 @@ def test_evaluating_the_test_set_needs_a_log_and_appends_to_it(tmp_path, capsys)
     run = _split_run(tmp_path)
     log = tmp_path / "evaluation-log.md"
     t = c.run_report(run, "in_sample", evaluate_test=True)
-    c.evaluation_log(log, "abc", "analytical-v1", t["development_split"], today="2026-11-11")
-    c.evaluation_log(log, "def", "analytical-v2", t["development_split"], today="2026-11-12")
+    c.evaluation_log(log, "abc", "v0.17.0", "analytical-v1", t["development_split"], today="2026-11-11")
+    c.evaluation_log(log, "def", "v0.18.0", "analytical-v2", t["development_split"], today="2026-11-12")
     text = log.read_text()
     assert text.startswith("# Evaluation log") and text.count("| analytical-v") == 4   # a test and a prospective row per evaluation
-    assert "| 2026-11-11 | abc | analytical-v1 | test |" in text
+    assert "| 2026-11-11 | abc | v0.17.0 | analytical-v1 | test |" in text
     d = tmp_path / "r"
     assert c.main(["run", "--dir", str(d), "--sample", "in_sample", "--evaluate-test"]) == 2
     assert "needs --log and --estimator" in capsys.readouterr().err
+
+
+def test_a_release_is_evaluated_on_the_test_set_once_and_must_be_named(tmp_path):
+    run = _split_run(tmp_path)
+    log = tmp_path / "evaluation-log.md"
+    ds = c.run_report(run, "in_sample", evaluate_test=True)["development_split"]
+    c.evaluation_log(log, "abc", "v0.17.0", "e1", ds, today="2026-11-11")
+    with pytest.raises(c.CompareError, match="already holds a test evaluation of v0.17.0"):
+        c.evaluation_log(log, "abc", "v0.17.0", "e2", ds, today="2026-11-12")
+    for bad in ("", "latest", "v0.17", "abc123"):
+        with pytest.raises(c.CompareError, match="not a release tag"):
+            c.evaluation_log(log, "abc", bad, "e3", ds)
+    assert c.logged_test_releases(log.read_text()) == {"v0.17.0": 1}
+    assert c.release_of({"blis": {"release": "unknown", "commit_sha": "a" * 40}}) == "a" * 40
 
 
 def test_a_held_out_report_refuses_a_run_with_train_points(tmp_path, capsys):

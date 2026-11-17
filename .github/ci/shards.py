@@ -48,6 +48,8 @@ SHARDS: dict[str, list[Cmd]] = {
         script("orchestrator/test_gen_direct_corpus.py"),
         script("orchestrator/test_run_agentic.py"),
         pytest("Agentic corpus pinned by its catalog workload's revision and full sha256", "orchestrator/test_resolve_agentic_corpus.py"),
+        pytest("The first-party corpus scorer and its client adapters", "orchestrator/baseline/test_corpus.py",
+               "orchestrator/baseline/test_clients_fp.py"),
         Cmd("Schema validates the committed render fixture", argv=[
             "python3", "orchestrator/validate_summary.py", "--schema", "schemas/summary.v1.json", "web/testdata/render-fixture.summary.json"]),
         Cmd("summary.json v3 builder + validator; the committed v3 web fixtures rebuild byte-for-byte; the frozen v2 ones validate",
@@ -70,11 +72,15 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
 """),
         pytest("Scoring harness entrypoint flags, harness commit and no image path", "harness/test_run_sh.py"),
         script("orchestrator/ingest/test_build.py", "vLLM build resolution + commit-distance gate"),
+        pytest("The matched comparison and the held-out check", "orchestrator/baseline/test_matched.py",
+               "orchestrator/baseline/test_published_test.py"),
     ],
     # The two largest standalone suites.
     "ingest": [
         script("orchestrator/ingest/test_extract.py", "API ingest extractor"),
         script("orchestrator/ingest/test_score_e2e.py", "Points through score_point and write_contract, fake BLIS binaries"),
+        pytest("configiq points and coverage by source", "orchestrator/ingest/test_configiq.py",
+               "orchestrator/ingest/test_by_source.py"),
     ],
     # The pytest-fixture suites: the nightly pipeline, the grades, the baseline tools.
     "nightly": [
@@ -93,10 +99,14 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
                "orchestrator/ingest/test_recipe_checkpoints.py", "orchestrator/ingest/test_locations.py",
                "orchestrator/ingest/test_value_refusal.py", "orchestrator/ingest/test_g1.py",
                "orchestrator/ingest/test_pd.py", "orchestrator/ingest/test_thinking_rule.py",
+               "orchestrator/ingest/test_sglang_scoring.py", "orchestrator/ingest/test_approximates.py", "orchestrator/ingest/test_release_translation.py",
                "orchestrator/baseline/test_compare.py", "orchestrator/baseline/test_split.py",
                "orchestrator/baseline/test_residuals.py", "orchestrator/baseline/test_docs.py",
                "orchestrator/baseline/test_contracts_current.py", "orchestrator/baseline/test_contract_currency.py",
                "orchestrator/test_update_index.py"),
+        pytest("The M3 baseline and the grade ceilings", "orchestrator/baseline/test_ceiling.py",
+               "orchestrator/baseline/test_ported_changes.py", "orchestrator/baseline/test_m3_baseline.py",
+               "orchestrator/baseline/test_release_runs.py"),
     ],
     # The two repository-wide checks that were hidden behind earlier failures: they run on their own.
     "boundary": [

@@ -280,7 +280,8 @@ def test_every_location_is_a_field_blis_vllm_engine_block_or_the_deployment_name
               "disable_hybrid_kv_cache_manager", "kv_cache_memory_bytes", "prefix_match_unit",
               "prefix_cache_retention_interval", "kv_events", "max_loras", "max_cpu_loras",
               "decoder_replay_cudagraph_capture_sizes", "custom_ops", "use_trtllm_attention", "mla_prefill_backend",
-              "indexer_kv_dtype", "linear_backend", "enable_chunked_prefill", "language_model_only", "env"}
+              "indexer_kv_dtype", "linear_backend", "enable_chunked_prefill", "language_model_only", "env",
+              "enforce_eager"}       # enforce_eager: blis-vllm#232 (cudagraph NONE, execution mode substituted)
     parallel = {"tp", "pp", "dp", "dp_local", "enable_expert_parallel", "pcp", "dcp"}
     for path, loc in st.LOCATIONS.items():
         top, _, rest = loc.partition(".")
@@ -581,12 +582,14 @@ def test_a_setting_nothing_recorded_is_left_unset_and_no_list_of_required_settin
     assert not hasattr(st, "REQUIRED")
 
 
-def test_a_built_scenario_holds_only_recorded_values_and_states_engine_version_from_stack_json():
-    # X19: nothing the run did not record is written; engine_version is the release passed in.
+def test_a_built_scenario_holds_only_recorded_values_and_states_the_engine_from_stack_json():
+    # X19: nothing the run did not record is written; the engine is vllm at the release passed in,
+    # stated as engine: {kind, version} (SIM-1), never the removed engine_version.
     c = _classify(_log("'tensor_parallel_size': 1, 'max_num_batched_tokens': 4096"))
     b = st.build(c, name="p", model="m", part=PART_H200, engine_version="0.32.0", field_list=FIELDS,
                  catalog_node_size=None, node=NODE8)
-    assert b.scenario["engine_version"] == "0.32.0"
+    assert b.scenario["engine"] == {"kind": "vllm", "version": "0.32.0"}
+    assert "engine_version" not in b.scenario
     recorded = {loc.split(".", 1)[1] for loc in c.mapped if loc.startswith("engine.")}
     assert set(b.deployment["pools"][0]["engine"]) == recorded
 
@@ -597,7 +600,7 @@ def test_the_cluster_states_the_node_size_and_holds_the_runs_own_gpus():
                        RESOLVED.replace("data_parallel_size=1", "data_parallel_size=2")))
     b = _build(c)
     assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 1, "gpus_per_node": 8}
-    assert b.scenario["engine_version"] == "0.31.0"
+    assert b.scenario["engine"] == {"kind": "vllm", "version": "0.31.0"}
     par = b.deployment["pools"][0]["parallel"]
     assert (par["tp"], par["dp"], par["enable_expert_parallel"]) == (1, 2, True)
 
@@ -1456,3 +1459,39 @@ def test_under_the_refuse_switch_a_multi_node_point_with_no_recorded_fabric_is_g
                  part=st.Part(name="h200"), engine_version="0.32.0", field_list=FIELDS, catalog_node_size=None, node=NODE8,
                  launch_config={"resources": {"fabric": "roce-200g"}})
     assert b.scenario["cluster"]["fabric"] == "roce-200g" and b.reasons == []
+
+
+_LOG_V25_FP4_INDEXER = (
+    "INFO [api_utils.py:273] non-default args: {'model': 'org/dsv4', 'tensor_parallel_size': 8}\n"
+    "INFO [core.py:116] Initializing a V1 LLM engine (v0.25.0) with config: model='org/dsv4', "
+    "attention_config=AttentionConfig(backend=None, use_fp4_indexer_cache=True, indexer_kv_dtype='bf16'), "
+    "tensor_parallel_size=8, kv_cache_dtype=fp8\n"
+    "INFO [attention.py:694] Using MXFP4 indexer cache for Lightning Indexer.\n")
+
+
+def test_an_earlier_releases_fp4_indexer_cache_is_this_releases_mxfp4_indexer_dtype_named_on_the_point():
+    # vLLM before #52550 states the MXFP4 index cache as use_fp4_indexer_cache=True; its indexer_kv_dtype 'bf16' is that
+    # release's unread default. The run's setting, in this release's field, is indexer_kv_dtype=mxfp4, set by the run,
+    # and the translation is a named release difference on the point.
+    readings, _ = st.read_all(_LOG_V25_FP4_INDEXER, None)
+    merged = st.merge(readings, st.defaults_for("0.25.0", DEFAULTS, st.vllm_defaults_release()))
+    kv = merged["attention_config.indexer_kv_dtype"]
+    assert (kv.value, kv.requested) == ("mxfp4", True)
+    decided = st.decide(merged, FIELDS)
+    subs = [s for s in decided.substitutions if s["subject"] == "attention_config.indexer_kv_dtype"
+            and s["kind"] == "resolved_differs"]
+    assert len(subs) == 1 and "#52550" in subs[0]["detail"]
+    assert not [s for s in decided.substitutions if s["kind"] == "other_release"]
+    # The grade accepts it: a kind outside G2_KINDS raised GradeError and stopped the whole scoring run.
+    import grade as gr
+    g = gr.grade(engine_version="0.33.0", release=gr.Release(version="0.33.0", nightly_or_custom=False),
+                 substitutions=decided.substitutions)
+    assert g.grade == gr.G2 and ("resolved_differs", "attention_config.indexer_kv_dtype") in {(x["kind"], x["subject"]) for x in g.substitutions}
+
+
+def test_an_index_cache_the_run_set_itself_is_not_translated():
+    readings, _ = st.read_all(_LOG_V25_FP4_INDEXER.replace("'bf16'", "'fp8'").replace(
+        "'tensor_parallel_size': 8}", "'tensor_parallel_size': 8, 'attention_config': {'indexer_kv_dtype': 'fp8'}}"), None)
+    merged = st.merge(readings, st.defaults_for("0.25.0", DEFAULTS, st.vllm_defaults_release()))
+    assert merged["attention_config.indexer_kv_dtype"].value == "fp8"
+    assert not merged["attention_config.indexer_kv_dtype"].translated

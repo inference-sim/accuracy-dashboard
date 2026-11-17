@@ -296,18 +296,55 @@ def test_an_anchor_unit_of_a_framework_no_engine_models_stays_in_the_window(tmp_
     assert fakes.pulled_only == both
 
 
-def test_a_night_fails_naming_the_count_when_an_anchor_unit_is_not_in_the_window(tmp_path, monkeypatch):
-    # An anchor unit with no row in the window is neither pulled nor listed with a reason, so
-    # the counts would omit it without a word (COV-1). The night stops before any fetch.
+def test_an_anchor_unit_the_window_holds_no_usable_row_of_is_g5_by_name_and_the_night_goes_on(tmp_path, monkeypatch):
+    # COV-1: every anchor unit is graded or G5 with a reason. One the window's pull holds no row of is G5
+    # not_in_pull_window; one whose row now differs from the ledger's record is G5 row_differs_from_ledger. Neither is
+    # fetched, and the rest are scored and published.
+    import pull as pl
+    kept, gone, changed = _row("m", 1, "2026-10-01"), _row("m", 2, "2026-10-01"), _row("m", 4, "2026-10-01")
+    fakes = Fakes([kept, gone, changed])
+    _install(monkeypatch, fakes, [ledger_fake.point_id(kept)])
+    fakes.ledger(tmp_path)
+    fakes.rows = [kept, {**changed, "precision": "fp4"}]          # the window: one row gone, one changed
+    real = fakes.cmd_pull
+
+    def pull(a):
+        fakes.rows = [kept]
+        return real(a)
+    monkeypatch.setattr(cli, "cmd_pull", pull)
+    assert cli.cmd_nightly(_args(tmp_path)) == 0
+    assert fakes.pulled_only == [ledger_fake.point_id(kept)]
+    entries = {e["point_id"]: e["reasons"] for e in json.loads((tmp_path / "work" / "manifest.json").read_text())["points"]}
+    assert entries == {ledger_fake.point_id(kept): [], ledger_fake.point_id(gone): [pl.NOT_IN_WINDOW],
+                       ledger_fake.point_id(changed): [pl.ROW_DIFFERS]}
+
+
+def test_an_anchor_unit_the_ledger_does_not_hold_stops_the_night_before_any_fetch(tmp_path, monkeypatch):
+    # The anchor list names units the ledger lacks: the list and the ledger are not one release's, so the ledger is
+    # unreadable for this night. It stops, naming the count, before any fetch.
     rows = [_row("m", 1, "2026-10-01")]
     fakes = Fakes(rows)
     fakes.anchors = [ledger_fake.point_id(rows[0]), "e" * 64, "f" * 64]
     _install(monkeypatch, fakes, [])
     fakes.ledger(tmp_path)
     monkeypatch.setattr(cli, "cmd_pull", lambda a: (_ for _ in ()).throw(AssertionError("pulled")))
-    with pytest.raises(RuntimeError, match=r"2 of the 3 anchor units are neither a point of the window nor listed"):
+    import ledger as ldg
+    with pytest.raises(ldg.LedgerError, match=r"2 anchor units are not units of the ledger"):
         cli.cmd_nightly(_args(tmp_path))
     assert not (tmp_path / "data" / "latest").exists()
+
+
+def test_an_unpulled_anchor_is_g5_in_the_contract_without_a_simulation(tmp_path):
+    import pull as pl
+    import score as sc
+    entry = {"point_id": "u", "identity": {}, "row": {"framework": "vllm", "benchmark_type": "single_turn"},
+             "reasons": [pl.NOT_IN_WINDOW], "files": {}}
+    o = sc.score_point(entry, tmp_path, tmp_path / "w", sc.Env(
+        blis="x", blis_release="v0.17.1", blis_commit="a" * 40, catalog=tmp_path, catalog_release="c",
+        registry=tmp_path, registry_release="r", kernel="k", corpora={}))
+    import assess as asx
+    assert o.fidelity is None and o.reasons == [pl.NOT_IN_WINDOW]
+    assert asx.g5_of(o.reasons[0]) == {"code": "value_not_recorded", "subject": "not_in_pull_window"}
 
 
 def test_a_night_whose_build_publishes_no_anchor_unit_fails_and_scores_nothing(tmp_path, monkeypatch):
@@ -594,6 +631,65 @@ def test_the_workflow_scores_one_release_and_starts_the_next_only_after_publishi
     assert score["env"]["BLIS_TAGS"] == "${{ needs.resolve.outputs.blis_tags }}"
 
 
+def _publish_step(tmp_path, dry_run):
+    """Run the publish job's publish step as the runner would, in a scratch checkout holding a night's incoming data,
+    with a fake git that records its calls. Returns (exit status, output, git calls, GITHUB_OUTPUT)."""
+    import re
+    import subprocess
+    import yaml
+    wf = yaml.safe_load((Path(__file__).resolve().parent.parent.parent / ".github" / "workflows" / "api-nightly.yml").read_text())
+    step = next(s for s in wf["jobs"]["publish"]["steps"] if s.get("id") == "pub")
+    env_expr = step["env"]["DRY_RUN"]
+    assert env_expr == "${{ inputs.dry_run && 'true' || 'false' }}", env_expr
+    script = re.sub(r"\$\{\{[^}]*\}\}", "v0.17.1", step["run"])
+    work = tmp_path / "checkout"
+    (work / "newdata" / "latest").mkdir(parents=True)
+    (work / "newdata" / "index.json").write_text("{}")
+    (work / "newdata" / "latest" / "summary.json").write_text(json.dumps(
+        {"snapshot_id": "2026-11-17_blis-v0.17.1_ix-api-2026-11-17", "coverage": {"points": 3, "graded": 2, "by_grade": {"G4": 2, "G5": 1}}}))
+    (work / "incoming" / "state").mkdir(parents=True)
+    (work / "incoming" / "state" / "last-run-api.json").write_text("{}")
+    (work / "incoming" / "state" / "scored-releases.json").write_text(json.dumps({"kind": "ScoredReleases", "releases": ["v0.17.1"]}))
+    bin_ = tmp_path / "bin"
+    bin_.mkdir()
+    (bin_ / "git").write_text(f"#!/bin/sh\necho \"$@\" >> {tmp_path / 'git.calls'}\n")
+    (bin_ / "git").chmod(0o755)
+    import sys as _sys
+    (bin_ / "python3").symlink_to(_sys.executable)
+    out = tmp_path / "gh_output"
+    r = subprocess.run(["bash", "-c", script], cwd=work, capture_output=True, text=True,
+                       env={"PATH": f"{bin_}:/usr/bin:/bin", "GITHUB_OUTPUT": str(out), "GITHUB_REF_NAME": "main",
+                            "DRY_RUN": "true" if dry_run else "false", "RELEASE": "v0.17.1"})
+    calls = (tmp_path / "git.calls").read_text().splitlines() if (tmp_path / "git.calls").exists() else []
+    return r.returncode, r.stdout + r.stderr, calls, out.read_text() if out.exists() else ""
+
+
+def test_a_dry_run_validates_prints_what_it_would_publish_and_pushes_nothing(tmp_path):
+    rc, text, calls, output = _publish_step(tmp_path, dry_run=True)
+    assert rc == 0, text
+    assert calls == [] and "pushed=false" in output
+    for want in ("DRY RUN: would publish", "snapshot_id: 2026-11-17_blis-v0.17.1_ix-api-2026-11-17", "release: v0.17.1",
+                 "points: 3, graded: 2", '"G4": 2', '"G5": 1'):
+        assert want in text, (want, text)
+
+
+def test_a_run_that_is_not_a_dry_run_commits_and_pushes_as_before(tmp_path):
+    rc, text, calls, output = _publish_step(tmp_path, dry_run=False)
+    assert rc == 0, text
+    assert any(c.startswith("commit ") for c in calls) and "push" in calls and "pushed=true" in output
+    assert "DRY RUN" not in text
+
+
+def test_the_pages_deploy_and_the_next_run_follow_only_a_push():
+    import yaml
+    wf = yaml.safe_load((Path(__file__).resolve().parent.parent.parent / ".github" / "workflows" / "api-nightly.yml").read_text())
+    steps = {s.get("name"): s for s in wf["jobs"]["publish"]["steps"]}
+    for name in ("Deploy the published data to Pages", "Score the next unscored release"):
+        assert "steps.pub.outputs.pushed == 'true'" in steps[name]["if"], name
+    assert wf[True]["workflow_dispatch"]["inputs"]["dry_run"] == {
+        "description": "Validate and print what would be published, and publish nothing", "type": "boolean", "default": False}
+
+
 def test_sim_build_must_be_the_checkouts_tag_or_commit(tmp_path):
     import subprocess
     sim = tmp_path / "sim"
@@ -703,25 +799,31 @@ def test_a_failed_catalog_resolve_stops_the_score_run(tmp_path, monkeypatch):
     assert any(want in m for m in msgs), msgs
 
 
-def test_an_ambiguous_catalog_repository_stops_the_night_before_any_fetch(tmp_path, monkeypatch):
-    # Two entries claim org/m. `blis catalog resolve` refuses it; the night checks the catalog
-    # once, before the pull, and exits with the message naming both entries (audit finding 14),
-    # instead of crashing mid-score.
+def test_a_repository_two_catalog_entries_claim_does_not_stop_the_night(tmp_path, monkeypatch):
+    # Two entries claim org/m, and `blis catalog resolve --model org/m` refuses it. The night's catalog check asks
+    # each entry by name and does not ask that repository: each run is matched to the entry its deployment is, and a
+    # run that matches none is G5 catalog_entry_ambiguous (test_drafter.py). So the night goes on to the pull.
     fakes = Fakes([_row("m", 1, "2026-10-01")])
     _install(monkeypatch, fakes, [])
     fakes.ledger(tmp_path)
     models = {"a": "org/m", "b": "org/m"}
     cat = write_catalog(tmp_path / "cat", models)
-    refusal = "model 'org/m' is the source repository of 2 catalog entries: a, b"
-    answers = {**resolves(cat, models),
+    refusal = 'Error: model "org/m" is the source repository of 2 catalog entries (a, b); name the entry instead'
+    present = {d.name: d.name for d in (cat / "models").iterdir() if d.name not in models}   # the fixture's own entries
+    answers = {**resolves(cat, present), **resolves(cat, models),
                f"catalog resolve --catalog {cat} --model org/m --json": [1, "", refusal]}
     fake_blis(tmp_path / "sim" / "blis", answers)
-    monkeypatch.setattr(cli, "cmd_pull", lambda a: (_ for _ in ()).throw(AssertionError("pulled")))
+    pulled = []
+    monkeypatch.setattr(cli, "cmd_pull", lambda a: pulled.append(a) or 1)
     msgs = []
     monkeypatch.setattr(cli, "_log", msgs.append)
-    assert cli.cmd_nightly(_args(tmp_path)) == 2
-    assert any("FATAL" in m and "a, b" in m and "--model org/m" in m for m in msgs), msgs
-    assert not (tmp_path / "data" / "latest").exists()
+    import pytest
+    with pytest.raises(RuntimeError, match="pull failed"):     # the fake pull fails: the night got past the check
+        cli.cmd_nightly(_args(tmp_path))
+    assert pulled, msgs
+    assert not any("catalog" in m and "FATAL" in m for m in msgs), msgs
+    saw = [json.loads(x) for x in (tmp_path / "sim" / "blis.saw").read_text().splitlines()]
+    assert ["catalog", "resolve", "--catalog", str(cat), "--model", "org/m", "--json"] not in saw
 
 
 def test_a_score_run_replays_every_agentx_corpus_by_its_catalog_entry(tmp_path, monkeypatch):

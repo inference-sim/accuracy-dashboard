@@ -81,8 +81,9 @@ def cmd_pull(a) -> int:
     # records the ledger joins are one point (design §10.2). Rows the ledger holds no unit for
     # are listed with why, in the manifest, and counted in coverage.
     lg = ldg.load(Path(a.ledger))
-    placed = pl.place(p.rows, lg)
-    pl.check_placed(p.rows, placed)
+    # A row whose content differs from the ledger's record is listed with that reason, not placed: the night lists
+    # its unit G5 (cmd_nightly), and the rest of the pull goes on.
+    placed, _ = cv.place_all(p.rows, lg)
     _log(f"pull: {len(placed.points)} points (ledger units) from {len(p.rows)} rows; "
          f"{len(placed.unlisted)} rows hold no unit of {lg.revision}")
     points_in = placed.points
@@ -119,7 +120,12 @@ def cmd_pull(a) -> int:
     resolver = build.Resolver(registry=clients.DockerHubRegistry(), github=clients.GitHubREST(token),
                               ref=vllm_ref)
     gh = art.GitHubArtifacts(pl.IX_REPO, token, Path(a.cache or out / "_artifacts"))
-    recipes = rcp.GitHubRecipes(clients.GitHubREST(token)._get, pl.IX_REPO)
+    ix_git = getattr(a, "inferencex_git", None)
+    recipes = (rcp.GitRecipes(clients.GitHubREST(token)._get, pl.IX_REPO, ix_git) if ix_git
+               else rcp.GitHubRecipes(clients.GitHubREST(token)._get, pl.IX_REPO))
+    # SGLang's artifacts are fetched only when the score step will have its field list (--score-sglang): until then
+    # its points are G5 for the label alone, and nothing is fetched for them.
+    scoring = engines.DEFAULT_SCORING | ({engines.SGLANG} if getattr(a, "score_sglang", False) else frozenset())
     points = []
     # Reused points: carry over the manifest entry and copy the frozen files (unless out IS prior).
     for pid, e in sorted(inc.reuse.items()):
@@ -139,7 +145,7 @@ def cmd_pull(a) -> int:
     def _freeze(pt):
         try:
             return pt, pl.freeze_point(pt, resolver=resolver, gh=gh, fetch=api.http_fetch, out=out,
-                                       recipes=recipes), None
+                                       recipes=recipes, scoring=scoring), None
         except (clients.RateLimited, clients.FetchFailed):
             raise   # the whole pull is invalid, not this point
         except Exception as ex:  # noqa: BLE001 -- one point's failure is recorded with why, never kills the pull
@@ -378,9 +384,12 @@ def cmd_score(a) -> int:
     if not bad:
         bad += check_metric_definitions(blis)
     try:
+        sglang_kit = None
         stack = read_stack(blis, getattr(a, "stack", None))
         engine_release = stack.engine("vllm")
         field_list, fields_sha = read_fields(Path(a.fields), engine_release)
+        if getattr(a, "sglang_fields", None):
+            sglang_kit = sc.read_sglang_kit(Path(a.sglang_fields), stack, getattr(a, "sglang_declarations", None))
     except (sk.StackError, fl.FieldsError, bc.CommandError, OSError, ValueError) as e:
         bad.append(str(e))
     # Every date-pinned AgentX corpus, by the catalog replay workload of its alias, checked against
@@ -425,7 +434,8 @@ def cmd_score(a) -> int:
         assumed_router_revision=getattr(a, "assume_router_revision", None),
         router_policy_experiment=getattr(a, "router_policy_experiment", None),
         speculative_fallback_category=getattr(a, "speculative_fallback_category", None),
-        router_checkout=Path(a.router_checkout).resolve() if getattr(a, "router_checkout", None) else None)
+        router_checkout=Path(a.router_checkout).resolve() if getattr(a, "router_checkout", None) else None,
+        sglang=sglang_kit)
     # The build every point records: --sim-build, else the release tag the checkout is at
     # (check_blis_inputs required one), with the engine release its stack.json names (COV-6).
     env.sim_build = sim_build or env.blis_release
@@ -459,6 +469,9 @@ def cmd_score(a) -> int:
                      "registry": env.registry_release, "extractor_version": f"blis-latency-kernel@{env.kernel}"},
             "simulator": env.simulator(), "engine": {"kind": "vllm", "version": engine_release},
             "harness_commit": a.harness_commit, "units": units,
+            **({"engines": [{"kind": "vllm", "version": engine_release},
+                            {"kind": "sglang", "version": sglang_kit.release, "fields_sha256": sglang_kit.fields_sha256}]}
+               if sglang_kit is not None else {}),
             # Design §11.7, X8: a figure is experimental unless its build and its data are both
             # released. The build is released when it is a release tag, and the data when the
             # catalog and the registry are named by release tags, not by commits.
@@ -485,7 +498,9 @@ def cmd_coverage(a) -> int:
         doc = cv.run(pull_dir=Path(a.pull), ledger=Path(a.ledger), fields_path=Path(a.fields), stack_path=Path(a.stack),
                      catalog=Path(a.catalog), registry=Path(a.registry), rows_path=Path(a.rows) if a.rows else None,
                      units_path=Path(a.units) if a.units else None, workers=a.workers or 1,
-                     work=Path(a.work) if a.work else None)
+                     work=Path(a.work) if a.work else None,
+                     sglang_fields_path=Path(a.sglang_fields) if a.sglang_fields else None,
+                     sglang_declarations=Path(a.sglang_declarations) if a.sglang_declarations else None)
     except (cv.CoverageError, ldg.LedgerError, fl.FieldsError, sk.StackError, bc.CommandError, OSError, KeyError,
             ValueError) as e:
         _log(f"FATAL: {e}")
@@ -570,14 +585,16 @@ def cmd_nightly(a) -> int:
         _log(f"FATAL: {e}")
         return 2
 
-    # The catalog is checked once, before any artifact is fetched: a source repository two
-    # entries claim makes `blis catalog resolve` refuse, and the night stops here, not
-    # mid-score.
+    # The catalog is checked once, before any artifact is fetched: a catalog the build cannot read stops the
+    # night here, not mid-score. A source repository several entries claim does not: each run is matched to the
+    # entry its deployment is, and a run that matches none is G5 catalog_entry_ambiguous (support.Catalog.model).
     try:
-        sp.Catalog(blis=str(Path(a.blis).resolve()), root=Path(a.catalog)).check_unambiguous()
+        sp.Catalog(blis=str(Path(a.blis).resolve()), root=Path(a.catalog)).check_readable()
     except (bc.CommandError, OSError, ValueError) as e:
-        _log(f"FATAL: the catalog is ambiguous or unreadable: {e}")
+        _log(f"FATAL: the catalog is unreadable: {e}")
         return 2
+
+    missing: dict = {}
 
     def pull_fn(work: Path, today_: date, last_ids: set, blis_changed: bool):
         # List the whole window (cheap -- api.pull hits only the REST API, no artifacts); its points
@@ -586,16 +603,19 @@ def cmd_nightly(a) -> int:
         # the new points. A row the pull itself can't read fails the run (cmd_pull returns
         # non-zero).
         p = api.pull(api.http_fetch, today=today_, window_days=a.window_days)
-        listed = {x.point_id for x in pl.place(p.rows, ldg.load(Path(a.ledger))).points}
-        # Every anchor unit must be in this window's pull, whatever its engine: a unit of a
-        # framework no BLIS engine models is a point too, and engines.py gives it its G5 reason
-        # without an artifact. An anchor unit with no row in the window would be dropped from the
-        # counts without a word, so the night fails (COV-1, COV-2).
-        missing = anchors - listed
-        if missing:
-            raise RuntimeError(f"{len(missing)} of the {len(anchors)} anchor units are neither a point of the "
-                               f"window nor listed with a reason (first: {sorted(missing)[0]}); the run stops "
-                               f"rather than publish counts that omit them (COV-1)")
+        lg = ldg.load(Path(a.ledger))
+        placed, differing = cv.place_all(p.rows, lg)
+        listed = {x.point_id for x in placed.points}
+        # Every anchor unit is counted (COV-1): one the window's pull holds no row of, or whose row now differs from
+        # the ledger's record, is G5 with that reason, and the rest are scored. An anchor the ledger does not hold
+        # stops the night: the anchor list and the ledger are then not one release's.
+        unknown = sorted(u for u in anchors if u not in lg.units)
+        if unknown:
+            raise ldg.LedgerError(f"{len(unknown)} anchor units are not units of the ledger {lg.revision} "
+                                  f"(first: {unknown[0]}); the anchor list and the ledger are not one release's")
+        changed = {lg.by_record[str(r["id"])].unit.unit_id for r in differing if str(r["id"]) in lg.by_record}
+        missing.clear()
+        missing.update({u: pl.ROW_DIFFERS if u in changed else pl.NOT_IN_WINDOW for u in anchors - listed})
         window_ids = set(anchors)
         prior = json.loads(latest_path.read_text()) if latest_path.is_file() else None
         whole = (blis_changed or not last_ids or not mergeable(prior, bsv2.SCHEMA_VERSION)
@@ -603,12 +623,16 @@ def cmd_nightly(a) -> int:
         to_fetch = window_ids if whole else (window_ids - set(last_ids))
         _log(f"nightly: window {len(listed)} units, {len(window_ids)} of them anchor units; "
              f"fetch {'every one' if whole else f'{len(to_fetch)} new'}")
+        _log(f"nightly: {len(missing)} anchor units are G5 without a pull: "
+             f"{sum(v == pl.NOT_IN_WINDOW for v in missing.values())} not in the window, "
+             f"{sum(v == pl.ROW_DIFFERS for v in missing.values())} whose row differs from the ledger")
         rc = cmd_pull(types.SimpleNamespace(out=str(work), today=today_.isoformat(),
                                             window_days=a.window_days, cache=a.cache, prior=None,
-                                            only=sorted(to_fetch), download_workers=a.download_workers,
+                                            only=sorted(to_fetch & listed), download_workers=a.download_workers,
                                             ledger=a.ledger))
         if rc != 0:
             raise RuntimeError(f"pull failed (rc={rc}); the run stops rather than publish a partial pull")
+        pl.add_unpulled(work, {u: r for u, r in missing.items() if u in to_fetch}, lg)
         return json.loads((work / "manifest.json").read_text())["pulled_at"][:10], window_ids
 
     # The catalog and registry are directories of the one substrate checkout, so both are at the
@@ -680,6 +704,12 @@ def main(argv=None) -> int:
                         "only the published unit ids")
     p.add_argument("--download-workers", type=int, default=0,
                    help="parallel artifact-download workers (default: min(2*cores, 8); I/O-bound)")
+    p.add_argument("--inferencex-git", metavar="DIR",
+                   help="a bare clone of InferenceX: its trees and blobs are read from it, not through the REST API (PROCESS §16); "
+                        "only the commit each run executed is asked of the API")
+    p.add_argument("--score-sglang", action="store_true",
+                   help="also fetch SGLang points' artifacts (their server log and launch command); the score step then needs "
+                        "--sglang-fields")
     s = sub.add_parser("score")
     s.add_argument("--pull", required=True)
     s.add_argument("--out", required=True)
@@ -694,6 +724,10 @@ def main(argv=None) -> int:
     s.add_argument("--fields", required=True,
                    help="the engine's fields.json for the release stack.json names: the pinned blis-vllm release's "
                         "file (TEMPORARY until the M2 substrate release lets `blis fields` print it)")
+    s.add_argument("--sglang-fields", help="blis-sglang's fields.json for the SGLang release stack.json names: with it, SGLang "
+                   "points are scored (design §11.4); without it they stay G5 field_unclassified")
+    s.add_argument("--sglang-declarations", help="blis-sglang's declarations table (gen_sglang_declarations.py); "
+                   "default: orchestrator/sglang_declarations.json")
     s.add_argument("--stack", help="TEMPORARY until the pinned inference-sim release ships stack.json: the scoring build's "
                                     "stack.json, when its checkout has none")
     s.add_argument("--sim-build", help="the simulator build: a release tag or a 40-hex commit; the checkout must be at it "
@@ -740,6 +774,8 @@ def main(argv=None) -> int:
                    help="a catalog checkout, read as `blis catalog resolve` answers it (TEMPORARY, support.CheckoutCatalog); "
                         "it must hold the replay workload of each AgentX corpus alias")
     c.add_argument("--registry", required=True)
+    c.add_argument("--sglang-fields", help="blis-sglang's fields.json (see score --sglang-fields): SGLang units are then graded")
+    c.add_argument("--sglang-declarations", help="see score --sglang-declarations")
     c.add_argument("--rows", help="a JSON list of the API rows (every framework); those in the pull's window are placed")
     c.add_argument("--units", help="a PublishedUnits list or a file of unit ids (the anchor list): adds the `anchor` section")
     c.add_argument("--work")

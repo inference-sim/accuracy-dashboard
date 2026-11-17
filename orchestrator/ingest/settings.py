@@ -254,6 +254,7 @@ class Setting:
     occurrences: int = 1
     conflict: list | None = None    # every distinct value, when sources or repeats disagree
     requested: bool = False         # the run asked for it (vs. the build's own resolution)
+    translated: str | None = None   # the run's setting under an earlier release's name, stated in this release's
 
 
 def _one(values: list):
@@ -266,14 +267,18 @@ def _one(values: list):
     return values[0], len(values), None
 
 
-def merge(readings: dict[str, Reading], vllm_defaults: dict) -> dict[str, Setting]:
+def merge(readings: dict[str, Reading], vllm_defaults: dict, requested=None) -> dict[str, Setting]:
     """One Setting per path: the first source in SOURCES order that states a value.
 
     A source that states a path as None ("let the engine decide") doesn't hide a later
     source's value for it: the first non-None value wins. Repeats within one source that
     disagree, and the two passed sources (launch_config, args) disagreeing, are conflicts
     (design §11.2, value_conflict). A resolved value that differs from a passed one is the
-    engine's resolution, never a conflict."""
+    engine's resolution, never a conflict.
+
+    `requested(path, readings, defaults)` decides whether the run set a path (_requested, vLLM's rule, when
+    omitted); another engine passes its own (sglang_settings.requested)."""
+    requested = requested or _requested
     paths = set()
     for r in readings.values():
         paths |= set(r.values)
@@ -284,7 +289,7 @@ def merge(readings: dict[str, Reading], vllm_defaults: dict) -> dict[str, Settin
         s, vals = (stated or found)[0]
         value, occ, conflict = _one([x for x in vals if x is not None] or vals)
         st = Setting(path=path, value=value, source=s, occurrences=occ, conflict=conflict,
-                     requested=_requested(path, readings, vllm_defaults))
+                     requested=requested(path, readings, vllm_defaults))
         if conflict is None and s in PASSED:
             for s2, vals2 in stated[1:]:
                 if s2 not in PASSED:
@@ -294,7 +299,29 @@ def merge(readings: dict[str, Reading], vllm_defaults: dict) -> dict[str, Settin
                     st.conflict = sorted({_canon(value): value, **{_canon(x): x for x in (c2 or [v2])}}.values(), key=_canon)
                     break
         out[path] = st
+    _translate_releases(out)
     return out
+
+
+def _translate_releases(settings: dict[str, Setting]) -> None:
+    """A setting an earlier vLLM release stated under another field, written as the field this engine release
+    reads, and named on the point (a release difference). TEMPORARY until the engine's field list states the
+    earlier names.
+
+      attention_config.use_fp4_indexer_cache=True (vLLM before #52550, e.g. v0.25) is
+      attention_config.indexer_kv_dtype=mxfp4: such a run logs 'Using MXFP4 indexer cache for Lightning Indexer',
+      and its indexer_kv_dtype ('bf16') is that release's default, which DeepSeek-V4 does not read. #52550 folded
+      the flag into indexer_kv_dtype, so the run's own setting, in this release's field, is mxfp4."""
+    fp4 = settings.get("attention_config.use_fp4_indexer_cache")
+    if fp4 is None or fp4.conflict is not None or not _flag(fp4.value):
+        return
+    kv = settings.get("attention_config.indexer_kv_dtype")
+    if kv is not None and kv.source in PASSED and kv.value not in (None, "auto", "bf16", "mxfp4"):
+        return          # the run passed another index cache itself: that setting stands
+    settings["attention_config.indexer_kv_dtype"] = Setting(
+        path="attention_config.indexer_kv_dtype", value="mxfp4", source=fp4.source, requested=True,
+        translated="the run's use_fp4_indexer_cache=True is indexer_kv_dtype=mxfp4 since vLLM #52550; its "
+                   f"indexer_kv_dtype {kv.value if kv is not None else None!r} was its release's unread default")
 
 
 # The sources that record the values passed, and those that record the values resolved.
@@ -503,6 +530,7 @@ LOCATIONS = {
     **{f: f"engine.{f}" for f in _SAME_NAME},
     "kv_cache_dtype": "engine.cache_dtype",
     "compilation_config.cudagraph_mode": "engine.cudagraph_mode",
+    "enforce_eager": "engine.enforce_eager",
     "compilation_config.max_cudagraph_capture_size": "engine.max_cudagraph_capture_size",
     "compilation_config.cudagraph_capture_sizes": "engine.cudagraph_capture_sizes",
     "compilation_config.decoder_replay_cudagraph_capture_sizes": "engine.decoder_replay_cudagraph_capture_sizes",
@@ -603,6 +631,18 @@ def _flag(v) -> bool:
     raise ValueError(f"{v!r} is not a boolean")
 
 
+@dataclass(frozen=True)
+class Names:
+    """What decide() takes from an engine's naming: the roles its settings play, the readings it derives,
+    the pool role a field states, the front-end variable, and where a recorded field goes in the scenario."""
+    roles: dict
+    pool_role: dict
+    derived: tuple
+    frontend_env: str | None
+    location: object
+    translations: dict | None = None        # removed name -> successor (RELEASE_TRANSLATIONS where None)
+
+
 @dataclass
 class Decided:
     """One point's recorded settings, decided by the engine's field list."""
@@ -614,6 +654,9 @@ class Decided:
     roles: dict = field(default_factory=dict)          # role -> value (model, served_model)
 
 
+VLLM_NAMES = Names(ROLES, POOL_ROLE, DERIVED, "env.VLLM_USE_RUST_FRONTEND", location)
+
+
 def _stated_by_resolution(field_list, path: str) -> bool:
     """Whether a value the engine only resolved may still be written to the scenario: the engine
     models the field, or proves it has no effect. Any other field (not modelled, inert but
@@ -623,7 +666,55 @@ def _stated_by_resolution(field_list, path: str) -> bool:
     return f is not None and f.status in (fl.MODELLED, fl.PROVEN_INERT)
 
 
-def decide(settings: dict[str, Setting], field_list, part: str | None = None, facts_of=None) -> Decided:
+# A setting the simulated release removed, written as the setting that replaced it: the run ran an earlier vLLM, and the
+# name it used is not a field of the release BLIS models. Each entry is (successor field, successor value, the release
+# fact it rests on). The point names it a resolved_differs substitution; the successor is then decided like any other.
+def _is_true(v) -> bool:
+    try:
+        return _flag(v) is True
+    except ValueError:
+        return False
+
+
+RELEASE_TRANSLATIONS = {
+    "attention_config.use_trtllm_ragged_deepseek_prefill": (
+        "attention_config.mla_prefill_backend", "TRTLLM_RAGGED", lambda v: _is_true(v),
+        "vLLM #42555 (9898f94abe00, 2026-05-14) removed the flag; before it AttentionConfig.__post_init__ migrated a stated "
+        "true to mla_prefill_backend TRTLLM_RAGGED when that was unset (vllm/config/attention.py at 9898f94abe00^)"),
+    "env.VLLM_USE_FLASHINFER_MOE_FP4": (
+        "moe_backend", "flashinfer_trtllm", lambda v: _is_true(v),
+        "vLLM #44992 (03878d1c2, deprecations for v0.23 and v0.24) removed the variable; before it a true value on a NVFP4 MoE chose "
+        "get_flashinfer_moe_backend(), which maps VLLM_FLASHINFER_MOE_BACKEND latency, the default, to the TRT-LLM kernels on "
+        "SM100 (fused_moe/oracle/nvfp4.py:90-102 and quantization/utils/flashinfer_utils.py:233-252 at 42135d689^); "
+        "VLLM_FLASHINFER_MOE_BACKEND is not stated by these recipes"),
+}
+
+
+SAME_VALUE = object()      # a translation that renames a field: the successor takes the run's value
+
+
+def translate_removed(settings: dict, field_list, table: dict | None = None) -> tuple:
+    """The settings with each removed name replaced by its successor, and the substitutions that say so. A name is translated
+    only when the release's field list lacks it and the successor is not already stated. An entry whose value is SAME_VALUE
+    renames the field: the successor takes the value the run set."""
+    out, subs = dict(settings), []
+    for path, (new, value, applies, why) in (RELEASE_TRANSLATIONS if table is None else table).items():
+        st = settings.get(path)
+        if st is None or field_list.lookup(path) is not None or st.conflict is not None:
+            continue
+        if not applies(st.value) or new in settings or (value is SAME_VALUE and not st.requested):
+            continue            # a renamed field the engine only resolved is not a request, so it is not carried over
+        del out[path]
+        value = st.value if value is SAME_VALUE else value
+        out[new] = Setting(path=new, value=value, source=st.source, requested=True)
+        subs.append({"kind": "resolved_differs", "subject": path,
+                     "detail": f"the run's engine release has {path}={st.value!r}; the modelled release removed it and states "
+                               f"{new}={value} for it: {why}"})
+    return out, subs
+
+
+def decide(settings: dict[str, Setting], field_list, part: str | None = None, facts_of=None,
+           names: "Names | None" = None) -> Decided:
     """Decide every recorded setting by the engine's fields.json (design §11.2, State and Decide).
 
     A setting two same-stage sources disagree on is a conflict (value_conflict). Every recorded
@@ -635,7 +726,11 @@ def decide(settings: dict[str, Setting], field_list, part: str | None = None, fa
     set that the field list calls modelled, but the scenario has no place for, is a setting the
     written scenario lost (setting_differs): the harness cannot state what the run did."""
     import fields as fl
+    nm = names or VLLM_NAMES
+    ROLES, POOL_ROLE, DERIVED, FRONTEND_ENV, location = nm.roles, nm.pool_role, nm.derived, nm.frontend_env, nm.location
+    settings, translated = translate_removed(settings, field_list, nm.translations)
     d = Decided(settings=settings)
+    d.substitutions.extend(translated)
     for path, st in sorted(settings.items()):
         if path in DERIVED:
             continue
@@ -654,10 +749,35 @@ def decide(settings: dict[str, Setting], field_list, part: str | None = None, fa
                            "values": [_record_value(v) for v in st.conflict]})
             continue
         estimated = None
+        if st.translated:
+            # A setting the run made under an earlier release's name is the run's own setting in this release's field: a
+            # resolved_differs (G2). other_release is the grade's own band for the ENGINE release (grade.grade names it).
+            d.substitutions.append({"kind": "resolved_differs", "subject": path, "detail": st.translated})
         if st.requested:
             dec = fl.decide(field_list, path, set_by_run=True)
             if dec.g5:
-                d.reasons.append(f"{dec.g5['code']}:{path}")
+                # A field with no exact stand-in may name the execution mode it is priced as, for named values and parts
+                # (estimation.approximates): the point is priced with that mode and names the substitution.
+                f_ = field_list.lookup(path)
+                appr = None
+                if dec.g5["code"] == "field_not_modelled" and f_ is not None and f_.estimation.get("approximates"):
+                    facts = facts_of(st.value, settings) if facts_of else {"value": st.value}
+                    appr = fl.approximate(f_.estimation, facts)
+                if appr is None:
+                    d.reasons.append(f"{dec.g5['code']}:{path}")
+                    continue
+                mode = json.dumps(appr["mode"], sort_keys=True)
+                d.substitutions.append({"kind": "execution_mode", "subject": path,
+                                        "detail": f"priced as {mode}: {appr['differs']} ({appr['evidence']})"})
+                d.args.append({**rec, "blis": None, "match": "approximated", "note": d.substitutions[-1]["detail"]})
+                for f2, v2 in sorted(appr["mode"].items()):
+                    if v2 is None:
+                        continue    # the mode is the field left unset, as the engine's own choice
+                    sub = location(f2)
+                    if sub is None:
+                        d.reasons.append(f"setting_differs:{f2}")
+                    else:
+                        d.mapped[sub] = (f2, v2)
                 continue
             if dec.substitution and dec.substitution["kind"] == "estimated":
                 est = field_list.lookup(path).estimation
@@ -891,7 +1011,7 @@ def recorded_node_size(launch: dict | None) -> int | None:
 
 def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str, field_list,
           catalog_node_size: int | None, node: ir.NodeSize, draft_model: str | None = None,
-          launch_config: dict | None = None) -> Built:
+          launch_config: dict | None = None, engine_kind: str = "vllm") -> Built:
     """The Scenario + Deployment for one point, from the decided settings.
 
     Only what the run recorded is written, under the engine's own names (LOCATIONS), and the
@@ -907,7 +1027,12 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
     chip the scenario states `node.gpus_per_node`, decided by inferencex_runners.resolve: the
     launch configuration's, else InferenceX's runner table. If it is unknown the point is G5
     value_not_recorded, or value_conflict where the two sources differ, and no size is invented.
-    A later record the table supplied is named as a G2 substitution."""
+    A later record the table supplied is named as a G2 substitution.
+
+    engine_kind is the engine the run executed. A vLLM scenario names its release by engine_version, as
+    before; any other engine's names it by engine: {kind, version}, the form the scenario takes for an
+    engine other than the first. The ranks of an SGLang run are tp x pp (x dp when attention is not
+    data-parallel): with enable_dp_attention the data-parallel groups divide the tensor-parallel ranks."""
     import fields as fl
     b = Built()
     acc = d.mapped.get("replay.acceptance_length")
@@ -956,6 +1081,8 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
     if offload:
         b.reasons += _write_offload(dep, offload, d, par)
     ranks = par["tp"] * par["pp"] * par["dp"] * par.get("pcp", 1)
+    if engine_kind == "sglang" and eng.get("enable_dp_attention") is True:
+        ranks = par["tp"] * par["pp"]
     b.gpus = ranks
     cluster = {"hardware": part.name}
     per_node = catalog_node_size
@@ -979,9 +1106,12 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
         if fabric is not None:
             cluster["fabric"] = fabric
             coefficients.append(FABRIC_COEFFICIENT)
-    b.scenario = {"kind": "Scenario", "name": name, "engine_version": engine_version.lstrip("v"),
+    # The engine the scenario runs, as engine: {kind, version} (SIM-1): inference-sim v0.18.0
+    # refuses the engine_version field this replaced.
+    b.scenario = {"kind": "Scenario", "name": name,
+                  "engine": {"kind": engine_kind, "version": engine_version.lstrip("v")},
                   "model": model, "coefficients": coefficients, "cluster": cluster}
-    if names_are_vllms(field_list):
+    if engine_kind == "vllm" and names_are_vllms(field_list):
         pool["engine"] = to_vllm_block(pool["engine"])
         b.vllm_names = True
     b.deployment = dep
