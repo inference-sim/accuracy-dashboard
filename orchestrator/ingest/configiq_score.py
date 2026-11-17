@@ -78,6 +78,12 @@ LAUNCH_SUBJECT = "launch"
 WORKLOAD_SUBJECT = "workload"
 
 
+# Stated on every scored point: the bias of the mean TTFT of the scored gpt-oss-120b points is unexplained.
+TTFT_NOTE = ("mean TTFT of the scored points (all gpt-oss-120b) is biased high, load-dependent, and the cause is unexplained: "
+             "candidates are H200-specific launch settings, prefix caching by GuideLLM's prompts, and the latency model "
+             "under lockstep waves; see docs/m3/configiq/README.md")
+
+
 class ScoreError(ValueError):
     """The inputs are not what scoring a configiq point requires."""
 
@@ -690,6 +696,7 @@ def record(o: Outcome) -> dict:
         r["achieved_concurrency"] = o.concurrency_achieved
         r["predicted"] = o.predicted
         r["errors_pct"] = o.errors
+        r["backlog"] = list(r.get("backlog") or []) + [TTFT_NOTE]
     else:
         r["grade"] = None      # withheld or failed: no figure, no grade
         r["g5_reason"], r["g5_reasons"] = None, []
