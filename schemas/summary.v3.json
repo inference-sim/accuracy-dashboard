@@ -193,7 +193,10 @@
           ],
           "properties": {
             "kind": {
-              "const": "vllm"
+              "enum": [
+                "vllm",
+                "sglang"
+              ]
             },
             "version": {
               "type": "string",
@@ -1473,7 +1476,10 @@
           ],
           "properties": {
             "kind": {
-              "const": "vllm"
+              "enum": [
+                "vllm",
+                "sglang"
+              ]
             },
             "version": {
               "type": "string",
