@@ -863,6 +863,15 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
         o.reasons.append(conflict)
         sup.reasons = [r for r in sup.reasons if r != "model_not_in_catalog"]
     o.reasons += sup.reasons
+    if sglang and sup.model and f"engine.{ss.CONTEXT_LENGTH_FIELD}" not in c.mapped and env.catalog_obj is not None:
+        # The run did not set the context length, and the catalog's graph carries no window; the SGLang host refuses a
+        # scenario that states none. SGLang derives it from the checkpoint's config, so that is the value stated.
+        window = ss.context_window(env.catalog_obj.root, sup.model)
+        if window is not None:
+            c.mapped[f"engine.{ss.CONTEXT_LENGTH_FIELD}"] = (ss.CONTEXT_LENGTH_FIELD, window)
+            o.subs.append({"kind": "estimated", "subject": ss.CONTEXT_LENGTH_FIELD,
+                           "detail": f"the run set no context length; SGLang derives {window} from the checkpoint's config "
+                                     f"(get_context_length), which the catalog graph does not carry"})
 
     agentic = row["benchmark_type"] == "agentic_traces"
     r = None

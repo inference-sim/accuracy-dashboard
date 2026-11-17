@@ -299,3 +299,33 @@ def parallel_reasons(reasons: list[str], c: st.Decided, field_list) -> list[str]
         else:
             out.append(r)
     return out
+
+
+# ------------------------------------------------------------------ the context length
+
+CONTEXT_LENGTH_KEYS = ("max_sequence_length", "seq_length", "max_seq_len", "model_max_length", "max_position_embeddings")
+CONTEXT_LENGTH_FIELD = "context_length"
+
+
+def context_window(catalog_root, model: str) -> int | None:
+    """The context length SGLang serves a model at when the run states no --context-length: get_context_length
+    (python/sglang/srt/utils/hf_transformers/common.py:677-694 at 297e54fd) over the catalog model's config.json. The
+    first of CONTEXT_LENGTH_KEYS the config sets, times the rope-scaling factor, which counts only when the scaling
+    names no original_max_position_embeddings and is not llama3. None when the entry has no config or none of the keys:
+    SGLang's own fallback (2048) is not a value the checkpoint states, so it is not supplied."""
+    f = Path(catalog_root) / "models" / model / "config.json"
+    if not f.is_file():
+        return None
+    cfg = json.loads(f.read_text())
+    cfg = cfg.get("text_config", cfg) if isinstance(cfg, dict) else {}
+    factor = 1
+    scaling = cfg.get("rope_scaling")
+    if scaling:
+        factor = scaling.get("factor", 1)
+        if "original_max_position_embeddings" in scaling or scaling.get("rope_type") == "llama3":
+            factor = 1
+    for key in CONTEXT_LENGTH_KEYS:
+        v = cfg.get(key)
+        if v is not None:
+            return int(factor * v)
+    return None
