@@ -408,3 +408,24 @@ def test_a_launch_scripts_own_helper_variables_are_not_the_engines():
         assert o.fidelity is not None, o.reasons
     finally:
         shutil.rmtree(tmp)
+
+
+def test_a_flag_an_earlier_release_had_is_read_as_the_field_that_replaced_it_and_named():
+    # --cuda-graph-max-bs is v0.5.14's deprecated alias of --cuda-graph-max-bs-decode, which v0.5.23 removed. 92 of the 142
+    # measured points pass it; without the translation each is field_not_in_release whatever the engine models.
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        fields = [{**_field(f.name, f.status, f.source)} for f in FIELDS.fields.values()] + [_field("cuda_graph_max_bs_decode", "modelled")]
+        fields.sort(key=lambda f: (f["name"], f["source"]))
+        entry, env = _setup(tmp, command=COMMAND + " --cuda-graph-max-bs 192")
+        env.sglang = sc.EngineKit("sglang", RELEASE, fl.parse(json.dumps(
+            {"kind": "FieldList", "engine": {"kind": "sglang", "version": RELEASE}, "fields": fields}).encode()), "f" * 64,
+            ss.load_declarations())
+        o, work = _score(tmp, entry, env)
+        assert o.fidelity is not None, o.reasons
+        sub = next(s for s in o.fidelity["substitutions"] if s["subject"] == "cuda_graph_max_bs")
+        assert sub["kind"] == "resolved_differs" and "cuda_graph_max_bs_decode=192" in sub["detail"]
+        dep = list(yaml.safe_load_all(next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()))[1]
+        assert dep["pools"][0]["engine"]["cuda_graph_max_bs_decode"] == 192
+    finally:
+        shutil.rmtree(tmp)

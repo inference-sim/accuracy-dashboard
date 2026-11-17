@@ -640,6 +640,7 @@ class Names:
     derived: tuple
     frontend_env: str | None
     location: object
+    translations: dict | None = None        # removed name -> successor (RELEASE_TRANSLATIONS where None)
 
 
 @dataclass
@@ -689,20 +690,25 @@ RELEASE_TRANSLATIONS = {
 }
 
 
-def translate_removed(settings: dict, field_list) -> tuple:
+SAME_VALUE = object()      # a translation that renames a field: the successor takes the run's value
+
+
+def translate_removed(settings: dict, field_list, table: dict | None = None) -> tuple:
     """The settings with each removed name replaced by its successor, and the substitutions that say so. A name is translated
-    only when the release's field list lacks it and the successor is not already stated."""
+    only when the release's field list lacks it and the successor is not already stated. An entry whose value is SAME_VALUE
+    renames the field: the successor takes the value the run set."""
     out, subs = dict(settings), []
-    for path, (new, value, applies, why) in RELEASE_TRANSLATIONS.items():
+    for path, (new, value, applies, why) in (RELEASE_TRANSLATIONS if table is None else table).items():
         st = settings.get(path)
         if st is None or field_list.lookup(path) is not None or st.conflict is not None:
             continue
-        if not applies(st.value) or new in settings:
-            continue
+        if not applies(st.value) or new in settings or (value is SAME_VALUE and not st.requested):
+            continue            # a renamed field the engine only resolved is not a request, so it is not carried over
         del out[path]
+        value = st.value if value is SAME_VALUE else value
         out[new] = Setting(path=new, value=value, source=st.source, requested=True)
         subs.append({"kind": "resolved_differs", "subject": path,
-                     "detail": f"the run's vLLM release has {path}={st.value!r}; the modelled release removed it and states "
+                     "detail": f"the run's engine release has {path}={st.value!r}; the modelled release removed it and states "
                                f"{new}={value} for it: {why}"})
     return out, subs
 
@@ -722,7 +728,7 @@ def decide(settings: dict[str, Setting], field_list, part: str | None = None, fa
     import fields as fl
     nm = names or VLLM_NAMES
     ROLES, POOL_ROLE, DERIVED, FRONTEND_ENV, location = nm.roles, nm.pool_role, nm.derived, nm.frontend_env, nm.location
-    settings, translated = translate_removed(settings, field_list)
+    settings, translated = translate_removed(settings, field_list, nm.translations)
     d = Decided(settings=settings)
     d.substitutions.extend(translated)
     for path, st in sorted(settings.items()):
