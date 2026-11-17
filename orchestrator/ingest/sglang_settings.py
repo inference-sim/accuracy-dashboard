@@ -186,9 +186,12 @@ def read_launch_command(text: str | None, decl: dict) -> st.Reading:
 
 
 def _value(text: str, kind: str):
-    """A flag's value, or None when the command left it to the shell (an unexpanded $VAR)."""
+    """A flag's value, or None when the command left it to the shell (an unexpanded $VAR). A flag the release does not
+    declare has no type; a whole number is read as one, so a renamed field takes the value as the earlier release read it."""
     if "$" in text:
         return None
+    if kind is None and re.fullmatch(r"-?\d+", text):
+        return int(text)
     try:
         return _coerce(text, kind)
     except ValueError:
@@ -260,6 +263,17 @@ PARALLEL = {"tp_size": "parallel.tp", "pp_size": "parallel.pp", "dp_size": "para
 ROLES = {"model_path": "model", "served_model_name": "served_model", "speculative_draft_model_path": "drafter"}
 
 
+# A flag or field of an earlier SGLang release that the modelled release removed, read as the field that replaced it
+# (settings.translate_removed). TEMPORARY until the engine's field list states the earlier names.
+TRANSLATIONS = {
+    "cuda_graph_max_bs": (
+        "cuda_graph_max_bs_decode", st.SAME_VALUE, lambda v: v is not None,
+        "SGLang's --cuda-graph-max-bs capped the decode CUDA graph's batch size; v0.5.14 split the cap by phase and kept the "
+        "old flag as a deprecated alias of --cuda-graph-max-bs-decode (server_args.py at v0.5.14: new_flag="
+        "\"--cuda-graph-max-bs-decode\"), and v0.5.23 removed the alias; the prefill cap is its own field"),
+}
+
+
 def make_names(decl: dict) -> st.Names:
     def location(path: str):
         if path in PARALLEL:
@@ -267,7 +281,8 @@ def make_names(decl: dict) -> st.Names:
         if path.startswith("env."):
             return f"engine.env.{path[4:]}"
         return f"engine.{path}" if path in decl["fields"] else None
-    return st.Names(roles=ROLES, pool_role={}, derived=("frontend.router",), frontend_env=None, location=location)
+    return st.Names(roles=ROLES, pool_role={}, derived=("frontend.router",), frontend_env=None, location=location,
+                    translations=TRANSLATIONS)
 
 
 def parallel_reasons(reasons: list[str], c: st.Decided, field_list) -> list[str]:
