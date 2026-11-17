@@ -96,17 +96,15 @@ def test_a_dp_free_row_has_two_pools_and_no_refusal():
     assert pdm.topology_reasons(ROW, pools) == []
 
 
-def test_a_pool_on_dp_attention_is_refused_by_name_with_the_other_pool_unequal():
-    row = {**ROW, "prefill_dp_attention": True, "num_prefill_gpu": 8, "prefill_tp": 8}
-    pools = pdm.pools_of(row)
+def test_pools_on_dp_attention_unequal_or_equal_are_not_refused():
+    # The engine runs a KV transfer with data parallelism and the placement allows unequal pools (blis-vllm#206,
+    # inference-sim#2162): neither shape is a topology refusal any more.
+    unequal = {**ROW, "prefill_dp_attention": True, "num_prefill_gpu": 8, "prefill_tp": 8}
+    pools = pdm.pools_of(unequal)
     assert pools["prefill"].dp == 8 and pools["decode"].dp == 1
-    assert pdm.topology_reasons(row, pools) == ["topology_unsupported:pd_pool_data_parallel",
-                                                "topology_unsupported:pd_unequal_data_parallel"]
-
-
-def test_equal_dp_above_one_is_a_pool_refusal_and_not_an_unequal_one():
-    row = {**ROW, "prefill_dp_attention": True, "num_prefill_gpu": 4, "prefill_tp": 4, "decode_dp_attention": True}
-    assert pdm.topology_reasons(row, pdm.pools_of(row)) == ["topology_unsupported:pd_pool_data_parallel"]
+    assert pdm.topology_reasons(unequal, pools) == []
+    equal = {**ROW, "prefill_dp_attention": True, "num_prefill_gpu": 4, "prefill_tp": 4, "decode_dp_attention": True}
+    assert pdm.topology_reasons(equal, pdm.pools_of(equal)) == []
 
 
 def test_the_recipes_data_parallel_size_decides_over_the_rows_reading():
@@ -278,6 +276,26 @@ def test_the_pseudo_launch_states_a_size_the_recipe_leaves_at_default_only_when_
     args = pdm.pseudo_launch(recipe(), "decode", ROW, odd)["roles"]["decode"]["args"]
     assert args["tensor-parallel-size"] == 4 and "pipeline-parallel-size" not in args
     assert pdm.pseudo_launch(recipe(), "decode", ROW, pools["decode"])["resources"] == {"gpus_per_node": 8}
+
+
+def test_a_dp_attention_pool_states_tensor_pipeline_and_data_parallel_sizes_from_the_recipe():
+    # Without this the build named required_setting_missing:parallel.pp / parallel.tp for every DP-attention pool.
+    row = {**ROW, "prefill_dp_attention": True, "num_prefill_gpu": 8, "prefill_tp": 8}
+    rc = recipe()
+    pools = pdm.pools_of(row, rc)
+    pre = pools["prefill"]
+    assert pre.gpus == 8 and pre.dp == 8
+    args = pdm.pseudo_launch(rc, "prefill", row, pre)["roles"]["prefill"]["args"]
+    assert (args["tensor-parallel-size"], args["pipeline-parallel-size"], args["data-parallel-size"]) == (1, 1, 8)
+    # A recipe that states tensor-parallel 2 on 8 GPUs is dp 4 per instance.
+    pre.dp = 4
+    two = pdr.parse(RECIPE.replace("tensor-parallel-size: 1", "tensor-parallel-size: 2")) if "tensor-parallel-size: 1" in RECIPE else rc
+    args = pdm.pseudo_launch(two, "prefill", row, pre)["roles"]["prefill"]["args"]
+    assert args["pipeline-parallel-size"] == 1
+    # Sizes that do not make the pool's GPUs are not invented.
+    odd = pdm.Pool("prefill", 1, 6, 6, 1, True, 6)
+    args = pdm.pseudo_launch(rc, "prefill", row, odd)["roles"]["prefill"]["args"]
+    assert "data-parallel-size" not in args or args["data-parallel-size"] * args.get("tensor-parallel-size", 1) == 6
 
 
 def test_the_transfer_connector_and_role_are_not_engine_settings():
@@ -563,15 +581,13 @@ def test_a_dp_free_row_is_written_as_two_pools_and_scored_with_the_instance_coun
         shutil.rmtree(tmp)
 
 
-def test_a_row_on_dp_attention_is_refused_by_name_and_blis_is_never_asked():
+def test_a_row_on_dp_attention_is_no_longer_refused_for_its_topology():
     tmp = Path(tempfile.mkdtemp())
     try:
         row = {"prefill_dp_attention": True, "num_prefill_gpu": 8, "prefill_tp": 8}
         entry, env = _pd_point(tmp, row=row, recipe_text=RECIPE.replace("gpus_per_prefill: 1", "gpus_per_prefill: 8"))
         o, _ = e2e._score(tmp, entry, env, tmp / "c1")
-        assert o.fidelity is None      # the pools differ from the router bound's regime too, so that is named beside the topology
-        assert {"topology_unsupported:pd_pool_data_parallel", "topology_unsupported:pd_unequal_data_parallel"} <= set(o.reasons)
-        assert e2e._saw(env) == []
+        assert not [r for r in o.reasons if r.startswith("topology_unsupported:pd_")], o.reasons
     finally:
         shutil.rmtree(tmp)
 
@@ -845,11 +861,10 @@ def test_a_router_policy_experiment_scores_the_writer_and_says_it_is_not_a_grade
         assert o.fidelity["router"]["outcome"] == "experiment"
         assert (next((work / "single_turn" / entry["point_id"]).glob("pd-round-robin.epp.yaml"))).is_file()
         # a router the experiment does not name policy for, and a point refused for another reason, stay refused
-        entry2, env2 = _pd_point(Path(tempfile.mkdtemp()), table=False, row={"prefill_dp_attention": True, "num_prefill_gpu": 8, "prefill_tp": 8},
-                                 recipe_text=RECIPE.replace("gpus_per_prefill: 1", "gpus_per_prefill: 8"), log=False)
+        entry2, env2 = _pd_point(Path(tempfile.mkdtemp()), table=False, row={"benchmark_type": "agentic_traces"}, recipe_text=RECIPE, log=False)
         env2.router_policy_experiment = "round-robin"
         o2 = sc._score_one(entry2, Path(env2.catalog) / "pull", Path(env2.catalog) / "w", env2)
-        assert o2.fidelity is None and "topology_unsupported:pd_pool_data_parallel" in o2.reasons
+        assert o2.fidelity is None and "topology_unsupported:pd_agentic" in o2.reasons
     finally:
         shutil.rmtree(tmp)
 
