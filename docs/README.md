@@ -12,6 +12,7 @@ The dashboard asks one question of every InferenceX benchmark point it can read:
 | [The evaluation protocol](m2/evaluation-protocol.md) | The development split, selection, the evaluation log, ranking metrics. |
 | [The evaluation log](m2/evaluation-log.md) | Every evaluation of a test set. |
 | [Reproducing the baseline and the after run](reproducing.md) | Every pin by hash, the commands, environment, expected counts, cost, and what cannot be reproduced. |
+| [The nightly, its source, and its rehearsals](nightly.md) | What a night scores, the ledger extract it reads instead of the dump, and the dry runs that rehearse it on pull requests and on new releases. |
 | [Does the dashboard compare like with like?](comparability.md) | Dimension by dimension: how InferenceX measured, how the dashboard and BLIS rebuild it, whether they agree, which differences a point names and which it does not, how to reproduce the checks. |
 | [Reading the before/after report](before-after.md) | How to read `table.md`; the baseline and the preliminary after-run. |
 | [The substrate point record](pointrecord.md) | `pointrecords.jsonl`: how each point is written under the substrate's names, what it cannot yet say, how it is tested. |
