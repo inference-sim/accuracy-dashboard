@@ -105,12 +105,18 @@ def draft_script(rc: Recipes, row: dict) -> str | None:
 def launch_script(rc: Recipes, row: dict) -> str | None:
     """The benchmark script that launched the row's engine, by InferenceX's naming
     (<model-prefix>_<precision>_<hardware>[_mtp].sh under benchmarks/single_node), or None unless exactly one
-    script of the row's recipes has it. The recipes that match the row (framework, precision, image, runner) give
-    the prefixes, so a script of another framework that shares the name stem is not taken for the row's."""
-    prefixes = {r.get("model-prefix") for r in matching(rc, row)} - {None}
+    script has it. The model prefix is the row's model slug, and it must be the prefix of a recipe of the row's
+    framework, precision and runner at the run's commit, so a script of another framework that shares the name stem
+    is not taken for the row's. (The recipe's image is not compared: the workflow can set the image a run uses.)"""
+    prefixes = {r.get("model-prefix") for r in rc.recipes
+                if r.get("framework") == row.get("framework") and r.get("precision") == row.get("precision")
+                and runner_hardware(r.get("runner")) == row.get("hardware")} & {row.get("model")}
     mtp = "_mtp" if row.get("spec_method") not in (None, "none") else ""
     names = {f"{p}_{row.get('precision')}_{row.get('hardware')}{mtp}.sh" for p in prefixes}
-    paths = [p for p in rc.scripts if p.startswith("benchmarks/single_node/") and p.rsplit("/", 1)[-1] in names]
+    # The single-turn scripts sit in benchmarks/single_node, or in its fixed_seq_len directory once InferenceX split
+    # them from the agentic ones.
+    dirs = ("benchmarks/single_node/", "benchmarks/single_node/fixed_seq_len/")
+    paths = [p for p in rc.scripts if p.rsplit("/", 1)[0] + "/" in dirs and p.rsplit("/", 1)[-1] in names]
     return paths[0] if len(paths) == 1 else None
 
 

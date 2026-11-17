@@ -357,3 +357,18 @@ def test_recipes_are_read_from_a_local_clone_and_a_missing_commit_is_fetched_by_
     assert rc_src.script(rc, "benchmarks/single_node/m_fp8_h200.sh").strip().endswith("--tp-size 4")
     with pytest.raises(rcp.RecipesUnavailable):
         rcp.GitRecipes(None, "o/r", clone).at("0" * 40)
+
+
+def test_the_launch_script_is_the_single_turn_script_of_the_rows_model_framework_precision_and_runner():
+    recipe = lambda **kw: {"model": "org/m", "model-prefix": "m", "framework": "sglang", "precision": "fp8",
+                           "runner": "h200-dgxc", "image": "x/y:other-image", **kw}
+    scripts = {"benchmarks/single_node/fixed_seq_len/m_fp8_h200.sh": "a", "benchmarks/single_node/agentic/m_fp8_h200.sh": "b",
+               "benchmarks/single_node/other_fp8_h200.sh": "c", "benchmarks/single_node/m_fp8_h200_mtp.sh": "d"}
+    rc = rcp.Recipes(recipes=[recipe(), recipe(**{"model-prefix": "other", "model": "org/o"})], scripts=scripts)
+    row = _row(model="m")
+    # The recipe pins another image than the run reports, the agentic copy is another script, and a neighbour model's
+    # recipe does not lend its prefix.
+    assert rcp.launch_script(rc, row) == "benchmarks/single_node/fixed_seq_len/m_fp8_h200.sh"
+    assert rcp.launch_script(rc, _row(model="m", spec_method="mtp")) == "benchmarks/single_node/m_fp8_h200_mtp.sh"
+    assert rcp.launch_script(rc, _row(model="unknown")) is None
+    assert rcp.launch_script(rc, _row(model="m", framework="vllm")) is None
