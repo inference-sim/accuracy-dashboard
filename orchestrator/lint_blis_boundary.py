@@ -69,6 +69,9 @@ DATA_READS = {
     ("orchestrator/ingest/pd.py", "model_window"):
         "TEMPORARY until a command prints a catalog model's context window: a prefill/decode recipe that states no "
         "--max-model-len runs at the checkpoint's own window, which the catalog entry's config.json holds",
+    ("orchestrator/ingest/sglang_settings.py", "context_window"):
+        "TEMPORARY until a command prints a catalog model's context window (see pd.model_window): SGLang derives the "
+        "context length of a run that sets none from the checkpoint's config.json, which the catalog entry holds",
     ("orchestrator/ingest/cli.py", "read_anchor_units"):
         "TEMPORARY until the M2 substrate release lets `blis ledger --list anchor` print the published "
         "anchor list, which the M1 simulator does not have (inference-sim/accuracy-dashboard#52)",
