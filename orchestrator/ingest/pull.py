@@ -235,7 +235,7 @@ def client_release(entry: dict, frozen: "Frozen", gh, run_id: str, attempt: int,
 
 
 def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArtifacts, fetch, out: Path,
-                 recipes=None, source_log: str | None = None) -> dict:
+                 recipes=None, source_log: str | None = None, logs_from_source: bool = False) -> dict:
     """Freeze one point's inputs. The point is one ledger unit; its inputs are the kept
     record's (the smallest row id the window holds), and its measured values are each
     measurement's, so the score is against their mean (design §10.2)."""
@@ -341,7 +341,10 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
         # it, read before the live API's copy.
         frozen.put("server_log", source_log.encode(), "source:server_logs")
         server_log = source_log
-    if not agentic and server_log is None:
+    if not agentic and server_log is None and logs_from_source:
+        # The night reads the run as the ledger's pinned source recorded it, and the source holds no log for the row.
+        entry["reasons"].append("server_log_missing:not_in_source")
+    elif not agentic and server_log is None:
         try:
             text = api.server_log(fetch, row["id"])
         except urllib.error.HTTPError as e:

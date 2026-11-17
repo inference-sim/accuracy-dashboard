@@ -363,12 +363,16 @@ class GitHubArtifacts:
 
     def _job_log(self, job_id: int) -> str | None:
         """A job's log text, or None when GitHub no longer has it (404 or 410: expired)."""
+        data = self._log_bytes(f"https://api.github.com/repos/{self.repo}/actions/jobs/{job_id}/logs")
+        return None if data is None else data.decode("utf-8", "replace")
+
+    def _log_bytes(self, url: str) -> bytes | None:
+        """The bytes a logs endpoint redirects to, or None when GitHub no longer has them (404 or 410: expired)."""
 
         class NoRedirect(urllib.request.HTTPRedirectHandler):
             def redirect_request(self, *a, **k):
                 return None
 
-        url = f"https://api.github.com/repos/{self.repo}/actions/jobs/{job_id}/logs"
         try:
             try:
                 data = clients._get_bytes(url, self._headers(), 120, sleep=self.sleep,
@@ -381,7 +385,7 @@ class GitHubArtifacts:
             if e.code in (404, 410):
                 return None
             raise
-        return data.decode("utf-8", "replace")
+        return data
 
     def job_logs_cached(self, run_id: str, attempt: int) -> tuple[dict, int]:
         """({normalised --result-filename: (job id, job name, log text)}, jobs whose log has
@@ -396,6 +400,17 @@ class GitHubArtifacts:
             return self._job_logs[key]
 
     def _index_job_logs(self, run_id: str, attempt: int) -> tuple[dict, int]:
+        """The run attempt's job logs, indexed by the result file each job's benchmark_serving.py command names. They
+        are read from the attempt's log archive, one request for every job (GET .../attempts/N/logs), not one
+        request per job: a run has hundreds of jobs, and the token's REST budget is per hour. The archive names each
+        job's whole log `<k>_<job name>.txt`, a "/" in the name written "_" and a long name shortened with "...";
+        a job's id is taken from the jobs listing by that name, and is None unless exactly one job has it. An archive GitHub no longer holds (404 or 410) means every
+        log has expired."""
+        import io
+        import zipfile
+        data = self._log_bytes(f"https://api.github.com/repos/{self.repo}/actions/runs/{run_id}/attempts/{attempt}/logs")
+        if data is None:
+            return {}, 1
         jobs, page = [], 1
         while True:
             url = (f"https://api.github.com/repos/{self.repo}/actions/runs/{run_id}/attempts/{attempt}"
@@ -406,17 +421,29 @@ class GitHubArtifacts:
             if len(jobs) >= int(doc.get("total_count") or 0) or not got:
                 break
             page += 1
-        index, expired = {}, 0
+        by_name: dict = {}
         for j in jobs:
-            text = self._job_log(j["id"])
-            if text is None:
-                expired += 1
-                continue
-            argv = command_after(text, "benchmark_serving.py ")
-            name = flag(argv, "--result-filename") if argv else None
-            if name:
-                index.setdefault(normal_result_name(name), (j["id"], j.get("name"), text))
-        return index, expired
+            by_name.setdefault((j.get("name") or "").replace("/", "_"), []).append(j)
+        index = {}
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            for info in sorted(z.infolist(), key=lambda i: i.filename):
+                name = info.filename
+                if "/" in name or not name.endswith(".txt") or "_" not in name:
+                    continue                 # a step's file inside a job's directory; the top-level file is the job's
+                job_name = name.split("_", 1)[1][:-4]
+                text = z.read(info).decode("utf-8", "replace")
+                argv = command_after(text, "benchmark_serving.py ")
+                rname = flag(argv, "--result-filename") if argv else None
+                if not rname:
+                    continue
+                same = by_name.get(job_name) or []
+                if not same and "..." in job_name:
+                    # The archive shortens a long name with "...": match the jobs whose name has its two ends.
+                    head, _, tail = job_name.partition("...")
+                    same = [j for n, js in by_name.items() if n.startswith(head) and n.endswith(tail) for j in js]
+                job = same[0] if len(same) == 1 else {"id": None, "name": job_name}
+                index.setdefault(normal_result_name(rname), (job["id"], job.get("name"), text))
+        return index, 0
 
     def download(self, art: Artifact) -> bytes:
         path = self.cache / f"{art.id}.zip"

@@ -146,6 +146,7 @@ def cmd_pull(a) -> int:
         try:
             return pt, pl.freeze_point(pt, resolver=resolver, gh=gh, fetch=api.http_fetch, out=out,
                                        source_log=(getattr(a, "source_logs", None) or {}).get(str(pt.row.get("id"))),
+                                       logs_from_source=getattr(a, "source_logs", None) is not None,
                                        recipes=recipes), None
         except (clients.RateLimited, clients.FetchFailed):
             raise   # the whole pull is invalid, not this point

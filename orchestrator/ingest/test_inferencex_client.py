@@ -353,26 +353,59 @@ def test_a_run_github_no_longer_holds_reads_no_job_log_and_names_why(tmp_path):
     assert "job_log" not in frozen.files
 
 
-def test_job_logs_are_found_by_result_file_and_a_410_is_expired(monkeypatch, tmp_path):
+def _archive(files: dict) -> bytes:
     import io
-    import urllib.error
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        for name, text in files.items():
+            z.writestr(name, text)
+    return buf.getvalue()
+
+
+def test_job_logs_are_read_from_the_runs_log_archive_in_one_request_and_found_by_result_file(monkeypatch, tmp_path):
+    # A run has hundreds of jobs: its job logs come from the attempt's one log archive, not one request per job, and
+    # each job's id comes from the jobs listing by its name (the archive writes "/" as "_").
     import artifacts as art
     import clients
-    jobs = {"total_count": 2, "jobs": [{"id": 1, "name": "a"}, {"id": 2, "name": "b"}]}
+    jobs = {"total_count": 4, "jobs": [{"id": 1, "name": "setup"}, {"id": 2, "name": "bench / c4"},
+                                       {"id": 3, "name": "bench / c8"}, {"id": 4, "name": "a very long job name / c16"}]}
+    calls = []
 
     def get_json(url, headers, timeout=60, **k):
+        calls.append(url)
         assert url.endswith("/actions/runs/9001/attempts/1/jobs?per_page=100&page=1")
         return jobs
 
     def get_bytes(url, headers, timeout=60, **k):
-        if url.endswith("/jobs/1/logs"):
-            raise urllib.error.HTTPError(url, 410, "gone", {}, io.BytesIO(b""))
-        return _job_log().encode()
+        calls.append(url)
+        assert url.endswith("/actions/runs/9001/attempts/1/logs"), url
+        return _archive({"0_setup.txt": "no client here", "1_bench _ c4.txt": _job_log(),
+                         "bench _ c4/3_run.txt": _job_log(), "2_bench _ c8.txt": "the c8 job ran nothing",
+                         "3_a very...c16.txt": _job_log().replace("x.json", "y.json")})
     monkeypatch.setattr(clients, "_get_json", get_json)
     monkeypatch.setattr(clients, "_get_bytes", get_bytes)
     gh = art.GitHubArtifacts("SemiAnalysisAI/InferenceX", None, tmp_path)
     index, expired = gh.job_logs_cached("9001", 1)
-    assert expired == 1 and list(index) == ["x"] and index["x"][:2] == (2, "b")
+    assert expired == 0 and sorted(index) == ["x", "y"] and index["x"][:2] == (2, "bench / c4")
+    assert index["y"][0] == 4                                 # a shortened name, matched by its two ends
+    assert len(calls) == 2
+    gh.job_logs_cached("9001", 1)
+    assert len(calls) == 2                                    # memoized per run attempt
+
+
+def test_a_log_archive_github_no_longer_holds_means_every_job_log_expired(monkeypatch, tmp_path):
+    import io
+    import urllib.error
+    import artifacts as art
+    import clients
+
+    def get_bytes(url, headers, timeout=60, **k):
+        raise urllib.error.HTTPError(url, 410, "gone", {}, io.BytesIO(b""))
+    monkeypatch.setattr(clients, "_get_bytes", get_bytes)
+    monkeypatch.setattr(clients, "_get_json", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no listing")))
+    index, expired = art.GitHubArtifacts("SemiAnalysisAI/InferenceX", None, tmp_path).job_logs_cached("9001", 1)
+    assert index == {} and expired == 1
 
 
 def _regime_of(commit_date):
