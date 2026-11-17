@@ -408,6 +408,13 @@ def test_every_action_of_every_workflow_is_pinned_to_a_commit_with_its_version_i
         uses = re.findall(r"^\s*-?\s*uses:\s*(\S+)(.*)$", wf.read_text(), re.M)
         assert uses, wf
         for ref, rest in uses:
+            if ref.startswith("./"):
+                # A workflow of this repository, called at the caller's own commit: there is nothing to pin. Only a
+                # reusable workflow file that exists here is allowed this way.
+                assert re.fullmatch(r"\./\.github/workflows/[\w.-]+\.yml", ref) and (HERE.parent / ref).is_file(), \
+                    f"{wf.name}: {ref} is not a workflow of this repository"
+                assert not rest.strip(), f"{wf.name}: {ref} carries a comment"
+                continue
             assert re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", ref), f"{wf.name}: {ref} is not pinned to a commit SHA"
             assert re.fullmatch(r"\s*# v\d+\.\d+\.\d+", rest), f"{wf.name}: {ref} has no version comment"
 

@@ -1,0 +1,94 @@
+name: nightly-rehearsal
+
+# The nightly, rehearsed before it matters (docs/nightly.md). It runs api-nightly.yml as a dry run: resolve, the
+# night's pull and scoring through harness/run.sh, and every validation of the publish job, which then prints what it
+# would publish and pushes nothing. Any failure fails this workflow.
+#
+#   on a pull request that changes the scorer, the harness or the nightly:
+#       a fixed, seeded, stratified draw of about 200 anchor units (every model, chip, framework and engine image the
+#       anchors hold, then a seeded random fill), read from the ledger extract (.github/ledger-extract.json), scored
+#       with the release the nightly would score next. A scorer change proves the nightly still publishes before it
+#       merges. Budget: about 15 minutes; the extract and the artifact downloads come from the Actions cache.
+#   on a schedule, every day:
+#       the same draw scored with the newest inference-sim release, so a release that will not score fails the day
+#       it is tagged, before the real nightly picks it up; and the newest blis-substrate release's ledger checked
+#       against the extract's pin, so a substrate release whose ledger needs a new extract fails the same day.
+
+on:
+  pull_request:
+    paths:
+      - "orchestrator/**"
+      - "harness/**"
+      - ".github/workflows/api-nightly.yml"
+      - ".github/workflows/nightly-rehearsal.yml"
+      - ".github/ledger-extract.json"
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-rehearsal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The release to rehearse: on a pull request the one the nightly would score next (resolve_blis.sh decides, given
+  # an empty tag); on a schedule the newest stable inference-sim release.
+  pick:
+    runs-on: ubuntu-latest
+    outputs:
+      blis_tag: ${{ steps.p.outputs.blis_tag }}
+    steps:
+      - id: p
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          tag=""
+          if [ "$EVENT" != pull_request ]; then
+            tag=$(gh release list --repo inference-sim/inference-sim --exclude-drafts --exclude-pre-releases -L 1 \
+              --json tagName -q '.[0].tagName')
+          fi
+          echo "blis_tag=$tag" | tee -a "$GITHUB_OUTPUT"
+
+  rehearse:
+    needs: pick
+    permissions:
+      contents: write # requested by api-nightly's publish job; a dry run pushes nothing
+      actions: write
+    uses: ./.github/workflows/api-nightly.yml
+    with:
+      dry_run: true
+      sample: 200
+      blis_tag: ${{ needs.pick.outputs.blis_tag }}
+    secrets: inherit
+
+  # A new blis-substrate release whose ledger is not the one the extract was built for needs a new extract before
+  # the nightly can read it: fail the day it is tagged, naming what to run.
+  substrate:
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+      - run: pip install --quiet --require-hashes -r requirements-ci.txt
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=$(gh release list --repo inference-sim/blis-substrate --exclude-drafts --exclude-pre-releases -L 1 \
+            --json tagName -q '.[0].tagName')
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/sources.yaml" \
+            "https://raw.githubusercontent.com/inference-sim/blis-substrate/${tag}/catalog/ledger/sources.yaml"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/anchor.yaml" \
+            "https://raw.githubusercontent.com/inference-sim/blis-substrate/${tag}/catalog/ledger/published/anchor.yaml"
+          echo "blis-substrate ${tag}:"
+          python3 orchestrator/ingest/ledger_extract.py check-source --sources "$RUNNER_TEMP/sources.yaml" \
+            --anchor-list "$RUNNER_TEMP/anchor.yaml" --pin .github/ledger-extract.json

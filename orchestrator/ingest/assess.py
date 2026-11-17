@@ -24,6 +24,9 @@ G5_FOR_REASON = {
     "model_not_in_catalog": "not_in_catalog",
     "hardware_no_coefficients": "not_in_catalog",
     "drafter_not_in_catalog": "not_in_catalog",
+    # A repository several catalog entries claim, and nothing the run recorded picks one: the value that would
+    # choose the entry is not recorded.
+    "catalog_entry_ambiguous": "value_not_recorded",
     "conflict": "value_conflict",
     "required_setting_missing": "value_not_recorded",
     "server_log_missing": "value_not_recorded",

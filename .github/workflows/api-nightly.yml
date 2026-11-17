@@ -30,13 +30,36 @@ on:
         description: "Ignore the artifact-download cache and re-download everything"
         type: boolean
         default: false
+      # A rehearsal: resolve and run-night as always, and publish runs every validation, then prints what it would
+      # publish and stops before the commit, the push, the Pages deploy and the next run. The schedule and a normal
+      # dispatch publish as before.
+      dry_run:
+        description: "Validate and print what would be published, and publish nothing"
+        type: boolean
+        default: false
+  # The rehearsal (nightly-rehearsal.yml) calls this workflow with dry_run, a sampled anchor set and, for a new
+  # release, the release to score; it never publishes (docs/nightly.md).
+  workflow_call:
+    inputs:
+      dry_run:
+        type: boolean
+        default: true
+      sample:
+        description: "score a seeded, stratified draw of about this many anchor units (0: every one)"
+        type: number
+        default: 0
+      blis_tag:
+        description: "the inference-sim release to score instead of the one resolve_blis.sh names"
+        type: string
+        default: ""
 
 # Least privilege: read-only by default. Only `publish` gets contents: write.
 permissions:
   contents: read
 
+# One publishing night at a time; a dry run (a rehearsal) runs in its own group and never waits for the night.
 concurrency:
-  group: api-nightly
+  group: ${{ inputs.dry_run && format('api-nightly-dry-{0}', github.ref) || 'api-nightly' }}
   cancel-in-progress: false
 
 env:
@@ -56,7 +79,16 @@ jobs:
       - id: r
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash orchestrator/resolve_blis.sh
+          BLIS_TAG_OVERRIDE: ${{ inputs.blis_tag }}
+        run: |
+          set -euo pipefail
+          if [ -n "${BLIS_TAG_OVERRIDE:-}" ]; then
+            # A rehearsal of a named release: score it, publish nothing, start no next run.
+            [[ "$BLIS_TAG_OVERRIDE" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "blis_tag is not a release tag"; exit 2; }
+            { echo "blis_tags=$BLIS_TAG_OVERRIDE"; echo "blis_tag=$BLIS_TAG_OVERRIDE"; echo "more=false"; } >> "$GITHUB_OUTPUT"
+          else
+            bash orchestrator/resolve_blis.sh
+          fi
 
   # ----------------------------------------------------------------- 2. run the night (pull+score)
   run-night:
@@ -92,6 +124,112 @@ jobs:
           restore-keys: |
             ix-artifacts-
 
+      # The ledger's own pinned source (design 2.2, COV-1): every anchor unit is scored on the record the ledger was
+      # made from, whatever its age. The night reads the ledger extract (ledger_extract.py: the dump's rows and logs the
+      # ledger's units need, about 1/200 of the dump) named by .github/ledger-extract.json, from the Actions cache the
+      # ledger-extract workflow fills, and checks its sha256, size and ledger revision before reading it. It never
+      # downloads the dump. The extract is third-party data (X12, licence NOASSERTION): cached only, never committed.
+      - name: Read the ledger extract's pin
+        id: lx
+        run: echo "key=$(python3 -c 'import json; print(json.load(open(".github/ledger-extract.json"))["cache_key"])')" >> "$GITHUB_OUTPUT"
+      # Restored here; on a miss the step below builds it, and the cache keeps it when the job ends.
+      - name: Restore the ledger extract
+        id: lxc
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/extract/ledger-extract.jsonl.gz
+          key: ${{ steps.lx.outputs.key }}
+      # A cache miss (the first run of a branch, or an entry GitHub evicted) builds the extract from the pinned dump
+      # as the ledger-extract workflow does, and must give the pinned bytes: the build is reproducible, so another
+      # sha256 means the pin is not this substrate's, and the night stops.
+      - name: Build the ledger extract (cache miss)
+        if: ${{ steps.lxc.outputs.cache-hit != 'true' }}
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          ref=$(python3 -c 'import json; print(json.load(open(".github/ledger-extract.json"))["substrate_ref"])')
+          git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/lx-substrate"
+          git -C "$RUNNER_TEMP/lx-substrate" checkout -q "$ref"
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
+          sudo apt-get install -y -qq postgresql-17 zstd >/dev/null
+          start=$(date +%s)
+          bash orchestrator/ingest/build_ledger_extract.sh "$RUNNER_TEMP/lx-substrate" "$RUNNER_TEMP/extract"
+          echo "built the ledger extract in $(( $(date +%s) - start )) s"
+          rm -rf "$RUNNER_TEMP/lx-substrate"
+          python3 - <<'PY'
+          import json, os, sys
+          pin = json.load(open(".github/ledger-extract.json"))
+          got = json.load(open(os.path.join(os.environ["RUNNER_TEMP"], "extract", "ledger-extract.json")))
+          if (got["sha256"], got["bytes"]) != (pin["sha256"], pin["bytes"]):
+              sys.exit(f"the extract built from {pin['substrate_ref']} has sha256 {got['sha256']} ({got['bytes']} bytes); "
+                       f".github/ledger-extract.json pins {pin['sha256']} ({pin['bytes']} bytes)")
+          PY
+      # The ledger's frozen pull (freeze_ledger.py): every anchor's GitHub inputs (artifact listings, agentic exports,
+      # launch configs, client job logs, P/D recipes, the build resolver's lookups), frozen once per extract and
+      # replayed every night, so a night asks GitHub almost nothing. It is third-party data: cached only (X12).
+      - name: Restore the frozen pull
+        id: lpc
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/ledger-pull.tar.gz
+          key: ledger-pull-${{ steps.lx.outputs.key }}
+      # On a miss the freeze runs here, on this run's own token at most 900 requests an hour, and continues from the
+      # last run's partial freeze. A run that does not finish it keeps its partial freeze and fails; the next continues.
+      - name: Restore a partial freeze
+        if: ${{ steps.lpc.outputs.cache-hit != 'true' }}
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/ledger-pull
+          key: ledger-pull-partial-${{ steps.lx.outputs.key }}-${{ github.run_id }}
+          restore-keys: |
+            ledger-pull-partial-${{ steps.lx.outputs.key }}-
+      - name: Freeze the ledger's pull (cache miss)
+        if: ${{ steps.lpc.outputs.cache-hit != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ref=$(python3 -c 'import json; print(json.load(open(".github/ledger-extract.json"))["substrate_ref"])')
+          git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/lp-substrate"
+          git -C "$RUNNER_TEMP/lp-substrate" checkout -q "$ref"
+          git clone -q --filter=tree:0 --no-checkout https://github.com/vllm-project/vllm.git "$RUNNER_TEMP/vllm"
+          git clone -q --filter=blob:none --no-checkout https://github.com/SemiAnalysisAI/InferenceX.git "$RUNNER_TEMP/ix"
+          # Leave two hours of this job for the scoring.
+          until=$(( $(date +%s) + 3 * 3600 ))
+          rc=0
+          python3 orchestrator/ingest/freeze_ledger.py freeze --extract "$RUNNER_TEMP/extract/ledger-extract.jsonl.gz" \
+            --ledger "$RUNNER_TEMP/lp-substrate/catalog/ledger" --out "$RUNNER_TEMP/ledger-pull" \
+            --cache "$RUNNER_TEMP/artifacts" --vllm-clone "$RUNNER_TEMP/vllm" --ix-clone "$RUNNER_TEMP/ix" \
+            --per-hour 900 --floor 100 --until "$until" || rc=$?
+          if [ "$rc" = 3 ]; then
+            echo "::error::the ledger's pull is not yet frozen; the next run continues from this run's partial freeze"
+            exit 1
+          fi
+          [ "$rc" = 0 ]
+          python3 orchestrator/ingest/freeze_ledger.py pack --pull "$RUNNER_TEMP/ledger-pull" \
+            --out "$RUNNER_TEMP/ledger-pull.tar.gz" | tee "$RUNNER_TEMP/ledger-pull.json"
+          { echo "### The ledger's frozen pull"; echo '```json'; cat "$RUNNER_TEMP/ledger-pull.json"; echo '```';
+            echo 'Pin it as "pull" in .github/ledger-extract.json.'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Name the frozen pull
+        run: |
+          set -euo pipefail
+          if [ ! -f "$RUNNER_TEMP/ledger-pull.json" ]; then
+            # Restored from the cache: its pin is the committed one, or its sha256 as found.
+            python3 - <<'PY'
+          import json, os, sys
+          sys.path.insert(0, "orchestrator/ingest")
+          import ledger_extract as lx
+          t = os.environ["RUNNER_TEMP"]
+          a = os.path.join(t, "ledger-pull.tar.gz")
+          pin = json.load(open(".github/ledger-extract.json")).get("pull")
+          got = {"sha256": lx.sha256(a), "bytes": os.path.getsize(a)}
+          if pin and (pin["sha256"], pin["bytes"]) != (got["sha256"], got["bytes"]):
+              sys.exit(f"the cached frozen pull is {got['sha256']}; .github/ledger-extract.json pins {pin['sha256']}")
+          json.dump(pin or got, open(os.path.join(t, "ledger-pull.json"), "w"))
+          PY
+          fi
+          cat "$RUNNER_TEMP/ledger-pull.json"
+
       # Score the release resolve_blis.sh named: the oldest unscored one, once (COV-9). Build blis
       # FROM SOURCE at the tag (so a per-release score is sound; #15's seed rule), fetch what it
       # pins, and run one night with it. The scoring is harness/run.sh, run from this checkout
@@ -105,6 +243,7 @@ jobs:
         env:
           BLIS_TAGS: ${{ needs.resolve.outputs.blis_tags }}
           GH_TOKEN: ${{ github.token }}
+          SAMPLE: ${{ inputs.sample || 0 }}
         run: |
           set -euo pipefail
           for BLIS_TAG in $BLIS_TAGS; do
@@ -181,7 +320,11 @@ jobs:
               --blis "$SIM/blis" --catalog "$CATALOG" --registry "$REGISTRY" \
               --substrate-dir "$RUNNER_TEMP/substrate" \
               --substrate-version "$substrate_version" --substrate-commit "$substrate_commit" \
-              --corpus-dir "$RUNNER_TEMP/corpora" --fields "$FIELDS"
+              --corpus-dir "$RUNNER_TEMP/corpora" --fields "$FIELDS" \
+              --ledger-extract "$RUNNER_TEMP/extract/ledger-extract.jsonl.gz" \
+              --ledger-extract-pin .github/ledger-extract.json \
+              --ledger-pull "$RUNNER_TEMP/ledger-pull.tar.gz" --ledger-pull-pin "$RUNNER_TEMP/ledger-pull.json" \
+              --sample "$SAMPLE"
             echo "::endgroup::"
           done
 
@@ -215,7 +358,8 @@ jobs:
       # the git remote for the push step.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          token: ${{ secrets.PUBLISH_PAT }}
+          # A dry run pushes nothing, so it needs no publishing token (a pull request's rehearsal has none).
+          token: ${{ inputs.dry_run && github.token || secrets.PUBLISH_PAT }}
           persist-credentials: true
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -281,6 +425,10 @@ jobs:
       # cleaner long-term design) -- out of scope here. See PR notes.
       - name: Publish data/ to main (index + latest + API snapshots; dump snapshots untouched)
         id: pub
+        env:
+          # A scheduled run has no inputs: it is never a dry run.
+          DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+          RELEASE: ${{ needs.resolve.outputs.blis_tags }}
         run: |
           set -euo pipefail
           if [ ! -f newdata/index.json ]; then
@@ -307,6 +455,22 @@ jobs:
             exit 1
           fi
           mkdir -p state; cp "$STATE_IN" state/last-run-api.json; cp "$SCORED_IN" state/scored-releases.json
+          if [ "$DRY_RUN" = true ]; then
+            # Every validation above passed; print what would be published, and publish nothing.
+            python3 - <<'PY'
+          import json, os
+          s = json.load(open("data/latest/summary.json"))
+          cov = s.get("coverage") or {}
+          scored = json.load(open("state/scored-releases.json")).get("releases")
+          print("DRY RUN: would publish")
+          print(f"  snapshot_id: {s.get('snapshot_id')}")
+          print(f"  release: {os.environ['RELEASE']}")
+          print(f"  points: {cov.get('points')}, graded: {cov.get('graded')}")
+          print(f"  by_grade: {json.dumps(cov.get('by_grade'), sort_keys=True)}")
+          print(f"  scored-releases: {scored}")
+          PY
+            echo "pushed=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A data state/last-run-api.json state/scored-releases.json

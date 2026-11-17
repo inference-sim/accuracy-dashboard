@@ -62,8 +62,16 @@ DATA_READS = {
         "prints only the published unit ids",
     ("orchestrator/ingest/ledger_fake.py", "write"):
         "TEMPORARY with ledger.load: writes, for tests, the ledger layout ledger.load reads",
-    ("orchestrator/ingest/support.py", "Catalog.check_unambiguous"):
-        "TEMPORARY until a command lists the catalog's models with their source repositories",
+    ("orchestrator/ingest/ledger_extract.py", "main"):
+        "TEMPORARY with cli.read_anchor_units: the extract's build reads catalog/ledger/published/anchor.yaml, whose "
+        "records' logs it carries, until `blis ledger --list anchor` prints the published list",
+    ("orchestrator/ingest/freeze_ledger.py", "freeze"):
+        "TEMPORARY with cli.read_anchor_units: the freeze reads catalog/ledger/published/anchor.yaml, the units it "
+        "freezes, until `blis ledger --list anchor` prints the published list",
+    ("orchestrator/ingest/support.py", "Catalog._claims"):
+        "TEMPORARY until a command lists the catalog's models with their source repositories and whether "
+        "each is a drafter: `blis catalog resolve` refuses a repository several entries claim, and the run's "
+        "own entry is chosen from those fields, then resolved by name",
     ("orchestrator/ingest/cli.py", "read_anchor_units"):
         "TEMPORARY until the M2 substrate release lets `blis ledger --list anchor` print the published "
         "anchor list, which the M1 simulator does not have (inference-sim/accuracy-dashboard#52)",
@@ -108,6 +116,10 @@ TEXT_READS = {
         "TEMPORARY until an inference-sim command prints the full unit list with identities and the "
         "ingest report (`blis ledger --list` prints only the published unit ids): the job checks out "
         "blis-substrate at the commit stack.json pins, for catalog/, registry/ and catalog/ledger",
+    (".github/workflows/ledger-extract.yml", "clone"):
+        "TEMPORARY with the api-nightly.yml substrate checkout: the extract job checks out blis-substrate at a release "
+        "for catalog/ledger/sources.yaml, ledger/inferencex/export.sql and the unit list, until an inference-sim "
+        "command prints the ledger's pinned source and its export",
     ("docs/m2/after-run.sh", "clone"):
         "TEMPORARY with the api-nightly.yml substrate checkout: the after-run script checks out the "
         "blis-substrate commit the run pins, for the catalog and registry, until the M2 substrate "

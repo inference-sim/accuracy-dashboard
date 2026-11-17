@@ -65,7 +65,13 @@ def cmd_pull(a) -> int:
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     today = date.fromisoformat(a.today) if a.today else date.today()
-    p = api.pull(api.http_fetch, today=today, window_days=a.window_days)
+    given = getattr(a, "rows", None)
+    if given is not None:
+        # The rows of the ledger's own pinned source (read_source_rows), not the live API's window.
+        dates = sorted(str(r["date"])[:10] for r in given) or [today.isoformat()]
+        p = api.Pull(rows=list(given), window=(dates[0], dates[-1]))
+    else:
+        p = api.pull(api.http_fetch, today=today, window_days=a.window_days)
     _log(f"pull: {len(p.rows)} rows in {p.window}; slugs with no site name: {p.unnamed_slugs}; "
          f"rows with an unreadable date: {len(p.undated)}")
     unknown = engines.unknown_labels(p.rows)
@@ -116,10 +122,29 @@ def cmd_pull(a) -> int:
     # nothing resolved falls back to build.VLLM_REF. Resolved once here, used in both places.
     import os
     vllm_ref = os.environ.get("VLLM_REF") or build.VLLM_REF
-    resolver = build.Resolver(registry=clients.DockerHubRegistry(), github=clients.GitHubREST(token),
+    # With clones of vLLM and InferenceX (the ledger extract's freeze), the build resolver's commit questions and
+    # the recipes' trees and blobs are read from them, and each run's head commit from the pinned source, with no
+    # REST request (gitlocal.py); only the run's artifacts and job logs are asked of GitHub.
+    import gitlocal
+    vllm_clone, ix_clone = getattr(a, "vllm_clone", None), getattr(a, "ix_clone", None)
+    resolver = build.Resolver(registry=clients.DockerHubRegistry(),
+                              github=gitlocal.LocalGit(Path(vllm_clone)) if vllm_clone else clients.GitHubREST(token),
                               ref=vllm_ref)
+    lookup_store = getattr(a, "lookups", None)
+    if lookup_store is not None:
+        import lookups as lkp
+        lkp.wrap(resolver, lookup_store)
     gh = art.GitHubArtifacts(pl.IX_REPO, token, Path(a.cache or out / "_artifacts"))
-    recipes = rcp.GitHubRecipes(clients.GitHubREST(token)._get, pl.IX_REPO)
+    rest_get = clients.GitHubREST(token)._get
+    recipes = rcp.GitHubRecipes(gitlocal.local_get(Path(ix_clone), pl.IX_REPO, rest_get) if ix_clone else rest_get,
+                                pl.IX_REPO)
+    heads = getattr(a, "run_heads", None) or {}
+    if heads:
+        wanted = {str(api.run_of(x.row)[0]) for x in points_in if api.run_of(x.row)}
+        recipes._sha.update({r: h for r, h in heads.items() if r in wanted})
+        if ix_clone:
+            gh.prefill_runs({r: {"sha": h, "date": gitlocal.commit_date(Path(ix_clone), h)}
+                             for r, h in heads.items() if r in wanted})
     points = []
     # Reused points: carry over the manifest entry and copy the frozen files (unless out IS prior).
     for pid, e in sorted(inc.reuse.items()):
@@ -139,6 +164,8 @@ def cmd_pull(a) -> int:
     def _freeze(pt):
         try:
             return pt, pl.freeze_point(pt, resolver=resolver, gh=gh, fetch=api.http_fetch, out=out,
+                                       source_log=(getattr(a, "source_logs", None) or {}).get(str(pt.row.get("id"))),
+                                       logs_from_source=getattr(a, "source_logs", None) is not None,
                                        recipes=recipes), None
         except (clients.RateLimited, clients.FetchFailed):
             raise   # the whole pull is invalid, not this point
@@ -337,6 +364,94 @@ def read_anchor_units(substrate_dir: Path, out: Path) -> set[str]:
     if not units:
         raise ldg.LedgerError(f"{src} lists no unit: there is no unit the nightly may score (COV-2)")
     return units
+
+
+# The G5 reason of an anchor unit whose record the ledger's pinned source does not hold.
+UNSOURCED = "value_not_recorded:anchor_not_in_source"
+
+
+def read_source_rows(source: list[dict], lg, anchors: set[str]) -> tuple[list[dict], list[str]]:
+    """The records of the anchor units, from the ledger's own pinned source (design §2.2: the dashboard fetches the
+    runs of the units the ledger lists): `source` is the rows of the ledger extract (ledger_extract.py), the dump's
+    rows as the substrate's export.sql prints them, so every anchor is read as the ledger recorded it, whatever its
+    age. Returns (the rows of the anchors' records, the anchors the source holds no record of, sorted). An anchor unit
+    the ledger does not hold is refused: the anchor list and the ledger are then not one release's."""
+    want, unknown = {}, []
+    for u in anchors:
+        unit = lg.units.get(u)
+        if unit is None:
+            unknown.append(u)
+            continue
+        for r in unit.records():
+            want[str(r)] = u
+    if unknown:
+        raise ldg.LedgerError(f"{len(unknown)} anchor units are not units of the ledger {lg.revision} "
+                              f"(first: {sorted(unknown)[0]}); the anchor list and the ledger are not one release's")
+    rows, seen = [], set()
+    for r in source:
+        u = want.get(str(r.get("id")))
+        if u is not None:
+            rows.append(r)
+            seen.add(u)
+    return rows, sorted(set(anchors) - seen)
+
+
+def add_unsourced(work: Path, units: list[str], lg) -> None:
+    """Add to the pull's manifest a G5 entry for each anchor unit the pinned source holds no record of: its identity is
+    the ledger's, and its reason is UNSOURCED. Nothing is fetched for it, and it is counted (COV-1)."""
+    if not units:
+        return
+    m = json.loads((work / "manifest.json").read_text())
+    for u in units:
+        ident = dict(lg.units[u].identity)
+        row = {"id": None, "model": ident["model"], "hardware": ident["hardware"], "precision": ident["precision"],
+               "framework": ident["framework"], "benchmark_type": ident["benchmark_type"], "conc": ident["conc"],
+               "date": ident["measured_date"], "metrics": {}}
+        m["points"].append({"point_id": u, "identity": ident, "row": row, "records": [], "measurements": [],
+                            "reasons": [UNSOURCED], "files": {}, "build": None})
+    meta = {k: v for k, v in m.items() if k != "points"}
+    pl.write_manifest(work, meta, sorted(m["points"], key=lambda e: e["point_id"]))
+
+
+def sample_anchors(rows: list[dict], lg, anchors: set[str], n: int, seed: int) -> set[str]:
+    """A fixed, seeded, stratified draw of about `n` anchor units, for a rehearsal of the night: first one unit for
+    every model, chip, framework and engine image the anchors hold (so each is exercised), then units drawn at
+    random to `n`. The same rows, anchors, n and seed give the same draw."""
+    import random
+    dates = contract.run_dates(rows)
+    by_unit = {}
+    for r in sorted(rows, key=lambda r: int(r["id"])):
+        p = lg.place(r, dates)
+        if p is not None and p.unit.unit_id in anchors:
+            by_unit.setdefault(p.unit.unit_id, r)
+    rng = random.Random(seed)
+    order = sorted(by_unit)
+    rng.shuffle(order)
+    pick, covered = [], set()
+    for key in ("model", "hardware", "framework", "image"):
+        for u in order:
+            v = (key, by_unit[u].get(key))
+            if v not in covered:
+                covered.add(v)
+                if u not in pick:
+                    pick.append(u)
+    for u in order:
+        if len(pick) >= n:
+            break
+        if u not in pick:
+            pick.append(u)
+    return set(pick)
+
+
+def later_ledger_candidates(lg) -> dict:
+    """The live InferenceX rows of the last 180 days whose content differs from the record the ledger's pinned source
+    holds (ledger.RowDiffers): each is scored at the source's version, and listed here as a candidate for a later
+    ledger, one pinned to a newer InferenceX snapshot."""
+    import coverage as cv
+    p = api.pull(api.http_fetch, today=date.today(), window_days=180)
+    _, differing = cv.place_all(p.rows, lg)
+    return {"count": len(differing), "ledger_revision": lg.revision,
+            "records": sorted((str(r["id"]) for r in differing), key=int)}
 
 
 def read_stack(blis: Path, given: str | None) -> sk.Stack:
@@ -570,32 +685,42 @@ def cmd_nightly(a) -> int:
         _log(f"FATAL: {e}")
         return 2
 
-    # The catalog is checked once, before any artifact is fetched: a source repository two
-    # entries claim makes `blis catalog resolve` refuse, and the night stops here, not
-    # mid-score.
+    # The catalog is checked once, before any artifact is fetched: a catalog the build cannot read stops the
+    # night here, not mid-score. A source repository several entries claim does not: each run is matched to the
+    # entry its deployment is, and a run that matches none is G5 catalog_entry_ambiguous (support.Catalog.model).
     try:
-        sp.Catalog(blis=str(Path(a.blis).resolve()), root=Path(a.catalog)).check_unambiguous()
+        sp.Catalog(blis=str(Path(a.blis).resolve()), root=Path(a.catalog)).check_readable()
     except (bc.CommandError, OSError, ValueError) as e:
-        _log(f"FATAL: the catalog is ambiguous or unreadable: {e}")
+        _log(f"FATAL: the catalog is unreadable: {e}")
         return 2
 
+    later = {}
+
     def pull_fn(work: Path, today_: date, last_ids: set, blis_changed: bool):
-        # List the whole window (cheap -- api.pull hits only the REST API, no artifacts); its points
-        # are the anchor units, all of which its rows must hold. Then fetch inputs for the points
-        # to score: every point on a BLIS release AND on the seed (no prior ids), otherwise only
-        # the new points. A row the pull itself can't read fails the run (cmd_pull returns
-        # non-zero).
-        p = api.pull(api.http_fetch, today=today_, window_days=a.window_days)
-        listed = {x.point_id for x in pl.place(p.rows, ldg.load(Path(a.ledger))).points}
-        # Every anchor unit must be in this window's pull, whatever its engine: a unit of a
-        # framework no BLIS engine models is a point too, and engines.py gives it its G5 reason
-        # without an artifact. An anchor unit with no row in the window would be dropped from the
-        # counts without a word, so the night fails (COV-1, COV-2).
-        missing = anchors - listed
-        if missing:
-            raise RuntimeError(f"{len(missing)} of the {len(anchors)} anchor units are neither a point of the "
-                               f"window nor listed with a reason (first: {sorted(missing)[0]}); the run stops "
-                               f"rather than publish counts that omit them (COV-1)")
+        # The night's points are the anchor units, every one, read from the ledger's own pinned source (design §2.2,
+        # COV-1): a unit is scored on the record the ledger was made from, whatever its age, not on the live API's
+        # window. An anchor the source holds no record of is G5 UNSOURCED. The live API's newer versions of those
+        # records are listed as later-ledger candidates in the backlog, never scored.
+        lg = ldg.load(Path(a.ledger))
+        import ledger_extract as lx
+        records = {str(r) for u in anchors if u in lg.units for r in lg.units[u].records()}
+        source, logs = lx.check(Path(a.ledger_extract), json.loads(Path(a.ledger_extract_pin).read_text()), lg,
+                                keep_log=records.__contains__)
+        if a.sample:
+            # A rehearsal (dry run): a seeded, stratified draw of the anchors, scored by the same path.
+            drawn = sample_anchors(source, lg, anchors, a.sample, a.sample_seed)
+            anchors.intersection_update(drawn)
+            anchor_path.write_text(json.dumps({"kind": "PublishedUnits", "role": "anchor", "partition_version": 1,
+                                               "seed_sha256": "0" * 64, "units": sorted(anchors)}))
+            _log(f"nightly: rehearsal on {len(anchors)} sampled anchor units (seed {a.sample_seed})")
+        rows, unsourced = read_source_rows(source, lg, anchors)
+        listed = {x.point_id for x in pl.place(rows, lg).points}
+        stray = listed - anchors
+        if stray:
+            raise RuntimeError(f"the source rows place {len(stray)} units that are not anchor units")
+        later.update(later_ledger_candidates(lg))
+        _log(f"nightly: {len(anchors)} anchor units, {len(listed)} with a record in {lg.revision}, "
+             f"{len(unsourced)} without one; {later['count']} live rows differ from it (later-ledger candidates)")
         window_ids = set(anchors)
         prior = json.loads(latest_path.read_text()) if latest_path.is_file() else None
         whole = (blis_changed or not last_ids or not mergeable(prior, bsv2.SCHEMA_VERSION)
@@ -603,12 +728,26 @@ def cmd_nightly(a) -> int:
         to_fetch = window_ids if whole else (window_ids - set(last_ids))
         _log(f"nightly: window {len(listed)} units, {len(window_ids)} of them anchor units; "
              f"fetch {'every one' if whole else f'{len(to_fetch)} new'}")
-        rc = cmd_pull(types.SimpleNamespace(out=str(work), today=today_.isoformat(),
-                                            window_days=a.window_days, cache=a.cache, prior=None,
-                                            only=sorted(to_fetch), download_workers=a.download_workers,
-                                            ledger=a.ledger))
-        if rc != 0:
-            raise RuntimeError(f"pull failed (rc={rc}); the run stops rather than publish a partial pull")
+        pin = json.loads(Path(a.ledger_extract_pin).read_text())
+        if getattr(a, "ledger_pull_pin", None):
+            # The pull this run's freeze packed (its sha256 printed for the pin), when the pin names none yet.
+            pin["pull"] = json.loads(Path(a.ledger_pull_pin).read_text())
+        if pin.get("pull"):
+            # The ledger's frozen pull (freeze_ledger.py): every anchor's GitHub inputs, frozen once per ledger version;
+            # the night asks GitHub nothing but the lookups a new engine release adds, and counts them.
+            import os
+            import freeze_ledger as fz
+            asked = fz.replay(Path(a.ledger_pull), pin["pull"], work, to_fetch & listed,
+                              os.environ.get("VLLM_REF") or build.VLLM_REF, os.environ.get("GH_TOKEN") or None)
+            _log(f"nightly: replayed the frozen pull ({pin['pull']['sha256'][:12]}); {asked} GitHub requests")
+        else:
+            rc = cmd_pull(types.SimpleNamespace(out=str(work), today=today_.isoformat(),
+                                                window_days=a.window_days, cache=a.cache, prior=None,
+                                                only=sorted(to_fetch & listed), download_workers=a.download_workers,
+                                                ledger=a.ledger, rows=rows, source_logs=logs))
+            if rc != 0:
+                raise RuntimeError(f"pull failed (rc={rc}); the run stops rather than publish a partial pull")
+        add_unsourced(work, [u for u in unsourced if u in to_fetch], lg)
         return json.loads((work / "manifest.json").read_text())["pulled_at"][:10], window_ids
 
     # The catalog and registry are directories of the one substrate checkout, so both are at the
@@ -654,7 +793,7 @@ def cmd_nightly(a) -> int:
     res = nr.run_night(today, a.blis_tag, work_dir=work_dir, data_dir=data_dir, state_path=state_path,
                        scored_path=Path(a.scored), pull_fn=pull_fn, score_build_fn=score_build_fn,
                        snapshot_date=a.today or today.isoformat(), keep_api=a.keep_api,
-                       backlog_fn=bsv2.backlog_of)
+                       backlog_fn=lambda summary: {**bsv2.backlog_of(summary), "later_ledger_candidates": later})
     _log(f"nightly: {res.action} -- {res.decision.reason}")
     if res.snapshot_id:
         _log(f"nightly: froze snapshot {res.snapshot_id}")
@@ -761,6 +900,15 @@ def main(argv=None) -> int:
     n.add_argument("--score-work")
     n.add_argument("--evaluator-commit")
     n.add_argument("--ledger", required=True, help="blis-substrate's catalog/ledger (see pull --ledger)")
+    n.add_argument("--sample", type=int, default=0,
+                   help="a rehearsal: score a seeded, stratified draw of about this many anchor units (0: every one)")
+    n.add_argument("--sample-seed", type=int, default=1)
+    n.add_argument("--ledger-extract", required=True,
+                   help="the ledger's pinned source as ledger_extract.py builds it (never committed: X12)")
+    n.add_argument("--ledger-pull-pin", help="the pull's own pin, when .github/ledger-extract.json names none yet")
+    n.add_argument("--ledger-pull", help="the ledger's frozen pull archive the pin's \"pull\" names (freeze_ledger.py)")
+    n.add_argument("--ledger-extract-pin", required=True,
+                   help="the pin naming the extract's sha256, size and ledger revision (.github/ledger-extract.json)")
     n.add_argument("--blis", required=True, help="the blis binary (see score --blis)")
     n.add_argument("--catalog", required=True)
     n.add_argument("--registry", required=True)

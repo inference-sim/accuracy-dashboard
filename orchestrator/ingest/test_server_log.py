@@ -71,3 +71,58 @@ def test_any_other_http_error_on_server_log_stays_a_run_fault(tmp_path):
     with pytest.raises(urllib.error.HTTPError) as e:
         _freeze_single_turn(tmp_path, fetch)
     assert e.value.code == 500
+
+
+def test_a_single_turn_point_of_a_run_github_no_longer_holds_is_frozen_from_the_api_log(tmp_path):
+    # The ledger's source holds runs GitHub has since deleted: their artifact listing answers 404. That is a fact about
+    # the source, not a fault of the pull, and a single-turn point is still frozen from the API's /server-log.
+    import types
+    import ledger as ldg
+    import ledger_fake
+    import pull as pl
+    row = {"id": "433032", "model": "m", "hardware": "h200", "precision": "fp8", "framework": "vllm",
+           "benchmark_type": "single_turn", "conc": 4, "isl": 1024, "osl": 1024, "disagg": False,
+           "is_multinode": False, "date": "2026-10-01", "image": "vllm/vllm-openai:v0.31.0",
+           "run_url": "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/1", "metrics": {"mean_ttft": 0.2}}
+    lg = ldg.load(ledger_fake.write(tmp_path / "ledger", [row]))
+    (point,) = pl.place([row], lg).points
+    resolver = types.SimpleNamespace(resolve=lambda image, log: types.SimpleNamespace(record=lambda: {"image": image}))
+
+    def gone(*a, **k):
+        raise _http_error(404)
+    gh = types.SimpleNamespace(repo="SemiAnalysisAI/InferenceX", list_cached=gone, run=gone)
+    log = "INFO 10-01 vLLM API server version 0.31.0\nnon-default args: {'model': 'm'}\n"
+    import json
+    entry = pl.freeze_point(point, resolver=resolver, gh=gh, fetch=lambda url: json.dumps({"serverLog": log}).encode(),
+                           out=tmp_path / "out")
+    assert "artifact_unmatched:run_gone_404" in entry["artifact_notes"]
+    assert entry["client_args_reason"] == "run_unavailable:HTTP_404"
+    assert "server_log" in entry["files"] and entry["reasons"] == []
+
+
+def test_a_night_from_the_pinned_source_reads_the_sources_log_and_names_a_row_it_holds_none_for(tmp_path):
+    # The night reads each run as the ledger's pinned source recorded it: the log the extract holds, and for a row the
+    # source holds no log for, no live-API call and the reason that names it.
+    import assess as asx
+
+    def no_api(url):
+        raise AssertionError("the night does not ask the live API for a log")
+    import types
+    import ledger as ldg
+    import ledger_fake
+    import pull as pl
+    row = {"id": "433032", "model": "m", "hardware": "h200", "precision": "fp8", "framework": "vllm",
+           "benchmark_type": "single_turn", "conc": 4, "isl": 1024, "osl": 1024, "disagg": False,
+           "is_multinode": False, "date": "2026-10-01", "image": "vllm/vllm-openai:v0.31.0",
+           "run_url": "https://github.com/other/repo/actions/runs/1", "metrics": {"mean_ttft": 0.2}}
+    lg = ldg.load(ledger_fake.write(tmp_path / "ledger", [row]))
+    (point,) = pl.place([row], lg).points
+    resolver = types.SimpleNamespace(resolve=lambda image, log: types.SimpleNamespace(record=lambda: {"image": image}))
+    gh = types.SimpleNamespace(repo="SemiAnalysisAI/InferenceX")
+    e = pl.freeze_point(point, resolver=resolver, gh=gh, fetch=no_api, out=tmp_path / "a", logs_from_source=True)
+    assert e["reasons"] == ["server_log_missing:not_in_source"]
+    assert asx.g5_of(e["reasons"][0]) == {"code": "value_not_recorded", "subject": "not_in_source"}
+    log = "INFO 10-01 vLLM API server version 0.31.0\nnon-default args: {'model': 'm'}\n"
+    e = pl.freeze_point(point, resolver=resolver, gh=gh, fetch=no_api, out=tmp_path / "b", source_log=log,
+                        logs_from_source=True)
+    assert e["reasons"] == [] and e["files"]["server_log"]["from"] == "source:server_logs"

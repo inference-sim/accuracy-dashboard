@@ -219,6 +219,10 @@ def client_release(entry: dict, frozen: "Frozen", gh, run_id: str, attempt: int,
             raise
         entry["client_commit"] = None
         entry["client_commit_reason"] = f"run_unavailable:HTTP_{e.code}"
+        # A run GitHub no longer holds has no job to read a log of either.
+        entry["client_args"] = None
+        entry["client_args_reason"] = f"run_unavailable:HTTP_{e.code}"
+        return
     index, expired = gh.job_logs_cached(run_id, attempt)
     hit = index.get(art.normal_result_name(result_filename or ""))
     if hit is None:
@@ -231,7 +235,7 @@ def client_release(entry: dict, frozen: "Frozen", gh, run_id: str, attempt: int,
 
 
 def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArtifacts, fetch, out: Path,
-                 recipes=None) -> dict:
+                 recipes=None, source_log: str | None = None, logs_from_source: bool = False) -> dict:
     """Freeze one point's inputs. The point is one ledger unit; its inputs are the kept
     record's (the smallest row id the window holds), and its measured values are each
     measurement's, so the score is against their mean (design §10.2)."""
@@ -266,7 +270,15 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
         run_id, attempt = run
         # Thread-safe memoized listing: one HTTP call per run even when a pool freezes many of its
         # points concurrently. (run_artifacts kept as an optional no-op for older callers.)
-        arts = gh.list_cached(run_id)
+        try:
+            arts = gh.list_cached(run_id)
+        except urllib.error.HTTPError as e:
+            # GitHub no longer holds the run (deleted, or past its retention): it has no artifacts to read. A fact
+            # about the source's data, not a fault of the pull. Single-turn still scores from the API's /server-log.
+            if e.code not in (404, 410):
+                raise
+            arts = []
+            join_reasons.append(f"artifact_unmatched:run_gone_{e.code}")
         j = art.join({**row, "_attempt": attempt}, arts,
                      lambda a: art.read_result_json(gh.download(a)), agentic=agentic)
         join_reasons += j.reasons
@@ -324,7 +336,15 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
                     entry["reasons"].append(f"conflict:{role}")
                 elif role == "client_export":
                     entry["reasons"].append("artifact_unmatched:client_export")
-    if not agentic and server_log is None:
+    if not agentic and server_log is None and source_log and art.is_server_log(source_log.encode()):
+        # The vLLM log the ledger's pinned source holds for the row (ledger_extract.py): the run as the ledger recorded
+        # it, read before the live API's copy.
+        frozen.put("server_log", source_log.encode(), "source:server_logs")
+        server_log = source_log
+    if not agentic and server_log is None and logs_from_source:
+        # The night reads the run as the ledger's pinned source recorded it, and the source holds no log for the row.
+        entry["reasons"].append("server_log_missing:not_in_source")
+    elif not agentic and server_log is None:
         try:
             text = api.server_log(fetch, row["id"])
         except urllib.error.HTTPError as e:

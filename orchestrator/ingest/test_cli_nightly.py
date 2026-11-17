@@ -69,7 +69,9 @@ def _args(tmp, **over):
              corpus_dir=str(tmp / "corpora"), corpus_cache=None,
              timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0, stack=None,
              ledger=str(tmp / "ledger"), substrate_dir=str(tmp / "substrate"), substrate_version="v1.0.0",
-             substrate_commit=_head(tmp / "substrate"), fields=str(tmp / "fields.json"))
+             substrate_commit=_head(tmp / "substrate"), fields=str(tmp / "fields.json"),
+             ledger_extract=str(tmp / "extract.jsonl.gz"), ledger_extract_pin=str(tmp / "extract.pin.json"),
+             sample=0, sample_seed=1)
     a.update(over)
     if not Path(a["scored"]).exists():
         Path(a["scored"]).write_text(json.dumps({"kind": "ScoredReleases", "releases": []}))
@@ -102,6 +104,7 @@ class Fakes:
         self.rows = rows
         self.pulled_only = None   # the --only list cmd_pull got
         self.anchors = None       # the anchor list blis prints; None = every row's unit
+        self.unsourced = []       # rows the ledger holds a unit for and the pinned source file does not hold
 
     def api_pull(self, fetch, *, today, window_days, framework="vllm"):
         return types.SimpleNamespace(rows=self.rows)
@@ -109,8 +112,14 @@ class Fakes:
     def ledger(self, tmp):
         # The ledger the night reads: one unit per row, written before each night, and the blis
         # that prints the anchor list of the substrate release it pins.
-        ledger_fake.write(tmp / "ledger", self.rows)
-        anchors = [ledger_fake.point_id(r) for r in self.rows] if self.anchors is None else self.anchors
+        ledger_fake.write(tmp / "ledger", self.rows + self.unsourced)
+        # The ledger's pinned source, as the ledger extract holds it, and the pin naming it.
+        import ledger_extract as lx
+        info = lx.write_extract([json.dumps(r) for r in self.rows], [], tmp / "extract.jsonl.gz")
+        import ledger as ldg
+        (tmp / "extract.pin.json").write_text(json.dumps({**info, "ledger_revision": ldg.load(tmp / "ledger").revision}))
+        anchors = ([ledger_fake.point_id(r) for r in self.rows + self.unsourced] if self.anchors is None
+                   else self.anchors)
         if not (tmp / "substrate" / ".git").exists():
             _tagged_repo(tmp / "substrate", "v1.0.0")
         cat = write_catalog(tmp / "cat", {"m": "org/m"})
@@ -296,18 +305,58 @@ def test_an_anchor_unit_of_a_framework_no_engine_models_stays_in_the_window(tmp_
     assert fakes.pulled_only == both
 
 
-def test_a_night_fails_naming_the_count_when_an_anchor_unit_is_not_in_the_window(tmp_path, monkeypatch):
-    # An anchor unit with no row in the window is neither pulled nor listed with a reason, so
-    # the counts would omit it without a word (COV-1). The night stops before any fetch.
+def test_an_anchor_unit_the_pinned_source_holds_no_record_of_is_g5_by_name_and_the_night_goes_on(tmp_path, monkeypatch):
+    # COV-1: every anchor unit is graded or G5 with a reason. A unit of the ledger whose record the source file lacks
+    # is not fetched; the pull lists it with value_not_recorded:anchor_not_in_source, and the night scores the rest.
+    rows, gone = [_row("m", 1, "2026-10-01")], _row("m", 2, "2026-10-01")
+    fakes = Fakes(rows)
+    fakes.unsourced = [gone]
+    _install(monkeypatch, fakes, [ledger_fake.point_id(rows[0])])
+    fakes.ledger(tmp_path)
+    assert cli.cmd_nightly(_args(tmp_path)) == 0
+    assert fakes.pulled_only == [ledger_fake.point_id(rows[0])]
+    entries = {e["point_id"]: e for e in json.loads((tmp_path / "work" / "manifest.json").read_text())["points"]}
+    assert entries[ledger_fake.point_id(gone)]["reasons"] == [cli.UNSOURCED]
+    assert set(entries) == {ledger_fake.point_id(r) for r in rows + [gone]}
+
+
+def test_an_anchor_unit_the_ledger_does_not_hold_stops_the_night_before_any_fetch(tmp_path, monkeypatch):
+    # The anchor list names units the ledger lacks: the list and the ledger are not one release's, so the ledger is
+    # unreadable for this night. It stops, naming the count, before any fetch.
     rows = [_row("m", 1, "2026-10-01")]
     fakes = Fakes(rows)
     fakes.anchors = [ledger_fake.point_id(rows[0]), "e" * 64, "f" * 64]
     _install(monkeypatch, fakes, [])
     fakes.ledger(tmp_path)
     monkeypatch.setattr(cli, "cmd_pull", lambda a: (_ for _ in ()).throw(AssertionError("pulled")))
-    with pytest.raises(RuntimeError, match=r"2 of the 3 anchor units are neither a point of the window nor listed"):
+    import ledger as ldg
+    with pytest.raises(ldg.LedgerError, match=r"2 anchor units are not units of the ledger"):
         cli.cmd_nightly(_args(tmp_path))
     assert not (tmp_path / "data" / "latest").exists()
+
+
+def test_the_night_reads_its_rows_from_the_pinned_source_and_lists_newer_live_rows_as_later_ledger_candidates(
+        tmp_path, monkeypatch):
+    # The ledger was made from the pinned source; the live API now serves a newer version of the record (another
+    # configuration). The night scores the source's version, and the backlog lists the live row as a candidate for a
+    # ledger pinned to a newer snapshot; it is not G5.
+    old = _row("m", 1, "2026-10-01")
+    fakes = Fakes([old])
+    _install(monkeypatch, fakes, [ledger_fake.point_id(old)])
+    fakes.ledger(tmp_path)
+    seen = {}
+
+    def pull(a):
+        seen["rows"] = a.rows
+        return fakes.cmd_pull(a)
+    monkeypatch.setattr(cli, "cmd_pull", pull)
+    # The live API's version of the record differs from the source's.
+    monkeypatch.setattr(api, "pull", lambda fetch, **k: types.SimpleNamespace(rows=[{**old, "precision": "fp4"}]))
+    assert cli.cmd_nightly(_args(tmp_path)) == 0
+    assert [r["precision"] for r in seen["rows"]] == ["fp8"]
+    backlog = json.loads((tmp_path / "data" / "latest" / "backlog.json").read_text())
+    assert backlog["later_ledger_candidates"]["count"] == 1
+    assert backlog["later_ledger_candidates"]["records"] == [old["id"]]
 
 
 def test_a_night_whose_build_publishes_no_anchor_unit_fails_and_scores_nothing(tmp_path, monkeypatch):
@@ -594,6 +643,65 @@ def test_the_workflow_scores_one_release_and_starts_the_next_only_after_publishi
     assert score["env"]["BLIS_TAGS"] == "${{ needs.resolve.outputs.blis_tags }}"
 
 
+def _publish_step(tmp_path, dry_run):
+    """Run the publish job's publish step as the runner would, in a scratch checkout holding a night's incoming data,
+    with a fake git that records its calls. Returns (exit status, output, git calls, GITHUB_OUTPUT)."""
+    import re
+    import subprocess
+    import yaml
+    wf = yaml.safe_load((Path(__file__).resolve().parent.parent.parent / ".github" / "workflows" / "api-nightly.yml").read_text())
+    step = next(s for s in wf["jobs"]["publish"]["steps"] if s.get("id") == "pub")
+    env_expr = step["env"]["DRY_RUN"]
+    assert env_expr == "${{ inputs.dry_run && 'true' || 'false' }}", env_expr
+    script = re.sub(r"\$\{\{[^}]*\}\}", "v0.17.1", step["run"])
+    work = tmp_path / "checkout"
+    (work / "newdata" / "latest").mkdir(parents=True)
+    (work / "newdata" / "index.json").write_text("{}")
+    (work / "newdata" / "latest" / "summary.json").write_text(json.dumps(
+        {"snapshot_id": "2026-11-17_blis-v0.17.1_ix-api-2026-11-17", "coverage": {"points": 3, "graded": 2, "by_grade": {"G4": 2, "G5": 1}}}))
+    (work / "incoming" / "state").mkdir(parents=True)
+    (work / "incoming" / "state" / "last-run-api.json").write_text("{}")
+    (work / "incoming" / "state" / "scored-releases.json").write_text(json.dumps({"kind": "ScoredReleases", "releases": ["v0.17.1"]}))
+    bin_ = tmp_path / "bin"
+    bin_.mkdir()
+    (bin_ / "git").write_text(f"#!/bin/sh\necho \"$@\" >> {tmp_path / 'git.calls'}\n")
+    (bin_ / "git").chmod(0o755)
+    import sys as _sys
+    (bin_ / "python3").symlink_to(_sys.executable)
+    out = tmp_path / "gh_output"
+    r = subprocess.run(["bash", "-c", script], cwd=work, capture_output=True, text=True,
+                       env={"PATH": f"{bin_}:/usr/bin:/bin", "GITHUB_OUTPUT": str(out), "GITHUB_REF_NAME": "main",
+                            "DRY_RUN": "true" if dry_run else "false", "RELEASE": "v0.17.1"})
+    calls = (tmp_path / "git.calls").read_text().splitlines() if (tmp_path / "git.calls").exists() else []
+    return r.returncode, r.stdout + r.stderr, calls, out.read_text() if out.exists() else ""
+
+
+def test_a_dry_run_validates_prints_what_it_would_publish_and_pushes_nothing(tmp_path):
+    rc, text, calls, output = _publish_step(tmp_path, dry_run=True)
+    assert rc == 0, text
+    assert calls == [] and "pushed=false" in output
+    for want in ("DRY RUN: would publish", "snapshot_id: 2026-11-17_blis-v0.17.1_ix-api-2026-11-17", "release: v0.17.1",
+                 "points: 3, graded: 2", '"G4": 2', '"G5": 1'):
+        assert want in text, (want, text)
+
+
+def test_a_run_that_is_not_a_dry_run_commits_and_pushes_as_before(tmp_path):
+    rc, text, calls, output = _publish_step(tmp_path, dry_run=False)
+    assert rc == 0, text
+    assert any(c.startswith("commit ") for c in calls) and "push" in calls and "pushed=true" in output
+    assert "DRY RUN" not in text
+
+
+def test_the_pages_deploy_and_the_next_run_follow_only_a_push():
+    import yaml
+    wf = yaml.safe_load((Path(__file__).resolve().parent.parent.parent / ".github" / "workflows" / "api-nightly.yml").read_text())
+    steps = {s.get("name"): s for s in wf["jobs"]["publish"]["steps"]}
+    for name in ("Deploy the published data to Pages", "Score the next unscored release"):
+        assert "steps.pub.outputs.pushed == 'true'" in steps[name]["if"], name
+    assert wf[True]["workflow_dispatch"]["inputs"]["dry_run"] == {
+        "description": "Validate and print what would be published, and publish nothing", "type": "boolean", "default": False}
+
+
 def test_sim_build_must_be_the_checkouts_tag_or_commit(tmp_path):
     import subprocess
     sim = tmp_path / "sim"
@@ -703,25 +811,31 @@ def test_a_failed_catalog_resolve_stops_the_score_run(tmp_path, monkeypatch):
     assert any(want in m for m in msgs), msgs
 
 
-def test_an_ambiguous_catalog_repository_stops_the_night_before_any_fetch(tmp_path, monkeypatch):
-    # Two entries claim org/m. `blis catalog resolve` refuses it; the night checks the catalog
-    # once, before the pull, and exits with the message naming both entries (audit finding 14),
-    # instead of crashing mid-score.
+def test_a_repository_two_catalog_entries_claim_does_not_stop_the_night(tmp_path, monkeypatch):
+    # Two entries claim org/m, and `blis catalog resolve --model org/m` refuses it. The night's catalog check asks
+    # each entry by name and does not ask that repository: each run is matched to the entry its deployment is, and a
+    # run that matches none is G5 catalog_entry_ambiguous (test_drafter.py). So the night goes on to the pull.
     fakes = Fakes([_row("m", 1, "2026-10-01")])
     _install(monkeypatch, fakes, [])
     fakes.ledger(tmp_path)
     models = {"a": "org/m", "b": "org/m"}
     cat = write_catalog(tmp_path / "cat", models)
-    refusal = "model 'org/m' is the source repository of 2 catalog entries: a, b"
-    answers = {**resolves(cat, models),
+    refusal = 'Error: model "org/m" is the source repository of 2 catalog entries (a, b); name the entry instead'
+    present = {d.name: d.name for d in (cat / "models").iterdir() if d.name not in models}   # the fixture's own entries
+    answers = {**resolves(cat, present), **resolves(cat, models),
                f"catalog resolve --catalog {cat} --model org/m --json": [1, "", refusal]}
     fake_blis(tmp_path / "sim" / "blis", answers)
-    monkeypatch.setattr(cli, "cmd_pull", lambda a: (_ for _ in ()).throw(AssertionError("pulled")))
+    pulled = []
+    monkeypatch.setattr(cli, "cmd_pull", lambda a: pulled.append(a) or 1)
     msgs = []
     monkeypatch.setattr(cli, "_log", msgs.append)
-    assert cli.cmd_nightly(_args(tmp_path)) == 2
-    assert any("FATAL" in m and "a, b" in m and "--model org/m" in m for m in msgs), msgs
-    assert not (tmp_path / "data" / "latest").exists()
+    import pytest
+    with pytest.raises(RuntimeError, match="pull failed"):     # the fake pull fails: the night got past the check
+        cli.cmd_nightly(_args(tmp_path))
+    assert pulled, msgs
+    assert not any("catalog" in m and "FATAL" in m for m in msgs), msgs
+    saw = [json.loads(x) for x in (tmp_path / "sim" / "blis.saw").read_text().splitlines()]
+    assert ["catalog", "resolve", "--catalog", str(cat), "--model", "org/m", "--json"] not in saw
 
 
 def test_a_score_run_replays_every_agentx_corpus_by_its_catalog_entry(tmp_path, monkeypatch):
@@ -777,3 +891,20 @@ def test_a_score_run_reads_the_field_list_file_and_scores(tmp_path, monkeypatch)
     import contract
     monkeypatch.setattr(contract, "validate_dir", lambda d: [])
     assert cli.cmd_score(a) == 0 and seen == [[]]
+
+
+def test_a_rehearsal_sample_is_fixed_by_its_seed_and_covers_every_model_chip_framework_and_image(tmp_path):
+    import ledger as ldg
+    rows = []
+    for k in range(60):
+        rows.append({**_row(f"m{k % 3}", k + 1, "2026-09-01"), "hardware": ("h100", "h200", "b200", "mi300x")[k % 4],
+                     "framework": ("vllm", "sglang")[k % 2], "image": f"img{k % 5}"})
+    lg = ldg.load(ledger_fake.write(tmp_path / "ledger", rows))
+    anchors = {ledger_fake.point_id(r) for r in rows}
+    a = cli.sample_anchors(rows, lg, anchors, 12, seed=3)
+    assert a == cli.sample_anchors(list(reversed(rows)), lg, anchors, 12, seed=3)
+    assert a != cli.sample_anchors(rows, lg, anchors, 12, seed=4)
+    assert len(a) == 12 and a <= anchors
+    by_id = {ledger_fake.point_id(r): r for r in rows}
+    for key in ("model", "hardware", "framework", "image"):
+        assert {by_id[u][key] for u in a} == {r[key] for r in rows}, key
