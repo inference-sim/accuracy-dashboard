@@ -12,9 +12,10 @@ InferenceX labels every row with a `framework`. This table is the one place that
 The table is a fact about InferenceX's labels, not a classification of settings (design §11.1):
 which fields an engine models still comes only from its fields.json.
 
-Only the labels whose engine is "vllm" fetch artifacts and are scored. Every other label's
-points are G5 without any fetch, each with every reason that is true of it (grade.G5_CODES
-order decides which is the point's g5_reason):
+A label is scored when its engine is one the run scores (`scoring`, below): "vllm" always, and
+"sglang" once the stack names an SGLang engine release and an SGLang field list is given. Every
+other label's points are G5 without any fetch, each with every reason that is true of it
+(grade.G5_CODES order decides which is the point's g5_reason):
 
   router_unsupported   the point ran behind a router BLIS does not host (llm-d's is the only
                        one), whatever its engine. The router is the row's, else the label's.
@@ -91,9 +92,16 @@ def unknown_labels(rows: list[dict]) -> list[str]:
     return sorted({str(r.get("framework")) for r in rows if r.get("framework") not in FRAMEWORKS})
 
 
-def scored(fw: Framework) -> bool:
-    """Whether the harness fetches this framework's artifacts and scores its points."""
-    return fw.engine == VLLM
+# The engines a run scores when it is given no others: vLLM's, the one engine whose field list
+# every run holds. A run that holds blis-sglang's field list adds SGLANG (score.Env.scoring).
+DEFAULT_SCORING = frozenset({VLLM})
+
+
+def scored(fw: Framework, scoring=DEFAULT_SCORING) -> bool:
+    """Whether the harness fetches this framework's artifacts and scores its points: its engine is
+    one of `scoring`. Until the stack names an SGLang release and a published SGLang field list,
+    `scoring` is vLLM alone, so no SGLang point changes grade by accident."""
+    return fw.engine is not None and fw.engine in scoring
 
 
 def reasons(fw: Framework) -> list[str]:

@@ -120,7 +120,12 @@ def cmd_pull(a) -> int:
     resolver = build.Resolver(registry=clients.DockerHubRegistry(), github=clients.GitHubREST(token),
                               ref=vllm_ref)
     gh = art.GitHubArtifacts(pl.IX_REPO, token, Path(a.cache or out / "_artifacts"))
-    recipes = rcp.GitHubRecipes(clients.GitHubREST(token)._get, pl.IX_REPO)
+    ix_git = getattr(a, "inferencex_git", None)
+    recipes = (rcp.GitRecipes(clients.GitHubREST(token)._get, pl.IX_REPO, ix_git) if ix_git
+               else rcp.GitHubRecipes(clients.GitHubREST(token)._get, pl.IX_REPO))
+    # SGLang's artifacts are fetched only when the score step will have its field list (--score-sglang): until then
+    # its points are G5 for the label alone, and nothing is fetched for them.
+    scoring = engines.DEFAULT_SCORING | ({engines.SGLANG} if getattr(a, "score_sglang", False) else frozenset())
     points = []
     # Reused points: carry over the manifest entry and copy the frozen files (unless out IS prior).
     for pid, e in sorted(inc.reuse.items()):
@@ -140,7 +145,7 @@ def cmd_pull(a) -> int:
     def _freeze(pt):
         try:
             return pt, pl.freeze_point(pt, resolver=resolver, gh=gh, fetch=api.http_fetch, out=out,
-                                       recipes=recipes), None
+                                       recipes=recipes, scoring=scoring), None
         except (clients.RateLimited, clients.FetchFailed):
             raise   # the whole pull is invalid, not this point
         except Exception as ex:  # noqa: BLE001 -- one point's failure is recorded with why, never kills the pull
@@ -379,9 +384,12 @@ def cmd_score(a) -> int:
     if not bad:
         bad += check_metric_definitions(blis)
     try:
+        sglang_kit = None
         stack = read_stack(blis, getattr(a, "stack", None))
         engine_release = stack.engine("vllm")
         field_list, fields_sha = read_fields(Path(a.fields), engine_release)
+        if getattr(a, "sglang_fields", None):
+            sglang_kit = sc.read_sglang_kit(Path(a.sglang_fields), stack, getattr(a, "sglang_declarations", None))
     except (sk.StackError, fl.FieldsError, bc.CommandError, OSError, ValueError) as e:
         bad.append(str(e))
     # Every date-pinned AgentX corpus, by the catalog replay workload of its alias, checked against
@@ -426,7 +434,8 @@ def cmd_score(a) -> int:
         assumed_router_revision=getattr(a, "assume_router_revision", None),
         router_policy_experiment=getattr(a, "router_policy_experiment", None),
         speculative_fallback_category=getattr(a, "speculative_fallback_category", None),
-        router_checkout=Path(a.router_checkout).resolve() if getattr(a, "router_checkout", None) else None)
+        router_checkout=Path(a.router_checkout).resolve() if getattr(a, "router_checkout", None) else None,
+        sglang=sglang_kit)
     # The build every point records: --sim-build, else the release tag the checkout is at
     # (check_blis_inputs required one), with the engine release its stack.json names (COV-6).
     env.sim_build = sim_build or env.blis_release
@@ -460,6 +469,9 @@ def cmd_score(a) -> int:
                      "registry": env.registry_release, "extractor_version": f"blis-latency-kernel@{env.kernel}"},
             "simulator": env.simulator(), "engine": {"kind": "vllm", "version": engine_release},
             "harness_commit": a.harness_commit, "units": units,
+            **({"engines": [{"kind": "vllm", "version": engine_release},
+                            {"kind": "sglang", "version": sglang_kit.release, "fields_sha256": sglang_kit.fields_sha256}]}
+               if sglang_kit is not None else {}),
             # Design §11.7, X8: a figure is experimental unless its build and its data are both
             # released. The build is released when it is a release tag, and the data when the
             # catalog and the registry are named by release tags, not by commits.
@@ -486,7 +498,9 @@ def cmd_coverage(a) -> int:
         doc = cv.run(pull_dir=Path(a.pull), ledger=Path(a.ledger), fields_path=Path(a.fields), stack_path=Path(a.stack),
                      catalog=Path(a.catalog), registry=Path(a.registry), rows_path=Path(a.rows) if a.rows else None,
                      units_path=Path(a.units) if a.units else None, workers=a.workers or 1,
-                     work=Path(a.work) if a.work else None)
+                     work=Path(a.work) if a.work else None,
+                     sglang_fields_path=Path(a.sglang_fields) if a.sglang_fields else None,
+                     sglang_declarations=Path(a.sglang_declarations) if a.sglang_declarations else None)
     except (cv.CoverageError, ldg.LedgerError, fl.FieldsError, sk.StackError, bc.CommandError, OSError, KeyError,
             ValueError) as e:
         _log(f"FATAL: {e}")
@@ -690,6 +704,12 @@ def main(argv=None) -> int:
                         "only the published unit ids")
     p.add_argument("--download-workers", type=int, default=0,
                    help="parallel artifact-download workers (default: min(2*cores, 8); I/O-bound)")
+    p.add_argument("--inferencex-git", metavar="DIR",
+                   help="a bare clone of InferenceX: its trees and blobs are read from it, not through the REST API (PROCESS §16); "
+                        "only the commit each run executed is asked of the API")
+    p.add_argument("--score-sglang", action="store_true",
+                   help="also fetch SGLang points' artifacts (their server log and launch command); the score step then needs "
+                        "--sglang-fields")
     s = sub.add_parser("score")
     s.add_argument("--pull", required=True)
     s.add_argument("--out", required=True)
@@ -704,6 +724,10 @@ def main(argv=None) -> int:
     s.add_argument("--fields", required=True,
                    help="the engine's fields.json for the release stack.json names: the pinned blis-vllm release's "
                         "file (TEMPORARY until the M2 substrate release lets `blis fields` print it)")
+    s.add_argument("--sglang-fields", help="blis-sglang's fields.json for the SGLang release stack.json names: with it, SGLang "
+                   "points are scored (design §11.4); without it they stay G5 field_unclassified")
+    s.add_argument("--sglang-declarations", help="blis-sglang's declarations table (gen_sglang_declarations.py); "
+                   "default: orchestrator/sglang_declarations.json")
     s.add_argument("--stack", help="TEMPORARY until the pinned inference-sim release ships stack.json: the scoring build's "
                                     "stack.json, when its checkout has none")
     s.add_argument("--sim-build", help="the simulator build: a release tag or a 40-hex commit; the checkout must be at it "
@@ -750,6 +774,8 @@ def main(argv=None) -> int:
                    help="a catalog checkout, read as `blis catalog resolve` answers it (TEMPORARY, support.CheckoutCatalog); "
                         "it must hold the replay workload of each AgentX corpus alias")
     c.add_argument("--registry", required=True)
+    c.add_argument("--sglang-fields", help="blis-sglang's fields.json (see score --sglang-fields): SGLang units are then graded")
+    c.add_argument("--sglang-declarations", help="see score --sglang-declarations")
     c.add_argument("--rows", help="a JSON list of the API rows (every framework); those in the pull's window are placed")
     c.add_argument("--units", help="a PublishedUnits list or a file of unit ids (the anchor list): adds the `anchor` section")
     c.add_argument("--work")
