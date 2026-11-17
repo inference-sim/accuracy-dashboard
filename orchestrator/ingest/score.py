@@ -298,6 +298,21 @@ _NOT_MODELLED = re.compile(r'\b([a-z_][a-z0-9_]*) "[^"]*"[^"]*?\bis not modelled
 _WORKLOAD_STATES_NO = re.compile(r"\bthe workload states no ([A-Za-z_][A-Za-z0-9_ ]*?)(?: mode)?\s*[,;.:]")
 
 
+# The latency kernel's own refusals: each message begins with its code and a colon (blis-substrate kernel/draft.go,
+# kernel/..., documented in docs/kernel/reference/refusals.md). The kernel will not price what the engine's plan does not
+# state, or states outside its list: that is a gap of the engine BLIS runs, not a value the run failed to record, so the
+# point is G5 engine_unsupported naming the kernel's code. (Before, "the engine states no DraftPassRequests" was read as a
+# missing field, and the point came out field_not_in_release:DraftPassRequests.)
+KERNEL_REFUSALS = ("draft_passes_unstated", "draft_passes_unknown", "served_weights_mismatch", "switch_group_collective_crosses")
+_KERNEL_REFUSAL = re.compile(r"(?<![A-Za-z0-9_])(" + "|".join(KERNEL_REFUSALS) + r"):")
+
+
+def kernel_refusal(stderr: str) -> str | None:
+    """engine_unsupported:<code> when the simulator's refusal is one of the kernel's, else None."""
+    m = _KERNEL_REFUSAL.search(re.sub(r"\s+", " ", stderr).replace('\\"', '"'))
+    return f"engine_unsupported:{m.group(1)}" if m else None
+
+
 def value_refusal(stderr: str, work: Path, field_list) -> str | None:
     """The G5 reason for an engine refusal that says the scenario lacks a value ("states no
     <field>"), else None. The field is parsed from the refusal's text. The field's estimation rule
@@ -305,6 +320,9 @@ def value_refusal(stderr: str, work: Path, field_list) -> str | None:
     a rule that would leave it unset or substitute another setting cannot help here, and the
     reason is value_not_recorded in every case (design 11.4). A refusal that says "states no"
     but names no parseable field takes the refusal's slug as the subject."""
+    kernel = kernel_refusal(stderr)
+    if kernel:
+        return kernel
     slug = _blis_refusal(stderr, work)
     text = slug.partition(":")[2]
     nm = _NOT_MODELLED.search(re.sub(r"\s+", " ", stderr).replace('\\"', '"'))

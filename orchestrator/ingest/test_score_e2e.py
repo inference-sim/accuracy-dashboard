@@ -1260,3 +1260,16 @@ def test_a_point_with_no_recorded_node_size_on_a_chip_that_fixes_none_is_g5_valu
         assert o.g5 == {"code": "value_not_recorded", "subject": "cluster.gpus_per_node"}
     finally:
         shutil.rmtree(tmp)
+
+
+def test_a_point_the_kernel_refuses_is_g5_engine_unsupported_by_its_code_not_failed_or_a_missing_field():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        env.blis = _refusing_blis(tmp, 'time=t level=fatal msg="kernelmodel: draft_passes_unstated: the \\"mtp\\" drafter drafts '
+                                       'autoregressively and the engine states no DraftPassRequests, so ..."\n')
+        o, _ = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is None and not o.faults
+        assert o.g5 == {"code": "engine_unsupported", "subject": "draft_passes_unstated"}
+    finally:
+        shutil.rmtree(tmp)
