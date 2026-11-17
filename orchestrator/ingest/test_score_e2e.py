@@ -81,6 +81,7 @@ FAKE_BLIS = """#!/usr/bin/env python3
 import csv, json, os, sys
 VALIDATE, DROP, EARLY_HOLDER, SHORT, TTFT_US, TPOT_US = {validate}, {drop}, {early_holder}, {short}, 180000, 9000.0
 BURST = {burst}
+PHASES = {phases}
 METHODS = {methods}
 WP = {wp}
 a = sys.argv[1:]
@@ -88,6 +89,9 @@ here = os.path.dirname(os.path.abspath(__file__))
 if a[:3] == ["schema", "validate", "result"]:
     json.load(open(a[3]))
     sys.exit(VALIDATE)
+if a[:2] == ["schema", "trace"]:
+    print('{{"properties": {{"phases": {{}}}}}}' if PHASES else '{{"properties": {{}}}}')
+    sys.exit(0)
 assert a[0] == "replay", a
 with open(os.path.join(here, "blis_saw.json"), "a") as fh:
     fh.write(json.dumps({{"argv": a, "cwd": os.getcwd()}}) + "\\n")
@@ -164,13 +168,13 @@ def _exe(path: Path, body: str) -> str:
 
 
 def _fake_blis(tmp: Path, *, validate: int = 0, drop: bool = False, early_holder: bool = False,
-               short: bool = False, methods=("measured",), workload_properties=None, burst: bool = False) -> str:
+               short: bool = False, methods=("measured",), workload_properties=None, burst: bool = False, phases: bool = True) -> str:
     d = tmp / "sim"
     d.mkdir(exist_ok=True)
     (d / "blis_saw.json").unlink(missing_ok=True)
     return _exe(d / "blis", FAKE_BLIS.format(validate=validate, drop=drop, early_holder=early_holder,
                                                      short=short, methods=repr(methods),
-                                                     wp=repr(workload_properties), burst=burst))
+                                                     wp=repr(workload_properties), burst=burst, phases=phases))
 
 
 # A blis that answers only `catalog resolve --catalog DIR --model|--chip NAME --json`: a model
@@ -1280,5 +1284,21 @@ def test_a_point_the_kernel_refuses_is_g5_engine_unsupported_by_its_code_not_fai
         o, _ = _score(tmp, entry, env, tmp / "c1")
         assert o.fidelity is None and not o.faults
         assert o.g5 == {"code": "engine_unsupported", "subject": "draft_passes_unstated"}
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_primed_point_scored_on_a_simulator_without_trace_phases_replays_the_pooled_form():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp, log=LOG.replace("'enable_prefix_caching': False", "'enable_prefix_caching': True")
+                            .replace("enable_prefix_caching=False", "enable_prefix_caching=True"))
+        env.blis = _fake_blis(tmp, phases=False)
+        o, work = _score(tmp, entry, env, tmp / "c1")
+        tr = _trace(work, entry["point_id"])
+        assert not (work / "single_turn" / entry["point_id"] / "trace.yaml").read_text().count("phases:")
+        assert "phase" not in tr[0]
+        argv = _saw(env)[-1]["argv"]
+        assert "--concurrent-sessions" in argv
     finally:
         shutil.rmtree(tmp)

@@ -433,3 +433,31 @@ def test_each_client_regime_draws_the_committed_seed0_requests_and_matches_the_e
         assert ix.target_lengths(p["isl"], p["osl"], p["concurrency"]) == (p["input_lens"], p["output_lens"]), regime
     for regime, dates in seen.items():
         assert {_regime_of(d) for d in dates} == {regime}, (regime, sorted(dates))
+
+
+# ---- a simulator that reads no trace phases (an older release tag) still gets a trace it parses
+
+def _probe_blis(tmp_path, schema_text):
+    exe = tmp_path / "blis"
+    exe.write_text("#!/bin/sh\n" + (f"echo '{schema_text}'\n" if schema_text is not None else "exit 2\n"))
+    exe.chmod(0o755)
+    return str(exe)
+
+
+def test_the_phases_header_is_written_only_for_a_simulator_whose_trace_contract_has_phases(tmp_path):
+    for name, text, want in (("new", '{"properties": {"phases": {}}}', True), ("old", '{"properties": {}}', False),
+                             ("none", None, False)):
+        d = tmp_path / name
+        d.mkdir()
+        assert ix.supports_phases(_probe_blis(d, text)) is want, name
+
+
+def test_a_primed_trace_for_an_older_simulator_has_no_phases_key_or_phase_column_and_the_new_one_has_both(tmp_path):
+    ins, outs = _lengths(3)
+    old = ix.primed_phase(ins, outs, 2, 1, phased=False)
+    h, d = ix.write_trace(old, tmp_path / "old")
+    assert "phases" not in h.read_text() and "phase" not in next(csv.reader(d.open()))
+    assert all(r["arrival_time_us"] == ix.PRIME_MAIN_START_US for r in old.records if r["session_id"].startswith("main-"))
+    new = ix.primed_phase(ins, outs, 2, 1, phased=True)
+    h, d = ix.write_trace(new, tmp_path / "new")
+    assert "phases:" in h.read_text() and "phase" in next(csv.reader(d.open()))
