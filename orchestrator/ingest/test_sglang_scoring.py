@@ -331,3 +331,29 @@ def test_a_field_list_or_declarations_of_another_release_than_the_stack_runs_is_
     d.write_text(json.dumps({"engine": {"kind": "sglang", "version": "0.5.12"}, "fields": {}}))
     with pytest.raises(fl.FieldsError, match="declarations are for"):
         sc.read_sglang_kit(f, stack, d)
+
+
+def test_recipes_are_read_from_a_local_clone_and_a_missing_commit_is_fetched_by_its_sha(tmp_path):
+    import subprocess
+    ident = ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false"]
+
+    def git(*a, cwd=None):
+        return subprocess.run(["git", *ident, *a], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
+    src = tmp_path / "src"
+    src.mkdir()
+    git("init", "-q", "-b", "main", cwd=src)
+    git("config", "uploadpack.allowAnySHA1InWant", "true", cwd=src)
+    (src / "benchmarks" / "single_node").mkdir(parents=True)
+    (src / "benchmarks" / "single_node" / "m_fp8_h200.sh").write_text("python3 -m sglang.launch_server --tp-size 8\n")
+    git("add", "-A", cwd=src)
+    git("commit", "-q", "-m", "a", cwd=src)
+    clone = tmp_path / "clone.git"
+    git("clone", "-q", "--bare", str(src), str(clone))
+    (src / "benchmarks" / "single_node" / "m_fp8_h200.sh").write_text("python3 -m sglang.launch_server --tp-size 4\n")
+    git("commit", "-q", "-am", "b", cwd=src)
+    later = git("rev-parse", "HEAD", cwd=src)
+    rc_src = rcp.GitRecipes(None, "o/r", clone)
+    rc = rc_src.at(later)               # not in the clone: fetched, then read
+    assert rc_src.script(rc, "benchmarks/single_node/m_fp8_h200.sh").strip().endswith("--tp-size 4")
+    with pytest.raises(rcp.RecipesUnavailable):
+        rcp.GitRecipes(None, "o/r", clone).at("0" * 40)

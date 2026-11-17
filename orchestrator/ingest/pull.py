@@ -224,7 +224,7 @@ def client_release(entry: dict, frozen: "Frozen", gh, run_id: str, attempt: int,
         # A run GitHub no longer holds has no job to read a log of either.
         entry["client_args"] = None
         entry["client_args_reason"] = f"run_unavailable:HTTP_{e.code}"
-        return None
+        return
     index, expired = gh.job_logs_cached(run_id, attempt)
     hit = index.get(art.normal_result_name(result_filename or ""))
     if hit is None:

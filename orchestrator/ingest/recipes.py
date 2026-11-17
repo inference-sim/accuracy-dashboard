@@ -204,10 +204,21 @@ class GitRecipes(GitHubRecipes):
             self._blob[blob_sha] = self._git("cat-file", "blob", blob_sha).decode()
         return self._blob[blob_sha]
 
+    def _tree(self, sha: str) -> bytes:
+        """The commit's files. A commit the clone lacks (a pull request's head, in no branch) is fetched by its sha once:
+        a git fetch, which the REST quota does not count."""
+        try:
+            return self._git("ls-tree", "-r", "-z", sha)
+        except RecipesUnavailable:
+            import subprocess
+            if subprocess.run(["git", "--git-dir", self.git_dir, "fetch", "-q", "origin", sha], capture_output=True).returncode:
+                raise
+            return self._git("ls-tree", "-r", "-z", sha)
+
     def at(self, sha: str) -> Recipes:
         if sha not in self._at:
             tree = []
-            for line in self._git("ls-tree", "-r", "-z", sha).decode().split("\0"):
+            for line in self._tree(sha).decode().split("\0"):
                 if not line:
                     continue
                 meta, _, path = line.partition("\t")
