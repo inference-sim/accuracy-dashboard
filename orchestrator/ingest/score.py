@@ -1166,7 +1166,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     (pdir / router_name).write_bytes(router)
     header_path, data_path = ix.write_trace(replay, pdir)
     argv = ix.replay_argv(env.blis, f"{name}.yaml", pdir, header_path, data_path, replay.sessions, replay.pool,
-                          SINGLE_TURN_SEED)
+                          SINGLE_TURN_SEED, phased=bool(replay.header.get("phases")))
     if env.catalog:
         argv += ["--catalog", str(env.catalog)]
     if env.registry:
