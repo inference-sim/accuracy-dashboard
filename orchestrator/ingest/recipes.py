@@ -126,6 +126,23 @@ def draft_model(text: str) -> tuple[str, int] | None:
     return hits[0] if len({h[0] for h in hits}) == 1 else None
 
 
+# Recipe `model` values that are a runner's local staging name, not a repository (dashboard#111). Each maps to the
+# repository whose files the name stands for. It applies only where the run's own runners.yaml stages the served
+# directory under the spelling and also under the repository's name: two records of the run agree, none is guessed.
+LOCAL_SPELLINGS = {
+    "deepseek-r1-fp4": "nvidia/DeepSeek-R1-0528-FP4-V2",
+}
+
+
+def _repository(model: str, staged: set) -> str | None:
+    """The recipe's model as a repository: itself when it is one, else the table's repository when the served
+    directory is also staged under that repository's name, else None."""
+    if "/" in model:
+        return model
+    repo = LOCAL_SPELLINGS.get(model)
+    return repo if repo and repo.rsplit("/", 1)[-1] in staged else None
+
+
 def checkpoint(rc: Recipes, row: dict, served_path: str | None) -> str | None:
     """The HF repo the row's recipe served, or None unless exactly one agrees with the path."""
     if not served_path:
@@ -137,7 +154,7 @@ def checkpoint(rc: Recipes, row: dict, served_path: str | None) -> str | None:
             and _image(r.get("image")) == _image(row.get("image"))
             and runner_hardware(r.get("runner")) == row.get("hardware")
             and r["model"].rsplit("/", 1)[-1] in ({leaf} | staged)}
-    return hits.pop() if len(hits) == 1 else None
+    return _repository(hits.pop(), staged) if len(hits) == 1 else None
 
 
 class RecipesUnavailable(Exception):
