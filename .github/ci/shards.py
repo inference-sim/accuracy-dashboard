@@ -104,6 +104,9 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
         pytest("The M3 baseline and the grade ceilings", "orchestrator/baseline/test_ceiling.py",
                "orchestrator/baseline/test_ported_changes.py", "orchestrator/baseline/test_m3_baseline.py",
                "orchestrator/baseline/test_release_runs.py"),
+        pytest("The facts the estimation evaluator gets, the evaluator against the substrate's vectors, and the baseline row placement",
+               "orchestrator/ingest/test_exact.py", "orchestrator/ingest/test_stand_in_facts.py",
+               "orchestrator/baseline/test_freeze_rows.py"),
     ],
     # The two repository-wide checks that were hidden behind earlier failures: they run on their own.
     "boundary": [
@@ -123,13 +126,8 @@ SIMULATOR = [
     "orchestrator/ingest/test_router_configs.py",
 ]
 
-# Test files no CI job runs, each with the reason. Before this manifest, CI named its test files by hand
-# and these three were in no list; they are listed so the omission is visible, not so it stays.
-NOT_RUN = {
-    "orchestrator/ingest/test_exact.py": "not run by CI before the manifest; needs review (compares against vectors from the Go evaluator)",
-    "orchestrator/ingest/test_stand_in_facts.py": "not run by CI before the manifest",
-    "orchestrator/baseline/test_freeze_rows.py": "not run by CI before the manifest; reads a substrate checkout",
-}
+# Test files no CI job runs, each with the reason. Empty: every tracked test file is in a shard or in SIMULATOR.
+NOT_RUN: dict[str, str] = {}
 
 
 def tracked_tests() -> list[str]:
