@@ -750,7 +750,9 @@ def decide(settings: dict[str, Setting], field_list, part: str | None = None, fa
             continue
         estimated = None
         if st.translated:
-            d.substitutions.append({"kind": "other_release", "subject": path, "detail": st.translated})
+            # A setting the run made under an earlier release's name is the run's own setting in this release's field: a
+            # resolved_differs (G2). other_release is the grade's own band for the ENGINE release (grade.grade names it).
+            d.substitutions.append({"kind": "resolved_differs", "subject": path, "detail": st.translated})
         if st.requested:
             dec = fl.decide(field_list, path, set_by_run=True)
             if dec.g5:

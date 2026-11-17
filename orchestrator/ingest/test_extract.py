@@ -1477,8 +1477,16 @@ def test_an_earlier_releases_fp4_indexer_cache_is_this_releases_mxfp4_indexer_dt
     merged = st.merge(readings, st.defaults_for("0.25.0", DEFAULTS, st.vllm_defaults_release()))
     kv = merged["attention_config.indexer_kv_dtype"]
     assert (kv.value, kv.requested) == ("mxfp4", True)
-    subs = [s for s in st.decide(merged, FIELDS).substitutions if s["kind"] == "other_release"]
-    assert [s["subject"] for s in subs] == ["attention_config.indexer_kv_dtype"] and "#52550" in subs[0]["detail"]
+    decided = st.decide(merged, FIELDS)
+    subs = [s for s in decided.substitutions if s["subject"] == "attention_config.indexer_kv_dtype"
+            and s["kind"] == "resolved_differs"]
+    assert len(subs) == 1 and "#52550" in subs[0]["detail"]
+    assert not [s for s in decided.substitutions if s["kind"] == "other_release"]
+    # The grade accepts it: a kind outside G2_KINDS raised GradeError and stopped the whole scoring run.
+    import grade as gr
+    g = gr.grade(engine_version="0.33.0", release=gr.Release(version="0.33.0", nightly_or_custom=False),
+                 substitutions=decided.substitutions)
+    assert g.grade == gr.G2 and ("resolved_differs", "attention_config.indexer_kv_dtype") in {(x["kind"], x["subject"]) for x in g.substitutions}
 
 
 def test_an_index_cache_the_run_set_itself_is_not_translated():
