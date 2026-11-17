@@ -73,8 +73,8 @@ SPEC_LINES = (
 # it writes one request row per trace record: a round-0 record is "request_<request_id>", a
 # holder round "session_<session>_round_1_0"; each runs its prompt (prefix plus input tokens)
 # and output tokens, with TTFT TTFT_US and TPOT TPOT_US, and arrives at its trace arrival
-# time. With DROP set, the last main-phase request is dropped; with EARLY_HOLDER set, a holder
-# round arrives at 0, inside the main phase; with SHORT set, main request 0 emits one token
+# time. With DROP set, the last main-phase request is dropped; with EARLY_HOLDER set, a phased
+# trace's main phase starts at 0, inside the warm-up (the drain gate is not kept); with SHORT set, main request 0 emits one token
 # fewer than its target. An agentic replay gets the
 # fixed metrics and reports below.
 FAKE_BLIS = """#!/usr/bin/env python3
@@ -121,6 +121,8 @@ if "--trace-data" in a:
         row = {{"id": rid, "fate": "completed", "arrival_us": arrival, "ttft_us": TTFT_US,
                "e2e_us": int(TTFT_US + TPOT_US * (out - 1)),
                "prompt_tokens": int(r["prefix_length"]) + int(r["input_tokens"]), "output_tokens": out}}
+        if r.get("phase"):
+            row["phase"] = r["phase"]
         if out > 1:
             row["tpot_us"] = TPOT_US
         if DROP and r is main[-1]:
@@ -129,7 +131,9 @@ if "--trace-data" in a:
         rows.append(row)
     # The closed loop: the client's `pool` slots each take the next request in order when they
     # free, one completion overhead after the request they held completed.
-    pool = int(arg("--concurrent-sessions")) - len({{r["session_id"] for r in recs if r["session_id"].startswith("warmup-")}})
+    phased = "phase" in recs[0]
+    pool = (int(arg("--concurrent-sessions")) - len({{r["session_id"] for r in recs if r["session_id"].startswith("warmup-")}})
+            if not phased else 4)
     main_ids = {{f"request_{{r['request_id']}}" for r in recs if r["session_id"].startswith("main-")}}
     mains = sorted((r for r in rows if r["id"] in main_ids), key=lambda r: int(r["id"][8:]))
     if mains and not BURST:
@@ -139,6 +143,11 @@ if "--trace-data" in a:
             free.sort()
             r["arrival_us"] = free.pop(0)
             free.append(r["arrival_us"] + r.get("e2e_us", 0) + 777)
+    if phased and not EARLY_HOLDER:
+        # Drain-gated phases: the main phase starts once every warm-up copy has ended.
+        warm_end = max([r["arrival_us"] + r["e2e_us"] for r in rows if r.get("phase") == "warmup"] or [0])
+        for r in mains:
+            r["arrival_us"] += warm_end + 777
     counts["generated"] = len(rows)
     counts["completed"] = sum(r["fate"] == "completed" for r in rows)
     if DROP:
@@ -437,9 +446,9 @@ def test_prefix_caching_on_replays_the_main_phase_primed():
         assert o.fidelity is not None, o.reasons
         tr = _trace(work, entry["point_id"])
         warm = [r for r in tr if r["session_id"].startswith("warmup-")]
-        # The client's own warm-up (conc 4): 2*CONC = 8 copies of request 0, each with its holder round.
-        assert len(warm) == 16 and len(tr) == 56
-        assert all(r["arrival_time_us"] == str(ix.PRIME_MAIN_START_US) for r in tr if r["session_id"].startswith("main-"))
+        # The client's own warm-up (conc 4): 2*CONC = 8 copies of request 0, each in the warm-up phase, with no holder round.
+        assert len(warm) == 8 and len(tr) == 48
+        assert {r["phase"] for r in tr if r["session_id"].startswith("main-")} == {"main"} and {r["phase"] for r in warm} == {"warmup"}
         req = o.fidelity["requests"]
         assert (req["start"], req["copies"]) == ("primed", 8)
         pts = list(csv.DictReader((tmp / "c1" / c.POINTS_CSV).open()))

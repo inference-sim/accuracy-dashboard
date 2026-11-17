@@ -40,7 +40,8 @@ def _run(tmp: Path, replay: ix.Replay) -> list[dict]:
     shutil.copy(scen / SCENARIO, tmp / SCENARIO)
     (tmp / ix.ROUTER_CONFIG_NAME).write_bytes(ix.router_config_bytes())
     h, d = ix.write_trace(replay, tmp)
-    argv = ix.replay_argv(blis, SCENARIO, tmp, h, d, replay.sessions, replay.pool, 42)
+    argv = ix.replay_argv(blis, SCENARIO, tmp, h, d, replay.sessions, replay.pool, 42,
+                         phased=bool(replay.header.get("phases")))
     proc = subprocess.run(argv, capture_output=True, text=True, timeout=1800)
     assert proc.returncode == 0, proc.stderr[-4000:]
     doc = json.loads(proc.stdout)

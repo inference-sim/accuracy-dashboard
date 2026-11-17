@@ -38,12 +38,9 @@ REQUESTS_PER_CONCURRENCY = 10     # --num-prompts $((CONC*10))
 WARMUPS_PER_CONCURRENCY = 2       # --num-warmups 2*CONC
 CLIENT_ID = "inferencex-benchmark-serving"
 
-# The primed main phase (blisrun.go). Main requests arrive at PRIME_MAIN_START_US, after every
-# warm-up copy has completed; each copy's holder round waits PRIME_HOLD_US, after any main
-# phase has completed, so a copy's pool slot admits no main request early.
-PRIME_MAIN_START_US = 10_000_000_000       # 10^4 s
-PRIME_HOLD_US = 1_000_000_000_000          # 10^6 s
+# The primed run is two drain-gated trace phases: the warm-up copies, then the main phase (primed_phase).
 PRIME_PREFIX_GROUP = "request-0-prompt"
+WARMUP_PHASE, MAIN_PHASE = "warmup", "main"
 
 
 # ------------------------------------------------------------------ numpy's legacy generator
@@ -257,15 +254,13 @@ def main_phase(input_lens: list[int], output_lens: list[int], conc: int) -> Repl
 
 
 def primed_phase(input_lens: list[int], output_lens: list[int], conc: int, copies: int) -> Replay:
-    """The main phase with request 0's prompt already cached, as the drained warm-up leaves it,
-    written with existing trace features only. `copies` warm-up sessions come first: round 0
-    is a copy of request 0 (its prompt as the shared prefix group, no further tokens, its
-    output length) at t=0; round 1 is a one-token holder PRIME_HOLD_US later, which keeps the
-    session's pool slot. Main request 0 is in the same prefix group, so its prompt is the
-    copy's token for token. Every main request arrives at PRIME_MAIN_START_US. The pool is
-    conc + copies, so the first `conc` main requests start together, in order. `copies` is the
-    client's own warm-up count, WARMUPS_PER_CONCURRENCY x conc: the client sends and drains
-    that many copies of request 0, whatever the deployment's data-parallel width (a data-parallel
+    """The main phase with request 0's prompt already cached, as the drained warm-up leaves it, written as two
+    drain-gated phases of blis-substrate's trace format. The `warmup` phase holds `copies` one-round sessions: each is
+    a copy of request 0 (its prompt as the shared prefix group, no further tokens, its output length). The `main`
+    phase starts once every copy has ended; main request 0 is in the same prefix group, so its prompt is a copy's
+    token for token. Each phase sends at most `conc` requests at a time, the next when one ends, in record order, as the
+    client's semaphore does. `copies` is the client's own warm-up count, WARMUPS_PER_CONCURRENCY x conc: the client
+    sends and drains that many copies of request 0, whatever the deployment's data-parallel width (a data-parallel
     deployment is one instance whose engine holds the balancer)."""
     _check_lengths(input_lens, output_lens, conc)
     if not isinstance(copies, int) or copies < 1:
@@ -273,16 +268,20 @@ def primed_phase(input_lens: list[int], output_lens: list[int], conc: int, copie
     n = len(input_lens)
     records = []
     for j in range(copies):
-        sid = f"warmup-{j}"
-        records.append(_record(n + 2 * j, sid, 0, 0, output_lens[0], prefix_group=PRIME_PREFIX_GROUP,
+        records.append(_record(n + j, f"warmup-{j}", 0, 0, output_lens[0], prefix_group=PRIME_PREFIX_GROUP,
                                prefix_length=input_lens[0]))
-        records.append(_record(n + 2 * j + 1, sid, 1, 1, 1, think_time_us=PRIME_HOLD_US))
+        records[-1]["phase"] = WARMUP_PHASE
     main = main_phase(input_lens, output_lens, conc).records
     for r in main:
-        r["arrival_time_us"] = PRIME_MAIN_START_US
+        r["phase"] = MAIN_PHASE
     main[0].update(prefix_group=PRIME_PREFIX_GROUP, prefix_length=input_lens[0], input_tokens=0)
     records += main
-    return Replay(header=_header(), records=records, sessions=n + copies, pool=conc + copies)
+    # Two drain-gated phases (blis-substrate trace `phases`): the main phase starts once every warm-up copy has
+    # ended, and each phase sends at most `conc` requests at a time, as the client does. A pooled replay ignores
+    # recorded arrivals, so the arrival times no longer carry the ordering.
+    header = {**_header(), "phases": [{"name": WARMUP_PHASE, "concurrency": conc},
+                                      {"name": MAIN_PHASE, "start": "after_drain", "concurrency": conc}]}
+    return Replay(header=header, records=records, sessions=n + copies, pool=conc)
 
 
 # The data CSV's columns, from blis-substrate contracts/spec/trace codec.go at 800ae263.
@@ -293,7 +292,7 @@ TRACE_COLUMNS = ["request_id", "client_id", "tenant_id", "slo_class", "session_i
                  "status"]
 # Written after TRACE_COLUMNS, each only when some record carries it. The records here carry
 # only think_time_us.
-TRACE_OPTIONAL_COLUMNS = ["slo_target_us", "adapter", "think_time_us", "input_tokens_reset"]
+TRACE_OPTIONAL_COLUMNS = ["slo_target_us", "adapter", "think_time_us", "input_tokens_reset", "phase"]
 
 
 def _cell(v) -> str:
@@ -315,7 +314,16 @@ def write_trace(replay: Replay, directory) -> tuple[Path, Path]:
     d.mkdir(parents=True, exist_ok=True)
     header_path, data_path = d / "trace.yaml", d / "trace.csv"
     h = replay.header
-    header_path.write_text(f"trace_version: {h['trace_version']}\ntime_unit: {h['time_unit']}\nmode: {h['mode']}\n")
+    text = f"trace_version: {h['trace_version']}\ntime_unit: {h['time_unit']}\nmode: {h['mode']}\n"
+    if h.get("phases"):
+        text += "phases:\n"
+        for ph in h["phases"]:
+            text += f"  - name: {ph['name']}\n"
+            if ph.get("start"):
+                text += f"    start: {ph['start']}\n"
+            if ph.get("concurrency"):
+                text += f"    concurrency: {ph['concurrency']}\n"
+    header_path.write_text(text)
     optional = [c for c in TRACE_OPTIONAL_COLUMNS if any(r.get(c) is not None for r in replay.records)]
     with open(data_path, "w", newline="") as fh:
         w = csv.writer(fh, lineterminator="\n")
@@ -332,7 +340,7 @@ def router_config_bytes() -> bytes:
 
 
 def replay_argv(blis: str, scenario_name: str, scenario_dir, header_path, data_path, sessions: int, pool: int,
-                seed: int) -> list[str]:
+                seed: int, phased: bool = False) -> list[str]:
     """The `blis replay` command line for one point. The pool flags are the client's gate:
     with --concurrent-sessions POOL every record is a one-round session (or a warm-up session
     of two rounds), the first POOL start at their arrival and each later one is admitted, in
@@ -340,6 +348,13 @@ def replay_argv(blis: str, scenario_name: str, scenario_dir, header_path, data_p
     so nothing is cloned, and there is no --shuffle-corpus, no think time and no deadline.
     The Result document is read from standard output (--format json). The catalog and
     registry are the simulator's own unless the caller appends --catalog and --registry."""
+    if phased:
+        # A trace with phases replays in fixed mode, where each phase's own `concurrency` is the client's gate and the
+        # drain between phases is the header's; a pooled replay does not run phases (inference-sim#1926).
+        return [blis, "replay",
+                "--scenario", scenario_name, "--scenarios", str(scenario_dir),
+                "--trace-header", str(header_path), "--trace-data", str(data_path),
+                "--session-mode", "fixed", "--seed", str(seed), "--format", "json", "--log", "error"]
     return [blis, "replay",
             "--scenario", scenario_name, "--scenarios", str(scenario_dir),
             "--trace-header", str(header_path), "--trace-data", str(data_path),
@@ -352,7 +367,7 @@ def replay_argv(blis: str, scenario_name: str, scenario_dir, header_path, data_p
 
 def request_index(row_id: str) -> int:
     """The trace record index of a one-round session's request, from the id `blis replay`
-    gives it, "request_<request_id>". Raises ValueError for any other id (a holder round)."""
+    gives it, "request_<request_id>". Raises ValueError for any other id."""
     prefix = "request_"
     if not isinstance(row_id, str) or not row_id.startswith(prefix):
         raise ValueError(f"request id {row_id!r} has no {prefix!r} prefix")
@@ -360,31 +375,25 @@ def request_index(row_id: str) -> int:
 
 
 def check_primed(rows: list[dict], n: int) -> None:
-    """Refuse a primed run that is not "the main phase after a drained warm-up": a warm-up copy
-    that had not completed before the main phase started; main request 0 not arriving with the
-    main phase; or a holder round arriving before the last main request completed. `rows` are
-    the Result's request_rows (times in simulated microseconds); n is the main-phase count."""
-    last_main_end, first_holder = 0, None
+    """Refuse a primed run that is not "the main phase after a drained warm-up": a warm-up copy that had not completed,
+    or a main request that began before the last warm-up copy ended (the drain gate of the trace's phases), or a row
+    whose phase is neither. `rows` are the Result's request_rows (times in simulated microseconds), each naming its
+    trace phase; n is the main-phase count."""
+    warm_end, main_start = 0, None
     for r in rows:
+        phase = r.get("phase")
+        if phase not in (WARMUP_PHASE, MAIN_PHASE):
+            raise ValueError(f"request {r['id']} is in phase {phase!r}, neither {WARMUP_PHASE!r} nor {MAIN_PHASE!r}")
         start = r["arrival_us"]
-        end = start + (r.get("e2e_us") or 0)
-        try:
-            i = request_index(r["id"])
-        except ValueError:
-            first_holder = start if first_holder is None else min(first_holder, start)
-            continue
-        if i >= n:
-            if r.get("fate") != "completed" or end >= PRIME_MAIN_START_US:
-                raise ValueError(f"warm-up copy {r['id']} ended at {end} us, not before the main phase at "
-                                 f"{PRIME_MAIN_START_US} us")
+        if phase == WARMUP_PHASE:
+            end = start + (r.get("e2e_us") or 0)
+            if r.get("fate") != "completed":
+                raise ValueError(f"warm-up copy {r['id']} did not complete ({r.get('fate')!r}) before the main phase")
+            warm_end = max(warm_end, end)
         else:
-            if i == 0 and abs(start - PRIME_MAIN_START_US) > 1:
-                raise ValueError(f"main request 0 arrived at {start} us, not with the main phase at "
-                                 f"{PRIME_MAIN_START_US} us")
-            last_main_end = max(last_main_end, end)
-    if first_holder is not None and first_holder <= last_main_end:
-        raise ValueError(f"a warm-up holder round arrived at {first_holder} us, before the main phase ended at "
-                         f"{last_main_end} us")
+            main_start = start if main_start is None else min(main_start, start)
+    if main_start is not None and main_start < warm_end:
+        raise ValueError(f"the main phase began at {main_start} us, before the last warm-up copy ended at {warm_end} us")
 
 
 def summarize(rows: list[dict], input_lens: list[int], output_lens: list[int], ignore=None) -> dict:
@@ -397,7 +406,7 @@ def summarize(rows: list[dict], input_lens: list[int], output_lens: list[int], i
     runs to the LAST content chunk. contracts/spec/result defines a row's tpot_us as
     (E2E - TTFT) / (output tokens - 1); TPOT is read from it. Both means are over requests,
     not pooled over tokens. `ignore(id)` drops rows that are not main-phase requests (the
-    warm-up copies and holder rounds of a primed run)."""
+    warm-up copies of a primed run)."""
     n = len(input_lens)
     seen = [False] * n
     ttft_sum = tpot_sum = 0.0
