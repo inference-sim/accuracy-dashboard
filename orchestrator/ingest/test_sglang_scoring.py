@@ -212,7 +212,10 @@ def test_a_vllm_point_is_unchanged_when_sglang_is_scored_too():
         env.sglang = _kit()
         o, work = _score(tmp, entry, env)
         scen = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
-        assert o.fidelity["simulator"]["engine"] == {"kind": "vllm", "version": "0.31.0"} and "engine_version: 0.31.0" in scen
+        import yaml
+        assert o.fidelity["simulator"]["engine"] == {"kind": "vllm", "version": "0.31.0"}
+        # the scenario states the engine as engine: {kind, version} (SIM-1), the same pair the fidelity record names
+        assert next(d for d in yaml.safe_load_all(scen) if d and d.get("kind") == "Scenario")["engine"] == {"kind": "vllm", "version": "0.31.0"} and "engine_version" not in scen
     finally:
         shutil.rmtree(tmp)
 
