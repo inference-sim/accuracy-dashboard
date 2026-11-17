@@ -280,7 +280,8 @@ def test_every_location_is_a_field_blis_vllm_engine_block_or_the_deployment_name
               "disable_hybrid_kv_cache_manager", "kv_cache_memory_bytes", "prefix_match_unit",
               "prefix_cache_retention_interval", "kv_events", "max_loras", "max_cpu_loras",
               "decoder_replay_cudagraph_capture_sizes", "custom_ops", "use_trtllm_attention", "mla_prefill_backend",
-              "indexer_kv_dtype", "linear_backend", "enable_chunked_prefill", "language_model_only", "env"}
+              "indexer_kv_dtype", "linear_backend", "enable_chunked_prefill", "language_model_only", "env",
+              "enforce_eager"}       # enforce_eager: blis-vllm#232 (cudagraph NONE, execution mode substituted)
     parallel = {"tp", "pp", "dp", "dp_local", "enable_expert_parallel", "pcp", "dcp"}
     for path, loc in st.LOCATIONS.items():
         top, _, rest = loc.partition(".")
