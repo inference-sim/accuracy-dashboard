@@ -33,3 +33,18 @@ Output: `configiq-points.jsonl`, `points.csv` (the InferenceX contract's columns
 ## Needs from M3.1
 
 Unstated `block_size` for gemma-4 on Hopper and for DeepSeek-V4 (blis-vllm#68) refuses 78 otherwise runnable units; a `config.json` in the Nemotron-3-Super catalog entry would admit 35; multi-turn session replay from a configiq row (110 units) needs a think-time statement the dataset lacks.
+
+## What the 135 scored points are, and the TTFT bias
+
+Every scored point is gpt-oss-120b (B200 105, H200 30, TP1): the other models' units are refused or fail on `block_size`. The figures describe that one model on two chips and are not a configiq-wide accuracy.
+
+Mean TTFT is biased high (signed median +101 percent) while mean ITL is -14 percent. Split by chip and load (signed median error of mean TTFT; n):
+
+| chip | concurrency 1 | 25-75 | 100-200 | 300 |
+|---|---|---|---|---|
+| B200 | -21 percent (21) | +113 (33) | +113 (36) | +1 (15) |
+| H200 | +61 percent (6) | +484 (10) | +498 (10) | +442 (4) |
+
+Checked and ruled out as the cause: the definition (TTFT is request start to first token on both sides, and the median is biased as much as the mean: +89 percent B200, +471 percent H200); the window (the simulated steady-state TTFT, requests after the first wave, is within 20 percent of the whole-run mean); prompt length (the recorded 1004-token mean is simulated, and block and batch defaults follow the engine's, 16384 batched tokens on B200); the rate type (the dataset records only the concurrency, the simulated mean in flight is 98 percent of it, and the simulated and recorded request latencies agree within 5 percent at concurrency 100). Prefix caching is on for all 135; whether GuideLLM's synthetic prompts shared prefixes is not recorded, and the simulation has no hits.
+
+What remains is the latency model, not the scenario: both sides run in lockstep waves (recorded request latencies spread 1-3 percent at concurrency 100), so the mean TTFT is about half the wave's prefill time and multiplies any prefill over-price; at concurrency 1 the gap is a fixed overhead (B200 1k prompts: 57 ms simulated, 30 ms recorded, the host admission cost). H200 prefill of this MXFP4 model is priced about 1.6x high even alone (8k prompt: 361 ms against 214-224). No scenario field was changed; these points stay provisional and outside the headline (COV-11).
