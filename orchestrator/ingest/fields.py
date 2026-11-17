@@ -283,8 +283,12 @@ def _value_classes(raw, where: str, status: str) -> dict:
             raise FieldsError(f"{where}: thresholds and covered_classes only for a numeric field")
         if not isinstance(c.get("covered"), list) or not c["covered"] or not all(isinstance(x, str) for x in c["covered"]):
             raise FieldsError(f"{where}.covered: a non-empty list of strings")
-    if status == PROVEN_INERT and t != "numeric" and not c.get("values"):
-        raise FieldsError(f"{where}.values: a proven-inert field lists every value")
+    # The substrate's rule (contracts/spec/fields classes.go): only an enumerated field lists its values; a boolean's are
+    # true and false.
+    if t != "enumerated" and c.get("values"):
+        raise FieldsError(f"{where}.values: only an enumerated field lists its values")
+    if status == PROVEN_INERT and t == "enumerated" and not c.get("values"):
+        raise FieldsError(f"{where}.values: a proven-inert enumerated field lists every value")
     return c
 
 
