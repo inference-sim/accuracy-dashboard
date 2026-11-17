@@ -292,6 +292,11 @@ _STATES_NO = re.compile(r"\bstates no ([A-Za-z_][A-Za-z0-9_.]*)")
 # The engine's refusal of a value it does not model: '<field> "<value>" ... is not modelled' (blis-vllm states the field,
 # the value and why, and links the issue that would model it).
 _NOT_MODELLED = re.compile(r'\b([a-z_][a-z0-9_]*) "[^"]*"[^"]*?\bis not modelled\b')
+# The engine's refusal of a value the scenario states for a field THIS model does not read:
+# '<field>="<value>" is read only for <model>'s <part>, and this model has none, so a stated value would be dropped'.
+# The model has no such part, so the field is not modelled for it (a gap of the model, not a fault of the run), and
+# the reason names the field. (Before, the message was cut to the bare slug "scenario" and the whole night stopped.)
+_NOT_READ = re.compile(r'\b([a-z_][a-z0-9_]*)="[^"]*" is read only for [^,]*, and this model has none\b')
 # "the workload states no thinking mode": the simulator wants a statement about the WORKLOAD (it
 # selects the acceptance profile), not a field of the engine's list. The reason names the workload
 # statement, so it is not looked up in fields.json (where it would read as a missing field).
@@ -330,6 +335,14 @@ def value_refusal(stderr: str, work: Path, field_list) -> str | None:
         # The engine states that the scenario's value of a field is not modelled: the release's own classification
         # of the run's setting (design 11.4, field_not_modelled), named by the field's path in the field list.
         name = nm.group(1)
+        path = name
+        if field_list is not None and field_list.lookup(name) is None:
+            hits = [f for f in field_list.fields if f.endswith("." + name)]
+            path = hits[0] if len(hits) == 1 else name
+        return f"field_not_modelled:{path}"
+    nr = _NOT_READ.search(re.sub(r"\s+", " ", stderr).replace('\\"', '"'))
+    if nr:
+        name = nr.group(1)
         path = name
         if field_list is not None and field_list.lookup(name) is None:
             hits = [f for f in field_list.fields if f.endswith("." + name)]
