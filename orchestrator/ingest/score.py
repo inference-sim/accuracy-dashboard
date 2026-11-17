@@ -1160,7 +1160,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     # primes with copies of request 0 and a single-turn point is primed unless prefix caching is off.
     primed = pd_run is None and any((p["engine"] or {}).get("enable_prefix_caching") is not False for p in dep["pools"])
     copies = ix.WARMUPS_PER_CONCURRENCY * conc if primed else 0
-    replay = ix.primed_phase(ins, outs, conc, copies) if primed else ix.main_phase(ins, outs, conc)
+    replay = ix.primed_phase(ins, outs, conc, copies, phased=ix.supports_phases(env.blis)) if primed else ix.main_phase(ins, outs, conc)
 
     pdir = (work / "single_turn" / pid).resolve()
     pdir.mkdir(parents=True, exist_ok=True)
@@ -1214,7 +1214,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
         return o
     try:
         if primed:
-            ix.check_primed(rows, len(ins))
+            ix.check_primed(rows, len(ins), phased=bool(replay.header.get("phases")))
     except ValueError:
         o.reasons = ["blis_refused:warmup_not_drained"]
         return o
