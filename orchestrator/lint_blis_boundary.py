@@ -110,6 +110,10 @@ TEXT_READS = {
         "TEMPORARY until an inference-sim command prints the full unit list with identities and the "
         "ingest report (`blis ledger --list` prints only the published unit ids): the job checks out "
         "blis-substrate at the commit stack.json pins, for catalog/, registry/ and catalog/ledger",
+    (".github/workflows/ledger-extract.yml", "clone"):
+        "TEMPORARY with the api-nightly.yml substrate checkout: the extract job checks out blis-substrate at a release "
+        "for catalog/ledger/sources.yaml, ledger/inferencex/export.sql and the unit list, until an inference-sim "
+        "command prints the ledger's pinned source and its export",
     ("docs/m2/after-run.sh", "clone"):
         "TEMPORARY with the api-nightly.yml substrate checkout: the after-run script checks out the "
         "blis-substrate commit the run pins, for the catalog and registry, until the M2 substrate "

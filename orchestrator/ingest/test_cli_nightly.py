@@ -70,7 +70,8 @@ def _args(tmp, **over):
              timeout=7200, workers=1, download_workers=1, agentic_workers=1, max_rss_mb=0, stack=None,
              ledger=str(tmp / "ledger"), substrate_dir=str(tmp / "substrate"), substrate_version="v1.0.0",
              substrate_commit=_head(tmp / "substrate"), fields=str(tmp / "fields.json"),
-             source_rows=str(tmp / "source-rows.jsonl"))
+             ledger_extract=str(tmp / "extract.jsonl.gz"), ledger_extract_pin=str(tmp / "extract.pin.json"),
+             sample=0, sample_seed=1)
     a.update(over)
     if not Path(a["scored"]).exists():
         Path(a["scored"]).write_text(json.dumps({"kind": "ScoredReleases", "releases": []}))
@@ -112,8 +113,11 @@ class Fakes:
         # The ledger the night reads: one unit per row, written before each night, and the blis
         # that prints the anchor list of the substrate release it pins.
         ledger_fake.write(tmp / "ledger", self.rows + self.unsourced)
-        # The ledger's pinned source: its rows, as export.sql prints them.
-        (tmp / "source-rows.jsonl").write_text("".join(json.dumps(r) + "\n" for r in self.rows))
+        # The ledger's pinned source, as the ledger extract holds it, and the pin naming it.
+        import ledger_extract as lx
+        info = lx.write_extract([json.dumps(r) for r in self.rows], [], tmp / "extract.jsonl.gz")
+        import ledger as ldg
+        (tmp / "extract.pin.json").write_text(json.dumps({**info, "ledger_revision": ldg.load(tmp / "ledger").revision}))
         anchors = ([ledger_fake.point_id(r) for r in self.rows + self.unsourced] if self.anchors is None
                    else self.anchors)
         if not (tmp / "substrate" / ".git").exists():
@@ -887,3 +891,20 @@ def test_a_score_run_reads_the_field_list_file_and_scores(tmp_path, monkeypatch)
     import contract
     monkeypatch.setattr(contract, "validate_dir", lambda d: [])
     assert cli.cmd_score(a) == 0 and seen == [[]]
+
+
+def test_a_rehearsal_sample_is_fixed_by_its_seed_and_covers_every_model_chip_framework_and_image(tmp_path):
+    import ledger as ldg
+    rows = []
+    for k in range(60):
+        rows.append({**_row(f"m{k % 3}", k + 1, "2026-09-01"), "hardware": ("h100", "h200", "b200", "mi300x")[k % 4],
+                     "framework": ("vllm", "sglang")[k % 2], "image": f"img{k % 5}"})
+    lg = ldg.load(ledger_fake.write(tmp_path / "ledger", rows))
+    anchors = {ledger_fake.point_id(r) for r in rows}
+    a = cli.sample_anchors(rows, lg, anchors, 12, seed=3)
+    assert a == cli.sample_anchors(list(reversed(rows)), lg, anchors, 12, seed=3)
+    assert a != cli.sample_anchors(rows, lg, anchors, 12, seed=4)
+    assert len(a) == 12 and a <= anchors
+    by_id = {ledger_fake.point_id(r): r for r in rows}
+    for key in ("model", "hardware", "framework", "image"):
+        assert {by_id[u][key] for u in a} == {r[key] for r in rows}, key

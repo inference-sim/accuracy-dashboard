@@ -145,6 +145,7 @@ def cmd_pull(a) -> int:
     def _freeze(pt):
         try:
             return pt, pl.freeze_point(pt, resolver=resolver, gh=gh, fetch=api.http_fetch, out=out,
+                                       source_log=(getattr(a, "source_logs", None) or {}).get(str(pt.row.get("id"))),
                                        recipes=recipes), None
         except (clients.RateLimited, clients.FetchFailed):
             raise   # the whole pull is invalid, not this point
@@ -349,13 +350,12 @@ def read_anchor_units(substrate_dir: Path, out: Path) -> set[str]:
 UNSOURCED = "value_not_recorded:anchor_not_in_source"
 
 
-def read_source_rows(path: Path, lg, anchors: set[str]) -> tuple[list[dict], list[str]]:
-    """The records of the anchor units, read from the ledger's own pinned source (design §2.2: the dashboard fetches the
-    runs of the units the ledger lists). `path` holds one JSON object per InferenceX row, as blis-substrate's
-    ledger/inferencex/export.sql prints them from a database restore.sh restored from the dump catalog/ledger/sources.yaml
-    pins, so every anchor is read as the ledger recorded it, whatever its age. Returns (the rows of the anchors'
-    records, the anchors the file holds no record of, sorted). An anchor unit the ledger does not hold is refused: the
-    anchor list and the ledger are then not one release's."""
+def read_source_rows(source: list[dict], lg, anchors: set[str]) -> tuple[list[dict], list[str]]:
+    """The records of the anchor units, from the ledger's own pinned source (design §2.2: the dashboard fetches the
+    runs of the units the ledger lists): `source` is the rows of the ledger extract (ledger_extract.py), the dump's
+    rows as the substrate's export.sql prints them, so every anchor is read as the ledger recorded it, whatever its
+    age. Returns (the rows of the anchors' records, the anchors the source holds no record of, sorted). An anchor unit
+    the ledger does not hold is refused: the anchor list and the ledger are then not one release's."""
     want, unknown = {}, []
     for u in anchors:
         unit = lg.units.get(u)
@@ -368,15 +368,11 @@ def read_source_rows(path: Path, lg, anchors: set[str]) -> tuple[list[dict], lis
         raise ldg.LedgerError(f"{len(unknown)} anchor units are not units of the ledger {lg.revision} "
                               f"(first: {sorted(unknown)[0]}); the anchor list and the ledger are not one release's")
     rows, seen = [], set()
-    with open(path) as fh:
-        for line in fh:
-            if not line.strip():
-                continue
-            r = json.loads(line)
-            u = want.get(str(r.get("id")))
-            if u is not None:
-                rows.append(r)
-                seen.add(u)
+    for r in source:
+        u = want.get(str(r.get("id")))
+        if u is not None:
+            rows.append(r)
+            seen.add(u)
     return rows, sorted(set(anchors) - seen)
 
 
@@ -395,6 +391,36 @@ def add_unsourced(work: Path, units: list[str], lg) -> None:
                             "reasons": [UNSOURCED], "files": {}, "build": None})
     meta = {k: v for k, v in m.items() if k != "points"}
     pl.write_manifest(work, meta, sorted(m["points"], key=lambda e: e["point_id"]))
+
+
+def sample_anchors(rows: list[dict], lg, anchors: set[str], n: int, seed: int) -> set[str]:
+    """A fixed, seeded, stratified draw of about `n` anchor units, for a rehearsal of the night: first one unit for
+    every model, chip, framework and engine image the anchors hold (so each is exercised), then units drawn at
+    random to `n`. The same rows, anchors, n and seed give the same draw."""
+    import random
+    dates = contract.run_dates(rows)
+    by_unit = {}
+    for r in sorted(rows, key=lambda r: int(r["id"])):
+        p = lg.place(r, dates)
+        if p is not None and p.unit.unit_id in anchors:
+            by_unit.setdefault(p.unit.unit_id, r)
+    rng = random.Random(seed)
+    order = sorted(by_unit)
+    rng.shuffle(order)
+    pick, covered = [], set()
+    for key in ("model", "hardware", "framework", "image"):
+        for u in order:
+            v = (key, by_unit[u].get(key))
+            if v not in covered:
+                covered.add(v)
+                if u not in pick:
+                    pick.append(u)
+    for u in order:
+        if len(pick) >= n:
+            break
+        if u not in pick:
+            pick.append(u)
+    return set(pick)
 
 
 def later_ledger_candidates(lg) -> dict:
@@ -656,7 +682,18 @@ def cmd_nightly(a) -> int:
         # window. An anchor the source holds no record of is G5 UNSOURCED. The live API's newer versions of those
         # records are listed as later-ledger candidates in the backlog, never scored.
         lg = ldg.load(Path(a.ledger))
-        rows, unsourced = read_source_rows(Path(a.source_rows), lg, anchors)
+        import ledger_extract as lx
+        records = {str(r) for u in anchors if u in lg.units for r in lg.units[u].records()}
+        source, logs = lx.check(Path(a.ledger_extract), json.loads(Path(a.ledger_extract_pin).read_text()), lg,
+                                keep_log=records.__contains__)
+        if a.sample:
+            # A rehearsal (dry run): a seeded, stratified draw of the anchors, scored by the same path.
+            drawn = sample_anchors(source, lg, anchors, a.sample, a.sample_seed)
+            anchors.intersection_update(drawn)
+            anchor_path.write_text(json.dumps({"kind": "PublishedUnits", "role": "anchor", "partition_version": 1,
+                                               "seed_sha256": "0" * 64, "units": sorted(anchors)}))
+            _log(f"nightly: rehearsal on {len(anchors)} sampled anchor units (seed {a.sample_seed})")
+        rows, unsourced = read_source_rows(source, lg, anchors)
         listed = {x.point_id for x in pl.place(rows, lg).points}
         stray = listed - anchors
         if stray:
@@ -674,7 +711,7 @@ def cmd_nightly(a) -> int:
         rc = cmd_pull(types.SimpleNamespace(out=str(work), today=today_.isoformat(),
                                             window_days=a.window_days, cache=a.cache, prior=None,
                                             only=sorted(to_fetch & listed), download_workers=a.download_workers,
-                                            ledger=a.ledger, rows=rows))
+                                            ledger=a.ledger, rows=rows, source_logs=logs))
         if rc != 0:
             raise RuntimeError(f"pull failed (rc={rc}); the run stops rather than publish a partial pull")
         add_unsourced(work, [u for u in unsourced if u in to_fetch], lg)
@@ -830,9 +867,13 @@ def main(argv=None) -> int:
     n.add_argument("--score-work")
     n.add_argument("--evaluator-commit")
     n.add_argument("--ledger", required=True, help="blis-substrate's catalog/ledger (see pull --ledger)")
-    n.add_argument("--source-rows", required=True,
-                   help="the ledger's pinned source, one JSON row per line (blis-substrate ledger/inferencex/export.sql over "
-                        "a restore.sh restore of the dump catalog/ledger/sources.yaml pins); never committed")
+    n.add_argument("--sample", type=int, default=0,
+                   help="a rehearsal: score a seeded, stratified draw of about this many anchor units (0: every one)")
+    n.add_argument("--sample-seed", type=int, default=1)
+    n.add_argument("--ledger-extract", required=True,
+                   help="the ledger's pinned source as ledger_extract.py builds it (never committed: X12)")
+    n.add_argument("--ledger-extract-pin", required=True,
+                   help="the pin naming the extract's sha256, size and ledger revision (.github/ledger-extract.json)")
     n.add_argument("--blis", required=True, help="the blis binary (see score --blis)")
     n.add_argument("--catalog", required=True)
     n.add_argument("--registry", required=True)

@@ -235,7 +235,7 @@ def client_release(entry: dict, frozen: "Frozen", gh, run_id: str, attempt: int,
 
 
 def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArtifacts, fetch, out: Path,
-                 recipes=None) -> dict:
+                 recipes=None, source_log: str | None = None) -> dict:
     """Freeze one point's inputs. The point is one ledger unit; its inputs are the kept
     record's (the smallest row id the window holds), and its measured values are each
     measurement's, so the score is against their mean (design §10.2)."""
@@ -336,6 +336,11 @@ def freeze_point(point: "Point", *, resolver: build.Resolver, gh: art.GitHubArti
                     entry["reasons"].append(f"conflict:{role}")
                 elif role == "client_export":
                     entry["reasons"].append("artifact_unmatched:client_export")
+    if not agentic and server_log is None and source_log and art.is_server_log(source_log.encode()):
+        # The vLLM log the ledger's pinned source holds for the row (ledger_extract.py): the run as the ledger recorded
+        # it, read before the live API's copy.
+        frozen.put("server_log", source_log.encode(), "source:server_logs")
+        server_log = source_log
     if not agentic and server_log is None:
         try:
             text = api.server_log(fetch, row["id"])

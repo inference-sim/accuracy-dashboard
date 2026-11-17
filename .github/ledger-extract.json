@@ -1,0 +1,12 @@
+{
+ "bytes": 199887567,
+ "cache_key": "ledger-extract-70d4ef41ed588fa73f7e1a007dcc76e55abff60412723709ed9f13226048a55a",
+ "kind": "LedgerExtract",
+ "ledger_revision": "db-dump/2026-09-28",
+ "logs": 2110,
+ "rows": 85325,
+ "sha256": "70d4ef41ed588fa73f7e1a007dcc76e55abff60412723709ed9f13226048a55a",
+ "source_sha256": "8092a3138dd45aba0309fae8da34846414a0eb909546232b1e2ede6abacb33e4",
+ "substrate_ref": "v0.14.1",
+ "units": 82347
+}
