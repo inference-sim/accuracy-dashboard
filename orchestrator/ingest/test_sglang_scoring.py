@@ -432,3 +432,52 @@ def test_a_flag_an_earlier_release_had_is_read_as_the_field_that_replaced_it_and
         assert dep["pools"][0]["engine"]["cuda_graph_max_bs_decode"] == 192
     finally:
         shutil.rmtree(tmp)
+
+
+def _config(tmp, cfg):
+    d = tmp / "catalog" / "models" / "m"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "config.json").write_text(json.dumps(cfg))
+
+
+def test_sglangs_context_length_is_the_checkpoints_by_its_own_rule(tmp_path):
+    # get_context_length: the first key, times the scaling factor unless the scaling names its original window or is llama3.
+    _config(tmp_path, {"max_position_embeddings": 131072})
+    assert ss.context_window(tmp_path / "catalog", "m") == 131072
+    _config(tmp_path, {"max_position_embeddings": 163840, "rope_scaling": {"type": "yarn", "factor": 40.0,
+                                                                          "original_max_position_embeddings": 4096}})
+    assert ss.context_window(tmp_path / "catalog", "m") == 163840          # the original window is named: factor 1
+    _config(tmp_path, {"text_config": {"max_position_embeddings": 32768, "rope_scaling": {"factor": 4.0}}})
+    assert ss.context_window(tmp_path / "catalog", "m") == 131072          # a bare factor multiplies
+    _config(tmp_path, {"seq_length": 4096, "max_position_embeddings": 99})
+    assert ss.context_window(tmp_path / "catalog", "m") == 4096            # key order is SGLang's
+    _config(tmp_path, {"hidden_size": 8})
+    assert ss.context_window(tmp_path / "catalog", "m") is None            # SGLang's 2048 fallback is not stated
+    assert ss.context_window(tmp_path / "nowhere", "m") is None
+
+
+def test_a_scenario_states_the_checkpoints_context_length_when_the_run_set_none_and_the_run_s_when_it_did():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp)
+        _config(tmp, {"max_position_embeddings": 131072})
+        o, work = _score(tmp, entry, env)
+        assert o.fidelity is not None, o.reasons
+        dep = list(yaml.safe_load_all(next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()))[1]
+        assert dep["pools"][0]["engine"]["context_length"] == 131072
+        sub = next(s for s in o.fidelity["substitutions"] if s["subject"] == "context_length")
+        assert sub["kind"] == "estimated" and "131072" in sub["detail"]
+        # A context length the run set is the run's own; nothing is estimated.
+        fields = [{**_field(f.name, f.status, f.source)} for f in FIELDS.fields.values()] + [_field("context_length", "modelled")]
+        fields.sort(key=lambda f: (f["name"], f["source"]))
+        env.sglang = sc.EngineKit("sglang", RELEASE, fl.parse(json.dumps(
+            {"kind": "FieldList", "engine": {"kind": "sglang", "version": RELEASE}, "fields": fields}).encode()), "f" * 64,
+            ss.load_declarations())
+        (tmp / "pull" / "points" / entry["point_id"] / "launch_command.gz").write_bytes(
+            gzip.compress((COMMAND + " --context-length 8192").encode(), mtime=0))
+        o, work = _score(tmp, entry, env, "c2")
+        dep = list(yaml.safe_load_all(next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()))[1]
+        assert dep["pools"][0]["engine"]["context_length"] == 8192
+        assert not [s for s in o.fidelity["substitutions"] if s["subject"] == "context_length"]
+    finally:
+        shutil.rmtree(tmp)
