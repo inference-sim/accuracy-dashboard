@@ -1456,3 +1456,31 @@ def test_under_the_refuse_switch_a_multi_node_point_with_no_recorded_fabric_is_g
                  part=st.Part(name="h200"), engine_version="0.32.0", field_list=FIELDS, catalog_node_size=None, node=NODE8,
                  launch_config={"resources": {"fabric": "roce-200g"}})
     assert b.scenario["cluster"]["fabric"] == "roce-200g" and b.reasons == []
+
+
+_LOG_V25_FP4_INDEXER = (
+    "INFO [api_utils.py:273] non-default args: {'model': 'org/dsv4', 'tensor_parallel_size': 8}\n"
+    "INFO [core.py:116] Initializing a V1 LLM engine (v0.25.0) with config: model='org/dsv4', "
+    "attention_config=AttentionConfig(backend=None, use_fp4_indexer_cache=True, indexer_kv_dtype='bf16'), "
+    "tensor_parallel_size=8, kv_cache_dtype=fp8\n"
+    "INFO [attention.py:694] Using MXFP4 indexer cache for Lightning Indexer.\n")
+
+
+def test_an_earlier_releases_fp4_indexer_cache_is_this_releases_mxfp4_indexer_dtype_named_on_the_point():
+    # vLLM before #52550 states the MXFP4 index cache as use_fp4_indexer_cache=True; its indexer_kv_dtype 'bf16' is that
+    # release's unread default. The run's setting, in this release's field, is indexer_kv_dtype=mxfp4, set by the run,
+    # and the translation is a named release difference on the point.
+    readings, _ = st.read_all(_LOG_V25_FP4_INDEXER, None)
+    merged = st.merge(readings, st.defaults_for("0.25.0", DEFAULTS, st.vllm_defaults_release()))
+    kv = merged["attention_config.indexer_kv_dtype"]
+    assert (kv.value, kv.requested) == ("mxfp4", True)
+    subs = [s for s in st.decide(merged, FIELDS).substitutions if s["kind"] == "other_release"]
+    assert [s["subject"] for s in subs] == ["attention_config.indexer_kv_dtype"] and "#52550" in subs[0]["detail"]
+
+
+def test_an_index_cache_the_run_set_itself_is_not_translated():
+    readings, _ = st.read_all(_LOG_V25_FP4_INDEXER.replace("'bf16'", "'fp8'").replace(
+        "'tensor_parallel_size': 8}", "'tensor_parallel_size': 8, 'attention_config': {'indexer_kv_dtype': 'fp8'}}"), None)
+    merged = st.merge(readings, st.defaults_for("0.25.0", DEFAULTS, st.vllm_defaults_release()))
+    assert merged["attention_config.indexer_kv_dtype"].value == "fp8"
+    assert not merged["attention_config.indexer_kv_dtype"].translated

@@ -919,3 +919,26 @@ def test_under_the_refuse_switch_a_pd_point_with_no_recorded_fabric_is_g5_value_
         assert "value_not_recorded:cluster.fabric" in o.reasons and o.fidelity is None, o.reasons
     finally:
         shutil.rmtree(tmp)
+
+
+def _acceptance_diff(pools):
+    import types
+    import score as sc
+    args = [{"arg": "speculative_config.synthetic_acceptance_length", "measured": "2.78", "source": "launch_config",
+             "blis_field": "replay.acceptance_length", "_value": 2.78}]
+    return sc._diff_args(args, {"pools": pools}, types.SimpleNamespace(acceptance_length=None, vllm_names=False)), args
+
+
+def test_a_pd_scenario_that_states_the_runs_synthetic_acceptance_in_every_pool_lost_nothing():
+    # A prefill/decode scenario states the synthetic acceptance in each pool's engine block, not as the replay's flag;
+    # the recorded value is there, so it is not setting_differs (which stops the publish).
+    pool = {"engine": {"speculative": {"method": "eagle3", "synthetic_acceptance_length": 2.78}}}
+    reasons, args = _acceptance_diff([pool, pool])
+    assert reasons == [] and args[0]["blis"] == "2.78"
+
+
+def test_a_pd_scenario_whose_pools_lack_or_disagree_on_the_acceptance_lost_the_setting():
+    a = {"engine": {"speculative": {"synthetic_acceptance_length": 2.78}}}
+    b = {"engine": {"speculative": {"synthetic_acceptance_length": 3.1}}}
+    assert _acceptance_diff([a, b])[0] == ["setting_differs:speculative_config.synthetic_acceptance_length"]
+    assert _acceptance_diff([{"engine": {}}])[0] == ["setting_differs:speculative_config.synthetic_acceptance_length"]

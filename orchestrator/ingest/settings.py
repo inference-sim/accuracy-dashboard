@@ -254,6 +254,7 @@ class Setting:
     occurrences: int = 1
     conflict: list | None = None    # every distinct value, when sources or repeats disagree
     requested: bool = False         # the run asked for it (vs. the build's own resolution)
+    translated: str | None = None   # the run's setting under an earlier release's name, stated in this release's
 
 
 def _one(values: list):
@@ -294,7 +295,29 @@ def merge(readings: dict[str, Reading], vllm_defaults: dict) -> dict[str, Settin
                     st.conflict = sorted({_canon(value): value, **{_canon(x): x for x in (c2 or [v2])}}.values(), key=_canon)
                     break
         out[path] = st
+    _translate_releases(out)
     return out
+
+
+def _translate_releases(settings: dict[str, Setting]) -> None:
+    """A setting an earlier vLLM release stated under another field, written as the field this engine release
+    reads, and named on the point (a release difference). TEMPORARY until the engine's field list states the
+    earlier names.
+
+      attention_config.use_fp4_indexer_cache=True (vLLM before #52550, e.g. v0.25) is
+      attention_config.indexer_kv_dtype=mxfp4: such a run logs 'Using MXFP4 indexer cache for Lightning Indexer',
+      and its indexer_kv_dtype ('bf16') is that release's default, which DeepSeek-V4 does not read. #52550 folded
+      the flag into indexer_kv_dtype, so the run's own setting, in this release's field, is mxfp4."""
+    fp4 = settings.get("attention_config.use_fp4_indexer_cache")
+    if fp4 is None or fp4.conflict is not None or not _flag(fp4.value):
+        return
+    kv = settings.get("attention_config.indexer_kv_dtype")
+    if kv is not None and kv.source in PASSED and kv.value not in (None, "auto", "bf16", "mxfp4"):
+        return          # the run passed another index cache itself: that setting stands
+    settings["attention_config.indexer_kv_dtype"] = Setting(
+        path="attention_config.indexer_kv_dtype", value="mxfp4", source=fp4.source, requested=True,
+        translated="the run's use_fp4_indexer_cache=True is indexer_kv_dtype=mxfp4 since vLLM #52550; its "
+                   f"indexer_kv_dtype {kv.value if kv is not None else None!r} was its release's unread default")
 
 
 # The sources that record the values passed, and those that record the values resolved.
@@ -654,6 +677,8 @@ def decide(settings: dict[str, Setting], field_list, part: str | None = None, fa
                            "values": [_record_value(v) for v in st.conflict]})
             continue
         estimated = None
+        if st.translated:
+            d.substitutions.append({"kind": "other_release", "subject": path, "detail": st.translated})
         if st.requested:
             dec = fl.decide(field_list, path, set_by_run=True)
             if dec.g5:
