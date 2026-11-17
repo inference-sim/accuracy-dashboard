@@ -84,6 +84,7 @@ G34_KINDS = ("other_release", "changed_functions", "nightly_or_custom", "ported_
 PORTED_FUNCTIONS_UNPUBLISHED = "ported-function list not published"
 _RELEASE = re.compile(r"^v?(\d+\.\d+\.\d+)$")
 _BANNER_RELEASE = re.compile(r"^(\d+\.\d+\.\d+)$")
+_SGLANG_RELEASE = re.compile(r"^v(\d+\.\d+\.\d+)(?:-cu\d+)?$")
 
 
 class GradeError(ValueError):
@@ -111,6 +112,11 @@ def run_release(build: dict, banner_version: str | None) -> Release:
     official = image.split("@", 1)[0].rsplit(":", 1)[0] in ("vllm/vllm-openai", "vllm/vllm-openai-rocm")
     if official and m and (banner_version is None or banner_version.lstrip("v") == m.group(1)):
         return Release(version=m.group(1), nightly_or_custom=False)
+    # SGLang's official image tags a release as vX.Y.Z with a CUDA suffix (lmsysorg/sglang:v0.5.12-cu130); its log
+    # prints no banner to cross-check, so the tag is the release.
+    sg = _SGLANG_RELEASE.match(tag) if image.split("@", 1)[0].rsplit(":", 1)[0] == "lmsysorg/sglang" else None
+    if sg:
+        return Release(version=sg.group(1), nightly_or_custom=False)
     if banner_version and _BANNER_RELEASE.match(banner_version.lstrip("v")) and official:
         return Release(version=banner_version.lstrip("v"), nightly_or_custom=False)
     return Release(version=None, nightly_or_custom=True,
@@ -225,20 +231,38 @@ def grade(*, engine_version: str, release: Release, substitutions: list[dict],
     return Graded(G2 if subs else G1, _sorted(subs))
 
 
-def check(points: list[dict], engine_version: str) -> list[str]:
+def check(points: list[dict], engine_version) -> list[str]:
     """COV-4, COV-5 and COV-6 over a run's points: every point has exactly one grade, every G5
     reason is on the closed list, every G2 to G4 substitution is named, each point's grade
     agrees with its recorded build and the simulator's engine release, and one simulator build,
-    running that engine release, scored every point."""
+    running that engine release, scored every point.
+
+    `engine_version` is the run's engine release, or, for a run that scores more than one engine, a dict of
+    engine kind -> release: a point is then held to the release of the engine it ran, and the one simulator
+    build that scored the run runs one release of each engine."""
     out = []
-    sims = {(json.dumps(p["simulator"], sort_keys=True) if p.get("simulator") else None) for p in points}
+
+    def expected(p):
+        if isinstance(engine_version, dict):
+            return engine_version.get((((p.get("simulator") or {}).get("engine")) or {}).get("kind"))
+        return engine_version
+
+    if isinstance(engine_version, dict):
+        sims = {(json.dumps({k: v for k, v in p["simulator"].items() if k != "engine"}, sort_keys=True)
+                 if p.get("simulator") else None) for p in points}
+        engines_seen = {((p["simulator"].get("engine") or {}).get("kind"), (p["simulator"].get("engine") or {}).get("version"))
+                        for p in points if p.get("simulator")}
+        if len({k for k, _ in engines_seen}) != len(engines_seen):
+            out.append(f"one engine kind ran two releases in this run (COV-6): {sorted(map(str, engines_seen))}")
+    else:
+        sims = {(json.dumps(p["simulator"], sort_keys=True) if p.get("simulator") else None) for p in points}
     if len(sims) > 1:
         out.append(f"{len(sims)} simulator builds or engine releases scored this run's points; one must score "
                    f"them all (COV-6): {sorted(s or 'none' for s in sims)}")
     for p in points:
         eng = ((p.get("simulator") or {}).get("engine") or {}).get("version")
-        if "simulator" in p and eng != engine_version:
-            out.append(f"{str(p.get('point_id'))[:12]}: scored by a simulator running {eng!r}, not {engine_version} (COV-6)")
+        if "simulator" in p and eng != expected(p):
+            out.append(f"{str(p.get('point_id'))[:12]}: scored by a simulator running {eng!r}, not {expected(p)} (COV-6)")
             break
     for p in points:
         pid = str(p.get("point_id"))[:12]
@@ -264,6 +288,6 @@ def check(points: list[dict], engine_version: str) -> list[str]:
         if g in (G3, G4) and not kinds & set(G34_KINDS):
             out.append(f"{pid}: a {g} point names no other release or build (COV-6)")
         rel = (p.get("build") or {}).get("release")
-        if g in (G1, G2) and rel != engine_version:
-            out.append(f"{pid}: graded {g}, but its build's release {rel!r} is not {engine_version} (COV-6)")
+        if g in (G1, G2) and rel != expected(p):
+            out.append(f"{pid}: graded {g}, but its build's release {rel!r} is not {expected(p)} (COV-6)")
     return out

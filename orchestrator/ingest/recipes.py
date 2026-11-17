@@ -102,6 +102,24 @@ def draft_script(rc: Recipes, row: dict) -> str | None:
     return paths[0] if len(paths) == 1 else None
 
 
+def launch_script(rc: Recipes, row: dict) -> str | None:
+    """The benchmark script that launched the row's engine, by InferenceX's naming
+    (<model-prefix>_<precision>_<hardware>[_mtp].sh under benchmarks/single_node), or None unless exactly one
+    script has it. The model prefix is the row's model slug, and it must be the prefix of a recipe of the row's
+    framework, precision and runner at the run's commit, so a script of another framework that shares the name stem
+    is not taken for the row's. (The recipe's image is not compared: the workflow can set the image a run uses.)"""
+    prefixes = {r.get("model-prefix") for r in rc.recipes
+                if r.get("framework") == row.get("framework") and r.get("precision") == row.get("precision")
+                and runner_hardware(r.get("runner")) == row.get("hardware")} & {row.get("model")}
+    mtp = "_mtp" if row.get("spec_method") not in (None, "none") else ""
+    names = {f"{p}_{row.get('precision')}_{row.get('hardware')}{mtp}.sh" for p in prefixes}
+    # The single-turn scripts sit in benchmarks/single_node, or in its fixed_seq_len directory once InferenceX split
+    # them from the agentic ones.
+    dirs = ("benchmarks/single_node/", "benchmarks/single_node/fixed_seq_len/")
+    paths = [p for p in rc.scripts if p.rsplit("/", 1)[0] + "/" in dirs and p.rsplit("/", 1)[-1] in names]
+    return paths[0] if len(paths) == 1 else None
+
+
 def draft_model(text: str) -> tuple[str, int] | None:
     """(the HF repo, the line) of the script's DRAFT_MODEL, or None unless it assigns exactly one."""
     hits = [(m.group(1), i + 1) for i, line in enumerate(text.splitlines()) if (m := _DRAFT.match(line))]
@@ -164,5 +182,59 @@ class GitHubRecipes:
             rc = parse(masters, runners)
             rc.scripts = {t["path"]: t["sha"] for t in tree if t["path"].startswith("benchmarks/") and t["path"].endswith(".sh")}
             rc.tree = {t["path"]: t["sha"] for t in tree if t.get("type", "blob") == "blob"}
+            self._at[sha] = rc
+        return self._at[sha]
+
+
+class GitRecipes(GitHubRecipes):
+    """The same reads from a local bare clone of the repository (git --git-dir), so the trees and blobs of a commit cost
+    no REST calls (PROCESS §16): only the commit a run executed (`run_commit`, one call per run) is asked of the API.
+    A commit the clone lacks is RecipesUnavailable, and the caller records that."""
+
+    def __init__(self, get, repo: str, git_dir):
+        super().__init__(get, repo)
+        self.git_dir = str(git_dir)
+
+    def _git(self, *args: str) -> bytes:
+        import subprocess
+        out = subprocess.run(["git", "--git-dir", self.git_dir, *args], capture_output=True)
+        if out.returncode != 0:
+            raise RecipesUnavailable(out.stderr.decode(errors="replace")[:200])
+        return out.stdout
+
+    def script(self, rc: Recipes, path: str) -> str:
+        return self.blob_text(rc.scripts[path])
+
+    def blob_text(self, blob_sha: str) -> str:
+        if blob_sha not in self._blob:
+            self._blob[blob_sha] = self._git("cat-file", "blob", blob_sha).decode()
+        return self._blob[blob_sha]
+
+    def _tree(self, sha: str) -> bytes:
+        """The commit's files. A commit the clone lacks (a pull request's head, in no branch) is fetched by its sha once:
+        a git fetch, which the REST quota does not count."""
+        try:
+            return self._git("ls-tree", "-r", "-z", sha)
+        except RecipesUnavailable:
+            import subprocess
+            if subprocess.run(["git", "--git-dir", self.git_dir, "fetch", "-q", "origin", sha], capture_output=True).returncode:
+                raise
+            return self._git("ls-tree", "-r", "-z", sha)
+
+    def at(self, sha: str) -> Recipes:
+        if sha not in self._at:
+            tree = []
+            for line in self._tree(sha).decode().split("\0"):
+                if not line:
+                    continue
+                meta, _, path = line.partition("\t")
+                _mode, kind, oid = meta.split()
+                if kind == "blob":
+                    tree.append({"path": path, "sha": oid, "type": "blob"})
+            masters = [self.blob_text(t["sha"]) for t in sorted(tree, key=lambda t: t["path"]) if _MASTER.search(t["path"])]
+            runners = next((self.blob_text(t["sha"]) for t in tree if _RUNNERS.search(t["path"])), None)
+            rc = parse(masters, runners)
+            rc.scripts = {t["path"]: t["sha"] for t in tree if t["path"].startswith("benchmarks/") and t["path"].endswith(".sh")}
+            rc.tree = {t["path"]: t["sha"] for t in tree}
             self._at[sha] = rc
         return self._at[sha]
