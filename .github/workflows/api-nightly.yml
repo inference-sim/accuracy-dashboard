@@ -224,6 +224,11 @@ jobs:
         with:
           token: ${{ secrets.PUBLISH_PAT }}
           persist-credentials: true
+      # The validation installs requirements-ci.txt, whose hashes are for CPython 3.13's wheels: the runner's own
+      # Python moved to 3.14, whose wheels have other hashes, and pip refused the install.
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: night

@@ -422,3 +422,16 @@ def test_ci_installs_python_dependencies_only_from_the_hashed_requirements_file(
     for wf in WORKFLOWS:
         for ln in re.findall(r"pip install[^\n]*", wf.read_text()):
             assert "--require-hashes -r requirements-ci.txt" in ln, f"{wf.name}: {ln}"
+
+
+def test_every_job_that_installs_the_hashed_requirements_runs_the_python_they_are_hashed_for():
+    # requirements-ci.txt pins wheel hashes for CPython 3.13. A job that installs it on the runner's own Python
+    # (3.14 since the image moved) is refused by pip, as the nightly's publish job was (run 44003772351).
+    import yaml
+    for wf in WORKFLOWS:
+        for name, job in (yaml.safe_load(wf.read_text()).get("jobs") or {}).items():
+            steps = job.get("steps") or []
+            for k, s in enumerate(steps):
+                if "requirements-ci.txt" in (s.get("run") or "") and "pip install" in (s.get("run") or ""):
+                    before = [x for x in steps[:k] if str(x.get("uses", "")).startswith("actions/setup-python@")]
+                    assert before and str(before[-1]["with"]["python-version"]) == "3.13", f"{wf.name}: {name}"
