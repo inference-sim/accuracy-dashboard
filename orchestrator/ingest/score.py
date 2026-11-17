@@ -36,6 +36,7 @@ import g1  # noqa: E402
 import grade as gr  # noqa: E402
 import pd as pdm  # noqa: E402
 import pd_recipe as pdr  # noqa: E402
+import pull as pl  # noqa: E402
 import router_table as rt  # noqa: E402
 import inferencex_client as ix  # noqa: E402
 import inferencex_runners as ir  # noqa: E402
@@ -243,6 +244,9 @@ def _blis_refusal(stderr: str, work: Path) -> str:
 # "... no profile for <model>/<method>/k<n>/thinking-<mode>/<category> in <sets>". The pair named is the gap.
 _NO_PROFILE = re.compile(r"acceptance: no profile for \S+/\S+/k\d+/thinking-(\w+)/(\S+) in ")
 _STATES_NO = re.compile(r"\bstates no ([A-Za-z_][A-Za-z0-9_.]*)")
+# The engine's refusal of a value it does not model: '<field> "<value>" ... is not modelled' (blis-vllm states the field,
+# the value and why, and links the issue that would model it).
+_NOT_MODELLED = re.compile(r'\b([a-z_][a-z0-9_]*) "[^"]*"[^"]*?\bis not modelled\b')
 # "the workload states no thinking mode": the simulator wants a statement about the WORKLOAD (it
 # selects the acceptance profile), not a field of the engine's list. The reason names the workload
 # statement, so it is not looked up in fields.json (where it would read as a missing field).
@@ -258,6 +262,16 @@ def value_refusal(stderr: str, work: Path, field_list) -> str | None:
     but names no parseable field takes the refusal's slug as the subject."""
     slug = _blis_refusal(stderr, work)
     text = slug.partition(":")[2]
+    nm = _NOT_MODELLED.search(re.sub(r"\s+", " ", stderr).replace('\\"', '"'))
+    if nm:
+        # The engine states that the scenario's value of a field is not modelled: the release's own classification
+        # of the run's setting (design 11.4, field_not_modelled), named by the field's path in the field list.
+        name = nm.group(1)
+        path = name
+        if field_list is not None and field_list.lookup(name) is None:
+            hits = [f for f in field_list.fields if f.endswith("." + name)]
+            path = hits[0] if len(hits) == 1 else name
+        return f"field_not_modelled:{path}"
     miss = _NO_PROFILE.search(re.sub(r"\s+", " ", stderr))
     if miss:
         return f"value_not_recorded:profile_not_available:{miss.group(2)}/{miss.group(1)}"
@@ -423,6 +437,15 @@ def _diff_args(args: list, dep: dict, b: st.Built) -> list[str]:
         a["blis_field"] = f
         if f == "replay.acceptance_length":
             got, want = b.acceptance_length, str(want)
+            if got is None:
+                # A prefill/decode scenario states the run's synthetic acceptance in each pool's engine block (the
+                # form the engine takes the synthetic method in), not as the replay's flag: one value in every pool
+                # is the recorded value, as written.
+                stated = {(((p.get("engine") or {}).get(k) or {}).get("synthetic_acceptance_length"))
+                          for p in dep.get("pools") or [] for k in ("speculative", "speculative_config")
+                          if ((p.get("engine") or {}).get(k))}
+                if len(stated) == 1 and None not in stated:
+                    got = f"{float(stated.pop()):g}"
         elif f.startswith("offload."):
             # The offload writer converts units (per-rank bytes -> the engine's tier); its own
             # checks refused any disagreement, so the arg records what BLIS was given.
@@ -676,6 +699,9 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     work = work.resolve()
     o = Outcome(point_id=pid, identity=ident, row=row, reasons=list(entry["reasons"]),
                 measurements=entry.get("measurements") or [], build=entry.get("build"))
+    if any(r in pl.NOT_PULLED for r in o.reasons):
+        # The night's pull holds no usable row of the unit (pull.add_unpulled): nothing to build a scenario from.
+        return o
     fw = engines.lookup(row["framework"])
     if not engines.scored(fw):
         # Nothing was fetched and BLIS is not asked: G5 for the label's reasons and its router.

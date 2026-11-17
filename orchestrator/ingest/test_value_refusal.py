@@ -30,3 +30,21 @@ def test_a_scenario_that_states_no_field_is_still_read_as_a_field(tmp_path):
 
 def test_an_unrelated_refusal_is_not_a_missing_value(tmp_path):
     assert sc.value_refusal('level=fatal msg="something else"', tmp_path, None) is None
+
+
+NOT_MODELLED = ('time="2026-11-16T21:15:49-05:00" level=fatal msg="scenario \\"p-1.yaml\\": deepseek KV layers: layer kind '
+                'csa4_hash_moe: indexer_kv_dtype \\"mxfp4\\" runs as mxfp4, a key record of 68 bytes for an index head of 128, '
+                'and the catalog graph\'s index cache states 132; the latency kernel keys the index record by one cache dtype '
+                'and prices the graph\'s, so this indexer dtype is not modelled (https://github.com/inference-sim/blis-vllm/issues/84)"')
+
+
+def test_a_value_the_engine_says_it_does_not_model_is_g5_field_not_modelled_by_the_fields_path(tmp_path):
+    # The release's own classification of the run's setting, not a fault of the harness: the point is G5 and the
+    # night goes on, where blis_refused would stop the publish (COV-8).
+    import fields as fl
+    import json
+    fls = fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.32.0"}, "fields": [
+        {"name": "attention_config.indexer_kv_dtype", "source": "config", "status": "modelled",
+         "evidence": {"traces": ["t"]}, "estimation": {"rule": "none"}}]}))
+    assert sc.value_refusal(NOT_MODELLED, tmp_path, fls) == "field_not_modelled:attention_config.indexer_kv_dtype"
+    assert sc.value_refusal(NOT_MODELLED, tmp_path, None) == "field_not_modelled:indexer_kv_dtype"
