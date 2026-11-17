@@ -28,8 +28,6 @@ A P/D row the stack cannot run is G5 `topology_unsupported` with the part of the
 
 | Subject | Meaning | What removes it |
 |---|---|---|
-| `pd_pool_data_parallel` | a pool runs data-parallel size above 1 | blis-vllm#47 (M3): the engine accepts a KV transfer with data parallelism |
-| `pd_unequal_data_parallel` | the two pools differ in data-parallel size (DEP prefill with TEP decode, or the reverse) | inference-sim#1952 (M3): the placement allows pools of different data-parallel size |
 | `pd_pool_not_recorded` | the row records a pool with no workers or GPUs | nothing: the row does not describe a P/D run |
 | `pd_agentic` | an agentic replay of a P/D deployment | the agentic replay for two pools and the router's session affinity (accuracy-dashboard#64, M3) |
 

@@ -65,8 +65,6 @@ The dashboard names why a prefill/decode (P/D) row is not scored by the part of 
 
 | Reason | Counted as | Gap |
 |---|---|---|
-| `topology_unsupported:pd_pool_data_parallel` | a pool at data-parallel size above 1 | engine (blis-vllm#47, M3) |
-| `topology_unsupported:pd_unequal_data_parallel` | pools of different data-parallel size | placement (inference-sim#1952, M3) |
 | `topology_unsupported:pd_pool_not_recorded` | a pool with no workers or GPUs in the row | the row |
 | `topology_unsupported:pd_agentic` | an agentic replay of a P/D deployment | writer (dashboard#64, M3) |
 | `value_not_recorded:recipe_unresolved:<slug>` (slug `no_master_entry`, `ambiguous`, `not_in_tree`, `unreadable`, `no_config_file`, `run_commit_unreadable`) | no recipe to give the pools' arguments | record |
