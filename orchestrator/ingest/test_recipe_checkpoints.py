@@ -154,3 +154,11 @@ def test_a_local_staging_name_is_not_taken_without_the_second_record_or_for_an_u
     unlisted = _dsr1_recipes({"DeepSeek-R1-0528-FP4-V2", "mystery-fp4"})
     unlisted.recipes[0]["model"] = "mystery-fp4"
     assert rcp.checkpoint(unlisted, DSR1_ROW, DSR1_PATH) is None
+
+
+def test_the_staging_directories_of_the_deepseek_r1_checkpoints_resolve_to_their_repositories():
+    for name, repo in (("deepseek-r1-0528-fp4-v2", "nvidia/DeepSeek-R1-0528-FP4-V2"),
+                       ("deepseek-r1-0528", "deepseek-ai/DeepSeek-R1-0528")):
+        rc = _dsr1_recipes(set())
+        rc.recipes[0]["model"], rc.dirs = name, {name: {name}}
+        assert rcp.checkpoint(rc, DSR1_ROW, f"/mnt/lustre01/models/{name}") == repo
