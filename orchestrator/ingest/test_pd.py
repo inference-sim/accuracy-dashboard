@@ -957,3 +957,23 @@ def test_a_pd_scenario_whose_pools_lack_or_disagree_on_the_acceptance_lost_the_s
     b = {"engine": {"speculative": {"synthetic_acceptance_length": 3.1}}}
     assert _acceptance_diff([a, b])[0] == ["setting_differs:speculative_config.synthetic_acceptance_length"]
     assert _acceptance_diff([{"engine": {}}])[0] == ["setting_differs:speculative_config.synthetic_acceptance_length"]
+
+
+def test_the_window_of_a_run_that_states_none_is_the_checkpoints_and_never_a_scaled_one(tmp_path):
+    import json as _json
+    def entry(name, cfg):
+        d = tmp_path / "models" / name
+        d.mkdir(parents=True)
+        if cfg is not None:
+            (d / "config.json").write_text(_json.dumps(cfg))
+    entry("plain", {"max_position_embeddings": 196608, "rope_scaling": None})
+    entry("nested", {"text_config": {"max_position_embeddings": 32768}})
+    entry("scaled", {"max_position_embeddings": 32768, "rope_scaling": {"type": "yarn", "factor": 4.0}})
+    entry("bare", {"hidden_size": 8})
+    entry("noconfig", None)
+    assert pdm.model_window(tmp_path, "plain") == 196608
+    assert pdm.model_window(tmp_path, "nested") == 32768
+    # A scaled window depends on the scaling vLLM applies; it is not read here, so the engine still refuses the scenario.
+    assert pdm.model_window(tmp_path, "scaled") is None
+    assert pdm.model_window(tmp_path, "bare") is None
+    assert pdm.model_window(tmp_path, "noconfig") is None
