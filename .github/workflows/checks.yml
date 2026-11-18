@@ -23,19 +23,25 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# A newer commit supersedes an in-flight run on the same ref — no stacking of fast checks.
+# A newer commit supersedes an in-flight run on the same ref — no stacking of fast checks. An edit of
+# the title or body (not the base) has its own group and runs no job: every job is skipped and its name
+# ends in " (edit)", so the checks of the last push keep their names and results, and a body edit costs
+# no CI run (the pattern of blis-substrate's ci-light.yml).
 concurrency:
-  group: checks-${{ github.workflow }}-${{ github.ref }}
+  group: checks-${{ github.workflow }}-${{ github.ref }}${{ github.event.action == 'edited' && !github.event.changes.base && '-edit' || '' }}
   cancel-in-progress: true
 
 jobs:
   # Decides which jobs this run needs, from the files the pull request changes (see the header).
   changes:
+    name: "changes${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
+    if: ${{ github.event.action != 'edited' || github.event.changes.base }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -72,8 +78,9 @@ jobs:
 
   # Fails when a test file is in no shard (and not in the simulator job or the listed exceptions), or in two.
   partition:
+    name: "partition${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
     needs: changes
-    if: needs.changes.outputs.orchestrator == 'true'
+    if: ${{ (github.event.action != 'edited' || github.event.changes.base) && (needs.changes.outputs.orchestrator == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -82,9 +89,9 @@ jobs:
 
   # The Python suite, in parallel shards. Each shard runs every one of its commands and reports all failures.
   shard:
-    name: orchestrator-shard (${{ matrix.shard }})
+    name: "orchestrator-shard (${{ matrix.shard }})${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
     needs: changes
-    if: needs.changes.outputs.orchestrator == 'true'
+    if: ${{ (github.event.action != 'edited' || github.event.changes.base) && (needs.changes.outputs.orchestrator == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -108,8 +115,9 @@ jobs:
 
   # The required check `orchestrator`: passes when the shards and the partition guard passed, or when none was needed.
   orchestrator:
+    name: "orchestrator${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
     needs: [changes, partition, shard]
-    if: ${{ always() }}
+    if: ${{ (github.event.action != 'edited' || github.event.changes.base) && (always()) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -130,8 +138,9 @@ jobs:
   # SIM_REF (a commit or a release tag); the Go release is read from that checkout's go.mod. The built
   # binary is cached by SIM_REF, so the build runs once per pin, not once per run.
   simulator:
+    name: "simulator${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
     needs: changes
-    if: needs.changes.outputs.simulator == 'true'
+    if: ${{ (github.event.action != 'edited' || github.event.changes.base) && (needs.changes.outputs.simulator == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -224,8 +233,9 @@ jobs:
 
   # The web steps after `npm ci` each run even when an earlier one failed, so one run shows every failure.
   web:
+    name: "web${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
     needs: changes
-    if: needs.changes.outputs.web == 'true'
+    if: ${{ (github.event.action != 'edited' || github.event.changes.base) && (needs.changes.outputs.web == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -284,6 +294,8 @@ jobs:
 
   # Not conditional: it takes seconds and scans paths of every job's inputs.
   grep-clean:
+    name: "grep-clean${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
+    if: ${{ github.event.action != 'edited' || github.event.changes.base }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -310,8 +322,9 @@ jobs:
   # have been skipped; so a job that silently did not run cannot pass. (The required checks today are
   # `orchestrator`, `grep-clean` and `web`; this job is the single check to require instead.)
   gate:
+    name: "gate${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
     needs: [changes, partition, orchestrator, simulator, web, grep-clean]
-    if: ${{ always() }}
+    if: ${{ (github.event.action != 'edited' || github.event.changes.base) && (always()) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
