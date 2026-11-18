@@ -366,6 +366,13 @@ TRANSLATIONS = {
         "SGLang's --cuda-graph-max-bs capped the decode CUDA graph's batch size; v0.5.14 split the cap by phase and kept the "
         "old flag as a deprecated alias of --cuda-graph-max-bs-decode (server_args.py at v0.5.14: new_flag="
         "\"--cuda-graph-max-bs-decode\"), and v0.5.23 removed the alias; the prefill cap is its own field"),
+    "mamba_scheduler_strategy": (
+        "mamba_radix_cache_strategy", lambda v: {"auto": "no_buffer"}.get(v, v), lambda v: v in ("auto", "no_buffer", "extra_buffer"),
+        "SGLang v0.5.12 and v0.5.13 named the strategy of the mamba radix cache --mamba-scheduler-strategy (auto, no_buffer, "
+        "extra_buffer) and resolved auto to no_buffer (server_args.py at v0.5.13: `if self.mamba_scheduler_strategy == \"auto\": "
+        "self.mamba_scheduler_strategy = \"no_buffer\"`); v0.5.14 renamed the field mamba_radix_cache_strategy, kept the old flag as "
+        "a deprecated alias (DeprecatedAliasStoreAction) and made auto choose extra_buffer under overlap scheduling, so an old "
+        "auto is stated as the no_buffer the run resolved it to"),
 }
 
 

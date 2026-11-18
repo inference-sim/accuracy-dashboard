@@ -454,6 +454,29 @@ def test_a_flag_an_earlier_release_had_is_read_as_the_field_that_replaced_it_and
         shutil.rmtree(tmp)
 
 
+def test_the_mamba_strategy_flag_of_an_earlier_release_is_read_as_the_field_that_replaced_it_with_its_old_auto_resolved():
+    # v0.5.13 resolved --mamba-scheduler-strategy auto to no_buffer; v0.5.14's auto can choose extra_buffer, so an old auto is
+    # stated as the no_buffer the run got. A value that is already a strategy keeps its meaning.
+    for given, stated in (("auto", "no_buffer"), ("extra_buffer", "extra_buffer")):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            fields = [{**_field(f.name, f.status, f.source)} for f in FIELDS.fields.values()] + [
+                _field("mamba_radix_cache_strategy", "modelled")]
+            fields.sort(key=lambda f: (f["name"], f["source"]))
+            entry, env = _setup(tmp, command=COMMAND + f" --mamba-scheduler-strategy {given}")
+            env.sglang = sc.EngineKit("sglang", RELEASE, fl.parse(json.dumps(
+                {"kind": "FieldList", "engine": {"kind": "sglang", "version": RELEASE}, "fields": fields}).encode()), "f" * 64,
+                ss.load_declarations())
+            o, work = _score(tmp, entry, env)
+            assert o.fidelity is not None, o.reasons
+            sub = next(s for s in o.fidelity["substitutions"] if s["subject"] == "mamba_scheduler_strategy")
+            assert sub["kind"] == "resolved_differs" and f"mamba_radix_cache_strategy={stated}" in sub["detail"]
+            dep = list(yaml.safe_load_all(next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()))[1]
+            assert dep["pools"][0]["engine"]["mamba_radix_cache_strategy"] == stated
+        finally:
+            shutil.rmtree(tmp)
+
+
 def _config(tmp, cfg):
     d = tmp / "catalog" / "models" / "m"
     d.mkdir(parents=True, exist_ok=True)
