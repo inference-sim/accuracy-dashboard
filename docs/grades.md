@@ -79,6 +79,7 @@ The list is closed (design §11.4). The scorer's own reason codes map onto it (`
 | `field_not_in_release` | The run set a field the engine release does not list. | Add the field to the release's fields.json, or score the point on a release that lists it. |
 | `value_conflict` | Two sources of one stage record different values for a field (launch configuration against the logged arguments, or a launch node size against the runners table). | Correct the source; the harness never picks one. |
 | `build_unparseable` | The run's image and log banner name no engine build at all. The scorer emits no such reason today: a build it cannot resolve is G4 (nightly or custom). | Not applicable until the scorer tells an unnamed build from a nightly one. |
+| `measurement_contaminated` | A vLLM single-turn point's server log holds a different number of client requests than its client sent (12 x concurrency: 10 x concurrency measured, 2 x concurrency warm-up). Another run's client shared the server, so the measured latencies are not the labelled scenario's. The subject names both counts. | Re-measure the point on a server of its own. Nothing to model. |
 
 ### Named `topology_unsupported` subjects (prefill/decode)
 
@@ -126,6 +127,7 @@ The scorer's reasons and the G5 reason each becomes:
 | `engine_unsupported` | `engine_unsupported` |
 | `code_not_visible` | `code_not_visible` |
 | `build_unparseable` | `build_unparseable` |
+| `measurement_contaminated` | `measurement_contaminated` |
 | `field_not_in_release` | `field_not_in_release` |
 | `field_not_modelled` | `field_not_modelled` |
 | `field_unclassified` | `field_unclassified` |

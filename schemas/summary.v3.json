@@ -1529,7 +1529,8 @@
             "not_in_catalog",
             "field_not_in_release",
             "value_conflict",
-            "build_unparseable"
+            "build_unparseable",
+            "measurement_contaminated"
           ]
         },
         "subject": {
