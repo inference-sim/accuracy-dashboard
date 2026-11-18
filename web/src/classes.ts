@@ -36,7 +36,14 @@ export interface ClassEntry {
   accuracy_by_grade: Record<string, Partial<Record<ClassStat, ClassFigure>>>
   refusals: { code: string; subject: string; points: number }[]
   substitutions: { kind: string; subject: string; detail: string; points: number }[]
-  engines?: { engine: string; points: number; graded: number; grades: Record<string, number> }[]
+  engines?: { engine: string; points: number; graded: number; grades: Record<string, number>; note?: string }[]
+  /** The partition the class's points were scored on (configiq: train and validation; the test partition is withheld). */
+  partition?: string
+  /** A statistic not shown as an accuracy figure, with the sentence shown instead (stat -> reason). */
+  figure_notes?: Partial<Record<ClassStat, string>>
+  /** One plain line that stands for the rows that are not scored; the card then lists no refusal. */
+  plain_line?: string
+  by_model?: { model: string; scored: number; gap: string | null; accuracy: Partial<Record<ClassStat, ClassFigure>> }[]
   itl_streamed_in_chunks_left_out?: number
   provenance: { command: string; heads: Record<string, unknown>; pulled_at: string; derived_at?: string; dataset?: string; split?: string }
 }
@@ -75,9 +82,19 @@ export function kindTag(kind: ClassKind): string | null {
   return null
 }
 
-/** The statistics a class reports, in column order: ITL only when some grade has a figure for it. */
+/** The statistics a class reports, in column order: a statistic only when some grade has a figure for it (configiq has no TTFT figure; most classes have no ITL). */
 export function statsOf(c: ClassEntry): ClassStat[] {
-  const out: ClassStat[] = ['ttft', 'tpot']
-  if (Object.values(c.accuracy_by_grade).some((g) => g.itl)) out.push('itl')
-  return out
+  return (['ttft', 'tpot', 'itl'] as ClassStat[]).filter((s) => Object.values(c.accuracy_by_grade).some((g) => g[s]))
+}
+
+/** The Classes tab fetches classes.json only when it is open, once, and only in a browser: not while a document or an error is already held. */
+export function shouldFetchClasses(view: string, doc: ClassesDoc | null, error: string | null, inBrowser: boolean): boolean {
+  return view === 'classes' && doc == null && error == null && inBrowser
+}
+
+/** Fetch and validate classes.json. A non-OK answer or an invalid file throws a message the tab shows as it is. */
+export async function fetchClasses(fetcher: typeof fetch = fetch, url: string = CLASSES_URL): Promise<ClassesDoc> {
+  const r = await fetcher(url, { cache: 'no-cache' })
+  if (!r.ok) throw new ClassesLoadError(`${url} answered ${r.status}: the classes are not published for this site yet`)
+  return validateClasses(await r.json())
 }

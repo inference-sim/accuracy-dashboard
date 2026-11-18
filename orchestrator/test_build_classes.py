@@ -77,10 +77,10 @@ def _configiq_dir(tmp_path, n_train=10, n_test=4):
     br = {"provisional_grades": {"G3": n_train}, "grades": {"G5": 1}}
     (d / "summary.json").write_text(json.dumps({"coverage": cov, "by_source": br,
                                                 "provenance": {"dataset": {"revision": "rev"}, "split": {"name": "dev"}}}))
-    recs = [{"status": "scored", "split": "train", "grade": "G3", "substitutions": [SUB],
-             "errors_pct": {"ttft_mean": 100.0, "itl_mean": -10.0, "tpot_median": 5.0}} for _ in range(n_train)]
+    recs = [{"status": "scored", "split": "train", "grade": "G3", "model": "m/a" if i < 7 else "m/b", "substitutions": [SUB],
+             "errors_pct": {"ttft_mean": 100.0, "itl_mean": -10.0, "tpot_median": 5.0}} for i in range(n_train)]
     # test-split points are never simulated, but if one were present it must not move any figure
-    recs += [{"status": "scored", "split": "test", "grade": "G3", "errors_pct": {"ttft_mean": 9999.0, "itl_mean": 9999.0, "tpot_median": 9999.0}}
+    recs += [{"status": "scored", "split": "test", "grade": "G3", "model": "m/a", "errors_pct": {"ttft_mean": 9999.0, "itl_mean": 9999.0, "tpot_median": 9999.0}}
              for _ in range(n_test)]
     jl(d / "configiq-points.jsonl", recs)
     return d
@@ -93,8 +93,47 @@ def test_configiq_class_uses_its_own_statistics_and_excludes_the_test_split(tmp_
     acc = c["accuracy_by_grade"]["G3"]
     assert (acc["ttft"]["mape"], acc["itl"]["mape"], acc["tpot"]["mape"]) == (100.0, 10.0, 5.0)
     assert acc["itl"]["signed_median"] == -10.0
-    assert c["refusals"] == [{"code": "field_not_in_release", "subject": "engine.max_model_len", "points": 1}]
     assert bc.check(_doc(_regular(), c)) == []
+
+
+def test_configiq_card_withholds_the_named_figure_and_lists_no_refusal(tmp_path):
+    """The card is the rows, the rows scored, the partition and one plain line: no refusal is listed, and a withheld statistic is
+    absent as a number and present as its reason (a rule fixed on the data's clarity)."""
+    c = bc.derive_configiq(_configiq_dir(tmp_path), cid="configiq", label="L", note="N", meta=META,
+                           withheld_figures={"ttft": "awaits the definition"}, plain_line="the rest wait",
+                           model_gaps={"m/b": "ours"})
+    assert c["refusals"] == []
+    assert set(c["accuracy_by_grade"]["G3"]) == {"tpot", "itl"}
+    assert c["figure_notes"] == {"ttft": "awaits the definition"}
+    assert c["plain_line"] == "the rest wait" and "test partition" in c["partition"]
+    assert c["counts"]["scored"] == 10 and c["counts"]["points"] == 16
+    by = {m["model"]: m for m in c["by_model"]}
+    assert (by["m/a"]["scored"], by["m/b"]["scored"]) == (7, 3)  # the withheld test rows are in neither
+    assert by["m/b"]["gap"] == "ours" and by["m/a"]["gap"] is None
+    assert "ttft" not in by["m/a"]["accuracy"] and by["m/a"]["accuracy"]["itl"]["mape"] == bc.TOO_FEW  # 7 points: under the minimum
+    assert not any("ttft" in json.dumps(g) for g in c["accuracy_by_grade"].values())
+
+
+def test_refusals_naming_other_hardware_are_one_row_and_keep_their_count(tmp_path):
+    d = contract(tmp_path, [1.0] * 10)
+    rows = [{"g5_reason": {"code": "field_not_modelled", "subject": s}} for s in
+            ["env.ROCM_QUICK_REDUCE_QUANTIZATION"] * 3 + ["enable_aiter_allreduce_fusion"] * 2 + ["moe_runner_backend"] * 4]
+    jl(d / "not_scored.jsonl", rows)
+    c = derive(d)
+    assert c["counts"]["refused"] == 9
+    assert c["refusals"] == [{"code": "field_not_modelled", "subject": bc.OTHER_SETTINGS, "points": 5},
+                             {"code": "field_not_modelled", "subject": "moe_runner_backend", "points": 4}]
+    assert "ROCM" not in json.dumps(c) and "aiter" not in json.dumps(c)
+
+
+def test_the_regular_card_says_its_sglang_points_are_not_the_sglang_cards(tmp_path):
+    before = _build(tmp_path)
+    assert all("note" not in e for e in before["classes"][0]["engines"])  # no SGLang class: nothing to point at
+    (tmp_path / "supp" / "sglang.json").write_text(json.dumps({**derive(contract(tmp_path, [1.0] * 12)), "id": "sglang", "kind": "regular"}))
+    after = bc.build(tmp_path / "summary.json", tmp_path / "supp", "t")
+    notes = {e["engine"]: e.get("note") for e in after["classes"][0]["engines"]}
+    assert notes["vllm"] is None and "not added here" in notes["sglang"]
+    assert after["classes"][0]["counts"] == before["classes"][0]["counts"]  # the SGLang class changes none of the regular counts
 
 
 def _regular(points=100, graded=40):

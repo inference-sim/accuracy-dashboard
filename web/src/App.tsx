@@ -14,7 +14,7 @@ import { Dropdown } from './components/Dropdown'
 import { Compare } from './components/Compare'
 import { Headline } from './components/Headline'
 import { Classes } from './components/Classes'
-import { CLASSES_URL, validateClasses, type ClassesDoc } from './classes'
+import { fetchClasses, shouldFetchClasses, type ClassesDoc } from './classes'
 import { Term } from './components/Term'
 import { GRADE_LABELS, inGrade } from './gradeFilter'
 import { formatCount } from './format'
@@ -73,14 +73,10 @@ export function App({
 
   // The classes page's data loads when its tab opens (the Overview never needs it), once, from the same site as the summary.
   useEffect(() => {
-    if (route.view !== 'classes' || classesDoc || classesFail || !hasWindow) return
+    if (!shouldFetchClasses(route.view, classesDoc, classesFail, hasWindow)) return
     let live = true
-    fetch(CLASSES_URL, { cache: 'no-cache' })
-      .then((r) => {
-        if (!r.ok) throw new Error(`${CLASSES_URL} answered ${r.status}: the classes are not published for this site yet`)
-        return r.json()
-      })
-      .then((raw) => live && setClassesDoc(validateClasses(raw)))
+    fetchClasses()
+      .then((doc) => live && setClassesDoc(doc))
       .catch((e: Error) => live && setClassesFail(e.message))
     return () => {
       live = false

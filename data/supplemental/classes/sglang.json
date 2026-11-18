@@ -88,7 +88,7 @@
  "itl_streamed_in_chunks_left_out": 9,
  "kind": "regular",
  "label": "InferenceX, SGLang (final census)",
- "note": "InferenceX SGLang points the final census scored: 242 train and validation points that have server logs, of 268. Scored by the same harness as the regular run and not yet in the nightly's summary, where SGLang points are still refused. No earlier release was run on these points, so there is no baseline. TTFT is the weak figure here. ITL covers only the points whose measured ITL is one token per chunk.",
+ "note": "InferenceX SGLang points the final census scored (train and validation points that have server logs). Scored by the same harness as the regular run; the nightly's summary does not score SGLang points yet, so this is a separate run, not added to the regular card's counts. No earlier release was run on these points, so there is no baseline. ITL covers only the points whose measured ITL is one token per chunk.",
  "provenance": {
   "command": "orchestrator/ingest/cli.py score of the SGLang units of the final census (train and validation only), then orchestrator/build_classes.py derive-contract --kind regular --itl-json --pull-manifest",
   "derived_at": "2026-11-18",
@@ -143,19 +143,14 @@
    "subject": "ep_size"
   },
   {
+   "code": "field_not_modelled",
+   "points": 8,
+   "subject": "other settings"
+  },
+  {
    "code": "value_not_recorded",
    "points": 7,
    "subject": ""
-  },
-  {
-   "code": "field_not_modelled",
-   "points": 5,
-   "subject": "env.ROCM_QUICK_REDUCE_QUANTIZATION"
-  },
-  {
-   "code": "field_not_modelled",
-   "points": 3,
-   "subject": "enable_aiter_allreduce_fusion"
   }
  ],
  "substitutions": [

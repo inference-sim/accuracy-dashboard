@@ -10,11 +10,6 @@
     "mape": "too few points",
     "n": 0,
     "signed_median": "too few points"
-   },
-   "ttft": {
-    "mape": "too few points",
-    "n": 0,
-    "signed_median": "too few points"
    }
   },
   "G2": {
@@ -27,362 +22,382 @@
     "mape": "too few points",
     "n": 0,
     "signed_median": "too few points"
-   },
-   "ttft": {
-    "mape": "too few points",
-    "n": 0,
-    "signed_median": "too few points"
    }
   },
   "G3": {
    "itl": {
-    "mape": 18.21010754848103,
+    "mape": 16.879705992765974,
     "n": 15,
-    "signed_median": -15.120324294155015
+    "signed_median": -16.24163214208431
    },
    "tpot": {
-    "mape": 16.57318513137907,
+    "mape": 15.279751409268412,
     "n": 15,
-    "signed_median": -12.88801067421907
-   },
-   "ttft": {
-    "mape": 119.58538693861694,
-    "n": 15,
-    "signed_median": 96.17863905944736
+    "signed_median": -14.341182681453796
    }
   },
   "G4": {
    "itl": {
-    "mape": 20.964755508669597,
-    "n": 120,
-    "signed_median": -13.42742215125879
+    "mape": 24.50896870358393,
+    "n": 183,
+    "signed_median": -0.8113671740497289
    },
    "tpot": {
-    "mape": 21.841868721807955,
-    "n": 120,
-    "signed_median": -6.843208158297811
-   },
-   "ttft": {
-    "mape": 194.91628750693735,
-    "n": 120,
-    "signed_median": 101.3977945295974
+    "mape": 24.83557023345457,
+    "n": 183,
+    "signed_median": 1.8923980344400955
    }
   }
  },
+ "by_model": [
+  {
+   "accuracy": {
+    "itl": {
+     "mape": 19.966074540619108,
+     "n": 135,
+     "signed_median": -14.975496926541265
+    },
+    "tpot": {
+     "mape": 20.593874061651913,
+     "n": 135,
+     "signed_median": -10.263496287832448
+    }
+   },
+   "gap": null,
+   "model": "openai/gpt-oss-120b",
+   "scored": 135
+  },
+  {
+   "accuracy": {
+    "itl": {
+     "mape": 56.835065628182555,
+     "n": 27,
+     "signed_median": 42.99504910004917
+    },
+    "tpot": {
+     "mape": 54.84002691338479,
+     "n": 27,
+     "signed_median": 46.11508451052547
+    }
+   },
+   "gap": "model-side gap in our simulator: this model's error is larger than the others'",
+   "model": "google/gemma-4-31B-it",
+   "scored": 27
+  },
+  {
+   "accuracy": {
+    "itl": {
+     "mape": 12.551828975896106,
+     "n": 20,
+     "signed_median": 6.024584250637638
+    },
+    "tpot": {
+     "mape": 17.380943215882915,
+     "n": 20,
+     "signed_median": 10.961198378076773
+    }
+   },
+   "gap": null,
+   "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
+   "scored": 20
+  },
+  {
+   "accuracy": {
+    "itl": {
+     "mape": 16.083340511557353,
+     "n": 16,
+     "signed_median": -19.67039766823421
+    },
+    "tpot": {
+     "mape": 10.352064659947267,
+     "n": 16,
+     "signed_median": -8.056202692445876
+    }
+   },
+   "gap": null,
+   "model": "deepseek-ai/DeepSeek-V4-Pro",
+   "scored": 16
+  }
+ ],
  "counts": {
-  "failed": 5,
+  "failed": 0,
   "points": 1702,
-  "refused": 1517,
-  "scored": 135,
-  "withheld": 45
+  "refused": 1460,
+  "scored": 198,
+  "withheld": 44
+ },
+ "figure_notes": {
+  "ttft": "first-token time awaits the team's definition"
  },
  "grades": {
   "G1": 0,
   "G2": 0,
   "G3": 15,
-  "G4": 120,
-  "G5": 1517
+  "G4": 183,
+  "G5": 1460
  },
  "id": "configiq",
- "interim": true,
+ "interim": false,
  "kind": "provisional",
  "label": "Red Hat configiq (scored by simulation)",
- "note": "Red Hat's configiq dataset (CC BY 4.0), aggregates of GuideLLM runs scored by simulation: a unit is simulated as a closed loop at its recorded concurrency and request count, with the substitutions named on each point. Provisional: launcher-consistent rows only, capped at G3, outside the regular headline. TTFT and ITL are GuideLLM's means; ITL is the per-request time per output token after the first (the InferenceX harness calls it TPOT); GuideLLM's own TPOT counts the first token and records no mean, so its median stands for it. Only the development split's train and validation points are simulated; the test split is withheld. Mean TTFT is biased high for reasons not yet explained.",
+ "note": "Red Hat's configiq dataset (CC BY 4.0), scored by simulation: each row is simulated as a closed loop at its recorded concurrency and request count, with the substitutions named below. Train and validation rows are simulated; the test partition is withheld. Provisional: graded no better than G3 and outside the headline. TPOT is GuideLLM's median (it counts the first token) and ITL its mean (the per-request time per output token after the first). First-token time (TTFT) is not shown as an accuracy figure, because its definition (client-side delay) is unconfirmed; that was decided on the clarity of the data, before any error was looked at, and nothing else is hidden.",
+ "partition": "train and validation rows are simulated; the test partition is withheld",
+ "plain_line": "The remaining rows wait on dataset clarifications from the configiq team.",
  "provenance": {
-  "command": "orchestrator/ingest/score_configiq.py (reg2 run; inference-sim v0.18.0, blis-substrate v0.15.0 catalog), then orchestrator/build_classes.py derive-configiq",
+  "command": "orchestrator/ingest/score_configiq.py over the dataset's rows in the final census (train and validation), then orchestrator/build_classes.py derive-configiq",
   "dataset": "21cc6eb06b1934485a83b17a93e634ef38b5799e",
   "derived_at": "2026-11-18",
   "heads": {
-   "dataset_revision": "21cc6eb06b1934485a83b17a93e634ef38b5799e",
-   "harness": "17b3493529b3b90b27a619e9821ee17c47a60f7e",
-   "simulator": "v0.18.0",
-   "substrate": "v0.15.0"
+   "blis-substrate": "fa28d5116739dc582efdb7694acf15a294cdc62b",
+   "blis-vllm": "b764039ea50ab1dc2e48c986bc7bba38adbeefb8",
+   "census_run": "20261118-071926-subset0",
+   "harness": "5916de4c43b2c61fb04b961d84a91d7cc2da8c5c",
+   "inference-sim": "3d3f9e34f3a4e53406af8503e49cb4afe6446bf4"
   },
   "pulled_at": "2026-11-16",
   "split": "development"
  },
- "refusals": [
-  {
-   "code": "value_not_recorded",
-   "points": 571,
-   "subject": "launch: vLLM-X predates the launcher's history (2026-06-02) or is not one it could have run"
-  },
-  {
-   "code": "chip_not_modelled",
-   "points": 417,
-   "subject": "MI355X (inference-sim/blis-substrate#210)"
-  },
-  {
-   "code": "value_not_recorded",
-   "points": 110,
-   "subject": "workload: multi-turn sessions with a shared prefix (N turns): the think time and each turn's lengths are not recorded"
-  },
-  {
-   "code": "value_not_recorded",
-   "points": 94,
-   "subject": "launch: no preset of the launcher names model RedHatAI/gemma-4-26B-A4B-it"
-  },
-  {
-   "code": "value_not_recorded",
-   "points": 78,
-   "subject": "engine block_size: the row does not record it and the simulator cannot choose it for this model and chip (https://github.com/inference-sim/blis-vllm/issues/68)"
-  },
-  {
-   "code": "value_not_recorded",
-   "points": 31,
-   "subject": "launch: vLLM-X was published after the last preset of nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8 that matches the row"
-  },
-  {
-   "code": "chip_not_modelled",
-   "points": 28,
-   "subject": "MI300X (inference-sim/blis-substrate#210)"
-  },
-  {
-   "code": "value_not_recorded",
-   "points": 23,
-   "subject": "launch: gpu_memory_utilization V is not what any preset of openai/gpt-oss-120b at tp 1 passes"
-  },
-  {
-   "code": "value_not_recorded",
-   "points": 23,
-   "subject": "launch: no preset of google/gemma-4-31B-it sets tensor parallel size N"
-  },
-  {
-   "code": "value_not_recorded",
-   "points": 21,
-   "subject": "launch: no preset of openai/gpt-oss-120b sets tensor parallel size N"
-  },
-  {
-   "code": "value_not_recorded",
-   "points": 20,
-   "subject": "launch: precision V is not what any preset of nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8 at tp 2 passes"
-  },
-  {
-   "code": "value_not_recorded",
-   "points": 18,
-   "subject": "launch: no preset of the launcher names model moonshotai/Kimi-K2.5"
-  },
-  {
-   "code": "field_not_in_release",
-   "points": 15,
-   "subject": "engine.max_model_len"
-  },
-  {
-   "code": "value_conflict",
-   "points": 15,
-   "subject": "repeat runs disagree on successful_requests"
-  },
-  {
-   "code": "value_not_recorded",
-   "points": 15,
-   "subject": "launch: vLLM-X was published after the last preset of deepseek-ai/DeepSeek-V4-Pro that matches the row"
-  },
-  {
-   "code": "value_not_recorded",
-   "points": 12,
-   "subject": "launch: max_seq_len V is not what any preset of nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8 at tp 2 passes"
-  },
-  {
-   "code": "value_not_recorded",
-   "points": 10,
-   "subject": "launch: kv_quantization V is not what any preset of google/gemma-4-31B-it at tp 1 passes"
-  },
-  {
-   "code": "value_not_recorded",
-   "points": 6,
-   "subject": "launch: kv_quantization V is not what any preset of nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8 at tp 4 passes"
-  },
-  {
-   "code": "value_not_recorded",
-   "points": 5,
-   "subject": "launch: max_seq_len V is not what any preset of deepseek-ai/DeepSeek-V4-Pro at tp 8 passes"
-  },
-  {
-   "code": "value_not_recorded",
-   "points": 5,
-   "subject": "launch: vLLM-X was published after the last preset of openai/gpt-oss-120b that matches the row"
-  }
- ],
+ "refusals": [],
  "substitutions": [
   {
-   "detail": "the GuideLLM release is not recorded; its definitions of the figures (configiq.METRICS) are those of the release at 3973120daa90fd50b52e08d1b6332772931cbdd3",
+   "detail": "",
    "kind": "client_difference",
-   "points": 135,
+   "points": 198,
    "subject": "client release"
   },
   {
-   "detail": "GuideLLM's stop rule, warm-up and measured window are not recorded: the simulation runs the recorded number of successful requests as one closed loop at the recorded concurrency, with no warm-up, and measures every request",
+   "detail": "",
    "kind": "client_difference",
-   "points": 135,
+   "points": 198,
    "subject": "frame"
   },
   {
-   "detail": "assumed",
+   "detail": "",
    "kind": "coefficient_method",
-   "points": 135,
+   "points": 198,
    "subject": "cost-model-attention/attention_decode_floor_mla"
   },
   {
-   "detail": "assumed",
+   "detail": "",
    "kind": "coefficient_method",
-   "points": 135,
+   "points": 198,
    "subject": "cost-model-host-overheads/host_admission_per_request"
   },
   {
-   "detail": "assumed",
+   "detail": "",
    "kind": "coefficient_method",
-   "points": 135,
+   "points": 198,
    "subject": "cost-model-host-overheads/host_admission_per_token"
   },
   {
-   "detail": "assumed",
+   "detail": "",
    "kind": "coefficient_method",
-   "points": 135,
+   "points": 198,
    "subject": "cost-model-host-overheads/host_completion"
   },
   {
-   "detail": "assumed",
+   "detail": "",
    "kind": "coefficient_method",
-   "points": 135,
+   "points": 198,
    "subject": "cost-model-host-overheads/host_launch_eager_per_layer"
   },
   {
-   "detail": "assumed",
+   "detail": "",
    "kind": "coefficient_method",
-   "points": 135,
+   "points": 198,
    "subject": "cost-model-host-overheads/host_launch_per_kernel"
   },
   {
-   "detail": "assumed",
+   "detail": "",
    "kind": "coefficient_method",
-   "points": 135,
+   "points": 198,
    "subject": "cost-model-host-overheads/host_output_token"
   },
   {
-   "detail": "assumed",
+   "detail": "",
    "kind": "coefficient_method",
-   "points": 135,
+   "points": 198,
    "subject": "cost-model-host-overheads/host_replay_graph_per_step"
   },
   {
-   "detail": "vendor_spec",
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 198,
+   "subject": "cost-model-memory/activation_scratch_floor_bytes"
+  },
+  {
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 198,
+   "subject": "cost-model-memory/cudagraph_capture_bytes_full_and_piecewise"
+  },
+  {
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 198,
+   "subject": "cost-model-primitives/engine_workspace_bytes"
+  },
+  {
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 198,
+   "subject": "cost-model-primitives/hbm_derate"
+  },
+  {
+   "detail": "",
+   "kind": "estimated",
+   "points": 198,
+   "subject": "cluster.gpus_per_node"
+  },
+  {
+   "detail": "",
+   "kind": "estimated",
+   "points": 198,
+   "subject": "engine flags the row leaves blank"
+  },
+  {
+   "detail": "",
+   "kind": "estimated",
+   "points": 198,
+   "subject": "engine.max_model_len"
+  },
+  {
+   "detail": "",
+   "kind": "provisional_blank_flags",
+   "points": 198,
+   "subject": "engine flags the row leaves blank"
+  },
+  {
+   "detail": "",
+   "kind": "provisional_frame",
+   "points": 198,
+   "subject": "frame"
+  },
+  {
+   "detail": "",
+   "kind": "provisional_parallelism",
+   "points": 198,
+   "subject": "parallelism"
+  },
+  {
+   "detail": "",
+   "kind": "unevaluated",
+   "points": 198,
+   "subject": "coefficient_range"
+  },
+  {
+   "detail": "",
+   "kind": "unevaluated",
+   "points": 198,
+   "subject": "kernel_hash"
+  },
+  {
+   "detail": "",
+   "kind": "unevaluated",
+   "points": 198,
+   "subject": "resolved_differs"
+  },
+  {
+   "detail": "",
+   "kind": "unevaluated",
+   "points": 198,
+   "subject": "value_class"
+  },
+  {
+   "detail": "",
+   "kind": "other_release",
+   "points": 183,
+   "subject": "engine release"
+  },
+  {
+   "detail": "",
+   "kind": "ported_functions_unpublished",
+   "points": 183,
+   "subject": "engine release"
+  },
+  {
+   "detail": "",
    "kind": "coefficient_method",
    "points": 135,
    "subject": "cost-model-memory/activation_buffer_count_moe_1rank"
   },
   {
-   "detail": "vendor_spec",
-   "kind": "coefficient_method",
-   "points": 135,
-   "subject": "cost-model-memory/activation_scratch_floor_bytes"
+   "detail": "",
+   "kind": "client_difference",
+   "points": 133,
+   "subject": "request lengths"
   },
   {
-   "detail": "assumed",
-   "kind": "coefficient_method",
-   "points": 135,
-   "subject": "cost-model-memory/cudagraph_capture_bytes_full_and_piecewise"
-  },
-  {
-   "detail": "vendor_spec",
-   "kind": "coefficient_method",
-   "points": 135,
-   "subject": "cost-model-primitives/engine_workspace_bytes"
-  },
-  {
-   "detail": "vendor_spec",
-   "kind": "coefficient_method",
-   "points": 135,
-   "subject": "cost-model-primitives/hbm_derate"
-  },
-  {
-   "detail": "the dataset records no node size; 8 GPUs, an HGX baseboard (the catalog's B200 comment names it the common chassis)",
-   "kind": "estimated",
-   "points": 135,
-   "subject": "cluster.gpus_per_node"
-  },
-  {
-   "detail": "max_num_seqs, max_seq_len, chunked_prefill_enabled, kv_quantization not recorded: for a launcher-consistent row the preset passed none, and the engine resolves them itself (openshift-psap/forge projects/rhaiis/orchestration/config.d/rhaiis.yaml engines.vllm.args, from b61e356becaaa72727dda419f768ee17e1f0e0be to 5bdf971139c235c26ed1a09b9c8015161037ad3f: gpu-memory-utilization 0.92, trust-remote-code, no-enable-log-requests, no-enable-prefix-caching unless a preset enables it, uvicorn-log-level debug)",
-   "kind": "estimated",
-   "points": 135,
-   "subject": "engine flags the row leaves blank"
-  },
-  {
-   "detail": "the row leaves max_seq_len blank, so the launch passed no --max-model-len and vLLM serves the checkpoint's own length: 131072, from the catalog entry's config.json by _get_and_verify_max_len at v0.33.0 (the tokenizer config is not read)",
-   "kind": "estimated",
-   "points": 135,
-   "subject": "engine.max_model_len"
-  },
-  {
-   "detail": "a blank parsed engine column means the preset did not pass that flag (forge-consistent rows only); openshift-psap/forge projects/rhaiis/orchestration/config.d/models.yaml, all 17 commits from 117e2386a31f14c6d00f7fc6da74a2426940216e to 5f6603b77c558d68e965a87ca127169c077ae163; openshift-psap/forge projects/rhaiis/orchestration/config.d/rhaiis.yaml engines.vllm.args, from b61e356becaaa72727dda419f768ee17e1f0e0be to 5bdf971139c235c26ed1a09b9c8015161037ad3f: gpu-memory-utilization 0.92, trust-remote-code, no-enable-log-requests, no-enable-prefix-caching unless a preset enables it, uvicorn-log-level debug",
-   "kind": "provisional_blank_flags",
-   "points": 135,
-   "subject": "engine flags the row leaves blank"
-  },
-  {
-   "detail": "stop rule, warm-up, measured window and client release unknown; the dataset drops them",
-   "kind": "provisional_frame",
-   "points": 135,
-   "subject": "frame"
-  },
-  {
-   "detail": "no data or expert parallelism: no preset of the model sets either, in openshift-psap/forge projects/rhaiis/orchestration/config.d/models.yaml, all 17 commits from 117e2386a31f14c6d00f7fc6da74a2426940216e to 5f6603b77c558d68e965a87ca127169c077ae163",
-   "kind": "provisional_parallelism",
-   "points": 135,
-   "subject": "parallelism"
-  },
-  {
-   "detail": "coefficient_range is unevaluated",
-   "kind": "unevaluated",
-   "points": 135,
-   "subject": "coefficient_range"
-  },
-  {
-   "detail": "kernel_hash is unevaluated",
-   "kind": "unevaluated",
-   "points": 135,
-   "subject": "kernel_hash"
-  },
-  {
-   "detail": "resolved_differs is unevaluated",
-   "kind": "unevaluated",
-   "points": 135,
-   "subject": "resolved_differs"
-  },
-  {
-   "detail": "value_class is unevaluated",
-   "kind": "unevaluated",
-   "points": 135,
-   "subject": "value_class"
-  },
-  {
-   "detail": "3 requests errored in the run and are not simulated; the 452 successful ones are",
+   "detail": "",
    "kind": "client_difference",
    "points": 127,
    "subject": "errored requests"
   },
   {
-   "detail": "0.26.0, scored on 0.33.0",
-   "kind": "other_release",
-   "points": 120,
-   "subject": "engine release"
-  },
-  {
-   "detail": "ported-function list not published",
-   "kind": "ported_functions_unpublished",
-   "points": 120,
-   "subject": "engine release"
-  },
-  {
-   "detail": "the run's prompt and output lengths varied (prompt mean 9074.96 p99 26041, output mean 519.695 p99 2373) and the dataset keeps no distribution; every simulated request has the recorded mean",
-   "kind": "client_difference",
-   "points": 70,
-   "subject": "request lengths"
-  },
-  {
-   "detail": "assumed",
+   "detail": "",
    "kind": "coefficient_method",
-   "points": 30,
+   "points": 93,
    "subject": "cost-model-primitives/host_gather_rate_uva"
+  },
+  {
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 27,
+   "subject": "cost-model-memory/activation_buffer_count_dense_1rank"
+  },
+  {
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 20,
+   "subject": "cost-model-primitives/gemm_eps_max_fp8_grouped_triton"
+  },
+  {
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 20,
+   "subject": "cost-model-primitives/gemm_floor_fp8_grouped_triton"
+  },
+  {
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 20,
+   "subject": "cost-model-primitives/gemm_m_half_fp8_grouped_triton"
+  },
+  {
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 16,
+   "subject": "cost-model-memory/activation_buffer_count_moe_8rank"
+  },
+  {
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 16,
+   "subject": "cost-model-primitives/nccl_communicator_bytes_8rank"
+  },
+  {
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 15,
+   "subject": "cost-model-memory/activation_buffer_count_moe_2rank"
+  },
+  {
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 15,
+   "subject": "cost-model-primitives/nccl_communicator_bytes_2rank"
+  },
+  {
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 5,
+   "subject": "cost-model-memory/activation_buffer_count_moe_4rank"
+  },
+  {
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 5,
+   "subject": "cost-model-primitives/nccl_communicator_bytes_4rank"
   }
  ]
 }

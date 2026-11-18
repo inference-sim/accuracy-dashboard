@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import statistics
 import sys
 from collections import Counter
@@ -49,6 +50,19 @@ SUPPLEMENTAL_ORDER = ("sglang", "inferencex-reconstructed", "configiq")
 
 class ClassesError(ValueError):
     pass
+
+
+# Refusal subjects that name another vendor's hardware settings are counted under one row, not listed by name: the dashboard says nothing
+# about hardware that is not delivered. The points stay in the refused count.
+_OTHER_HARDWARE = re.compile(r"amd|mi\d{3}|rocm|aiter|hip_|gfx\d", re.I)
+OTHER_SETTINGS = "other settings"
+
+
+def _refusal_rows(counter: Counter) -> list[dict]:
+    folded: Counter = Counter()
+    for (code, subject), n in counter.items():
+        folded[(code, OTHER_SETTINGS if _OTHER_HARDWARE.search(subject) else subject)] += n
+    return [{"code": c, "subject": sub, "points": n} for (c, sub), n in sorted(folded.items(), key=lambda kv: (-kv[1], kv[0]))]
 
 
 def _figure(errors: list[float]) -> dict:
@@ -130,42 +144,62 @@ def derive_contract(directory: Path, *, cid: str, label: str, note: str, kind: s
                        "withheld": 0},
             "grades": {g: grades.get(g, 0) for g in GRADES},
             "accuracy_by_grade": figures, **extra,
-            "refusals": [{"code": c, "subject": s, "points": n} for (c, s), n in sorted(refusals.items(), key=lambda kv: (-kv[1], kv[0]))],
+            "refusals": _refusal_rows(refusals),
             "substitutions": sorted(subs.values(), key=lambda e: (-e["points"], e["kind"], e["subject"])),
             "provenance": meta}
 
 
-def derive_configiq(directory: Path, *, cid: str, label: str, note: str, meta: dict, interim: bool = False) -> dict:
+def derive_configiq(directory: Path, *, cid: str, label: str, note: str, meta: dict, interim: bool = False,
+                    withheld_figures: dict | None = None, plain_line: str | None = None, model_gaps: dict | None = None) -> dict:
     """The configiq class from a score_configiq output directory (summary.json, configiq-points.jsonl). Errors are by grade over the
-    scored train and validation points; the test split is withheld and never appears."""
+    scored train and validation points; the test split is withheld and never appears.
+
+    The card shows the dataset's rows, the rows scored and the partition, and one plain line (plain_line) for the rest: no refusal is
+    listed. A statistic named in withheld_figures (stat -> why) is not reported as an accuracy figure and its reason is shown instead;
+    which statistics those are is a rule fixed on the data's clarity, never on an error. model_gaps (model -> text) labels a model
+    whose larger error is the simulator's, not the data's. Substitutions are named by kind and subject with their point counts."""
     directory = Path(directory)
+    withheld_figures = withheld_figures or {}
+    model_gaps = model_gaps or {}
+    stats = tuple(s for s in STATS if s not in withheld_figures)
     doc = json.loads((directory / "summary.json").read_text())
     cov, br = doc["coverage"], doc["by_source"]
     recs = _lines(directory / "configiq-points.jsonl")
-    err = {g: {s: [] for s in STATS} for g in GRADED}
+    err = {g: {s: [] for s in stats} for g in GRADED}
+    by_model: dict = {}
     subs: dict = {}
     for r in recs:
         if r.get("status") != "scored" or r.get("split") == "test" or r.get("grade") not in err:
             continue
-        for s in STATS:
+        m = by_model.setdefault(r["model"], {s: [] for s in stats})
+        for s in stats:
             e = (r.get("errors_pct") or {}).get(CONFIGIQ_STAT[s])
             if e is not None:
                 err[r["grade"]][s].append(e)
+                m[s].append(e)
         for sub in r.get("substitutions", []):
             k = (sub["kind"], sub["subject"])
-            e = subs.setdefault(k, {"kind": sub["kind"], "subject": sub["subject"], "detail": sub.get("detail", ""), "points": 0})
+            e = subs.setdefault(k, {"kind": sub["kind"], "subject": sub["subject"], "detail": "", "points": 0})
             e["points"] += 1
     grades = {g: br["provisional_grades"].get(g, 0) for g in GRADED}
     grades["G5"] = br["grades"]["G5"]
-    return {"id": cid, "label": label, "kind": "provisional", "interim": interim, "note": note,
-            "counts": {"points": cov["points"], "scored": cov["scored"], "refused": cov["refused"], "failed": cov["failed"],
-                       "withheld": cov["withheld"]},
-            "grades": grades,
-            "accuracy_by_grade": {g: {s: _figure(err[g][s]) for s in STATS} for g in GRADED},
-            "refusals": [{"code": k.split(": ", 1)[0], "subject": k.split(": ", 1)[1] if ": " in k else "", "points": n}
-                         for k, n in sorted(cov["refusals_by_reason"].items(), key=lambda kv: (-kv[1], kv[0]))],
-            "substitutions": sorted(subs.values(), key=lambda e: (-e["points"], e["kind"], e["subject"])),
-            "provenance": {**meta, "dataset": doc["provenance"]["dataset"]["revision"], "split": doc["provenance"]["split"]["name"]}}
+    models = [{"model": name, "scored": len(next(iter(v.values()))), "gap": model_gaps.get(name),
+               "accuracy": {s: _figure(v[s]) for s in stats}} for name, v in by_model.items()]
+    models.sort(key=lambda m: (-m["scored"], m["model"]))
+    out = {"id": cid, "label": label, "kind": "provisional", "interim": interim, "note": note,
+           "counts": {"points": cov["points"], "scored": cov["scored"], "refused": cov["refused"], "failed": cov["failed"],
+                      "withheld": cov["withheld"]},
+           "partition": "train and validation rows are simulated; the test partition is withheld",
+           "grades": grades,
+           "accuracy_by_grade": {g: {s: _figure(err[g][s]) for s in stats} for g in GRADED},
+           "by_model": models,
+           "figure_notes": dict(withheld_figures),
+           "refusals": [],
+           "substitutions": sorted(subs.values(), key=lambda e: (-e["points"], e["kind"], e["subject"])),
+           "provenance": {**meta, "dataset": doc["provenance"]["dataset"]["revision"], "split": doc["provenance"]["split"]["name"]}}
+    if plain_line:
+        out["plain_line"] = plain_line
+    return out
 
 
 # ---------------------------------------------------------------------------------------------- build
@@ -181,8 +215,8 @@ def regular_class(summary: dict) -> dict:
     engines = [{"engine": k, "points": v["points"], "graded": v["graded"], "grades": v["grades"]}
                for k, v in sorted(cov["by_engine"].items())]
     return {"id": "inferencex", "label": "InferenceX, regular recipes", "kind": "regular", "interim": False,
-            "note": "The summary's own run: every point whose launch the run recorded, vLLM and SGLang, graded G1 to G4 by the harness. "
-                    "SGLang points appear here as they are scored; a framework with no graded point is shown with its refusals.",
+            "note": "The nightly's summary: every point whose launch the run recorded, graded G1 to G4 by the harness. A framework with no "
+                    "graded point is shown with its points and refusals.",
             "counts": {"points": cov["points"], "scored": cov["graded"], "refused": cov["not_scored"], "failed": cov["failed"], "withheld": 0},
             "grades": {g: cov["by_grade"][g] for g in GRADES},
             "accuracy_by_grade": acc,
@@ -202,6 +236,12 @@ def build(summary_path: Path, supplemental: Path, generated_at: str) -> dict:
     for cid in SUPPLEMENTAL_ORDER:
         if cid in files:
             classes.append(json.loads(files[cid].read_text()))
+    if any(c["id"] == "sglang" for c in classes):
+        # The final census scored SGLang points in its own run; the summary does not score them yet. The two are different runs over
+        # partly the same points, so the SGLang card is never added to this card's counts.
+        for e in classes[0].get("engines", []):
+            if e["engine"] == "sglang":
+                e["note"] = "Not scored in this run. The final census scored SGLang points in its own run, shown in the SGLang card and not added here."
     doc = {"format": FORMAT, "generated_at": generated_at, "snapshot_id": summary.get("snapshot_id"), "classes": classes}
     problems = check(doc)
     if problems:
@@ -271,6 +311,11 @@ def main(argv=None) -> int:
         p.add_argument("--meta", required=True)
         p.add_argument("--out", required=True)
         p.add_argument("--interim", action="store_true")
+        if name == "derive-configiq":
+            p.add_argument("--withhold-figure", action="append", default=[], metavar="STAT=REASON",
+                           help="a statistic not reported as an accuracy figure, with the sentence shown instead")
+            p.add_argument("--plain-line", default=None)
+            p.add_argument("--model-gap", action="append", default=[], metavar="MODEL=TEXT")
         if name == "derive-contract":
             p.add_argument("--kind", default="reconstructed", choices=KINDS)
             p.add_argument("--itl-json", default=None, help="the run's simulated ITL per point (itl.json)")
@@ -289,7 +334,9 @@ def main(argv=None) -> int:
                                  itl_json=a.itl_json, manifest=a.pull_manifest)
             Path(a.out).write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n")
         elif a.cmd == "derive-configiq":
-            doc = derive_configiq(Path(a.dir), cid=a.id, label=a.label, note=a.note, meta=_meta(a.meta), interim=a.interim)
+            doc = derive_configiq(Path(a.dir), cid=a.id, label=a.label, note=a.note, meta=_meta(a.meta), interim=a.interim,
+                                  withheld_figures=dict(x.split("=", 1) for x in a.withhold_figure), plain_line=a.plain_line,
+                                  model_gaps=dict(x.split("=", 1) for x in a.model_gap))
             Path(a.out).write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n")
         elif a.cmd == "build":
             summary = json.loads(Path(a.summary).read_text())

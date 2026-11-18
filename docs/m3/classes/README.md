@@ -1,6 +1,6 @@
 # The classes page
 
-The dashboard counts four classes of points apart. A point is in exactly one class, and no class is added into another's counts.
+The dashboard counts four classes of points apart. No class is added into another's counts. The classes come from different scoring runs: the regular class is the nightly's summary, the others are the final census's runs, and the SGLang class's points overlap in part with the SGLang points the summary lists as not scored. The regular card says so beside its SGLang row.
 
 | Class | What it is | Grades | Where its numbers come from |
 |---|---|---|---|
@@ -28,5 +28,6 @@ python3 orchestrator/build_classes.py check data/latest/classes.json
 ## What each figure means
 
 * Accuracy by grade is the mean absolute percent error (MAPE) and the signed median error of the simulator's TTFT and TPOT against the measurement, over the graded points of that grade. A figure over fewer than 10 points reads "too few points" (COV-11).
-* configiq reports GuideLLM's statistics: TTFT and ITL are means; ITL is the per-request time per output token after the first, which the InferenceX harness calls TPOT. GuideLLM's own TPOT counts the first token and records no mean, so its median stands for it. Only the development split's train and validation points are simulated; the test split is withheld.
-* configiq's mean TTFT is biased high; the cause is not yet explained, and the page says so rather than offering one.
+* configiq's card shows the rows in the dataset, the rows scored and the partition (train and validation are simulated; the test partition is withheld), and one plain line for the rows that are not scored. It lists no refusal. Its accuracy is TPOT (GuideLLM's median, which counts the first token) and ITL (its mean: the per-request time per output token after the first), by grade and by model. A model whose error is larger because of the simulator, not the data, is labelled as such.
+* configiq's first-token time (TTFT) is not shown as an accuracy figure, because its definition (client-side delay) is unconfirmed. That rule was fixed on the clarity of the data, before any error was looked at; the class's `figure_notes` says it and nothing else is hidden.
+* A refusal whose setting belongs to hardware that is not delivered is counted under "other settings"; its points stay in the refused count.

@@ -51,17 +51,21 @@ function ClassCard({ c }: { c: ClassEntry }) {
         <div className="stat">
           <div className="stat-value">{formatCount(n.scored)}</div>
           <div className="stat-label">scored</div>
-          <div className="stat-hint">of {formatCount(n.points)} points</div>
+          <div className="stat-hint">{`of ${formatCount(n.points)} ${c.plain_line ? 'rows in the dataset' : 'points'}`}</div>
         </div>
-        <div className="stat">
-          <div className="stat-value">{formatCount(n.refused)}</div>
-          <div className="stat-label">refused, by name</div>
-          <div className="stat-hint">
-            {formatCount(n.failed)} failed
-            {n.withheld ? ` · ${formatCount(n.withheld)} withheld (test split)` : ''}
+        {c.plain_line ? null : (
+          <div className="stat">
+            <div className="stat-value">{formatCount(n.refused)}</div>
+            <div className="stat-label">refused, by name</div>
+            <div className="stat-hint">
+              {formatCount(n.failed)} failed
+              {n.withheld ? ` · ${formatCount(n.withheld)} withheld (test split)` : ''}
+            </div>
           </div>
-        </div>
+        )}
       </div>
+      {c.partition ? <p className="context">{`Partition: ${c.partition}.`}</p> : null}
+      {c.plain_line ? <p className="context">{c.plain_line}</p> : null}
       <table className="grades" aria-label={`${c.label}: points and accuracy by grade`}>
         <thead>
           <tr>
@@ -94,6 +98,38 @@ function ClassCard({ c }: { c: ClassEntry }) {
           ))}
         </tbody>
       </table>
+      {Object.entries(c.figure_notes ?? {}).map(([stat, why]) => (
+        <p className="context" key={stat}>
+          {`${STAT_LABEL[stat as ClassStat]}: ${why}.`}
+        </p>
+      ))}
+      {c.by_model && c.by_model.length > 0 ? (
+        <table className="readout classmodels" aria-label={`${c.label}: accuracy by model`}>
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Scored</th>
+              {stats.map((s) => (
+                <th key={s}>{STAT_LABEL[s]} error</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {c.by_model.map((m) => (
+              <tr key={m.model}>
+                <td style={{ whiteSpace: 'normal' }}>
+                  {m.model}
+                  {m.gap ? <span className="stat-hint">{` · ${m.gap}`}</span> : null}
+                </td>
+                <td className="num">{formatCount(m.scored)}</td>
+                {stats.map((s) => (
+                  <FigureCell key={s} f={m.accuracy[s]} />
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : null}
       {c.itl_streamed_in_chunks_left_out ? (
         <p className="context">
           ITL compares one token per chunk; {formatCount(c.itl_streamed_in_chunks_left_out)} scored points streamed several tokens per
@@ -107,6 +143,7 @@ function ClassCard({ c }: { c: ClassEntry }) {
               <th>Framework</th>
               <th>Points</th>
               <th>Graded</th>
+              <th>Note</th>
             </tr>
           </thead>
           <tbody>
@@ -115,6 +152,7 @@ function ClassCard({ c }: { c: ClassEntry }) {
                 <td>{e.engine}</td>
                 <td className="num">{formatCount(e.points)}</td>
                 <td className="num">{formatCount(e.graded)}</td>
+                <td style={{ whiteSpace: 'normal' }}>{e.note ?? ''}</td>
               </tr>
             ))}
           </tbody>

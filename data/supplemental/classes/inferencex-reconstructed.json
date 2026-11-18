@@ -38,196 +38,205 @@
   },
   "G4": {
    "tpot": {
-    "mape": 15.06959035088943,
-    "n": 213,
-    "signed_median": 5.465600679934546
+    "mape": 13.17898730351958,
+    "n": 157,
+    "signed_median": 2.9803635095303362
    },
    "ttft": {
-    "mape": 22.282888346421753,
-    "n": 213,
-    "signed_median": 9.079665435452519
+    "mape": 21.49014624798791,
+    "n": 157,
+    "signed_median": 3.222096987288401
    }
   }
  },
  "counts": {
   "failed": 0,
   "points": 213,
-  "refused": 0,
-  "scored": 213,
+  "refused": 56,
+  "scored": 157,
   "withheld": 0
  },
  "grades": {
   "G1": 0,
   "G2": 0,
   "G3": 0,
-  "G4": 213,
-  "G5": 0
+  "G4": 157,
+  "G5": 56
  },
  "id": "inferencex-reconstructed",
- "interim": true,
+ "interim": false,
  "kind": "reconstructed",
  "label": "InferenceX, reconstructed recipe, G4",
- "note": "InferenceX points of Llama-3.3-70B (benchmark_run ids are InferenceX workflow runs) whose launch the run did not record: the recipe was reconstructed from the model's published configuration. Scored by the same harness, graded G4 at best with the substitutions below, and kept apart from the regular counts.",
+ "note": "InferenceX points of Llama-3.3-70B (benchmark_run ids are InferenceX workflow runs) whose launch the run did not record: the recipe was reconstructed from the benchmark scripts of the day. Scored by the same harness, graded G4 at best with the substitutions named below, and kept apart from the regular counts.",
  "provenance": {
-  "command": "orchestrator/build_classes.py derive-contract <contract> --kind reconstructed (the contract: cli.py score of the Llama-3.3-70B reconstructed-recipe units, inference-sim v0.18.0 census run censussupp-20261118-012051-supplemental)",
+  "command": "orchestrator/ingest/cli.py score of the reconstructed-recipe units in the final census (train and validation), then orchestrator/build_classes.py derive-contract --kind reconstructed",
   "derived_at": "2026-11-18",
   "heads": {
-   "fields_sha256": "af0180f1952d0e5f9bc26fa7c872671a0cfd41df19a30bf6d04b1eb000e91a9b",
-   "harness": "c8b45466c323f647f700d7efc2c9936ef075e3dd",
+   "blis-substrate": "fa28d5116739dc582efdb7694acf15a294cdc62b",
+   "blis-vllm": "b764039ea50ab1dc2e48c986bc7bba38adbeefb8",
+   "census_run": "20261118-071926-subset0",
+   "harness": "5916de4c43b2c61fb04b961d84a91d7cc2da8c5c",
+   "inference-sim": "3d3f9e34f3a4e53406af8503e49cb4afe6446bf4",
    "pull_manifest_sha256": "d02d403437bdfb95d1416896416c244da7c7da9a949bd0996b0c70b6af11b133"
   },
   "pulled_at": "2026-11-16T18:26:39Z"
  },
- "refusals": [],
+ "refusals": [
+  {
+   "code": "field_not_modelled",
+   "points": 56,
+   "subject": "env.TORCH_CUDA_ARCH_LIST"
+  }
+ ],
  "substitutions": [
   {
    "detail": "job log expired; the client's flags are assumed to be the launcher's defaults",
    "kind": "client_difference",
-   "points": 213,
+   "points": 157,
    "subject": "client_flags"
   },
   {
    "detail": "the InferenceX commit of the run is not recorded",
    "kind": "client_difference",
-   "points": 213,
+   "points": 157,
    "subject": "client_release"
   },
   {
    "detail": "the run's completed and num_prompts counts are not in the pulled data; requests the client lost, which would leave a different population, are not ruled out",
    "kind": "client_difference",
-   "points": 213,
+   "points": 157,
    "subject": "failed_requests"
   },
   {
    "detail": "BLIS releases the next request at the previous one's completion plus the assumed completion overhead of 777 us; the real client's gap (usage chunk, [DONE], session exit, event-loop wake-up) is not measured",
    "kind": "client_difference",
-   "points": 213,
+   "points": 157,
    "subject": "send_gap"
   },
   {
    "detail": "sent prompt lengths not verified equal to the replayed targets: prompt-lengths.json holds no evidence for the point (no engine log, so no run date or client version; or a gated tokenizer)",
    "kind": "client_difference",
-   "points": 213,
+   "points": 157,
    "subject": "sent_prompt_lengths"
   },
   {
    "detail": "assumed",
    "kind": "coefficient_method",
-   "points": 213,
+   "points": 157,
    "subject": "cost-model-attention/attention_decode_floor_mla"
   },
   {
    "detail": "assumed",
    "kind": "coefficient_method",
-   "points": 213,
+   "points": 157,
    "subject": "cost-model-host-overheads/host_admission_per_request"
   },
   {
    "detail": "assumed",
    "kind": "coefficient_method",
-   "points": 213,
+   "points": 157,
    "subject": "cost-model-host-overheads/host_admission_per_token"
   },
   {
    "detail": "assumed",
    "kind": "coefficient_method",
-   "points": 213,
+   "points": 157,
    "subject": "cost-model-host-overheads/host_completion"
   },
   {
    "detail": "assumed",
    "kind": "coefficient_method",
-   "points": 213,
+   "points": 157,
    "subject": "cost-model-host-overheads/host_launch_eager_per_layer"
   },
   {
    "detail": "assumed",
    "kind": "coefficient_method",
-   "points": 213,
+   "points": 157,
    "subject": "cost-model-host-overheads/host_launch_per_kernel"
   },
   {
    "detail": "assumed",
    "kind": "coefficient_method",
-   "points": 213,
+   "points": 157,
    "subject": "cost-model-host-overheads/host_output_token"
   },
   {
    "detail": "assumed",
    "kind": "coefficient_method",
-   "points": 213,
+   "points": 157,
    "subject": "cost-model-host-overheads/host_replay_graph_per_step"
   },
   {
    "detail": "vendor_spec",
    "kind": "coefficient_method",
-   "points": 213,
+   "points": 157,
    "subject": "cost-model-memory/activation_scratch_floor_bytes"
   },
   {
    "detail": "vendor_spec",
    "kind": "coefficient_method",
-   "points": 213,
+   "points": 157,
    "subject": "cost-model-primitives/engine_workspace_bytes"
   },
   {
    "detail": "vendor_spec",
    "kind": "coefficient_method",
-   "points": 213,
+   "points": 157,
    "subject": "cost-model-primitives/hbm_derate"
   },
   {
    "detail": "the run set disable_log_requests=True; the modelled release has no such setting, and it is left out of the scenario: --disable-log-requests is not an argument of v0.33.0 (vllm/entrypoints/openai/cli_args.py, vllm/engine/arg_utils.py at v0.33.0 have no such field); it only switched per-request log lines off, which no price depends on",
    "kind": "estimated",
-   "points": 213,
+   "points": 157,
    "subject": "disable_log_requests"
   },
   {
    "detail": "0.10.2, scored on 0.33.0",
    "kind": "other_release",
-   "points": 213,
+   "points": 157,
    "subject": "engine release"
   },
   {
    "detail": "ported-function list not published",
    "kind": "ported_functions_unpublished",
-   "points": 213,
+   "points": 157,
    "subject": "engine release"
   },
   {
    "detail": "coefficient_range is unevaluated",
    "kind": "unevaluated",
-   "points": 213,
+   "points": 157,
    "subject": "coefficient_range"
   },
   {
    "detail": "kernel_hash is unevaluated",
    "kind": "unevaluated",
-   "points": 213,
+   "points": 157,
    "subject": "kernel_hash"
   },
   {
    "detail": "resolved_differs is unevaluated",
    "kind": "unevaluated",
-   "points": 213,
+   "points": 157,
    "subject": "resolved_differs"
   },
   {
    "detail": "1 is outside every value class the evidence covers",
    "kind": "value_class",
-   "points": 213,
+   "points": 157,
    "subject": "data_parallel_size"
   },
   {
    "detail": "8192 is outside every value class the evidence covers",
    "kind": "value_class",
-   "points": 213,
+   "points": 157,
    "subject": "max_num_batched_tokens"
   },
   {
    "detail": "1 is outside every value class the evidence covers",
    "kind": "value_class",
-   "points": 213,
+   "points": 157,
    "subject": "pipeline_parallel_size"
   },
   {
@@ -291,55 +300,7 @@
    "subject": "compilation_config.pass_config.enable_noop"
   },
   {
-   "detail": "assumed",
-   "kind": "coefficient_method",
-   "points": 97,
-   "subject": "cost-model-memory/cudagraph_capture_bytes_full_and_piecewise"
-  },
-  {
-   "detail": "assumed",
-   "kind": "coefficient_method",
-   "points": 97,
-   "subject": "cost-model-primitives/host_gather_rate_uva"
-  },
-  {
-   "detail": "9416 is outside every value class the evidence covers",
-   "kind": "value_class",
-   "points": 74,
-   "subject": "max_model_len"
-  },
-  {
-   "detail": "vendor_spec",
-   "kind": "coefficient_method",
-   "points": 60,
-   "subject": "cost-model-memory/activation_buffer_count_dense_4rank"
-  },
-  {
-   "detail": "vendor_spec",
-   "kind": "coefficient_method",
-   "points": 60,
-   "subject": "cost-model-memory/activation_buffer_count_dense_8rank"
-  },
-  {
-   "detail": "vendor_spec",
-   "kind": "coefficient_method",
-   "points": 60,
-   "subject": "cost-model-primitives/nccl_communicator_bytes_4rank"
-  },
-  {
-   "detail": "vendor_spec",
-   "kind": "coefficient_method",
-   "points": 60,
-   "subject": "cost-model-primitives/nccl_communicator_bytes_8rank"
-  },
-  {
-   "detail": "8 is outside every value class the evidence covers",
-   "kind": "value_class",
-   "points": 60,
-   "subject": "tensor_parallel_size"
-  },
-  {
-   "detail": "the run set env.TORCH_CUDA_ARCH_LIST='10.0'; the modelled release has no such setting, and it is left out of the scenario: vLLM v0.33.0 never reads it while serving (grep of vllm/ at v0.33.0: only vllm/collect_env.py, a diagnostic)",
+   "detail": "left unset; the engine resolves the upstream default",
    "kind": "estimated",
    "points": 58,
    "subject": "env.TORCH_CUDA_ARCH_LIST"
@@ -347,32 +308,68 @@
   {
    "detail": "vendor_spec",
    "kind": "coefficient_method",
-   "points": 56,
-   "subject": "cost-model-memory/activation_buffer_count_dense_2rank"
+   "points": 45,
+   "subject": "cost-model-memory/activation_buffer_count_dense_4rank"
   },
   {
    "detail": "vendor_spec",
    "kind": "coefficient_method",
-   "points": 56,
-   "subject": "cost-model-primitives/nccl_communicator_bytes_2rank"
+   "points": 45,
+   "subject": "cost-model-memory/activation_buffer_count_dense_8rank"
   },
   {
-   "detail": "the run set env.TORCH_CUDA_ARCH_LIST='9.0'; the modelled release has no such setting, and it is left out of the scenario: vLLM v0.33.0 never reads it while serving (grep of vllm/ at v0.33.0: only vllm/collect_env.py, a diagnostic)",
-   "kind": "estimated",
-   "points": 56,
-   "subject": "env.TORCH_CUDA_ARCH_LIST"
+   "detail": "vendor_spec",
+   "kind": "coefficient_method",
+   "points": 45,
+   "subject": "cost-model-primitives/nccl_communicator_bytes_4rank"
   },
   {
-   "detail": "2 is outside every value class the evidence covers",
+   "detail": "vendor_spec",
+   "kind": "coefficient_method",
+   "points": 45,
+   "subject": "cost-model-primitives/nccl_communicator_bytes_8rank"
+  },
+  {
+   "detail": "8 is outside every value class the evidence covers",
    "kind": "value_class",
-   "points": 56,
+   "points": 45,
    "subject": "tensor_parallel_size"
+  },
+  {
+   "detail": "vendor_spec",
+   "kind": "coefficient_method",
+   "points": 41,
+   "subject": "cost-model-memory/activation_buffer_count_dense_2rank"
+  },
+  {
+   "detail": "assumed",
+   "kind": "coefficient_method",
+   "points": 41,
+   "subject": "cost-model-memory/cudagraph_capture_bytes_full_and_piecewise"
+  },
+  {
+   "detail": "assumed",
+   "kind": "coefficient_method",
+   "points": 41,
+   "subject": "cost-model-primitives/host_gather_rate_uva"
+  },
+  {
+   "detail": "vendor_spec",
+   "kind": "coefficient_method",
+   "points": 41,
+   "subject": "cost-model-primitives/nccl_communicator_bytes_2rank"
   },
   {
    "detail": "10240 is outside every value class the evidence covers",
    "kind": "value_class",
    "points": 41,
    "subject": "max_model_len"
+  },
+  {
+   "detail": "2 is outside every value class the evidence covers",
+   "kind": "value_class",
+   "points": 41,
+   "subject": "tensor_parallel_size"
   },
   {
    "detail": "recipe reconstructed from InferenceX scripts at c198b20ebe3b69d1f30da0a6df4c13b842a39538; the run's own recipe is gone; vLLM v0.10.2 modelled as 0.33.0 (script benchmarks/70b_fp8_b200_docker.sh, image vllm/vllm-openai:v0.10.2); sizes the script leaves at vLLM's default, stated: pipeline-parallel-size=1, data-parallel-size=1; the runner's own environment is not stated (NCCL_GRAPH_REGISTER=0, TORCH_CUDA_ARCH_LIST=10.0): no server log shows it, so a run with a log does not state it either",
@@ -387,34 +384,34 @@
    "subject": "engine.recipe"
   },
   {
-   "detail": "recipe reconstructed from InferenceX scripts at c198b20ebe3b69d1f30da0a6df4c13b842a39538; the run's own recipe is gone; vLLM v0.10.2 modelled as 0.33.0 (script benchmarks/70b_fp8_h200_slurm.sh, image vllm/vllm-openai:v0.10.2); sizes the script leaves at vLLM's default, stated: pipeline-parallel-size=1, data-parallel-size=1",
-   "kind": "estimated",
-   "points": 38,
-   "subject": "engine.recipe"
-  },
-  {
    "detail": "9216 is outside every value class the evidence covers",
    "kind": "value_class",
    "points": 38,
    "subject": "max_model_len"
   },
   {
-   "detail": "vendor_spec",
-   "kind": "coefficient_method",
-   "points": 37,
-   "subject": "cost-model-memory/activation_buffer_count_dense_1rank"
-  },
-  {
-   "detail": "1 is outside every value class the evidence covers",
+   "detail": "9416 is outside every value class the evidence covers",
    "kind": "value_class",
-   "points": 37,
-   "subject": "tensor_parallel_size"
+   "points": 38,
+   "subject": "max_model_len"
   },
   {
    "detail": "recipe reconstructed from InferenceX scripts at c198b20ebe3b69d1f30da0a6df4c13b842a39538; the run's own recipe is gone; vLLM v0.10.2 modelled as 0.33.0 (script benchmarks/70b_fp8_h100_docker.sh, image vllm/vllm-openai:v0.10.2); sizes the script leaves at vLLM's default, stated: pipeline-parallel-size=1, data-parallel-size=1; the runner's own environment is not stated (TORCH_CUDA_ARCH_LIST=9.0): no server log shows it, so a run with a log does not state it either",
    "kind": "estimated",
    "points": 28,
    "subject": "engine.recipe"
+  },
+  {
+   "detail": "vendor_spec",
+   "kind": "coefficient_method",
+   "points": 26,
+   "subject": "cost-model-memory/activation_buffer_count_dense_1rank"
+  },
+  {
+   "detail": "1 is outside every value class the evidence covers",
+   "kind": "value_class",
+   "points": 26,
+   "subject": "tensor_parallel_size"
   },
   {
    "detail": "recipe reconstructed from InferenceX scripts at ac1998a504dff8f944cef2c05925fb1edac48382; the run's own recipe is gone; vLLM v0.10.2 modelled as 0.33.0 (script benchmarks/70b_fp8_b200_docker.sh, image vllm/vllm-openai:v0.10.2); sizes the script leaves at vLLM's default, stated: pipeline-parallel-size=1, data-parallel-size=1; the runner's own environment is not stated (NCCL_GRAPH_REGISTER=0, TORCH_CUDA_ARCH_LIST=10.0): no server log shows it, so a run with a log does not state it either",
@@ -426,12 +423,6 @@
    "detail": "recipe reconstructed from InferenceX scripts at ac1998a504dff8f944cef2c05925fb1edac48382; the run's own recipe is gone; vLLM v0.10.2 modelled as 0.33.0 (script benchmarks/70b_fp4_b200_docker.sh, image vllm/vllm-openai:v0.10.2); sizes the script leaves at vLLM's default, stated: pipeline-parallel-size=1, data-parallel-size=1; the runner's own environment is not stated (NCCL_GRAPH_REGISTER=0, TORCH_CUDA_ARCH_LIST=10.0): no server log shows it, so a run with a log does not state it either",
    "kind": "estimated",
    "points": 19,
-   "subject": "engine.recipe"
-  },
-  {
-   "detail": "recipe reconstructed from InferenceX scripts at ac1998a504dff8f944cef2c05925fb1edac48382; the run's own recipe is gone; vLLM v0.10.2 modelled as 0.33.0 (script benchmarks/70b_fp8_h200_slurm.sh, image vllm/vllm-openai:v0.10.2); sizes the script leaves at vLLM's default, stated: pipeline-parallel-size=1, data-parallel-size=1",
-   "kind": "estimated",
-   "points": 18,
    "subject": "engine.recipe"
   },
   {
