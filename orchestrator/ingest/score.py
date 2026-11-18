@@ -875,12 +875,16 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     o.subs = recovery + list(c.substitutions)
     for name in entry.get("omit_unread") or []:
         # The model never reads this setting (the simulator said so for this point once): the release default the run
-        # recorded is not stated, and the point says so (X19).
-        if OMITTABLE[name] in c.mapped:
-            del c.mapped[OMITTABLE[name]]
+        # recorded is not stated, and the point says so with the recorded value and the line that shows it (X19).
+        loc = OMITTABLE[name]
+        if loc in c.mapped:
+            path, value = c.mapped.pop(loc)
+            c.args[:] = [x for x in c.args if x.get("arg") != path and x.get("blis_field") != loc]
             o.subs.append({"kind": "resolved_differs", "subject": name,
-                           "detail": f"the run's release defaults {name} to a value this model never reads (the simulator "
-                                     f"refuses a stated one); it is not stated, and the model's own handling stands"})
+                           "detail": f"the run's engine recorded {path}={value!r} (its release's default, which this model never "
+                                     f"reads); the scenario does not state it, because the simulator refuses a stated value for "
+                                     f"a model with no indexer cache (blis-vllm compat/kernelmodel/kvlayers.go, kvLayersOf, "
+                                     f"issue #84: \"read only for MiniMax-M3's indexer cache\")"})
     o.reasons += row_vs_run(row, c)
 
     o.g1_inputs = {"requested": st.requested_values(c.settings),

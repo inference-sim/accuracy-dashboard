@@ -1302,3 +1302,48 @@ def test_a_primed_point_scored_on_a_simulator_without_trace_phases_replays_the_p
         assert "--concurrent-sessions" in argv
     finally:
         shutil.rmtree(tmp)
+
+
+REFUSES_INDEXER = """#!/usr/bin/env python3
+import os, sys
+a = sys.argv[1:]
+if a and a[0] == "replay":
+    text = open(os.path.join(a[a.index("--scenarios") + 1], a[a.index("--scenario") + 1])).read()
+    if "indexer_kv_dtype" in text:
+        sys.stderr.write('level=fatal msg="scenario \\\\"x.yaml\\\\": indexer_kv_dtype=\\\\"bf16\\\\" is read only for MiniMax-M3\\'s indexer cache, '
+                         'and this model has none, so a stated value would be dropped"\\n')
+        sys.exit(1)
+os.execv({real!r}, [{real!r}] + a)
+"""
+
+
+def test_a_stated_release_default_the_model_never_reads_is_left_out_and_named_not_a_failure():
+    # Kimi K2.5 has no indexer cache; the run's release default indexer_kv_dtype was copied into the scenario and the
+    # simulator refused it (accuracy-dashboard#126). The point is run again without it and says so.
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        log = LOG.replace("'gpu_memory_utilization': 0.9,", "'gpu_memory_utilization': 0.9, 'attention_config': {'indexer_kv_dtype': 'bf16'},")
+        entry, env = _setup(tmp, log=log)
+        doc = json.loads((HERE / "testdata" / "fields" / "fields.json").read_bytes())
+        for f in doc["fields"]:
+            if f["name"] == "enable_prefix_caching":
+                f["value_classes"] = {"type": "boolean", "covered": ["true", "false"]}      # vLLM's own names
+            if f["name"] == "attention_config.indexer_kv_dtype":
+                f.update(status="modelled", evidence={"traces": ["core/sched/testdata/golden/t.json"]}, estimation={"rule": "none"},
+                         value_classes={"type": "enumerated", "values": ["auto", "bf16"], "covered": ["auto", "bf16"]})
+        env.field_list = fl.parse(json.dumps(doc).encode())
+        real = env.blis
+        env.blis = _exe(tmp / "wrapped", REFUSES_INDEXER.format(real=real))
+        o, work = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        sub = next(s for s in o.fidelity["substitutions"] if s["subject"] == "indexer_kv_dtype")
+        assert sub["kind"] == "resolved_differs" and "never" in sub["detail"] and "bf16" in sub["detail"]
+        assert "kvlayers.go" in sub["detail"] and "issue #84" in sub["detail"]
+        assert all(a["arg"] != "attention_config.indexer_kv_dtype" for a in o.fidelity["args"])
+        scen = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
+        assert "indexer_kv_dtype" not in scen
+        # A refusal of anything else is still a refusal: the retry is for this one message only.
+        assert sc._UNREAD_VALUE.search('indexer_kv_dtype="bf16" is read only for MiniMax-M3\'s indexer cache, and this model has none')
+        assert not sc._UNREAD_VALUE.search('max_num_seqs="5" is not modelled')
+    finally:
+        shutil.rmtree(tmp)
