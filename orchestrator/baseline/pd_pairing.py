@@ -2,7 +2,7 @@
 """Pair the disaggregated cells of a pinned external end-to-end accuracy artifact with the InferenceX records
 that measured them (the P/D half of the matched comparison, #88; the aggregated half is matched.py).
 
-The artifact's extractor (blis-substrate kernel/scripts/extract_aisimulate_e2e.py) carries every prefill/decode
+The artifact's extractor (the e2e extractor under blis-substrate kernel/scripts) carries every prefill/decode
 topology whole, in the corpus's `disaggregated` list, with the measured and the estimator's absolute TTFT and TPOT
 in ms. A topology is the pair of pools of one InferenceX run; the artifact states only the total GPU count and a
 parallelism, so the pools come from the record.
