@@ -56,6 +56,14 @@ jobs:
           fetch-depth: 0
       - name: The table of which change runs which job holds its own samples
         run: python3 .github/ci/selftest.py
+      # Whitespace errors a pull request adds (extra blank lines at the end of a file, trailing
+      # spaces, a space before a tab): git's own check, over the same range the job picker reads.
+      - name: The change adds no whitespace errors
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: git diff --check "$BASE...$HEAD"
       - id: pick
         env:
           EVENT: ${{ github.event_name }}
