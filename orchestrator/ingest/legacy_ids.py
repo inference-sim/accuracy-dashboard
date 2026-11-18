@@ -98,6 +98,13 @@ def check(doc: dict, ids: set[str]) -> list[str]:
     return out
 
 
+def prune(doc: dict, ids: set[str]) -> dict:
+    """The map without the point ids no kept snapshot publishes any more. The nightly keeps the last few API snapshots and
+    drops the oldest; its v2 point ids leave with it, and the map must not keep them (check's second rule). No id is added:
+    a v3 snapshot's ids are ledger unit ids already."""
+    return {**doc, "points": {k: v for k, v in doc.get("points", {}).items() if k in ids}}
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -106,6 +113,9 @@ def main(argv=None) -> int:
     b.add_argument("--ledger", required=True)
     b.add_argument("--data", required=True)
     b.add_argument("--out", required=True)
+    pr = sub.add_parser("prune")
+    pr.add_argument("--map", required=True)
+    pr.add_argument("--data", required=True)
     k = sub.add_parser("check")
     k.add_argument("--map", required=True)
     k.add_argument("--data", required=True)
@@ -117,6 +127,12 @@ def main(argv=None) -> int:
         for e in doc["points"].values():
             reasons[e.get("reason", "mapped")] = reasons.get(e.get("reason", "mapped"), 0) + 1
         print(f"{len(doc['points'])} published point ids: {reasons}", file=sys.stderr)
+        return 0
+    if a.cmd == "prune":
+        doc = json.loads(Path(a.map).read_text())
+        out = prune(doc, published_ids(Path(a.data)))
+        Path(a.map).write_text(c.canonical_dumps(out) + "\n")
+        print(f"{len(doc.get('points', {})) - len(out['points'])} point ids no longer published removed", file=sys.stderr)
         return 0
     problems = check(json.loads(Path(a.map).read_text()), published_ids(Path(a.data)))
     for p in problems:

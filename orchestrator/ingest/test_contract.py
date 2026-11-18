@@ -417,7 +417,12 @@ def _summary_validator(version: int):
 
 
 def _published_v2() -> dict:
-    return json.loads((REPO / "data" / "latest" / "summary.json").read_text())
+    """The newest published v2 snapshot. data/latest moves to the newest schema (the 2026-11-17 night published v3), but a
+    published v2 snapshot never changes (COV-8), so the frozen schema is checked against the newest one kept."""
+    docs = [json.loads(f.read_text()) for f in sorted((REPO / "data" / "snapshots").glob("*/summary.json"))]
+    v2 = [d for d in docs if d.get("schema_version") == 2]
+    assert v2, "no published v2 snapshot is kept under data/snapshots"
+    return v2[-1]
 
 
 def _v3() -> dict:
@@ -438,6 +443,17 @@ def test_the_v2_schema_still_reads_the_published_snapshot_and_its_frozen_fidelit
     _first_point(doc)["fidelity"]["build"]["distance"] = "near"
     assert not v.is_valid(doc)
     assert not _summary_validator(2).is_valid(_v3())
+
+
+def test_a_night_that_prunes_a_v2_snapshot_prunes_its_ids_from_the_legacy_map_and_the_check_passes():
+    import legacy_ids as li
+    doc = {"kind": "LegacyPointIds", "ledger_revision": "r", "points": {"a" * 64: {"units": ["u"]}, "b" * 64: {"units": ["v"]}}}
+    kept = {"a" * 64}
+    assert li.check(doc, kept) == [f"{'b' * 12}: in the map, not published"]
+    pruned = li.prune(doc, kept)
+    assert li.check(pruned, kept) == [] and set(pruned["points"]) == kept and pruned["ledger_revision"] == "r"
+    # Pruning never adds an id: a published id the map lacks is still reported.
+    assert li.check(pruned, kept | {"c" * 64}) == [f"{'c' * 12}: published, not in the map"]
 
 
 def test_the_v2_fidelity_schema_is_byte_identical_to_the_one_main_published():
