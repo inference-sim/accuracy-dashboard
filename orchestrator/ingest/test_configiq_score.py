@@ -443,3 +443,19 @@ def test_a_hybrid_model_whose_cache_block_needs_the_window_is_a_named_g5_not_a_f
     _, outs, _ = run(tmp_path, {f"{F}:0": prow()}, config=False, fake=str(fake))
     (o,) = outs
     assert o.status == "refused" and o.g5[0]["code"] == "value_not_recorded" and "max_model_len" in o.g5[0]["subject"]
+
+
+def test_a_window_the_catalog_derived_into_the_graph_is_stated_when_no_config_file_is_committed(tmp_path):
+    pts, env = setup(tmp_path, {f"{F}:0": prow()}, config=False)
+    (env.catalog / "models" / "gpt-oss-120b" / "graph.yaml").write_text("global:\n  context_window: 262144\n")
+    o = cs.score_point(pts[0], env, tmp_path / "work")
+    assert o.status == "scored", (o.g5, o.faults)
+    argv = replays(env)[0]["argv"]
+    text = (Path(argv[argv.index("--scenarios") + 1]) / argv[argv.index("--scenario") + 1]).read_text()
+    assert "max_model_len: 262144" in text
+    sub = next(s for s in o.substitutions if s["subject"] == "engine.max_model_len")
+    assert "262144" in sub["detail"] and "global.context_window" in sub["detail"]
+    # A config file, where the catalog commits one, still wins.
+    assert cs.catalog_context(env.catalog, "gpt-oss-120b") == 262144
+    (env.catalog / "models" / "gpt-oss-120b" / "config.json").write_text(json.dumps({"max_position_embeddings": 131072}))
+    assert cs.catalog_context(env.catalog, "gpt-oss-120b") == 131072

@@ -311,10 +311,21 @@ def vllm_max_model_len(config: dict) -> int | None:
 
 
 def catalog_context(catalog_root, model: str) -> int | None:
-    """vllm_max_model_len of the catalog entry's config.json, or None where the entry commits none (a licence can keep the
-    file out of the catalog while its hash and the derived graph, which the simulator reads, are committed)."""
-    f = Path(catalog_root) / "models" / model / "config.json"
-    return vllm_max_model_len(json.loads(f.read_text())) if f.is_file() else None
+    """The max_model_len vLLM serves a catalog model at when the launch passes none. From the entry's config.json when it
+    commits one (vllm_max_model_len). Else from the derived graph's `global.context_window`, which the catalog writer derives
+    from the config's max_position_embeddings when a licence keeps config.json itself out (X12 allows derived values; the
+    writer refuses a config that scales its RoPE, so the value is vLLM's). None where neither exists."""
+    d = Path(catalog_root) / "models" / model
+    f = d / "config.json"
+    if f.is_file():
+        return vllm_max_model_len(json.loads(f.read_text()))
+    g = d / "graph.yaml"
+    if g.is_file():
+        import yaml
+        w = ((yaml.safe_load(g.read_text()) or {}).get("global") or {}).get("context_window")
+        if isinstance(w, int) and not isinstance(w, bool) and w > 0:
+            return w
+    return None
 
 
 def build(p: "cq.Point", *, model: str, chip: str, engine_release: str, packaging: dict,
@@ -333,8 +344,9 @@ def build(p: "cq.Point", *, model: str, chip: str, engine_release: str, packagin
     if context is not None and eng.get("max_model_len") == context and ident.get("max_seq_len") in (None, ""):
         subs.append({"kind": "estimated", "subject": "engine.max_model_len",
                      "detail": f"the row leaves max_seq_len blank, so the launch passed no --max-model-len and vLLM serves the "
-                               f"checkpoint's own length: {context}, from the catalog entry's config.json by "
-                               f"_get_and_verify_max_len at v0.33.0 (the tokenizer config is not read)"})
+                               f"checkpoint's own length: {context}, from the catalog entry (its config.json by "
+                               f"_get_and_verify_max_len at v0.33.0, the tokenizer config not read, or the graph's derived "
+                               f"global.context_window)"})
     if "max_model_len" not in eng:
         subs.append({"kind": "estimated", "subject": "engine.max_model_len",
                      "detail": "the row leaves max_seq_len blank and the catalog entry commits no config.json to derive vLLM's "
