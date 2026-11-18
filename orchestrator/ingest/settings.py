@@ -580,6 +580,8 @@ LOCATIONS = {
     "kv_transfer_config.kv_connector_extra_config.blocks_per_chunk": "offload.connector_options.blocks_per_chunk",
     "kv_transfer_config.kv_load_failure_policy": "offload.connector_options.kv_load_failure_policy",
     "speculative_config.synthetic_acceptance_length": "replay.acceptance_length",
+    # The API-server count has no key in the Scenario (blis-schemas states none); `blis replay` takes it as --api-server-count.
+    "api_server_count": "replay.api_server_count",
 }
 
 
@@ -985,6 +987,7 @@ class Built:
     scenario: dict = field(default_factory=dict)      # the Scenario document
     deployment: dict = field(default_factory=dict)    # the Deployment document
     acceptance_length: str | None = None              # --speculative-acceptance-length
+    api_server_count: str | None = None               # --api-server-count: the count the run stated
     gpus: int = 0
     reasons: list = field(default_factory=list)
     substitutions: list = field(default_factory=list)  # estimates of values the run did not record
@@ -1054,12 +1057,15 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
     acc = d.mapped.get("replay.acceptance_length")
     if acc is not None:
         b.acceptance_length = str(d.settings[acc[0]].value)
+    asc = d.mapped.get("replay.api_server_count")
+    if asc is not None:
+        b.api_server_count = str(d.settings[asc[0]].value)
     pool = {"role": "colocated", "nodes": 1, "parallel": {}, "engine": {}}
     dep = {"kind": "Deployment", "name": name, "pools": [pool]}
     offload = {}
     for loc, (path, value) in sorted(d.mapped.items()):
         top = loc.split(".")[0]
-        if loc == "replay.acceptance_length":
+        if loc in ("replay.acceptance_length", "replay.api_server_count"):
             continue
         if top == "offload":
             offload[loc] = (path, value)
