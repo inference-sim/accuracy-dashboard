@@ -558,6 +558,27 @@ def test_an_env_variable_no_sglang_release_reads_is_left_out_and_named():
     assert "SGLANG_ENABLE_FLASHINFER_GEMM" not in json.dumps(dep["pools"][0]["engine"])
 
 
+def test_a_json_text_stated_for_a_str_field_stays_the_text_the_engine_takes():
+    # --model-loader-extra-config '{"enable_multithread_load": true}': SGLang's field is a str holding JSON (its log prints
+    # model_loader_extra_config='{}'), so the scenario must carry the text; parsed into a map it is refused by the engine
+    # ("is not a string"), which refused 20 development points.
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        fields = [{**_field(f.name, f.status, f.source)} for f in FIELDS.fields.values()] + [
+            _field("model_loader_extra_config", "modelled")]
+        fields.sort(key=lambda f: (f["name"], f["source"]))
+        entry, env = _setup(tmp, command=COMMAND + " --model-loader-extra-config '{\"enable_multithread_load\": true}'")
+        env.sglang = sc.EngineKit("sglang", RELEASE, fl.parse(json.dumps(
+            {"kind": "FieldList", "engine": {"kind": "sglang", "version": RELEASE}, "fields": fields}).encode()), "f" * 64,
+            ss.load_declarations())
+        o, work = _score(tmp, entry, env)
+        assert o.fidelity is not None, o.reasons
+        dep = list(yaml.safe_load_all(next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()))[1]
+        assert dep["pools"][0]["engine"]["model_loader_extra_config"] == '{"enable_multithread_load": true}'
+    finally:
+        shutil.rmtree(tmp)
+
+
 def _config(tmp, cfg):
     d = tmp / "catalog" / "models" / "m"
     d.mkdir(parents=True, exist_ok=True)

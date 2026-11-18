@@ -163,6 +163,8 @@ def _coerce(value: str, kind: str):
         return pyrepr.Float(value)
     if k == "bool":
         return value.strip().lower() in ("1", "true", "yes")
+    if k == "str":
+        return value        # a JSON text in a str field (--model-loader-extra-config '{...}') stays the text SGLang takes
     if value[:1] in "{[":
         try:
             return json.loads(value)
