@@ -83,6 +83,7 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
         pytest("configiq points and coverage by source", "orchestrator/ingest/test_configiq.py",
                "orchestrator/ingest/test_by_source.py", "orchestrator/ingest/test_configiq_score.py"),
         pytest("An SGLang point's speculative method is read the way a row states it", "orchestrator/ingest/test_sglang_spec_method.py"),
+        pytest("A vLLM point whose server log holds another request count than its client sent is G5 measurement_contaminated", "orchestrator/ingest/test_contamination.py"),
         pytest("A prefill/decode SGLang point scored from its schema 2 recipe", "orchestrator/ingest/test_sglang_pd.py"),
     ],
     # The pytest-fixture suites: the nightly pipeline, the grades, the baseline tools.
