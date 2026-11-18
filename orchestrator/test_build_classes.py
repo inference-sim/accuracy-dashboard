@@ -60,7 +60,7 @@ def test_contract_class_counts_and_error_worked_by_hand(tmp_path):
     assert g4["mape"] == pytest.approx(sum(abs(e) for e in errors) / 11)
     assert g4["signed_median"] == pytest.approx(10)
     assert c["substitutions"] == [{**SUB, "points": 11}]
-    assert c["refusals"] == [{"code": "no_recipe", "subject": "x", "points": 3}]
+    assert c["refusals"] == [{"code": "no_recipe", "subject": bc.OTHER_SETTINGS, "points": 3}]  # a reason under the minimum is one row per code
     assert bc.check(_doc(_regular(), c)) == []
 
 
@@ -114,16 +114,16 @@ def test_configiq_card_withholds_the_named_figure_and_lists_no_refusal(tmp_path)
     assert not any("ttft" in json.dumps(g) for g in c["accuracy_by_grade"].values())
 
 
-def test_refusals_naming_other_hardware_are_one_row_and_keep_their_count(tmp_path):
+def test_one_off_refusal_reasons_are_one_row_per_code_and_keep_their_count(tmp_path):
     d = contract(tmp_path, [1.0] * 10)
-    rows = [{"g5_reason": {"code": "field_not_modelled", "subject": s}} for s in
-            ["env.ROCM_QUICK_REDUCE_QUANTIZATION"] * 3 + ["enable_aiter_allreduce_fusion"] * 2 + ["moe_runner_backend"] * 4]
-    jl(d / "not_scored.jsonl", rows)
+    reasons = [("field_not_modelled", "vendor_specific_kernel_setting")] * 3 + [("field_not_modelled", "another_one_off_flag")] * 2 \
+        + [("field_not_modelled", "moe_runner_backend")] * bc.MIN_NAMED_POINTS + [("value_not_recorded", "launch_command")] * 2
+    jl(d / "not_scored.jsonl", [{"g5_reason": {"code": c, "subject": s}} for c, s in reasons])
     c = derive(d)
-    assert c["counts"]["refused"] == 9
-    assert c["refusals"] == [{"code": "field_not_modelled", "subject": bc.OTHER_SETTINGS, "points": 5},
-                             {"code": "field_not_modelled", "subject": "moe_runner_backend", "points": 4}]
-    assert "ROCM" not in json.dumps(c) and "aiter" not in json.dumps(c)
+    assert c["counts"]["refused"] == len(reasons) == sum(r["points"] for r in c["refusals"])
+    assert c["refusals"] == [{"code": "field_not_modelled", "subject": "moe_runner_backend", "points": bc.MIN_NAMED_POINTS},
+                             {"code": "field_not_modelled", "subject": bc.OTHER_SETTINGS, "points": 5},
+                             {"code": "value_not_recorded", "subject": bc.OTHER_SETTINGS, "points": 2}]
 
 
 def test_the_regular_card_says_its_sglang_points_are_not_the_sglang_cards(tmp_path):

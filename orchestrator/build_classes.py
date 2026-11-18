@@ -52,16 +52,16 @@ class ClassesError(ValueError):
     pass
 
 
-# Refusal subjects that name another vendor's hardware settings are counted under one row, not listed by name: the dashboard says nothing
-# about hardware that is not delivered. The points stay in the refused count.
-_OTHER_HARDWARE = re.compile(r"amd|mi\d{3}|rocm|aiter|hip_|gfx\d", re.I)
+# A refusal reason with fewer points than this is counted under one "other settings" row of its code instead of being listed by name: the
+# long tail of one-off settings says little each, and the card stays readable. The points stay in the refused count.
+MIN_NAMED_POINTS = 6
 OTHER_SETTINGS = "other settings"
 
 
 def _refusal_rows(counter: Counter) -> list[dict]:
     folded: Counter = Counter()
     for (code, subject), n in counter.items():
-        folded[(code, OTHER_SETTINGS if _OTHER_HARDWARE.search(subject) else subject)] += n
+        folded[(code, subject if n >= MIN_NAMED_POINTS else OTHER_SETTINGS)] += n
     return [{"code": c, "subject": sub, "points": n} for (c, sub), n in sorted(folded.items(), key=lambda kv: (-kv[1], kv[0]))]
 
 
