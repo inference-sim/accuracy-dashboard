@@ -19,8 +19,9 @@ OTHER = 'level=fatal msg="scenario \\"p-0123456789abcdef.yaml\\": the kernel wil
 
 def test_a_refusal_with_a_quoted_scenario_name_is_not_cut_to_the_bare_slug(tmp_path):
     slug = sc._blis_refusal(OTHER, tmp_path)
-    assert slug != "blis_refused:scenario"
-    assert slug.startswith("blis_refused:scenario_") and "the_kernel_will_not_price" in slug and "p-0123456789abcdef" not in slug
+    # the whole message, without the scenario's file name or its quotes: the words of the refusal
+    assert slug == "blis_refused:the_kernel_will_not_price_a_layer_of_this_kind"
+    assert sc._blis_refusal(KV, tmp_path) == ("blis_refused:engine_vllm_0.33.0:_vllmengine:_vllm:_kv_layers:_kv:_KV_layers_of_unequal_page_s")
     # the file name is normalised, so the reason is the same for every scenario
     assert sc._blis_refusal(OTHER.replace("p-0123456789abcdef", "p-fedcba9876543210"), tmp_path) == slug
     assert sc._blis_refusal(KV, tmp_path) == sc._blis_refusal(KV.replace("04353280edecc7b4", "ffffffffffffffff"), tmp_path)

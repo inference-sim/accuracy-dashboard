@@ -101,7 +101,7 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
                "orchestrator/ingest/test_stack.py", "orchestrator/ingest/test_server_log.py",
                "orchestrator/ingest/test_gen_grade_doc.py", "orchestrator/ingest/test_drafter.py",
                "orchestrator/ingest/test_recipe_checkpoints.py", "orchestrator/ingest/test_locations.py",
-               "orchestrator/ingest/test_value_refusal.py", "orchestrator/ingest/test_g1.py",
+               "orchestrator/ingest/test_value_refusal.py", "orchestrator/ingest/test_named_scenario_refusals.py", "orchestrator/ingest/test_g1.py",
                "orchestrator/ingest/test_pd.py", "orchestrator/ingest/test_thinking_rule.py",
                "orchestrator/ingest/test_sglang_scoring.py", "orchestrator/ingest/test_approximates.py", "orchestrator/ingest/test_release_translation.py",
                "orchestrator/baseline/test_compare.py", "orchestrator/baseline/test_split.py",

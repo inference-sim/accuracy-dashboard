@@ -309,7 +309,11 @@ def _blis_refusal(stderr: str, work: Path) -> str:
     text = text.replace('\\"', '"')
     text = text.replace(str(work), "").replace(str(work.resolve()), "")
     text = re.sub(r"(/[^\s\"']+)+", "<path>", text)
-    text = re.sub(r"\b(?:p|cq)-[0-9a-f]{8,16}(?:\.yaml)?\b", "<scenario>", text)
+    # The engine names the scenario file in its message, as a prefix and again inside (`scenario "p-....yaml": ... vllmengine:
+    # p-....yaml: ...`); the name is the run's, not the reason, so it is removed with its colon, and the quotes and apostrophes
+    # of the wording are dropped, so the slug reads as words: no repeated "scenario", no stray punctuation.
+    text = re.sub(r"(?:\bscenario\s+\"?)?\b(?:p|cq)-[0-9a-f]{8,16}(?:\.yaml)?\"?:?\s*", "", text)
+    text = re.sub(r"[\"']", "", text)
     slug = re.sub(r"[^A-Za-z0-9_.:=-]+", "_", text)[:80].strip("_")
     return f"blis_refused:{slug}" if slug else "blis_refused"
 

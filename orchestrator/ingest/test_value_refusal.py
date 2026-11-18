@@ -83,7 +83,9 @@ NOT_READ = ('time="2026-11-17T18:21:21-05:00" level=fatal msg="scenario \\"p-d66
 def test_a_value_stated_for_a_part_the_model_lacks_is_a_named_g5_not_the_slug_scenario(tmp_path):
     # Cut to 80 characters after the scenario's name, this message was the bare slug "scenario", and a failure that is
     # not a runner limit stops the whole night (COV-8). It names the field now (COV-1: a bad row is a G5, never an abort).
-    assert sc._blis_refusal(NOT_READ, tmp_path) == "blis_refused:scenario"       # what it used to be
+    # It was the bare "blis_refused:scenario"; the slug now reads the whole message, without the scenario's file name, quotes or
+    # apostrophes: the words of the refusal, not a repeated "scenario" and stray punctuation.
+    assert sc._blis_refusal(NOT_READ, tmp_path) == "blis_refused:indexer_kv_dtype=bf16_is_read_only_for_MiniMax-M3s_indexer_cache_and_this_model"
     assert sc.value_refusal(NOT_READ, tmp_path, None) == "field_not_modelled:indexer_kv_dtype"
 
 
