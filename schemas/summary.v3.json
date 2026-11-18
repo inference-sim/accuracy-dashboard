@@ -201,6 +201,22 @@
             }
           }
         },
+        "engines": {
+          "description": "A release that scores more than one engine names the release each runs, one entry per engine kind (a summary of one engine may omit this and use `engine`). A point's simulator.engine names one of them, with its version.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "version"],
+            "properties": {
+              "kind": {"enum": ["vllm", "sglang"]},
+              "version": {"type": "string", "minLength": 1},
+              "module": {"type": "string", "description": "The blis module that hosts the engine, as stack.json names it."}
+            }
+          }
+        },
         "fields_sha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$",

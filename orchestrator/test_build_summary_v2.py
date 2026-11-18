@@ -814,3 +814,34 @@ def test_a_summary_scored_by_an_sglang_simulator_validates_and_an_unknown_engine
     assert schema_problems(_with_engine_kind("vllm")) == []
     assert schema_problems(_with_engine_kind("sglang")) == []
     assert any("'trtllm' is not one of ['vllm', 'sglang']" in p for p in schema_problems(_with_engine_kind("trtllm")))
+
+
+def _mixed(listed):
+    """run-a with its first point scored on an SGLang engine, and provenance listing `listed` engine kinds."""
+    doc = _build()
+    prov = doc["provenance"]
+    vllm = dict(prov["engine"])
+    engines = [vllm] + ([{"kind": "sglang", "version": "0.5.23", "module": "blis-sglang"}] if listed else [])
+    prov["engines"] = engines
+    _points(doc)[0]["fidelity"]["simulator"]["engine"] = {"kind": "sglang", "version": "0.5.23"}
+    return doc
+
+
+def test_a_summary_may_score_vllm_and_sglang_points_when_provenance_names_both_engines():
+    # One release summary, two engines: provenance lists a release per kind and each point is held to its own.
+    def engine_problems(doc):
+        return [p for p in vs2.problems(doc) if "provenance does not list" in p or "not one of provenance.engines" in p
+                or "is not one of" in p or "Additional properties" in p]
+
+    assert engine_problems(_mixed(listed=True)) == []
+    # The single-engine form stays valid, as every historical contract has it.
+    assert engine_problems(_build()) == []
+
+
+def test_a_point_scored_on_an_engine_provenance_does_not_list_is_refused():
+    problems = [p for p in vs2.problems(_mixed(listed=False)) if "provenance does not list" in p]
+    assert len(problems) == 1 and "sglang 0.5.23" in problems[0]
+    # A point on a listed engine at another release is refused too.
+    doc = _mixed(listed=True)
+    _points(doc)[0]["fidelity"]["simulator"]["engine"] = {"kind": "sglang", "version": "0.5.99"}
+    assert any("provenance does not list" in p for p in vs2.problems(doc))
