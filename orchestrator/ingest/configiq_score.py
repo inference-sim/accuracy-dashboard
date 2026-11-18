@@ -589,9 +589,9 @@ def _run(argv, env: Env, work: Path, pid: str):
                                 "subject": f"engine {m.group(1) or m.group(2)}: the row does not record it and the simulator cannot choose "
                                            f"it for this model and chip" + (f" ({issue.group(0)})" if issue else "")}
         reason = sc_.value_refusal(e.stderr, work, env.field_list) or sc_._blis_refusal(e.stderr, work)
-        if reason.partition(":")[0] != "blis_refused":
-            g = asx.g5_of(reason)
-            return None, None, g
+        if not asx.is_run_fault(reason):
+            # a value the simulator could not read, or its own refusal in its own words: a named not-scored point
+            return None, None, asx.g5_of(reason)
         return None, reason, None
     except result.ResultError as e:
         return None, f"blis_refused:{e.slug}", None

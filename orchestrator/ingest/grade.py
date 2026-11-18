@@ -43,6 +43,9 @@ G5_CODES = (
     "value_conflict",
     "build_unparseable",
     "measurement_contaminated",
+    # The simulator refused the scenario and said why (blis_refused:<what it said>): last in the order, since it names a gap
+    # only the simulator knows and every other reason says more.
+    "blis_refused",
 )
 
 # Substitution kinds (blis-substrate contracts/spec/pointrecord): the G2 conditions, and the G3

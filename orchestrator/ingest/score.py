@@ -316,7 +316,9 @@ def _blis_refusal(stderr: str, work: Path) -> str:
     text = re.sub(r"(?:\bscenario\s+\"?)?\b(?:p|cq)-[0-9a-f]{8,16}(?:\.yaml)?\"?:?\s*", "", text)
     text = re.sub(r"[\"']", "", text)
     slug = re.sub(r"[^A-Za-z0-9_.:=-]+", "_", text)[:80].strip("_")
-    return f"blis_refused:{slug}" if slug else "blis_refused"
+    # A fatal message of the simulator's own is a refusal it explains (a named not-scored point). No such message (a panic, a
+    # signal, no output) is a crash, a fault of the run.
+    return f"blis_refused:{slug}" if m and slug else f"blis_crashed:{slug}" if slug else "blis_crashed"
 
 
 # The substrate's refusal when no acceptance profile holds the key (contracts/spec/acceptance Resolve):
@@ -1716,7 +1718,7 @@ def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None
     rel = gr.run_release(o.build or {"image": o.row.get("image")}, o.banner)
     o.run_release = rel.version
     o.simulator = simulator
-    faults = sorted({r for r in o.reasons if asx.is_fault(r)})
+    faults = sorted({r for r in o.reasons if asx.is_run_fault(r)})
     if faults:
         o.fidelity, o.facets, o.csv_row, o.faults = None, None, None, faults
         return

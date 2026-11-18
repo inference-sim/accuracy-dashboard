@@ -6,6 +6,8 @@
 set -euo pipefail
 # More than 5 percent of the night's points failed (a harness fault; a named G5 is a result): the publish stops.
 python3 orchestrator/nightly/night_health.py data/latest/summary.json
+# Named simulator refusals never stop a night; a refusal code not met before, or many unclassified ones, is a warning to read.
+python3 orchestrator/nightly/night_notes.py data/latest/summary.json
 # The classes page is built from this summary (a missing or stale classes.json would show another night beside it).
 python3 orchestrator/build_classes.py check data/latest/classes.json
 python3 - <<'PY'

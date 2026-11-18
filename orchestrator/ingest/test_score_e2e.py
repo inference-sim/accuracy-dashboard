@@ -804,7 +804,7 @@ def test_the_agentic_path_reads_the_registry_means_and_the_engine_report():
         # A cached Result whose key differs is not reused.
         next((work / "results").glob("*.key")).write_text("other")
         o3 = sc._score_one(entry, tmp / "pull", work, env)
-        assert o3.fidelity is None and o3.faults[0].startswith("blis_refused")
+        assert o3.fidelity is None and o3.faults[0].startswith("blis_crashed")     # exit 99 with no message of its own: a crash
     finally:
         shutil.rmtree(tmp)
 
@@ -911,7 +911,12 @@ def test_an_unrecorded_setting_is_left_unset_and_the_engines_refusal_is_value_no
         assert o.g5["code"] == "value_not_recorded"
         env.blis = _refusing_blis(tmp, 'level=fatal msg="something else broke"\n')
         o, _ = _score(tmp, entry, env, tmp / "c4")
-        assert o.fidelity is None and o.faults[0].startswith("blis_refused:")
+        # a refusal in the simulator's own words, none of the classifier's: a named not-scored point, not a fault of the run
+        assert o.fidelity is None and not o.faults
+        assert o.g5_reasons == [{"code": "blis_refused", "subject": "something_else_broke"}]
+        env.blis = _refusing_blis(tmp, "panic: runtime error: index out of range\n")
+        o, _ = _score(tmp, entry, env, tmp / "c5")
+        assert o.fidelity is None and o.faults and o.faults[0].startswith("blis_crashed:")    # no message of its own: a crash
     finally:
         shutil.rmtree(tmp)
 

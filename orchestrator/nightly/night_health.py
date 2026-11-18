@@ -3,9 +3,9 @@
 
     night_health.py SUMMARY.json [--limit 0.05]
 
-A point is a result when it is graded (G1 to G4) or a named G5 (a reason on design 11.4's list is a fact about the point).
-It is a fault when the harness failed it: the simulator refused a scenario the harness wrote and no classifier turned the
-refusal into a named G5 (an unclassified blis_refused), or the run hit a runner limit. The summary lists those in `failed`.
+A point is a result when it is graded (G1 to G4) or a named G5 (a reason on design 11.4's list is a fact about the point;
+the simulator refusing a scenario and saying why is one, G5 blis_refused). It is a fault when the run failed it: the runner's
+memory or time, a crash, output the harness cannot read, a lost setting. The summary lists those in `failed`.
 When more than LIMIT of the night's points are faults the publish stops (exit 1), because a release scored mostly by a
 harness that cannot place its points is not a measure of BLIS. A named G5 never counts against the night.
 """

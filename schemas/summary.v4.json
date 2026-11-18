@@ -723,6 +723,13 @@
         }
       }
     },
+    "new_refusal_codes": {
+      "description": "The codes of the simulator's named refusals (G5 blis_refused) this night met that the nightly had not seen before (assess.KNOWN_REFUSAL_CODES), sorted. A new code does not stop the night: it is published, named, and listed here so a person reads it. Absent from snapshots published before the field existed.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "backlog": {
       "description": "The ten most common reasons a point is not G1, over every engine: each G5 reason and each substitution, counted once per point (design §11.6). The whole ranked backlog is published beside summary.json.",
       "type": "object",
@@ -1545,7 +1552,8 @@
             "field_not_in_release",
             "value_conflict",
             "build_unparseable",
-            "measurement_contaminated"
+            "measurement_contaminated",
+            "blis_refused"
           ]
         },
         "subject": {
@@ -1557,7 +1565,7 @@
     "fault": {
       "description": "A fault of the run, not a fact about the point: the simulator refused the scenario the harness wrote, or the scenario lost a recorded value. Never a grade (CONTRACT.md, Failed points). The qualifier after ':' is a short slug.",
       "type": "string",
-      "pattern": "^(blis_refused|setting_differs)(:[^\\s]+)?$"
+      "pattern": "^(blis_refused|blis_crashed|setting_differs)(:[^\\s]+)?$"
     },
     "notScored": {
       "description": "A G5 point (design §11.4): one line of not_scored.jsonl, copied into summary.json v3's not_scored list.",

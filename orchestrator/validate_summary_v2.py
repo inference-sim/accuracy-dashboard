@@ -189,6 +189,12 @@ def _v3_problems(doc: dict, pts: list[dict]) -> list[str]:
             out.append(f"headline.grades.{g} counts {head['grades'][g]['points']} points, the matrix {again['grades'][g]['points']}")
     if [e["reason"] for e in doc["backlog"]["top"]] != [r for r, _ in bl.top(runs + g5, len(doc["backlog"]["top"]))]:
         out.append("backlog.top does not recompute from the points")
+    if "new_refusal_codes" in doc:
+        again = sorted({assess.refusal_code(r.get("subject", "")) for p in doc["not_scored"]
+                        for r in p.get("g5_reasons") or [p["g5_reason"]] if r.get("code") == "blis_refused"}
+                       - set(assess.KNOWN_REFUSAL_CODES))
+        if doc["new_refusal_codes"] != again:
+            out.append("new_refusal_codes does not recompute from the not-scored points")
     for f in failed:
         if not set(f["faults"]) <= set(assess.RUNNER_LIMITS):
             out.append(f"failed {f['point_id'][:12]}: {f['faults']} is not a runner limit; nothing may be published (COV-8)")
