@@ -34,10 +34,28 @@ def _blis() -> tuple[str, Path]:
     return blis, Path(os.environ.get("BLIS_SCENARIO_DIR") or SCENARIO_DIR)
 
 
+def _release(blis: str) -> str:
+    """The vLLM release the simulator runs, from the stack.json beside the binary: the one place
+    the pinned stack states it (X23)."""
+    stack = json.loads((Path(blis).parent / "stack.json").read_text())
+    return next(e["version"] for e in stack["engines"] if e["kind"] == "vllm")
+
+
+def _scenario(scen: Path, release: str) -> str:
+    """The fixture scenario at the simulator's release. A fixture that names its release itself
+    must name this one, or the run would price another engine than the test means."""
+    text = (scen / SCENARIO).read_text()
+    if "ENGINE_RELEASE" in text:
+        return text.replace("ENGINE_RELEASE", release)
+    assert f'version: "{release}"' in text, f"{SCENARIO} names an engine release other than the build's {release}"
+    return text
+
+
 def _run(tmp: Path, replay: ix.Replay) -> list[dict]:
     blis, scen = _blis()
+    release = _release(blis)
     tmp.mkdir(parents=True, exist_ok=True)
-    shutil.copy(scen / SCENARIO, tmp / SCENARIO)
+    (tmp / SCENARIO).write_text(_scenario(scen, release))
     (tmp / ix.ROUTER_CONFIG_NAME).write_bytes(ix.router_config_bytes())
     h, d = ix.write_trace(replay, tmp)
     argv = ix.replay_argv(blis, SCENARIO, tmp, h, d, replay.sessions, replay.pool, 42,
@@ -46,6 +64,7 @@ def _run(tmp: Path, replay: ix.Replay) -> list[dict]:
     assert proc.returncode == 0, proc.stderr[-4000:]
     doc = json.loads(proc.stdout)
     assert doc.get("kind") == "Result" and doc.get("schema_version") in (2, 3)   # 3 from the M2 simulators
+    assert doc.get("engine") == {"kind": "vllm", "version": release}, doc.get("engine")
     rows = doc.get("request_rows")
     assert rows, "the Result has no request_rows"
     return rows
@@ -92,7 +111,7 @@ def test_the_scenario_the_generator_writes_is_one_the_simulator_validates_and_ru
     blis, _ = _blis()
     sys.path.insert(0, str(HERE.parent))
     import gen_scenarios as g
-    release = json.loads((Path(blis).parent / "stack.json").read_text())["engines"][0]["version"]
+    release = _release(blis)
     # gpt-oss-120b on H100 at nvfp4 weights and fp8 KV is a combination the engine resolves (the
     # committed scenario runs it). A run states its block size when the engine cannot resolve it
     # (blis-vllm #68); the generator never writes one it was not given.
