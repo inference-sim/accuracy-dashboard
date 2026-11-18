@@ -47,6 +47,7 @@ def setup(tmp_path, rows: dict, *, fake=None, models=None, chips=None, engine_re
     pts = cq.points(lg, rows, CATALOG)
     cat_root = tmp_path / "catalog"
     (cat_root / "models" / "gpt-oss-120b").mkdir(parents=True, exist_ok=True)
+    (cat_root / "models" / "gpt-oss-120b" / "graph.yaml").write_text("layers: []\n")
     if config:
         (cat_root / "models" / "gpt-oss-120b" / "config.json").write_text(json.dumps(
             {"max_position_embeddings": 131072,
@@ -174,10 +175,34 @@ def test_a_multi_turn_row_is_refused_with_what_the_dataset_does_not_record(tmp_p
     assert o.g5[0]["code"] == "value_not_recorded" and "multi-turn" in o.g5[0]["subject"] and "think time" in o.g5[0]["subject"]
 
 
-def test_a_model_whose_default_context_the_catalog_cannot_give_is_refused_when_the_row_leaves_it_blank(tmp_path):
+def test_an_entry_with_a_committed_graph_and_no_config_file_is_scored_and_names_the_window_it_left_to_the_simulator(tmp_path):
+    # The catalog keeps a licensed model's config.json out and commits its hash and the derived graph, which is all the
+    # simulator reads. The scorer states no max_model_len and says so.
     _, outs, env = run(tmp_path, {f"{F}:0": prow()}, config=False)
-    assert outs[0].status == "refused" and replays(env) == []
-    assert outs[0].g5[0]["code"] == "value_not_recorded" and "max_model_len" in outs[0].g5[0]["subject"]
+    (o,) = outs
+    assert o.status == "scored", (o.g5, o.faults)
+    assert len(replays(env)) == 1
+    sub = next(s for s in o.substitutions if s["subject"] == "engine.max_model_len")
+    assert sub["kind"] == "estimated" and "commits no config.json" in sub["detail"]
+    text = (Path(replays(env)[0]["argv"][replays(env)[0]["argv"].index("--scenarios") + 1]) / f"cq-{o.point.unit_id[:16]}.yaml").read_text()
+    assert "max_model_len" not in text
+
+
+def test_an_entry_with_no_derived_graph_is_refused_by_name(tmp_path):
+    pts, env = setup(tmp_path, {f"{F}:0": prow()}, config=False)
+    (env.catalog / "models" / "gpt-oss-120b" / "graph.yaml").unlink()
+    o = cs.score_point(pts[0], env, tmp_path / "work")
+    assert o.status == "refused" and replays(env) == []
+    assert o.g5[0]["code"] == "not_in_catalog" and "no derived graph" in o.g5[0]["subject"]
+
+
+def test_a_simulator_that_cannot_resolve_the_window_makes_the_point_a_named_g5_not_a_failure(tmp_path):
+    fake = tmp_path / "refuse"
+    fake.write_text("#!/usr/bin/env python3\nimport sys\nsys.stderr.write('level=fatal msg=\"scenario x.yaml: the first pool states no engine.max_model_len and its model graph no context window\"\\n')\nsys.exit(1)\n")
+    fake.chmod(0o755)
+    _, outs, _ = run(tmp_path, {f"{F}:0": prow()}, config=False, fake=str(fake))
+    (o,) = outs
+    assert o.status == "refused" and o.g5[0]["code"] == "value_not_recorded" and "max_model_len" in o.g5[0]["subject"]
 
 
 def test_a_row_that_states_its_max_seq_len_needs_no_config_and_names_no_estimate(tmp_path):
@@ -408,3 +433,13 @@ def test_the_command_refuses_a_simulator_checkout_that_is_not_at_the_named_build
     args = _command_fixture(tmp_path, {f"{F}:0": prow()})
     assert cmd.main(args + ["--sim-build", "v0.17.0"]) == 2
     assert not (tmp_path / "out").exists()
+
+
+def test_a_hybrid_model_whose_cache_block_needs_the_window_is_a_named_g5_not_a_failure(tmp_path):
+    fake = tmp_path / "refuse"
+    fake.write_text("#!/usr/bin/env python3\nimport sys\nsys.stderr.write('level=fatal msg=\"scenario x.yaml: recurrent layers: mamba_cache_mode none sets "
+                    "mamba_block_size to max_model_len, which is not stated and which the engine fits to the KV budget\"\\n')\nsys.exit(1)\n")
+    fake.chmod(0o755)
+    _, outs, _ = run(tmp_path, {f"{F}:0": prow()}, config=False, fake=str(fake))
+    (o,) = outs
+    assert o.status == "refused" and o.g5[0]["code"] == "value_not_recorded" and "max_model_len" in o.g5[0]["subject"]
