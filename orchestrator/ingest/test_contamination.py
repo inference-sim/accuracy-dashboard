@@ -63,3 +63,29 @@ def test_a_point_scores_with_the_clients_requests_and_is_not_scored_with_another
         assert o.fidelity is None
         assert [r for r in o.reasons if r.startswith("measurement_contaminated")] == [
             f"measurement_contaminated:request_count_mismatch(expected 48, logged {n})"]
+
+
+STATS = "(APIServer pid=1) INFO 05-30 22:23:12 [loggers.py:271] Engine 000: Avg prompt throughput: 1.0 tokens/s, Running: {r} reqs, Waiting: 0 reqs, GPU KV cache usage: 1.0%\n"
+
+
+def _two_phases(first: int, second: int, gap: bool = True) -> str:
+    """A server that served `first` requests, sat idle for a stats interval (or not), then served `second`."""
+    return BARE + POST * first + STATS.format(r=4) + (STATS.format(r=0) if gap else STATS.format(r=4)) + POST * second + STATS.format(r=4)
+
+
+def test_an_eval_run_apart_in_time_from_the_timed_requests_is_not_contamination():
+    assert ct.busy_segments(_two_phases(48, 1319)) == [48, 1319]
+    assert ct.reasons(_two_phases(48, 1319), _row(conc=4)) == []
+    assert ct.reasons(_two_phases(1319, 48), _row(conc=4)) == []
+
+
+def test_extra_requests_that_overlap_the_timed_ones_or_split_them_are_contamination():
+    # no idle interval between the phases: nothing says they are apart
+    assert ct.reasons(_two_phases(48, 1319, gap=False), _row(conc=4)) == [
+        "measurement_contaminated:request_count_mismatch(expected 48, logged 1367)"]
+    # two stretches, but neither is the client's count
+    assert ct.reasons(_two_phases(20, 1319), _row(conc=4)) == [
+        "measurement_contaminated:request_count_mismatch(expected 48, logged 1339)"]
+    # a deficit is never forgiven, even when what is left is a clean stretch
+    assert ct.reasons(_two_phases(4, 237), _row(conc=32)) == [
+        "measurement_contaminated:request_count_mismatch(expected 384, logged 241)"]
