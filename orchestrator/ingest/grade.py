@@ -42,6 +42,7 @@ G5_CODES = (
     "field_not_in_release",
     "value_conflict",
     "build_unparseable",
+    "measurement_contaminated",
 )
 
 # Substitution kinds (blis-substrate contracts/spec/pointrecord): the G2 conditions, and the G3

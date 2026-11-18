@@ -38,6 +38,7 @@ G5_FOR_REASON = {
     "engine_unsupported": "engine_unsupported",
     "code_not_visible": "code_not_visible",
     "build_unparseable": "build_unparseable",
+    "measurement_contaminated": "measurement_contaminated",
     "field_not_in_release": "field_not_in_release",
     "field_not_modelled": "field_not_modelled",
     "field_unclassified": "field_unclassified",

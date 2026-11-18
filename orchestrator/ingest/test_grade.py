@@ -59,7 +59,8 @@ def test_g5_is_only_for_the_closed_list_and_wins_over_every_other_grade():
 def test_the_g5_list_is_design_11_4_with_router_unsupported_and_value_conflict():
     assert set(g.G5_CODES) == {"code_not_visible", "router_unsupported", "topology_unsupported", "value_not_recorded",
                                "field_not_modelled", "field_unclassified", "engine_unsupported",
-                               "not_in_catalog", "field_not_in_release", "value_conflict", "build_unparseable"}
+                               "not_in_catalog", "field_not_in_release", "value_conflict", "build_unparseable",
+                               "measurement_contaminated"}
 
 
 def test_a_substitution_must_be_a_g2_condition_and_name_its_subject():

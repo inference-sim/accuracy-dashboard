@@ -50,7 +50,7 @@ LOG = (
     "kv_cache_dtype=auto, enable_prefix_caching=False, "
     "compilation_config={'mode': <CompilationMode.NONE: 0>, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>}\n"
     "INFO [kv_cache_utils.py:1] GPU KV cache size: 100,000 tokens\n"
-    '"POST /v1/completions HTTP/1.1" 200\n')
+    + '"POST /v1/completions HTTP/1.1" 200\n' * 48)      # 12 x conc 4: the requests the default point's client sent
 
 # Two periodic spec-decode lines of vLLM's metrics logger, and an idle one that drafted nothing.
 # A run whose rejection sampling is not the synthetic kind records no length, and a synthetic run that
@@ -224,7 +224,8 @@ def job_log_text(isl: int, osl: int, conc: int, extra: str = "") -> str:
 
 def _setup(tmp: Path, *, log: str = LOG, job_log: str | None = "default", client_commit: bool = True, repo: str = "org/m", conc: int = 4, isl: int = 1024, osl: int = 1024,
            date: str = "2026-10-01", spec: str = "mtp", benchmark_type: str = "single_turn",
-           hardware: str = "mi355x", chips: dict | None = None, node_size: int | None = None):
+           hardware: str = "mi355x", chips: dict | None = None, node_size: int | None = None,
+           client_requests: bool = True):
     row = {"id": "1", "model": "m", "hardware": hardware, "precision": "fp8", "framework": "vllm",
            "benchmark_type": benchmark_type, "conc": conc, "isl": isl, "osl": osl, "spec_method": spec,
            "disagg": False, "is_multinode": False, "decode_tp": 1, "decode_ep": 1, "num_decode_gpu": 1,
@@ -235,6 +236,10 @@ def _setup(tmp: Path, *, log: str = LOG, job_log: str | None = "default", client
     pdir = tmp / "pull" / "points" / pid
     pdir.mkdir(parents=True)
     log = log.replace("org/m", repo)
+    if client_requests and conc != 4:
+        # A real log records the requests its client sent: 10*conc measured and 2*conc warm-up (contamination.py).
+        line = '"POST /v1/completions HTTP/1.1" 200\n'
+        log = log.replace(line * 48, line * (12 * conc))
     (pdir / "server_log.gz").write_bytes(gzip.compress(log.encode(), mtime=0))
     entry = {"point_id": pid, "identity": ident, "row": row, "reasons": [], "records": ["1"],
              "client_commit": {"repo": "SemiAnalysisAI/InferenceX", "sha": "f" * 40, "date": "2026-10-01T00:00:00Z"}

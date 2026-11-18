@@ -87,7 +87,8 @@ CHIP_NOT_MODELLED = "chip_not_modelled"
 # or model as the gap BLIS can close: chip_not_modelled, then not_in_catalog (blis-design#14).
 G5_ORDER = (CHIP_NOT_MODELLED, "not_in_catalog", "code_not_visible", "router_unsupported", "topology_unsupported",
             "value_not_recorded", "field_not_modelled", "field_unclassified", "engine_unsupported",
-            "field_not_in_release", "value_conflict", "build_unparseable")
+            "field_not_in_release", "value_conflict", "build_unparseable",
+            "measurement_contaminated")
 
 # The engine settings the publisher parses from the command line. A blank is value_not_recorded.
 ENGINE_COLUMNS = ("gpu_memory_utilization", "max_num_seqs", "max_seq_len", "chunked_prefill_enabled", "precision",

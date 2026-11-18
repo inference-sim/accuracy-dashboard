@@ -71,6 +71,8 @@ G5_TEXT = {
                        "Correct the source; the harness never picks one."),
     "build_unparseable": ("The run's image and log banner name no engine build at all. The scorer emits no such reason today: a build it cannot resolve is G4 (nightly or custom).",
                           "Not applicable until the scorer tells an unnamed build from a nightly one."),
+    "measurement_contaminated": ("A vLLM single-turn point's server log holds a different number of client requests than its client sent (12 x concurrency: 10 x concurrency measured, 2 x concurrency warm-up). Another run's client shared the server, so the measured latencies are not the labelled scenario's. The subject names both counts.",
+                                 "Re-measure the point on a server of its own. Nothing to model."),
 }
 
 KIND_TEXT = {

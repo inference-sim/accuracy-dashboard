@@ -45,6 +45,7 @@ import result  # noqa: E402
 import settings as st  # noqa: E402
 import sglang_settings as ss  # noqa: E402
 import blis_commands as bc  # noqa: E402
+import contamination  # noqa: E402
 import support as sp  # noqa: E402
 
 AGENTIC_LABEL = "agentx"
@@ -835,6 +836,9 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
         return o
     log = log_b.decode("utf-8", "replace") if log_b is not None else ""
     o.banner = _banner_version(log)
+    if log_b is not None and not sglang:
+        # A server log holding other requests than the client's is another run's queue (contamination.py).
+        o.reasons += contamination.reasons(log, row)
     lc_b = _read(pdir, entry["files"], "launch_config")
     launch = json.loads(lc_b) if lc_b else None
     cmd_b = _read(pdir, entry["files"], "launch_command") if sglang else None
