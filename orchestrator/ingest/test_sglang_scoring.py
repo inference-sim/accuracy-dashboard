@@ -454,6 +454,27 @@ def test_a_flag_an_earlier_release_had_is_read_as_the_field_that_replaced_it_and
         shutil.rmtree(tmp)
 
 
+def test_a_json_text_stated_for_a_str_field_stays_the_text_the_engine_takes():
+    # --model-loader-extra-config '{"enable_multithread_load": true}': SGLang's field is a str holding JSON (its log prints
+    # model_loader_extra_config='{}'), so the scenario must carry the text; parsed into a map it is refused by the engine
+    # ("is not a string"), which refused 20 development points.
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        fields = [{**_field(f.name, f.status, f.source)} for f in FIELDS.fields.values()] + [
+            _field("model_loader_extra_config", "modelled")]
+        fields.sort(key=lambda f: (f["name"], f["source"]))
+        entry, env = _setup(tmp, command=COMMAND + " --model-loader-extra-config '{\"enable_multithread_load\": true}'")
+        env.sglang = sc.EngineKit("sglang", RELEASE, fl.parse(json.dumps(
+            {"kind": "FieldList", "engine": {"kind": "sglang", "version": RELEASE}, "fields": fields}).encode()), "f" * 64,
+            ss.load_declarations())
+        o, work = _score(tmp, entry, env)
+        assert o.fidelity is not None, o.reasons
+        dep = list(yaml.safe_load_all(next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()))[1]
+        assert dep["pools"][0]["engine"]["model_loader_extra_config"] == '{"enable_multithread_load": true}'
+    finally:
+        shutil.rmtree(tmp)
+
+
 def test_the_mamba_strategy_flag_of_an_earlier_release_is_read_as_the_field_that_replaced_it_with_its_old_auto_resolved():
     # v0.5.13 resolved --mamba-scheduler-strategy auto to no_buffer; v0.5.14's auto can choose extra_buffer, so an old auto is
     # stated as the no_buffer the run got. A value that is already a strategy keeps its meaning.
