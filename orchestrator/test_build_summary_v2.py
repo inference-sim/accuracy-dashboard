@@ -795,3 +795,22 @@ if __name__ == "__main__":
             traceback.print_exc()
     print(f"\n{len(fns) - failed}/{len(fns)} passed")
     sys.exit(1 if failed else 0)
+
+
+def _with_engine_kind(kind):
+    doc = _build()
+    doc["provenance"]["simulator"]["engine"]["kind"] = kind
+    for p in _points(doc):
+        p["fidelity"]["simulator"]["engine"]["kind"] = kind
+    return doc
+
+
+def test_a_summary_scored_by_an_sglang_simulator_validates_and_an_unknown_engine_is_refused():
+    # The simulator block names the engine the build ran. inference-sim releases vLLM and SGLang;
+    # the schema admitted vLLM only, so a successful SGLang run failed validation.
+    def schema_problems(doc):
+        return [p for p in vs2.problems(doc) if "is not one of" in p or "was expected" in p]
+
+    assert schema_problems(_with_engine_kind("vllm")) == []
+    assert schema_problems(_with_engine_kind("sglang")) == []
+    assert any("'trtllm' is not one of ['vllm', 'sglang']" in p for p in schema_problems(_with_engine_kind("trtllm")))
