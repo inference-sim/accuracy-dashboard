@@ -405,6 +405,7 @@ def cmd_score(a) -> int:
         return 2
     manifest_text = (pull_dir / "manifest.json").read_text()
     manifest = json.loads(manifest_text)
+    supplemental_class = None
     if getattr(a, "supplemental", None):
         # A run of the reconstructed class alone, beside the regular run and never inside it: the points are the supplemental
         # units whose own record is gone, each carrying its reconstructed launch (supplemental.py).
@@ -416,6 +417,8 @@ def cmd_score(a) -> int:
             _log(f"supplemental: {unit[:12]} left out: {why}")
         _log(f"supplemental: {len(sp_points)} unit(s) scored with a reconstructed launch, {len(sp_skipped)} left out")
         manifest["points"] = sp_points
+        supplemental_class = {"class": "reconstructed", "file_sha256": art.sha256(Path(a.supplemental).read_bytes()),
+                              "units": len(sp_points)}
     failed = [e["point_id"][:12] for e in manifest["points"] if PULL_ERROR in e["reasons"]]
     if failed:
         _log(f"FATAL: the pull has {len(failed)} row(s) it failed to read ({', '.join(failed[:5])}); re-run the pull")
@@ -495,6 +498,9 @@ def cmd_score(a) -> int:
             "corpora": sc.corpora_provenance(env.corpora),
             "pull_manifest_sha256": art.sha256(manifest_text.encode()),
             "source": {"name": "SemiAnalysis InferenceX API", "url": api.API + "/"}}
+    if supplemental_class is not None:
+        # The run is the reconstructed-recipe class, not a regular release: the summary builder refuses it (build_summary_v2).
+        prov["recipe_class"] = supplemental_class
     sc.write_contract(Path(a.out), outcomes, prov)
     problems = contract.validate_dir(a.out)
     for p in problems:
@@ -747,7 +753,7 @@ def main(argv=None) -> int:
     s.add_argument("--harness-commit", required=True, help="the full 40-hex commit of the harness checkout (X8)")
     s.add_argument("--units", help="the ledger units to score: a PublishedUnits list or a file of unit ids "
                                     "(default: every point of the pull)")
-    s.add_argument("--supplemental", help="supplemental-recipes.json (M3.1/dspark/recipe/supplement.py): score the units whose own "
+    s.add_argument("--supplemental", help="a supplemental-recipes file (data/supplemental/, orchestrator/supplemental/supplement.py): score the units whose own "
                                            "recipe is gone with the launch reconstructed from the benchmark scripts of their day; the "
                                            "run holds those units alone, a class beside the regular run's")
     s.add_argument("--supplemental-sources", help="with --supplemental: the matched pull's directory (match.json, dump-rows.jsonl, "

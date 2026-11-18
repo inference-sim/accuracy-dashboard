@@ -53,4 +53,5 @@ def main():
                "units": units}, open(f"{HERE}/supplemental-recipes.json", "w"), indent=1, sort_keys=True)
     print(len(units))
 
-main()
+if __name__ == "__main__":
+    main()

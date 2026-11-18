@@ -3,8 +3,8 @@
 A matched InferenceX unit whose workflow run and server log answer HTTP 404 (pull-errors.json) has no recipe the
 scorer can read. For a unit of a sweep whose benchmark scripts are still in the InferenceX repository, the launch
 the script gives (what `vllm serve` is handed, config.yaml, the variables in force) can be recovered by running
-the script with the environment the workflow gave it (M3.1/dspark/recipe/reconstruct.py; the file it writes is
-supplemental-recipes.json). That launch is not the run's record: it is read as the launch config and named on
+the script with the environment the workflow gave it (orchestrator/supplemental/reconstruct.py and supplement.py; the file they write
+is data/supplemental/matched-llama70b-2025-10-recipes.json). That launch is not the run's record: it is read as the launch config and named on
 the point, the run's own release is the script's image tag, and the grade is no higher than G4.
 """
 from __future__ import annotations

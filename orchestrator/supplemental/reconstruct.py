@@ -41,7 +41,8 @@ setup_eval_context() { :; }
 '''
 
 def run_script(commit, path, env):
-    """Run <path> as of <commit> in a sandbox; return the recorded launch or None if vllm was never started."""
+    """Run <path> as of <commit> under bash with a restricted PATH in a temporary directory (not a sandbox: there is no network or
+    filesystem isolation, so run it only on InferenceX's own scripts); return the recorded launch, or {"error": ...} if vllm was never started."""
     with tempfile.TemporaryDirectory() as d:
         for p in {path, "benchmarks/benchmark_lib.sh"}:
             try:

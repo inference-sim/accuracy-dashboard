@@ -152,3 +152,16 @@ def test_a_variable_or_flag_v0_33_0_does_not_read_is_left_out_and_named_not_refu
     assert d.reasons == []
     left = {x["subject"] for x in d.substitutions if x["kind"] == "estimated"}
     assert left == {"env.TORCH_CUDA_ARCH_LIST", "env.VLLM_FLASHINFER_ALLREDUCE_FUSION_THRESHOLDS_MB", "disable_log_requests"}
+
+
+# ------------------------------------------------------------------------------- the class marker in provenance.json
+
+def test_the_summary_builder_refuses_a_contract_that_names_a_recipe_class_and_takes_a_regular_one():
+    import build_summary_v2 as bs
+    bs.refuse_recipe_class({"ingest": "api"})            # a regular run: nothing to refuse
+    try:
+        bs.refuse_recipe_class({"recipe_class": {"class": "reconstructed", "file_sha256": "0" * 64, "units": 213}})
+    except bs.ContractError as e:
+        assert "reconstructed" in str(e) and "213" in str(e)
+    else:
+        raise AssertionError("a reconstructed-recipe contract was given to the summary builder")
