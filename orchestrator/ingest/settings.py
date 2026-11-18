@@ -749,6 +749,22 @@ def translate_removed(settings: dict, field_list, table: dict | None = None) -> 
     return out, subs
 
 
+_TOKEN = re.compile(r"[A-Za-z0-9_.+:/\-]+")
+
+
+def mode_value_fits(field_list, name: str, value) -> bool:
+    """Whether an approximation's mode value can be written as the setting `name`: a value the field list's own value classes
+    cover where it states them; else (a field the engine does not model has none) a plain value, a boolean, a number or a
+    token such as `auto` or `flashinfer_nvlink_one_sided`, never a sentence."""
+    import fields as fl
+    f = field_list.lookup(name)
+    if f is not None and f.value_classes is not None:
+        return fl.covers(value, f.value_classes)
+    if isinstance(value, (bool, int, float)):
+        return True
+    return isinstance(value, str) and _TOKEN.fullmatch(value) is not None
+
+
 def decide(settings: dict[str, Setting], field_list, part: str | None = None, facts_of=None,
            names: "Names | None" = None) -> Decided:
     """Decide every recorded setting by the engine's fields.json (design §11.2, State and Decide).
@@ -801,6 +817,12 @@ def decide(settings: dict[str, Setting], field_list, part: str | None = None, fa
                     appr = fl.approximate(f_.estimation, facts)
                 if appr is None:
                     d.reasons.append(f"{dec.g5['code']}:{path}")
+                    continue
+                unfit = [f2 for f2, v2 in sorted(appr["mode"].items()) if v2 is not None and not mode_value_fits(field_list, f2, v2)]
+                if unfit:
+                    # A mode value the field list's own value classes do not accept (or, for a field with none, that is not a value
+                    # at all, such as a sentence) is not written into the engine block.
+                    d.reasons += [f"field_unclassified:{f2}" for f2 in unfit]
                     continue
                 mode = json.dumps(appr["mode"], sort_keys=True)
                 d.substitutions.append({"kind": "execution_mode", "subject": path,
