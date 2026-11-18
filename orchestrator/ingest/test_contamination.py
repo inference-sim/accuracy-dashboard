@@ -89,3 +89,29 @@ def test_extra_requests_that_overlap_the_timed_ones_or_split_them_are_contaminat
     # a deficit is never forgiven, even when what is left is a clean stretch
     assert ct.reasons(_two_phases(4, 237), _row(conc=32)) == [
         "measurement_contaminated:request_count_mismatch(expected 384, logged 241)"]
+
+
+def _posts(ok: int, status: int = 200, n: int = 0) -> str:
+    line = '(APIServer pid=1) INFO:     127.0.0.1:44314 - "POST /v1/completions HTTP/1.1" {} {}\n'
+    return line.format(200, "OK") * ok + line.format(status, "Not Found") * n
+
+
+def test_only_completed_requests_count():
+    # 48 completed beside 384 answered 404: the 200s are the client's 12 x 4 exactly (the H100 points 449d09f0 and dc13b68d).
+    assert ct.reasons(BARE + _posts(48, 404, 384), _row(conc=4)) == []
+    assert ct.reasons(BARE + _posts(96, 404, 96), _row(conc=8)) == []
+
+
+def test_a_run_whose_responses_mostly_failed_is_named_so():
+    # minimax-m2.5 H200 conc 2: 20 completed of 24 expected, 3,230 answered 400 (cf867ddb)
+    assert ct.reasons(BARE + _posts(20, 400, 3230), _row(conc=2)) == ["measurement_contaminated:requests_failed(20 of 24 completed)"]
+    assert ct.reasons(BARE + _posts(0, 400, 50), _row(conc=2)) == ["measurement_contaminated:requests_failed(0 of 24 completed)"]
+
+
+def test_a_few_failures_beside_a_wrong_count_stay_a_count_mismatch():
+    # 458dc24f: 85 completed and 38 answered 400 of 192 expected; the failures are fewer than the completions
+    assert ct.reasons(BARE + _posts(85, 400, 38), _row(conc=16)) == [
+        "measurement_contaminated:request_count_mismatch(expected 192, logged 85)"]
+    # a surplus of completed requests with no overlap is still forgiven only through the busy stretches
+    assert ct.reasons(BARE + _posts(48 + 30, 404, 5), _row(conc=4)) == [
+        "measurement_contaminated:request_count_mismatch(expected 48, logged 78)"]
