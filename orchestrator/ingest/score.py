@@ -1503,6 +1503,13 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
         derived = sorted(f for f in ("tensor_parallel_size", "pipeline_parallel_size", "data_parallel_size")
                          if f in rd.values and f.replace("_", "-") not in recipe.pools[role].flags)
         o.subs.append(pdm.recovery_substitution(role, meta, stated, derived))
+        if sglang and "disaggregation_transfer_backend" not in recipe.pools[role].flags and \
+                "disaggregation_transfer_backend" not in {k.replace("-", "_") for k in recipe.pools[role].flags}:
+            # The recipe states no KV transfer backend; the pool takes the engine's declared default (ss.read_pool), a value the
+            # run did not record, so the point says so (X19).
+            o.subs.append({"kind": "estimated", "subject": f"{role}.disaggregation_transfer_backend",
+                           "detail": f"the recipe's {role} pool states no --disaggregation-transfer-backend; the engine's declared "
+                                     f"default, {taken[role].get(ss.CONNECTOR_PATH)!r}, is simulated"})
         for p in (ss.TRANSFER_FIELDS if sglang else pdm.TRANSFER_PATHS):
             if p in taken[role]:
                 dec = fl.decide(field_list, p, set_by_run=True)

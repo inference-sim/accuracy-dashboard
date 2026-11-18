@@ -48,6 +48,7 @@ jobs:
       orchestrator: ${{ steps.pick.outputs.orchestrator }}
       simulator: ${{ steps.pick.outputs.simulator }}
       web: ${{ steps.pick.outputs.web }}
+      nightly: ${{ steps.pick.outputs.nightly }}
       shards: ${{ steps.pick.outputs.shards }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -292,6 +293,29 @@ jobs:
           npm run build
           node browser_smoke.mjs
 
+  # The nightly's gate (orchestrator/nightly/checks.sh: prune the legacy map, the boundary and contract shards, the v1 browser
+  # smoke), run on a pull request that changes what it reads, so it is exercised before the nightly relies on it.
+  nightly-gate:
+    name: "nightly-gate${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
+    needs: changes
+    if: ${{ (github.event.action != 'edited' || github.event.changes.base) && (needs.changes.outputs.nightly == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+      - run: pip install --quiet --require-hashes -r requirements-ci.txt
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: bash orchestrator/nightly/checks.sh
+
   # Not conditional: it takes seconds and scans paths of every job's inputs.
   grep-clean:
     name: "grep-clean${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
@@ -323,7 +347,7 @@ jobs:
   # `orchestrator`, `grep-clean` and `web`; this job is the single check to require instead.)
   gate:
     name: "gate${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
-    needs: [changes, partition, orchestrator, simulator, web, grep-clean]
+    needs: [changes, partition, orchestrator, simulator, web, nightly-gate, grep-clean]
     if: ${{ (github.event.action != 'edited' || github.event.changes.base) && (always()) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -333,10 +357,12 @@ jobs:
           WANT_ORCH: ${{ needs.changes.outputs.orchestrator }}
           WANT_SIM: ${{ needs.changes.outputs.simulator }}
           WANT_WEB: ${{ needs.changes.outputs.web }}
+          WANT_NIGHTLY: ${{ needs.changes.outputs.nightly }}
           R_PARTITION: ${{ needs.partition.result }}
           R_ORCH: ${{ needs.orchestrator.result }}
           R_SIM: ${{ needs.simulator.result }}
           R_WEB: ${{ needs.web.result }}
+          R_NIGHTLY: ${{ needs.nightly-gate.result }}
           R_GREP: ${{ needs.grep-clean.result }}
         run: |
           bad=0
@@ -349,6 +375,7 @@ jobs:
           check partition "$WANT_ORCH" "$R_PARTITION"
           check simulator "$WANT_SIM" "$R_SIM"
           check web "$WANT_WEB" "$R_WEB"
+          check nightly-gate "$WANT_NIGHTLY" "$R_NIGHTLY"
           check grep-clean true "$R_GREP"
           # `orchestrator` always runs: it reports success when the shards passed or none was needed.
           check orchestrator true "$R_ORCH"

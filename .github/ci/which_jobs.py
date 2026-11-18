@@ -28,6 +28,10 @@ READS = {
     "simulator": ("orchestrator/", "harness/", "schemas/", "requirements-ci.txt", ".github/stack-pins.env"),
     # The web app, its fixtures (web/testdata), and the committed snapshot the v1 smoke serves.
     "web": ("web/", "data/"),
+    # The nightly's own gate (orchestrator/nightly/checks.sh), run on a pull request so it is exercised before the nightly
+    # relies on it: the script, the workflow that calls it, the map it prunes, the snapshot it serves, and its smoke.
+    "nightly": ("orchestrator/nightly/", ".github/workflows/api-nightly.yml", "orchestrator/ingest/legacy_ids.py",
+                "data/", "web/browser_smoke.mjs"),
 }
 # Under a read directory, these are not read.
 IGNORED = ("docs/mockups/", "docs/screenshots/")
