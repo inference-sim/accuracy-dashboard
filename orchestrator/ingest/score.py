@@ -234,6 +234,22 @@ def _checkpoints(c: st.Decided, launch_cfg: dict | None, cat: "sp.Catalog | None
     return out
 
 
+def staged_substitution(c: st.Decided, cat: "sp.Catalog", checkpoint: str | None) -> dict | None:
+    """The substitution a point names when its model was found from a staged checkpoint directory and not from a
+    repository the run named (X19): the directory and the repository it was matched to. None when the chosen checkpoint
+    is not one a local path gave."""
+    if not checkpoint:
+        return None
+    for role in ("served_model", "model"):
+        v = c.roles.get(role)
+        for x in (v if isinstance(v, list) else [v]):
+            if isinstance(x, str) and x.startswith("/") and cat.repo_of_local_path(x) == checkpoint:
+                return {"kind": "estimated", "subject": "checkpoint_from_staged_path",
+                        "detail": f"the run served the staged copy {x}, which names no Hugging Face repository; the catalog "
+                                  f"model is the one repository whose name is the directory's: {checkpoint}"}
+    return None
+
+
 def measured(entry: dict) -> dict:
     """The point's measured values: the mean, over the unit's measurements, of each metric
     (design §10.2: a unit holding several measurements is scored against their mean, COV-10).
@@ -868,6 +884,9 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     sup = sp.check(cat, env.parts, checkpoints=cks, base_models=env.base_models,
                    hardware=part_name, spec_method=spec, draft_checkpoint=draft_ck,
                    num_spec_tokens=c.mapped.get("engine.speculative.num_spec_tokens", (None, None))[1])
+    staged = staged_substitution(c, cat, sup.checkpoint) if sup.model else None
+    if staged:
+        o.subs.append(staged)
     if conflict:
         o.reasons.append(conflict)
         sup.reasons = [r for r in sup.reasons if r != "model_not_in_catalog"]

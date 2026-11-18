@@ -56,3 +56,18 @@ def test_a_path_that_fits_no_single_catalog_repository_is_refused_not_guessed(tm
 def test_a_named_repository_still_comes_first(tmp_path):
     cat = catalog(tmp_path)
     assert sc._checkpoints(decided("/lustre/fsw/models/GLM-5-FP8", ["nvidia/GLM-5-NVFP4"]), None, cat)[0] == "nvidia/GLM-5-NVFP4"
+
+
+def test_a_point_found_from_a_staged_path_names_the_directory_and_the_repository_chosen(tmp_path):
+    cat = catalog(tmp_path)
+    path = "/lustre/fsw/models/GLM-5-FP8"
+    c = decided(path, path)
+    cks = sc._checkpoints(c, None, cat)
+    sup = sp.check(cat, {"h200"}, checkpoints=cks, base_models={}, hardware="h200", spec_method=None)
+    sub = sc.staged_substitution(c, cat, sup.checkpoint)
+    assert sub["kind"] == "estimated" and sub["subject"] == "checkpoint_from_staged_path"
+    assert path in sub["detail"] and "zai-org/glm-5-fp8" in sub["detail"]
+    # A run that named its repository is not given the substitution, even when it also served a staged path.
+    named = decided(path, ["zai-org/GLM-5-FP8"])
+    cks = sc._checkpoints(named, None, cat)
+    assert sc.staged_substitution(named, cat, cks[0]) is None
