@@ -913,7 +913,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
         o.subs.append(staged)
     if conflict:
         o.reasons.append(conflict)
-        sup.reasons = [r for r in sup.reasons if r != "model_not_in_catalog"]
+        sup.reasons = [r for r in sup.reasons if r.partition(":")[0] != "model_not_in_catalog"]
     o.reasons += sup.reasons
     if sglang and sup.model and f"engine.{ss.CONTEXT_LENGTH_FIELD}" not in c.mapped and env.catalog_obj is not None:
         # The run did not set the context length, and the catalog's graph carries no window; the SGLang host refuses a

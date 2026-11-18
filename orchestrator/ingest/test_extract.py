@@ -870,14 +870,14 @@ def test_support_asks_blis_catalog_resolve_with_the_catalog_and_caches_each_answ
 def test_support_refuses_an_unknown_model_part_or_drafter():
     cat = _catalog(Path(tempfile.mkdtemp()))
     s = sp.check(cat, {"h200"}, checkpoints=["org/unknown"], base_models={}, hardware="h200", spec_method=None)
-    assert s.reasons == ["model_not_in_catalog"]
+    assert s.reasons == ["model_not_in_catalog:org/unknown"]
     s = sp.check(cat, {"h200"}, checkpoints=["deepseek-ai/DeepSeek-V4.1-Flash"], base_models={}, hardware="tpuv7",
                  spec_method="dspark")
-    assert s.reasons == ["hardware_no_coefficients"]
+    assert s.reasons == ["hardware_no_coefficients:tpuv7"]
     # A part the registry has coefficients for but the catalog has no entry of.
     s = sp.check(cat, {"h200", "mi355x"}, checkpoints=["deepseek-ai/DeepSeek-V4.1-Flash"], base_models={},
                  hardware="mi355x", spec_method="dspark")
-    assert (s.chip, s.reasons) == (None, ["hardware_no_coefficients"])
+    assert (s.chip, s.reasons) == (None, ["hardware_no_coefficients:mi355x"])
     s = sp.check(cat, {"h200"}, checkpoints=["MiniMaxAI/MiniMax-M3"], base_models={}, hardware="h200",
                  spec_method="eagle3")
     assert s.reasons == ["drafter_not_in_catalog:eagle3"]
