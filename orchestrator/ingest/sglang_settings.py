@@ -253,6 +253,46 @@ def _value(text: str, kind: str):
         return text
 
 
+# The flags of a prefill/decode pool that are the deployment's (its role and its KV transfer), not engine settings.
+TRANSFER_FIELDS = ("disaggregation_mode", "disaggregation_transfer_backend")
+CONNECTOR_PATH = "kv_transfer_config.kv_connector"      # where pd.build_pd looks for the pools' connector
+
+
+def pool_launch_text(launch: dict) -> str:
+    """A launch command, in the form `read_launch_command` reads, of the one pool a pseudo launch
+    configuration (pd.pseudo_launch) holds: the recipe's flags and environment. A flag set to false is not on the command."""
+    (role, spec), = launch["roles"].items()
+    lines = [f"export {k}={shlex.quote(str(v))}" for k, v in (spec.get("env") or {}).items()]
+    words = ["python3", "-m", "sglang.launch_server"]
+    for k, v in (spec.get("args") or {}).items():
+        if v is None or v is False:
+            continue
+        words.append(f"--{k}")
+        if v is not True:
+            words += [shlex.quote(str(x)) for x in (v if isinstance(v, list) else [v])]
+    return "\n".join(lines + [" ".join(words)])
+
+
+def read_pool(launch: dict, decl: dict, field_list=None) -> tuple[st.Reading, dict]:
+    """(the pool's settings reading without its role and transfer backend, {field: value}) from a pseudo launch
+    configuration. The transfer backend is also given as the connector pd.build_pd reads; one the recipe leaves
+    unstated is the engine's declared default."""
+    rd = read_launch_command(pool_launch_text(launch), decl)
+    if field_list is not None:
+        drop_foreign_env(rd, field_list)
+    taken = {}
+    for f in TRANSFER_FIELDS:
+        vals = rd.values.pop(f, None)
+        if vals:
+            taken[f] = vals[0]
+    backend = taken.get("disaggregation_transfer_backend")
+    if backend is None and "disaggregation_mode" in taken:
+        backend = (decl["fields"].get("disaggregation_transfer_backend") or {}).get("default")
+    if backend is not None:
+        taken[CONNECTOR_PATH] = backend
+    return rd, taken
+
+
 def unresolved_env(readings: dict) -> list[str]:
     """The environment variables the launch command sets to a value left to the shell ($X): the value is not
     recorded, and the point is refused naming the variable rather than run without it."""
