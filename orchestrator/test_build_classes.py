@@ -171,3 +171,11 @@ def test_the_committed_classes_agree_with_the_committed_summary():
     reg = classes["classes"][0]
     assert reg["counts"]["scored"] == summary["coverage"]["graded"] and reg["counts"]["points"] == summary["coverage"]["points"]
     assert reg["grades"] == {g: summary["coverage"]["by_grade"][g] for g in bc.GRADES}
+
+
+def test_a_provisional_class_is_never_graded_above_g3(tmp_path):
+    """configiq's points are provisional (COV-7): a G1 or G2 among them is a build that skipped the cap, and check says so."""
+    c = bc.derive_configiq(_configiq_dir(tmp_path), cid="configiq", label="L", note="N", meta=META)
+    assert bc.check(_doc(_regular(), c)) == []
+    c["grades"].update(G1=2, G3=c["grades"]["G3"] - 2)  # the same number of scored points, two of them above the cap
+    assert any("capped at G3" in p for p in bc.check(_doc(_regular(), c)))
