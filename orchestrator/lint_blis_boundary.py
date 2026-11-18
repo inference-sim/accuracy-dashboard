@@ -67,6 +67,9 @@ DATA_READS = {
     ("orchestrator/ingest/configiq_score.py", "catalog_context"):
         "TEMPORARY until a command prints a catalog model's context window (see pd.model_window): a configiq row that "
         "leaves max_seq_len blank ran at vLLM's default, the checkpoint's own length, which the entry's config.json holds",
+    ("orchestrator/ingest/configiq_score.py", "resolve"):
+        "TEMPORARY until a command says whether a catalog model has its derived graph (models/<name>/graph.yaml): a configiq "
+        "point whose entry commits a graph and a config hash but no config.json is scored; one with no graph is refused",
     ("orchestrator/ingest/configiq_score.py", "load_points"):
         "TEMPORARY until an inference-sim command prints the full unit list with identities and the ingest report "
         "(see ledger.load): the configiq units are read from catalog/ledger/units, reports and sources.yaml",
