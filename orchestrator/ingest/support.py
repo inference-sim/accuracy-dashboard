@@ -100,6 +100,15 @@ class Catalog:
             self._claim_map = {"entries": entries, "repos": repos}
         return self._claim_map
 
+    def repo_of_local_path(self, path: str) -> str | None:
+        """The source repository of the one catalog model whose repository name ends in the last component of a local
+        checkpoint path (compared without regard to case), or None when no model or several have it. A run that serves a
+        staged copy (/lustre/fsw/models/GLM-5-FP8) names no Hugging Face id, but the staged directory keeps the
+        repository's name; a path whose name fits no single catalog repository is not guessed at."""
+        base = path.rstrip("/").rsplit("/", 1)[-1].casefold()
+        hits = sorted(r for r in self._claims()["repos"] if r.rsplit("/", 1)[-1] == base)
+        return hits[0] if len(hits) == 1 else None
+
     def chip(self, name: str) -> str | None:
         """The catalog chip of that name, or None."""
         if name not in self._chips:

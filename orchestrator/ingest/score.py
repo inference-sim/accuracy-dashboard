@@ -208,9 +208,11 @@ def _read(point_dir: Path, files: dict, role: str) -> bytes | None:
     return gzip.decompress((point_dir / f["path"]).read_bytes())
 
 
-def _checkpoints(c: st.Decided, launch_cfg: dict | None) -> list[str]:
+def _checkpoints(c: st.Decided, launch_cfg: dict | None, cat: "sp.Catalog | None" = None) -> list[str]:
     """The served checkpoint's candidate HF repos, most authoritative first: the launch
-    config's model path, then the served model name, then --model."""
+    config's model path, then the served model name, then --model. A local path that names
+    no repository (a staged copy of the checkpoint) is mapped to the one catalog repository
+    its directory name is (support.Catalog.repo_of_local_path), after the named ones."""
     out = []
     if launch_cfg:
         r = sp.hf_repo(((launch_cfg.get("model") or {}).get("path")))
@@ -222,6 +224,13 @@ def _checkpoints(c: st.Decided, launch_cfg: dict | None) -> list[str]:
             r = sp.hf_repo(x)
             if r and r not in out:
                 out.append(r)
+    if cat is not None:
+        for role in ("served_model", "model"):
+            v = c.roles.get(role)
+            for x in (v if isinstance(v, list) else [v]):
+                r = cat.repo_of_local_path(x) if isinstance(x, str) and x.startswith("/") else None
+                if r and r not in out:
+                    out.append(r)
     return out
 
 
@@ -846,7 +855,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
                    "libraries": {}}      # no source of the run's library versions is read yet
     cat = env.catalog_obj
     spec = c.mapped.get("engine.speculative.method", (None, None))[1]
-    cks = _checkpoints(c, launch)
+    cks = _checkpoints(c, launch, cat)
     served = [x for k in ("served_model", "model") for x in ([c.roles.get(k)] if not isinstance(c.roles.get(k), list) else c.roles.get(k))]
     draft_ck, draft_reason = sp.resolve_draft(c.roles.get("drafter"), served, entry)
     if draft_reason:
