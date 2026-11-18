@@ -38,7 +38,9 @@ def write_corpus(root: Path, runs=1, visibility="private", log=e2e.LOG, client=N
         rid = f"r{k}"
         c = conc[k % len(conc)]
         (root / rid).mkdir()
-        (root / rid / "vllm.log").write_text(log)
+        # A real log records the requests its client sent: 10*conc measured and 2*conc warm-up (ingest/contamination.py).
+        line = '"POST /v1/completions HTTP/1.1" 200\n'
+        (root / rid / "vllm.log").write_text(log.replace(line * 48, line * (12 * c)))
         (root / rid / "client.log").write_text(e2e.job_log_text(1024, 1024, c))
         doc["runs"].append({"id": rid, "workload": "w", "row": row(conc=c),
                             "client": client or {"name": "inferencex", "repo": "SemiAnalysisAI/InferenceX", "commit": "f" * 40},
