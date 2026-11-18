@@ -23,6 +23,7 @@ import assess  # noqa: E402
 import build_summary_v2 as b2  # noqa: E402
 import contract as c  # noqa: E402
 import score as sc  # noqa: E402
+import validate_summary_v2 as vs2  # noqa: E402
 
 FIXTURE = HERE / "testdata" / "contract"
 STAMP = "2026-10-23T00:00:00Z"
@@ -141,3 +142,14 @@ def test_refusal_codes_are_the_same_on_every_point_of_a_kind():
     assert assess.refusal_code("Failed_to_load_trace:_parsing_trace_header:_yaml") == "Failed_to_load_trace"
     assert assess.refusal_code("batch_4096_too_large") == assess.refusal_code("batch_512_too_large") == "batch_N_too_large"
     assert len(assess.refusal_code("x" * 200)) == 40
+
+
+def test_the_validator_holds_new_refusal_codes_to_the_not_scored_points():
+    with tempfile.TemporaryDirectory() as tmp:
+        d, rec = _run_b_with(tmp, "blis_refused:timeout")
+        _as_not_scored(d, rec, "blis_refused:batch_4096_too_large")
+        doc = b2.build(d, generated_at=STAMP, evaluator_commit="test")
+    assert doc["new_refusal_codes"] == ["batch_N_too_large"] and vs2.problems(doc) == []
+    for wrong in ([], ["batch_N_too_large", "invented_code"]):
+        bad = {**doc, "new_refusal_codes": wrong}
+        assert any("new_refusal_codes does not recompute" in p for p in vs2.problems(bad)), wrong
