@@ -433,3 +433,13 @@ def test_the_command_refuses_a_simulator_checkout_that_is_not_at_the_named_build
     args = _command_fixture(tmp_path, {f"{F}:0": prow()})
     assert cmd.main(args + ["--sim-build", "v0.17.0"]) == 2
     assert not (tmp_path / "out").exists()
+
+
+def test_a_hybrid_model_whose_cache_block_needs_the_window_is_a_named_g5_not_a_failure(tmp_path):
+    fake = tmp_path / "refuse"
+    fake.write_text("#!/usr/bin/env python3\nimport sys\nsys.stderr.write('level=fatal msg=\"scenario x.yaml: recurrent layers: mamba_cache_mode none sets "
+                    "mamba_block_size to max_model_len, which is not stated and which the engine fits to the KV budget\"\\n')\nsys.exit(1)\n")
+    fake.chmod(0o755)
+    _, outs, _ = run(tmp_path, {f"{F}:0": prow()}, config=False, fake=str(fake))
+    (o,) = outs
+    assert o.status == "refused" and o.g5[0]["code"] == "value_not_recorded" and "max_model_len" in o.g5[0]["subject"]

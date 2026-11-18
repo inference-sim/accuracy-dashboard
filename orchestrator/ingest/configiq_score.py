@@ -508,7 +508,7 @@ def scored_grade(release_of_run: str | None, engine_release: str, subs: list[dic
 _REQ = re.compile(r"^request_(\d+)$")
 # The engine's refusal of a scenario that lacks a value it would have to choose itself: 'deployment <field> is not
 # stated' (blis-vllm resolves an unstated block_size only for some models and chips, blis-vllm#68).
-_NOT_STATED = re.compile(r"deployment ([a-z_]+) is not stated")
+_NOT_STATED = re.compile(r"deployment ([a-z_]+) is not stated|to (max_model_len), which is not stated")
 _ISSUE = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/issues/\d+")
 
 
@@ -567,7 +567,7 @@ def _run(argv, env: Env, work: Path, pid: str):
         if m:
             issue = _ISSUE.search(flat)
             return None, None, {"code": "value_not_recorded",
-                                "subject": f"engine {m.group(1)}: the row does not record it and the simulator cannot choose "
+                                "subject": f"engine {m.group(1) or m.group(2)}: the row does not record it and the simulator cannot choose "
                                            f"it for this model and chip" + (f" ({issue.group(0)})" if issue else "")}
         reason = sc_.value_refusal(e.stderr, work, env.field_list) or sc_._blis_refusal(e.stderr, work)
         if reason.partition(":")[0] != "blis_refused":
