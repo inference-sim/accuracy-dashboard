@@ -6,6 +6,10 @@ Red Hat's configiq dataset (`redhat-performance/configiq-performance-upstream-da
 
 `orchestrator/ingest/configiq.py` turns ledger units into points and decides which are launcher-consistent ("provisional"). Nothing called `points()` except its own test: there was no scenario builder for a dataset row, no workload built from GuideLLM's columns, and no scoring loop, so all 388 provisional points stayed "awaiting simulation" and the configiq view counted 0 simulated of 1702.
 
+## Pre-registered criterion: missed
+
+The registration (accuracy/preregistrations.md, configiq lane) required at least 95 percent of the 213 simulated-eligible train+validation units to be scored, at least 203. 135 were scored. The criterion was missed: the 78 units refused for an unstated `block_size` (blis-vllm#68) were not in the prediction, which was made from identity alone. The amendment that moved them out of the denominator was written after a trial run and is not relied on here. The points land as provisional, outside the headline, pending the maintainer's decision.
+
 ## What runs
 
 `orchestrator/ingest/score_configiq.py` (a separate entry point, so `cli.py`'s scorer closure, which committed InferenceX contracts name, is unchanged) reads the ledger, the dataset export and the pinned catalog and registry, then for each unit either refuses it by name or replays it:
