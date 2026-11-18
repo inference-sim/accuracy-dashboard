@@ -67,6 +67,9 @@ DATA_READS = {
     ("orchestrator/ingest/configiq_score.py", "catalog_context"):
         "TEMPORARY until a command prints a catalog model's context window (see pd.model_window): a configiq row that "
         "leaves max_seq_len blank ran at vLLM's default, the checkpoint's own length, which the entry's config.json holds",
+    ("orchestrator/ingest/ledger_extract.py", "main"):
+        "TEMPORARY with cli.read_anchor_units: the extract's build reads catalog/ledger/published/anchor.yaml, whose "
+        "records' logs it carries, until `blis ledger --list anchor` prints the published list",
     ("orchestrator/ingest/configiq_score.py", "resolve"):
         "TEMPORARY until a command says whether a catalog model has its derived graph (models/<name>/graph.yaml): a configiq "
         "point whose entry commits a graph and a config hash but no config.json is scored; one with no graph is refused",
@@ -125,6 +128,10 @@ DATA_READS = {
 # Rule 4. (file, rule) pairs, and the command whose absence keeps each. Rules: clone, go_doc,
 # go_list, installation (shell and workflows), pins (Python).
 TEXT_READS = {
+    (".github/workflows/ledger-extract.yml", "clone"):
+        "TEMPORARY with the api-nightly.yml substrate checkout: the extract job checks out blis-substrate at a release "
+        "for catalog/ledger/sources.yaml, ledger/inferencex/export.sql and the unit list, until an inference-sim "
+        "command prints the ledger's pinned source and its export",
     (".github/workflows/api-nightly.yml", "clone"):
         "TEMPORARY until an inference-sim command prints the full unit list with identities and the "
         "ingest report (`blis ledger --list` prints only the published unit ids): the job checks out "
