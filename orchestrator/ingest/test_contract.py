@@ -416,8 +416,25 @@ def _summary_validator(version: int):
     return vs.validator(version)
 
 
-def _published_v2() -> dict:
-    return json.loads((REPO / "data" / "latest" / "summary.json").read_text())
+def _published_v2(data: Path | None = None) -> dict:
+    """The newest published v2 snapshot. `latest` is whatever the last night published, and since the M3.0 scorer that is
+    a v3 snapshot; these tests are about the frozen v2 form, so they read the newest snapshot that is one."""
+    root = data or REPO / "data"
+    for f in sorted(root.glob("snapshots/*/summary.json"), key=lambda f: f.parent.name, reverse=True):
+        doc = json.loads(f.read_text())
+        if doc.get("schema_version") == 2:
+            return doc
+    raise AssertionError("no published v2 snapshot under " + str(root))
+
+
+def test_the_published_v2_snapshot_is_the_newest_v2_one_when_latest_is_v3():
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        for sid, version in (("2026-10-31_a", 2), ("2026-11-09_b", 2), ("2026-11-17_c", 3)):
+            d = Path(tmp) / "snapshots" / sid
+            d.mkdir(parents=True)
+            (d / "summary.json").write_text(json.dumps({"schema_version": version, "snapshot_id": sid}))
+        assert _published_v2(Path(tmp))["snapshot_id"] == "2026-11-09_b"
 
 
 def _v3() -> dict:
@@ -502,3 +519,17 @@ if __name__ == "__main__":
             traceback.print_exc()
     print(f"\n{len(fns) - failed}/{len(fns)} passed")
     sys.exit(1 if failed else 0)
+
+
+def test_pruning_the_legacy_map_drops_only_the_ids_no_published_snapshot_holds(tmp_path):
+    # The nightly keeps the newest API snapshots only, so publishing one retires the oldest; the map must then hold no id
+    # that is not published (legacy_ids check). Pruning removes those and changes nothing else.
+    sys.path.insert(0, str(HERE))
+    import legacy_ids as li
+    keep = {"entry": {"units": ["u1"], "rows": ["1"]}}
+    doc = {"kind": "LegacyPointIds", "ledger_revision": "r", "points": {"a" * 64: keep["entry"], "b" * 64: {"units": [], "reason": "no_api_row"}}}
+    out = li.prune(doc, {"a" * 64})
+    assert out["points"] == {"a" * 64: keep["entry"]} and out["ledger_revision"] == "r"
+    assert li.check(out, {"a" * 64}) == []
+    assert li.check(doc, {"a" * 64}) == ["b" * 12 + ": in the map, not published"]       # what main reported
+    assert li.prune(out, {"a" * 64, "c" * 64}) == out                                 # it never adds an id
