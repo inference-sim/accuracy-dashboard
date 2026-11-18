@@ -179,3 +179,22 @@ def test_a_provisional_class_is_never_graded_above_g3(tmp_path):
     assert bc.check(_doc(_regular(), c)) == []
     c["grades"].update(G1=2, G3=c["grades"]["G3"] - 2)  # the same number of scored points, two of them above the cap
     assert any("capped at G3" in p for p in bc.check(_doc(_regular(), c)))
+
+
+def test_itl_error_counts_only_points_that_stream_one_token_per_chunk(tmp_path):
+    """Measured ITL is comparable with the simulator's per-token ITL only when it sits within 15 percent of the measured TPOT; a point that
+    streamed several tokens per chunk is counted apart, not scored. Eleven comparable points err by +10 percent, two stream in chunks."""
+    d = contract(tmp_path, [0.0] * 13)
+    itl, points = {}, []
+    for i in range(13):
+        chunked = i >= 11
+        measured_itl, measured_tpot = (0.040, 0.010) if chunked else (0.010, 0.0105)  # seconds
+        points.append({"point_id": f"p{i}", "measurements": [{"metrics": {"mean_itl": measured_itl, "mean_tpot": measured_tpot}}]})
+        itl[f"p{i}"] = {"itl_mean_ms": measured_itl * 1000 * 1.10}
+    (tmp_path / "itl.json").write_text(json.dumps(itl))
+    (tmp_path / "manifest.json").write_text(json.dumps({"points": points}))
+    c = derive(d, itl_json=tmp_path / "itl.json", manifest=tmp_path / "manifest.json")
+    f = c["accuracy_by_grade"]["G4"]["itl"]
+    assert f["n"] == 11 and f["mape"] == pytest.approx(10.0) and f["signed_median"] == pytest.approx(10.0)
+    assert c["itl_streamed_in_chunks_left_out"] == 2
+    assert "itl" not in derive(d)["accuracy_by_grade"]["G4"]  # without the inputs a class has no ITL figure, not an invented one

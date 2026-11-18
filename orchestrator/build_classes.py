@@ -44,7 +44,7 @@ STATS = ("ttft", "tpot", "itl")
 # the first, the quantity the InferenceX harness calls TPOT); GuideLLM's own TPOT counts the first token and records no mean, so its
 # median stands for it.
 CONFIGIQ_STAT = {"ttft": "ttft_mean", "itl": "itl_mean", "tpot": "tpot_median"}
-SUPPLEMENTAL_ORDER = ("inferencex-reconstructed", "configiq")
+SUPPLEMENTAL_ORDER = ("sglang", "inferencex-reconstructed", "configiq")
 
 
 class ClassesError(ValueError):
@@ -73,8 +73,29 @@ def _lines(p: Path) -> list[dict]:
 
 # ---------------------------------------------------------------------------------------------- derive
 
-def derive_contract(directory: Path, *, cid: str, label: str, note: str, kind: str, meta: dict, interim: bool = False) -> dict:
-    """A class from a scored contract directory (fidelity.jsonl, points.csv, not_scored.jsonl, failed.jsonl)."""
+def _itl_errors(itl_json: Path, manifest: Path, grade_of: dict) -> tuple[dict, int]:
+    """Percent error of the simulator's mean ITL against the measured mean ITL, by grade. Only a point whose measured ITL is a per-token
+    one counts (mean ITL within 15 percent of mean TPOT); a point that streamed several tokens per chunk is counted apart, since the
+    simulator's per-token ITL does not compare with it."""
+    itl = json.loads(Path(itl_json).read_text())
+    by = {q["point_id"]: q for q in json.loads(Path(manifest).read_text())["points"]}
+    err, left_out = {g: [] for g in GRADED}, 0
+    for pid, grade in grade_of.items():
+        sim = itl.get(pid)
+        mt = ((by.get(pid) or {}).get("measurements") or [{}])[0].get("metrics", {})
+        if not sim or not mt.get("mean_itl") or not mt.get("mean_tpot") or grade not in err:
+            continue
+        if abs(mt["mean_itl"] / mt["mean_tpot"] - 1) > 0.15:
+            left_out += 1
+            continue
+        err[grade].append((sim["itl_mean_ms"] - mt["mean_itl"] * 1000) / (mt["mean_itl"] * 1000) * 100)
+    return err, left_out
+
+
+def derive_contract(directory: Path, *, cid: str, label: str, note: str, kind: str, meta: dict, interim: bool = False,
+                    itl_json: Path | None = None, manifest: Path | None = None) -> dict:
+    """A class from a scored contract directory (fidelity.jsonl, points.csv, not_scored.jsonl, failed.jsonl). With itl_json (the run's
+    simulated ITL per point) and the pull's manifest (the measured ITL) the class also has an ITL figure."""
     directory = Path(directory)
     fid = {r["point_id"]: r for r in _lines(directory / "fidelity.jsonl")}
     ns, failed = _lines(directory / "not_scored.jsonl"), _lines(directory / "failed.jsonl")
@@ -97,11 +118,18 @@ def derive_contract(directory: Path, *, cid: str, label: str, note: str, kind: s
                                                                                  "detail": s.get("detail", ""), "points": 0})
             e["points"] += 1
     refusals = Counter((n["g5_reason"]["code"], n["g5_reason"].get("subject", "")) for n in ns)
+    figures = {g: {s: _figure(err[g][s]) for s in ("ttft", "tpot")} for g in GRADED}
+    extra = {}
+    if itl_json and manifest:
+        itl_err, left_out = _itl_errors(itl_json, manifest, {pid: r["grade"] for pid, r in fid.items()})
+        for g in GRADED:
+            figures[g]["itl"] = _figure(itl_err[g])
+        extra["itl_streamed_in_chunks_left_out"] = left_out
     return {"id": cid, "label": label, "kind": kind, "interim": interim, "note": note,
             "counts": {"points": len(fid) + len(ns) + len(failed), "scored": len(fid), "refused": len(ns), "failed": len(failed),
                        "withheld": 0},
             "grades": {g: grades.get(g, 0) for g in GRADES},
-            "accuracy_by_grade": {g: {s: _figure(err[g][s]) for s in ("ttft", "tpot")} for g in GRADED},
+            "accuracy_by_grade": figures, **extra,
             "refusals": [{"code": c, "subject": s, "points": n} for (c, s), n in sorted(refusals.items(), key=lambda kv: (-kv[1], kv[0]))],
             "substitutions": sorted(subs.values(), key=lambda e: (-e["points"], e["kind"], e["subject"])),
             "provenance": meta}
@@ -245,6 +273,8 @@ def main(argv=None) -> int:
         p.add_argument("--interim", action="store_true")
         if name == "derive-contract":
             p.add_argument("--kind", default="reconstructed", choices=KINDS)
+            p.add_argument("--itl-json", default=None, help="the run's simulated ITL per point (itl.json)")
+            p.add_argument("--pull-manifest", default=None, help="the pull's manifest.json (the measured ITL)")
     b = sub.add_parser("build")
     b.add_argument("--summary", default="data/latest/summary.json")
     b.add_argument("--supplemental", default="data/supplemental/classes")
@@ -255,7 +285,8 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
     try:
         if a.cmd == "derive-contract":
-            doc = derive_contract(Path(a.dir), cid=a.id, label=a.label, note=a.note, kind=a.kind, meta=_meta(a.meta), interim=a.interim)
+            doc = derive_contract(Path(a.dir), cid=a.id, label=a.label, note=a.note, kind=a.kind, meta=_meta(a.meta), interim=a.interim,
+                                 itl_json=a.itl_json, manifest=a.pull_manifest)
             Path(a.out).write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n")
         elif a.cmd == "derive-configiq":
             doc = derive_configiq(Path(a.dir), cid=a.id, label=a.label, note=a.note, meta=_meta(a.meta), interim=a.interim)

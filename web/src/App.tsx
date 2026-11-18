@@ -13,6 +13,8 @@ import { SummaryTable } from './components/SummaryTable'
 import { Dropdown } from './components/Dropdown'
 import { Compare } from './components/Compare'
 import { Headline } from './components/Headline'
+import { Classes } from './components/Classes'
+import { CLASSES_URL, validateClasses, type ClassesDoc } from './classes'
 import { Term } from './components/Term'
 import { GRADE_LABELS, inGrade } from './gradeFilter'
 import { formatCount } from './format'
@@ -39,6 +41,8 @@ export function App({
   loadError,
   index = null,
   initialHash,
+  classes = null,
+  classesError = null,
 }: {
   summary: Summary | null
   /** The second run's snapshot for the A-vs-B compare view; null = single-run mode. */
@@ -48,12 +52,17 @@ export function App({
   index?: RunIndex | null
   /** Test/SSR seam: the starting hash when there is no window. In the browser the live hash wins. */
   initialHash?: string
+  /** Test seam: the classes page's data. In the browser it is fetched when the Classes tab opens. */
+  classes?: ClassesDoc | null
+  classesError?: string | null
 }) {
   const [route, setRoute] = useState<RouteState>(() =>
     parseRoute(hasWindow ? window.location.hash : (initialHash ?? '')),
   )
   const [sort, setSort] = useState<SortSpec | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+  const [classesDoc, setClassesDoc] = useState<ClassesDoc | null>(classes)
+  const [classesFail, setClassesFail] = useState<string | null>(classesError)
 
   useEffect(() => {
     if (!hasWindow) return
@@ -61,6 +70,22 @@ export function App({
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
+
+  // The classes page's data loads when its tab opens (the Overview never needs it), once, from the same site as the summary.
+  useEffect(() => {
+    if (route.view !== 'classes' || classesDoc || classesFail || !hasWindow) return
+    let live = true
+    fetch(CLASSES_URL, { cache: 'no-cache' })
+      .then((r) => {
+        if (!r.ok) throw new Error(`${CLASSES_URL} answered ${r.status}: the classes are not published for this site yet`)
+        return r.json()
+      })
+      .then((raw) => live && setClassesDoc(validateClasses(raw)))
+      .catch((e: Error) => live && setClassesFail(e.message))
+    return () => {
+      live = false
+    }
+  }, [route.view, classesDoc, classesFail])
 
   const update = (next: Partial<RouteState>) => {
     const merged = { ...route, ...next }
@@ -86,6 +111,17 @@ export function App({
         update({ run: route.run === latest ? null : route.run, runB: null, sel: null })
       }
     },
+  }
+
+  // The classes page reads classes.json only, so it shows even while the summary is still loading.
+  if (route.view === 'classes') {
+    return (
+      <Shell view="classes" onView={(view) => update({ view, runB: null, run: null, sel: null })}>
+        <ErrorBoundary resetKey={classesDoc?.generated_at ?? null}>
+          <Classes doc={classesDoc} error={classesFail} />
+        </ErrorBoundary>
+      </Shell>
+    )
   }
 
   if (loadError) {
@@ -150,8 +186,8 @@ function Shell({
   onView,
   children,
 }: {
-  view: 'overview' | 'dev'
-  onView: (v: 'overview' | 'dev') => void
+  view: 'overview' | 'classes' | 'dev'
+  onView: (v: 'overview' | 'classes' | 'dev') => void
   children: React.ReactNode
 }) {
   return (
@@ -159,6 +195,9 @@ function Shell({
       <nav className="tabs" aria-label="Views">
         <button type="button" className={`tab${view === 'overview' ? ' on' : ''}`} onClick={() => onView('overview')}>
           Overview
+        </button>
+        <button type="button" className={`tab${view === 'classes' ? ' on' : ''}`} onClick={() => onView('classes')}>
+          Classes
         </button>
         <button type="button" className={`tab${view === 'dev' ? ' on' : ''}`} onClick={() => onView('dev')}>
           For developers

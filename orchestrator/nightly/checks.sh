@@ -25,6 +25,7 @@ python3 .github/ci/shards.py run contract
   rm -rf public/data dist
   mkdir -p public/data/latest
   cp ../data/latest/summary.json public/data/latest/summary.json
+  cp ../data/latest/classes.json public/data/latest/classes.json
   npm run build --silent
   npx playwright install --with-deps chromium
   node browser_smoke.mjs

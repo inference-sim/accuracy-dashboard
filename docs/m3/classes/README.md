@@ -1,10 +1,11 @@
 # The classes page
 
-The dashboard counts three classes of points apart. A point is in exactly one class, and no class is added into another's counts.
+The dashboard counts four classes of points apart. A point is in exactly one class, and no class is added into another's counts.
 
 | Class | What it is | Grades | Where its numbers come from |
 |---|---|---|---|
 | InferenceX, regular recipes | Every InferenceX point whose launch the run recorded, vLLM and SGLang. | G1 to G4, or G5 with a named reason | `data/latest/summary.json`, the nightly's own run. The headline is this class. |
+| InferenceX, SGLang (final census) | The SGLang points the final census scored (train and validation only), until the nightly's own summary scores SGLang points. | G1 to G4, or G5 with a named reason | `data/supplemental/classes/sglang.json` |
 | InferenceX, reconstructed recipe | Llama-3.3-70B InferenceX points whose launch the run did not record; the recipe was reconstructed from the model's published configuration. | G4 at best, with the substitutions that say so | `data/supplemental/classes/inferencex-reconstructed.json` |
 | Red Hat configiq | The configiq dataset, scored by simulation (see [configiq scored by simulation](../configiq/README.md)). | Provisional, capped at G3 | `data/supplemental/classes/configiq.json` |
 
@@ -18,6 +19,7 @@ Each file under `data/supplemental/classes/` is derived once from a scoring run'
 
 ```
 python3 orchestrator/build_classes.py derive-contract CONTRACT_DIR --id inferencex-reconstructed --label L --note N --meta META.json --interim --out data/supplemental/classes/inferencex-reconstructed.json
+python3 orchestrator/build_classes.py derive-contract CONTRACT_DIR --kind regular --id sglang --label L --note N --meta META.json --itl-json itl.json --pull-manifest manifest.json --out data/supplemental/classes/sglang.json
 python3 orchestrator/build_classes.py derive-configiq SCORE_DIR    --id configiq --label L --note N --meta META.json --interim --out data/supplemental/classes/configiq.json
 python3 orchestrator/build_classes.py build
 python3 orchestrator/build_classes.py check data/latest/classes.json
