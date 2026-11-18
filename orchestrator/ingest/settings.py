@@ -812,10 +812,15 @@ def decide(settings: dict[str, Setting], field_list, part: str | None = None, fa
             if estimated["rule"] == fl.SUBSTITUTE:
                 for f, v in sorted(estimated["setting"].items()):
                     sub = location(f)
-                    if sub is None:
-                        d.reasons.append(f"setting_differs:{f}")
-                    else:
+                    succ = field_list.lookup(f)
+                    if sub is not None:
                         d.mapped[sub] = (f, v)
+                    elif succ is not None and succ.status in (fl.PROVEN_INERT, fl.INERT_UNPROVEN):
+                        # A successor the engine calls inert has no place in the scenario because it changes nothing
+                        # the simulation prices; the substitution's detail names it, so it is not a lost setting.
+                        d.args.append({"arg": f, "measured": None, "source": st.source, "blis": None, "match": "inert"})
+                    else:
+                        d.reasons.append(f"setting_differs:{f}")
             continue
         if st.value is None:
             continue    # None is "let the engine decide": nothing to copy
