@@ -45,3 +45,20 @@ def test_a_removed_name_the_release_still_lists_is_not_translated():
     c = _decide(_list(_row("attention_config.mla_prefill_backend", MLA), _row("attention_config.use_trtllm_ragged_deepseek_prefill")),
                 attention_config__use_trtllm_ragged_deepseek_prefill=True)
     assert c.reasons == ["field_not_modelled:attention_config.use_trtllm_ragged_deepseek_prefill"]
+
+
+MOE_X = {"name": "moe_backend", "source": "config", "status": "modelled", "evidence": {"traces": ["t"]}, "estimation": {"rule": "none"}}
+ACT_INERT = {"name": "quantization_config.moe.activation", "source": "config", "status": "inert_unproven",
+             "evidence": {"note": "marked inert; no proof yet"}, "estimation": {"rule": "none"}}
+TRANSLATED = {"name": "VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8", "source": "env", "status": "not_modelled", "evidence": {"issue": "o/r#276"},
+              "estimation": {"rule": "substitute", "setting": {"moe_backend": "flashinfer_trtllm", "quantization_config.moe.activation": "mxfp8"},
+                             "reason": "env_var_not_in_release: removed", "preserves": "the MoE kernel the run used",
+                             "valid_when": [{"value_in": ["1", "true"], "compute_capability": {"gte": "10.0", "lt": "11.0"}}]}}
+
+
+def test_a_substitution_whose_second_setting_is_inert_names_it_and_loses_nothing():
+    """The translated MXFP8 variable states moe_backend and quantization_config.moe.activation; the scenario has no place for the
+    second, which the engine calls inert, so it is not a setting the written scenario lost."""
+    c = _decide(_list(TRANSLATED, MOE_X, ACT_INERT), env__VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8=True)
+    assert "setting_differs:quantization_config.moe.activation" not in c.reasons
+    assert any(a["arg"] == "quantization_config.moe.activation" and a["match"] == "inert" for a in c.args)
