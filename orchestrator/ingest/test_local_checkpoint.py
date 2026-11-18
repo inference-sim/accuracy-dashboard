@@ -12,7 +12,7 @@ import score as sc  # noqa: E402
 import support as sp  # noqa: E402
 import test_score_e2e as e2e  # noqa: E402
 
-REPOS = {"glm-5-fp8": "zai-org/GLM-5-FP8", "glm-5-nvfp4": "nvidia/GLM-5-NVFP4",
+REPOS = {"deepseek-r1-0528": "deepseek-ai/DeepSeek-R1-0528", "glm-5-fp8": "zai-org/GLM-5-FP8", "glm-5-nvfp4": "nvidia/GLM-5-NVFP4",
          "qwen3.5-397b-a17b": "Qwen/Qwen3.5-397B-A17B", "qwen3.5-397b-a17b-nvfp4": "nvidia/Qwen3.5-397B-A17B-NVFP4",
          "twin-a": "org-a/Twin-70B", "twin-b": "org-b/Twin-70B"}
 
@@ -48,7 +48,7 @@ def test_the_quantisation_in_the_directory_name_picks_its_own_entry(tmp_path):
 
 
 def test_a_path_that_fits_no_single_catalog_repository_is_refused_not_guessed(tmp_path):
-    for path in ("/lustre/fsw/models/dsr1-0528-fp8", "/models/Twin-70B"):      # none; two repositories
+    for path in ("/lustre/fsw/models/unknown-dir-fp8", "/models/Twin-70B"):      # none; two repositories
         cks, sup = served_model(tmp_path, path)
         assert cks == [] and sup.model is None and "model_not_in_catalog" in sup.reasons
 
@@ -71,3 +71,17 @@ def test_a_point_found_from_a_staged_path_names_the_directory_and_the_repository
     named = decided(path, ["zai-org/GLM-5-FP8"])
     cks = sc._checkpoints(named, None, cat)
     assert sc.staged_substitution(named, cat, cks[0]) is None
+
+
+def test_a_staged_directory_bound_to_its_repository_by_the_runs_harness_resolves_and_cites_the_binding(tmp_path):
+    cat = catalog(tmp_path)
+    path = "/lustre/fsw/models/dsr1-0528-fp8"
+    c = decided(path, path)
+    cks = sc._checkpoints(c, None, cat)
+    sup = sp.check(cat, {"h200"}, checkpoints=cks, base_models={}, hardware="h200", spec_method=None)
+    assert sup.model == "deepseek-r1-0528"
+    sub = sc.staged_substitution(c, cat, sup.checkpoint)
+    assert "launch_b200-dgxc.sh:19-20" in sub["detail"] and "deepseek-ai/deepseek-r1-0528" in sub["detail"]
+    # A catalog without that repository is not given the guess.
+    bare = e2e._catalog(tmp_path / "x", {}, {"h200": (8, None)}, {})
+    assert bare.repo_of_local_path(path) is None

@@ -242,7 +242,10 @@ def staged_substitution(c: st.Decided, cat: "sp.Catalog", checkpoint: str | None
             if isinstance(x, str) and x.startswith("/") and cat.repo_of_local_path(x) == checkpoint:
                 return {"kind": "estimated", "subject": "checkpoint_from_staged_path",
                         "detail": f"the run served the staged copy {x}, which names no Hugging Face repository; the catalog "
-                                  f"model is the one repository whose name is the directory's: {checkpoint}"}
+                                  f"model is the one repository whose name is the directory's: {checkpoint}"
+                                  + (f"; the directory's name is not the repository's, and a record of the run's harness binds "
+                                     f"them: {sp.STAGED_ALIASES[x.rstrip('/').rsplit('/', 1)[-1].casefold()][1]}"
+                                     if x.rstrip('/').rsplit('/', 1)[-1].casefold() in sp.STAGED_ALIASES else "")}
     return None
 
 
