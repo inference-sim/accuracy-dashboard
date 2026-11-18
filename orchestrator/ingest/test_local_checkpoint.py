@@ -50,7 +50,7 @@ def test_the_quantisation_in_the_directory_name_picks_its_own_entry(tmp_path):
 def test_a_path_that_fits_no_single_catalog_repository_is_refused_not_guessed(tmp_path):
     for path in ("/lustre/fsw/models/unknown-dir-fp8", "/models/Twin-70B"):      # none; two repositories
         cks, sup = served_model(tmp_path, path)
-        assert cks == [] and sup.model is None and "model_not_in_catalog" in sup.reasons
+        assert cks == [] and sup.model is None and "model_not_in_catalog:no_checkpoint_recorded" in sup.reasons
 
 
 def test_a_named_repository_still_comes_first(tmp_path):

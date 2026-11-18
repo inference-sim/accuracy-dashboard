@@ -416,10 +416,11 @@ def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models:
         # Only a reason when it could have mattered: a checkpoint that matched needs no base.
         s.reasons.append("model_not_in_catalog:base_model_lookup_failed")
     if not s.model and not ambiguous:
-        s.reasons.append("model_not_in_catalog")
+        # The subject names what the catalog lacks: the repositories the run could have served.
+        s.reasons.append("model_not_in_catalog:" + (",".join(checkpoints) if checkpoints else "no_checkpoint_recorded"))
     s.chip = cat.chip(hardware)
     if s.chip is None or hardware not in parts:
-        s.reasons.append("hardware_no_coefficients")
+        s.reasons.append(f"hardware_no_coefficients:{hardware}")
     if s.model and spec_method:
         named = cat.drafters_of(draft_checkpoint) if draft_checkpoint else []
         d = None
