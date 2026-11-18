@@ -12,6 +12,8 @@ with and the reason. The list is checked here:
   - an entry gives a reason.
 
 `current(root)` is every committed contract that is not historical: the ones the currency gate holds to HEAD.
+Current contracts come from the score-contracts workflow, which freezes the pull in GitHub Actions and keeps it as an
+artifact, so a later scorer change can always score them again.
 """
 from __future__ import annotations
 

@@ -63,7 +63,14 @@ The units file for step 3 is committed; `split.py splits --pull PULL --out split
 
 **A contract is made by the scorer it sits beside.** The harness commit in each `contract/provenance.json` is the checkout `run.sh` ran from; the results are committed after it, so it is not the head. `orchestrator/baseline/test_contracts_current.py` fails if any scoring file (`harness/`, `schemas/`, `requirements-ci.txt`, a non-test file under `orchestrator/` except the boundary lint and `build_summary_v2.py`, which write no contract) differs between that commit and the head: a change to the scorer means every current contract is scored again and its tables regenerated. CI checks out the full history for this.
 
-**Historical contracts.** The five M2 contracts above (`docs/m2/*/contract`) were scored at harness `0e9627e219c207593de5bc55d997cf3dca707d64` from pulls frozen on one machine, and those pulls are no longer held, so they cannot be scored again. They are listed, each by its exact path with its harness commit, pull manifest sha256 and reason, in `docs/m2/historical-contracts.json`, and the gate exempts exactly those (`orchestrator/baseline/contract_currency.py` checks that each entry names an existing contract at its own provenance, by path and never by pattern). Every other committed contract is current.
+**Historical contracts.** The five M2 contracts above (`docs/m2/*/contract`) were scored at harness `0e9627e219c207593de5bc55d997cf3dca707d64` from pulls frozen on one machine, and those pulls are no longer held, so they cannot be scored again. They are listed, each by its exact path with its harness commit, pull manifest sha256 and reason, in `docs/m2/historical-contracts.json`, and the gate exempts exactly those (`orchestrator/baseline/contract_currency.py` checks that each entry names an existing contract at its own provenance, by path and never by pattern). Every other committed contract is current, and comes from the `score-contracts` workflow (`.github/workflows/score-contracts.yml`, run by hand with `workflow_dispatch`):
+
+```
+gh workflow run score-contracts.yml -f harness_commit=<40 hex> -f sim=<tag or 40 hex> \
+  -f units=<units file at that commit> -f today=<YYYY-MM-DD> -f label=<name>
+```
+
+It checks out the harness commit, reads the simulator's `stack.json` for the substrate, the field list and the vLLM tag, freezes the units from the live InferenceX API on the run's own token, scores them with `harness/run.sh`, and keeps two artifacts for 90 days, the most GitHub allows: `pull-<label>-<manifest sha256>` (the frozen pull, third-party data, never committed) and `contract-<label>` (the contract directory, its splits file and its units, to commit). The run's summary prints the pull's manifest sha256, which is the contract's `pull_manifest_sha256`. A current contract is re-scored by a new run, never from a pull on a developer's machine.
 
 ## Expected results
 
