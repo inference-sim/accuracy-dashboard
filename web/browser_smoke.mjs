@@ -81,15 +81,11 @@ try {
       problems.push(`drill-down: expected a row matching "${sel}" but found none (table is empty or broken)`)
       break
     }
-    if (sel === 'tr.r3') {
-      // What a click at the row's centre lands on (a tooltip control inside the row swallows it).
-      var underClick = await el.evaluate((row) => {
-        const b = row.getBoundingClientRect()
-        const t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2)
-        return t ? `${t.tagName}.${t.className}` : 'nothing'
-      })
-    }
-    await el.click()
+    // A topology row is selected by clicking it, but its name cell holds the provenance mark, whose click opens a tooltip
+    // and must not select (SummaryTable stops it). Playwright clicks a row at its centre, which on the production snapshot
+    // (every point carries the mark) is that mark, so click the row's last cell, a number a reader would click.
+    if (sel === 'tr.r3') await (await el.$('td:last-child')).click()
+    else await el.click()
     await page.waitForTimeout(300)
   }
   await page.waitForTimeout(300)
@@ -104,7 +100,7 @@ try {
       selected: document.querySelectorAll('tr.selected, tr.r3.on').length,
       pointsArea: (document.querySelector('.pts-empty, .pts-hint')?.textContent || '').slice(0, 160),
     }))
-    problems.push('drill-down: points table rendered zero rows after selecting a topology ' + JSON.stringify({ ...seen, underClick: typeof underClick === 'string' ? underClick : null }))
+    problems.push('drill-down: points table rendered zero rows after selecting a topology ' + JSON.stringify({ ...seen }))
   }
 
   // The vLLM version is shown per point, never filtered on: no version dropdown.
