@@ -79,6 +79,7 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
     "ingest": [
         script("orchestrator/ingest/test_extract.py", "API ingest extractor"),
         script("orchestrator/ingest/test_score_e2e.py", "Points through score_point and write_contract, fake BLIS binaries"),
+        pytest("a staged checkpoint path resolves to its catalog model", "orchestrator/ingest/test_local_checkpoint.py"),
         pytest("configiq points and coverage by source", "orchestrator/ingest/test_configiq.py",
                "orchestrator/ingest/test_by_source.py"),
     ],
