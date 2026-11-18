@@ -43,6 +43,7 @@ import inferencex_runners as ir  # noqa: E402
 import replay as rp  # noqa: E402
 import result  # noqa: E402
 import settings as st  # noqa: E402
+import supplemental  # noqa: E402
 import sglang_settings as ss  # noqa: E402
 import blis_commands as bc  # noqa: E402
 import contamination  # noqa: E402
@@ -829,13 +830,19 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
         return score_pd(o, entry, pdir, env, work, fw, simulate=simulate)
     log_b = _read(pdir, entry["files"], "server_log")
     agg = aggregated_recipe(entry, pdir) if log_b is None and not sglang else None
-    if log_b is None and agg is None:
+    # A unit whose own recipe is gone (the run's record answered 404) and for which a launch was reconstructed
+    # from the benchmark scripts of its day (supplemental.py): that launch is read as the launch config, named on
+    # the point as the substitution it is, and the point is graded as a run of another release (G4).
+    supp = entry.get("supplemental_recipe") if log_b is None and agg is None and not sglang else None
+    if log_b is None and agg is None and supp is None:
         # The pull may already have said why (the API answered 413 or 404): that reason stands alone.
         bare = [] if any(r.startswith("server_log_missing:api_") for r in o.reasons) else ["server_log_missing"]
         o.reasons = sorted(set(o.reasons + bare + asx.router_reason(row, fw.router)))
         return o
     log = log_b.decode("utf-8", "replace") if log_b is not None else ""
     o.banner = _banner_version(log)
+    if supp is not None:
+        o.banner = supp["release"]
     if log_b is not None and not sglang:
         # A server log holding other requests than the client's is another run's queue (contamination.py).
         o.reasons += contamination.reasons(log, row)
@@ -857,7 +864,11 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     # A colocated engine over several nodes (row.is_multinode, not disagg) is one pool: build() sizes the
     # cluster from the engine's ranks and states the fabric. A prefill/decode run never
     # reaches here: score_pd takes it before the log is read.
-    if agg is not None:
+    if supp is not None:
+        launch = supp["launch"]
+        o.reasons = [r for r in o.reasons if r.partition(":")[0] != "server_log_missing"]
+        recovery = [supplemental.substitution(supp)]
+    if agg is not None or supp is not None:
         readings, problems = {src: st.Reading() for src in st.SOURCES}, []
         readings["launch_config"] = st.read_launch_config(launch)
     elif sglang:
