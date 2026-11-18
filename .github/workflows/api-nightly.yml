@@ -192,6 +192,15 @@ jobs:
             echo "::endgroup::"
           done
 
+      - name: Build the classes page data from the night's summary and the committed derived files
+        run: |
+          set -euo pipefail
+          # data/supplemental/classes/ holds the derived files of the reconstructed-recipe and configiq classes (committed, with the
+          # command and heads that made them); no configiq or reconstructed point is scored here. The night's summary supplies the
+          # regular class, so classes.json is always the summary's own snapshot.
+          if [ -f data/latest/summary.json ]; then
+            python3 orchestrator/build_classes.py build --summary data/latest/summary.json --supplemental data/supplemental/classes --out data/latest/classes.json
+          fi
       - name: Package the published data for the publish job
         run: tar -czf data.tgz -C data . 2>/dev/null || tar -czf data.tgz --files-from /dev/null
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
