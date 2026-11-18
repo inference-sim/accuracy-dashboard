@@ -603,6 +603,9 @@ class Outcome:
     # the number of requests behind the predicted and the measured mean.
     result_data: dict | None = None
     samples: tuple | None = None
+    # Set by _run_result when the simulator refused a stated value that the model never reads: the scorer runs the point once
+    # more without it (_score_one) and names the omission.
+    retry_omit: str | None = None
 
 
 def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env, simulate: bool = True) -> Outcome:
@@ -612,6 +615,8 @@ def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env, simulate: bool
     simulator block."""
     try:
         o = score_point(entry, pull_dir, work, env, simulate=simulate)
+        if o.retry_omit and not entry.get("omit_unread"):
+            o = score_point({**entry, "omit_unread": [o.retry_omit]}, pull_dir, work, env, simulate=simulate)
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
         o = Outcome(point_id=entry["point_id"], identity=entry["identity"], row=entry["row"],
                     reasons=sorted(set(entry["reasons"] + ["blis_refused:extractor_error"])),
@@ -868,6 +873,18 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
         c = st.decide(st.merge(readings, defaults), env.field_list, part_name, _facts_of(env, part_name, st.recorded_node_size(launch)))
     o.reasons += c.reasons
     o.subs = recovery + list(c.substitutions)
+    for name in entry.get("omit_unread") or []:
+        # The model never reads this setting (the simulator said so for this point once): the release default the run
+        # recorded is not stated, and the point says so with the recorded value and the line that shows it (X19).
+        loc = OMITTABLE[name]
+        if loc in c.mapped:
+            path, value = c.mapped.pop(loc)
+            c.args[:] = [x for x in c.args if x.get("arg") != path and x.get("blis_field") != loc]
+            o.subs.append({"kind": "resolved_differs", "subject": name,
+                           "detail": f"the run's engine recorded {path}={value!r} (its release's default, which this model never "
+                                     f"reads); the scenario does not state it, because the simulator refuses a stated value for "
+                                     f"a model with no indexer cache (blis-vllm compat/kernelmodel/kvlayers.go, kvLayersOf, "
+                                     f"issue #84: \"read only for MiniMax-M3's indexer cache\")"})
     o.reasons += row_vs_run(row, c)
 
     o.g1_inputs = {"requested": st.requested_values(c.settings),
@@ -1069,6 +1086,13 @@ def _single_turn_label(isl: int, osl: int) -> str:
 SINGLE_TURN_SEED = 42
 
 
+# The simulator's refusal of a setting the scenario states for a model that never reads it ("indexer_kv_dtype="bf16" is read only
+# for MiniMax-M3's indexer cache, and this model has none, so a stated value would be dropped"). The value the run recorded is
+# its release's default, not a choice it made for this model, so the point is run again without it and says so.
+_UNREAD_VALUE = re.compile(r'([a-z_]+)="[^"]*" is read only for [^,]*, and this model has none')
+OMITTABLE = {"indexer_kv_dtype": "engine.indexer_kv_dtype"}
+
+
 def _run_result(o: Outcome, argv: list[str], key: str, cache: Path, env: Env, work: Path,
                 runner=None) -> dict | None:
     """The Result of one `blis replay`, read from its standard output and validated
@@ -1096,6 +1120,9 @@ def _run_result(o: Outcome, argv: list[str], key: str, cache: Path, env: Env, wo
     except result.RunFailed as e:
         (logs / f"{o.point_id}.err").write_text(e.stderr[-20000:])
         o.reasons = [value_refusal(e.stderr, work, env.kit(o.engine).field_list) or _blis_refusal(e.stderr, work)]
+        unread = _UNREAD_VALUE.search(re.sub(r"\s+", " ", e.stderr).replace('\\"', '"'))
+        if unread and unread.group(1) in OMITTABLE:
+            o.retry_omit = unread.group(1)
         return None
     except result.ResultError as e:
         (logs / f"{o.point_id}.err").write_text(str(e)[-20000:])
