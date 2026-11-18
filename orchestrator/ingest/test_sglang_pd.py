@@ -63,8 +63,8 @@ def _fields(transfer_status):
                                 "fields": sorted(f, key=lambda x: (x["name"], x["source"]))}).encode())
 
 
-def _point(tmp, transfer_status):
-    entry, env = tpd._pd_point(tmp, log=False, recipe_text=RECIPE2, row={"framework": "dynamo-sglang", "image": tsg.IMAGE})
+def _point(tmp, transfer_status, recipe=RECIPE2):
+    entry, env = tpd._pd_point(tmp, log=False, recipe_text=recipe, row={"framework": "dynamo-sglang", "image": tsg.IMAGE})
     entry_doc = json.loads(json.dumps(tpd.TABLE_ENTRY))
     for ratio in entry_doc["bound"]["ratios"]:
         ratio["regime"]["engine_version"] = tsg.RELEASE        # the router bound's regime is the engine release it was measured on
@@ -99,5 +99,33 @@ def test_a_prefill_decode_sglang_point_whose_fields_are_accepted_is_written_as_t
         assert [p["role"] for p in dep["pools"]] == ["prefill", "decode"]
         assert [p["parallel"]["tp"] for p in dep["pools"]] == [1, 4]
         assert dep["pd_transfer"] == {"connector": "nixl"}
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_transfer_backend_the_recipe_leaves_unstated_is_the_engines_declared_default_and_named_on_the_point():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _point(tmp, "proven_inert", recipe=RECIPE2.replace(" disaggregation-transfer-backend: nixl,", ""))
+        o, work = e2e._score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        default = ss.load_declarations()["fields"]["disaggregation_transfer_backend"]["default"]
+        dep = next(d for d in yaml.safe_load_all(next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text())
+                   if d["kind"] == "Deployment")
+        assert dep["pd_transfer"] == {"connector": default}
+        subs = {s["subject"]: s for s in o.fidelity["substitutions"] if s["subject"].endswith("disaggregation_transfer_backend")}
+        assert set(subs) == {"prefill.disaggregation_transfer_backend", "decode.disaggregation_transfer_backend"}
+        assert all(s["kind"] == "estimated" and repr(default) in s["detail"] for s in subs.values())
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_a_recipe_that_states_its_transfer_backend_is_given_no_such_substitution():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _point(tmp, "proven_inert")
+        o, _ = e2e._score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        assert not any(s["subject"].endswith("disaggregation_transfer_backend") for s in o.fidelity["substitutions"])
     finally:
         shutil.rmtree(tmp)
