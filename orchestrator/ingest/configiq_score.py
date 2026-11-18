@@ -311,7 +311,8 @@ def vllm_max_model_len(config: dict) -> int | None:
 
 
 def catalog_context(catalog_root, model: str) -> int | None:
-    """vllm_max_model_len of the catalog entry's config.json, or None where the entry carries none."""
+    """vllm_max_model_len of the catalog entry's config.json, or None where the entry commits none (a licence can keep the
+    file out of the catalog while its hash and the derived graph, which the simulator reads, are committed)."""
     f = Path(catalog_root) / "models" / model / "config.json"
     return vllm_max_model_len(json.loads(f.read_text())) if f.is_file() else None
 
@@ -326,9 +327,7 @@ def build(p: "cq.Point", *, model: str, chip: str, engine_release: str, packagin
     name = f"cq-{p.unit_id[:16]}"
     tp = int(ident["tp"])
     eng, blank_subs = engine_block(ident)
-    if "max_model_len" not in eng:
-        if context is None:
-            raise ScoreError("no max_model_len: the row leaves max_seq_len blank and the catalog entry has no config.json")
+    if "max_model_len" not in eng and context is not None:
         eng["max_model_len"] = context
     subs = [dict(s) for s in cq.PROVISIONAL_SUBSTITUTIONS] + [dict(s) for s in FRAME_SUBSTITUTIONS] + blank_subs
     if context is not None and eng.get("max_model_len") == context and ident.get("max_seq_len") in (None, ""):
@@ -336,6 +335,11 @@ def build(p: "cq.Point", *, model: str, chip: str, engine_release: str, packagin
                      "detail": f"the row leaves max_seq_len blank, so the launch passed no --max-model-len and vLLM serves the "
                                f"checkpoint's own length: {context}, from the catalog entry's config.json by "
                                f"_get_and_verify_max_len at v0.33.0 (the tokenizer config is not read)"})
+    if "max_model_len" not in eng:
+        subs.append({"kind": "estimated", "subject": "engine.max_model_len",
+                     "detail": "the row leaves max_seq_len blank and the catalog entry commits no config.json to derive vLLM's "
+                               "default from (its licence keeps the file out; the config hash and the derived graph are "
+                               "committed); the scenario states none and the simulator resolves it from the graph, or refuses"})
     cluster = {"hardware": chip}
     per_node = packaging.get("gpus_per_node")
     if per_node is None:
@@ -585,10 +589,10 @@ def resolve(p: "cq.Point", env: Env) -> tuple[str | None, str | None, list[dict]
         g5 = sorted([asx.g5_of(r) for r in sup.reasons], key=lambda r: (cq.G5_ORDER.index(r["code"]), r.get("subject", "")))
         return None, None, g5 or [{"code": "not_in_catalog", "subject": f"model {ident['model_id']}"}], None
     context = catalog_context(env.catalog, sup.model)
-    if context is None and ident.get("max_seq_len") in (None, ""):
-        return sup.model, sup.chip, [{"code": "value_not_recorded",
-                                      "subject": f"engine max_model_len: the row leaves max_seq_len blank, and the catalog entry "
-                                                 f"{sup.model} has no config.json to derive vLLM's default from"}], None
+    if context is None and ident.get("max_seq_len") in (None, "") \
+            and not (Path(env.catalog) / "models" / sup.model / "graph.yaml").is_file():
+        return sup.model, sup.chip, [{"code": "not_in_catalog",
+                                      "subject": f"model {sup.model}: the catalog entry has no derived graph"}], None
     return sup.model, sup.chip, [], context
 
 
