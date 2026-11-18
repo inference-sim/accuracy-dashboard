@@ -233,6 +233,12 @@ jobs:
         with:
           name: night
           path: incoming
+      # The browser smoke that gates the commit (checks.yml's web job runs the same on a pull request).
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
       - name: Unpack and validate the incoming data (never swap in a partial artifact)
         run: |
           set -euo pipefail
@@ -323,7 +329,10 @@ jobs:
             exit 1
           fi
           mkdir -p state; cp "$STATE_IN" state/last-run-api.json; cp "$SCORED_IN" state/scored-releases.json
+          # This commit is [skip ci], so nothing checks it after it lands: publish.sh runs the checks it can break
+          # (orchestrator/nightly/checks.sh) on this tree before it commits, and a failing check stops the step.
           if [ "$DRY_RUN" = true ]; then
+            bash orchestrator/nightly/publish.sh --dry-run unused
             # Every validation above passed; print what would be published, and publish nothing.
             python3 - <<'PY'
           import json, os
@@ -341,8 +350,9 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A data state/last-run-api.json state/scored-releases.json
-          if git commit -m "api-nightly: ${{ needs.resolve.outputs.blis_tag }} $(date -u +%F) [skip ci]"; then
+          rc=0
+          bash orchestrator/nightly/publish.sh "api-nightly: ${{ needs.resolve.outputs.blis_tag }} $(date -u +%F) [skip ci]" || rc=$?
+          if [ "$rc" = 0 ]; then
             # A long rescore can finish after another commit landed on main; rebase onto it so the
             # push doesn't fail and lose the night. Our commit only touches data/ + state/, which no
             # other workflow writes, so a rebase can't conflict. A few retries absorb a tight race;
@@ -356,9 +366,10 @@ jobs:
               echo "FATAL: could not push after 3 rebase+retry attempts"; exit 1
             fi
             echo "pushed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "nothing to commit (index unchanged)"
+          elif [ "$rc" = 10 ]; then
             echo "pushed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "FATAL: a check failed or the commit failed (status $rc); nothing was committed or pushed"; exit "$rc"
           fi
 
       - name: Deploy the published data to Pages

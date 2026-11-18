@@ -81,6 +81,14 @@ try {
       problems.push(`drill-down: expected a row matching "${sel}" but found none (table is empty or broken)`)
       break
     }
+    if (sel === 'tr.r3') {
+      // What a click at the row's centre lands on (a tooltip control inside the row swallows it).
+      var underClick = await el.evaluate((row) => {
+        const b = row.getBoundingClientRect()
+        const t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2)
+        return t ? `${t.tagName}.${t.className}` : 'nothing'
+      })
+    }
     await el.click()
     await page.waitForTimeout(300)
   }
@@ -92,10 +100,11 @@ try {
     const seen = await page.evaluate(() => ({
       hash: location.hash,
       topologyRows: document.querySelectorAll('tr.r3').length,
+      rowClass: document.querySelector('tr.r3')?.className,
       selected: document.querySelectorAll('tr.selected, tr.r3.on').length,
       pointsArea: (document.querySelector('.pts-empty, .pts-hint')?.textContent || '').slice(0, 160),
     }))
-    problems.push('drill-down: points table rendered zero rows after selecting a topology ' + JSON.stringify(seen))
+    problems.push('drill-down: points table rendered zero rows after selecting a topology ' + JSON.stringify({ ...seen, underClick: typeof underClick === 'string' ? underClick : null }))
   }
 
   // The vLLM version is shown per point, never filtered on: no version dropdown.
