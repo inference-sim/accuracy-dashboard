@@ -151,6 +151,18 @@ try {
     await page.waitForTimeout(150)
     if (await page.$('.dd-list')) problems.push('dropdown did not close after selection')
   }
+
+  // The classes page, when the served data holds classes.json (the nightly gate and CI stage it; a bare snapshot has none, and the
+  // page then says so). Every class is one card, and no card shows NaN or undefined.
+  const haveClasses = (await page.request.get(`${BASE}/data/latest/classes.json`)).ok()
+  if (haveClasses) {
+    await page.goto(`${BASE}/#/?view=classes`, { waitUntil: 'networkidle', timeout: 30000 })
+    await page.waitForSelector('section.classcard', { timeout: 5000 }).catch(() => {})
+    const cards = await page.$$('section.classcard')
+    if (cards.length < 1) problems.push('classes page rendered no class card')
+    const body = await page.innerText('.classes')
+    if (/NaN|undefined/.test(body)) problems.push('classes page shows NaN or undefined')
+  }
 } catch (e) {
   problems.push(`navigation: ${e.message}`)
   ok = false

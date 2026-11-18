@@ -290,6 +290,7 @@ jobs:
           rm -rf public/data dist
           mkdir -p public/data/latest
           cp ../data/latest/summary.json public/data/latest/summary.json
+          cp ../data/latest/classes.json public/data/latest/classes.json
           npm run build
           node browser_smoke.mjs
 

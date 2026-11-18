@@ -60,7 +60,7 @@ def test_contract_class_counts_and_error_worked_by_hand(tmp_path):
     assert g4["mape"] == pytest.approx(sum(abs(e) for e in errors) / 11)
     assert g4["signed_median"] == pytest.approx(10)
     assert c["substitutions"] == [{**SUB, "points": 11}]
-    assert c["refusals"] == [{"code": "no_recipe", "subject": "x", "points": 3}]
+    assert c["refusals"] == [{"code": "no_recipe", "subject": bc.OTHER_SETTINGS, "points": 3}]  # a reason under the minimum is one row per code
     assert bc.check(_doc(_regular(), c)) == []
 
 
@@ -77,10 +77,10 @@ def _configiq_dir(tmp_path, n_train=10, n_test=4):
     br = {"provisional_grades": {"G3": n_train}, "grades": {"G5": 1}}
     (d / "summary.json").write_text(json.dumps({"coverage": cov, "by_source": br,
                                                 "provenance": {"dataset": {"revision": "rev"}, "split": {"name": "dev"}}}))
-    recs = [{"status": "scored", "split": "train", "grade": "G3", "substitutions": [SUB],
-             "errors_pct": {"ttft_mean": 100.0, "itl_mean": -10.0, "tpot_median": 5.0}} for _ in range(n_train)]
+    recs = [{"status": "scored", "split": "train", "grade": "G3", "model": "m/a" if i < 7 else "m/b", "substitutions": [SUB],
+             "errors_pct": {"ttft_mean": 100.0, "itl_mean": -10.0, "tpot_median": 5.0}} for i in range(n_train)]
     # test-split points are never simulated, but if one were present it must not move any figure
-    recs += [{"status": "scored", "split": "test", "grade": "G3", "errors_pct": {"ttft_mean": 9999.0, "itl_mean": 9999.0, "tpot_median": 9999.0}}
+    recs += [{"status": "scored", "split": "test", "grade": "G3", "model": "m/a", "errors_pct": {"ttft_mean": 9999.0, "itl_mean": 9999.0, "tpot_median": 9999.0}}
              for _ in range(n_test)]
     jl(d / "configiq-points.jsonl", recs)
     return d
@@ -93,8 +93,47 @@ def test_configiq_class_uses_its_own_statistics_and_excludes_the_test_split(tmp_
     acc = c["accuracy_by_grade"]["G3"]
     assert (acc["ttft"]["mape"], acc["itl"]["mape"], acc["tpot"]["mape"]) == (100.0, 10.0, 5.0)
     assert acc["itl"]["signed_median"] == -10.0
-    assert c["refusals"] == [{"code": "field_not_in_release", "subject": "engine.max_model_len", "points": 1}]
     assert bc.check(_doc(_regular(), c)) == []
+
+
+def test_configiq_card_withholds_the_named_figure_and_lists_no_refusal(tmp_path):
+    """The card is the rows, the rows scored, the partition and one plain line: no refusal is listed, and a withheld statistic is
+    absent as a number and present as its reason (a rule fixed on the data's clarity)."""
+    c = bc.derive_configiq(_configiq_dir(tmp_path), cid="configiq", label="L", note="N", meta=META,
+                           withheld_figures={"ttft": "awaits the definition"}, plain_line="the rest wait",
+                           model_gaps={"m/b": "ours"})
+    assert c["refusals"] == []
+    assert set(c["accuracy_by_grade"]["G3"]) == {"tpot", "itl"}
+    assert c["figure_notes"] == {"ttft": "awaits the definition"}
+    assert c["plain_line"] == "the rest wait" and "test partition" in c["partition"]
+    assert c["counts"]["scored"] == 10 and c["counts"]["points"] == 16
+    by = {m["model"]: m for m in c["by_model"]}
+    assert (by["m/a"]["scored"], by["m/b"]["scored"]) == (7, 3)  # the withheld test rows are in neither
+    assert by["m/b"]["gap"] == "ours" and by["m/a"]["gap"] is None
+    assert "ttft" not in by["m/a"]["accuracy"] and by["m/a"]["accuracy"]["itl"]["mape"] == bc.TOO_FEW  # 7 points: under the minimum
+    assert not any("ttft" in json.dumps(g) for g in c["accuracy_by_grade"].values())
+
+
+def test_one_off_refusal_reasons_are_one_row_per_code_and_keep_their_count(tmp_path):
+    d = contract(tmp_path, [1.0] * 10)
+    reasons = [("field_not_modelled", "vendor_specific_kernel_setting")] * 3 + [("field_not_modelled", "another_one_off_flag")] * 2 \
+        + [("field_not_modelled", "moe_runner_backend")] * bc.MIN_NAMED_POINTS + [("value_not_recorded", "launch_command")] * 2
+    jl(d / "not_scored.jsonl", [{"g5_reason": {"code": c, "subject": s}} for c, s in reasons])
+    c = derive(d)
+    assert c["counts"]["refused"] == len(reasons) == sum(r["points"] for r in c["refusals"])
+    assert c["refusals"] == [{"code": "field_not_modelled", "subject": "moe_runner_backend", "points": bc.MIN_NAMED_POINTS},
+                             {"code": "field_not_modelled", "subject": bc.OTHER_SETTINGS, "points": 5},
+                             {"code": "value_not_recorded", "subject": bc.OTHER_SETTINGS, "points": 2}]
+
+
+def test_the_regular_card_says_its_sglang_points_are_not_the_sglang_cards(tmp_path):
+    before = _build(tmp_path)
+    assert all("note" not in e for e in before["classes"][0]["engines"])  # no SGLang class: nothing to point at
+    (tmp_path / "supp" / "sglang.json").write_text(json.dumps({**derive(contract(tmp_path, [1.0] * 12)), "id": "sglang", "kind": "regular"}))
+    after = bc.build(tmp_path / "summary.json", tmp_path / "supp", "t")
+    notes = {e["engine"]: e.get("note") for e in after["classes"][0]["engines"]}
+    assert notes["vllm"] is None and "not added here" in notes["sglang"]
+    assert after["classes"][0]["counts"] == before["classes"][0]["counts"]  # the SGLang class changes none of the regular counts
 
 
 def _regular(points=100, graded=40):
@@ -179,3 +218,22 @@ def test_a_provisional_class_is_never_graded_above_g3(tmp_path):
     assert bc.check(_doc(_regular(), c)) == []
     c["grades"].update(G1=2, G3=c["grades"]["G3"] - 2)  # the same number of scored points, two of them above the cap
     assert any("capped at G3" in p for p in bc.check(_doc(_regular(), c)))
+
+
+def test_itl_error_counts_only_points_that_stream_one_token_per_chunk(tmp_path):
+    """Measured ITL is comparable with the simulator's per-token ITL only when it sits within 15 percent of the measured TPOT; a point that
+    streamed several tokens per chunk is counted apart, not scored. Eleven comparable points err by +10 percent, two stream in chunks."""
+    d = contract(tmp_path, [0.0] * 13)
+    itl, points = {}, []
+    for i in range(13):
+        chunked = i >= 11
+        measured_itl, measured_tpot = (0.040, 0.010) if chunked else (0.010, 0.0105)  # seconds
+        points.append({"point_id": f"p{i}", "measurements": [{"metrics": {"mean_itl": measured_itl, "mean_tpot": measured_tpot}}]})
+        itl[f"p{i}"] = {"itl_mean_ms": measured_itl * 1000 * 1.10}
+    (tmp_path / "itl.json").write_text(json.dumps(itl))
+    (tmp_path / "manifest.json").write_text(json.dumps({"points": points}))
+    c = derive(d, itl_json=tmp_path / "itl.json", manifest=tmp_path / "manifest.json")
+    f = c["accuracy_by_grade"]["G4"]["itl"]
+    assert f["n"] == 11 and f["mape"] == pytest.approx(10.0) and f["signed_median"] == pytest.approx(10.0)
+    assert c["itl_streamed_in_chunks_left_out"] == 2
+    assert "itl" not in derive(d)["accuracy_by_grade"]["G4"]  # without the inputs a class has no ITL figure, not an invented one
