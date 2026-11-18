@@ -303,7 +303,7 @@ def _blis_refusal(stderr: str, work: Path) -> str:
     reason is the same on every machine."""
     # The message is a quoted Go string: a quote inside it is written \" (the scenario's own name, a value), so the
     # closing quote is the first one not escaped. Reading to the first quote cut "scenario \"p-....yaml\": <why>" to the
-    # bare slug "scenario", an unnamed fault (22 matched and 14 anchors failures of the M3.0 census).
+    # bare slug "scenario", an unnamed fault (22 matched and 12 anchors failures of the M3.0 census).
     m = re.findall(r'level=fatal msg="((?:[^"\\]|\\.)*)"', stderr) or re.findall(r"level=fatal msg=(.+)", stderr)
     text = (m[-1] if m else stderr.strip().splitlines()[-1] if stderr.strip() else "no output")
     text = text.replace('\\"', '"')
