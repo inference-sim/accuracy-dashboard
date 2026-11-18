@@ -6,6 +6,14 @@
 set -euo pipefail
 # More than 5 percent of the night's points failed (a harness fault; a named G5 is a result): the publish stops.
 python3 orchestrator/nightly/night_health.py data/latest/summary.json
+# The classes page is built from this summary (a missing or stale classes.json would show another night beside it).
+python3 orchestrator/build_classes.py check data/latest/classes.json
+python3 - <<'PY'
+import json, sys
+c, s = (json.load(open(f"data/latest/{n}.json")) for n in ("classes", "summary"))
+if c["snapshot_id"] != s["snapshot_id"]:
+    sys.exit(f"FATAL: data/latest/classes.json is of {c['snapshot_id']}, the summary is {s['snapshot_id']}; refusing to publish")
+PY
 # The night prunes v2 snapshots; their point ids leave the map first, so the map stays exact.
 python3 orchestrator/ingest/legacy_ids.py prune --map data/legacy/point-ids.json --data data
 python3 .github/ci/shards.py run boundary
