@@ -454,6 +454,54 @@ def test_a_flag_an_earlier_release_had_is_read_as_the_field_that_replaced_it_and
         shutil.rmtree(tmp)
 
 
+def test_the_nsa_backend_flags_of_an_earlier_release_are_read_as_the_dsa_fields_that_replaced_them_and_named():
+    # SGLang PR #25821 (8131641bc66, v0.5.13) renamed --nsa-prefill-backend and --nsa-decode-backend to --dsa-*-backend with the
+    # same choices and kept the old flags as deprecated aliases; PR #38375 removed them before v0.5.23. The GLM-5 recipes on
+    # B200 and B300 still pass the old names: 30 development points were field_not_in_release whatever the engine models.
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        fields = [{**_field(f.name, f.status, f.source)} for f in FIELDS.fields.values()] + [
+            _field("dsa_prefill_backend", "modelled"), _field("dsa_decode_backend", "modelled")]
+        fields.sort(key=lambda f: (f["name"], f["source"]))
+        entry, env = _setup(tmp, command=COMMAND + " --nsa-prefill-backend trtllm --nsa-decode-backend flashmla_kv")
+        env.sglang = sc.EngineKit("sglang", RELEASE, fl.parse(json.dumps(
+            {"kind": "FieldList", "engine": {"kind": "sglang", "version": RELEASE}, "fields": fields}).encode()), "f" * 64,
+            ss.load_declarations())
+        o, work = _score(tmp, entry, env)
+        assert o.fidelity is not None, o.reasons
+        subs = {s["subject"]: s for s in o.fidelity["substitutions"]}
+        assert subs["nsa_prefill_backend"]["kind"] == "resolved_differs" and "dsa_prefill_backend=trtllm" in subs["nsa_prefill_backend"]["detail"]
+        assert subs["nsa_decode_backend"]["kind"] == "resolved_differs" and "dsa_decode_backend=flashmla_kv" in subs["nsa_decode_backend"]["detail"]
+        dep = list(yaml.safe_load_all(next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()))[1]
+        assert dep["pools"][0]["engine"]["dsa_prefill_backend"] == "trtllm"
+        assert dep["pools"][0]["engine"]["dsa_decode_backend"] == "flashmla_kv"
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_an_old_flag_is_still_read_as_its_successor_when_the_log_of_the_later_release_prints_the_successor_resolved():
+    # A nightly image after the rename prints dsa_prefill_backend and dsa_decode_backend in its server_args while the recipe
+    # still passes the nsa flags: the log's value is the engine's resolution, not a request, so it must not stop the
+    # translation of what the run asked for (7 development points were refused field_not_in_release for it).
+    log = LOG.replace("cuda_graph_max_bs=512)", "cuda_graph_max_bs=512, dsa_prefill_backend='flashmla_sparse', dsa_decode_backend='fa3')")
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        fields = [{**_field(f.name, f.status, f.source)} for f in FIELDS.fields.values()] + [
+            _field("dsa_prefill_backend", "modelled"), _field("dsa_decode_backend", "modelled")]
+        fields.sort(key=lambda f: (f["name"], f["source"]))
+        entry, env = _setup(tmp, log=log, command=COMMAND + " --nsa-prefill-backend trtllm --nsa-decode-backend trtllm")
+        env.sglang = sc.EngineKit("sglang", RELEASE, fl.parse(json.dumps(
+            {"kind": "FieldList", "engine": {"kind": "sglang", "version": RELEASE}, "fields": fields}).encode()), "f" * 64,
+            ss.load_declarations())
+        o, work = _score(tmp, entry, env)
+        assert o.fidelity is not None, o.reasons
+        dep = list(yaml.safe_load_all(next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()))[1]
+        assert dep["pools"][0]["engine"]["dsa_prefill_backend"] == "trtllm"
+        assert dep["pools"][0]["engine"]["dsa_decode_backend"] == "trtllm"
+    finally:
+        shutil.rmtree(tmp)
+
+
 def test_the_mamba_strategy_flag_of_an_earlier_release_is_read_as_the_field_that_replaced_it_with_its_old_auto_resolved():
     # v0.5.13 resolved --mamba-scheduler-strategy auto to no_buffer; v0.5.14's auto can choose extra_buffer, so an old auto is
     # stated as the no_buffer the run got. A value that is already a strategy keeps its meaning.

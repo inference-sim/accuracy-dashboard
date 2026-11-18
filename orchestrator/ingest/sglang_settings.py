@@ -379,6 +379,18 @@ TRANSLATIONS = {
         "per-phase ones and kept the flag as a deprecated alias of --cuda-graph-backend-prefill=disabled "
         "(DeprecatedStoreConstAction, const_value=Backend.DISABLED, server_args.py at v0.5.14), so a stated flag is the prefill "
         "graph backend disabled"),
+    "nsa_prefill_backend": (
+        "dsa_prefill_backend", st.SAME_VALUE, lambda v: v is not None,
+        "SGLang v0.5.13 renamed NSA (native sparse attention) to DSA throughout (PR #25821, commit 8131641bc66): --nsa-prefill-backend became "
+        "--dsa-prefill-backend with the same choices (NSA_CHOICES = DSA_CHOICES), and the old flag stayed a deprecated alias "
+        "(DeprecatedAliasStoreAction, dest dsa_prefill_backend); PR #38375 (db272201a2d) cleared the deprecated flags that have a replacement, so "
+        "v0.5.23 has no --nsa-prefill-backend and the value is stated as dsa_prefill_backend"),
+    "nsa_decode_backend": (
+        "dsa_decode_backend", st.SAME_VALUE, lambda v: v is not None,
+        "SGLang v0.5.13 renamed NSA (native sparse attention) to DSA throughout (PR #25821, commit 8131641bc66): --nsa-decode-backend became "
+        "--dsa-decode-backend with the same choices (NSA_CHOICES = DSA_CHOICES), and the old flag stayed a deprecated alias "
+        "(DeprecatedAliasStoreAction, dest dsa_decode_backend); PR #38375 (db272201a2d) cleared the deprecated flags that have a replacement, so "
+        "v0.5.23 has no --nsa-decode-backend and the value is stated as dsa_decode_backend"),
     "env.SGLANG_ENABLE_FLASHINFER_GEMM": (
         None, None, lambda v: True,
         "no SGLang release from v0.5.12 to v0.5.23 reads it (it is in no environ.py or source file; only AgentX documentation "
