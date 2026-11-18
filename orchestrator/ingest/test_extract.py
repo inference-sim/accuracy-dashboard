@@ -295,7 +295,7 @@ def test_every_location_is_a_field_blis_vllm_engine_block_or_the_deployment_name
                                              "kv_load_failure_policy"}, (path, loc)
         else:
             assert top in ("offload", "replay") and rest in ("connector", "spec", "tiers.cpu_dram",
-                                                             "acceptance_length"), (path, loc)
+                                                             "acceptance_length", "api_server_count"), (path, loc)
     assert st.location("env.VLLM_FLASHINFER_ALLREDUCE_BACKEND") == "engine.env.VLLM_FLASHINFER_ALLREDUCE_BACKEND"
 
 
@@ -1495,3 +1495,18 @@ def test_an_index_cache_the_run_set_itself_is_not_translated():
     merged = st.merge(readings, st.defaults_for("0.25.0", DEFAULTS, st.vllm_defaults_release()))
     assert merged["attention_config.indexer_kv_dtype"].value == "fp8"
     assert not merged["attention_config.indexer_kv_dtype"].translated
+
+
+def test_the_api_server_count_a_run_stated_is_given_to_replay_not_lost():
+    """The Scenario has no key for the API-server count; `blis replay --api-server-count` takes it. A recipe stating 2 must reach
+    the flag, and the build must not call it a setting the scenario lost."""
+    FL = fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.33.0"}, "fields": [
+        {"name": "api_server_count", "source": "config", "status": "modelled", "evidence": {"traces": ["t"]},
+         "value_classes": {"type": "numeric", "thresholds": [{"value": 1, "closed": "above"}], "covered_classes": [0, 1]},
+         "estimation": {"rule": "none"}}]}))
+    readings, problems = st.read_all(_log("'api_server_count': 2"), None)
+    assert problems == []
+    c = st.decide(st.merge(readings, DEFAULTS), FL)
+    assert not any("api_server_count" in r for r in c.reasons), c.reasons
+    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="0.33.0", field_list=FL, catalog_node_size=None, node=NODE8)
+    assert b.api_server_count == "2" and not any("api_server_count" in r for r in b.reasons), b.reasons

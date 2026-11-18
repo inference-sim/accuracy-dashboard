@@ -546,6 +546,8 @@ def _diff_args(args: list, dep: dict, b: st.Built) -> list[str]:
                           if ((p.get("engine") or {}).get(k))}
                 if len(stated) == 1 and None not in stated:
                     got = f"{float(stated.pop()):g}"
+        elif f == "replay.api_server_count":
+            got, want = b.api_server_count, str(want)
         elif f.startswith("offload."):
             # The offload writer converts units (per-rank bytes -> the engine's tier); its own
             # checks refused any disagreement, so the arg records what BLIS was given.
@@ -704,6 +706,11 @@ def _acceptance_subs(b: st.Built, doc: dict | None, log: str | None = None) -> l
     if spec is None or b.acceptance_length is not None:
         return []
     return [result.acceptance_substitution(doc, st.realised_acceptance(log) if log is not None else False)]
+
+
+def api_server_argv(b: st.Built) -> list[str]:
+    """The API-server count the run stated, as `blis replay --api-server-count` (0 there means vLLM's per-mode default)."""
+    return ["--api-server-count", b.api_server_count] if b.api_server_count is not None else []
 
 
 def thinking_argv(b: st.Built) -> list[str]:
@@ -1017,7 +1024,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
             "--catalog", str(env.catalog), "--registry", str(env.registry), "--format", "json"]
     if b.acceptance_length is not None:
         argv += ["--speculative-acceptance-length", b.acceptance_length]
-    argv += thinking_argv(b)
+    argv += thinking_argv(b) + api_server_argv(b)
     if env.corpus_cache:
         argv += ["--corpus-cache", str(env.corpus_cache)]
     if not simulate:
@@ -1242,7 +1249,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
         argv += ["--catalog", str(env.catalog)]
     if env.registry:
         argv += ["--registry", str(env.registry)]
-    argv += thinking_argv(b)
+    argv += thinking_argv(b) + api_server_argv(b)
     if pd_run is not None:
         argv += ["--num-instances", str(pd_run.prefill + pd_run.decode), "--prefill-instances", str(pd_run.prefill),
                  "--decode-instances", str(pd_run.decode)]
