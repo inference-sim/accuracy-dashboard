@@ -697,7 +697,7 @@ SAME_VALUE = object()      # a translation that renames a field: the successor t
 
 def translate_removed(settings: dict, field_list, table: dict | None = None) -> tuple:
     """The settings with each removed name replaced by its successor, and the substitutions that say so. A name is translated
-    only when the release's field list lacks it and the successor is not already stated. An entry whose value is SAME_VALUE
+    only when the release's field list lacks it and the successor is not already requested by the run (a successor the engine only resolved, which a log of the later release prints, is replaced by the value the run requested under the old name). An entry whose value is SAME_VALUE
     renames the field: the successor takes the value the run set."""
     out, subs = dict(settings), []
     for path, (new, value, applies, why) in (RELEASE_TRANSLATIONS if table is None else table).items():
@@ -713,7 +713,7 @@ def translate_removed(settings: dict, field_list, table: dict | None = None) -> 
                                        f"left out of the scenario: {why}"})
             continue
         renames = value is SAME_VALUE or callable(value)
-        if not applies(st.value) or new in settings or (renames and not st.requested):
+        if not applies(st.value) or (new in settings and settings[new].requested) or (renames and not st.requested):
             continue            # a renamed field the engine only resolved is not a request, so it is not carried over
         del out[path]
         # SAME_VALUE: the run's value. A function: the successor's value for the run's, where the earlier release's
