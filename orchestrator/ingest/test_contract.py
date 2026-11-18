@@ -546,4 +546,3 @@ def test_the_simulator_and_the_engine_of_a_run_may_be_any_registered_engine_kind
            "harness_commit": "0123456789abcdef0123456789abcdef01234567"}
     problems = list(jsonschema.Draft7Validator({**doc["definitions"]["simulator"], "definitions": doc["definitions"]}).iter_errors(sim))
     assert (not problems) is ok, [p.message for p in problems]
-

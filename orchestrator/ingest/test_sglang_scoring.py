@@ -665,4 +665,3 @@ def test_a_flag_whose_value_the_shell_computes_is_named_with_its_value_left_to_t
 
 def test_an_expansion_that_decides_whether_a_flag_is_set_is_still_refused():
     assert ss.launch_command_of("python3 -m sglang.launch_server $( [[ $X ]] && echo --ep-size 4 ) --tp-size 2\n") == (None, ss.SHELL_EXPANSION)
-
