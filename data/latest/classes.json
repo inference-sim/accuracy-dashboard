@@ -689,30 +689,30 @@
     },
     "G4": {
      "tpot": {
-      "mape": 13.17898730351958,
-      "n": 157,
-      "signed_median": 2.9803635095303362
+      "mape": 15.06959035088943,
+      "n": 213,
+      "signed_median": 5.465600679934546
      },
      "ttft": {
-      "mape": 21.49014624798791,
-      "n": 157,
-      "signed_median": 3.222096987288401
+      "mape": 22.282888346421753,
+      "n": 213,
+      "signed_median": 9.079665435452519
      }
     }
    },
    "counts": {
     "failed": 0,
     "points": 213,
-    "refused": 56,
-    "scored": 157,
+    "refused": 0,
+    "scored": 213,
     "withheld": 0
    },
    "grades": {
     "G1": 0,
     "G2": 0,
     "G3": 0,
-    "G4": 157,
-    "G5": 56
+    "G4": 213,
+    "G5": 0
    },
    "id": "inferencex-reconstructed",
    "interim": false,
@@ -724,170 +724,164 @@
     "derived_at": "2026-11-18",
     "heads": {
      "blis-substrate": "fa28d5116739dc582efdb7694acf15a294cdc62b",
-     "blis-vllm": "b764039ea50ab1dc2e48c986bc7bba38adbeefb8",
-     "census_run": "20261118-071926-subset0",
-     "harness": "5916de4c43b2c61fb04b961d84a91d7cc2da8c5c",
-     "inference-sim": "3d3f9e34f3a4e53406af8503e49cb4afe6446bf4",
+     "blis-vllm": "8dbf92b0f881262da2adf286a30c43800ceb2722",
+     "census_run": "final2-cheap (censusfinal2-20261118-075416)",
+     "harness": "f78235d8da50f36acbff3288d049a48649d75bfe",
+     "inference-sim": "f6543b3d0e01c0dce8ac8f1d82792acbe4a73220",
      "pull_manifest_sha256": "d02d403437bdfb95d1416896416c244da7c7da9a949bd0996b0c70b6af11b133"
     },
     "pulled_at": "2026-11-16T18:26:39Z"
    },
-   "refusals": [
-    {
-     "code": "field_not_modelled",
-     "points": 56,
-     "subject": "env.TORCH_CUDA_ARCH_LIST"
-    }
-   ],
+   "refusals": [],
    "substitutions": [
     {
      "detail": "job log expired; the client's flags are assumed to be the launcher's defaults",
      "kind": "client_difference",
-     "points": 157,
+     "points": 213,
      "subject": "client_flags"
     },
     {
      "detail": "the InferenceX commit of the run is not recorded",
      "kind": "client_difference",
-     "points": 157,
+     "points": 213,
      "subject": "client_release"
     },
     {
      "detail": "the run's completed and num_prompts counts are not in the pulled data; requests the client lost, which would leave a different population, are not ruled out",
      "kind": "client_difference",
-     "points": 157,
+     "points": 213,
      "subject": "failed_requests"
     },
     {
      "detail": "BLIS releases the next request at the previous one's completion plus the assumed completion overhead of 777 us; the real client's gap (usage chunk, [DONE], session exit, event-loop wake-up) is not measured",
      "kind": "client_difference",
-     "points": 157,
+     "points": 213,
      "subject": "send_gap"
     },
     {
      "detail": "sent prompt lengths not verified equal to the replayed targets: prompt-lengths.json holds no evidence for the point (no engine log, so no run date or client version; or a gated tokenizer)",
      "kind": "client_difference",
-     "points": 157,
+     "points": 213,
      "subject": "sent_prompt_lengths"
     },
     {
      "detail": "assumed",
      "kind": "coefficient_method",
-     "points": 157,
+     "points": 213,
      "subject": "cost-model-attention/attention_decode_floor_mla"
     },
     {
      "detail": "assumed",
      "kind": "coefficient_method",
-     "points": 157,
+     "points": 213,
      "subject": "cost-model-host-overheads/host_admission_per_request"
     },
     {
      "detail": "assumed",
      "kind": "coefficient_method",
-     "points": 157,
+     "points": 213,
      "subject": "cost-model-host-overheads/host_admission_per_token"
     },
     {
      "detail": "assumed",
      "kind": "coefficient_method",
-     "points": 157,
+     "points": 213,
      "subject": "cost-model-host-overheads/host_completion"
     },
     {
      "detail": "assumed",
      "kind": "coefficient_method",
-     "points": 157,
+     "points": 213,
      "subject": "cost-model-host-overheads/host_launch_eager_per_layer"
     },
     {
      "detail": "assumed",
      "kind": "coefficient_method",
-     "points": 157,
+     "points": 213,
      "subject": "cost-model-host-overheads/host_launch_per_kernel"
     },
     {
      "detail": "assumed",
      "kind": "coefficient_method",
-     "points": 157,
+     "points": 213,
      "subject": "cost-model-host-overheads/host_output_token"
     },
     {
      "detail": "assumed",
      "kind": "coefficient_method",
-     "points": 157,
+     "points": 213,
      "subject": "cost-model-host-overheads/host_replay_graph_per_step"
     },
     {
      "detail": "vendor_spec",
      "kind": "coefficient_method",
-     "points": 157,
+     "points": 213,
      "subject": "cost-model-memory/activation_scratch_floor_bytes"
     },
     {
      "detail": "vendor_spec",
      "kind": "coefficient_method",
-     "points": 157,
+     "points": 213,
      "subject": "cost-model-primitives/engine_workspace_bytes"
     },
     {
      "detail": "vendor_spec",
      "kind": "coefficient_method",
-     "points": 157,
+     "points": 213,
      "subject": "cost-model-primitives/hbm_derate"
     },
     {
      "detail": "the run set disable_log_requests=True; the modelled release has no such setting, and it is left out of the scenario: --disable-log-requests is not an argument of v0.33.0 (vllm/entrypoints/openai/cli_args.py, vllm/engine/arg_utils.py at v0.33.0 have no such field); it only switched per-request log lines off, which no price depends on",
      "kind": "estimated",
-     "points": 157,
+     "points": 213,
      "subject": "disable_log_requests"
     },
     {
      "detail": "0.10.2, scored on 0.33.0",
      "kind": "other_release",
-     "points": 157,
+     "points": 213,
      "subject": "engine release"
     },
     {
      "detail": "ported-function list not published",
      "kind": "ported_functions_unpublished",
-     "points": 157,
+     "points": 213,
      "subject": "engine release"
     },
     {
      "detail": "coefficient_range is unevaluated",
      "kind": "unevaluated",
-     "points": 157,
+     "points": 213,
      "subject": "coefficient_range"
     },
     {
      "detail": "kernel_hash is unevaluated",
      "kind": "unevaluated",
-     "points": 157,
+     "points": 213,
      "subject": "kernel_hash"
     },
     {
      "detail": "resolved_differs is unevaluated",
      "kind": "unevaluated",
-     "points": 157,
+     "points": 213,
      "subject": "resolved_differs"
     },
     {
      "detail": "1 is outside every value class the evidence covers",
      "kind": "value_class",
-     "points": 157,
+     "points": 213,
      "subject": "data_parallel_size"
     },
     {
      "detail": "8192 is outside every value class the evidence covers",
      "kind": "value_class",
-     "points": 157,
+     "points": 213,
      "subject": "max_num_batched_tokens"
     },
     {
      "detail": "1 is outside every value class the evidence covers",
      "kind": "value_class",
-     "points": 157,
+     "points": 213,
      "subject": "pipeline_parallel_size"
     },
     {
@@ -953,74 +947,80 @@
     {
      "detail": "left unset; the engine resolves the upstream default",
      "kind": "estimated",
-     "points": 58,
+     "points": 114,
      "subject": "env.TORCH_CUDA_ARCH_LIST"
-    },
-    {
-     "detail": "vendor_spec",
-     "kind": "coefficient_method",
-     "points": 45,
-     "subject": "cost-model-memory/activation_buffer_count_dense_4rank"
-    },
-    {
-     "detail": "vendor_spec",
-     "kind": "coefficient_method",
-     "points": 45,
-     "subject": "cost-model-memory/activation_buffer_count_dense_8rank"
-    },
-    {
-     "detail": "vendor_spec",
-     "kind": "coefficient_method",
-     "points": 45,
-     "subject": "cost-model-primitives/nccl_communicator_bytes_4rank"
-    },
-    {
-     "detail": "vendor_spec",
-     "kind": "coefficient_method",
-     "points": 45,
-     "subject": "cost-model-primitives/nccl_communicator_bytes_8rank"
-    },
-    {
-     "detail": "8 is outside every value class the evidence covers",
-     "kind": "value_class",
-     "points": 45,
-     "subject": "tensor_parallel_size"
-    },
-    {
-     "detail": "vendor_spec",
-     "kind": "coefficient_method",
-     "points": 41,
-     "subject": "cost-model-memory/activation_buffer_count_dense_2rank"
     },
     {
      "detail": "assumed",
      "kind": "coefficient_method",
-     "points": 41,
+     "points": 97,
      "subject": "cost-model-memory/cudagraph_capture_bytes_full_and_piecewise"
     },
     {
      "detail": "assumed",
      "kind": "coefficient_method",
-     "points": 41,
+     "points": 97,
      "subject": "cost-model-primitives/host_gather_rate_uva"
+    },
+    {
+     "detail": "9416 is outside every value class the evidence covers",
+     "kind": "value_class",
+     "points": 74,
+     "subject": "max_model_len"
     },
     {
      "detail": "vendor_spec",
      "kind": "coefficient_method",
-     "points": 41,
+     "points": 60,
+     "subject": "cost-model-memory/activation_buffer_count_dense_4rank"
+    },
+    {
+     "detail": "vendor_spec",
+     "kind": "coefficient_method",
+     "points": 60,
+     "subject": "cost-model-memory/activation_buffer_count_dense_8rank"
+    },
+    {
+     "detail": "vendor_spec",
+     "kind": "coefficient_method",
+     "points": 60,
+     "subject": "cost-model-primitives/nccl_communicator_bytes_4rank"
+    },
+    {
+     "detail": "vendor_spec",
+     "kind": "coefficient_method",
+     "points": 60,
+     "subject": "cost-model-primitives/nccl_communicator_bytes_8rank"
+    },
+    {
+     "detail": "8 is outside every value class the evidence covers",
+     "kind": "value_class",
+     "points": 60,
+     "subject": "tensor_parallel_size"
+    },
+    {
+     "detail": "vendor_spec",
+     "kind": "coefficient_method",
+     "points": 56,
+     "subject": "cost-model-memory/activation_buffer_count_dense_2rank"
+    },
+    {
+     "detail": "vendor_spec",
+     "kind": "coefficient_method",
+     "points": 56,
      "subject": "cost-model-primitives/nccl_communicator_bytes_2rank"
+    },
+    {
+     "detail": "2 is outside every value class the evidence covers",
+     "kind": "value_class",
+     "points": 56,
+     "subject": "tensor_parallel_size"
     },
     {
      "detail": "10240 is outside every value class the evidence covers",
      "kind": "value_class",
      "points": 41,
      "subject": "max_model_len"
-    },
-    {
-     "detail": "2 is outside every value class the evidence covers",
-     "kind": "value_class",
-     "points": 41,
-     "subject": "tensor_parallel_size"
     },
     {
      "detail": "recipe reconstructed from InferenceX scripts at c198b20ebe3b69d1f30da0a6df4c13b842a39538; the run's own recipe is gone; vLLM v0.10.2 modelled as 0.33.0 (script benchmarks/70b_fp8_b200_docker.sh, image vllm/vllm-openai:v0.10.2); sizes the script leaves at vLLM's default, stated: pipeline-parallel-size=1, data-parallel-size=1; the runner's own environment is not stated (NCCL_GRAPH_REGISTER=0, TORCH_CUDA_ARCH_LIST=10.0): no server log shows it, so a run with a log does not state it either",
@@ -1035,34 +1035,34 @@
      "subject": "engine.recipe"
     },
     {
+     "detail": "recipe reconstructed from InferenceX scripts at c198b20ebe3b69d1f30da0a6df4c13b842a39538; the run's own recipe is gone; vLLM v0.10.2 modelled as 0.33.0 (script benchmarks/70b_fp8_h200_slurm.sh, image vllm/vllm-openai:v0.10.2); sizes the script leaves at vLLM's default, stated: pipeline-parallel-size=1, data-parallel-size=1",
+     "kind": "estimated",
+     "points": 38,
+     "subject": "engine.recipe"
+    },
+    {
      "detail": "9216 is outside every value class the evidence covers",
      "kind": "value_class",
      "points": 38,
      "subject": "max_model_len"
     },
     {
-     "detail": "9416 is outside every value class the evidence covers",
+     "detail": "vendor_spec",
+     "kind": "coefficient_method",
+     "points": 37,
+     "subject": "cost-model-memory/activation_buffer_count_dense_1rank"
+    },
+    {
+     "detail": "1 is outside every value class the evidence covers",
      "kind": "value_class",
-     "points": 38,
-     "subject": "max_model_len"
+     "points": 37,
+     "subject": "tensor_parallel_size"
     },
     {
      "detail": "recipe reconstructed from InferenceX scripts at c198b20ebe3b69d1f30da0a6df4c13b842a39538; the run's own recipe is gone; vLLM v0.10.2 modelled as 0.33.0 (script benchmarks/70b_fp8_h100_docker.sh, image vllm/vllm-openai:v0.10.2); sizes the script leaves at vLLM's default, stated: pipeline-parallel-size=1, data-parallel-size=1; the runner's own environment is not stated (TORCH_CUDA_ARCH_LIST=9.0): no server log shows it, so a run with a log does not state it either",
      "kind": "estimated",
      "points": 28,
      "subject": "engine.recipe"
-    },
-    {
-     "detail": "vendor_spec",
-     "kind": "coefficient_method",
-     "points": 26,
-     "subject": "cost-model-memory/activation_buffer_count_dense_1rank"
-    },
-    {
-     "detail": "1 is outside every value class the evidence covers",
-     "kind": "value_class",
-     "points": 26,
-     "subject": "tensor_parallel_size"
     },
     {
      "detail": "recipe reconstructed from InferenceX scripts at ac1998a504dff8f944cef2c05925fb1edac48382; the run's own recipe is gone; vLLM v0.10.2 modelled as 0.33.0 (script benchmarks/70b_fp8_b200_docker.sh, image vllm/vllm-openai:v0.10.2); sizes the script leaves at vLLM's default, stated: pipeline-parallel-size=1, data-parallel-size=1; the runner's own environment is not stated (NCCL_GRAPH_REGISTER=0, TORCH_CUDA_ARCH_LIST=10.0): no server log shows it, so a run with a log does not state it either",
@@ -1074,6 +1074,12 @@
      "detail": "recipe reconstructed from InferenceX scripts at ac1998a504dff8f944cef2c05925fb1edac48382; the run's own recipe is gone; vLLM v0.10.2 modelled as 0.33.0 (script benchmarks/70b_fp4_b200_docker.sh, image vllm/vllm-openai:v0.10.2); sizes the script leaves at vLLM's default, stated: pipeline-parallel-size=1, data-parallel-size=1; the runner's own environment is not stated (NCCL_GRAPH_REGISTER=0, TORCH_CUDA_ARCH_LIST=10.0): no server log shows it, so a run with a log does not state it either",
      "kind": "estimated",
      "points": 19,
+     "subject": "engine.recipe"
+    },
+    {
+     "detail": "recipe reconstructed from InferenceX scripts at ac1998a504dff8f944cef2c05925fb1edac48382; the run's own recipe is gone; vLLM v0.10.2 modelled as 0.33.0 (script benchmarks/70b_fp8_h200_slurm.sh, image vllm/vllm-openai:v0.10.2); sizes the script leaves at vLLM's default, stated: pipeline-parallel-size=1, data-parallel-size=1",
+     "kind": "estimated",
+     "points": 18,
      "subject": "engine.recipe"
     },
     {
@@ -1124,14 +1130,14 @@
     },
     "G4": {
      "itl": {
-      "mape": 24.50896870358393,
-      "n": 183,
-      "signed_median": -0.8113671740497289
+      "mape": 24.596303524614274,
+      "n": 208,
+      "signed_median": -3.0428417212714995
      },
      "tpot": {
-      "mape": 24.83557023345457,
-      "n": 183,
-      "signed_median": 1.8923980344400955
+      "mape": 24.739334721324163,
+      "n": 208,
+      "signed_median": -0.6307115501220042
      }
     }
    },
@@ -1173,6 +1179,23 @@
     {
      "accuracy": {
       "itl": {
+       "mape": 25.235594414556395,
+       "n": 25,
+       "signed_median": -13.344296222079988
+      },
+      "tpot": {
+       "mape": 24.03489077252962,
+       "n": 25,
+       "signed_median": -16.088788486302246
+      }
+     },
+     "gap": "model-side gap in our simulator",
+     "model": "RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic",
+     "scored": 25
+    },
+    {
+     "accuracy": {
+      "itl": {
        "mape": 12.551828975896106,
        "n": 20,
        "signed_median": 6.024584250637638
@@ -1208,8 +1231,8 @@
    "counts": {
     "failed": 0,
     "points": 1702,
-    "refused": 1460,
-    "scored": 198,
+    "refused": 1435,
+    "scored": 223,
     "withheld": 44
    },
    "figure_notes": {
@@ -1219,8 +1242,8 @@
     "G1": 0,
     "G2": 0,
     "G3": 15,
-    "G4": 183,
-    "G5": 1460
+    "G4": 208,
+    "G5": 1435
    },
    "id": "configiq",
    "interim": false,
@@ -1235,10 +1258,10 @@
     "derived_at": "2026-11-18",
     "heads": {
      "blis-substrate": "fa28d5116739dc582efdb7694acf15a294cdc62b",
-     "blis-vllm": "b764039ea50ab1dc2e48c986bc7bba38adbeefb8",
-     "census_run": "20261118-071926-subset0",
-     "harness": "5916de4c43b2c61fb04b961d84a91d7cc2da8c5c",
-     "inference-sim": "3d3f9e34f3a4e53406af8503e49cb4afe6446bf4"
+     "blis-vllm": "8dbf92b0f881262da2adf286a30c43800ceb2722",
+     "census_run": "final2-cheap (censusfinal2-20261118-075416)",
+     "harness": "f78235d8da50f36acbff3288d049a48649d75bfe",
+     "inference-sim": "f6543b3d0e01c0dce8ac8f1d82792acbe4a73220"
     },
     "pulled_at": "2026-11-16",
     "split": "development"
@@ -1248,158 +1271,164 @@
     {
      "detail": "",
      "kind": "client_difference",
-     "points": 198,
+     "points": 223,
      "subject": "client release"
     },
     {
      "detail": "",
      "kind": "client_difference",
-     "points": 198,
+     "points": 223,
      "subject": "frame"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 198,
+     "points": 223,
      "subject": "cost-model-attention/attention_decode_floor_mla"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 198,
+     "points": 223,
      "subject": "cost-model-host-overheads/host_admission_per_request"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 198,
+     "points": 223,
      "subject": "cost-model-host-overheads/host_admission_per_token"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 198,
+     "points": 223,
      "subject": "cost-model-host-overheads/host_completion"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 198,
+     "points": 223,
      "subject": "cost-model-host-overheads/host_launch_eager_per_layer"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 198,
+     "points": 223,
      "subject": "cost-model-host-overheads/host_launch_per_kernel"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 198,
+     "points": 223,
      "subject": "cost-model-host-overheads/host_output_token"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 198,
+     "points": 223,
      "subject": "cost-model-host-overheads/host_replay_graph_per_step"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 198,
+     "points": 223,
      "subject": "cost-model-memory/activation_scratch_floor_bytes"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 198,
+     "points": 223,
      "subject": "cost-model-memory/cudagraph_capture_bytes_full_and_piecewise"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 198,
+     "points": 223,
      "subject": "cost-model-primitives/engine_workspace_bytes"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 198,
+     "points": 223,
      "subject": "cost-model-primitives/hbm_derate"
     },
     {
      "detail": "",
      "kind": "estimated",
-     "points": 198,
+     "points": 223,
      "subject": "cluster.gpus_per_node"
     },
     {
      "detail": "",
      "kind": "estimated",
-     "points": 198,
+     "points": 223,
      "subject": "engine flags the row leaves blank"
     },
     {
      "detail": "",
      "kind": "estimated",
-     "points": 198,
+     "points": 223,
      "subject": "engine.max_model_len"
     },
     {
      "detail": "",
      "kind": "provisional_blank_flags",
-     "points": 198,
+     "points": 223,
      "subject": "engine flags the row leaves blank"
     },
     {
      "detail": "",
      "kind": "provisional_frame",
-     "points": 198,
+     "points": 223,
      "subject": "frame"
     },
     {
      "detail": "",
      "kind": "provisional_parallelism",
-     "points": 198,
+     "points": 223,
      "subject": "parallelism"
     },
     {
      "detail": "",
      "kind": "unevaluated",
-     "points": 198,
+     "points": 223,
      "subject": "coefficient_range"
     },
     {
      "detail": "",
      "kind": "unevaluated",
-     "points": 198,
+     "points": 223,
      "subject": "kernel_hash"
     },
     {
      "detail": "",
      "kind": "unevaluated",
-     "points": 198,
+     "points": 223,
      "subject": "resolved_differs"
     },
     {
      "detail": "",
      "kind": "unevaluated",
-     "points": 198,
+     "points": 223,
      "subject": "value_class"
     },
     {
      "detail": "",
      "kind": "other_release",
-     "points": 183,
+     "points": 208,
      "subject": "engine release"
     },
     {
      "detail": "",
      "kind": "ported_functions_unpublished",
-     "points": 183,
+     "points": 208,
      "subject": "engine release"
+    },
+    {
+     "detail": "",
+     "kind": "client_difference",
+     "points": 158,
+     "subject": "request lengths"
     },
     {
      "detail": "",
@@ -1410,44 +1439,50 @@
     {
      "detail": "",
      "kind": "client_difference",
-     "points": 133,
-     "subject": "request lengths"
-    },
-    {
-     "detail": "",
-     "kind": "client_difference",
      "points": 127,
      "subject": "errored requests"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 93,
+     "points": 118,
      "subject": "cost-model-primitives/host_gather_rate_uva"
+    },
+    {
+     "detail": "",
+     "kind": "coefficient_method",
+     "points": 45,
+     "subject": "cost-model-primitives/gemm_eps_max_fp8_grouped_triton"
+    },
+    {
+     "detail": "",
+     "kind": "coefficient_method",
+     "points": 45,
+     "subject": "cost-model-primitives/gemm_floor_fp8_grouped_triton"
+    },
+    {
+     "detail": "",
+     "kind": "coefficient_method",
+     "points": 45,
+     "subject": "cost-model-primitives/gemm_m_half_fp8_grouped_triton"
+    },
+    {
+     "detail": "",
+     "kind": "coefficient_method",
+     "points": 40,
+     "subject": "cost-model-memory/activation_buffer_count_moe_2rank"
+    },
+    {
+     "detail": "",
+     "kind": "coefficient_method",
+     "points": 40,
+     "subject": "cost-model-primitives/nccl_communicator_bytes_2rank"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
      "points": 27,
      "subject": "cost-model-memory/activation_buffer_count_dense_1rank"
-    },
-    {
-     "detail": "",
-     "kind": "coefficient_method",
-     "points": 20,
-     "subject": "cost-model-primitives/gemm_eps_max_fp8_grouped_triton"
-    },
-    {
-     "detail": "",
-     "kind": "coefficient_method",
-     "points": 20,
-     "subject": "cost-model-primitives/gemm_floor_fp8_grouped_triton"
-    },
-    {
-     "detail": "",
-     "kind": "coefficient_method",
-     "points": 20,
-     "subject": "cost-model-primitives/gemm_m_half_fp8_grouped_triton"
     },
     {
      "detail": "",
@@ -1460,18 +1495,6 @@
      "kind": "coefficient_method",
      "points": 16,
      "subject": "cost-model-primitives/nccl_communicator_bytes_8rank"
-    },
-    {
-     "detail": "",
-     "kind": "coefficient_method",
-     "points": 15,
-     "subject": "cost-model-memory/activation_buffer_count_moe_2rank"
-    },
-    {
-     "detail": "",
-     "kind": "coefficient_method",
-     "points": 15,
-     "subject": "cost-model-primitives/nccl_communicator_bytes_2rank"
     },
     {
      "detail": "",
