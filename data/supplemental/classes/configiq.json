@@ -38,14 +38,14 @@
   },
   "G4": {
    "itl": {
-    "mape": 24.50896870358393,
-    "n": 183,
-    "signed_median": -0.8113671740497289
+    "mape": 24.596303524614274,
+    "n": 208,
+    "signed_median": -3.0428417212714995
    },
    "tpot": {
-    "mape": 24.83557023345457,
-    "n": 183,
-    "signed_median": 1.8923980344400955
+    "mape": 24.739334721324163,
+    "n": 208,
+    "signed_median": -0.6307115501220042
    }
   }
  },
@@ -87,6 +87,23 @@
   {
    "accuracy": {
     "itl": {
+     "mape": 25.235594414556395,
+     "n": 25,
+     "signed_median": -13.344296222079988
+    },
+    "tpot": {
+     "mape": 24.03489077252962,
+     "n": 25,
+     "signed_median": -16.088788486302246
+    }
+   },
+   "gap": "model-side gap in our simulator",
+   "model": "RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic",
+   "scored": 25
+  },
+  {
+   "accuracy": {
+    "itl": {
      "mape": 12.551828975896106,
      "n": 20,
      "signed_median": 6.024584250637638
@@ -122,8 +139,8 @@
  "counts": {
   "failed": 0,
   "points": 1702,
-  "refused": 1460,
-  "scored": 198,
+  "refused": 1435,
+  "scored": 223,
   "withheld": 44
  },
  "figure_notes": {
@@ -133,8 +150,8 @@
   "G1": 0,
   "G2": 0,
   "G3": 15,
-  "G4": 183,
-  "G5": 1460
+  "G4": 208,
+  "G5": 1435
  },
  "id": "configiq",
  "interim": false,
@@ -149,10 +166,10 @@
   "derived_at": "2026-11-18",
   "heads": {
    "blis-substrate": "fa28d5116739dc582efdb7694acf15a294cdc62b",
-   "blis-vllm": "b764039ea50ab1dc2e48c986bc7bba38adbeefb8",
-   "census_run": "20261118-071926-subset0",
-   "harness": "5916de4c43b2c61fb04b961d84a91d7cc2da8c5c",
-   "inference-sim": "3d3f9e34f3a4e53406af8503e49cb4afe6446bf4"
+   "blis-vllm": "8dbf92b0f881262da2adf286a30c43800ceb2722",
+   "census_run": "final2-cheap (censusfinal2-20261118-075416)",
+   "harness": "f78235d8da50f36acbff3288d049a48649d75bfe",
+   "inference-sim": "f6543b3d0e01c0dce8ac8f1d82792acbe4a73220"
   },
   "pulled_at": "2026-11-16",
   "split": "development"
@@ -162,158 +179,164 @@
   {
    "detail": "",
    "kind": "client_difference",
-   "points": 198,
+   "points": 223,
    "subject": "client release"
   },
   {
    "detail": "",
    "kind": "client_difference",
-   "points": 198,
+   "points": 223,
    "subject": "frame"
   },
   {
    "detail": "",
    "kind": "coefficient_method",
-   "points": 198,
+   "points": 223,
    "subject": "cost-model-attention/attention_decode_floor_mla"
   },
   {
    "detail": "",
    "kind": "coefficient_method",
-   "points": 198,
+   "points": 223,
    "subject": "cost-model-host-overheads/host_admission_per_request"
   },
   {
    "detail": "",
    "kind": "coefficient_method",
-   "points": 198,
+   "points": 223,
    "subject": "cost-model-host-overheads/host_admission_per_token"
   },
   {
    "detail": "",
    "kind": "coefficient_method",
-   "points": 198,
+   "points": 223,
    "subject": "cost-model-host-overheads/host_completion"
   },
   {
    "detail": "",
    "kind": "coefficient_method",
-   "points": 198,
+   "points": 223,
    "subject": "cost-model-host-overheads/host_launch_eager_per_layer"
   },
   {
    "detail": "",
    "kind": "coefficient_method",
-   "points": 198,
+   "points": 223,
    "subject": "cost-model-host-overheads/host_launch_per_kernel"
   },
   {
    "detail": "",
    "kind": "coefficient_method",
-   "points": 198,
+   "points": 223,
    "subject": "cost-model-host-overheads/host_output_token"
   },
   {
    "detail": "",
    "kind": "coefficient_method",
-   "points": 198,
+   "points": 223,
    "subject": "cost-model-host-overheads/host_replay_graph_per_step"
   },
   {
    "detail": "",
    "kind": "coefficient_method",
-   "points": 198,
+   "points": 223,
    "subject": "cost-model-memory/activation_scratch_floor_bytes"
   },
   {
    "detail": "",
    "kind": "coefficient_method",
-   "points": 198,
+   "points": 223,
    "subject": "cost-model-memory/cudagraph_capture_bytes_full_and_piecewise"
   },
   {
    "detail": "",
    "kind": "coefficient_method",
-   "points": 198,
+   "points": 223,
    "subject": "cost-model-primitives/engine_workspace_bytes"
   },
   {
    "detail": "",
    "kind": "coefficient_method",
-   "points": 198,
+   "points": 223,
    "subject": "cost-model-primitives/hbm_derate"
   },
   {
    "detail": "",
    "kind": "estimated",
-   "points": 198,
+   "points": 223,
    "subject": "cluster.gpus_per_node"
   },
   {
    "detail": "",
    "kind": "estimated",
-   "points": 198,
+   "points": 223,
    "subject": "engine flags the row leaves blank"
   },
   {
    "detail": "",
    "kind": "estimated",
-   "points": 198,
+   "points": 223,
    "subject": "engine.max_model_len"
   },
   {
    "detail": "",
    "kind": "provisional_blank_flags",
-   "points": 198,
+   "points": 223,
    "subject": "engine flags the row leaves blank"
   },
   {
    "detail": "",
    "kind": "provisional_frame",
-   "points": 198,
+   "points": 223,
    "subject": "frame"
   },
   {
    "detail": "",
    "kind": "provisional_parallelism",
-   "points": 198,
+   "points": 223,
    "subject": "parallelism"
   },
   {
    "detail": "",
    "kind": "unevaluated",
-   "points": 198,
+   "points": 223,
    "subject": "coefficient_range"
   },
   {
    "detail": "",
    "kind": "unevaluated",
-   "points": 198,
+   "points": 223,
    "subject": "kernel_hash"
   },
   {
    "detail": "",
    "kind": "unevaluated",
-   "points": 198,
+   "points": 223,
    "subject": "resolved_differs"
   },
   {
    "detail": "",
    "kind": "unevaluated",
-   "points": 198,
+   "points": 223,
    "subject": "value_class"
   },
   {
    "detail": "",
    "kind": "other_release",
-   "points": 183,
+   "points": 208,
    "subject": "engine release"
   },
   {
    "detail": "",
    "kind": "ported_functions_unpublished",
-   "points": 183,
+   "points": 208,
    "subject": "engine release"
+  },
+  {
+   "detail": "",
+   "kind": "client_difference",
+   "points": 158,
+   "subject": "request lengths"
   },
   {
    "detail": "",
@@ -324,44 +347,50 @@
   {
    "detail": "",
    "kind": "client_difference",
-   "points": 133,
-   "subject": "request lengths"
-  },
-  {
-   "detail": "",
-   "kind": "client_difference",
    "points": 127,
    "subject": "errored requests"
   },
   {
    "detail": "",
    "kind": "coefficient_method",
-   "points": 93,
+   "points": 118,
    "subject": "cost-model-primitives/host_gather_rate_uva"
+  },
+  {
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 45,
+   "subject": "cost-model-primitives/gemm_eps_max_fp8_grouped_triton"
+  },
+  {
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 45,
+   "subject": "cost-model-primitives/gemm_floor_fp8_grouped_triton"
+  },
+  {
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 45,
+   "subject": "cost-model-primitives/gemm_m_half_fp8_grouped_triton"
+  },
+  {
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 40,
+   "subject": "cost-model-memory/activation_buffer_count_moe_2rank"
+  },
+  {
+   "detail": "",
+   "kind": "coefficient_method",
+   "points": 40,
+   "subject": "cost-model-primitives/nccl_communicator_bytes_2rank"
   },
   {
    "detail": "",
    "kind": "coefficient_method",
    "points": 27,
    "subject": "cost-model-memory/activation_buffer_count_dense_1rank"
-  },
-  {
-   "detail": "",
-   "kind": "coefficient_method",
-   "points": 20,
-   "subject": "cost-model-primitives/gemm_eps_max_fp8_grouped_triton"
-  },
-  {
-   "detail": "",
-   "kind": "coefficient_method",
-   "points": 20,
-   "subject": "cost-model-primitives/gemm_floor_fp8_grouped_triton"
-  },
-  {
-   "detail": "",
-   "kind": "coefficient_method",
-   "points": 20,
-   "subject": "cost-model-primitives/gemm_m_half_fp8_grouped_triton"
   },
   {
    "detail": "",
@@ -374,18 +403,6 @@
    "kind": "coefficient_method",
    "points": 16,
    "subject": "cost-model-primitives/nccl_communicator_bytes_8rank"
-  },
-  {
-   "detail": "",
-   "kind": "coefficient_method",
-   "points": 15,
-   "subject": "cost-model-memory/activation_buffer_count_moe_2rank"
-  },
-  {
-   "detail": "",
-   "kind": "coefficient_method",
-   "points": 15,
-   "subject": "cost-model-primitives/nccl_communicator_bytes_2rank"
   },
   {
    "detail": "",
