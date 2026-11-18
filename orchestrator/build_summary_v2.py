@@ -302,6 +302,22 @@ def refused_faults(failed: list[dict]) -> list[str]:
             if not set(f["faults"]) <= set(assess.RUNNER_LIMITS)]
 
 
+def scored_engines(prov_in: dict, points: list[dict]) -> list[dict] | None:
+    """One entry per engine kind the contract's points were scored on, {kind, version[, module]}, sorted by kind, when more
+    than one kind is present; None otherwise, and then the summary keeps its single `engine` block, unchanged. The kind and
+    release are each point's simulator.engine; the module is the one the contract's provenance lists for that kind."""
+    seen: dict = {}
+    for x in points:
+        e = (x.get("simulator") or {}).get("engine") or {}
+        if e.get("kind"):
+            seen[e["kind"]] = e.get("version")
+    if len(seen) < 2:
+        return None
+    listed = {e.get("kind"): e for e in prov_in.get("engines") or []}
+    return [{"kind": k, "version": v, **({"module": listed[k]["module"]} if listed.get(k, {}).get("module") else {})}
+            for k, v in sorted(seen.items())]
+
+
 def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     problems = contract.validate_dir(directory)
     if problems:
@@ -354,6 +370,7 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     if len(ids) != len(graded) or len(set(ids)) != len(ids):
         raise ContractError("repeat folding lost or doubled a point")
 
+    engines = scored_engines(prov_in, list(fidelity.values()) + not_scored + failed)
     pull_date = prov_in["pulled_at"][:10]
     dates = sorted({p["measured_date"] for p in flat} | {ns["measured_date"] for ns in not_scored})
     provenance = {
@@ -363,6 +380,7 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
         "experimental": prov_in["experimental"],
         "units": prov_in["units"],
         "engine": prov_in["engine"],
+        **({"engines": engines} if engines else {}),
         # What the extractor pulled, as it recorded it (provenance.json's source).
         "ground_truth": {"source": prov_in["source"]["name"], "source_url": prov_in["source"]["url"],
                          "release_tag": f"api-{pull_date}",
@@ -477,6 +495,7 @@ def _prov_out_to_in(prov: dict, coverage: dict) -> dict:
     return {"ingest": "api", "blis": prov["blis"], "simulator": prov["simulator"],
             "harness_commit": prov["harness_commit"], "experimental": prov["experimental"], "units": prov["units"],
             "engine": prov["engine"],
+            **({"engines": prov["engines"]} if prov.get("engines") else {}),
             "points": coverage["points"],
             "left_out_records": coverage["left_out_records"], "vllm_ref": prov["vllm_ref"],
             "vllm_max_distance": prov["vllm_max_distance"], "fields_sha256": prov["fields_sha256"],

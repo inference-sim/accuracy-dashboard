@@ -60,6 +60,16 @@ DATA_READS = {
         "TEMPORARY until an inference-sim command prints the full unit list with identities "
         "(catalog/ledger/units) and the ingest report (catalog/ledger/reports); `blis ledger --list` "
         "prints only the published unit ids",
+    ("orchestrator/ingest/configiq_score.py", "catalog_view"):
+        "TEMPORARY until a command lists the catalog's models with their source repositories and whether each is a "
+        "mixture of experts, and its hardware (see support.Catalog._claims): configiq.gates needs both for every unit "
+        "before any simulation, and reads them from models/*/model.yaml, graph.yaml and hardware/*.yaml",
+    ("orchestrator/ingest/configiq_score.py", "catalog_context"):
+        "TEMPORARY until a command prints a catalog model's context window (see pd.model_window): a configiq row that "
+        "leaves max_seq_len blank ran at vLLM's default, the checkpoint's own length, which the entry's config.json holds",
+    ("orchestrator/ingest/configiq_score.py", "load_points"):
+        "TEMPORARY until an inference-sim command prints the full unit list with identities and the ingest report "
+        "(see ledger.load): the configiq units are read from catalog/ledger/units, reports and sources.yaml",
     ("orchestrator/ingest/ledger_fake.py", "write"):
         "TEMPORARY with ledger.load: writes, for tests, the ledger layout ledger.load reads",
     ("orchestrator/ingest/support.py", "Catalog._claims"):
@@ -116,6 +126,10 @@ TEXT_READS = {
         "TEMPORARY until an inference-sim command prints the full unit list with identities and the "
         "ingest report (`blis ledger --list` prints only the published unit ids): the job checks out "
         "blis-substrate at the commit stack.json pins, for catalog/, registry/ and catalog/ledger",
+    (".github/workflows/score-contracts.yml", "clone"):
+        "TEMPORARY with the api-nightly.yml substrate checkout: the contract-scoring job checks out "
+        "blis-substrate at the commit the simulator's stack.json pins, for catalog/, registry/ and "
+        "catalog/ledger, until an inference-sim command prints them",
     ("docs/m2/after-run.sh", "clone"):
         "TEMPORARY with the api-nightly.yml substrate checkout: the after-run script checks out the "
         "blis-substrate commit the run pins, for the catalog and registry, until the M2 substrate "

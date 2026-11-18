@@ -124,7 +124,7 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
           selMissing ? (
             <div className="pts-empty">
               That topology isn’t in this snapshot (it may have aged out, differ by run, or be hidden
-              by the current tier). Pick a row below, or switch the tier.
+              by the current grade filter). Pick a row below, or change the grade.
             </div>
           ) : (
             <div className="pts-empty">Expand a model above and pick a deployment to see each measurement next to its prediction.</div>

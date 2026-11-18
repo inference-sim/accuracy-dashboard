@@ -47,5 +47,7 @@ The dashboard asks one question of every InferenceX benchmark point it can read:
 |---|---|
 | [The M3 InferenceX baseline](m3/baseline/README.md) | The vLLM and SGLang lanes: points in scope, scored, refused by reason and issue, G1 to G5, and every point's grade ceiling with its reason ([the table](m3/baseline/baseline.md)). |
 | [Runs on the releases BLIS runs](m3/release-runs/README.md) | InferenceX at its latest data and the configiq dataset: the runs on vLLM v0.32.0, SGLang v0.5.23 or a release next to either, and what each needs before it is graded. |
+| [The grade filter](m3/grade-filter/README.md) | The cumulative closeness-grade filter that replaced the tier toggle, the deprecated `tier` field, and how old links and v1 snapshots read. |
+| [configiq scored by simulation](m3/configiq/README.md) | Why no configiq point reached the simulator, how a dataset row becomes a scenario and a workload, what is refused by name, and the command. |
 
 Design terms (D7, COV-2, X8, X19 and the like) are the numbered rules of the BLIS design document; the pages say what each one means where it is used.

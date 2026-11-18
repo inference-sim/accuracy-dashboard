@@ -43,6 +43,11 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     label: 'TPOT',
     definition: 'Time per output token — the average time between output tokens.',
   },
+  gradeFilter: {
+    label: 'grade',
+    definition:
+      'Which points are included, by closeness grade (G1 closest). The filter is cumulative: “G1” keeps only G1 points, “up to G2” keeps G1 and G2, “up to G3” keeps G1 to G3, and “all graded” keeps every graded point. The headline above always covers every graded point.',
+  },
   tier: {
     label: 'tier',
     definition:

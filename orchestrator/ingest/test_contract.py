@@ -4,6 +4,8 @@ Run: python3 orchestrator/ingest/test_contract.py
 """
 import hashlib
 import json
+
+import pytest
 import os
 import shutil
 import subprocess
@@ -416,13 +418,25 @@ def _summary_validator(version: int):
     return vs.validator(version)
 
 
-def _published_v2() -> dict:
-    """The newest published v2 snapshot. data/latest moves to the newest schema (the 2026-11-17 night published v3), but a
-    published v2 snapshot never changes (COV-8), so the frozen schema is checked against the newest one kept."""
-    docs = [json.loads(f.read_text()) for f in sorted((REPO / "data" / "snapshots").glob("*/summary.json"))]
-    v2 = [d for d in docs if d.get("schema_version") == 2]
-    assert v2, "no published v2 snapshot is kept under data/snapshots"
-    return v2[-1]
+def _published_v2(data: Path | None = None) -> dict:
+    """The newest published v2 snapshot. `latest` is whatever the last night published, and since the M3.0 scorer that is
+    a v3 snapshot; these tests are about the frozen v2 form, so they read the newest snapshot that is one."""
+    root = data or REPO / "data"
+    for f in sorted(root.glob("snapshots/*/summary.json"), key=lambda f: f.parent.name, reverse=True):
+        doc = json.loads(f.read_text())
+        if doc.get("schema_version") == 2:
+            return doc
+    raise AssertionError("no published v2 snapshot under " + str(root))
+
+
+def test_the_published_v2_snapshot_is_the_newest_v2_one_when_latest_is_v3():
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        for sid, version in (("2026-10-31_a", 2), ("2026-11-09_b", 2), ("2026-11-17_c", 3)):
+            d = Path(tmp) / "snapshots" / sid
+            d.mkdir(parents=True)
+            (d / "summary.json").write_text(json.dumps({"schema_version": version, "snapshot_id": sid}))
+        assert _published_v2(Path(tmp))["snapshot_id"] == "2026-11-09_b"
 
 
 def _v3() -> dict:
@@ -443,17 +457,6 @@ def test_the_v2_schema_still_reads_the_published_snapshot_and_its_frozen_fidelit
     _first_point(doc)["fidelity"]["build"]["distance"] = "near"
     assert not v.is_valid(doc)
     assert not _summary_validator(2).is_valid(_v3())
-
-
-def test_a_night_that_prunes_a_v2_snapshot_prunes_its_ids_from_the_legacy_map_and_the_check_passes():
-    import legacy_ids as li
-    doc = {"kind": "LegacyPointIds", "ledger_revision": "r", "points": {"a" * 64: {"units": ["u"]}, "b" * 64: {"units": ["v"]}}}
-    kept = {"a" * 64}
-    assert li.check(doc, kept) == [f"{'b' * 12}: in the map, not published"]
-    pruned = li.prune(doc, kept)
-    assert li.check(pruned, kept) == [] and set(pruned["points"]) == kept and pruned["ledger_revision"] == "r"
-    # Pruning never adds an id: a published id the map lacks is still reported.
-    assert li.check(pruned, kept | {"c" * 64}) == [f"{'c' * 12}: published, not in the map"]
 
 
 def test_the_v2_fidelity_schema_is_byte_identical_to_the_one_main_published():
@@ -518,3 +521,29 @@ if __name__ == "__main__":
             traceback.print_exc()
     print(f"\n{len(fns) - failed}/{len(fns)} passed")
     sys.exit(1 if failed else 0)
+
+
+def test_pruning_the_legacy_map_drops_only_the_ids_no_published_snapshot_holds(tmp_path):
+    # The nightly keeps the newest API snapshots only, so publishing one retires the oldest; the map must then hold no id
+    # that is not published (legacy_ids check). Pruning removes those and changes nothing else.
+    sys.path.insert(0, str(HERE))
+    import legacy_ids as li
+    keep = {"entry": {"units": ["u1"], "rows": ["1"]}}
+    doc = {"kind": "LegacyPointIds", "ledger_revision": "r", "points": {"a" * 64: keep["entry"], "b" * 64: {"units": [], "reason": "no_api_row"}}}
+    out = li.prune(doc, {"a" * 64})
+    assert out["points"] == {"a" * 64: keep["entry"]} and out["ledger_revision"] == "r"
+    assert li.check(out, {"a" * 64}) == []
+    assert li.check(doc, {"a" * 64}) == ["b" * 12 + ": in the map, not published"]       # what main reported
+    assert li.prune(out, {"a" * 64, "c" * 64}) == out                                 # it never adds an id
+
+@pytest.mark.parametrize("schema", ["summary.v3.json", "summary.v4.json"])
+@pytest.mark.parametrize("kind,ok", [("vllm", True), ("sglang", True), ("trtllm", False)])
+def test_the_simulator_and_the_engine_of_a_run_may_be_any_registered_engine_kind(schema, kind, ok):
+    # An SGLang point's record names simulator.engine {kind: sglang}; the schema pinned vllm, so no SGLang record validated.
+    import jsonschema
+    doc = json.loads((c.LISTS_SCHEMA.parent / schema).read_text())
+    sim = {"build": "v0.11.0", "engine": {"kind": kind, "version": "0.5.23"},
+           "harness_commit": "0123456789abcdef0123456789abcdef01234567"}
+    problems = list(jsonschema.Draft7Validator({**doc["definitions"]["simulator"], "definitions": doc["definitions"]}).iter_errors(sim))
+    assert (not problems) is ok, [p.message for p in problems]
+

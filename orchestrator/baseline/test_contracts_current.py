@@ -27,6 +27,8 @@ import subprocess
 import sys
 from pathlib import Path, PurePosixPath
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import contract_currency  # noqa: E402
 
@@ -49,10 +51,12 @@ def _is_test(path: str) -> bool:
 
 def import_closure(repo, rev: str) -> set[str]:
     """The .py files under orchestrator/ and harness/ that the entry point imports at `rev`,
-    transitively, read statically with ast."""
+    transitively, read statically with ast. Raises if `rev` has no entry point: the closure would
+    then be empty, and a change to any scoring module would pass unseen."""
     files = set(git(repo, "ls-tree", "-r", "--name-only", rev, "--", "orchestrator", "harness").stdout.split())
     if ENTRY not in files:
-        return set()
+        raise AssertionError(f"revision {rev} has no scoring entry point {ENTRY}, so its scorer files cannot be "
+                             f"derived; the gate cannot tell whether a contract scored there is current")
     seen, todo = set(), [ENTRY]
     while todo:
         path = todo.pop()
@@ -230,3 +234,14 @@ def test_moving_an_upstream_pin_does_not_make_a_contract_stale(tmp_path):
     repo.write(pins, "SIM_REF=" + "a" * 40 + "\n")
     repo.base = repo.commit("scored")
     assert repo.changed_after(pins) == []
+
+
+def test_a_revision_without_the_entry_point_is_refused(tmp_path):
+    """With no entry point the closure would be empty and no Python module would count, so the gate
+    would pass a scorer change it cannot see; it fails, naming the revision and the entry point."""
+    repo = Repo(tmp_path)
+    (tmp_path / ENTRY).unlink()
+    head = repo.commit("entry point removed")
+    with pytest.raises(AssertionError) as e:
+        scorer_changes(tmp_path, repo.base, head)
+    assert head in str(e.value) and ENTRY in str(e.value)

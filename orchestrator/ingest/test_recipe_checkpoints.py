@@ -126,3 +126,39 @@ def test_the_recipe_and_a_served_path_that_name_different_checkpoints_are_a_conf
     assert sp.served_conflict({"checkpoint_conflict": got}) == (
         "value_conflict:model: the log serves /scratch/models/DeepSeek-V4-Pro-NVFP4, the recipe deepseek-ai/DeepSeek-V4-Pro")
     assert sp.served_conflict({}) is None
+
+
+# ---- a recipe that names its model by a runner's local staging name (dashboard#111)
+
+def _dsr1_recipes(staged):
+    rc = recipes_of(models=("deepseek-r1-fp4",))
+    rc.recipes = [{**r, "framework": "sglang", "precision": "fp4", "runner": "b200"} for r in rc.recipes]
+    rc.dirs = {"DeepSeek-R1-0528-NVFP4-v2": staged}
+    return rc
+
+
+DSR1_ROW = {**ROW, "framework": "sglang", "precision": "fp4", "hardware": "b200", "model": "dsr1", "spec_method": "none"}
+DSR1_PATH = "/mnt/lustre01/models/DeepSeek-R1-0528-NVFP4-v2"
+
+
+def test_a_local_staging_name_resolves_when_the_runner_stages_the_directory_under_the_repositorys_name_too():
+    rc = _dsr1_recipes({"DeepSeek-R1-0528-NVFP4-v2", "DeepSeek-R1-0528-FP4-V2", "deepseek-r1-fp4"})
+    assert rcp.checkpoint(rc, DSR1_ROW, DSR1_PATH) == "nvidia/DeepSeek-R1-0528-FP4-V2"
+    got = pl.recipe_checkpoint(DSR1_ROW, log(DSR1_PATH, None), FakeRecipes(rc))
+    assert got and got["repo"] == "nvidia/DeepSeek-R1-0528-FP4-V2"
+
+
+def test_a_local_staging_name_is_not_taken_without_the_second_record_or_for_an_unlisted_spelling():
+    only_alias = _dsr1_recipes({"DeepSeek-R1-0528-NVFP4-v2", "deepseek-r1-fp4"})
+    assert rcp.checkpoint(only_alias, DSR1_ROW, DSR1_PATH) is None
+    unlisted = _dsr1_recipes({"DeepSeek-R1-0528-FP4-V2", "mystery-fp4"})
+    unlisted.recipes[0]["model"] = "mystery-fp4"
+    assert rcp.checkpoint(unlisted, DSR1_ROW, DSR1_PATH) is None
+
+
+def test_the_staging_directories_of_the_deepseek_r1_checkpoints_resolve_to_their_repositories():
+    for name, repo in (("deepseek-r1-0528-fp4-v2", "nvidia/DeepSeek-R1-0528-FP4-V2"),
+                       ("deepseek-r1-0528", "deepseek-ai/DeepSeek-R1-0528")):
+        rc = _dsr1_recipes(set())
+        rc.recipes[0]["model"], rc.dirs = name, {name: {name}}
+        assert rcp.checkpoint(rc, DSR1_ROW, f"/mnt/lustre01/models/{name}") == repo

@@ -85,21 +85,24 @@ describe('App renders the real CI-shaped snapshot', () => {
     expect(html).toContain('minimax-m2.5')
   })
 
-  it('falls back to the all tier (with a banner) when measured·resolved is asked for and empty', () => {
-    // The real snapshot has zero measured·resolved points (direct path), so a link asking for
-    // that tier must not show an empty table — it falls back to the all tier and says so.
-    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} initialHash="#/?tier=measured_or_resolved" />)
-    expect(html).toContain('no measured·resolved points yet — showing all')
-    expect(html).toContain('deepseek-v4-pro') // data visible, not an empty table
+  it('a grade with no points says so, and the control stays on the grade asked', () => {
+    // The direct-path fixture has no G1 point (v1 points are read as G1 only when measured·resolved).
+    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} initialHash="#/?grade=G1" />)
+    expect(html).toContain('no points at this grade yet')
+    expect(html).toContain('<span class="clk on">G1</span>')
+    expect(html).toContain('<span class="clk ">all graded</span>')
   })
 
-  it('highlights the tier actually shown, not the one requested (#23)', () => {
-    // measured·resolved is asked for, but this snapshot has none, so the view shows "all". The
-    // highlighted option must be "all": highlighting measured·resolved while showing all
-    // contradicts the banner beside it.
+  it('an old ?tier=measured_or_resolved link opens on G1', () => {
     const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} initialHash="#/?tier=measured_or_resolved" />)
-    expect(html).toContain('<span class="clk on">all</span>')
-    expect(html).toContain('<span class="clk ">measured·resolved</span>')
+    expect(html).toContain('<span class="clk on">G1</span>')
+  })
+
+  it('opens on all graded points by default, with the cumulative grades beside it', () => {
+    const html = renderToStaticMarkup(<App summary={loadFixture()} loadError={null} />)
+    expect(html).toContain('<span class="clk on">all graded</span>')
+    for (const label of ['G1', 'up to G2', 'up to G3']) expect(html).toContain(`>${label}</span>`)
+    expect(html).not.toContain('measured·resolved')
   })
 
   it('speaks to an outside reader: no internal terms, no disabled controls (#23)', () => {

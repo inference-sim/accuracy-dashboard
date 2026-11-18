@@ -13,6 +13,10 @@ a recipe fingerprint, concurrency and date. The map pairs it with the units thos
       catalog/ledger, DATA: the published data/ tree. Writes MAP.
   legacy_ids.py check --map MAP --data DATA
       Every point_id of every published v2 snapshot is in MAP, and MAP holds no other.
+  legacy_ids.py prune --map MAP --data DATA
+      Drops from MAP the ids no published v2 snapshot holds any more (the nightly keeps only the newest API
+      snapshots, so publishing one can retire the oldest). It adds nothing: an id published and missing from MAP
+      needs `build`.
 
 MAP is canonical JSON: {"kind": "LegacyPointIds", "ledger_revision", "points": {old_id: entry}},
 entry {"units": [unit_id, ...], "rows": [row id, ...]} or {"units": [], "reason": ...} for an id
@@ -99,10 +103,8 @@ def check(doc: dict, ids: set[str]) -> list[str]:
 
 
 def prune(doc: dict, ids: set[str]) -> dict:
-    """The map without the point ids no kept snapshot publishes any more. The nightly keeps the last few API snapshots and
-    drops the oldest; its v2 point ids leave with it, and the map must not keep them (check's second rule). No id is added:
-    a v3 snapshot's ids are ledger unit ids already."""
-    return {**doc, "points": {k: v for k, v in doc.get("points", {}).items() if k in ids}}
+    """The map without the ids no published snapshot holds; every other entry unchanged."""
+    return {**doc, "points": {p: e for p, e in doc.get("points", {}).items() if p in ids}}
 
 
 def main(argv=None) -> int:
@@ -113,12 +115,12 @@ def main(argv=None) -> int:
     b.add_argument("--ledger", required=True)
     b.add_argument("--data", required=True)
     b.add_argument("--out", required=True)
-    pr = sub.add_parser("prune")
-    pr.add_argument("--map", required=True)
-    pr.add_argument("--data", required=True)
     k = sub.add_parser("check")
     k.add_argument("--map", required=True)
     k.add_argument("--data", required=True)
+    r = sub.add_parser("prune")
+    r.add_argument("--map", required=True)
+    r.add_argument("--data", required=True)
     a = ap.parse_args(argv)
     if a.cmd == "build":
         doc = build(json.loads(Path(a.rows).read_text()), ldg.load(Path(a.ledger)), published_ids(Path(a.data)))
@@ -129,10 +131,10 @@ def main(argv=None) -> int:
         print(f"{len(doc['points'])} published point ids: {reasons}", file=sys.stderr)
         return 0
     if a.cmd == "prune":
-        doc = json.loads(Path(a.map).read_text())
-        out = prune(doc, published_ids(Path(a.data)))
-        Path(a.map).write_text(c.canonical_dumps(out) + "\n")
-        print(f"{len(doc.get('points', {})) - len(out['points'])} point ids no longer published removed", file=sys.stderr)
+        before = json.loads(Path(a.map).read_text())
+        after = prune(before, published_ids(Path(a.data)))
+        Path(a.map).write_text(c.canonical_dumps(after) + "\n")
+        print(f"pruned {len(before.get('points', {})) - len(after['points'])} of {len(before.get('points', {}))} ids", file=sys.stderr)
         return 0
     problems = check(json.loads(Path(a.map).read_text()), published_ids(Path(a.data)))
     for p in problems:

@@ -74,6 +74,52 @@ NO_COMMAND, AMBIGUOUS_COMMAND, SHELL_EXPANSION = "no_launch_command", "several_l
 _EXPANSION = re.compile(r"\$\(|`|\$\{[^}]*:[-+=?]")
 
 
+LEFT_TO_THE_LOG = "$LEFT_TO_THE_LOG"
+_FLAG_BEFORE_VALUE = re.compile(r"--[A-Za-z0-9][A-Za-z0-9-]*(?:=|\s+)$")
+
+
+def _hide_computed_values(cmd: str) -> str:
+    """The command with each `$(...)` or `$((...))` that is a flag's whole value replaced by a variable the reader
+    leaves to the log. The flag is still named, and the printout of the resolved arguments holds its value; an
+    expansion anywhere else (it may decide whether a flag is set at all) is left, and the command is refused."""
+    out, i = [], 0
+    while i < len(cmd):
+        j = cmd.find("$(", i)
+        if j < 0:
+            break
+        depth, k = 0, j + 1
+        while k < len(cmd):
+            depth += {"(": 1, ")": -1}.get(cmd[k], 0)
+            k += 1
+            if depth == 0:
+                break
+        if depth != 0 or not _FLAG_BEFORE_VALUE.search(cmd[:j]) or (k < len(cmd) and not cmd[k].isspace()):
+            break
+        out.append(cmd[i:j] + LEFT_TO_THE_LOG)
+        i = k
+    return "".join(out) + cmd[i:]
+
+
+def _merge_branches(cmds: list[str]) -> str | None:
+    """One command for the several a script launches by branch, when they differ only in the values of the flags they
+    all name: each differing value becomes a variable left to the log. Commands that name different flags, or are
+    laid out differently, are not merged (None): which flags the run set is then unknown."""
+    split = [shlex.split(c, comments=True) for c in cmds]
+    if len({len(t) for t in split}) != 1:
+        return None
+    merged = []
+    for col in zip(*split):
+        if len(set(col)) == 1:
+            merged.append(col[0])
+            continue
+        heads = {t.partition("=")[0] for t in col}
+        if any(t.startswith("--") and "=" not in t for t in col) or len(heads) != 1 and any("=" in t for t in col):
+            return None
+        merged.append(f"{heads.pop()}={LEFT_TO_THE_LOG}" if all("=" in t for t in col) and next(iter(heads)).startswith("--")
+                      else LEFT_TO_THE_LOG)
+    return " ".join(shlex.quote(t) if t != LEFT_TO_THE_LOG and not t.startswith("--") else t for t in merged)
+
+
 def launch_command_of(text: str) -> tuple[str | None, str | None]:
     """(the launch command with the environment it ran with, None) from a CI job log or a script, or (None, why).
 
@@ -95,11 +141,14 @@ def launch_command_of(text: str) -> tuple[str | None, str | None]:
                 cmd = cmd[:-1].rstrip() + " " + lines[i].strip()
             cmds.append(cmd)
         i += 1
-    distinct = sorted(set(cmds))
+    distinct = sorted({_hide_computed_values(c) for c in cmds})
     if not distinct:
         return None, NO_COMMAND
     if len(distinct) > 1:
-        return None, AMBIGUOUS_COMMAND
+        merged = None if any(_EXPANSION.search(c) for c in distinct) else _merge_branches(distinct)
+        if merged is None:
+            return None, AMBIGUOUS_COMMAND
+        distinct = [merged]
     if _EXPANSION.search(distinct[0]):
         return None, SHELL_EXPANSION
     return "\n".join(env + distinct), None
@@ -202,6 +251,46 @@ def _value(text: str, kind: str):
         return _coerce(text, kind)
     except ValueError:
         return text
+
+
+# The flags of a prefill/decode pool that are the deployment's (its role and its KV transfer), not engine settings.
+TRANSFER_FIELDS = ("disaggregation_mode", "disaggregation_transfer_backend")
+CONNECTOR_PATH = "kv_transfer_config.kv_connector"      # where pd.build_pd looks for the pools' connector
+
+
+def pool_launch_text(launch: dict) -> str:
+    """A launch command, in the form `read_launch_command` reads, of the one pool a pseudo launch
+    configuration (pd.pseudo_launch) holds: the recipe's flags and environment. A flag set to false is not on the command."""
+    (role, spec), = launch["roles"].items()
+    lines = [f"export {k}={shlex.quote(str(v))}" for k, v in (spec.get("env") or {}).items()]
+    words = ["python3", "-m", "sglang.launch_server"]
+    for k, v in (spec.get("args") or {}).items():
+        if v is None or v is False:
+            continue
+        words.append(f"--{k}")
+        if v is not True:
+            words += [shlex.quote(str(x)) for x in (v if isinstance(v, list) else [v])]
+    return "\n".join(lines + [" ".join(words)])
+
+
+def read_pool(launch: dict, decl: dict, field_list=None) -> tuple[st.Reading, dict]:
+    """(the pool's settings reading without its role and transfer backend, {field: value}) from a pseudo launch
+    configuration. The transfer backend is also given as the connector pd.build_pd reads; one the recipe leaves
+    unstated is the engine's declared default."""
+    rd = read_launch_command(pool_launch_text(launch), decl)
+    if field_list is not None:
+        drop_foreign_env(rd, field_list)
+    taken = {}
+    for f in TRANSFER_FIELDS:
+        vals = rd.values.pop(f, None)
+        if vals:
+            taken[f] = vals[0]
+    backend = taken.get("disaggregation_transfer_backend")
+    if backend is None and "disaggregation_mode" in taken:
+        backend = (decl["fields"].get("disaggregation_transfer_backend") or {}).get("default")
+    if backend is not None:
+        taken[CONNECTOR_PATH] = backend
+    return rd, taken
 
 
 def unresolved_env(readings: dict) -> list[str]:

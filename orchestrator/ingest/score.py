@@ -49,10 +49,6 @@ import support as sp  # noqa: E402
 
 AGENTIC_LABEL = "agentx"
 
-# A prefill/decode SGLang point: the writer of a prefill/decode scenario (score_pd) reads vLLM's recipe flags, so
-# an SGLang one is not scored yet (dashboard#110, the part after the aggregated path).
-SGLANG_PD_UNSCORED = "topology_unsupported:sglang_disaggregated"
-
 # The API row fields that vary from point to point within one InferenceX curve. Every other
 # field is the curve's (run, model, part, parallelism, drafter, DP attention, offload, ...), so
 # rows that differ in any of them are separate curves even inside one workflow run. A field the
@@ -292,6 +288,11 @@ _STATES_NO = re.compile(r"\bstates no ([A-Za-z_][A-Za-z0-9_.]*)")
 # The engine's refusal of a value it does not model: '<field> "<value>" ... is not modelled' (blis-vllm states the field,
 # the value and why, and links the issue that would model it).
 _NOT_MODELLED = re.compile(r'\b([a-z_][a-z0-9_]*) "[^"]*"[^"]*?\bis not modelled\b')
+# The engine's refusal of a value the scenario states for a field THIS model does not read:
+# '<field>="<value>" is read only for <model>'s <part>, and this model has none, so a stated value would be dropped'.
+# The model has no such part, so the field is not modelled for it (a gap of the model, not a fault of the run), and
+# the reason names the field. (Before, the message was cut to the bare slug "scenario" and the whole night stopped.)
+_NOT_READ = re.compile(r'\b([a-z_][a-z0-9_]*)="[^"]*" is read only for [^,]*, and this model has none\b')
 # "the workload states no thinking mode": the simulator wants a statement about the WORKLOAD (it
 # selects the acceptance profile), not a field of the engine's list. The reason names the workload
 # statement, so it is not looked up in fields.json (where it would read as a missing field).
@@ -330,6 +331,14 @@ def value_refusal(stderr: str, work: Path, field_list) -> str | None:
         # The engine states that the scenario's value of a field is not modelled: the release's own classification
         # of the run's setting (design 11.4, field_not_modelled), named by the field's path in the field list.
         name = nm.group(1)
+        path = name
+        if field_list is not None and field_list.lookup(name) is None:
+            hits = [f for f in field_list.fields if f.endswith("." + name)]
+            path = hits[0] if len(hits) == 1 else name
+        return f"field_not_modelled:{path}"
+    nr = _NOT_READ.search(re.sub(r"\s+", " ", stderr).replace('\\"', '"'))
+    if nr:
+        name = nr.group(1)
         path = name
         if field_list is not None and field_list.lookup(name) is None:
             hits = [f for f in field_list.fields if f.endswith("." + name)]
@@ -776,11 +785,6 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     o.engine = fw.engine
     pdir = pull_dir / "points" / pid
     if row.get("disagg"):
-        if sglang:
-            # The prefill/decode writer reads vLLM's recipe flags and launches two vLLM pools (score_pd); SGLang's is
-            # not written yet, and BLIS is not asked.
-            o.reasons = sorted(set(o.reasons + [SGLANG_PD_UNSCORED] + asx.router_reason(row, fw.router)))
-            return o
         return score_pd(o, entry, pdir, env, work, fw, simulate=simulate)
     log_b = _read(pdir, entry["files"], "server_log")
     agg = aggregated_recipe(entry, pdir) if log_b is None and not sglang else None
@@ -1385,6 +1389,10 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
     scenario states two pools and the NIXL connector, and the instance counts reach `blis replay` as
     flags. The replay is the single-turn one."""
     row, pid, ident = entry["row"], entry["point_id"], entry["identity"]
+    sglang = fw.engine == engines.SGLANG
+    kit = env.kit(fw.engine)
+    field_list = kit.field_list if sglang else env.field_list
+    release = kit.release if sglang else env.engine_release
     rb = _read(pdir, entry["files"], "recipe")
     recipe = None
     if entry.get("recipe") and rb:
@@ -1401,7 +1409,7 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
         # Without a recipe the pools' arguments are not known. A log that records topology fields still
         # has them decided by the engine's field list (design §11.4), as every other recorded field is.
         log_b = _read(pdir, entry["files"], "server_log")
-        if log_b is not None:
+        if log_b is not None and not sglang:      # the vLLM log's non-default arguments; SGLang's is read through the recipe only
             lc = _read(pdir, entry["files"], "launch_config")
             o.reasons += st.topology_reasons(json.loads(lc) if lc else None,
                                              st.read_args(log_b.decode("utf-8", "replace")), env.field_list)
@@ -1415,7 +1423,7 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
         return o
     o.reasons += pdr.check_row(recipe, row)
     log_b = _read(pdir, entry["files"], "server_log")
-    if log_b is not None and pools is not None:
+    if log_b is not None and pools is not None and not sglang:
         o.reasons += pdm.log_conflicts(logged_configs(log_b.decode("utf-8", "replace")), recipe, pools)
 
     meta = entry["recipe"]
@@ -1424,8 +1432,15 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
     decided, taken, launches = {}, {}, {}
     for role, pool in pools.items():
         launches[role] = pdm.pseudo_launch(recipe, role, row, pool)
-        rd, taken[role] = pdm.read_pool(launches[role])
-        c = st.decide(st.merge({"launch_config": rd}, {}), env.field_list, part_name, _facts_of(env, part_name, recipe.gpus_per_node))
+        if sglang:
+            rd, taken[role] = ss.read_pool(launches[role], kit.declarations, kit.field_list)
+            if taken[role].get("disaggregation_mode") not in (None, role):
+                o.reasons.append("conflict:disaggregation_mode")
+            c = st.decide(st.merge({"launch_config": rd}, {}, ss.make_requested(kit.declarations)), field_list, part_name,
+                          _facts_of(env, part_name, recipe.gpus_per_node), names=ss.make_names(kit.declarations))
+        else:
+            rd, taken[role] = pdm.read_pool(launches[role])
+            c = st.decide(st.merge({"launch_config": rd}, {}), field_list, part_name, _facts_of(env, part_name, recipe.gpus_per_node))
         decided[role] = c
         o.reasons += c.reasons
         o.subs += c.substitutions
@@ -1433,9 +1448,9 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
         derived = sorted(f for f in ("tensor_parallel_size", "pipeline_parallel_size", "data_parallel_size")
                          if f in rd.values and f.replace("_", "-") not in recipe.pools[role].flags)
         o.subs.append(pdm.recovery_substitution(role, meta, stated, derived))
-        for p in pdm.TRANSFER_PATHS:
+        for p in (ss.TRANSFER_FIELDS if sglang else pdm.TRANSFER_PATHS):
             if p in taken[role]:
-                dec = fl.decide(env.field_list, p, set_by_run=True)
+                dec = fl.decide(field_list, p, set_by_run=True)
                 if dec.g5:
                     o.reasons.append(f"{dec.g5['code']}:{p}")
     connectors = {t.get("kv_transfer_config.kv_connector") for t in taken.values()}
@@ -1467,7 +1482,7 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
            "shape": f"{pools['prefill'].workers}P{pools['decode'].workers}D",
            # The rest of the regime (the substrate's exact form): the engine release, the fabric the run recorded
            # (an assumed class is not a recorded one, so it is None), and each pool's per-instance parallelism.
-           "engine_version": env.engine_release, "fabric": recipe.fabric or st.recorded_fabric(launches["decode"]),
+           "engine_version": release, "fabric": recipe.fabric or st.recorded_fabric(launches["decode"]),
            "prefill": pdm.pool_parallel(pools["prefill"], recipe.pools["prefill"].flags),
            "decode": pdm.pool_parallel(pools["decode"], recipe.pools["decode"].flags)}
     policy, rsubs, rreasons, rrec = pd_router(row, router_name, recipe, table, ctx, env.assumed_router_revision)
@@ -1485,7 +1500,14 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
     node = ir.resolve(env.runner_table, row["hardware"], run_date=ident["measured_date"],
                       launch_size=recipe.gpus_per_node, fixes_packaging=catalog_size is not None)
     for role, c in decided.items():
-        if "engine.max_model_len" not in c.mapped and cat is not None:
+        if sglang and f"engine.{ss.CONTEXT_LENGTH_FIELD}" not in c.mapped and cat is not None:
+            win = ss.context_window(cat.root, sup.model)
+            if win is not None:
+                c.mapped[f"engine.{ss.CONTEXT_LENGTH_FIELD}"] = (ss.CONTEXT_LENGTH_FIELD, win)
+                o.subs.append({"kind": "estimated", "subject": f"engine.{role}.{ss.CONTEXT_LENGTH_FIELD}",
+                               "detail": f"the recipe set no context length; SGLang derives {win} from the checkpoint's config "
+                                         f"(get_context_length), which the catalog graph does not carry"})
+        elif not sglang and "engine.max_model_len" not in c.mapped and cat is not None:
             # The recipe states no --max-model-len, so vLLM served the checkpoint's own window; the engine needs it stated.
             win = pdm.model_window(cat.root, sup.model)
             if win is not None:
@@ -1493,9 +1515,12 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
                 o.subs.append({"kind": "estimated", "subject": f"engine.{role}.max_model_len",
                                "detail": f"not stated by the recipe; vLLM resolves it to the checkpoint's max_position_embeddings, "
                                          f"{win} (the catalog model {sup.model}'s config.json)"})
-    builts = {role: st.build(decided[role], name=name, model=sup.model, part=part, engine_version=env.engine_release,
-                             field_list=env.field_list, catalog_node_size=catalog_size, node=node,
-                             draft_model=sup.drafter, launch_config=launches[role]) for role in pools}
+    builts = {role: st.build(decided[role], name=name, model=sup.model, part=part, engine_version=release,
+                             field_list=field_list, catalog_node_size=catalog_size, node=node,
+                             draft_model=sup.drafter, launch_config=launches[role], engine_kind=fw.engine) for role in pools}
+    if sglang:
+        for role, b_ in builts.items():
+            b_.reasons = ss.parallel_reasons(b_.reasons, decided[role], field_list)
     b = pdm.build_pd(builts, recipe, pools, taken, name=name, policy=policy, per_node=catalog_size or node.gpus_per_node)
     o.reasons += b.reasons
     o.subs += b.substitutions
