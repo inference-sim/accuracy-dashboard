@@ -318,6 +318,15 @@ def scored_engines(prov_in: dict, points: list[dict]) -> list[dict] | None:
             for k, v in sorted(seen.items())]
 
 
+def refuse_recipe_class(prov_in: dict) -> None:
+    """A contract whose provenance names a recipe class (the reconstructed launches of supplemental.py) is a run beside the regular
+    one, scored with launches that are not the runs' own; it is never given to the summary as a release."""
+    rc = prov_in.get("recipe_class")
+    if rc:
+        raise ContractError(f"this contract is the {rc.get('class')!r} recipe class ({rc.get('units')} units), not a regular run; "
+                            "the summary builder takes regular runs only")
+
+
 def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     problems = contract.validate_dir(directory)
     if problems:
@@ -332,6 +341,7 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     facets = json.loads((directory / contract.FACETS_JSON).read_text())
     not_scored = _lines(directory / contract.NOT_SCORED_JSONL)
     prov_in = json.loads((directory / contract.PROVENANCE_JSON).read_text())
+    refuse_recipe_class(prov_in)
 
     # Every point of the contract, graded or not, in the shape headline and backlog read.
     graded = [{**r, "grade": fidelity[r["point_id"]]["grade"], "framework": facets[r["point_id"]]["framework"],

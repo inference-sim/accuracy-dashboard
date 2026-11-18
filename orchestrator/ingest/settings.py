@@ -678,7 +678,33 @@ def _is_true(v) -> bool:
         return False
 
 
+SAME_VALUE = object()      # a translation that renames a field: the successor takes the run's value
+
+_PASS_RENAMED = ("vllm/config/compilation.py PassConfig at v0.10.2 (lines 80-88) and at v0.33.0 (lines 130-140): the field kept its meaning "
+                 "(its docstring) and took a new name")
+_NOT_A_VLLM_SETTING = "vLLM v0.33.0 never reads it while serving (grep of vllm/ at v0.33.0: only vllm/collect_env.py, a diagnostic)"
+_LOG_FLAG = ("--disable-log-requests is not an argument of v0.33.0 (vllm/entrypoints/openai/cli_args.py, vllm/engine/arg_utils.py at "
+             "v0.33.0 have no such field); it only switched per-request log lines off, which no price depends on")
+
 RELEASE_TRANSLATIONS = {
+    "compilation_config.pass_config.enable_attn_fusion": (
+        "compilation_config.pass_config.fuse_attn_quant", SAME_VALUE, lambda v: True,
+        "PassConfig.enable_attn_fusion (the attention+quant fusion pass) is fuse_attn_quant; " + _PASS_RENAMED),
+    "compilation_config.pass_config.enable_fi_allreduce_fusion": (
+        "compilation_config.pass_config.fuse_allreduce_rms", SAME_VALUE, lambda v: True,
+        "PassConfig.enable_fi_allreduce_fusion (the FlashInfer allreduce fusion) is fuse_allreduce_rms; " + _PASS_RENAMED),
+    "compilation_config.pass_config.enable_noop": (
+        "compilation_config.pass_config.eliminate_noops", SAME_VALUE, lambda v: True,
+        "PassConfig.enable_noop (no-op elimination) is eliminate_noops, whose default is true; " + _PASS_RENAMED),
+    "env.TORCH_CUDA_ARCH_LIST": (None, None, lambda v: True, _NOT_A_VLLM_SETTING),
+    "env.VLLM_FLASHINFER_ALLREDUCE_FUSION_THRESHOLDS_MB": (
+        None, None, lambda v: True,
+        "vLLM v0.33.0 has no such environment variable (vllm/envs.py): the per-world-size thresholds became "
+        "PassConfig.fi_allreduce_fusion_max_size_mb (vllm/config/compilation.py:162), a float whose per-capability defaults are "
+        "FI_ALLREDUCE_FUSION_MAX_SIZE_MB (vllm/compilation/passes/fusion/allreduce_rms_fusion.py:104-120: capability 100 gives "
+        "2 ranks 64 MB, 4 ranks 32, 8 ranks 1; the run's thresholds were 32, 32 and 8 MB). The engine's field list classes the "
+        "successor as inert (leave_unset), so the scenario states neither the variable nor the field"),
+    "disable_log_requests": (None, None, lambda v: True, _LOG_FLAG),
     "attention_config.use_trtllm_ragged_deepseek_prefill": (
         "attention_config.mla_prefill_backend", "TRTLLM_RAGGED", lambda v: _is_true(v),
         "vLLM #42555 (9898f94abe00, 2026-05-14) removed the flag; before it AttentionConfig.__post_init__ migrated a stated "
@@ -690,9 +716,6 @@ RELEASE_TRANSLATIONS = {
         "SM100 (fused_moe/oracle/nvfp4.py:90-102 and quantization/utils/flashinfer_utils.py:233-252 at 42135d689^); "
         "VLLM_FLASHINFER_MOE_BACKEND is not stated by these recipes"),
 }
-
-
-SAME_VALUE = object()      # a translation that renames a field: the successor takes the run's value
 
 
 def translate_removed(settings: dict, field_list, table: dict | None = None) -> tuple:
