@@ -4,7 +4,7 @@ A `leave_unset` estimation rule of the engine's field list is exact only for som
 writes which (blis-vllm fields.json, `estimation.valid_when`) and the substrate's evaluator decides. The dashboard supplies the
 facts, and no rule of its own:
 
-  value              the value the run recorded, trimmed and lowercased
+  value              the value the run recorded, trimmed and lowercased (a list joined with commas, as the clauses split it)
   tp_group_nodes     the nodes the pool's tensor-parallel group spans: ceil(tp / gpus per node)
   compute_capability the part's CUDA compute capability, from the catalog's hardware entry (`ComputeCapability`)
 
@@ -34,6 +34,9 @@ def compute_capability(catalog_root, chip: str) -> str | None:
 def facts(value, *, tp=None, gpus_per_node=None, capability: str | None = None) -> dict:
     """The facts for one recorded value; a fact that cannot be supplied is absent."""
     out = {}
+    if isinstance(value, (list, tuple)):
+        # A list-valued setting (compilation_config.custom_ops) is recorded as a list; the clauses read the value split on commas.
+        value = ",".join(str(x).strip() for x in value)
     if value is not None:
         out["value"] = str(value).strip().lower()
     nodes = tp_group_nodes(tp, gpus_per_node)

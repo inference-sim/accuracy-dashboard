@@ -47,3 +47,11 @@ def test_a_part_with_no_catalog_entry_is_sized_by_its_launch_and_does_not_stop_t
             raise bc.CommandError(f"blis catalog resolve --chip {chip} reports no packaging")
     facts_of = score._facts_of(types.SimpleNamespace(catalog_obj=NoEntry()), "mi355x", 8)
     assert facts_of("auto", {"tensor_parallel_size": types.SimpleNamespace(value=16)})["tp_group_nodes"] == 2
+
+
+def test_a_list_valued_setting_is_given_to_the_clauses_as_its_comma_separated_items():
+    """compilation_config.custom_ops is recorded as a list; the clauses read the value split on commas, so a list reaches them
+    joined, not as its Python repr (whose first item would read "['+quant_fp8')."""
+    assert sif.facts(["+quant_fp8", "+rms_norm", "+rotary_embedding"], capability="10.0")["value"] == "+quant_fp8,+rms_norm,+rotary_embedding"
+    assert sif.facts(("all",))["value"] == "all"
+    assert sif.facts([])["value"] == ""
