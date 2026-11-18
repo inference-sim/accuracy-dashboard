@@ -702,6 +702,14 @@ def translate_removed(settings: dict, field_list, table: dict | None = None) -> 
         st = settings.get(path)
         if st is None or field_list.lookup(path) is not None or st.conflict is not None:
             continue
+        if new is None:
+            # A setting no release of the engine reads, named and left out: the successor is nothing (see the entry's why).
+            if applies(st.value):
+                del out[path]
+                subs.append({"kind": "estimated", "subject": path,
+                             "detail": f"the run set {path}={st.value!r}; the modelled release has no such setting, and it is "
+                                       f"left out of the scenario: {why}"})
+            continue
         renames = value is SAME_VALUE or callable(value)
         if not applies(st.value) or new in settings or (renames and not st.requested):
             continue            # a renamed field the engine only resolved is not a request, so it is not carried over

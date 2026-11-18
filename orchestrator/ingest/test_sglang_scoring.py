@@ -477,6 +477,39 @@ def test_the_mamba_strategy_flag_of_an_earlier_release_is_read_as_the_field_that
             shutil.rmtree(tmp)
 
 
+def _score_with_field(extra_command, field_name, prefix=""):
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        fields = [{**_field(f.name, f.status, f.source)} for f in FIELDS.fields.values()] + [_field(field_name, "modelled")]
+        fields.sort(key=lambda f: (f["name"], f["source"]))
+        entry, env = _setup(tmp, command=prefix + COMMAND + extra_command)
+        env.sglang = sc.EngineKit("sglang", RELEASE, fl.parse(json.dumps(
+            {"kind": "FieldList", "engine": {"kind": "sglang", "version": RELEASE}, "fields": fields}).encode()), "f" * 64,
+            ss.load_declarations())
+        o, work = _score(tmp, entry, env)
+        dep = list(yaml.safe_load_all(next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()))[1] \
+            if o.fidelity is not None else None
+        return o, dep
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_the_removed_piecewise_flag_is_the_prefill_graph_backend_disabled_and_named():
+    o, dep = _score_with_field(" --disable-piecewise-cuda-graph", "cuda_graph_backend_prefill")
+    assert o.fidelity is not None, o.reasons
+    sub = next(s for s in o.fidelity["substitutions"] if s["subject"] == "disable_piecewise_cuda_graph")
+    assert sub["kind"] == "resolved_differs" and "cuda_graph_backend_prefill=disabled" in sub["detail"]
+    assert dep["pools"][0]["engine"]["cuda_graph_backend_prefill"] == "disabled"
+
+
+def test_an_env_variable_no_sglang_release_reads_is_left_out_and_named():
+    o, dep = _score_with_field("", "cuda_graph_backend_prefill", prefix="export SGLANG_ENABLE_FLASHINFER_GEMM=1\n")
+    assert o.fidelity is not None, o.reasons
+    sub = next(s for s in o.fidelity["substitutions"] if s["subject"] == "env.SGLANG_ENABLE_FLASHINFER_GEMM")
+    assert sub["kind"] == "estimated" and "no SGLang release" in sub["detail"]
+    assert "SGLANG_ENABLE_FLASHINFER_GEMM" not in json.dumps(dep["pools"][0]["engine"])
+
+
 def _config(tmp, cfg):
     d = tmp / "catalog" / "models" / "m"
     d.mkdir(parents=True, exist_ok=True)

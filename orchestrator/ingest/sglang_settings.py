@@ -373,6 +373,17 @@ TRANSLATIONS = {
         "self.mamba_scheduler_strategy = \"no_buffer\"`); v0.5.14 renamed the field mamba_radix_cache_strategy, kept the old flag as "
         "a deprecated alias (DeprecatedAliasStoreAction) and made auto choose extra_buffer under overlap scheduling, so an old "
         "auto is stated as the no_buffer the run resolved it to"),
+    "disable_piecewise_cuda_graph": (
+        "cuda_graph_backend_prefill", lambda v: "disabled", lambda v: v is True,
+        "SGLang v0.5.12 and v0.5.13 had --disable-piecewise-cuda-graph; v0.5.14 replaced the prefill CUDA graph settings by "
+        "per-phase ones and kept the flag as a deprecated alias of --cuda-graph-backend-prefill=disabled "
+        "(DeprecatedStoreConstAction, const_value=Backend.DISABLED, server_args.py at v0.5.14), so a stated flag is the prefill "
+        "graph backend disabled"),
+    "env.SGLANG_ENABLE_FLASHINFER_GEMM": (
+        None, None, lambda v: True,
+        "no SGLang release from v0.5.12 to v0.5.23 reads it (it is in no environ.py or source file; only AgentX documentation "
+        "snippets name it), so the variable acts, if at all, in the image's FlashInfer layer; whether it changes scheduling "
+        "decisions is unproven"),
 }
 
 
