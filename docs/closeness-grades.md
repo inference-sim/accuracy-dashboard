@@ -60,4 +60,4 @@ The list is closed (design §11.4); [grades.md](grades.md) has the table with th
 - **`engine_unsupported`**: no BLIS engine exists for the run's engine (TensorRT-LLM, ATOM, TileRT and the like). Removed by adding the engine.
 - **`code_not_visible`**, **`build_unparseable`**: in the list, emitted by no scorer path today; a build the scorer cannot resolve is G4.
 
-A run that fails at the simulator is not a G5 reason: it is a **fault** (`blis_refused:<slug>`), listed in `failed.jsonl`, and the next work list ([the preliminary after-run](m2/preliminary-after/preliminary-after-run.md) groups them).
+A simulator that refuses the scenario and says why gives the point a G5 reason, `blis_refused:<what it said>`: a named not-scored point, counted and listed, and the night publishes. A run that fails some other way is a **fault** (a crash, the runner's memory or time, output the harness cannot read), listed in `failed.jsonl`; only a runner limit lets the night publish, and the next work list ([the preliminary after-run](m2/preliminary-after/preliminary-after-run.md) groups them).

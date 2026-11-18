@@ -43,15 +43,13 @@ import inferencex_runners as ir  # noqa: E402
 import replay as rp  # noqa: E402
 import result  # noqa: E402
 import settings as st  # noqa: E402
+import supplemental  # noqa: E402
 import sglang_settings as ss  # noqa: E402
 import blis_commands as bc  # noqa: E402
+import contamination  # noqa: E402
 import support as sp  # noqa: E402
 
 AGENTIC_LABEL = "agentx"
-
-# A prefill/decode SGLang point: the writer of a prefill/decode scenario (score_pd) reads vLLM's recipe flags, so
-# an SGLang one is not scored yet (dashboard#110, the part after the aggregated path).
-SGLANG_PD_UNSCORED = "topology_unsupported:sglang_disaggregated"
 
 # The API row fields that vary from point to point within one InferenceX curve. Every other
 # field is the curve's (run, model, part, parallelism, drafter, DP attention, offload, ...), so
@@ -208,9 +206,11 @@ def _read(point_dir: Path, files: dict, role: str) -> bytes | None:
     return gzip.decompress((point_dir / f["path"]).read_bytes())
 
 
-def _checkpoints(c: st.Decided, launch_cfg: dict | None) -> list[str]:
+def _checkpoints(c: st.Decided, launch_cfg: dict | None, cat: "sp.Catalog | None" = None) -> list[str]:
     """The served checkpoint's candidate HF repos, most authoritative first: the launch
-    config's model path, then the served model name, then --model."""
+    config's model path, then the served model name, then --model. A local path that names
+    no repository (a staged copy of the checkpoint) is mapped to the one catalog repository
+    its directory name is (support.Catalog.repo_of_local_path), after the named ones."""
     out = []
     if launch_cfg:
         r = sp.hf_repo(((launch_cfg.get("model") or {}).get("path")))
@@ -222,7 +222,33 @@ def _checkpoints(c: st.Decided, launch_cfg: dict | None) -> list[str]:
             r = sp.hf_repo(x)
             if r and r not in out:
                 out.append(r)
+    if cat is not None:
+        for role in ("served_model", "model"):
+            v = c.roles.get(role)
+            for x in (v if isinstance(v, list) else [v]):
+                r = cat.repo_of_local_path(x) if isinstance(x, str) and x.startswith("/") else None
+                if r and r not in out:
+                    out.append(r)
     return out
+
+
+def staged_substitution(c: st.Decided, cat: "sp.Catalog", checkpoint: str | None) -> dict | None:
+    """The substitution a point names when its model was found from a staged checkpoint directory and not from a
+    repository the run named (X19): the directory and the repository it was matched to. None when the chosen checkpoint
+    is not one a local path gave."""
+    if not checkpoint:
+        return None
+    for role in ("served_model", "model"):
+        v = c.roles.get(role)
+        for x in (v if isinstance(v, list) else [v]):
+            if isinstance(x, str) and x.startswith("/") and cat.repo_of_local_path(x) == checkpoint:
+                return {"kind": "estimated", "subject": "checkpoint_from_staged_path",
+                        "detail": f"the run served the staged copy {x}, which names no Hugging Face repository; the catalog "
+                                  f"model is the one repository whose name is the directory's: {checkpoint}"
+                                  + (f"; the directory's name is not the repository's, and a record of the run's harness binds "
+                                     f"them: {sp.STAGED_ALIASES[x.rstrip('/').rsplit('/', 1)[-1].casefold()][1]}"
+                                     if x.rstrip('/').rsplit('/', 1)[-1].casefold() in sp.STAGED_ALIASES else "")}
+    return None
 
 
 def measured(entry: dict) -> dict:
@@ -276,13 +302,23 @@ def measured_population(entry: dict, pdir: Path, conc: int) -> tuple[list[str], 
 def _blis_refusal(stderr: str, work: Path) -> str:
     """blis_refused:<slug> from BLIS's fatal message, with this run's paths removed so the
     reason is the same on every machine."""
-    m = re.findall(r'level=fatal msg="([^"]+)"', stderr) or re.findall(r"level=fatal msg=(.+)", stderr)
+    # The message is a quoted Go string: a quote inside it is written \" (the scenario's own name, a value), so the
+    # closing quote is the first one not escaped. Reading to the first quote cut "scenario \"p-....yaml\": <why>" to the
+    # bare slug "scenario", an unnamed fault (22 matched and 12 anchors failures of the M3.0 census).
+    m = re.findall(r'level=fatal msg="((?:[^"\\]|\\.)*)"', stderr) or re.findall(r"level=fatal msg=(.+)", stderr)
     text = (m[-1] if m else stderr.strip().splitlines()[-1] if stderr.strip() else "no output")
+    text = text.replace('\\"', '"')
     text = text.replace(str(work), "").replace(str(work.resolve()), "")
     text = re.sub(r"(/[^\s\"']+)+", "<path>", text)
-    text = re.sub(r"\bp-[0-9a-f]{16}\b", "<scenario>", text)
+    # The engine names the scenario file in its message, as a prefix and again inside (`scenario "p-....yaml": ... vllmengine:
+    # p-....yaml: ...`); the name is the run's, not the reason, so it is removed with its colon, and the quotes and apostrophes
+    # of the wording are dropped, so the slug reads as words: no repeated "scenario", no stray punctuation.
+    text = re.sub(r"(?:\bscenario\s+\"?)?\b(?:p|cq)-[0-9a-f]{8,16}(?:\.yaml)?\"?:?\s*", "", text)
+    text = re.sub(r"[\"']", "", text)
     slug = re.sub(r"[^A-Za-z0-9_.:=-]+", "_", text)[:80].strip("_")
-    return f"blis_refused:{slug}" if slug else "blis_refused"
+    # A fatal message of the simulator's own is a refusal it explains (a named not-scored point). No such message (a panic, a
+    # signal, no output) is a crash, a fault of the run.
+    return f"blis_refused:{slug}" if m and slug else f"blis_crashed:{slug}" if slug else "blis_crashed"
 
 
 # The substrate's refusal when no acceptance profile holds the key (contracts/spec/acceptance Resolve):
@@ -292,6 +328,11 @@ _STATES_NO = re.compile(r"\bstates no ([A-Za-z_][A-Za-z0-9_.]*)")
 # The engine's refusal of a value it does not model: '<field> "<value>" ... is not modelled' (blis-vllm states the field,
 # the value and why, and links the issue that would model it).
 _NOT_MODELLED = re.compile(r'\b([a-z_][a-z0-9_]*) "[^"]*"[^"]*?\bis not modelled\b')
+# The engine's refusal of a value the scenario states for a field THIS model does not read:
+# '<field>="<value>" is read only for <model>'s <part>, and this model has none, so a stated value would be dropped'.
+# The model has no such part, so the field is not modelled for it (a gap of the model, not a fault of the run), and
+# the reason names the field. (Before, the message was cut to the bare slug "scenario" and the whole night stopped.)
+_NOT_READ = re.compile(r'\b([a-z_][a-z0-9_]*)="[^"]*" is read only for [^,]*, and this model has none\b')
 # "the workload states no thinking mode": the simulator wants a statement about the WORKLOAD (it
 # selects the acceptance profile), not a field of the engine's list. The reason names the workload
 # statement, so it is not looked up in fields.json (where it would read as a missing field).
@@ -307,10 +348,22 @@ KERNEL_REFUSALS = ("draft_passes_unstated", "draft_passes_unknown", "served_weig
 _KERNEL_REFUSAL = re.compile(r"(?<![A-Za-z0-9_])(" + "|".join(KERNEL_REFUSALS) + r"):")
 
 
+# The engine's refusal of a KV layout the port does not unify: layers of unequal page sizes in a model that is not
+# DeepSeek's packed layout (Gemma 4 mixes sliding-window and full-attention layers of different head geometry; vLLM
+# unifies their pages with unify_kv_cache_spec_page_size and blis-vllm does not: core/kv/layers.go checkEqualPages). A gap
+# of the engine BLIS runs, not a fault of the run, so the point is G5 engine_unsupported naming it, as the kernel's own
+# refusals are.
+_KV_UNEQUAL_PAGES = re.compile(r"KV layers of unequal page sizes \([0-9]+ and [0-9]+ elements per token\) need vLLM's packed KV cache groups")
+KV_UNEQUAL_PAGES = "kv_unequal_page_sizes"
+
+
 def kernel_refusal(stderr: str) -> str | None:
     """engine_unsupported:<code> when the simulator's refusal is one of the kernel's, else None."""
-    m = _KERNEL_REFUSAL.search(re.sub(r"\s+", " ", stderr).replace('\\"', '"'))
-    return f"engine_unsupported:{m.group(1)}" if m else None
+    flat = re.sub(r"\s+", " ", stderr).replace('\\"', '"')
+    m = _KERNEL_REFUSAL.search(flat)
+    if m:
+        return f"engine_unsupported:{m.group(1)}"
+    return f"engine_unsupported:{KV_UNEQUAL_PAGES}" if _KV_UNEQUAL_PAGES.search(flat) else None
 
 
 def value_refusal(stderr: str, work: Path, field_list) -> str | None:
@@ -330,6 +383,14 @@ def value_refusal(stderr: str, work: Path, field_list) -> str | None:
         # The engine states that the scenario's value of a field is not modelled: the release's own classification
         # of the run's setting (design 11.4, field_not_modelled), named by the field's path in the field list.
         name = nm.group(1)
+        path = name
+        if field_list is not None and field_list.lookup(name) is None:
+            hits = [f for f in field_list.fields if f.endswith("." + name)]
+            path = hits[0] if len(hits) == 1 else name
+        return f"field_not_modelled:{path}"
+    nr = _NOT_READ.search(re.sub(r"\s+", " ", stderr).replace('\\"', '"'))
+    if nr:
+        name = nr.group(1)
         path = name
         if field_list is not None and field_list.lookup(name) is None:
             hits = [f for f in field_list.fields if f.endswith("." + name)]
@@ -509,6 +570,8 @@ def _diff_args(args: list, dep: dict, b: st.Built) -> list[str]:
                           if ((p.get("engine") or {}).get(k))}
                 if len(stated) == 1 and None not in stated:
                     got = f"{float(stated.pop()):g}"
+        elif f == "replay.api_server_count":
+            got, want = b.api_server_count, str(want)
         elif f.startswith("offload."):
             # The offload writer converts units (per-rank bytes -> the engine's tier); its own
             # checks refused any disagreement, so the arg records what BLIS was given.
@@ -569,6 +632,9 @@ class Outcome:
     # the number of requests behind the predicted and the measured mean.
     result_data: dict | None = None
     samples: tuple | None = None
+    # Set by _run_result when the simulator refused a stated value that the model never reads: the scorer runs the point once
+    # more without it (_score_one) and names the omission.
+    retry_omit: str | None = None
 
 
 def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env, simulate: bool = True) -> Outcome:
@@ -578,6 +644,8 @@ def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env, simulate: bool
     simulator block."""
     try:
         o = score_point(entry, pull_dir, work, env, simulate=simulate)
+        if o.retry_omit and not entry.get("omit_unread"):
+            o = score_point({**entry, "omit_unread": [o.retry_omit]}, pull_dir, work, env, simulate=simulate)
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
         o = Outcome(point_id=entry["point_id"], identity=entry["identity"], row=entry["row"],
                     reasons=sorted(set(entry["reasons"] + ["blis_refused:extractor_error"])),
@@ -662,6 +730,11 @@ def _acceptance_subs(b: st.Built, doc: dict | None, log: str | None = None) -> l
     if spec is None or b.acceptance_length is not None:
         return []
     return [result.acceptance_substitution(doc, st.realised_acceptance(log) if log is not None else False)]
+
+
+def api_server_argv(b: st.Built) -> list[str]:
+    """The API-server count the run stated, as `blis replay --api-server-count` (0 there means vLLM's per-mode default)."""
+    return ["--api-server-count", b.api_server_count] if b.api_server_count is not None else []
 
 
 def thinking_argv(b: st.Built) -> list[str]:
@@ -776,21 +849,25 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     o.engine = fw.engine
     pdir = pull_dir / "points" / pid
     if row.get("disagg"):
-        if sglang:
-            # The prefill/decode writer reads vLLM's recipe flags and launches two vLLM pools (score_pd); SGLang's is
-            # not written yet, and BLIS is not asked.
-            o.reasons = sorted(set(o.reasons + [SGLANG_PD_UNSCORED] + asx.router_reason(row, fw.router)))
-            return o
         return score_pd(o, entry, pdir, env, work, fw, simulate=simulate)
     log_b = _read(pdir, entry["files"], "server_log")
     agg = aggregated_recipe(entry, pdir) if log_b is None and not sglang else None
-    if log_b is None and agg is None:
+    # A unit whose own recipe is gone (the run's record answered 404) and for which a launch was reconstructed
+    # from the benchmark scripts of its day (supplemental.py): that launch is read as the launch config, named on
+    # the point as the substitution it is, and the point is graded as a run of another release (G4).
+    supp = entry.get("supplemental_recipe") if log_b is None and agg is None and not sglang else None
+    if log_b is None and agg is None and supp is None:
         # The pull may already have said why (the API answered 413 or 404): that reason stands alone.
         bare = [] if any(r.startswith("server_log_missing:api_") for r in o.reasons) else ["server_log_missing"]
         o.reasons = sorted(set(o.reasons + bare + asx.router_reason(row, fw.router)))
         return o
     log = log_b.decode("utf-8", "replace") if log_b is not None else ""
     o.banner = _banner_version(log)
+    if supp is not None:
+        o.banner = supp["release"]
+    if log_b is not None and not sglang:
+        # A server log holding other requests than the client's is another run's queue (contamination.py).
+        o.reasons += contamination.reasons(log, row)
     lc_b = _read(pdir, entry["files"], "launch_config")
     launch = json.loads(lc_b) if lc_b else None
     cmd_b = _read(pdir, entry["files"], "launch_command") if sglang else None
@@ -809,7 +886,11 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     # A colocated engine over several nodes (row.is_multinode, not disagg) is one pool: build() sizes the
     # cluster from the engine's ranks and states the fabric. A prefill/decode run never
     # reaches here: score_pd takes it before the log is read.
-    if agg is not None:
+    if supp is not None:
+        launch = supp["launch"]
+        o.reasons = [r for r in o.reasons if r.partition(":")[0] != "server_log_missing"]
+        recovery = [supplemental.substitution(supp)]
+    if agg is not None or supp is not None:
         readings, problems = {src: st.Reading() for src in st.SOURCES}, []
         readings["launch_config"] = st.read_launch_config(launch)
     elif sglang:
@@ -839,6 +920,18 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
         c = st.decide(st.merge(readings, defaults), env.field_list, part_name, _facts_of(env, part_name, st.recorded_node_size(launch)))
     o.reasons += c.reasons
     o.subs = recovery + list(c.substitutions)
+    for name in entry.get("omit_unread") or []:
+        # The model never reads this setting (the simulator said so for this point once): the release default the run
+        # recorded is not stated, and the point says so with the recorded value and the line that shows it (X19).
+        loc = OMITTABLE[name]
+        if loc in c.mapped:
+            path, value = c.mapped.pop(loc)
+            c.args[:] = [x for x in c.args if x.get("arg") != path and x.get("blis_field") != loc]
+            o.subs.append({"kind": "resolved_differs", "subject": name,
+                           "detail": f"the run's engine recorded {path}={value!r} (its release's default, which this model never "
+                                     f"reads); the scenario does not state it, because the simulator refuses a stated value for "
+                                     f"a model with no indexer cache (blis-vllm compat/kernelmodel/kvlayers.go, kvLayersOf, "
+                                     f"issue #84: \"read only for MiniMax-M3's indexer cache\")"})
     o.reasons += row_vs_run(row, c)
 
     o.g1_inputs = {"requested": st.requested_values(c.settings),
@@ -846,7 +939,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
                    "libraries": {}}      # no source of the run's library versions is read yet
     cat = env.catalog_obj
     spec = c.mapped.get("engine.speculative.method", (None, None))[1]
-    cks = _checkpoints(c, launch)
+    cks = _checkpoints(c, launch, cat)
     served = [x for k in ("served_model", "model") for x in ([c.roles.get(k)] if not isinstance(c.roles.get(k), list) else c.roles.get(k))]
     draft_ck, draft_reason = sp.resolve_draft(c.roles.get("drafter"), served, entry)
     if draft_reason:
@@ -859,9 +952,12 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     sup = sp.check(cat, env.parts, checkpoints=cks, base_models=env.base_models,
                    hardware=part_name, spec_method=spec, draft_checkpoint=draft_ck,
                    num_spec_tokens=c.mapped.get("engine.speculative.num_spec_tokens", (None, None))[1])
+    staged = staged_substitution(c, cat, sup.checkpoint) if sup.model else None
+    if staged:
+        o.subs.append(staged)
     if conflict:
         o.reasons.append(conflict)
-        sup.reasons = [r for r in sup.reasons if r != "model_not_in_catalog"]
+        sup.reasons = [r for r in sup.reasons if r.partition(":")[0] != "model_not_in_catalog"]
     o.reasons += sup.reasons
     if sglang and sup.model and f"engine.{ss.CONTEXT_LENGTH_FIELD}" not in c.mapped and env.catalog_obj is not None:
         # The run did not set the context length, and the catalog's graph carries no window; the SGLang host refuses a
@@ -965,7 +1061,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
             "--catalog", str(env.catalog), "--registry", str(env.registry), "--format", "json"]
     if b.acceptance_length is not None:
         argv += ["--speculative-acceptance-length", b.acceptance_length]
-    argv += thinking_argv(b)
+    argv += thinking_argv(b) + api_server_argv(b)
     if env.corpus_cache:
         argv += ["--corpus-cache", str(env.corpus_cache)]
     if not simulate:
@@ -1037,6 +1133,13 @@ def _single_turn_label(isl: int, osl: int) -> str:
 SINGLE_TURN_SEED = 42
 
 
+# The simulator's refusal of a setting the scenario states for a model that never reads it ("indexer_kv_dtype="bf16" is read only
+# for MiniMax-M3's indexer cache, and this model has none, so a stated value would be dropped"). The value the run recorded is
+# its release's default, not a choice it made for this model, so the point is run again without it and says so.
+_UNREAD_VALUE = re.compile(r'([a-z_]+)="[^"]*" is read only for [^,]*, and this model has none')
+OMITTABLE = {"indexer_kv_dtype": "engine.indexer_kv_dtype"}
+
+
 def _run_result(o: Outcome, argv: list[str], key: str, cache: Path, env: Env, work: Path,
                 runner=None) -> dict | None:
     """The Result of one `blis replay`, read from its standard output and validated
@@ -1064,6 +1167,9 @@ def _run_result(o: Outcome, argv: list[str], key: str, cache: Path, env: Env, wo
     except result.RunFailed as e:
         (logs / f"{o.point_id}.err").write_text(e.stderr[-20000:])
         o.reasons = [value_refusal(e.stderr, work, env.kit(o.engine).field_list) or _blis_refusal(e.stderr, work)]
+        unread = _UNREAD_VALUE.search(re.sub(r"\s+", " ", e.stderr).replace('\\"', '"'))
+        if unread and unread.group(1) in OMITTABLE:
+            o.retry_omit = unread.group(1)
         return None
     except result.ResultError as e:
         (logs / f"{o.point_id}.err").write_text(str(e)[-20000:])
@@ -1180,7 +1286,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
         argv += ["--catalog", str(env.catalog)]
     if env.registry:
         argv += ["--registry", str(env.registry)]
-    argv += thinking_argv(b)
+    argv += thinking_argv(b) + api_server_argv(b)
     if pd_run is not None:
         argv += ["--num-instances", str(pd_run.prefill + pd_run.decode), "--prefill-instances", str(pd_run.prefill),
                  "--decode-instances", str(pd_run.decode)]
@@ -1385,6 +1491,10 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
     scenario states two pools and the NIXL connector, and the instance counts reach `blis replay` as
     flags. The replay is the single-turn one."""
     row, pid, ident = entry["row"], entry["point_id"], entry["identity"]
+    sglang = fw.engine == engines.SGLANG
+    kit = env.kit(fw.engine)
+    field_list = kit.field_list if sglang else env.field_list
+    release = kit.release if sglang else env.engine_release
     rb = _read(pdir, entry["files"], "recipe")
     recipe = None
     if entry.get("recipe") and rb:
@@ -1401,7 +1511,7 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
         # Without a recipe the pools' arguments are not known. A log that records topology fields still
         # has them decided by the engine's field list (design §11.4), as every other recorded field is.
         log_b = _read(pdir, entry["files"], "server_log")
-        if log_b is not None:
+        if log_b is not None and not sglang:      # the vLLM log's non-default arguments; SGLang's is read through the recipe only
             lc = _read(pdir, entry["files"], "launch_config")
             o.reasons += st.topology_reasons(json.loads(lc) if lc else None,
                                              st.read_args(log_b.decode("utf-8", "replace")), env.field_list)
@@ -1415,7 +1525,7 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
         return o
     o.reasons += pdr.check_row(recipe, row)
     log_b = _read(pdir, entry["files"], "server_log")
-    if log_b is not None and pools is not None:
+    if log_b is not None and pools is not None and not sglang:
         o.reasons += pdm.log_conflicts(logged_configs(log_b.decode("utf-8", "replace")), recipe, pools)
 
     meta = entry["recipe"]
@@ -1424,8 +1534,15 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
     decided, taken, launches = {}, {}, {}
     for role, pool in pools.items():
         launches[role] = pdm.pseudo_launch(recipe, role, row, pool)
-        rd, taken[role] = pdm.read_pool(launches[role])
-        c = st.decide(st.merge({"launch_config": rd}, {}), env.field_list, part_name, _facts_of(env, part_name, recipe.gpus_per_node))
+        if sglang:
+            rd, taken[role] = ss.read_pool(launches[role], kit.declarations, kit.field_list)
+            if taken[role].get("disaggregation_mode") not in (None, role):
+                o.reasons.append("conflict:disaggregation_mode")
+            c = st.decide(st.merge({"launch_config": rd}, {}, ss.make_requested(kit.declarations)), field_list, part_name,
+                          _facts_of(env, part_name, recipe.gpus_per_node), names=ss.make_names(kit.declarations))
+        else:
+            rd, taken[role] = pdm.read_pool(launches[role])
+            c = st.decide(st.merge({"launch_config": rd}, {}), field_list, part_name, _facts_of(env, part_name, recipe.gpus_per_node))
         decided[role] = c
         o.reasons += c.reasons
         o.subs += c.substitutions
@@ -1433,9 +1550,16 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
         derived = sorted(f for f in ("tensor_parallel_size", "pipeline_parallel_size", "data_parallel_size")
                          if f in rd.values and f.replace("_", "-") not in recipe.pools[role].flags)
         o.subs.append(pdm.recovery_substitution(role, meta, stated, derived))
-        for p in pdm.TRANSFER_PATHS:
+        if sglang and "disaggregation_transfer_backend" not in recipe.pools[role].flags and \
+                "disaggregation_transfer_backend" not in {k.replace("-", "_") for k in recipe.pools[role].flags}:
+            # The recipe states no KV transfer backend; the pool takes the engine's declared default (ss.read_pool), a value the
+            # run did not record, so the point says so (X19).
+            o.subs.append({"kind": "estimated", "subject": f"{role}.disaggregation_transfer_backend",
+                           "detail": f"the recipe's {role} pool states no --disaggregation-transfer-backend; the engine's declared "
+                                     f"default, {taken[role].get(ss.CONNECTOR_PATH)!r}, is simulated"})
+        for p in (ss.TRANSFER_FIELDS if sglang else pdm.TRANSFER_PATHS):
             if p in taken[role]:
-                dec = fl.decide(env.field_list, p, set_by_run=True)
+                dec = fl.decide(field_list, p, set_by_run=True)
                 if dec.g5:
                     o.reasons.append(f"{dec.g5['code']}:{p}")
     connectors = {t.get("kv_transfer_config.kv_connector") for t in taken.values()}
@@ -1467,7 +1591,7 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
            "shape": f"{pools['prefill'].workers}P{pools['decode'].workers}D",
            # The rest of the regime (the substrate's exact form): the engine release, the fabric the run recorded
            # (an assumed class is not a recorded one, so it is None), and each pool's per-instance parallelism.
-           "engine_version": env.engine_release, "fabric": recipe.fabric or st.recorded_fabric(launches["decode"]),
+           "engine_version": release, "fabric": recipe.fabric or st.recorded_fabric(launches["decode"]),
            "prefill": pdm.pool_parallel(pools["prefill"], recipe.pools["prefill"].flags),
            "decode": pdm.pool_parallel(pools["decode"], recipe.pools["decode"].flags)}
     policy, rsubs, rreasons, rrec = pd_router(row, router_name, recipe, table, ctx, env.assumed_router_revision)
@@ -1485,7 +1609,14 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
     node = ir.resolve(env.runner_table, row["hardware"], run_date=ident["measured_date"],
                       launch_size=recipe.gpus_per_node, fixes_packaging=catalog_size is not None)
     for role, c in decided.items():
-        if "engine.max_model_len" not in c.mapped and cat is not None:
+        if sglang and f"engine.{ss.CONTEXT_LENGTH_FIELD}" not in c.mapped and cat is not None:
+            win = ss.context_window(cat.root, sup.model)
+            if win is not None:
+                c.mapped[f"engine.{ss.CONTEXT_LENGTH_FIELD}"] = (ss.CONTEXT_LENGTH_FIELD, win)
+                o.subs.append({"kind": "estimated", "subject": f"engine.{role}.{ss.CONTEXT_LENGTH_FIELD}",
+                               "detail": f"the recipe set no context length; SGLang derives {win} from the checkpoint's config "
+                                         f"(get_context_length), which the catalog graph does not carry"})
+        elif not sglang and "engine.max_model_len" not in c.mapped and cat is not None:
             # The recipe states no --max-model-len, so vLLM served the checkpoint's own window; the engine needs it stated.
             win = pdm.model_window(cat.root, sup.model)
             if win is not None:
@@ -1493,9 +1624,12 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
                 o.subs.append({"kind": "estimated", "subject": f"engine.{role}.max_model_len",
                                "detail": f"not stated by the recipe; vLLM resolves it to the checkpoint's max_position_embeddings, "
                                          f"{win} (the catalog model {sup.model}'s config.json)"})
-    builts = {role: st.build(decided[role], name=name, model=sup.model, part=part, engine_version=env.engine_release,
-                             field_list=env.field_list, catalog_node_size=catalog_size, node=node,
-                             draft_model=sup.drafter, launch_config=launches[role]) for role in pools}
+    builts = {role: st.build(decided[role], name=name, model=sup.model, part=part, engine_version=release,
+                             field_list=field_list, catalog_node_size=catalog_size, node=node,
+                             draft_model=sup.drafter, launch_config=launches[role], engine_kind=fw.engine) for role in pools}
+    if sglang:
+        for role, b_ in builts.items():
+            b_.reasons = ss.parallel_reasons(b_.reasons, decided[role], field_list)
     b = pdm.build_pd(builts, recipe, pools, taken, name=name, policy=policy, per_node=catalog_size or node.gpus_per_node)
     o.reasons += b.reasons
     o.subs += b.substitutions
@@ -1584,7 +1718,7 @@ def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None
     rel = gr.run_release(o.build or {"image": o.row.get("image")}, o.banner)
     o.run_release = rel.version
     o.simulator = simulator
-    faults = sorted({r for r in o.reasons if asx.is_fault(r)})
+    faults = sorted({r for r in o.reasons if asx.is_run_fault(r)})
     if faults:
         o.fidelity, o.facets, o.csv_row, o.faults = None, None, None, faults
         return
@@ -1608,8 +1742,14 @@ def row_vs_run(row: dict, c: st.Decided) -> list[str]:
     are what's scored, and a disagreement means the row and the artifacts aren't the same run."""
     out = []
     spec = c.mapped.get("engine.speculative.method", (None, None))[1]
+    sglang = row.get("framework") == "sglang"
+    if spec is None and sglang:
+        # SGLang names the algorithm, not the method: read it the way the row does (sglang_settings.spec_method_of).
+        spec = ss.spec_method_of(c.mapped.get("engine.speculative_algorithm", (None, None))[1], c.roles.get("drafter"))
     row_spec = row.get("spec_method")
     if row_spec and (row_spec == "none") != (spec is None):
+        out.append("conflict:spec_method")
+    elif sglang and row_spec not in (None, "none") and spec != row_spec:
         out.append("conflict:spec_method")
     offload = c.mapped.get("offload.connector", (None, None))[1]
     row_off = row.get("offload_mode")

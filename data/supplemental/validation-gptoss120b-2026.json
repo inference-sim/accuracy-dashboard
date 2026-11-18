@@ -1,0 +1,274 @@
+{
+ "about": "reconstruct.py validate: six gpt-oss-120b vLLM units of 2026 whose server logs survive; the launch reconstructed from the InferenceX script at the commit against vLLM's own non-default-args line. equal=true for all six.",
+ "units": [
+  {
+   "unit": "b200 2026-02-25 conc64 tp4 1024/8192",
+   "commit": "89ce6098e",
+   "script_stable_through_the_day": false,
+   "recorded": {
+    "model": "gpt-oss-120b",
+    "max_model_len": 9416,
+    "tensor_parallel_size": 4,
+    "kv_cache_dtype": "fp8",
+    "enable_prefix_caching": false,
+    "max_num_batched_tokens": 8192,
+    "max_num_seqs": 512,
+    "max_cudagraph_capture_size": 2048,
+    "compilation_config": {
+     "level": null,
+     "mode": null,
+     "debug_dump_path": null,
+     "cache_dir": "",
+     "compile_cache_save_format": "binary",
+     "backend": "inductor",
+     "custom_ops": [],
+     "splitting_ops": null,
+     "compile_mm_encoder": false,
+     "compile_sizes": null,
+     "compile_ranges_split_points": null,
+     "inductor_compile_config": {
+      "enable_auto_functionalized_v2": false,
+      "combo_kernels": true,
+      "benchmark_combo_kernel": true
+     },
+     "inductor_passes": {},
+     "cudagraph_mode": null,
+     "cudagraph_num_of_warmups": 0,
+     "cudagraph_capture_sizes": null,
+     "cudagraph_copy_inputs": false,
+     "cudagraph_specialize_lora": true,
+     "use_inductor_graph_partition": null,
+     "pass_config": {
+      "eliminate_noops": true,
+      "fuse_allreduce_rms": true
+     },
+     "max_cudagraph_capture_size": null,
+     "dynamic_shapes_config": {
+      "type": "enum",
+      "evaluate_guards": false,
+      "assume_32_bit_indexing": true
+     },
+     "local_cache_dir": null,
+     "static_all_moe_layers": []
+    }
+   },
+   "reconstructed": {
+    "kv_cache_dtype": "fp8",
+    "compilation_config": "{\"pass_config\":{\"fuse_allreduce_rms\":true,\"eliminate_noops\":true}}",
+    "max_cudagraph_capture_size": 2048,
+    "max_num_batched_tokens": 8192,
+    "max_model_len": 9416,
+    "model": "gpt-oss-120b",
+    "tensor_parallel_size": 4,
+    "max_num_seqs": 512,
+    "enable_prefix_caching": false
+   },
+   "differences": {},
+   "equal": true,
+   "env": {
+    "PYTHONNOUSERSITE": "1",
+    "TORCH_CUDA_ARCH_LIST": "10.0",
+    "VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8": "1"
+   }
+  },
+  {
+   "unit": "b200 2026-05-31 conc32 tp2 8192/1024",
+   "commit": "f4a002ef1",
+   "script_stable_through_the_day": true,
+   "recorded": {
+    "model": "gpt-oss-120b",
+    "max_model_len": 9472,
+    "tensor_parallel_size": 2,
+    "gpu_memory_utilization": 0.9,
+    "kv_cache_dtype": "fp8",
+    "enable_prefix_caching": false,
+    "max_num_batched_tokens": 8192,
+    "max_num_seqs": 512,
+    "max_cudagraph_capture_size": 2048,
+    "compilation_config": {
+     "mode": null,
+     "debug_dump_path": null,
+     "cache_dir": "",
+     "compile_cache_save_format": "binary",
+     "backend": "inductor",
+     "custom_ops": [],
+     "ir_enable_torch_wrap": null,
+     "splitting_ops": null,
+     "compile_mm_encoder": false,
+     "cudagraph_mm_encoder": false,
+     "encoder_cudagraph_token_budgets": [],
+     "encoder_cudagraph_max_vision_items_per_batch": 0,
+     "encoder_cudagraph_max_frames_per_batch": null,
+     "compile_sizes": null,
+     "compile_ranges_endpoints": null,
+     "inductor_compile_config": {
+      "enable_auto_functionalized_v2": false,
+      "size_asserts": false,
+      "alignment_asserts": false,
+      "scalar_asserts": false,
+      "combo_kernels": true,
+      "benchmark_combo_kernel": true
+     },
+     "inductor_passes": {},
+     "cudagraph_mode": null,
+     "cudagraph_num_of_warmups": 0,
+     "cudagraph_capture_sizes": null,
+     "cudagraph_copy_inputs": false,
+     "cudagraph_specialize_lora": true,
+     "use_inductor_graph_partition": null,
+     "pass_config": {
+      "fuse_allreduce_rms": true
+     },
+     "max_cudagraph_capture_size": null,
+     "dynamic_shapes_config": {
+      "type": "enum",
+      "evaluate_guards": false,
+      "assume_32_bit_indexing": false
+     },
+     "local_cache_dir": null,
+     "fast_moe_cold_start": null,
+     "static_all_moe_layers": []
+    }
+   },
+   "reconstructed": {
+    "kv_cache_dtype": "fp8",
+    "compilation_config": "{\"pass_config\":{\"fuse_allreduce_rms\":true,\"eliminate_noops\":true}}",
+    "max_cudagraph_capture_size": 2048,
+    "max_num_batched_tokens": 8192,
+    "max_model_len": 9472,
+    "model": "gpt-oss-120b",
+    "gpu_memory_utilization": 0.9,
+    "tensor_parallel_size": 2,
+    "max_num_seqs": 512,
+    "enable_prefix_caching": false
+   },
+   "differences": {},
+   "equal": true,
+   "env": {
+    "PYTHONNOUSERSITE": "1",
+    "TORCH_CUDA_ARCH_LIST": "10.0",
+    "VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8": "1"
+   }
+  },
+  {
+   "unit": "h100 2026-03-27 conc8 tp8 1024/8192",
+   "commit": "0f78cf4eb",
+   "script_stable_through_the_day": false,
+   "recorded": {
+    "model": "gpt-oss-120b",
+    "max_model_len": 10240,
+    "tensor_parallel_size": 8,
+    "enable_prefix_caching": false,
+    "max_num_batched_tokens": 8192,
+    "max_num_seqs": 8,
+    "max_cudagraph_capture_size": 2048
+   },
+   "reconstructed": {
+    "max_cudagraph_capture_size": 2048,
+    "max_num_batched_tokens": 8192,
+    "max_model_len": 10240,
+    "model": "gpt-oss-120b",
+    "tensor_parallel_size": 8,
+    "max_num_seqs": 8,
+    "enable_prefix_caching": false
+   },
+   "differences": {},
+   "equal": true,
+   "env": {
+    "PYTHONNOUSERSITE": "1",
+    "VLLM_MXFP4_USE_MARLIN": "1"
+   }
+  },
+  {
+   "unit": "h100 2026-05-17 conc4 tp2 1024/1024",
+   "commit": "0c4bf823e",
+   "script_stable_through_the_day": true,
+   "recorded": {
+    "model": "gpt-oss-120b",
+    "max_model_len": 10240,
+    "tensor_parallel_size": 2,
+    "gpu_memory_utilization": 0.9,
+    "enable_prefix_caching": false,
+    "max_num_batched_tokens": 8192,
+    "max_num_seqs": 4,
+    "max_cudagraph_capture_size": 2048
+   },
+   "reconstructed": {
+    "max_cudagraph_capture_size": 2048,
+    "max_num_batched_tokens": 8192,
+    "max_model_len": 10240,
+    "model": "gpt-oss-120b",
+    "gpu_memory_utilization": 0.9,
+    "tensor_parallel_size": 2,
+    "max_num_seqs": 4,
+    "enable_prefix_caching": false
+   },
+   "differences": {},
+   "equal": true,
+   "env": {
+    "PYTHONNOUSERSITE": "1",
+    "VLLM_MXFP4_USE_MARLIN": "1"
+   }
+  },
+  {
+   "unit": "h200 2026-03-27 conc16 tp8 1024/8192",
+   "commit": "0f78cf4eb",
+   "script_stable_through_the_day": false,
+   "recorded": {
+    "model": "gpt-oss-120b",
+    "max_model_len": 9416,
+    "tensor_parallel_size": 8,
+    "enable_prefix_caching": false,
+    "max_num_batched_tokens": 8192,
+    "max_num_seqs": 16,
+    "max_cudagraph_capture_size": 2048
+   },
+   "reconstructed": {
+    "max_cudagraph_capture_size": 2048,
+    "max_num_batched_tokens": 8192,
+    "max_model_len": 9416,
+    "model": "gpt-oss-120b",
+    "tensor_parallel_size": 8,
+    "max_num_seqs": 16,
+    "enable_prefix_caching": false
+   },
+   "differences": {},
+   "equal": true,
+   "env": {
+    "PYTHONNOUSERSITE": "1",
+    "VLLM_MXFP4_USE_MARLIN": "1",
+    "TORCH_CUDA_ARCH_LIST": "9.0"
+   }
+  },
+  {
+   "unit": "h200 2026-05-30 conc8 tp1 8192/1024",
+   "commit": "f9aafa943",
+   "script_stable_through_the_day": true,
+   "recorded": {
+    "model": "gpt-oss-120b",
+    "max_model_len": 9472,
+    "gpu_memory_utilization": 0.9,
+    "enable_prefix_caching": false,
+    "max_num_batched_tokens": 8192,
+    "max_num_seqs": 8,
+    "max_cudagraph_capture_size": 2048
+   },
+   "reconstructed": {
+    "max_cudagraph_capture_size": 2048,
+    "max_num_batched_tokens": 8192,
+    "max_model_len": 9472,
+    "model": "gpt-oss-120b",
+    "gpu_memory_utilization": 0.9,
+    "max_num_seqs": 8,
+    "enable_prefix_caching": false
+   },
+   "differences": {},
+   "equal": true,
+   "env": {
+    "PYTHONNOUSERSITE": "1",
+    "VLLM_MXFP4_USE_MARLIN": "1",
+    "TORCH_CUDA_ARCH_LIST": "9.0"
+   }
+  }
+ ]
+}

@@ -79,6 +79,8 @@ The list is closed (design §11.4). The scorer's own reason codes map onto it (`
 | `field_not_in_release` | The run set a field the engine release does not list. | Add the field to the release's fields.json, or score the point on a release that lists it. |
 | `value_conflict` | Two sources of one stage record different values for a field (launch configuration against the logged arguments, or a launch node size against the runners table). | Correct the source; the harness never picks one. |
 | `build_unparseable` | The run's image and log banner name no engine build at all. The scorer emits no such reason today: a build it cannot resolve is G4 (nightly or custom). | Not applicable until the scorer tells an unnamed build from a nightly one. |
+| `measurement_contaminated` | A vLLM single-turn point's server log holds a different number of client requests than its client sent (12 x concurrency: 10 x concurrency measured, 2 x concurrency warm-up). Another run's client shared the server, so the measured latencies are not the labelled scenario's. The subject names both counts. | Re-measure the point on a server of its own. Nothing to model. |
+| `blis_refused` | The simulator refused the scenario the harness wrote and said why; the subject is its message, with paths removed. The point is listed as not scored with that reason. A refusal that is a fault of the run, not the simulator's own message, is not this reason (see the run faults below). | Read the message: the engine or substrate does not yet model what the scenario asked, or the scenario asks for something the simulator cannot run. A refusal code the nightly has not seen before is listed in the summary's new_refusal_codes. |
 
 ### Named `topology_unsupported` subjects (prefill/decode)
 
@@ -116,6 +118,7 @@ The scorer's reasons and the G5 reason each becomes:
 | `drafter_not_in_catalog` | `not_in_catalog` |
 | `catalog_entry_ambiguous` | `value_not_recorded` |
 | `conflict` | `value_conflict` |
+| `blis_refused` | `blis_refused` |
 | `required_setting_missing` | `value_not_recorded` |
 | `server_log_missing` | `value_not_recorded` |
 | `recipe_unresolved` | `value_not_recorded` |
@@ -126,6 +129,7 @@ The scorer's reasons and the G5 reason each becomes:
 | `engine_unsupported` | `engine_unsupported` |
 | `code_not_visible` | `code_not_visible` |
 | `build_unparseable` | `build_unparseable` |
+| `measurement_contaminated` | `measurement_contaminated` |
 | `field_not_in_release` | `field_not_in_release` |
 | `field_not_modelled` | `field_not_modelled` |
 | `field_unclassified` | `field_unclassified` |
@@ -138,8 +142,9 @@ A point whose scoring fails has no grade. It is listed as failed, and the run st
 
 | Fault | Meaning |
 |---|---|
-| `blis_refused` | The simulator refused a scenario the harness wrote from recorded values. A refusal for memory or time (`insufficient_memory`, `timeout`) lists the point as failed. Any other refusal stops the run. |
+| `blis_refused` | A refusal that is a fault of the run, not the simulator's own named refusal: the replay exceeded the runner's memory (`insufficient_memory`) or time (`timeout`), which lists the point as failed and lets the night publish; or the harness found the simulator's output malformed or incomplete (`result_invalid`, `result_unreadable`, `metrics_incomplete`, `requests_incomplete` and the like), or the extractor failed (`extractor_error`), which stop the run. The simulator's own refusal in its own words is a named not-scored point (G5 `blis_refused`), not a fault. |
 | `setting_differs` | The scenario written lost a value the run recorded. The run stops. |
+| `blis_crashed` | The simulator exited with no message of its own (a panic, a signal, no output). The run stops. |
 
 ## Reading the tables
 

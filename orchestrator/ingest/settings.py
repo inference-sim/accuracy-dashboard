@@ -580,6 +580,8 @@ LOCATIONS = {
     "kv_transfer_config.kv_connector_extra_config.blocks_per_chunk": "offload.connector_options.blocks_per_chunk",
     "kv_transfer_config.kv_load_failure_policy": "offload.connector_options.kv_load_failure_policy",
     "speculative_config.synthetic_acceptance_length": "replay.acceptance_length",
+    # The API-server count has no key in the Scenario (blis-schemas states none); `blis replay` takes it as --api-server-count.
+    "api_server_count": "replay.api_server_count",
 }
 
 
@@ -676,7 +678,33 @@ def _is_true(v) -> bool:
         return False
 
 
+SAME_VALUE = object()      # a translation that renames a field: the successor takes the run's value
+
+_PASS_RENAMED = ("vllm/config/compilation.py PassConfig at v0.10.2 (lines 80-88) and at v0.33.0 (lines 130-140): the field kept its meaning "
+                 "(its docstring) and took a new name")
+_NOT_A_VLLM_SETTING = "vLLM v0.33.0 never reads it while serving (grep of vllm/ at v0.33.0: only vllm/collect_env.py, a diagnostic)"
+_LOG_FLAG = ("--disable-log-requests is not an argument of v0.33.0 (vllm/entrypoints/openai/cli_args.py, vllm/engine/arg_utils.py at "
+             "v0.33.0 have no such field); it only switched per-request log lines off, which no price depends on")
+
 RELEASE_TRANSLATIONS = {
+    "compilation_config.pass_config.enable_attn_fusion": (
+        "compilation_config.pass_config.fuse_attn_quant", SAME_VALUE, lambda v: True,
+        "PassConfig.enable_attn_fusion (the attention+quant fusion pass) is fuse_attn_quant; " + _PASS_RENAMED),
+    "compilation_config.pass_config.enable_fi_allreduce_fusion": (
+        "compilation_config.pass_config.fuse_allreduce_rms", SAME_VALUE, lambda v: True,
+        "PassConfig.enable_fi_allreduce_fusion (the FlashInfer allreduce fusion) is fuse_allreduce_rms; " + _PASS_RENAMED),
+    "compilation_config.pass_config.enable_noop": (
+        "compilation_config.pass_config.eliminate_noops", SAME_VALUE, lambda v: True,
+        "PassConfig.enable_noop (no-op elimination) is eliminate_noops, whose default is true; " + _PASS_RENAMED),
+    "env.TORCH_CUDA_ARCH_LIST": (None, None, lambda v: True, _NOT_A_VLLM_SETTING),
+    "env.VLLM_FLASHINFER_ALLREDUCE_FUSION_THRESHOLDS_MB": (
+        None, None, lambda v: True,
+        "vLLM v0.33.0 has no such environment variable (vllm/envs.py): the per-world-size thresholds became "
+        "PassConfig.fi_allreduce_fusion_max_size_mb (vllm/config/compilation.py:162), a float whose per-capability defaults are "
+        "FI_ALLREDUCE_FUSION_MAX_SIZE_MB (vllm/compilation/passes/fusion/allreduce_rms_fusion.py:104-120: capability 100 gives "
+        "2 ranks 64 MB, 4 ranks 32, 8 ranks 1; the run's thresholds were 32, 32 and 8 MB). The engine's field list classes the "
+        "successor as inert (leave_unset), so the scenario states neither the variable nor the field"),
+    "disable_log_requests": (None, None, lambda v: True, _LOG_FLAG),
     "attention_config.use_trtllm_ragged_deepseek_prefill": (
         "attention_config.mla_prefill_backend", "TRTLLM_RAGGED", lambda v: _is_true(v),
         "vLLM #42555 (9898f94abe00, 2026-05-14) removed the flag; before it AttentionConfig.__post_init__ migrated a stated "
@@ -690,27 +718,51 @@ RELEASE_TRANSLATIONS = {
 }
 
 
-SAME_VALUE = object()      # a translation that renames a field: the successor takes the run's value
-
-
 def translate_removed(settings: dict, field_list, table: dict | None = None) -> tuple:
     """The settings with each removed name replaced by its successor, and the substitutions that say so. A name is translated
-    only when the release's field list lacks it and the successor is not already stated. An entry whose value is SAME_VALUE
+    only when the release's field list lacks it and the successor is not already requested by the run (a successor the engine only resolved, which a log of the later release prints, is replaced by the value the run requested under the old name). An entry whose value is SAME_VALUE
     renames the field: the successor takes the value the run set."""
     out, subs = dict(settings), []
     for path, (new, value, applies, why) in (RELEASE_TRANSLATIONS if table is None else table).items():
         st = settings.get(path)
         if st is None or field_list.lookup(path) is not None or st.conflict is not None:
             continue
-        if not applies(st.value) or new in settings or (value is SAME_VALUE and not st.requested):
+        if new is None:
+            # A setting no release of the engine reads, named and left out: the successor is nothing (see the entry's why).
+            if applies(st.value):
+                del out[path]
+                subs.append({"kind": "estimated", "subject": path,
+                             "detail": f"the run set {path}={st.value!r}; the modelled release has no such setting, and it is "
+                                       f"left out of the scenario: {why}"})
+            continue
+        renames = value is SAME_VALUE or callable(value)
+        if not applies(st.value) or (new in settings and settings[new].requested) or (renames and not st.requested):
             continue            # a renamed field the engine only resolved is not a request, so it is not carried over
         del out[path]
-        value = st.value if value is SAME_VALUE else value
+        # SAME_VALUE: the run's value. A function: the successor's value for the run's, where the earlier release's
+        # values were read differently (mamba_scheduler_strategy "auto" resolved to no_buffer there).
+        value = st.value if value is SAME_VALUE else value(st.value) if callable(value) else value
         out[new] = Setting(path=new, value=value, source=st.source, requested=True)
         subs.append({"kind": "resolved_differs", "subject": path,
                      "detail": f"the run's engine release has {path}={st.value!r}; the modelled release removed it and states "
                                f"{new}={value} for it: {why}"})
     return out, subs
+
+
+_TOKEN = re.compile(r"[A-Za-z0-9_.+:/\-]+")
+
+
+def mode_value_fits(field_list, name: str, value) -> bool:
+    """Whether an approximation's mode value can be written as the setting `name`: a value the field list's own value classes
+    cover where it states them; else (a field the engine does not model has none) a plain value, a boolean, a number or a
+    token such as `auto` or `flashinfer_nvlink_one_sided`, never a sentence."""
+    import fields as fl
+    f = field_list.lookup(name)
+    if f is not None and f.value_classes is not None:
+        return fl.covers(value, f.value_classes)
+    if isinstance(value, (bool, int, float)):
+        return True
+    return isinstance(value, str) and _TOKEN.fullmatch(value) is not None
 
 
 def decide(settings: dict[str, Setting], field_list, part: str | None = None, facts_of=None,
@@ -766,6 +818,12 @@ def decide(settings: dict[str, Setting], field_list, part: str | None = None, fa
                 if appr is None:
                     d.reasons.append(f"{dec.g5['code']}:{path}")
                     continue
+                unfit = [f2 for f2, v2 in sorted(appr["mode"].items()) if v2 is not None and not mode_value_fits(field_list, f2, v2)]
+                if unfit:
+                    # A mode value the field list's own value classes do not accept (or, for a field with none, that is not a value
+                    # at all, such as a sentence) is not written into the engine block.
+                    d.reasons += [f"field_unclassified:{f2}" for f2 in unfit]
+                    continue
                 mode = json.dumps(appr["mode"], sort_keys=True)
                 d.substitutions.append({"kind": "execution_mode", "subject": path,
                                         "detail": f"priced as {mode}: {appr['differs']} ({appr['evidence']})"})
@@ -801,10 +859,15 @@ def decide(settings: dict[str, Setting], field_list, part: str | None = None, fa
             if estimated["rule"] == fl.SUBSTITUTE:
                 for f, v in sorted(estimated["setting"].items()):
                     sub = location(f)
-                    if sub is None:
-                        d.reasons.append(f"setting_differs:{f}")
-                    else:
+                    succ = field_list.lookup(f)
+                    if sub is not None:
                         d.mapped[sub] = (f, v)
+                    elif succ is not None and succ.status in (fl.PROVEN_INERT, fl.INERT_UNPROVEN):
+                        # A successor the engine calls inert has no place in the scenario because it changes nothing
+                        # the simulation prices; the substitution's detail names it, so it is not a lost setting.
+                        d.args.append({"arg": f, "measured": None, "source": st.source, "blis": None, "match": "inert"})
+                    else:
+                        d.reasons.append(f"setting_differs:{f}")
             continue
         if st.value is None:
             continue    # None is "let the engine decide": nothing to copy
@@ -969,6 +1032,7 @@ class Built:
     scenario: dict = field(default_factory=dict)      # the Scenario document
     deployment: dict = field(default_factory=dict)    # the Deployment document
     acceptance_length: str | None = None              # --speculative-acceptance-length
+    api_server_count: str | None = None               # --api-server-count: the count the run stated
     gpus: int = 0
     reasons: list = field(default_factory=list)
     substitutions: list = field(default_factory=list)  # estimates of values the run did not record
@@ -1038,12 +1102,15 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
     acc = d.mapped.get("replay.acceptance_length")
     if acc is not None:
         b.acceptance_length = str(d.settings[acc[0]].value)
+    asc = d.mapped.get("replay.api_server_count")
+    if asc is not None:
+        b.api_server_count = str(d.settings[asc[0]].value)
     pool = {"role": "colocated", "nodes": 1, "parallel": {}, "engine": {}}
     dep = {"kind": "Deployment", "name": name, "pools": [pool]}
     offload = {}
     for loc, (path, value) in sorted(d.mapped.items()):
         top = loc.split(".")[0]
-        if loc == "replay.acceptance_length":
+        if loc in ("replay.acceptance_length", "replay.api_server_count"):
             continue
         if top == "offload":
             offload[loc] = (path, value)

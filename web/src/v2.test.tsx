@@ -94,38 +94,33 @@ describe('a v2 snapshot renders', () => {
   })
 })
 
-describe('the tier follows the match record', () => {
-  it('reads exact / estimated / all on a v2 snapshot, and keeps the v1 wording on v1', () => {
-    const { html } = render(<App summary={v2a()} loadError={null} initialHash="#/" />)
-    expect(html).toContain('>exact<')
-    expect(html).toContain('>estimated<')
-    expect(html).toContain('>all<')
-    expect(html).not.toContain('including estimations')
-    expect(html).not.toContain('measured·resolved')
-    const old = render(<App summary={v1()} loadError={null} initialHash="#/" />).html
-    expect(old).toContain('measured·resolved')
-    expect(old).not.toContain('>estimated<')
+describe('the grade filter replaces the tier toggle', () => {
+  it('reads the cumulative grades on a v2 snapshot and on v1, never exact / estimated / measured·resolved', () => {
+    for (const summary of [v2a(), v1()]) {
+      const { html } = render(<App summary={summary} loadError={null} initialHash="#/" />)
+      for (const label of ['>G1<', '>up to G2<', '>up to G3<', '>all graded<']) expect(html).toContain(label)
+      expect(html).not.toContain('>estimated<')
+      expect(html).not.toContain('measured·resolved')
+    }
   })
 
-  it('the estimated tier lists only deployments with estimated points, and the headline is unchanged', () => {
+  it('G1 lists only deployments with a G1 point, and the headline is unchanged', () => {
     const s = v2a()
-    const exact = render(<App summary={s} loadError={null} initialHash="#/" />).html
-    const est = render(<App summary={s} loadError={null} initialHash="#/?tier=estimated" />).html
+    const all = render(<App summary={s} loadError={null} initialHash="#/" />).html
+    const g1 = render(<App summary={s} loadError={null} initialHash="#/?grade=G1" />).html
     const headline = (h: string) => h.match(/<section class="headline"[\s\S]*?<\/section>/)![0]
-    expect(headline(est)).toBe(headline(exact))
-    // the only estimated point is DeepSeek-V4.1-Flash; DeepSeek-V4-Pro (all exact) drops out
-    expect(est).toContain('deepseek-v4.1-flash')
-    expect(est).not.toContain('deepseek-v4-pro')
-    expect(exact).toContain('deepseek-v4-pro')
+    expect(headline(g1)).toBe(headline(all))
+    expect(g1).toContain('deepseek-v4-pro')
+    expect(g1).not.toBe(all)
   })
 
-  it('an estimated point is in all only; every exact point is in the exact tier', () => {
+  it('a v2 point reads as G1 when exact and as a lower grade when estimated', () => {
     for (const p of flattenPoints(v2a()))
       expect(p.tier).toBe(p.fidelity!.status === 'approximate' ? 'all' : 'measured_or_resolved')
   })
 })
 
-describe('the tier controls what the table lists', () => {
+describe('the grade controls what the table lists', () => {
   it('the exact tier lists no estimated-only deployment (no rows of dashes)', () => {
     const s = v2a()
     // expand everything: model, workload and every GPU
@@ -293,7 +288,7 @@ describe('the default view is every point, and the tier text names the build win
   it('opens on all: the headline and the table cover every scored point', () => {
     const a = v2a()
     const html = renderToStaticMarkup(<App summary={a} loadError={null} />)
-    expect(html).toContain('<span class="clk on">all</span>')
+    expect(html).toContain('<span class="clk on">all graded</span>')
     const n = flattenPoints(a).length
     expect(html).toContain(`${n} measurements`)
     const all = aggregatePair(flattenPoints(a)).all.mape.ttft as number

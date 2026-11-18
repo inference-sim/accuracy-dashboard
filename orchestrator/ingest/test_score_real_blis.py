@@ -32,7 +32,7 @@ LOG = (
     "tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, quantization=mxfp4, "
     "kv_cache_dtype=fp8, enable_prefix_caching=False\n"
     "INFO [kv_cache_utils.py:1] GPU KV cache size: 400,000 tokens\n"
-    '"POST /v1/completions HTTP/1.1" 200\n')
+    + '"POST /v1/completions HTTP/1.1" 200\n' * 48)      # 12 x conc 4: the requests the point's client sent (contamination.py)
 
 
 def _real():

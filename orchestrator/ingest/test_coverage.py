@@ -127,6 +127,11 @@ def _pull(tmp: Path):
         r = ROWS[rid]
         (tmp / "pull" / "points" / old / "job_log.gz").write_bytes(
             gzip.compress(e2e.job_log_text(r["isl"], r["osl"], r["conc"]).encode(), mtime=0))
+        # ... and its server log holds that client's requests, 12 x concurrency (contamination.py).
+        line = '"POST /v1/completions HTTP/1.1" 200\n'
+        slog = gzip.decompress((tmp / "pull" / "points" / old / "server_log.gz").read_bytes()).decode()
+        (tmp / "pull" / "points" / old / "server_log.gz").write_bytes(
+            gzip.compress(slog.replace(line * 48, line * (12 * r["conc"])).encode(), mtime=0))
         pts.append({**entry, "point_id": old, "row": r, "records": [rid]})
     shutil.rmtree(tmp / "pull" / "points" / entry["point_id"])
     manifest = {"window": ["2026-06-01", "2026-06-30"], "base_models": {}, "points": pts}

@@ -126,6 +126,29 @@ def draft_model(text: str) -> tuple[str, int] | None:
     return hits[0] if len({h[0] for h in hits}) == 1 else None
 
 
+# Recipe `model` values that are a runner's local staging name, not a repository (dashboard#111; the catalog lead's
+# map). Each maps to the repository whose files the name stands for. It applies only where a second record of the
+# run agrees: the run's runners.yaml stages the served directory under the repository's name as well (case aside),
+# or the served directory is itself named so. A name outside the table, or one without that second record, stays
+# unresolved. (amd/MiniMax-M3-MXFP8, a repository Hugging Face 404s, is MiniMaxAI/MiniMax-M3-MXFP8: 42 AMD points,
+# post-M4, recorded in the issue and not mapped here.)
+LOCAL_SPELLINGS = {
+    "deepseek-r1-fp4": "nvidia/DeepSeek-R1-0528-FP4-V2",
+    "deepseek-r1-0528-fp4-v2": "nvidia/DeepSeek-R1-0528-FP4-V2",
+    "deepseek-r1-0528": "deepseek-ai/DeepSeek-R1-0528",
+}
+
+
+def _repository(model: str, staged: set, leaf: str) -> str | None:
+    """The recipe's model as a repository: itself when it is one, else the table's repository when the served
+    directory is also known under that repository's name, else None."""
+    if "/" in model:
+        return model
+    repo = LOCAL_SPELLINGS.get(model)
+    known = {n.casefold() for n in staged} | {leaf.casefold()}
+    return repo if repo and repo.rsplit("/", 1)[-1].casefold() in known else None
+
+
 def checkpoint(rc: Recipes, row: dict, served_path: str | None) -> str | None:
     """The HF repo the row's recipe served, or None unless exactly one agrees with the path."""
     if not served_path:
@@ -137,7 +160,7 @@ def checkpoint(rc: Recipes, row: dict, served_path: str | None) -> str | None:
             and _image(r.get("image")) == _image(row.get("image"))
             and runner_hardware(r.get("runner")) == row.get("hardware")
             and r["model"].rsplit("/", 1)[-1] in ({leaf} | staged)}
-    return hits.pop() if len(hits) == 1 else None
+    return _repository(hits.pop(), staged, leaf) if len(hits) == 1 else None
 
 
 class RecipesUnavailable(Exception):

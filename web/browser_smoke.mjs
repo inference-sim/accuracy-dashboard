@@ -81,13 +81,27 @@ try {
       problems.push(`drill-down: expected a row matching "${sel}" but found none (table is empty or broken)`)
       break
     }
-    await el.click()
+    // A topology row is selected by clicking it, but its name cell holds the provenance mark, whose click opens a tooltip
+    // and must not select (SummaryTable stops it). Playwright clicks a row at its centre, which on the production snapshot
+    // (every point carries the mark) is that mark, so click the row's last cell, a number a reader would click.
+    if (sel === 'tr.r3') await (await el.$('td:last-child')).click()
+    else await el.click()
     await page.waitForTimeout(300)
   }
   await page.waitForTimeout(300)
   // After drilling to a topology, the points table must actually render rows (not the empty prompt).
   const ptRows = await page.$$('table.pts tbody tr')
-  if (ptRows.length === 0) problems.push('drill-down: points table rendered zero rows after selecting a topology')
+  if (ptRows.length === 0) {
+    // Say what the page showed, so a failure on new data can be read from the log.
+    const seen = await page.evaluate(() => ({
+      hash: location.hash,
+      topologyRows: document.querySelectorAll('tr.r3').length,
+      rowClass: document.querySelector('tr.r3')?.className,
+      selected: document.querySelectorAll('tr.selected, tr.r3.on').length,
+      pointsArea: (document.querySelector('.pts-empty, .pts-hint')?.textContent || '').slice(0, 160),
+    }))
+    problems.push('drill-down: points table rendered zero rows after selecting a topology ' + JSON.stringify({ ...seen }))
+  }
 
   // The vLLM version is shown per point, never filtered on: no version dropdown.
   if (await page.$('.dd-trigger.vllmsel')) problems.push('the removed vLLM version filter is back')
@@ -136,6 +150,18 @@ try {
     await opts[opts.length - 1].click()
     await page.waitForTimeout(150)
     if (await page.$('.dd-list')) problems.push('dropdown did not close after selection')
+  }
+
+  // The classes page, when the served data holds classes.json (the nightly gate and CI stage it; a bare snapshot has none, and the
+  // page then says so). Every class is one card, and no card shows NaN or undefined.
+  const haveClasses = (await page.request.get(`${BASE}/data/latest/classes.json`)).ok()
+  if (haveClasses) {
+    await page.goto(`${BASE}/#/?view=classes`, { waitUntil: 'networkidle', timeout: 30000 })
+    await page.waitForSelector('section.classcard', { timeout: 5000 }).catch(() => {})
+    const cards = await page.$$('section.classcard')
+    if (cards.length < 1) problems.push('classes page rendered no class card')
+    const body = await page.innerText('.classes')
+    if (/NaN|undefined/.test(body)) problems.push('classes page shows NaN or undefined')
   }
 } catch (e) {
   problems.push(`navigation: ${e.message}`)

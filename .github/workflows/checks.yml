@@ -23,24 +23,32 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# A newer commit supersedes an in-flight run on the same ref — no stacking of fast checks.
+# A newer commit supersedes an in-flight run on the same ref — no stacking of fast checks. An edit of
+# the title or body (not the base) has its own group and runs no job: every job is skipped and its name
+# ends in " (edit)", so the checks of the last push keep their names and results, and a body edit costs
+# no CI run (the pattern of blis-substrate's ci-light.yml).
 concurrency:
-  group: checks-${{ github.workflow }}-${{ github.ref }}
+  group: checks-${{ github.workflow }}-${{ github.ref }}${{ github.event.action == 'edited' && !github.event.changes.base && '-edit' || '' }}
   cancel-in-progress: true
 
 jobs:
   # Decides which jobs this run needs, from the files the pull request changes (see the header).
   changes:
+    name: "changes${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
+    if: ${{ github.event.action != 'edited' || github.event.changes.base }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       orchestrator: ${{ steps.pick.outputs.orchestrator }}
       simulator: ${{ steps.pick.outputs.simulator }}
       web: ${{ steps.pick.outputs.web }}
+      nightly: ${{ steps.pick.outputs.nightly }}
       shards: ${{ steps.pick.outputs.shards }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -48,6 +56,14 @@ jobs:
           fetch-depth: 0
       - name: The table of which change runs which job holds its own samples
         run: python3 .github/ci/selftest.py
+      # Whitespace errors a pull request adds (extra blank lines at the end of a file, trailing
+      # spaces, a space before a tab): git's own check, over the same range the job picker reads.
+      - name: The change adds no whitespace errors
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: git diff --check "$BASE...$HEAD"
       - id: pick
         env:
           EVENT: ${{ github.event_name }}
@@ -71,19 +87,22 @@ jobs:
 
   # Fails when a test file is in no shard (and not in the simulator job or the listed exceptions), or in two.
   partition:
+    name: "partition${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
     needs: changes
-    if: needs.changes.outputs.orchestrator == 'true'
+    if: ${{ (github.event.action != 'edited' || github.event.changes.base) && (needs.changes.outputs.orchestrator == 'true') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - run: python3 .github/ci/shards.py check
 
   # The Python suite, in parallel shards. Each shard runs every one of its commands and reports all failures.
   shard:
-    name: orchestrator-shard (${{ matrix.shard }})
+    name: "orchestrator-shard (${{ matrix.shard }})${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
     needs: changes
-    if: needs.changes.outputs.orchestrator == 'true'
+    if: ${{ (github.event.action != 'edited' || github.event.changes.base) && (needs.changes.outputs.orchestrator == 'true') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -105,9 +124,11 @@ jobs:
 
   # The required check `orchestrator`: passes when the shards and the partition guard passed, or when none was needed.
   orchestrator:
+    name: "orchestrator${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
     needs: [changes, partition, shard]
-    if: ${{ always() }}
+    if: ${{ (github.event.action != 'edited' || github.event.changes.base) && (always()) }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - env:
           NEEDED: ${{ needs.changes.outputs.orchestrator }}
@@ -126,9 +147,11 @@ jobs:
   # SIM_REF (a commit or a release tag); the Go release is read from that checkout's go.mod. The built
   # binary is cached by SIM_REF, so the build runs once per pin, not once per run.
   simulator:
+    name: "simulator${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
     needs: changes
-    if: needs.changes.outputs.simulator == 'true'
+    if: ${{ (github.event.action != 'edited' || github.event.changes.base) && (needs.changes.outputs.simulator == 'true') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
@@ -219,9 +242,11 @@ jobs:
 
   # The web steps after `npm ci` each run even when an earlier one failed, so one run shows every failure.
   web:
+    name: "web${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
     needs: changes
-    if: needs.changes.outputs.web == 'true'
+    if: ${{ (github.event.action != 'edited' || github.event.changes.base) && (needs.changes.outputs.web == 'true') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: web
@@ -273,12 +298,39 @@ jobs:
           rm -rf public/data dist
           mkdir -p public/data/latest
           cp ../data/latest/summary.json public/data/latest/summary.json
+          cp ../data/latest/classes.json public/data/latest/classes.json
           npm run build
           node browser_smoke.mjs
 
+  # The nightly's gate (orchestrator/nightly/checks.sh: prune the legacy map, the boundary and contract shards, the v1 browser
+  # smoke), run on a pull request that changes what it reads, so it is exercised before the nightly relies on it.
+  nightly-gate:
+    name: "nightly-gate${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
+    needs: changes
+    if: ${{ (github.event.action != 'edited' || github.event.changes.base) && (needs.changes.outputs.nightly == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+      - run: pip install --quiet --require-hashes -r requirements-ci.txt
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: bash orchestrator/nightly/checks.sh
+
   # Not conditional: it takes seconds and scans paths of every job's inputs.
   grep-clean:
+    name: "grep-clean${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
+    if: ${{ github.event.action != 'edited' || github.event.changes.base }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: No AISimulate / AIConfigurator / AIC in shipped code, config or data (RFC C1)
@@ -303,19 +355,23 @@ jobs:
   # have been skipped; so a job that silently did not run cannot pass. (The required checks today are
   # `orchestrator`, `grep-clean` and `web`; this job is the single check to require instead.)
   gate:
-    needs: [changes, partition, orchestrator, simulator, web, grep-clean]
-    if: ${{ always() }}
+    name: "gate${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
+    needs: [changes, partition, orchestrator, simulator, web, nightly-gate, grep-clean]
+    if: ${{ (github.event.action != 'edited' || github.event.changes.base) && (always()) }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - env:
           CHANGES: ${{ needs.changes.result }}
           WANT_ORCH: ${{ needs.changes.outputs.orchestrator }}
           WANT_SIM: ${{ needs.changes.outputs.simulator }}
           WANT_WEB: ${{ needs.changes.outputs.web }}
+          WANT_NIGHTLY: ${{ needs.changes.outputs.nightly }}
           R_PARTITION: ${{ needs.partition.result }}
           R_ORCH: ${{ needs.orchestrator.result }}
           R_SIM: ${{ needs.simulator.result }}
           R_WEB: ${{ needs.web.result }}
+          R_NIGHTLY: ${{ needs.nightly-gate.result }}
           R_GREP: ${{ needs.grep-clean.result }}
         run: |
           bad=0
@@ -328,6 +384,7 @@ jobs:
           check partition "$WANT_ORCH" "$R_PARTITION"
           check simulator "$WANT_SIM" "$R_SIM"
           check web "$WANT_WEB" "$R_WEB"
+          check nightly-gate "$WANT_NIGHTLY" "$R_NIGHTLY"
           check grep-clean true "$R_GREP"
           # `orchestrator` always runs: it reports success when the shards passed or none was needed.
           check orchestrator true "$R_ORCH"

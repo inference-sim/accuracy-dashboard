@@ -103,3 +103,42 @@ def test_a_stated_trtllm_attention_is_priced_as_auto_and_the_key_is_left_unset()
     c = st.decide(st.merge({"launch_config": r}, {}), flist, "b200", sif.facts_of(8, "10.0"))
     assert c.reasons == [] and [x["kind"] for x in c.substitutions] == ["execution_mode"]
     assert "engine.use_trtllm_attention" not in c.mapped
+
+
+def _mode_list(mode, target=None):
+    rows = [{"name": "sparse_attention_pair", "source": "config", "status": "not_modelled", "evidence": {"issue": "o/r#80"},
+             "estimation": {"rule": "none", "approximates": {"mode": mode, "evidence": "e", "differs": "d",
+                                                              "when": [{"value_in": ["x"]}]}}}]
+    if target:
+        rows.append(target)
+    rows.sort(key=lambda f: (f["name"], f["source"]))
+    return fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "sglang", "version": "0.5.23"}, "fields": rows}))
+
+
+def _decide_mode(flist):
+    r = st.Reading()
+    r.add("sparse_attention_pair", "x")
+    return st.decide(st.merge({"launch_config": r}, {}), flist, "b200", sif.facts_of(8, "10.0"))
+
+
+def test_a_mode_value_that_is_a_sentence_is_refused_by_name_not_written_into_the_engine_block():
+    # blis-sglang #138 wrote "the part-wide sparse-MLA attention pair" as a mode value; written as a setting it is an invalid engine block.
+    c = _decide_mode(_mode_list({"attention_backend": "the part-wide sparse-MLA attention pair"}))
+    assert c.reasons == ["field_unclassified:attention_backend"] and c.substitutions == [] and c.mapped == {}
+
+
+def test_a_mode_value_the_target_fields_value_classes_do_not_cover_is_refused_and_one_they_cover_is_written():
+    target = {"name": "kernel_config.linear_backend", "source": "config", "status": "modelled", "evidence": {"traces": ["t"]},
+              "value_classes": {"type": "enumerated", "values": ["auto", "marlin"], "covered": ["auto"]},
+              "estimation": {"rule": "none"}}
+    bad = _decide_mode(_mode_list({"kernel_config.linear_backend": "marlin"}, target))
+    assert bad.reasons == ["field_unclassified:kernel_config.linear_backend"] and bad.mapped == {}
+    ok = _decide_mode(_mode_list({"kernel_config.linear_backend": "auto"}, target))
+    assert ok.reasons == [] and [s["kind"] for s in ok.substitutions] == ["execution_mode"]
+
+
+def test_the_plain_values_the_real_field_lists_write_as_modes_are_still_written():
+    for name, value in (("enforce_eager", True), ("kernel_config.linear_backend", "auto"), ("all2all_backend", "flashinfer_nvlink_one_sided")):
+        c = _decide_mode(_mode_list({name: value}))
+        assert c.reasons == [], (name, value, c.reasons)
+    assert _decide_mode(_mode_list({"kernel_config.linear_backend": None})).reasons == []       # null: left unset

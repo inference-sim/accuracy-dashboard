@@ -50,7 +50,7 @@ LOG = (
     "kv_cache_dtype=auto, enable_prefix_caching=False, "
     "compilation_config={'mode': <CompilationMode.NONE: 0>, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>}\n"
     "INFO [kv_cache_utils.py:1] GPU KV cache size: 100,000 tokens\n"
-    '"POST /v1/completions HTTP/1.1" 200\n')
+    + '"POST /v1/completions HTTP/1.1" 200\n' * 48)      # 12 x conc 4: the requests the default point's client sent
 
 # Two periodic spec-decode lines of vLLM's metrics logger, and an idle one that drafted nothing.
 # A run whose rejection sampling is not the synthetic kind records no length, and a synthetic run that
@@ -224,7 +224,8 @@ def job_log_text(isl: int, osl: int, conc: int, extra: str = "") -> str:
 
 def _setup(tmp: Path, *, log: str = LOG, job_log: str | None = "default", client_commit: bool = True, repo: str = "org/m", conc: int = 4, isl: int = 1024, osl: int = 1024,
            date: str = "2026-10-01", spec: str = "mtp", benchmark_type: str = "single_turn",
-           hardware: str = "mi355x", chips: dict | None = None, node_size: int | None = None):
+           hardware: str = "mi355x", chips: dict | None = None, node_size: int | None = None,
+           client_requests: bool = True):
     row = {"id": "1", "model": "m", "hardware": hardware, "precision": "fp8", "framework": "vllm",
            "benchmark_type": benchmark_type, "conc": conc, "isl": isl, "osl": osl, "spec_method": spec,
            "disagg": False, "is_multinode": False, "decode_tp": 1, "decode_ep": 1, "num_decode_gpu": 1,
@@ -235,6 +236,10 @@ def _setup(tmp: Path, *, log: str = LOG, job_log: str | None = "default", client
     pdir = tmp / "pull" / "points" / pid
     pdir.mkdir(parents=True)
     log = log.replace("org/m", repo)
+    if client_requests and conc != 4:
+        # A real log records the requests its client sent: 10*conc measured and 2*conc warm-up (contamination.py).
+        line = '"POST /v1/completions HTTP/1.1" 200\n'
+        log = log.replace(line * 48, line * (12 * conc))
     (pdir / "server_log.gz").write_bytes(gzip.compress(log.encode(), mtime=0))
     entry = {"point_id": pid, "identity": ident, "row": row, "reasons": [], "records": ["1"],
              "client_commit": {"repo": "SemiAnalysisAI/InferenceX", "sha": "f" * 40, "date": "2026-10-01T00:00:00Z"}
@@ -799,7 +804,7 @@ def test_the_agentic_path_reads_the_registry_means_and_the_engine_report():
         # A cached Result whose key differs is not reused.
         next((work / "results").glob("*.key")).write_text("other")
         o3 = sc._score_one(entry, tmp / "pull", work, env)
-        assert o3.fidelity is None and o3.faults[0].startswith("blis_refused")
+        assert o3.fidelity is None and o3.faults[0].startswith("blis_crashed")     # exit 99 with no message of its own: a crash
     finally:
         shutil.rmtree(tmp)
 
@@ -906,7 +911,12 @@ def test_an_unrecorded_setting_is_left_unset_and_the_engines_refusal_is_value_no
         assert o.g5["code"] == "value_not_recorded"
         env.blis = _refusing_blis(tmp, 'level=fatal msg="something else broke"\n')
         o, _ = _score(tmp, entry, env, tmp / "c4")
-        assert o.fidelity is None and o.faults[0].startswith("blis_refused:")
+        # a refusal in the simulator's own words, none of the classifier's: a named not-scored point, not a fault of the run
+        assert o.fidelity is None and not o.faults
+        assert o.g5_reasons == [{"code": "blis_refused", "subject": "something_else_broke"}]
+        env.blis = _refusing_blis(tmp, "panic: runtime error: index out of range\n")
+        o, _ = _score(tmp, entry, env, tmp / "c5")
+        assert o.fidelity is None and o.faults and o.faults[0].startswith("blis_crashed:")    # no message of its own: a crash
     finally:
         shutil.rmtree(tmp)
 
@@ -1300,5 +1310,50 @@ def test_a_primed_point_scored_on_a_simulator_without_trace_phases_replays_the_p
         assert "phase" not in tr[0]
         argv = _saw(env)[-1]["argv"]
         assert "--concurrent-sessions" in argv
+    finally:
+        shutil.rmtree(tmp)
+
+
+REFUSES_INDEXER = """#!/usr/bin/env python3
+import os, sys
+a = sys.argv[1:]
+if a and a[0] == "replay":
+    text = open(os.path.join(a[a.index("--scenarios") + 1], a[a.index("--scenario") + 1])).read()
+    if "indexer_kv_dtype" in text:
+        sys.stderr.write('level=fatal msg="scenario \\\\"x.yaml\\\\": indexer_kv_dtype=\\\\"bf16\\\\" is read only for MiniMax-M3\\'s indexer cache, '
+                         'and this model has none, so a stated value would be dropped"\\n')
+        sys.exit(1)
+os.execv({real!r}, [{real!r}] + a)
+"""
+
+
+def test_a_stated_release_default_the_model_never_reads_is_left_out_and_named_not_a_failure():
+    # Kimi K2.5 has no indexer cache; the run's release default indexer_kv_dtype was copied into the scenario and the
+    # simulator refused it (accuracy-dashboard#126). The point is run again without it and says so.
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        log = LOG.replace("'gpu_memory_utilization': 0.9,", "'gpu_memory_utilization': 0.9, 'attention_config': {'indexer_kv_dtype': 'bf16'},")
+        entry, env = _setup(tmp, log=log)
+        doc = json.loads((HERE / "testdata" / "fields" / "fields.json").read_bytes())
+        for f in doc["fields"]:
+            if f["name"] == "enable_prefix_caching":
+                f["value_classes"] = {"type": "boolean", "covered": ["true", "false"]}      # vLLM's own names
+            if f["name"] == "attention_config.indexer_kv_dtype":
+                f.update(status="modelled", evidence={"traces": ["core/sched/testdata/golden/t.json"]}, estimation={"rule": "none"},
+                         value_classes={"type": "enumerated", "values": ["auto", "bf16"], "covered": ["auto", "bf16"]})
+        env.field_list = fl.parse(json.dumps(doc).encode())
+        real = env.blis
+        env.blis = _exe(tmp / "wrapped", REFUSES_INDEXER.format(real=real))
+        o, work = _score(tmp, entry, env, tmp / "c1")
+        assert o.fidelity is not None, o.reasons
+        sub = next(s for s in o.fidelity["substitutions"] if s["subject"] == "indexer_kv_dtype")
+        assert sub["kind"] == "resolved_differs" and "never" in sub["detail"] and "bf16" in sub["detail"]
+        assert "kvlayers.go" in sub["detail"] and "issue #84" in sub["detail"]
+        assert all(a["arg"] != "attention_config.indexer_kv_dtype" for a in o.fidelity["args"])
+        scen = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
+        assert "indexer_kv_dtype" not in scen
+        # A refusal of anything else is still a refusal: the retry is for this one message only.
+        assert sc._UNREAD_VALUE.search('indexer_kv_dtype="bf16" is read only for MiniMax-M3\'s indexer cache, and this model has none')
+        assert not sc._UNREAD_VALUE.search('max_num_seqs="5" is not modelled')
     finally:
         shutil.rmtree(tmp)

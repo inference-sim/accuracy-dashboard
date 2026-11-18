@@ -1,0 +1,386 @@
+{
+ "accuracy_by_grade": {
+  "G1": {
+   "itl": {
+    "mape": "too few points",
+    "n": 0,
+    "signed_median": "too few points"
+   },
+   "tpot": {
+    "mape": "too few points",
+    "n": 0,
+    "signed_median": "too few points"
+   },
+   "ttft": {
+    "mape": "too few points",
+    "n": 0,
+    "signed_median": "too few points"
+   }
+  },
+  "G2": {
+   "itl": {
+    "mape": "too few points",
+    "n": 0,
+    "signed_median": "too few points"
+   },
+   "tpot": {
+    "mape": "too few points",
+    "n": 0,
+    "signed_median": "too few points"
+   },
+   "ttft": {
+    "mape": "too few points",
+    "n": 0,
+    "signed_median": "too few points"
+   }
+  },
+  "G3": {
+   "itl": {
+    "mape": "too few points",
+    "n": 0,
+    "signed_median": "too few points"
+   },
+   "tpot": {
+    "mape": "too few points",
+    "n": 0,
+    "signed_median": "too few points"
+   },
+   "ttft": {
+    "mape": "too few points",
+    "n": 0,
+    "signed_median": "too few points"
+   }
+  },
+  "G4": {
+   "itl": {
+    "mape": 15.510913757211,
+    "n": 15,
+    "signed_median": -16.36282387599063
+   },
+   "tpot": {
+    "mape": 12.044851911050158,
+    "n": 24,
+    "signed_median": -12.126701284682568
+   },
+   "ttft": {
+    "mape": 45.535278626960995,
+    "n": 24,
+    "signed_median": -48.88591817257144
+   }
+  }
+ },
+ "counts": {
+  "failed": 0,
+  "points": 242,
+  "refused": 218,
+  "scored": 24,
+  "withheld": 0
+ },
+ "grades": {
+  "G1": 0,
+  "G2": 0,
+  "G3": 0,
+  "G4": 24,
+  "G5": 218
+ },
+ "id": "sglang",
+ "interim": false,
+ "itl_streamed_in_chunks_left_out": 9,
+ "kind": "regular",
+ "label": "InferenceX, SGLang (final census)",
+ "note": "InferenceX SGLang points the final census scored (train and validation points that have server logs). Scored by the same harness as the regular run; the nightly's summary does not score SGLang points yet, so this is a separate run, not added to the regular card's counts. No earlier release was run on these points, so there is no baseline. ITL covers only the points whose measured ITL is one token per chunk.",
+ "provenance": {
+  "command": "orchestrator/ingest/cli.py score of the SGLang units of the final census (train and validation only), then orchestrator/build_classes.py derive-contract --kind regular --itl-json --pull-manifest",
+  "derived_at": "2026-11-18",
+  "heads": {
+   "blis-sglang": "a721ab16b5ee0d3a124efe9bd0e5a423da0a372a",
+   "blis-substrate": "fa28d5116739dc582efdb7694acf15a294cdc62b",
+   "census_run": "20261118-071926-subset0",
+   "harness": "5916de4c43b2c61fb04b961d84a91d7cc2da8c5c",
+   "inference-sim": "3d3f9e34f3a4e53406af8503e49cb4afe6446bf4"
+  },
+  "pulled_at": "2026-11-17T13:49:06Z"
+ },
+ "refusals": [
+  {
+   "code": "field_not_modelled",
+   "points": 60,
+   "subject": "env.NCCL_NVLS_ENABLE"
+  },
+  {
+   "code": "field_not_modelled",
+   "points": 56,
+   "subject": "moe_runner_backend"
+  },
+  {
+   "code": "field_not_modelled",
+   "points": 29,
+   "subject": "enable_symm_mem"
+  },
+  {
+   "code": "value_not_recorded",
+   "points": 16,
+   "subject": "launch_command"
+  },
+  {
+   "code": "field_not_modelled",
+   "points": 13,
+   "subject": "cuda_graph_backend_prefill"
+  },
+  {
+   "code": "field_not_modelled",
+   "points": 12,
+   "subject": "env.NCCL_CUMEM_ENABLE"
+  },
+  {
+   "code": "field_not_modelled",
+   "points": 9,
+   "subject": "fp8_gemm_runner_backend"
+  },
+  {
+   "code": "field_not_modelled",
+   "points": 8,
+   "subject": "ep_size"
+  },
+  {
+   "code": "field_not_modelled",
+   "points": 8,
+   "subject": "other settings"
+  },
+  {
+   "code": "value_not_recorded",
+   "points": 7,
+   "subject": ""
+  }
+ ],
+ "substitutions": [
+  {
+   "detail": "job log expired; the client's flags are assumed to be the launcher's defaults",
+   "kind": "client_difference",
+   "points": 24,
+   "subject": "client_flags"
+  },
+  {
+   "detail": "the run's completed and num_prompts counts are not in the pulled data; requests the client lost, which would leave a different population, are not ruled out",
+   "kind": "client_difference",
+   "points": 24,
+   "subject": "failed_requests"
+  },
+  {
+   "detail": "BLIS releases the next request at the previous one's completion plus the assumed completion overhead of 777 us; the real client's gap (usage chunk, [DONE], session exit, event-loop wake-up) is not measured",
+   "kind": "client_difference",
+   "points": 24,
+   "subject": "send_gap"
+  },
+  {
+   "detail": "sent prompt lengths not verified equal to the replayed targets: prompt-lengths.json holds no evidence for the point (no engine log, so no run date or client version; or a gated tokenizer)",
+   "kind": "client_difference",
+   "points": 24,
+   "subject": "sent_prompt_lengths"
+  },
+  {
+   "detail": "assumed",
+   "kind": "coefficient_method",
+   "points": 24,
+   "subject": "cost-model-attention/attention_decode_floor_mla"
+  },
+  {
+   "detail": "assumed",
+   "kind": "coefficient_method",
+   "points": 24,
+   "subject": "cost-model-host-overheads/host_admission_per_request"
+  },
+  {
+   "detail": "assumed",
+   "kind": "coefficient_method",
+   "points": 24,
+   "subject": "cost-model-host-overheads/host_admission_per_token"
+  },
+  {
+   "detail": "assumed",
+   "kind": "coefficient_method",
+   "points": 24,
+   "subject": "cost-model-host-overheads/host_completion"
+  },
+  {
+   "detail": "assumed",
+   "kind": "coefficient_method",
+   "points": 24,
+   "subject": "cost-model-host-overheads/host_launch_eager_per_layer"
+  },
+  {
+   "detail": "assumed",
+   "kind": "coefficient_method",
+   "points": 24,
+   "subject": "cost-model-host-overheads/host_launch_per_kernel"
+  },
+  {
+   "detail": "assumed",
+   "kind": "coefficient_method",
+   "points": 24,
+   "subject": "cost-model-host-overheads/host_output_token"
+  },
+  {
+   "detail": "assumed",
+   "kind": "coefficient_method",
+   "points": 24,
+   "subject": "cost-model-host-overheads/host_replay_graph_per_step"
+  },
+  {
+   "detail": "vendor_spec",
+   "kind": "coefficient_method",
+   "points": 24,
+   "subject": "cost-model-memory/activation_buffer_count_moe_8rank"
+  },
+  {
+   "detail": "vendor_spec",
+   "kind": "coefficient_method",
+   "points": 24,
+   "subject": "cost-model-memory/activation_scratch_floor_bytes"
+  },
+  {
+   "detail": "assumed",
+   "kind": "coefficient_method",
+   "points": 24,
+   "subject": "cost-model-memory/cudagraph_capture_bytes_full_and_piecewise"
+  },
+  {
+   "detail": "vendor_spec",
+   "kind": "coefficient_method",
+   "points": 24,
+   "subject": "cost-model-primitives/engine_workspace_bytes"
+  },
+  {
+   "detail": "transferred",
+   "kind": "coefficient_method",
+   "points": 24,
+   "subject": "cost-model-primitives/gemm_eps_max_fp8_grouped_triton"
+  },
+  {
+   "detail": "transferred",
+   "kind": "coefficient_method",
+   "points": 24,
+   "subject": "cost-model-primitives/gemm_floor_fp8_grouped_triton"
+  },
+  {
+   "detail": "transferred",
+   "kind": "coefficient_method",
+   "points": 24,
+   "subject": "cost-model-primitives/gemm_m_half_fp8_grouped_triton"
+  },
+  {
+   "detail": "vendor_spec",
+   "kind": "coefficient_method",
+   "points": 24,
+   "subject": "cost-model-primitives/hbm_derate"
+  },
+  {
+   "detail": "assumed",
+   "kind": "coefficient_method",
+   "points": 24,
+   "subject": "cost-model-primitives/host_gather_rate_uva"
+  },
+  {
+   "detail": "vendor_spec",
+   "kind": "coefficient_method",
+   "points": 24,
+   "subject": "cost-model-primitives/nccl_communicator_bytes_8rank"
+  },
+  {
+   "detail": "inert, unproven: allowed only until M2 (release plan \u00a73.3)",
+   "kind": "interim_status",
+   "points": 24,
+   "subject": "host"
+  },
+  {
+   "detail": "inert, unproven: allowed only until M2 (release plan \u00a73.3)",
+   "kind": "interim_status",
+   "points": 24,
+   "subject": "trust_remote_code"
+  },
+  {
+   "detail": "taken from the records of label h200 in InferenceX runners.yaml (303669b0 of 2026-07-02, 5d06e10c of 2026-09-27, 4a63bf50 of 2026-11-06), which all state 8; no record lists the runner",
+   "kind": "later_record",
+   "points": 24,
+   "subject": "cluster.gpus_per_node"
+  },
+  {
+   "detail": "coefficient_range is unevaluated",
+   "kind": "unevaluated",
+   "points": 24,
+   "subject": "coefficient_range"
+  },
+  {
+   "detail": "kernel_hash is unevaluated",
+   "kind": "unevaluated",
+   "points": 24,
+   "subject": "kernel_hash"
+  },
+  {
+   "detail": "ported-function list not published",
+   "kind": "ported_functions_unpublished",
+   "points": 19,
+   "subject": "engine release"
+  },
+  {
+   "detail": "the run set no context length; SGLang derives 202752 from the checkpoint's config (get_context_length), which the catalog graph does not carry",
+   "kind": "estimated",
+   "points": 15,
+   "subject": "context_length"
+  },
+  {
+   "detail": "inert, unproven: allowed only until M2 (release plan \u00a73.3)",
+   "kind": "interim_status",
+   "points": 15,
+   "subject": "reasoning_parser"
+  },
+  {
+   "detail": "inert, unproven: allowed only until M2 (release plan \u00a73.3)",
+   "kind": "interim_status",
+   "points": 15,
+   "subject": "served_model_name"
+  },
+  {
+   "detail": "inert, unproven: allowed only until M2 (release plan \u00a73.3)",
+   "kind": "interim_status",
+   "points": 15,
+   "subject": "tool_call_parser"
+  },
+  {
+   "detail": "0.5.12, scored on 0.5.23",
+   "kind": "other_release",
+   "points": 15,
+   "subject": "engine release"
+  },
+  {
+   "detail": "the run set no context length; SGLang derives 163840 from the checkpoint's config (get_context_length), which the catalog graph does not carry",
+   "kind": "estimated",
+   "points": 9,
+   "subject": "context_length"
+  },
+  {
+   "detail": "lmsysorg/sglang:glm5-hopper (banner none)",
+   "kind": "nightly_or_custom",
+   "points": 5,
+   "subject": "engine build"
+  },
+  {
+   "detail": "the run's engine release has cuda_graph_max_bs=512; the modelled release removed it and states cuda_graph_max_bs_decode=512 for it: SGLang's --cuda-graph-max-bs capped the decode CUDA graph's batch size; v0.5.14 split the cap by phase and kept the old flag as a deprecated alias of --cuda-graph-max-bs-decode (server_args.py at v0.5.14: new_flag=\"--cuda-graph-max-bs-decode\"), and v0.5.23 removed the alias; the prefill cap is its own field",
+   "kind": "resolved_differs",
+   "points": 5,
+   "subject": "cuda_graph_max_bs"
+  },
+  {
+   "detail": "0.5.9, scored on 0.5.23",
+   "kind": "other_release",
+   "points": 4,
+   "subject": "engine release"
+  },
+  {
+   "detail": "the run's engine release has cuda_graph_max_bs=256; the modelled release removed it and states cuda_graph_max_bs_decode=256 for it: SGLang's --cuda-graph-max-bs capped the decode CUDA graph's batch size; v0.5.14 split the cap by phase and kept the old flag as a deprecated alias of --cuda-graph-max-bs-decode (server_args.py at v0.5.14: new_flag=\"--cuda-graph-max-bs-decode\"), and v0.5.23 removed the alias; the prefill cap is its own field",
+   "kind": "resolved_differs",
+   "points": 4,
+   "subject": "cuda_graph_max_bs"
+  }
+ ]
+}

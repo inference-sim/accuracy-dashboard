@@ -74,6 +74,52 @@ NO_COMMAND, AMBIGUOUS_COMMAND, SHELL_EXPANSION = "no_launch_command", "several_l
 _EXPANSION = re.compile(r"\$\(|`|\$\{[^}]*:[-+=?]")
 
 
+LEFT_TO_THE_LOG = "$LEFT_TO_THE_LOG"
+_FLAG_BEFORE_VALUE = re.compile(r"--[A-Za-z0-9][A-Za-z0-9-]*(?:=|\s+)$")
+
+
+def _hide_computed_values(cmd: str) -> str:
+    """The command with each `$(...)` or `$((...))` that is a flag's whole value replaced by a variable the reader
+    leaves to the log. The flag is still named, and the printout of the resolved arguments holds its value; an
+    expansion anywhere else (it may decide whether a flag is set at all) is left, and the command is refused."""
+    out, i = [], 0
+    while i < len(cmd):
+        j = cmd.find("$(", i)
+        if j < 0:
+            break
+        depth, k = 0, j + 1
+        while k < len(cmd):
+            depth += {"(": 1, ")": -1}.get(cmd[k], 0)
+            k += 1
+            if depth == 0:
+                break
+        if depth != 0 or not _FLAG_BEFORE_VALUE.search(cmd[:j]) or (k < len(cmd) and not cmd[k].isspace()):
+            break
+        out.append(cmd[i:j] + LEFT_TO_THE_LOG)
+        i = k
+    return "".join(out) + cmd[i:]
+
+
+def _merge_branches(cmds: list[str]) -> str | None:
+    """One command for the several a script launches by branch, when they differ only in the values of the flags they
+    all name: each differing value becomes a variable left to the log. Commands that name different flags, or are
+    laid out differently, are not merged (None): which flags the run set is then unknown."""
+    split = [shlex.split(c, comments=True) for c in cmds]
+    if len({len(t) for t in split}) != 1:
+        return None
+    merged = []
+    for col in zip(*split):
+        if len(set(col)) == 1:
+            merged.append(col[0])
+            continue
+        heads = {t.partition("=")[0] for t in col}
+        if any(t.startswith("--") and "=" not in t for t in col) or len(heads) != 1 and any("=" in t for t in col):
+            return None
+        merged.append(f"{heads.pop()}={LEFT_TO_THE_LOG}" if all("=" in t for t in col) and next(iter(heads)).startswith("--")
+                      else LEFT_TO_THE_LOG)
+    return " ".join(shlex.quote(t) if t != LEFT_TO_THE_LOG and not t.startswith("--") else t for t in merged)
+
+
 def launch_command_of(text: str) -> tuple[str | None, str | None]:
     """(the launch command with the environment it ran with, None) from a CI job log or a script, or (None, why).
 
@@ -95,11 +141,14 @@ def launch_command_of(text: str) -> tuple[str | None, str | None]:
                 cmd = cmd[:-1].rstrip() + " " + lines[i].strip()
             cmds.append(cmd)
         i += 1
-    distinct = sorted(set(cmds))
+    distinct = sorted({_hide_computed_values(c) for c in cmds})
     if not distinct:
         return None, NO_COMMAND
     if len(distinct) > 1:
-        return None, AMBIGUOUS_COMMAND
+        merged = None if any(_EXPANSION.search(c) for c in distinct) else _merge_branches(distinct)
+        if merged is None:
+            return None, AMBIGUOUS_COMMAND
+        distinct = [merged]
     if _EXPANSION.search(distinct[0]):
         return None, SHELL_EXPANSION
     return "\n".join(env + distinct), None
@@ -114,6 +163,8 @@ def _coerce(value: str, kind: str):
         return pyrepr.Float(value)
     if k == "bool":
         return value.strip().lower() in ("1", "true", "yes")
+    if k == "str":
+        return value        # a JSON text in a str field (--model-loader-extra-config '{...}') stays the text SGLang takes
     if value[:1] in "{[":
         try:
             return json.loads(value)
@@ -204,6 +255,46 @@ def _value(text: str, kind: str):
         return text
 
 
+# The flags of a prefill/decode pool that are the deployment's (its role and its KV transfer), not engine settings.
+TRANSFER_FIELDS = ("disaggregation_mode", "disaggregation_transfer_backend")
+CONNECTOR_PATH = "kv_transfer_config.kv_connector"      # where pd.build_pd looks for the pools' connector
+
+
+def pool_launch_text(launch: dict) -> str:
+    """A launch command, in the form `read_launch_command` reads, of the one pool a pseudo launch
+    configuration (pd.pseudo_launch) holds: the recipe's flags and environment. A flag set to false is not on the command."""
+    (role, spec), = launch["roles"].items()
+    lines = [f"export {k}={shlex.quote(str(v))}" for k, v in (spec.get("env") or {}).items()]
+    words = ["python3", "-m", "sglang.launch_server"]
+    for k, v in (spec.get("args") or {}).items():
+        if v is None or v is False:
+            continue
+        words.append(f"--{k}")
+        if v is not True:
+            words += [shlex.quote(str(x)) for x in (v if isinstance(v, list) else [v])]
+    return "\n".join(lines + [" ".join(words)])
+
+
+def read_pool(launch: dict, decl: dict, field_list=None) -> tuple[st.Reading, dict]:
+    """(the pool's settings reading without its role and transfer backend, {field: value}) from a pseudo launch
+    configuration. The transfer backend is also given as the connector pd.build_pd reads; one the recipe leaves
+    unstated is the engine's declared default."""
+    rd = read_launch_command(pool_launch_text(launch), decl)
+    if field_list is not None:
+        drop_foreign_env(rd, field_list)
+    taken = {}
+    for f in TRANSFER_FIELDS:
+        vals = rd.values.pop(f, None)
+        if vals:
+            taken[f] = vals[0]
+    backend = taken.get("disaggregation_transfer_backend")
+    if backend is None and "disaggregation_mode" in taken:
+        backend = (decl["fields"].get("disaggregation_transfer_backend") or {}).get("default")
+    if backend is not None:
+        taken[CONNECTOR_PATH] = backend
+    return rd, taken
+
+
 def unresolved_env(readings: dict) -> list[str]:
     """The environment variables the launch command sets to a value left to the shell ($X): the value is not
     recorded, and the point is refused naming the variable rather than run without it."""
@@ -277,7 +368,52 @@ TRANSLATIONS = {
         "SGLang's --cuda-graph-max-bs capped the decode CUDA graph's batch size; v0.5.14 split the cap by phase and kept the "
         "old flag as a deprecated alias of --cuda-graph-max-bs-decode (server_args.py at v0.5.14: new_flag="
         "\"--cuda-graph-max-bs-decode\"), and v0.5.23 removed the alias; the prefill cap is its own field"),
+    "mamba_scheduler_strategy": (
+        "mamba_radix_cache_strategy", lambda v: {"auto": "no_buffer"}.get(v, v), lambda v: v in ("auto", "no_buffer", "extra_buffer"),
+        "SGLang v0.5.12 and v0.5.13 named the strategy of the mamba radix cache --mamba-scheduler-strategy (auto, no_buffer, "
+        "extra_buffer) and resolved auto to no_buffer (server_args.py at v0.5.13: `if self.mamba_scheduler_strategy == \"auto\": "
+        "self.mamba_scheduler_strategy = \"no_buffer\"`); v0.5.14 renamed the field mamba_radix_cache_strategy, kept the old flag as "
+        "a deprecated alias (DeprecatedAliasStoreAction) and made auto choose extra_buffer under overlap scheduling or paging when the model architecture supports it (_support_mamba_cache_extra_buffer), so an old "
+        "auto is stated as the no_buffer the run resolved it to"),
+    "disable_piecewise_cuda_graph": (
+        "cuda_graph_backend_prefill", lambda v: "disabled", lambda v: v is True,
+        "SGLang v0.5.12 and v0.5.13 had --disable-piecewise-cuda-graph; v0.5.14 replaced the prefill CUDA graph settings by "
+        "per-phase ones and kept the flag as a deprecated alias of --cuda-graph-backend-prefill=disabled "
+        "(DeprecatedStoreConstAction, const_value=Backend.DISABLED, server_args.py at v0.5.14), so a stated flag is the prefill "
+        "graph backend disabled"),
+    "nsa_prefill_backend": (
+        "dsa_prefill_backend", st.SAME_VALUE, lambda v: v is not None,
+        "SGLang v0.5.13 renamed NSA (native sparse attention) to DSA throughout (PR #25821, commit 8131641bc66): --nsa-prefill-backend became "
+        "--dsa-prefill-backend with the same choices (NSA_CHOICES = DSA_CHOICES), and the old flag stayed a deprecated alias "
+        "(DeprecatedAliasStoreAction, dest dsa_prefill_backend); PR #38375 (db272201a2d) cleared the deprecated flags that have a replacement, so "
+        "v0.5.23 has no --nsa-prefill-backend and the value is stated as dsa_prefill_backend"),
+    "nsa_decode_backend": (
+        "dsa_decode_backend", st.SAME_VALUE, lambda v: v is not None,
+        "SGLang v0.5.13 renamed NSA (native sparse attention) to DSA throughout (PR #25821, commit 8131641bc66): --nsa-decode-backend became "
+        "--dsa-decode-backend with the same choices (NSA_CHOICES = DSA_CHOICES), and the old flag stayed a deprecated alias "
+        "(DeprecatedAliasStoreAction, dest dsa_decode_backend); PR #38375 (db272201a2d) cleared the deprecated flags that have a replacement, so "
+        "v0.5.23 has no --nsa-decode-backend and the value is stated as dsa_decode_backend"),
+    "env.SGLANG_ENABLE_FLASHINFER_GEMM": (
+        None, None, lambda v: True,
+        "no SGLang release from v0.5.12 to v0.5.23 reads it (it is in no environ.py or source file; only AgentX documentation "
+        "snippets name it), so the variable acts, if at all, in the image's FlashInfer layer; whether it changes scheduling "
+        "decisions is unproven"),
 }
+
+
+def spec_method_of(algorithm, drafter) -> str | None:
+    """The speculative method a deployment states for the SGLang `speculative_algorithm` a run set, in the words an
+    InferenceX row uses: `mtp` for EAGLE or NEXTN with no draft model of its own. SGLang resolves both spellings to
+    EAGLE (arg_groups/speculative_hook.py:_resolve_speculative_algorithm_alias, v0.5.23), and with no
+    speculative_draft_model_path the draft is the target checkpoint's own multi-token-prediction layer (model_config.py,
+    the is_draft_model rewrite to the NextN architecture); with a draft model it is an ordinary EAGLE draft. Any other
+    algorithm keeps its own lower-case name. None when the run set none."""
+    if algorithm in (None, ""):
+        return None
+    a = str(algorithm).upper()
+    if a in ("EAGLE", "NEXTN"):
+        return "eagle" if drafter else "mtp"
+    return a.lower()
 
 
 def make_names(decl: dict) -> st.Names:

@@ -302,6 +302,39 @@ def refused_faults(failed: list[dict]) -> list[str]:
             if not set(f["faults"]) <= set(assess.RUNNER_LIMITS)]
 
 
+def new_refusal_codes(not_scored: list[dict]) -> list[str]:
+    """The codes of the simulator's named refusals (G5 blis_refused) among the not-scored points that the nightly has not met before
+    (assess.KNOWN_REFUSAL_CODES), sorted. A new code is published like any other; the list is how a person comes to read it."""
+    seen = {assess.refusal_code(r.get("subject", "")) for p in not_scored for r in p.get("g5_reasons") or [p["g5_reason"]]
+            if r.get("code") == "blis_refused"}
+    return sorted(seen - set(assess.KNOWN_REFUSAL_CODES))
+
+
+def scored_engines(prov_in: dict, points: list[dict]) -> list[dict] | None:
+    """One entry per engine kind the contract's points were scored on, {kind, version[, module]}, sorted by kind, when more
+    than one kind is present; None otherwise, and then the summary keeps its single `engine` block, unchanged. The kind and
+    release are each point's simulator.engine; the module is the one the contract's provenance lists for that kind."""
+    seen: dict = {}
+    for x in points:
+        e = (x.get("simulator") or {}).get("engine") or {}
+        if e.get("kind"):
+            seen[e["kind"]] = e.get("version")
+    if len(seen) < 2:
+        return None
+    listed = {e.get("kind"): e for e in prov_in.get("engines") or []}
+    return [{"kind": k, "version": v, **({"module": listed[k]["module"]} if listed.get(k, {}).get("module") else {})}
+            for k, v in sorted(seen.items())]
+
+
+def refuse_recipe_class(prov_in: dict) -> None:
+    """A contract whose provenance names a recipe class (the reconstructed launches of supplemental.py) is a run beside the regular
+    one, scored with launches that are not the runs' own; it is never given to the summary as a release."""
+    rc = prov_in.get("recipe_class")
+    if rc:
+        raise ContractError(f"this contract is the {rc.get('class')!r} recipe class ({rc.get('units')} units), not a regular run; "
+                            "the summary builder takes regular runs only")
+
+
 def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     problems = contract.validate_dir(directory)
     if problems:
@@ -316,6 +349,7 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     facets = json.loads((directory / contract.FACETS_JSON).read_text())
     not_scored = _lines(directory / contract.NOT_SCORED_JSONL)
     prov_in = json.loads((directory / contract.PROVENANCE_JSON).read_text())
+    refuse_recipe_class(prov_in)
 
     # Every point of the contract, graded or not, in the shape headline and backlog read.
     graded = [{**r, "grade": fidelity[r["point_id"]]["grade"], "framework": facets[r["point_id"]]["framework"],
@@ -354,6 +388,7 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     if len(ids) != len(graded) or len(set(ids)) != len(ids):
         raise ContractError("repeat folding lost or doubled a point")
 
+    engines = scored_engines(prov_in, list(fidelity.values()) + not_scored + failed)
     pull_date = prov_in["pulled_at"][:10]
     dates = sorted({p["measured_date"] for p in flat} | {ns["measured_date"] for ns in not_scored})
     provenance = {
@@ -363,6 +398,7 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
         "experimental": prov_in["experimental"],
         "units": prov_in["units"],
         "engine": prov_in["engine"],
+        **({"engines": engines} if engines else {}),
         # What the extractor pulled, as it recorded it (provenance.json's source).
         "ground_truth": {"source": prov_in["source"]["name"], "source_url": prov_in["source"]["url"],
                          "release_tag": f"api-{pull_date}",
@@ -381,6 +417,7 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
         "headline": head,
         "coverage": coverage,
         "backlog": {"top": [{"reason": r, "points": n} for r, n in bl.top(graded + g5, BACKLOG_TOP)]},
+        "new_refusal_codes": new_refusal_codes(not_scored),
         "known_artefacts": [],
         "metrics": ["ttft", "tpot"],
         "metricscore_comparison": None,
@@ -477,6 +514,7 @@ def _prov_out_to_in(prov: dict, coverage: dict) -> dict:
     return {"ingest": "api", "blis": prov["blis"], "simulator": prov["simulator"],
             "harness_commit": prov["harness_commit"], "experimental": prov["experimental"], "units": prov["units"],
             "engine": prov["engine"],
+            **({"engines": prov["engines"]} if prov.get("engines") else {}),
             "points": coverage["points"],
             "left_out_records": coverage["left_out_records"], "vllm_ref": prov["vllm_ref"],
             "vllm_max_distance": prov["vllm_max_distance"], "fields_sha256": prov["fields_sha256"],

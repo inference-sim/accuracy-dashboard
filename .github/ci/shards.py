@@ -48,6 +48,7 @@ SHARDS: dict[str, list[Cmd]] = {
         script("orchestrator/test_gen_direct_corpus.py"),
         script("orchestrator/test_run_agentic.py"),
         pytest("Agentic corpus pinned by its catalog workload's revision and full sha256", "orchestrator/test_resolve_agentic_corpus.py"),
+        pytest("The classes page: regular, reconstructed-recipe and configiq points counted apart, never mixed", "orchestrator/test_build_classes.py"),
         pytest("The first-party corpus scorer and its client adapters", "orchestrator/baseline/test_corpus.py",
                "orchestrator/baseline/test_clients_fp.py"),
         Cmd("Schema validates the committed render fixture", argv=[
@@ -79,8 +80,13 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
     "ingest": [
         script("orchestrator/ingest/test_extract.py", "API ingest extractor"),
         script("orchestrator/ingest/test_score_e2e.py", "Points through score_point and write_contract, fake BLIS binaries"),
+        pytest("a staged checkpoint path resolves to its catalog model", "orchestrator/ingest/test_local_checkpoint.py"),
+        pytest("A simulator refusal is a named not-scored point; a fault of the run still stops the night", "orchestrator/ingest/test_named_refusals.py"),
         pytest("configiq points and coverage by source", "orchestrator/ingest/test_configiq.py",
-               "orchestrator/ingest/test_by_source.py"),
+               "orchestrator/ingest/test_by_source.py", "orchestrator/ingest/test_configiq_score.py"),
+        pytest("An SGLang point's speculative method is read the way a row states it", "orchestrator/ingest/test_sglang_spec_method.py"),
+        pytest("A vLLM point whose server log holds another request count than its client sent is G5 measurement_contaminated", "orchestrator/ingest/test_contamination.py"),
+        pytest("A prefill/decode SGLang point scored from its schema 2 recipe", "orchestrator/ingest/test_sglang_pd.py"),
     ],
     # The pytest-fixture suites: the nightly pipeline, the grades, the baseline tools.
     "nightly": [
@@ -97,9 +103,9 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
                "orchestrator/ingest/test_stack.py", "orchestrator/ingest/test_server_log.py",
                "orchestrator/ingest/test_gen_grade_doc.py", "orchestrator/ingest/test_drafter.py",
                "orchestrator/ingest/test_recipe_checkpoints.py", "orchestrator/ingest/test_locations.py",
-               "orchestrator/ingest/test_value_refusal.py", "orchestrator/ingest/test_g1.py",
+               "orchestrator/ingest/test_value_refusal.py", "orchestrator/ingest/test_named_scenario_refusals.py", "orchestrator/ingest/test_g1.py",
                "orchestrator/ingest/test_pd.py", "orchestrator/ingest/test_thinking_rule.py",
-               "orchestrator/ingest/test_sglang_scoring.py", "orchestrator/ingest/test_approximates.py", "orchestrator/ingest/test_release_translation.py",
+               "orchestrator/ingest/test_sglang_scoring.py", "orchestrator/ingest/test_approximates.py", "orchestrator/ingest/test_release_translation.py", "orchestrator/ingest/test_supplemental.py", "orchestrator/ingest/test_supplemental_tools.py",
                "orchestrator/baseline/test_compare.py", "orchestrator/baseline/test_split.py",
                "orchestrator/baseline/test_residuals.py", "orchestrator/baseline/test_docs.py",
                "orchestrator/baseline/test_contracts_current.py", "orchestrator/baseline/test_contract_currency.py",
@@ -107,12 +113,21 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
         pytest("The M3 baseline and the grade ceilings", "orchestrator/baseline/test_ceiling.py",
                "orchestrator/baseline/test_ported_changes.py", "orchestrator/baseline/test_m3_baseline.py",
                "orchestrator/baseline/test_release_runs.py"),
+        pytest("The facts the estimation evaluator gets, the evaluator against the substrate's vectors, and the baseline row placement",
+               "orchestrator/ingest/test_exact.py", "orchestrator/ingest/test_stand_in_facts.py",
+               "orchestrator/baseline/test_freeze_rows.py"),
+        pytest("P/D cells paired, frozen and priced, and the git recipes the anchors are read from",
+               "orchestrator/baseline/test_pd_pairing.py", "orchestrator/baseline/test_pd_freeze.py",
+               "orchestrator/baseline/test_pd_net.py", "orchestrator/baseline/test_git_recipes.py"),
     ],
     # The two repository-wide checks that were hidden behind earlier failures: they run on their own.
     "boundary": [
         Cmd("Every point id of every published snapshot maps to a ledger unit", argv=[
             "python3", "orchestrator/ingest/legacy_ids.py", "check", "--map", "data/legacy/point-ids.json", "--data", "data"]),
         pytest("BLIS is read only through the inference-sim commands: the lint's own tests", "orchestrator/test_lint_blis_boundary.py"),
+        pytest("An edit of a pull request's title or body runs no CI job", "orchestrator/test_ci_edit.py"),
+        pytest("A night with more than 5 percent faulted points is not published", "orchestrator/nightly/test_night_health.py"),
+        pytest("A night's notes are warnings and never stop a publish", "orchestrator/nightly/test_night_notes.py"),
         Cmd("BLIS is read only through the inference-sim commands: the lint", argv=["python3", "orchestrator/lint_blis_boundary.py"]),
     ],
 }
@@ -126,13 +141,8 @@ SIMULATOR = [
     "orchestrator/ingest/test_router_configs.py",
 ]
 
-# Test files no CI job runs, each with the reason. Before this manifest, CI named its test files by hand
-# and these three were in no list; they are listed so the omission is visible, not so it stays.
-NOT_RUN = {
-    "orchestrator/ingest/test_exact.py": "not run by CI before the manifest; needs review (compares against vectors from the Go evaluator)",
-    "orchestrator/ingest/test_stand_in_facts.py": "not run by CI before the manifest",
-    "orchestrator/baseline/test_freeze_rows.py": "not run by CI before the manifest; reads a substrate checkout",
-}
+# Test files no CI job runs, each with the reason. Empty: every tracked test file is in a shard or in SIMULATOR.
+NOT_RUN: dict[str, str] = {}
 
 
 def tracked_tests() -> list[str]:

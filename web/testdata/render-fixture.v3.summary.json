@@ -281,6 +281,7 @@
       }
     ]
   },
+  "new_refusal_codes": [],
   "known_artefacts": [],
   "metrics": [
     "ttft",

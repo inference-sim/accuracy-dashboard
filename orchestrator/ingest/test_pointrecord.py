@@ -95,6 +95,40 @@ def test_a_record_is_assembled_for_every_scored_and_g5_point():
         shutil.rmtree(tmp)
 
 
+def test_a_named_simulator_refusal_is_recorded_as_g5_blis_refused_with_the_message_as_its_subject():
+    """What the harness writes for a point the simulator refused and explained (design 11.4 blis_refused, blis-design#32).
+
+    The substrate's record lists the G5 reasons of design 11.4 as a closed list that does not hold `blis_refused` yet, so
+    `blis schema validate point-record` refuses this record (inference-sim/blis-substrate#403, for the next substrate change).
+    The nightly does not run that validator. This test pins what is written, and is the place that changes when the substrate
+    lists the code: then this record also joins the records the validator test above loads."""
+    import score as sc
+    import test_score_e2e as T
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = T._setup(tmp, repo="openai/gpt-oss-120b", isl=1024, osl=8192, date="2026-02-25", conc=4)
+        ok = sc._score_one(entry, tmp / "pull", tmp / "w1", env)
+        refused_entry, _ = T._setup(tmp, repo="openai/gpt-oss-120b", isl=1024, osl=8192, date="2026-02-25", conc=8)
+        env.blis = T._refusing_blis(tmp, 'level=fatal msg="something else broke"\n')
+        refused = sc._score_one(refused_entry, tmp / "pull", tmp / "w2", env)
+        assert ok.fidelity is not None and refused.fidelity is None and not refused.faults
+        out = tmp / "contract"
+        sc.write_contract(out, [ok, refused], {"ingest": "api", "blis": {}, "simulator": env.simulator(),
+                                               "harness_commit": env.harness_commit, "experimental": False, "units": None,
+                                               "engine": {"kind": "vllm", "version": "0.31.0"}, "left_out_records": 0,
+                                               "vllm_ref": "v0.31.0", "vllm_max_distance": 2000, "fields_sha256": "d" * 64,
+                                               "pulled_at": "2026-10-23T00:00:00Z", "corpora": [],
+                                               "pull_manifest_sha256": "e" * 64,
+                                               "source": {"name": "t", "url": "https://example.invalid/"}})
+        recs = {r["point_id"]: r for r in (json.loads(l) for l in (out / "pointrecords.jsonl").read_text().splitlines())}
+        rec = recs[refused.point_id]
+        assert rec["grade"] == "G5" and "figures" not in rec
+        assert rec["g5_reason"] == {"code": "blis_refused", "subject": "something_else_broke"}
+        assert recs[ok.point_id]["grade"] != "G5"
+    finally:
+        shutil.rmtree(tmp)
+
+
 @SKIP
 def test_the_assembled_records_load_and_validate_with_the_substrates_validator(validator):
     tmp = Path(tempfile.mkdtemp())

@@ -130,7 +130,12 @@ def _v3_problems(doc: dict, pts: list[dict]) -> list[str]:
     """What schema v3 adds: the grades, headline, coverage and backlog agree with the points."""
     out = []
     ns, failed, cov = doc["not_scored"], doc["failed"], doc["coverage"]
-    engine = doc["provenance"]["engine"]["version"]
+    prov = doc["provenance"]
+    # One engine: its release. Several (provenance.engines): a release per kind, and a point is held to its own engine's.
+    engines = {e["kind"]: e["version"] for e in prov.get("engines") or [prov["engine"]]}
+    engine = engines if len(engines) > 1 else prov["engine"]["version"]
+    if prov["engine"]["kind"] not in engines or engines[prov["engine"]["kind"]] != prov["engine"]["version"]:
+        out.append("provenance.engine is not one of provenance.engines")
     # Every graded point, repeats unfolded: each run is an anchor unit of its own.
     runs = []
     for m, w, g, t, p in _leaves(doc):
@@ -149,8 +154,15 @@ def _v3_problems(doc: dict, pts: list[dict]) -> list[str]:
         out.append(f"pulled {doc['provenance']['pulled_at'][:10]}, before its newest measurement "
                    f"{gt['measurement_date_through']} (COV-9)")
     sim = doc["provenance"]["simulator"]
-    if any(x.get("simulator") != sim for x in runs + g5 + failed):
+    build = lambda s: {k: v for k, v in (s or {}).items() if k != "engine"}
+    if any(build(x.get("simulator")) != build(sim) for x in runs + g5 + failed):
         out.append("a point names a simulator other than the provenance's; one build scores a release's points (COV-6)")
+    for x in runs + g5 + failed:
+        e = (x.get("simulator") or {}).get("engine") or {}
+        if engines.get(e.get("kind")) != e.get("version"):
+            out.append(f"a point names engine {e.get('kind')} {e.get('version')}, which provenance does not list "
+                       f"({sorted(engines.items())}) (COV-6)")
+            break
     if cov["graded"] != len(runs):
         out.append(f"coverage.graded {cov['graded']} != {len(runs)} graded points")
     if cov["not_scored"] != len(ns) or cov["failed"] != len(failed):
@@ -177,6 +189,12 @@ def _v3_problems(doc: dict, pts: list[dict]) -> list[str]:
             out.append(f"headline.grades.{g} counts {head['grades'][g]['points']} points, the matrix {again['grades'][g]['points']}")
     if [e["reason"] for e in doc["backlog"]["top"]] != [r for r, _ in bl.top(runs + g5, len(doc["backlog"]["top"]))]:
         out.append("backlog.top does not recompute from the points")
+    if "new_refusal_codes" in doc:
+        again = sorted({assess.refusal_code(r.get("subject", "")) for p in doc["not_scored"]
+                        for r in p.get("g5_reasons") or [p["g5_reason"]] if r.get("code") == "blis_refused"}
+                       - set(assess.KNOWN_REFUSAL_CODES))
+        if doc["new_refusal_codes"] != again:
+            out.append("new_refusal_codes does not recompute from the not-scored points")
     for f in failed:
         if not set(f["faults"]) <= set(assess.RUNNER_LIMITS):
             out.append(f"failed {f['point_id'][:12]}: {f['faults']} is not a runner limit; nothing may be published (COV-8)")

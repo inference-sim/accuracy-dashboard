@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
 import { loadIndex, RunLoader, type RunIndex } from './load'
-import { parseRoute } from './route'
+import { parseRoute, routeToHash } from './route'
 import type { Summary } from './types'
 import './styles.css'
 
@@ -49,6 +49,11 @@ async function loadForHash() {
   } catch (e) {
     render(null, null, (e as Error).message)
   }
+}
+
+// An old link's `tier=` becomes `grade=` before anything reads the hash, so shared links keep working.
+if (/[?&]tier=/.test(window.location.hash)) {
+  window.history.replaceState(null, '', routeToHash(parseRoute(window.location.hash)))
 }
 
 render(null, null, null) // loading state

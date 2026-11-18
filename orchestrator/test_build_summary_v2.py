@@ -795,3 +795,86 @@ if __name__ == "__main__":
             traceback.print_exc()
     print(f"\n{len(fns) - failed}/{len(fns)} passed")
     sys.exit(1 if failed else 0)
+
+
+def _with_engine_kind(kind):
+    doc = _build()
+    doc["provenance"]["simulator"]["engine"]["kind"] = kind
+    for p in _points(doc):
+        p["fidelity"]["simulator"]["engine"]["kind"] = kind
+    return doc
+
+
+def test_a_summary_scored_by_an_sglang_simulator_validates_and_an_unknown_engine_is_refused():
+    # The simulator block names the engine the build ran. inference-sim releases vLLM and SGLang;
+    # the schema admitted vLLM only, so a successful SGLang run failed validation.
+    def schema_problems(doc):
+        return [p for p in vs2.problems(doc) if "is not one of" in p or "was expected" in p]
+
+    assert schema_problems(_with_engine_kind("vllm")) == []
+    assert schema_problems(_with_engine_kind("sglang")) == []
+    assert any("'trtllm' is not one of ['vllm', 'sglang']" in p for p in schema_problems(_with_engine_kind("trtllm")))
+
+
+def _mixed(listed):
+    """run-a with its first point scored on an SGLang engine, and provenance listing `listed` engine kinds."""
+    doc = _build()
+    prov = doc["provenance"]
+    vllm = dict(prov["engine"])
+    engines = [vllm] + ([{"kind": "sglang", "version": "0.5.23", "module": "blis-sglang"}] if listed else [])
+    prov["engines"] = engines
+    _points(doc)[0]["fidelity"]["simulator"]["engine"] = {"kind": "sglang", "version": "0.5.23"}
+    return doc
+
+
+def test_a_summary_may_score_vllm_and_sglang_points_when_provenance_names_both_engines():
+    # One release summary, two engines: provenance lists a release per kind and each point is held to its own.
+    def engine_problems(doc):
+        return [p for p in vs2.problems(doc) if "provenance does not list" in p or "not one of provenance.engines" in p
+                or "is not one of" in p or "Additional properties" in p]
+
+    assert engine_problems(_mixed(listed=True)) == []
+    # The single-engine form stays valid, as every historical contract has it.
+    assert engine_problems(_build()) == []
+
+
+def test_a_point_scored_on_an_engine_provenance_does_not_list_is_refused():
+    problems = [p for p in vs2.problems(_mixed(listed=False)) if "provenance does not list" in p]
+    assert len(problems) == 1 and "sglang 0.5.23" in problems[0]
+    # A point on a listed engine at another release is refused too.
+    doc = _mixed(listed=True)
+    _points(doc)[0]["fidelity"]["simulator"]["engine"] = {"kind": "sglang", "version": "0.5.99"}
+    assert any("provenance does not list" in p for p in vs2.problems(doc))
+
+
+def _mixed_contract(tmp_path):
+    """run-a as a contract scored by one simulator build on two engines: its first G2 point ran SGLang 0.5.23."""
+    sys.path.insert(0, str(HERE / "ingest"))
+    import contract as c
+    d = tmp_path / "mixed"
+    shutil.copytree(FIXTURE / "run-a", d)
+    prov = json.loads((d / c.PROVENANCE_JSON).read_text())
+    prov["engines"] = [dict(prov["engine"]), {"kind": "sglang", "version": "0.5.23", "module": "blis-sglang"}]
+    (d / c.PROVENANCE_JSON).write_text(c.canonical_dumps(prov) + "\n")
+    recs = [json.loads(x) for x in (d / c.FIDELITY_JSONL).read_text().splitlines()]
+    r = next(x for x in recs if x["grade"] == "G2")
+    r["simulator"] = {**r["simulator"], "engine": {"kind": "sglang", "version": "0.5.23"}}
+    r["run_release"] = "0.5.23"
+    (d / c.FIDELITY_JSONL).write_text("".join(c.canonical_dumps(x) + "\n" for x in recs))
+    return d
+
+
+def test_a_contract_scored_on_two_engines_builds_a_summary_that_lists_both_and_validates(tmp_path):
+    doc = b2.build(_mixed_contract(tmp_path), generated_at=STAMP, evaluator_commit="test")
+    assert doc["provenance"]["engines"] == [
+        {"kind": "sglang", "module": "blis-sglang", "version": "0.5.23"},
+        {"kind": "vllm", "version": doc["provenance"]["engine"]["version"]}]
+    assert [p for p in vs2.problems(doc) if "provenance does not list" in p or "is not one of" in p
+            or "Additional properties" in p] == []
+
+
+def test_a_single_engine_contract_builds_the_summary_it_always_did():
+    doc = _build()
+    assert "engines" not in doc["provenance"] and doc["provenance"]["engine"]["kind"] == "vllm"
+    assert b2.scored_engines({"engine": {"kind": "vllm", "version": "0.31.0"}, "engines": [
+        {"kind": "vllm", "version": "0.31.0"}]}, [{"simulator": {"engine": {"kind": "vllm", "version": "0.31.0"}}}]) is None

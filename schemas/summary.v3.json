@@ -193,11 +193,30 @@
           ],
           "properties": {
             "kind": {
-              "const": "vllm"
+              "enum": [
+                "vllm",
+                "sglang"
+              ]
             },
             "version": {
               "type": "string",
               "minLength": 1
+            }
+          }
+        },
+        "engines": {
+          "description": "A release that scores more than one engine names the release each runs, one entry per engine kind (a summary of one engine may omit this and use `engine`). A point's simulator.engine names one of them, with its version.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "version"],
+            "properties": {
+              "kind": {"enum": ["vllm", "sglang"]},
+              "version": {"type": "string", "minLength": 1},
+              "module": {"type": "string", "description": "The blis module that hosts the engine, as stack.json names it."}
             }
           }
         },
@@ -687,6 +706,13 @@
             }
           }
         }
+      }
+    },
+    "new_refusal_codes": {
+      "description": "The codes of the simulator's named refusals (G5 blis_refused) this night met that the nightly had not seen before (assess.KNOWN_REFUSAL_CODES), sorted. A new code does not stop the night: it is published, named, and listed here so a person reads it. Absent from snapshots published before the field existed.",
+      "type": "array",
+      "items": {
+        "type": "string"
       }
     },
     "backlog": {
@@ -1473,7 +1499,10 @@
           ],
           "properties": {
             "kind": {
-              "const": "vllm"
+              "enum": [
+                "vllm",
+                "sglang"
+              ]
             },
             "version": {
               "type": "string",
@@ -1507,7 +1536,9 @@
             "not_in_catalog",
             "field_not_in_release",
             "value_conflict",
-            "build_unparseable"
+            "build_unparseable",
+            "measurement_contaminated",
+            "blis_refused"
           ]
         },
         "subject": {
@@ -1519,7 +1550,7 @@
     "fault": {
       "description": "A fault of the run, not a fact about the point: the simulator refused the scenario the harness wrote, or the scenario lost a recorded value. Never a grade (CONTRACT.md, Failed points). The qualifier after ':' is a short slug.",
       "type": "string",
-      "pattern": "^(blis_refused|setting_differs)(:[^\\s]+)?$"
+      "pattern": "^(blis_refused|blis_crashed|setting_differs)(:[^\\s]+)?$"
     },
     "notScored": {
       "description": "A G5 point (design §11.4): one line of not_scored.jsonl, copied into summary.json v3's not_scored list.",

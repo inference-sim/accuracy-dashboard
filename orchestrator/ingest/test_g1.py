@@ -35,7 +35,7 @@ def doc(*cs, resolutions=None, version=2):
 
 def field_list(classes=None, status="modelled"):
     f = {"name": "max_num_seqs", "source": "config", "status": status,
-         "evidence": {"traces": ["t.json"]} if status == "modelled" else {"issue": "x/y#1"},
+         "evidence": {"traces": ["t.json"]} if status == "modelled" else {"proof": "TestX"} if status == "proven_inert" else {"issue": "x/y#1"},
          "estimation": {"rule": "leave_unset"}}
     if classes is not None:
         f["value_classes"] = classes
@@ -241,6 +241,15 @@ def test_the_field_list_loader_checks_value_classes():
             field_list(b)
     with pytest.raises(fl.FieldsError, match="only a modelled or proven-inert"):
         field_list(NUMERIC, status="not_modelled")
+
+
+def test_a_proven_inert_boolean_lists_no_values_and_a_proven_inert_enumerated_field_lists_them_all():
+    field_list(BOOL, status="proven_inert")                                         # a boolean's values are true and false
+    with pytest.raises(fl.FieldsError, match="only an enumerated field lists its values"):
+        field_list({**BOOL, "values": ["true", "false"]}, status="proven_inert")
+    with pytest.raises(fl.FieldsError, match="lists every value"):
+        field_list(ENUM, status="proven_inert")
+    field_list({**ENUM, "values": ["fp8", "auto"]}, status="proven_inert")
 
 
 # ---- resolved_value

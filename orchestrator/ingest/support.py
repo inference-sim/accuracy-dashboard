@@ -49,6 +49,18 @@ class EntryAmbiguous(Exception):
         self.repo, self.entries = repo, entries
 
 
+# Staged checkpoint directories whose name is not their repository's, each bound to the repository by a record of the run's
+# own harness (dashboard#111, the catalog lead's map): (repository, the evidence). A directory outside this table is not
+# guessed at. The evidence is named on every point that uses it (score.staged_substitution).
+STAGED_ALIASES = {
+    "dsr1-0528-fp8": (
+        "deepseek-ai/DeepSeek-R1-0528",
+        "SemiAnalysisAI/InferenceX at 6a4fe2a127: runners/launch_b200-dgxc.sh:19-20 sets MODEL_PATH=/lustre/fsw/models/dsr1-0528-fp8 "
+        "for MODEL_PREFIX dsr1 at PRECISION fp8, and .github/configs/nvidia-master.yaml:1959 (dsr1-fp8-b200-sglang) binds "
+        "prefix dsr1, precision fp8 to model deepseek-ai/DeepSeek-R1-0528"),
+}
+
+
 @dataclass
 class Catalog:
     """The catalog the scoring build reads, asked through `blis catalog resolve`. Each answer is
@@ -99,6 +111,21 @@ class Catalog:
                     repos.setdefault(repo.casefold(), []).append((m.parent.name, _is_drafter(doc)))
             self._claim_map = {"entries": entries, "repos": repos}
         return self._claim_map
+
+    def repo_of_local_path(self, path: str) -> str | None:
+        """The source repository of the one catalog model whose repository name equals the last component of a local
+        checkpoint path (compared without regard to case), else the repository STAGED_ALIASES binds that directory to when
+        the catalog has it, else None (no model, or several, fits). A run that serves a staged copy
+        (/lustre/fsw/models/GLM-5-FP8) names no Hugging Face id, but the staged directory usually keeps the repository's name;
+        a path whose name fits no single catalog repository is not guessed at."""
+        base = path.rstrip("/").rsplit("/", 1)[-1].casefold()
+        hits = sorted(r for r in self._claims()["repos"] if r.rsplit("/", 1)[-1] == base)
+        if len(hits) == 1:
+            return hits[0]
+        alias = STAGED_ALIASES.get(base)
+        if alias and alias[0].casefold() in self._claims()["repos"]:
+            return alias[0].casefold()
+        return None
 
     def chip(self, name: str) -> str | None:
         """The catalog chip of that name, or None."""
@@ -389,10 +416,11 @@ def check(cat: Catalog, parts: set[str], *, checkpoints: list[str], base_models:
         # Only a reason when it could have mattered: a checkpoint that matched needs no base.
         s.reasons.append("model_not_in_catalog:base_model_lookup_failed")
     if not s.model and not ambiguous:
-        s.reasons.append("model_not_in_catalog")
+        # The subject names what the catalog lacks: the repositories the run could have served.
+        s.reasons.append("model_not_in_catalog:" + (",".join(checkpoints) if checkpoints else "no_checkpoint_recorded"))
     s.chip = cat.chip(hardware)
     if s.chip is None or hardware not in parts:
-        s.reasons.append("hardware_no_coefficients")
+        s.reasons.append(f"hardware_no_coefficients:{hardware}")
     if s.model and spec_method:
         named = cat.drafters_of(draft_checkpoint) if draft_checkpoint else []
         d = None
