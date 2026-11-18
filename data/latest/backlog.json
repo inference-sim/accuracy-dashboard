@@ -1,26 +1,20 @@
 {
   "kind": "Backlog",
-  "snapshot_id": "2026-11-17_blis-v0.17.1_ix-api-2026-11-17",
+  "snapshot_id": "2026-11-18_blis-v0.18.0_ix-api-2026-11-18",
   "simulator": {
-    "build": "v0.17.1",
+    "build": "v0.18.0",
     "engine": {
       "kind": "vllm",
-      "version": "0.32.0"
+      "version": "0.33.0"
     },
-    "harness_commit": "f3185a0a93d215ffa0c750b04978202e564bd60c"
+    "harness_commit": "000505aa06f160482f03f9e82d445ffe8b98d8ac"
   },
   "engines": {
     "atom": [
       {
         "entry": "value_not_recorded:not_in_pull_window",
-        "blocks": 199,
-        "alone": 199,
-        "demotes": 0
-      },
-      {
-        "entry": "engine_unsupported:atom",
-        "blocks": 7,
-        "alone": 7,
+        "blocks": 206,
+        "alone": 206,
         "demotes": 0
       }
     ],
@@ -82,73 +76,7 @@
       {
         "entry": "router_unsupported:dynamo-router:revision_not_covered",
         "blocks": 115,
-        "alone": 20,
-        "demotes": 0
-      },
-      {
-        "entry": "field_not_modelled:data_parallel_rpc_port",
-        "blocks": 76,
-        "alone": 0,
-        "demotes": 0
-      },
-      {
-        "entry": "field_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND",
-        "blocks": 50,
-        "alone": 0,
-        "demotes": 0
-      },
-      {
-        "entry": "field_not_modelled:attention_config.use_trtllm_attention",
-        "blocks": 41,
-        "alone": 0,
-        "demotes": 0
-      },
-      {
-        "entry": "field_not_modelled:env.NCCL_CUMEM_ENABLE",
-        "blocks": 36,
-        "alone": 0,
-        "demotes": 0
-      },
-      {
-        "entry": "field_not_in_release:env.NCCL_MNNVL_ENABLE",
-        "blocks": 30,
-        "alone": 0,
-        "demotes": 0
-      },
-      {
-        "entry": "field_not_modelled:env.NCCL_NVLS_ENABLE",
-        "blocks": 30,
-        "alone": 0,
-        "demotes": 0
-      },
-      {
-        "entry": "field_not_in_release:env.UCX_CUDA_IPC_ENABLE_MNNVL",
-        "blocks": 25,
-        "alone": 0,
-        "demotes": 0
-      },
-      {
-        "entry": "field_not_modelled:enforce_eager",
-        "blocks": 19,
-        "alone": 0,
-        "demotes": 0
-      },
-      {
-        "entry": "field_not_modelled:moe_backend",
-        "blocks": 14,
-        "alone": 0,
-        "demotes": 0
-      },
-      {
-        "entry": "field_not_modelled:compilation_config.custom_ops",
-        "blocks": 13,
-        "alone": 0,
-        "demotes": 0
-      },
-      {
-        "entry": "field_not_modelled:env.VLLM_USE_NCCL_SYMM_MEM",
-        "blocks": 12,
-        "alone": 0,
+        "alone": 94,
         "demotes": 0
       },
       {
@@ -164,19 +92,7 @@
         "demotes": 0
       },
       {
-        "entry": "field_not_modelled:attention_config.mla_prefill_backend",
-        "blocks": 8,
-        "alone": 0,
-        "demotes": 0
-      },
-      {
         "entry": "field_not_in_release:env.UCX_MEMTYPE_REG_WHOLE",
-        "blocks": 7,
-        "alone": 0,
-        "demotes": 0
-      },
-      {
-        "entry": "field_not_modelled:all2all_backend",
         "blocks": 7,
         "alone": 0,
         "demotes": 0
@@ -207,6 +123,12 @@
       },
       {
         "entry": "field_not_modelled:env.TILELANG_CLEANUP_TEMP_FILES",
+        "blocks": 5,
+        "alone": 0,
+        "demotes": 0
+      },
+      {
+        "entry": "field_not_modelled:env.VLLM_FLASHINFER_ALLREDUCE_BACKEND",
         "blocks": 5,
         "alone": 0,
         "demotes": 0
@@ -302,12 +224,6 @@
         "demotes": 0
       },
       {
-        "entry": "field_not_in_release:env.TORCH_CUDA_ARCH_LIST",
-        "blocks": 2,
-        "alone": 0,
-        "demotes": 0
-      },
-      {
         "entry": "field_not_in_release:env.TRANSFORMERS_CACHE",
         "blocks": 2,
         "alone": 0,
@@ -369,12 +285,6 @@
       },
       {
         "entry": "field_not_modelled:kv_transfer_config.kv_load_failure_policy",
-        "blocks": 2,
-        "alone": 0,
-        "demotes": 0
-      },
-      {
-        "entry": "not_in_catalog",
         "blocks": 2,
         "alone": 0,
         "demotes": 0
@@ -452,7 +362,7 @@
         "demotes": 0
       },
       {
-        "entry": "field_not_modelled:compilation_config.mode",
+        "entry": "field_not_modelled:all2all_backend",
         "blocks": 1,
         "alone": 0,
         "demotes": 0
@@ -575,14 +485,14 @@
     "sglang": [
       {
         "entry": "value_not_recorded:not_in_pull_window",
-        "blocks": 4102,
-        "alone": 4102,
+        "blocks": 4115,
+        "alone": 4115,
         "demotes": 0
       },
       {
         "entry": "field_unclassified:sglang: no field list published",
-        "blocks": 136,
-        "alone": 136,
+        "blocks": 123,
+        "alone": 123,
         "demotes": 0
       }
     ],
@@ -608,21 +518,15 @@
         "demotes": 0
       },
       {
-        "entry": "not_in_catalog",
-        "blocks": 84,
-        "alone": 45,
+        "entry": "not_in_catalog:mi325x",
+        "blocks": 39,
+        "alone": 39,
         "demotes": 0
       },
       {
-        "entry": "field_not_modelled:attention_config.indexer_kv_dtype",
-        "blocks": 25,
-        "alone": 25,
-        "demotes": 0
-      },
-      {
-        "entry": "field_not_modelled:linear_backend",
-        "blocks": 14,
-        "alone": 14,
+        "entry": "value_not_recorded:workload_category_not_stated",
+        "blocks": 11,
+        "alone": 11,
         "demotes": 0
       },
       {
@@ -632,9 +536,15 @@
         "demotes": 0
       },
       {
-        "entry": "value_not_recorded:workload_category_not_stated",
-        "blocks": 11,
+        "entry": "field_not_modelled:moe_backend",
+        "blocks": 40,
         "alone": 7,
+        "demotes": 0
+      },
+      {
+        "entry": "not_in_catalog:mi355x",
+        "blocks": 45,
+        "alone": 6,
         "demotes": 0
       },
       {
@@ -646,12 +556,12 @@
       {
         "entry": "field_not_in_release:env.VLLM_MXFP4_USE_MARLIN",
         "blocks": 4,
-        "alone": 4,
+        "alone": 3,
         "demotes": 0
       },
       {
-        "entry": "field_not_modelled:moe_backend",
-        "blocks": 45,
+        "entry": "measurement_contaminated:request_count_mismatch(expected 384, logged 172)",
+        "blocks": 1,
         "alone": 1,
         "demotes": 0
       },
@@ -668,12 +578,6 @@
         "demotes": 0
       },
       {
-        "entry": "value_conflict:model: the log serves /scratch/models/DeepSeek-V4-Pro-NVFP4, the recipe deepseek-ai/DeepSeek-V4-Pro",
-        "blocks": 7,
-        "alone": 0,
-        "demotes": 0
-      },
-      {
         "entry": "value_not_recorded",
         "blocks": 2,
         "alone": 0,
@@ -686,196 +590,208 @@
         "demotes": 0
       },
       {
+        "entry": "measurement_contaminated:request_count_mismatch(expected 192, logged 293)",
+        "blocks": 1,
+        "alone": 0,
+        "demotes": 0
+      },
+      {
         "entry": "client_difference:client_flags",
         "blocks": 0,
         "alone": 0,
-        "demotes": 199
+        "demotes": 238
       },
       {
         "entry": "client_difference:failed_requests",
         "blocks": 0,
         "alone": 0,
-        "demotes": 199
+        "demotes": 238
       },
       {
         "entry": "coefficient_method:cost-model-attention/attention_decode_floor_mla",
         "blocks": 0,
         "alone": 0,
-        "demotes": 199
+        "demotes": 238
       },
       {
         "entry": "coefficient_method:cost-model-host-overheads/host_admission_per_request",
         "blocks": 0,
         "alone": 0,
-        "demotes": 199
+        "demotes": 238
       },
       {
         "entry": "coefficient_method:cost-model-host-overheads/host_admission_per_token",
         "blocks": 0,
         "alone": 0,
-        "demotes": 199
+        "demotes": 238
       },
       {
         "entry": "coefficient_method:cost-model-host-overheads/host_completion",
         "blocks": 0,
         "alone": 0,
-        "demotes": 199
+        "demotes": 238
       },
       {
         "entry": "coefficient_method:cost-model-host-overheads/host_launch_eager_per_layer",
         "blocks": 0,
         "alone": 0,
-        "demotes": 199
+        "demotes": 238
       },
       {
         "entry": "coefficient_method:cost-model-host-overheads/host_launch_per_kernel",
         "blocks": 0,
         "alone": 0,
-        "demotes": 199
+        "demotes": 238
       },
       {
         "entry": "coefficient_method:cost-model-host-overheads/host_output_token",
         "blocks": 0,
         "alone": 0,
-        "demotes": 199
+        "demotes": 238
       },
       {
         "entry": "coefficient_method:cost-model-host-overheads/host_replay_graph_per_step",
         "blocks": 0,
         "alone": 0,
-        "demotes": 199
+        "demotes": 238
       },
       {
         "entry": "coefficient_method:cost-model-memory/activation_scratch_floor_bytes",
         "blocks": 0,
         "alone": 0,
-        "demotes": 199
+        "demotes": 238
       },
       {
         "entry": "coefficient_method:cost-model-primitives/engine_workspace_bytes",
         "blocks": 0,
         "alone": 0,
-        "demotes": 199
+        "demotes": 238
       },
       {
         "entry": "coefficient_method:cost-model-primitives/hbm_derate",
         "blocks": 0,
         "alone": 0,
-        "demotes": 199
+        "demotes": 238
       },
       {
         "entry": "interim_status:model",
         "blocks": 0,
         "alone": 0,
-        "demotes": 199
+        "demotes": 238
       },
       {
         "entry": "interim_status:model_tag",
         "blocks": 0,
         "alone": 0,
-        "demotes": 199
+        "demotes": 238
       },
       {
         "entry": "interim_status:port",
         "blocks": 0,
         "alone": 0,
-        "demotes": 199
+        "demotes": 238
       },
       {
         "entry": "interim_status:trust_remote_code",
         "blocks": 0,
         "alone": 0,
-        "demotes": 199
-      },
-      {
-        "entry": "unevaluated:coefficient_range",
-        "blocks": 0,
-        "alone": 0,
-        "demotes": 199
+        "demotes": 238
       },
       {
         "entry": "unevaluated:kernel_hash",
         "blocks": 0,
         "alone": 0,
-        "demotes": 199
-      },
-      {
-        "entry": "value_class:max_num_batched_tokens",
-        "blocks": 0,
-        "alone": 0,
-        "demotes": 185
+        "demotes": 238
       },
       {
         "entry": "coefficient_method:cost-model-memory/cudagraph_capture_bytes_full_and_piecewise",
         "blocks": 0,
         "alone": 0,
-        "demotes": 184
+        "demotes": 223
+      },
+      {
+        "entry": "unevaluated:coefficient_range",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 219
+      },
+      {
+        "entry": "value_class:max_num_batched_tokens",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 211
       },
       {
         "entry": "value_class:block_size",
         "blocks": 0,
         "alone": 0,
-        "demotes": 174
-      },
-      {
-        "entry": "nightly_or_custom:engine build",
-        "blocks": 0,
-        "alone": 0,
-        "demotes": 158
+        "demotes": 200
       },
       {
         "entry": "client_difference:sent_prompt_lengths",
         "blocks": 0,
         "alone": 0,
-        "demotes": 155
+        "demotes": 198
       },
       {
         "entry": "later_record:cluster.gpus_per_node",
         "blocks": 0,
         "alone": 0,
-        "demotes": 153
+        "demotes": 172
+      },
+      {
+        "entry": "nightly_or_custom:engine build",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 172
       },
       {
         "entry": "value_class:tensor_parallel_size",
         "blocks": 0,
         "alone": 0,
-        "demotes": 126
+        "demotes": 147
       },
       {
         "entry": "interim_status:host",
         "blocks": 0,
         "alone": 0,
-        "demotes": 106
-      },
-      {
-        "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_8rank",
-        "blocks": 0,
-        "alone": 0,
-        "demotes": 98
+        "demotes": 145
       },
       {
         "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_8rank",
         "blocks": 0,
         "alone": 0,
-        "demotes": 98
+        "demotes": 119
       },
       {
         "entry": "value_class:max_model_len",
         "blocks": 0,
         "alone": 0,
-        "demotes": 95
+        "demotes": 111
       },
       {
-        "entry": "estimated:speculative_config.acceptance_length",
+        "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_8rank",
         "blocks": 0,
         "alone": 0,
-        "demotes": 83
+        "demotes": 108
       },
       {
         "entry": "interim_status:served_model_name",
         "blocks": 0,
         "alone": 0,
-        "demotes": 83
+        "demotes": 103
+      },
+      {
+        "entry": "estimated:speculative_config.acceptance_length",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 97
+      },
+      {
+        "entry": "estimated:checkpoint_from_staged_path",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 93
       },
       {
         "entry": "interim_status:speculative_config.attention_backend",
@@ -890,16 +806,46 @@
         "demotes": 77
       },
       {
-        "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_4rank",
-        "blocks": 0,
-        "alone": 0,
-        "demotes": 59
-      },
-      {
         "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_4rank",
         "blocks": 0,
         "alone": 0,
-        "demotes": 59
+        "demotes": 74
+      },
+      {
+        "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_4rank",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 72
+      },
+      {
+        "entry": "interim_status:reasoning_parser",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 69
+      },
+      {
+        "entry": "interim_status:tool_call_parser",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 69
+      },
+      {
+        "entry": "other_release:engine release",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 66
+      },
+      {
+        "entry": "ported_functions_unpublished:engine release",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 66
+      },
+      {
+        "entry": "interim_status:enable_auto_tool_choice",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 47
       },
       {
         "entry": "coefficient_method:cost-model-primitives/host_gather_rate_uva",
@@ -908,40 +854,34 @@
         "demotes": 42
       },
       {
-        "entry": "other_release:engine release",
-        "blocks": 0,
-        "alone": 0,
-        "demotes": 41
-      },
-      {
-        "entry": "ported_functions_unpublished:engine release",
-        "blocks": 0,
-        "alone": 0,
-        "demotes": 41
-      },
-      {
         "entry": "coefficient_method:cost-model-primitives/nccl_communicator_bytes_2rank",
         "blocks": 0,
         "alone": 0,
-        "demotes": 38
+        "demotes": 41
       },
       {
-        "entry": "interim_status:reasoning_parser",
+        "entry": "interim_status:tokenizer_mode",
         "blocks": 0,
         "alone": 0,
-        "demotes": 30
-      },
-      {
-        "entry": "interim_status:tool_call_parser",
-        "blocks": 0,
-        "alone": 0,
-        "demotes": 30
+        "demotes": 41
       },
       {
         "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_2rank",
         "blocks": 0,
         "alone": 0,
         "demotes": 28
+      },
+      {
+        "entry": "resolved_differs:attention_config.indexer_kv_dtype",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 26
+      },
+      {
+        "entry": "value_class:attention_config.indexer_kv_dtype",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 26
       },
       {
         "entry": "coefficient_method:cost-model-primitives/gemm_eps_max_w8a16_mxfp8",
@@ -956,10 +896,10 @@
         "demotes": 21
       },
       {
-        "entry": "interim_status:enable_auto_tool_choice",
+        "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_1rank",
         "blocks": 0,
         "alone": 0,
-        "demotes": 21
+        "demotes": 17
       },
       {
         "entry": "coefficient_method:cost-model-memory/cudagraph_capture_bytes_full_decode_only",
@@ -974,28 +914,52 @@
         "demotes": 15
       },
       {
-        "entry": "interim_status:tokenizer_mode",
-        "blocks": 0,
-        "alone": 0,
-        "demotes": 15
-      },
-      {
-        "entry": "coefficient_method:cost-model-memory/activation_buffer_count_moe_1rank",
+        "entry": "execution_mode:linear_backend",
         "blocks": 0,
         "alone": 0,
         "demotes": 14
       },
       {
+        "entry": "resolved_differs:indexer_kv_dtype",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 14
+      },
+      {
+        "entry": "coefficient_range:cost-model-memory/cudagraph_capture_bytes_per_mixed_token_full_and_piecewise",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 13
+      },
+      {
+        "entry": "coefficient_range:cost-model-memory/cudagraph_capture_floor_bytes_full_and_piecewise",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 13
+      },
+      {
         "entry": "estimated:api_server_count",
         "blocks": 0,
         "alone": 0,
-        "demotes": 10
+        "demotes": 13
       },
       {
         "entry": "execution_mode:data-parallel balancer",
         "blocks": 0,
         "alone": 0,
-        "demotes": 10
+        "demotes": 13
+      },
+      {
+        "entry": "coefficient_range:cost-model-memory/activation_buffer_count_moe_8rank",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 11
+      },
+      {
+        "entry": "coefficient_range:cost-model-memory/nontorch_in_budget_bytes_8rank",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 11
       },
       {
         "entry": "value_class:speculative_config.num_speculative_tokens",
@@ -1004,10 +968,52 @@
         "demotes": 7
       },
       {
+        "entry": "coefficient_method:cost-model-primitives/gemm_eps_max_fp8_grouped_flashinfer_cutlass",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 6
+      },
+      {
+        "entry": "coefficient_method:cost-model-primitives/gemm_floor_fp8_grouped_flashinfer_cutlass",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 6
+      },
+      {
+        "entry": "coefficient_method:cost-model-primitives/gemm_m_half_fp8_grouped_flashinfer_cutlass",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 6
+      },
+      {
+        "entry": "coefficient_range:cost-model-primitives/gemm_m_half_fp8_grouped_flashinfer_cutlass",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 6
+      },
+      {
         "entry": "client_difference:client_saturation",
         "blocks": 0,
         "alone": 0,
         "demotes": 3
+      },
+      {
+        "entry": "coefficient_range:cost-model-memory/activation_buffer_count_moe_4rank",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 2
+      },
+      {
+        "entry": "coefficient_range:cost-model-memory/nontorch_in_budget_bytes_4rank",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 2
+      },
+      {
+        "entry": "execution_mode:moe_backend",
+        "blocks": 0,
+        "alone": 0,
+        "demotes": 1
       }
     ],
     "vllm-disagg": [

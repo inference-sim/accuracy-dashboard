@@ -40,13 +40,13 @@
     },
     "G4": {
      "tpot": {
-      "mape": 24.042257173489524,
-      "n": 199,
+      "mape": 24.24975025891889,
+      "n": 238,
       "signed_median": null
      },
      "ttft": {
-      "mape": 25.679478302016715,
-      "n": 199,
+      "mape": 26.286762728425913,
+      "n": 238,
       "signed_median": null
      }
     }
@@ -54,8 +54,8 @@
    "counts": {
     "failed": 0,
     "points": 20364,
-    "refused": 20165,
-    "scored": 199,
+    "refused": 20126,
+    "scored": 238,
     "withheld": 0
    },
    "engines": [
@@ -182,13 +182,13 @@
     },
     {
      "engine": "vllm",
-     "graded": 199,
+     "graded": 238,
      "grades": {
       "G1": 0,
       "G2": 0,
       "G3": 0,
-      "G4": 199,
-      "G5": 9241
+      "G4": 238,
+      "G5": 9202
      },
      "points": 9440
     },
@@ -209,8 +209,8 @@
     "G1": 0,
     "G2": 0,
     "G3": 0,
-    "G4": 199,
-    "G5": 20165
+    "G4": 238,
+    "G5": 20126
    },
    "id": "inferencex",
    "interim": false,
@@ -220,14 +220,14 @@
    "provenance": {
     "command": "orchestrator/build_summary_v2.py (the nightly)",
     "heads": {
-     "snapshot_id": "2026-11-17_blis-v0.17.1_ix-api-2026-11-17"
+     "snapshot_id": "2026-11-18_blis-v0.18.0_ix-api-2026-11-18"
     },
-    "pulled_at": "2026-11-17T22:25:49Z"
+    "pulled_at": "2026-11-18T21:44:51Z"
    },
    "refusals": [
     {
      "code": "value_not_recorded",
-     "points": 19504,
+     "points": 19524,
      "subject": ""
     },
     {
@@ -237,17 +237,17 @@
     },
     {
      "code": "field_unclassified",
-     "points": 156,
+     "points": 143,
      "subject": ""
     },
     {
      "code": "engine_unsupported",
-     "points": 99,
+     "points": 92,
      "subject": ""
     },
     {
      "code": "field_not_modelled",
-     "points": 86,
+     "points": 46,
      "subject": ""
     },
     {
@@ -258,6 +258,11 @@
     {
      "code": "field_not_in_release",
      "points": 12,
+     "subject": ""
+    },
+    {
+     "code": "measurement_contaminated",
+     "points": 1,
      "subject": ""
     }
    ],
@@ -1512,6 +1517,6 @@
   }
  ],
  "format": "classes-1",
- "generated_at": "2026-11-17T22:25:49Z",
- "snapshot_id": "2026-11-17_blis-v0.17.1_ix-api-2026-11-17"
+ "generated_at": "2026-11-18T21:44:51Z",
+ "snapshot_id": "2026-11-18_blis-v0.18.0_ix-api-2026-11-18"
 }
