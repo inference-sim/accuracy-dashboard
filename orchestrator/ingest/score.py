@@ -301,11 +301,19 @@ def measured_population(entry: dict, pdir: Path, conc: int) -> tuple[list[str], 
 def _blis_refusal(stderr: str, work: Path) -> str:
     """blis_refused:<slug> from BLIS's fatal message, with this run's paths removed so the
     reason is the same on every machine."""
-    m = re.findall(r'level=fatal msg="([^"]+)"', stderr) or re.findall(r"level=fatal msg=(.+)", stderr)
+    # The message is a quoted Go string: a quote inside it is written \" (the scenario's own name, a value), so the
+    # closing quote is the first one not escaped. Reading to the first quote cut "scenario \"p-....yaml\": <why>" to the
+    # bare slug "scenario", an unnamed fault (22 matched and 12 anchors failures of the M3.0 census).
+    m = re.findall(r'level=fatal msg="((?:[^"\\]|\\.)*)"', stderr) or re.findall(r"level=fatal msg=(.+)", stderr)
     text = (m[-1] if m else stderr.strip().splitlines()[-1] if stderr.strip() else "no output")
+    text = text.replace('\\"', '"')
     text = text.replace(str(work), "").replace(str(work.resolve()), "")
     text = re.sub(r"(/[^\s\"']+)+", "<path>", text)
-    text = re.sub(r"\bp-[0-9a-f]{16}\b", "<scenario>", text)
+    # The engine names the scenario file in its message, as a prefix and again inside (`scenario "p-....yaml": ... vllmengine:
+    # p-....yaml: ...`); the name is the run's, not the reason, so it is removed with its colon, and the quotes and apostrophes
+    # of the wording are dropped, so the slug reads as words: no repeated "scenario", no stray punctuation.
+    text = re.sub(r"(?:\bscenario\s+\"?)?\b(?:p|cq)-[0-9a-f]{8,16}(?:\.yaml)?\"?:?\s*", "", text)
+    text = re.sub(r"[\"']", "", text)
     slug = re.sub(r"[^A-Za-z0-9_.:=-]+", "_", text)[:80].strip("_")
     return f"blis_refused:{slug}" if slug else "blis_refused"
 
@@ -337,10 +345,22 @@ KERNEL_REFUSALS = ("draft_passes_unstated", "draft_passes_unknown", "served_weig
 _KERNEL_REFUSAL = re.compile(r"(?<![A-Za-z0-9_])(" + "|".join(KERNEL_REFUSALS) + r"):")
 
 
+# The engine's refusal of a KV layout the port does not unify: layers of unequal page sizes in a model that is not
+# DeepSeek's packed layout (Gemma 4 mixes sliding-window and full-attention layers of different head geometry; vLLM
+# unifies their pages with unify_kv_cache_spec_page_size and blis-vllm does not: core/kv/layers.go checkEqualPages). A gap
+# of the engine BLIS runs, not a fault of the run, so the point is G5 engine_unsupported naming it, as the kernel's own
+# refusals are.
+_KV_UNEQUAL_PAGES = re.compile(r"KV layers of unequal page sizes \([0-9]+ and [0-9]+ elements per token\) need vLLM's packed KV cache groups")
+KV_UNEQUAL_PAGES = "kv_unequal_page_sizes"
+
+
 def kernel_refusal(stderr: str) -> str | None:
     """engine_unsupported:<code> when the simulator's refusal is one of the kernel's, else None."""
-    m = _KERNEL_REFUSAL.search(re.sub(r"\s+", " ", stderr).replace('\\"', '"'))
-    return f"engine_unsupported:{m.group(1)}" if m else None
+    flat = re.sub(r"\s+", " ", stderr).replace('\\"', '"')
+    m = _KERNEL_REFUSAL.search(flat)
+    if m:
+        return f"engine_unsupported:{m.group(1)}"
+    return f"engine_unsupported:{KV_UNEQUAL_PAGES}" if _KV_UNEQUAL_PAGES.search(flat) else None
 
 
 def value_refusal(stderr: str, work: Path, field_list) -> str | None:

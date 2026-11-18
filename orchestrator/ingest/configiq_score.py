@@ -156,6 +156,13 @@ def _measurement_reasons(p: "cq.Point") -> list[dict]:
             out.append({"code": "value_not_recorded", "subject": f"{WORKLOAD_SUBJECT}: {c}"})
     if not isinstance(p.identity.get("concurrency"), int) or p.identity["concurrency"] < 1:
         out.append({"code": "value_not_recorded", "subject": f"{WORKLOAD_SUBJECT}: concurrency"})
+    else:
+        # A time-limited sweep at concurrency M had M requests in flight whatever number finished, so replaying N < M requests
+        # would misstate the load; the replay itself refuses a trace shorter than its concurrency (Failed to build session pool).
+        # No clamp: the two records disagree about the run's shape, and the point says so by name.
+        n, conc = cq._num(v.get("successful_requests")), p.identity["concurrency"]
+        if n is not None and 1 <= n < conc:
+            out.append({"code": "value_conflict", "subject": f"stated concurrency exceeds recorded requests: concurrency {conc}, {int(n)} requests"})
     return out
 
 
