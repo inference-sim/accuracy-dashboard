@@ -5,6 +5,7 @@ cmd_pull, run_harness and build_summary_v2 are monkeypatched to cheap fakes -- t
 test_score_e2e and test_nightly_run cover.
 """
 import json
+import shutil
 import sys
 import types
 from datetime import date
@@ -612,6 +613,83 @@ def test_resolve_blis_skips_a_superseded_release_once_its_patch_release_is_tagge
     assert json.loads((state / "scored-releases.json").read_text())["releases"] == ["v0.15.0", "v0.17.1"]
 
 
+PUBLISH = Path(__file__).resolve().parent.parent / "nightly" / "publish.sh"
+
+
+def _publish_repo(tmp_path):
+    """A repository holding a committed data/ and state/, then a night's change to both, uncommitted."""
+    import subprocess
+    repo = tmp_path / "repo"
+    (repo / "data").mkdir(parents=True)
+    (repo / "state").mkdir()
+    (repo / "data" / "index.json").write_text("{}")
+    (repo / "state" / "last-run-api.json").write_text("{}")
+    (repo / "state" / "scored-releases.json").write_text("{}")
+    for cmd in (["init", "-q"], ["add", "-A"], ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "base"]):
+        subprocess.run(["git", "-C", str(repo), *cmd], check=True)
+    (repo / "data" / "index.json").write_text('{"night": 1}')
+    return repo
+
+
+def _commits(repo) -> int:
+    import subprocess
+    return int(subprocess.run(["git", "-C", str(repo), "rev-list", "--count", "HEAD"], capture_output=True, text=True, check=True).stdout)
+
+
+def _publish(repo, checks_body: str, *args):
+    import os
+    import subprocess
+    checks = repo.parent / "checks.sh"
+    checks.write_text("#!/usr/bin/env bash\n" + checks_body)
+    env = {**os.environ, "PUBLISH_CHECKS": str(checks), "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+    return subprocess.run(["bash", str(PUBLISH), *args], cwd=repo, env=env, capture_output=True, text=True)
+
+
+def test_a_night_whose_check_fails_commits_nothing(tmp_path):
+    repo = _publish_repo(tmp_path)
+    before = _commits(repo)
+    r = _publish(repo, "echo 'boundary: 157 ids in the map, not published' >&2; exit 7", "api-nightly: v0.18.0 [skip ci]")
+    assert r.returncode == 7 and "boundary" in r.stderr
+    assert _commits(repo) == before
+    # The night's data is still in the working tree, unstaged: nothing landed and nothing was lost.
+    assert (repo / "data" / "index.json").read_text() == '{"night": 1}'
+
+
+def test_a_night_whose_checks_all_pass_commits_once_with_its_message(tmp_path):
+    import subprocess
+    repo = _publish_repo(tmp_path)
+    before = _commits(repo)
+    r = _publish(repo, "exit 0", "api-nightly: v0.18.0 2026-11-17 [skip ci]")
+    assert r.returncode == 0, r.stderr
+    assert _commits(repo) == before + 1
+    log = subprocess.run(["git", "-C", str(repo), "log", "-1", "--format=%s"], capture_output=True, text=True).stdout.strip()
+    assert log == "api-nightly: v0.18.0 2026-11-17 [skip ci]"
+
+
+def test_a_night_that_changes_nothing_reports_it_and_commits_nothing(tmp_path):
+    import subprocess
+    repo = _publish_repo(tmp_path)
+    subprocess.run(["git", "-C", str(repo), "checkout", "-q", "--", "data"], check=True)
+    before = _commits(repo)
+    r = _publish(repo, "exit 0", "msg")
+    assert r.returncode == 10 and _commits(repo) == before
+
+
+def test_a_dry_run_runs_the_checks_and_commits_nothing(tmp_path):
+    repo = _publish_repo(tmp_path)
+    before = _commits(repo)
+    assert _publish(repo, "exit 0", "--dry-run", "unused").returncode == 0 and _commits(repo) == before
+    assert _publish(repo, "exit 3", "--dry-run", "unused").returncode == 3
+
+
+def test_the_workflow_publishes_through_the_script(tmp_path):
+    import yaml
+    wf = yaml.safe_load((Path(__file__).resolve().parent.parent.parent / ".github" / "workflows" / "api-nightly.yml").read_text())
+    run = next(s for s in wf["jobs"]["publish"]["steps"] if s.get("id") == "pub")["run"]
+    assert "orchestrator/nightly/publish.sh" in run and "git commit" not in run
+
+
 def test_the_workflow_scores_one_release_and_starts_the_next_only_after_publishing_it():
     import yaml
     wf = yaml.safe_load((Path(__file__).resolve().parent.parent.parent / ".github" / "workflows" / "api-nightly.yml").read_text())
@@ -652,13 +730,19 @@ def _publish_step(tmp_path, dry_run):
     (work / "incoming" / "state" / "scored-releases.json").write_text(json.dumps({"kind": "ScoredReleases", "releases": ["v0.17.1"]}))
     bin_ = tmp_path / "bin"
     bin_.mkdir()
-    (bin_ / "git").write_text(f"#!/bin/sh\necho \"$@\" >> {tmp_path / 'git.calls'}\n")
+    # `git diff --cached --quiet` exits 1: the night staged a change, so publish.sh commits it.
+    (bin_ / "git").write_text(f"#!/bin/sh\necho \"$@\" >> {tmp_path / 'git.calls'}\ncase \"$1\" in diff) exit 1;; esac\n")
     (bin_ / "git").chmod(0o755)
     import sys as _sys
     (bin_ / "python3").symlink_to(_sys.executable)
     out = tmp_path / "gh_output"
+    # The real publish.sh, with its checks stubbed to pass (the script's own behaviour is tested above).
+    (work / "orchestrator" / "nightly").mkdir(parents=True)
+    shutil.copy(PUBLISH, work / "orchestrator" / "nightly" / "publish.sh")
+    (tmp_path / "pass.sh").write_text("exit 0\n")
     r = subprocess.run(["bash", "-c", script], cwd=work, capture_output=True, text=True,
                        env={"PATH": f"{bin_}:/usr/bin:/bin", "GITHUB_OUTPUT": str(out), "GITHUB_REF_NAME": "main",
+                            "PUBLISH_CHECKS": str(tmp_path / "pass.sh"),
                             "DRY_RUN": "true" if dry_run else "false", "RELEASE": "v0.17.1"})
     calls = (tmp_path / "git.calls").read_text().splitlines() if (tmp_path / "git.calls").exists() else []
     return r.returncode, r.stdout + r.stderr, calls, out.read_text() if out.exists() else ""
