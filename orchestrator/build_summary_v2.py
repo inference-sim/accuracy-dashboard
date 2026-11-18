@@ -302,6 +302,14 @@ def refused_faults(failed: list[dict]) -> list[str]:
             if not set(f["faults"]) <= set(assess.RUNNER_LIMITS)]
 
 
+def new_refusal_codes(not_scored: list[dict]) -> list[str]:
+    """The codes of the simulator's named refusals (G5 blis_refused) among the not-scored points that the nightly has not met before
+    (assess.KNOWN_REFUSAL_CODES), sorted. A new code is published like any other; the list is how a person comes to read it."""
+    seen = {assess.refusal_code(r.get("subject", "")) for p in not_scored for r in p.get("g5_reasons") or [p["g5_reason"]]
+            if r.get("code") == "blis_refused"}
+    return sorted(seen - set(assess.KNOWN_REFUSAL_CODES))
+
+
 def scored_engines(prov_in: dict, points: list[dict]) -> list[dict] | None:
     """One entry per engine kind the contract's points were scored on, {kind, version[, module]}, sorted by kind, when more
     than one kind is present; None otherwise, and then the summary keeps its single `engine` block, unchanged. The kind and
@@ -409,6 +417,7 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
         "headline": head,
         "coverage": coverage,
         "backlog": {"top": [{"reason": r, "points": n} for r, n in bl.top(graded + g5, BACKLOG_TOP)]},
+        "new_refusal_codes": new_refusal_codes(not_scored),
         "known_artefacts": [],
         "metrics": ["ttft", "tpot"],
         "metricscore_comparison": None,

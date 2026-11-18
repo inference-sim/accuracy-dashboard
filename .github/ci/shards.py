@@ -81,6 +81,7 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
         script("orchestrator/ingest/test_extract.py", "API ingest extractor"),
         script("orchestrator/ingest/test_score_e2e.py", "Points through score_point and write_contract, fake BLIS binaries"),
         pytest("a staged checkpoint path resolves to its catalog model", "orchestrator/ingest/test_local_checkpoint.py"),
+        pytest("A simulator refusal is a named not-scored point; a fault of the run still stops the night", "orchestrator/ingest/test_named_refusals.py"),
         pytest("configiq points and coverage by source", "orchestrator/ingest/test_configiq.py",
                "orchestrator/ingest/test_by_source.py", "orchestrator/ingest/test_configiq_score.py"),
         pytest("An SGLang point's speculative method is read the way a row states it", "orchestrator/ingest/test_sglang_spec_method.py"),
@@ -126,6 +127,7 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
         pytest("BLIS is read only through the inference-sim commands: the lint's own tests", "orchestrator/test_lint_blis_boundary.py"),
         pytest("An edit of a pull request's title or body runs no CI job", "orchestrator/test_ci_edit.py"),
         pytest("A night with more than 5 percent faulted points is not published", "orchestrator/nightly/test_night_health.py"),
+        pytest("A night's notes are warnings and never stop a publish", "orchestrator/nightly/test_night_notes.py"),
         Cmd("BLIS is read only through the inference-sim commands: the lint", argv=["python3", "orchestrator/lint_blis_boundary.py"]),
     ],
 }

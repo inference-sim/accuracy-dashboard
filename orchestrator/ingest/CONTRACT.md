@@ -61,9 +61,9 @@ The stability check, printed by the generator and enforced when the table is loa
 
 ## Failed points
 
-A reason that is a fault of the run, not a fact about the point, is not a grade. There are two. `blis_refused` is the simulator refusing the scenario the harness wrote from recorded values, or its Result failing a check. `setting_differs` is the written scenario losing a recorded value. Such a point is listed in `failed.jsonl` with its `faults`, and is counted in coverage as failed, never graded.
+The simulator refusing the scenario the harness wrote, with a message of its own, is a fact about the point: it is G5 `blis_refused`, subject the message (`assess.is_named_refusal`), listed in `not_scored.jsonl` like any other G5 reason, and the night publishes. A reason that is a fault of the run is not a grade. There are three. `blis_refused` with one of `assess.FAULT_SLUGS` is the runner's memory or time (`insufficient_memory`, `timeout`) or the harness finding the simulator's output malformed, incomplete or not the client's pattern, or the extractor failing. `blis_crashed` is the simulator exiting with no message of its own. `setting_differs` is the written scenario losing a recorded value. Such a point is listed in `failed.jsonl` with its `faults`, and is counted in coverage as failed, never graded.
 
-The summary builder refuses to publish a contract holding a failed point unless every one of its faults is a runner limit: `blis_refused:insufficient_memory` (the replay exceeded the runner's memory ceiling) and `blis_refused:timeout`. A larger runner or a longer timeout scores those points; any other fault means the run has not finished scoring, so the night publishes nothing (COV-8).
+The summary builder refuses to publish a contract holding a failed point unless every one of its faults is a runner limit: `blis_refused:insufficient_memory` (the replay exceeded the runner's memory ceiling) and `blis_refused:timeout`. A larger runner or a longer timeout scores those points; any other fault means the run has not finished scoring, so the night publishes nothing (COV-8). A named refusal never stops a night: the summary lists a refusal code the nightly has not met before in `new_refusal_codes` (`assess.KNOWN_REFUSAL_CODES`), and `orchestrator/nightly/night_notes.py` warns about it and about an unclassified share above `assess.UNCLASSIFIED_WARN_SHARE`.
 
 ### `points.csv`
 
@@ -232,6 +232,7 @@ The closed list of design §11.4 (`grade.G5_CODES`; COV-5). A reason the scorer 
 | `field_not_in_release` | The run sets a field the engine release BLIS runs does not have. |
 | `value_conflict` | Two sources that record the same stage of one field disagree. |
 | `build_unparseable` | The run's recorded engine build cannot be read. |
+| `blis_refused` | The simulator refused the scenario and said why; the subject is its message. |
 
 ## Determinism
 

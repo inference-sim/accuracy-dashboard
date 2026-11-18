@@ -73,6 +73,8 @@ G5_TEXT = {
                           "Not applicable until the scorer tells an unnamed build from a nightly one."),
     "measurement_contaminated": ("A vLLM single-turn point's server log holds a different number of client requests than its client sent (12 x concurrency: 10 x concurrency measured, 2 x concurrency warm-up). Another run's client shared the server, so the measured latencies are not the labelled scenario's. The subject names both counts.",
                                  "Re-measure the point on a server of its own. Nothing to model."),
+    "blis_refused": ("The simulator refused the scenario the harness wrote and said why; the subject is its message, with paths removed. The point is listed as not scored with that reason. A refusal that is a fault of the run, not the simulator's own message, is not this reason (see the run faults below).",
+                     "Read the message: the engine or substrate does not yet model what the scenario asked, or the scenario asks for something the simulator cannot run. A refusal code the nightly has not seen before is listed in the summary's new_refusal_codes."),
 }
 
 KIND_TEXT = {
@@ -115,8 +117,9 @@ G34_TEXT = {
     "ported_functions_unpublished": "The engine has not published its list of ported functions or the diff.",
 }
 RUN_FAULT_TEXT = {
-    "blis_refused": "The simulator refused a scenario the harness wrote from recorded values. A refusal for memory or time (`insufficient_memory`, `timeout`) lists the point as failed. Any other refusal stops the run.",
+    "blis_refused": "A refusal that is a fault of the run, not the simulator's own named refusal: the replay exceeded the runner's memory (`insufficient_memory`) or time (`timeout`), which lists the point as failed and lets the night publish; or the harness found the simulator's output malformed or incomplete (`result_invalid`, `result_unreadable`, `metrics_incomplete`, `requests_incomplete` and the like), or the extractor failed (`extractor_error`), which stop the run. The simulator's own refusal in its own words is a named not-scored point (G5 `blis_refused`), not a fault.",
     "setting_differs": "The scenario written lost a value the run recorded. The run stops.",
+    "blis_crashed": "The simulator exited with no message of its own (a panic, a signal, no output). The run stops.",
 }
 
 

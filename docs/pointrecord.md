@@ -10,7 +10,7 @@ The code is `orchestrator/ingest/pointrecord.py`; `score.write_contract` calls i
 |---|---|
 | point id | `point_id` and `unit_id` (the same string) |
 | the unit's row | `identity`; `recipe` is the source's recipe fingerprint, or `row:<id>` when it has none |
-| grade, G5 reason | `grade`, `g5_reason`; the eleven G5 codes are the substrate's |
+| grade, G5 reason | `grade`, `g5_reason`; the eleven G5 codes are the substrate's. The dashboard also writes the twelfth, `blis_refused` (design 11.4, blis-design#32), which the substrate's closed list does not hold yet: `blis schema validate point-record` refuses such a record until it does (inference-sim/blis-substrate#403). The nightly does not run that validator; `test_pointrecord.py` pins what is written. |
 | substitutions | `substitutions`, sorted by kind and subject, with only the keys the substrate declares |
 | `ported_functions_unpublished` | kind `changed_functions` (a G4 condition); the detail says the engine publishes no list of its ported functions, so a changed one is not ruled out |
 | `args` | `settings`; `approximated` becomes `estimated`, and its rule is `substitute` when the note says the value stands in, else `leave_unset` |

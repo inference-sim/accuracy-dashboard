@@ -178,7 +178,7 @@ def test_validator_rejects_a_scored_point_graded_g5():
 
 def test_validator_rejects_a_g5_reason_off_the_closed_list():
     # COV-5: G5 is only for design §11.4's reasons.
-    for code in ("looked_wrong", "blis_refused", "setting_not_modelled"):
+    for code in ("looked_wrong", "blis_crashed", "setting_not_modelled"):
         d = _copy("run-a")
         rows = _lines(d / c.NOT_SCORED_JSONL)
         rows[0]["g5_reason"] = rows[0]["g5_reasons"][0] = {"code": code}

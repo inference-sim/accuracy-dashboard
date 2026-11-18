@@ -60,7 +60,7 @@ def test_the_g5_list_is_design_11_4_with_router_unsupported_and_value_conflict()
     assert set(g.G5_CODES) == {"code_not_visible", "router_unsupported", "topology_unsupported", "value_not_recorded",
                                "field_not_modelled", "field_unclassified", "engine_unsupported",
                                "not_in_catalog", "field_not_in_release", "value_conflict", "build_unparseable",
-                               "measurement_contaminated"}
+                               "measurement_contaminated", "blis_refused"}
 
 
 def test_a_substitution_must_be_a_g2_condition_and_name_its_subject():
@@ -89,7 +89,7 @@ def test_check_holds_every_point_to_one_grade_and_its_build():
     bad = [{"point_id": "e", "grade": "G2", "build": {"release": V}},
            {"point_id": "f", "grade": "G1", "build": {"release": "0.25.0"}},
            {"point_id": "h", "grade": "G4", "build": {"release": V}, "substitutions": [EST]},
-           {"point_id": "i", "grade": "G5", "g5_reason": {"code": "blis_refused"}},
+           {"point_id": "i", "grade": "G5", "g5_reason": {"code": "mystery_refusal"}},
            {"point_id": "j", "grade": "G6"}]
     assert len(g.check(bad, V)) == 5
 
