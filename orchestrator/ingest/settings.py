@@ -702,10 +702,13 @@ def translate_removed(settings: dict, field_list, table: dict | None = None) -> 
         st = settings.get(path)
         if st is None or field_list.lookup(path) is not None or st.conflict is not None:
             continue
-        if not applies(st.value) or new in settings or (value is SAME_VALUE and not st.requested):
+        renames = value is SAME_VALUE or callable(value)
+        if not applies(st.value) or new in settings or (renames and not st.requested):
             continue            # a renamed field the engine only resolved is not a request, so it is not carried over
         del out[path]
-        value = st.value if value is SAME_VALUE else value
+        # SAME_VALUE: the run's value. A function: the successor's value for the run's, where the earlier release's
+        # values were read differently (mamba_scheduler_strategy "auto" resolved to no_buffer there).
+        value = st.value if value is SAME_VALUE else value(st.value) if callable(value) else value
         out[new] = Setting(path=new, value=value, source=st.source, requested=True)
         subs.append({"kind": "resolved_differs", "subject": path,
                      "detail": f"the run's engine release has {path}={st.value!r}; the modelled release removed it and states "
