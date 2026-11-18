@@ -4,6 +4,8 @@
 # data/latest to v3 under a test that read it as v2. Run from the repository root with python3, node and the pip and npm
 # dependencies installed. Any failing command stops the script (set -e).
 set -euo pipefail
+# More than 5 percent of the night's points failed (a harness fault; a named G5 is a result): the publish stops.
+python3 orchestrator/nightly/night_health.py data/latest/summary.json
 # The night prunes v2 snapshots; their point ids leave the map first, so the map stays exact.
 python3 orchestrator/ingest/legacy_ids.py prune --map data/legacy/point-ids.json --data data
 python3 .github/ci/shards.py run boundary
