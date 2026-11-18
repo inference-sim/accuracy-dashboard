@@ -387,6 +387,21 @@ TRANSLATIONS = {
 }
 
 
+def spec_method_of(algorithm, drafter) -> str | None:
+    """The speculative method a deployment states for the SGLang `speculative_algorithm` a run set, in the words an
+    InferenceX row uses: `mtp` for EAGLE or NEXTN with no draft model of its own. SGLang resolves both spellings to
+    EAGLE (arg_groups/speculative_hook.py:_resolve_speculative_algorithm_alias, v0.5.23), and with no
+    speculative_draft_model_path the draft is the target checkpoint's own multi-token-prediction layer (model_config.py,
+    the is_draft_model rewrite to the NextN architecture); with a draft model it is an ordinary EAGLE draft. Any other
+    algorithm keeps its own lower-case name. None when the run set none."""
+    if algorithm in (None, ""):
+        return None
+    a = str(algorithm).upper()
+    if a in ("EAGLE", "NEXTN"):
+        return "eagle" if drafter else "mtp"
+    return a.lower()
+
+
 def make_names(decl: dict) -> st.Names:
     def location(path: str):
         if path in PARALLEL:

@@ -1698,8 +1698,14 @@ def row_vs_run(row: dict, c: st.Decided) -> list[str]:
     are what's scored, and a disagreement means the row and the artifacts aren't the same run."""
     out = []
     spec = c.mapped.get("engine.speculative.method", (None, None))[1]
+    sglang = row.get("framework") == "sglang"
+    if spec is None and sglang:
+        # SGLang names the algorithm, not the method: read it the way the row does (sglang_settings.spec_method_of).
+        spec = ss.spec_method_of(c.mapped.get("engine.speculative_algorithm", (None, None))[1], c.roles.get("drafter"))
     row_spec = row.get("spec_method")
     if row_spec and (row_spec == "none") != (spec is None):
+        out.append("conflict:spec_method")
+    elif sglang and row_spec not in (None, "none") and spec != row_spec:
         out.append("conflict:spec_method")
     offload = c.mapped.get("offload.connector", (None, None))[1]
     row_off = row.get("offload_mode")
