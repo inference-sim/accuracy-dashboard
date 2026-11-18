@@ -4,6 +4,8 @@ Run: python3 orchestrator/ingest/test_contract.py
 """
 import hashlib
 import json
+
+import pytest
 import os
 import shutil
 import subprocess
@@ -533,3 +535,15 @@ def test_pruning_the_legacy_map_drops_only_the_ids_no_published_snapshot_holds(t
     assert li.check(out, {"a" * 64}) == []
     assert li.check(doc, {"a" * 64}) == ["b" * 12 + ": in the map, not published"]       # what main reported
     assert li.prune(out, {"a" * 64, "c" * 64}) == out                                 # it never adds an id
+
+@pytest.mark.parametrize("schema", ["summary.v3.json", "summary.v4.json"])
+@pytest.mark.parametrize("kind,ok", [("vllm", True), ("sglang", True), ("trtllm", False)])
+def test_the_simulator_and_the_engine_of_a_run_may_be_any_registered_engine_kind(schema, kind, ok):
+    # An SGLang point's record names simulator.engine {kind: sglang}; the schema pinned vllm, so no SGLang record validated.
+    import jsonschema
+    doc = json.loads((c.LISTS_SCHEMA.parent / schema).read_text())
+    sim = {"build": "v0.11.0", "engine": {"kind": kind, "version": "0.5.23"},
+           "harness_commit": "0123456789abcdef0123456789abcdef01234567"}
+    problems = list(jsonschema.Draft7Validator({**doc["definitions"]["simulator"], "definitions": doc["definitions"]}).iter_errors(sim))
+    assert (not problems) is ok, [p.message for p in problems]
+
