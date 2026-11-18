@@ -288,7 +288,7 @@ describe('the default view is every point, and the tier text names the build win
   it('opens on all: the headline and the table cover every scored point', () => {
     const a = v2a()
     const html = renderToStaticMarkup(<App summary={a} loadError={null} />)
-    expect(html).toContain('<span class="clk on">all</span>')
+    expect(html).toContain('<span class="clk on">all graded</span>')
     const n = flattenPoints(a).length
     expect(html).toContain(`${n} measurements`)
     const all = aggregatePair(flattenPoints(a)).all.mape.ttft as number
