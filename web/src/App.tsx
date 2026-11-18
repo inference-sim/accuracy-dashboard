@@ -14,10 +14,10 @@ import { Dropdown } from './components/Dropdown'
 import { Compare } from './components/Compare'
 import { Headline } from './components/Headline'
 import { Term } from './components/Term'
-import { tierV2Definition } from './glossary'
+import { GRADE_LABELS, inGrade } from './gradeFilter'
 import { formatCount } from './format'
 import type { RunIndex, RunRef } from './load'
-import { DEFAULT_ROUTE, parseRoute, routeToHash, type RouteState } from './route'
+import { DEFAULT_ROUTE, GRADE_FILTERS, parseRoute, routeToHash, type RouteState } from './route'
 import { buildRows } from './tree'
 import { nextSort, sortModelKeys, type SortKey, type SortSpec } from './sort'
 import { isEstimated, type Summary, type TierKey } from './types'
@@ -117,7 +117,7 @@ export function App({
         <DevView summary={summary} summaryB={comparing ? summaryB : null} picker={picker}>
           {comparing ? (
             <ErrorBoundary resetKey={route.runB}>
-              <Compare a={summary} b={summaryB!} tier={route.tier === 'estimated' ? 'all' : route.tier} />
+              <Compare a={summary} b={summaryB!} tier="all" />
             </ErrorBoundary>
           ) : (
             <p className="pts-hint">Pick a second run above to see how accuracy changed between them.</p>
@@ -197,20 +197,11 @@ function Overview({
   const allPoints = useMemo(() => latestPerConfig(flattenPoints(summary)), [summary])
   const visible = useMemo(() => applyFilters(allPoints, route), [allPoints, route])
 
-  // Effective tier: the default is measured_or_resolved, but if a snapshot has zero
-  // measured-or-resolved points (the direct dump path leaves settings resolved, so every point
-  // lands in "all") we fall back to the "all" tier rather than show an empty headline. The
-  // user's explicit tier click is always honoured; this only rescues the DEFAULT.
-  // 'estimated' is a view over the "all" tier: only the points BLIS estimated, aggregated as
-  // the "all" tier aggregates (none of them is in the strict one). v1 has no such points.
-  const showEstimated = route.tier === 'estimated' && summary.schema_version >= 2
-  const tierFellBack =
-    route.tier === 'measured_or_resolved' &&
-    visible.filter((p) => p.tier === 'measured_or_resolved').length === 0 &&
-    visible.length > 0
-  const effectiveTier: TierKey = tierFellBack || route.tier !== 'measured_or_resolved' ? 'all' : 'measured_or_resolved'
-  const inTier = (p: FlatPoint) =>
-    showEstimated ? isEstimated(p.fidelity) : effectiveTier === 'all' || p.tier === 'measured_or_resolved'
+  // The grade filter is cumulative (G1, up to G2, up to G3, all graded) and defaults to all graded.
+  // Every aggregate is recomputed over the points it keeps, so the table, the points and the
+  // counts agree with the grades the control names.
+  const inTier = (p: FlatPoint) => inGrade(p, route.grade)
+  const noneAtGrade = route.grade !== 'all' && visible.length > 0 && !visible.some(inTier)
 
   // The headline always describes the full latest run under the default view (every scored
   // point, the "all" tier), never the current filter, so the top-line "how accurate is BLIS?"
@@ -226,13 +217,13 @@ function Overview({
 
   // A row is listed only if it has points in the tier being shown, so the exact tier never shows
   // deployments that are entirely estimated as rows of dashes.
-  const tierPoints = useMemo(() => visible.filter(inTier), [visible, effectiveTier, showEstimated])
+  const tierPoints = useMemo(() => visible.filter(inTier), [visible, route.grade])
   const rows = useMemo(() => buildRows(tierPoints, expanded, summary.min_points ?? 0), [tierPoints, expanded, summary.min_points])
 
   // Sort reorders only the model-level rows; children follow their parent.
   const orderedRows = useMemo(() => {
     const modelRows = rows.filter((r) => r.level === 'model')
-    const order = sortModelKeys(modelRows, sort, effectiveTier)
+    const order = sortModelKeys(modelRows, sort, 'all')
     const rank = new Map(order.map((label, i) => [label, i]))
     // Stable: group rows by their owning model, then emit models in sorted order.
     const byModel = new Map<string, typeof rows>()
@@ -246,7 +237,7 @@ function Overview({
     return [...byModel.entries()]
       .sort((a, b) => (rank.get(a[0]) ?? 0) - (rank.get(b[0]) ?? 0))
       .flatMap(([, rs]) => rs)
-  }, [rows, sort, effectiveTier])
+  }, [rows, sort])
 
   const onToggle = (id: string) => {
     const next = new Set(expanded)
@@ -259,7 +250,7 @@ function Overview({
   const selectedPoints: FlatPoint[] = useMemo(() => {
     if (!route.sel) return []
     return visible.filter(inTier).filter((p) => p.sweepKey === route.sel)
-  }, [visible, route.sel, effectiveTier, showEstimated])
+  }, [visible, route.sel, route.grade])
 
   const selFirst = selectedPoints[0]
   const pointsTitle = selFirst
@@ -270,10 +261,6 @@ function Overview({
   const selMissing = route.sel != null && selectedPoints.length === 0
 
   const cov = summary.coverage
-  // v2 tiers come from each point's match record: exact, or estimated (a setting BLIS can't
-  // represent yet was estimated). v1 keeps the harness's measured·resolved / all wording.
-  const v2 = summary.schema_version >= 2
-  const prov = summary.provenance
 
   return (
     <>
@@ -300,43 +287,21 @@ function Overview({
       {/* Filters sit beside the table they change; the headline above ignores them (PR #26 review). */}
       <div className="chips">
         <span className="flt">
-        {v2 && prov?.vllm_ref && prov.vllm_max_distance != null ? (
-          <Term content={tierV2Definition(prov.vllm_ref, prov.vllm_max_distance)}>tier</Term>
-        ) : (
-          <Term name={v2 ? 'tierV2' : 'tier'} />
-        )}{' '}
+        <Term name="gradeFilter" />{' '}
         <span className="tierseg">
-          {/* The highlighted option is the one actually shown: when the stricter tier has no
-              points the view falls back to "all", so "all" is highlighted then (#23). */}
-          <span
-            className={`clk ${effectiveTier === 'measured_or_resolved' ? 'on' : ''}`}
-            onClick={() => update({ tier: 'measured_or_resolved', sel: null })}
-          >
-            {v2 ? 'exact' : 'measured·resolved'}
-          </span>
-          {v2 && (
-            <span className={`clk ${showEstimated ? 'on' : ''}`} onClick={() => update({ tier: 'estimated', sel: null })}>
-              estimated
+          {GRADE_FILTERS.map((g) => (
+            <span key={g} className={`clk ${route.grade === g ? 'on' : ''}`} onClick={() => update({ grade: g, sel: null })}>
+              {GRADE_LABELS[g]}
             </span>
-          )}
-          <span
-            className={`clk ${effectiveTier === 'all' && !showEstimated ? 'on' : ''}`}
-            onClick={() => update({ tier: 'all', sel: null })}
-          >
-            all
-          </span>
+          ))}
         </span>
-        {tierFellBack && (
-          <span className="disabled-note">
-            ({v2 ? 'no exact points yet' : 'no measured·resolved points yet'} — showing all)
-          </span>
-        )}
+        {noneAtGrade && <span className="disabled-note">(no points at this grade yet — pick all graded)</span>}
       </span>
     </div>
 
       <SummaryTable
         rows={orderedRows}
-        tier={effectiveTier}
+        tier="all"
         sort={sort}
         onSort={(k: SortKey) => setSort(nextSort(sort, k))}
         selectedId={route.sel ? findIdForSweep(orderedRows, route.sel) : null}

@@ -51,7 +51,7 @@ try {
     throw new Error(`staged summary is schema_version ${summary.schema_version}, not 2 or 3`)
   version = summary.schema_version
 
-  await page.goto(`${BASE}/#/?tier=all`, { waitUntil: 'networkidle', timeout: 30000 })
+  await page.goto(`${BASE}/#/?grade=all`, { waitUntil: 'networkidle', timeout: 30000 })
   await page.waitForSelector('table.readout', { timeout: 15000 })
   const body = await page.textContent('body')
   for (const bad of ['NaN', 'undefined']) if (body.includes(bad)) problems.push(`page text contains ${bad}`)
