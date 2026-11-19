@@ -113,7 +113,7 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
                "orchestrator/test_update_index.py"),
         pytest("The M3 baseline and the grade ceilings", "orchestrator/baseline/test_ceiling.py",
                "orchestrator/baseline/test_ported_changes.py", "orchestrator/baseline/test_m3_baseline.py",
-               "orchestrator/baseline/test_release_runs.py"),
+               "orchestrator/baseline/test_release_runs.py", "orchestrator/baseline/test_recoverable.py"),
         pytest("The facts the estimation evaluator gets, the evaluator against the substrate's vectors, and the baseline row placement",
                "orchestrator/ingest/test_exact.py", "orchestrator/ingest/test_stand_in_facts.py",
                "orchestrator/baseline/test_freeze_rows.py"),
