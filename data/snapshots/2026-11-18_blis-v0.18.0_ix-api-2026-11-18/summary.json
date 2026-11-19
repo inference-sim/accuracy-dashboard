@@ -75640,7 +75640,7 @@
                             "blis": null,
                             "match": "approximated",
                             "measured": "flashinfer_cutlass",
-                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "source": "args"
                           },
                           {
@@ -76509,7 +76509,7 @@
                             "subject": "checkpoint_from_staged_path"
                           },
                           {
-                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "kind": "execution_mode",
                             "subject": "linear_backend"
                           },
@@ -77111,7 +77111,7 @@
                             "blis": null,
                             "match": "approximated",
                             "measured": "flashinfer_cutlass",
-                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "source": "args"
                           },
                           {
@@ -77980,7 +77980,7 @@
                             "subject": "checkpoint_from_staged_path"
                           },
                           {
-                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "kind": "execution_mode",
                             "subject": "linear_backend"
                           },
@@ -78582,7 +78582,7 @@
                             "blis": null,
                             "match": "approximated",
                             "measured": "flashinfer_cutlass",
-                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "source": "args"
                           },
                           {
@@ -79451,7 +79451,7 @@
                             "subject": "checkpoint_from_staged_path"
                           },
                           {
-                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "kind": "execution_mode",
                             "subject": "linear_backend"
                           },
@@ -80053,7 +80053,7 @@
                             "blis": null,
                             "match": "approximated",
                             "measured": "flashinfer_cutlass",
-                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "source": "args"
                           },
                           {
@@ -80922,7 +80922,7 @@
                             "subject": "checkpoint_from_staged_path"
                           },
                           {
-                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "kind": "execution_mode",
                             "subject": "linear_backend"
                           },
@@ -81524,7 +81524,7 @@
                             "blis": null,
                             "match": "approximated",
                             "measured": "flashinfer_cutlass",
-                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "source": "args"
                           },
                           {
@@ -82393,7 +82393,7 @@
                             "subject": "checkpoint_from_staged_path"
                           },
                           {
-                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "kind": "execution_mode",
                             "subject": "linear_backend"
                           },
@@ -83045,7 +83045,7 @@
                             "blis": null,
                             "match": "approximated",
                             "measured": "flashinfer_cutlass",
-                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "source": "args"
                           },
                           {
@@ -83914,7 +83914,7 @@
                             "subject": "checkpoint_from_staged_path"
                           },
                           {
-                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "kind": "execution_mode",
                             "subject": "linear_backend"
                           },
@@ -84521,7 +84521,7 @@
                             "blis": null,
                             "match": "approximated",
                             "measured": "flashinfer_cutlass",
-                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "source": "args"
                           },
                           {
@@ -85390,7 +85390,7 @@
                             "subject": "checkpoint_from_staged_path"
                           },
                           {
-                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "kind": "execution_mode",
                             "subject": "linear_backend"
                           },
@@ -85997,7 +85997,7 @@
                             "blis": null,
                             "match": "approximated",
                             "measured": "flashinfer_cutlass",
-                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "source": "args"
                           },
                           {
@@ -86866,7 +86866,7 @@
                             "subject": "checkpoint_from_staged_path"
                           },
                           {
-                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "kind": "execution_mode",
                             "subject": "linear_backend"
                           },
@@ -87473,7 +87473,7 @@
                             "blis": null,
                             "match": "approximated",
                             "measured": "flashinfer_cutlass",
-                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "source": "args"
                           },
                           {
@@ -88342,7 +88342,7 @@
                             "subject": "checkpoint_from_staged_path"
                           },
                           {
-                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "kind": "execution_mode",
                             "subject": "linear_backend"
                           },
@@ -88949,7 +88949,7 @@
                             "blis": null,
                             "match": "approximated",
                             "measured": "flashinfer_cutlass",
-                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "source": "args"
                           },
                           {
@@ -89818,7 +89818,7 @@
                             "subject": "checkpoint_from_staged_path"
                           },
                           {
-                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "kind": "execution_mode",
                             "subject": "linear_backend"
                           },
@@ -90425,7 +90425,7 @@
                             "blis": null,
                             "match": "approximated",
                             "measured": "flashinfer_cutlass",
-                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "source": "args"
                           },
                           {
@@ -91294,7 +91294,7 @@
                             "subject": "checkpoint_from_staged_path"
                           },
                           {
-                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "kind": "execution_mode",
                             "subject": "linear_backend"
                           },
@@ -91988,7 +91988,7 @@
                             "blis": null,
                             "match": "approximated",
                             "measured": "flashinfer_cutlass",
-                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "source": "args"
                           },
                           {
@@ -92805,7 +92805,7 @@
                             "subject": "cost-model-primitives/nccl_communicator_bytes_8rank"
                           },
                           {
-                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "kind": "execution_mode",
                             "subject": "linear_backend"
                           },
@@ -93473,7 +93473,7 @@
                             "blis": null,
                             "match": "approximated",
                             "measured": "flashinfer_cutlass",
-                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "source": "args"
                           },
                           {
@@ -94327,7 +94327,7 @@
                             "subject": "data-parallel balancer"
                           },
                           {
-                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "kind": "execution_mode",
                             "subject": "linear_backend"
                           },
@@ -94940,7 +94940,7 @@
                             "blis": null,
                             "match": "approximated",
                             "measured": "flashinfer_cutlass",
-                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "note": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "source": "args"
                           },
                           {
@@ -95794,7 +95794,7 @@
                             "subject": "data-parallel balancer"
                           },
                           {
-                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on AISimulate's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
+                            "detail": "priced as {\"kernel_config.linear_backend\": \"auto\"}: the NVFP4 linears run FlashInfer's CUTLASS FP4 GEMM, priced at the CuteDSL kernel's measured speed; BF16 linears are unaffected, since v0.33.0 maps only flashinfer_cutedsl to a FlashInfer BF16 GEMM (vllm/model_executor/layers/utils.py:148-154 at v0.33.0) (the registry's NVFP4 dense ramp (gemm_eps_max_nvfp4, gemm_m_half_nvfp4 on b200 and b300), fitted on an external simulator's vLLM FlashInferCuteDslNvFp4LinearKernel rows, the kernel vLLM v0.33.0 runs at linear_backend auto (vllm/model_executor/kernels/linear/__init__.py:592-596 at v0.33.0); no allowed table measures FlashInferCutlassNvFp4LinearKernel)",
                             "kind": "execution_mode",
                             "subject": "linear_backend"
                           },
