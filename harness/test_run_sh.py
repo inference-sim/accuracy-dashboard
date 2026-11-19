@@ -289,7 +289,7 @@ def test_the_real_path_scores_a_full_commit(tmp_path):
     p, out, log, commit, head, _ = run_real(tmp_path, lambda c: c)
     assert p.returncode == 0, p.stderr
     prov = json.loads((out / "provenance.json").read_text())
-    assert prov["simulator"]["build"] == commit and prov["experimental"] is True
+    assert prov["simulator"]["build"] == commit and prov["experimental"] is False      # a full commit is an exact pin
 
 
 def test_the_real_path_refuses_a_corpus_that_is_not_the_catalog_entrys(tmp_path):
@@ -379,21 +379,21 @@ def test_a_commit_named_in_the_environment_must_be_the_checkouts_head(tmp_path):
     assert p.returncode == 2 and "is not the checkout's HEAD" in p.stderr and not out.exists()
 
 
-def test_the_real_path_scores_a_pre_release_tag_and_marks_its_figures_experimental(tmp_path):
+def test_the_real_path_scores_a_pre_release_tag_as_an_exact_pin(tmp_path):
     p, out, log, commit, head, _ = run_real(tmp_path, lambda c: "v0.16.0-rc1", tag="v0.16.0-rc1")
     assert p.returncode == 0, p.stderr
     prov = json.loads((out / "provenance.json").read_text())
-    assert prov["simulator"]["build"] == "v0.16.0-rc1" and prov["experimental"] is True
+    assert prov["simulator"]["build"] == "v0.16.0-rc1" and prov["experimental"] is False
 
 
-def test_data_pinned_by_commit_is_recorded_as_given_and_marks_the_figures_experimental(tmp_path):
+def test_data_pinned_by_commit_is_recorded_as_given_and_is_as_good_as_a_tag(tmp_path):
     cat, reg = "c" * 40, "e" * 40
     p, out, *_ = run_real(tmp_path, lambda c: "v0.16.0", releases=(cat, reg))
     assert p.returncode == 0, p.stderr
     prov = json.loads((out / "provenance.json").read_text())
     assert prov["blis"]["catalog"] == cat and prov["blis"]["registry"] == reg
-    assert prov["simulator"]["build"] == "v0.16.0" and prov["experimental"] is True
-    # tags for the data and a tag for the build: not experimental, as before
+    assert prov["simulator"]["build"] == "v0.16.0" and prov["experimental"] is False
+    # tags for the data and a tag for the build: not experimental either
     (tmp_path / "t").mkdir()
     p, out, *_ = run_real(tmp_path / "t", lambda c: "v0.16.0")
     assert p.returncode == 0, p.stderr

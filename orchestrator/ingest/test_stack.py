@@ -189,6 +189,33 @@ def test_a_tag_that_does_not_exist_or_a_commit_stack_json_does_not_pin_is_refuse
     assert problems == [f"tag v1.0.0 is commit {tagged}, but stack.json pins {head}"]
 
 
+COMMIT = "b6748ca9d757f149ba760cf821f96feed3bbf5bf"
+
+
+@pytest.mark.parametrize("version,commit,pin,fragment", [
+    ("v0.15.0", "", "v0.15.0", None),                                              # a tag pins by its name
+    ("v0.15.1-0.20261118162118-b6748ca9d757", COMMIT, COMMIT, None),               # a pseudo-version pins by its commit
+    (COMMIT, COMMIT, COMMIT, None),                                                # the version is the commit itself
+    ("v0.15.1-0.20261118162118-b6748ca9d757", "", None, "pins no full 40-hex commit"),
+    ("v0.15.1-0.20261118162118-b6748ca9d757", COMMIT[:12], None, "pins no full 40-hex commit"),
+    ("v0.15.1-0.20261118162118-aaaaaaaaaaaa", COMMIT, None, "names the commit aaaaaaaaaaaa"),   # another commit
+    ("main", COMMIT, None, "neither a release tag, a pseudo-version nor the pinned commit"),
+])
+def test_an_exact_pin_is_a_tag_or_the_full_commit_a_pseudo_version_names(version, commit, pin, fragment):
+    got, problems = sk.pin_of(version, commit)
+    assert got == pin
+    assert (not problems) if fragment is None else any(fragment in x for x in problems)
+
+
+def test_a_checkout_is_exactly_the_commit_pin_or_it_is_refused(tmp_path):
+    _, tagged, head = _repo_with_tag(tmp_path / "r")
+    assert sk.verify_checkout(tmp_path / "r", head, head) == []            # at the pinned commit, no tag needed
+    assert sk.verify_checkout(tmp_path / "r", head, "") == []
+    problems = sk.verify_checkout(tmp_path / "r", tagged, tagged)          # HEAD is the later commit
+    assert problems == [f"{tmp_path / 'r'} is at {head}, but the pin is commit {tagged}"]
+    assert sk.verify_checkout(tmp_path / "r", head, tagged) == [f"the pin is commit {head}, but stack.json pins {tagged}"]
+
+
 def test_resolve_stack_prints_the_pins_for_a_checkout_and_fails_without_a_stack(tmp_path):
     script = ROOT / "resolve_stack.py"
     (tmp_path / "stack.json").write_bytes(SUBSTRATE_STACK.read_bytes())

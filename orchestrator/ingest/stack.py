@@ -111,33 +111,61 @@ _PSEUDO = re.compile(r"(^|[.-])\d{14}-[0-9a-f]{12}$")
 
 
 def release_name(module_entry: dict) -> str | None:
-    """The release a module entry of stack.json names: its version when that is a release tag
-    (vX.Y.Z or vX.Y.Z-rc1), None when it is a Go pseudo-version (v0.0.0-<14-digit time>-<12 hex>),
-    which a draft build carries and no release does (X8)."""
+    """The release tag a module entry of stack.json names: its version when that is a tag (vX.Y.Z or vX.Y.Z-rc1), None when
+    it is a Go pseudo-version (v0.0.0-<14-digit time>-<12 hex>), which names a commit and no tag."""
     version = module_entry.get("version")
     if not isinstance(version, str) or not _RELEASE_NAME.match(version) or _PSEUDO.search(version):
         return None
     return version
 
 
-def verify_checkout(repo: Path, tag: str, commit: str) -> list[str]:
-    """What is wrong with a checkout that should be release `tag` at stack.json's `commit`; empty
-    when nothing is. Its HEAD must be the commit the tag resolves to in the repository, and that
-    must be `commit`. The tag must exist locally (clone without --depth so tags are fetched)."""
+_COMMIT = re.compile(r"^[0-9a-f]{40}$")
+
+
+def pin_of(version: str | None, commit: str | None) -> tuple[str | None, list[str]]:
+    """(pin, problems): the name an exact pin of a module goes by, and what is wrong when it has none (design X8).
+
+    A tag pins by its name. A Go pseudo-version, or a version that is the commit itself, pins by the full 40-hex commit stack.json
+    records beside it, and that commit must be the one the pseudo-version names (its 12 hex digits are a prefix of it). Anything
+    else (no tag, no commit, a short hash, a pseudo-version that names another commit) is no pin and gets a problem."""
+    if isinstance(version, str) and release_name({"version": version}) is not None:
+        return version, []
+    if not isinstance(commit, str) or not _COMMIT.match(commit):
+        return None, [f"{version} is not a release tag and stack.json pins no full 40-hex commit for it ({commit!r})"]
+    m = _PSEUDO.search(version) if isinstance(version, str) else None
+    if m and not commit.startswith(m.group(0)[-12:]):
+        return None, [f"{version} names the commit {m.group(0)[-12:]}..., but stack.json pins {commit}"]
+    if not m and version != commit:
+        return None, [f"{version} is neither a release tag, a pseudo-version nor the pinned commit {commit}"]
+    return commit, []
+
+
+def verify_checkout(repo: Path, pin: str, commit: str) -> list[str]:
+    """What is wrong with a checkout that should be exactly `pin` (a release tag, or a full commit) at stack.json's `commit`; empty
+    when nothing is. A tag must exist locally (clone without --depth so tags are fetched), HEAD must be the commit it resolves to,
+    and that must be `commit` when stack.json states one. A commit pin is HEAD itself, and must equal `commit`."""
     def rev(ref):
         r = subprocess.run(["git", "-C", str(repo), "rev-parse", "--verify", "-q", ref],
                            capture_output=True, text=True)
         return r.stdout.strip() if r.returncode == 0 else None
-    head, tagged = rev("HEAD^{commit}"), rev(f"refs/tags/{tag}^{{commit}}")
+    head = rev("HEAD^{commit}")
     if head is None:
         return [f"{repo}: no HEAD commit"]
+    if _COMMIT.match(pin):
+        out = []
+        if head != pin:
+            out.append(f"{repo} is at {head}, but the pin is commit {pin}")
+        if commit and commit != pin:
+            out.append(f"the pin is commit {pin}, but stack.json pins {commit}")
+        return out
+    tagged = rev(f"refs/tags/{pin}^{{commit}}")
     if tagged is None:
-        return [f"{repo}: tag {tag} does not exist"]
+        return [f"{repo}: tag {pin} does not exist"]
     out = []
     if head != tagged:
-        out.append(f"{repo} is at {head}, but tag {tag} is commit {tagged}")
+        out.append(f"{repo} is at {head}, but tag {pin} is commit {tagged}")
     if commit and tagged != commit:
-        out.append(f"tag {tag} is commit {tagged}, but stack.json pins {commit}")
+        out.append(f"tag {pin} is commit {tagged}, but stack.json pins {commit}")
     return out
 
 

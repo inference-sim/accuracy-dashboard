@@ -246,7 +246,7 @@ def _go_require(gomod: Path, module: str) -> str | None:
 
 
 # A simulator tag: vMAJOR.MINOR.PATCH with an optional pre-release suffix, the same set harness/run.sh
-# accepts. A release tag has no suffix; a build at a pre-release tag is experimental (design §11.7).
+# accepts. A tag, with or without a suffix, and a full commit are each an exact pin.
 _SIM_TAG = re.compile(r"^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$")
 _RELEASE_TAG = re.compile(r"^v\d+\.\d+\.\d+$")
 _SIM_COMMIT = re.compile(r"^[0-9a-f]{40}$")
@@ -288,6 +288,14 @@ def check_blis_inputs(blis: Path, catalog_release: str | None, registry_release:
         elif not _DATA_PIN.match(release):
             out.append(f"{flag} {release!r} is neither a release tag nor a full 40-hex commit")
     return out
+
+
+def experimental_run(env) -> bool:
+    """A figure is experimental when it used a router overlay or an experiment flag, or its simulator build, catalog or registry is
+    not named by a tag or a full commit."""
+    return (env.routers_dir is not None or env.assumed_router_revision is not None or env.router_policy_experiment is not None
+            or env.speculative_fallback_category is not None
+            or not all(_DATA_PIN.match(x) for x in (env.sim_build, env.catalog_release, env.registry_release)))
 
 
 def check_harness_commit(commit: str | None) -> list[str]:
@@ -487,11 +495,9 @@ def cmd_score(a) -> int:
             **({"engines": [{"kind": "vllm", "version": engine_release},
                             {"kind": "sglang", "version": sglang_kit.release, "fields_sha256": sglang_kit.fields_sha256}]}
                if sglang_kit is not None else {}),
-            # Design §11.7, X8: a figure is experimental unless its build and its data are both
-            # released. The build is released when it is a release tag, and the data when the
-            # catalog and the registry are named by release tags, not by commits.
-            "experimental": env.routers_dir is not None or env.assumed_router_revision is not None or env.router_policy_experiment is not None or env.speculative_fallback_category is not None or not all(
-                _RELEASE_TAG.match(x) for x in (env.sim_build, env.catalog_release, env.registry_release)),
+            # Design §11.7, X8: a figure is experimental when it used an overlay or an experiment flag, or when its build or
+            # its data is not exactly pinned. A tag or a full commit is an exact pin; the figure records it.
+            "experimental": experimental_run(env),
             "left_out_records": len((manifest.get("ledger") or {}).get("unlisted") or []),
             "vllm_ref": manifest["vllm_ref"], "vllm_max_distance": manifest["vllm_max_distance"],
             "fields_sha256": fields_sha, "pulled_at": manifest["pulled_at"],
@@ -653,17 +659,16 @@ def cmd_nightly(a) -> int:
         pl.add_unpulled(work, {u: r for u, r in missing.items() if u in to_fetch}, lg)
         return json.loads((work / "manifest.json").read_text())["pulled_at"][:10], window_ids
 
-    # The catalog and registry are directories of the one substrate checkout, so both are at the
-    # release stack.json names for it. A draft build's substrate is a pseudo-version: it is not a
-    # release and its figures are not published (X8). The checkout must be that release's commit.
-    release = sk.release_name({"version": a.substrate_version})
+    # The catalog and registry are directories of the one substrate checkout, so both are at the one pin stack.json
+    # names for it: a release tag, or the full commit of a pseudo-version (design X8: a number records exactly what it came
+    # from, and an exact pin is enough). The checkout must be exactly that pin.
+    release, bad_pin = sk.pin_of(a.substrate_version, a.substrate_commit)
     if release is None:
-        _log(f"FATAL: blis-substrate {a.substrate_version} in stack.json is not a release tag; "
-             f"a release is scored on a tagged substrate")
+        _log(f"FATAL: blis-substrate {a.substrate_version} in stack.json is not an exact pin: " + "; ".join(bad_pin))
         return 2
     problems = sk.verify_checkout(Path(a.substrate_dir), release, a.substrate_commit)
     if problems:
-        _log("FATAL: the blis-substrate checkout is not release " + release + ": " + "; ".join(problems))
+        _log("FATAL: the blis-substrate checkout is not " + release + ": " + "; ".join(problems))
         return 2
 
     def score_build_fn(work: Path, blis_tag: str, score_ids, pull_date: str, window_ids: set):
