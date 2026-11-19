@@ -7,7 +7,8 @@ name: checks
 #
 # Which job runs. `changes` lists the files a pull request changes and .github/ci/which_jobs.py says
 # which jobs read them (the lists are in that file; .github/ci/selftest.py pins them). A job whose
-# inputs did not change is skipped, and a skipped job counts as passing for the required checks. A push
+# inputs did not change is skipped, but GitHub reports a skipped job under its unevaluated name, so a
+# required check never skips: `orchestrator` and `web` are always-running aggregates of the jobs behind them. A push
 # to main and a manual run run everything. `gate` is the one check that reads them all: it fails if a
 # selected job did not succeed or an unselected job ran.
 #
@@ -241,8 +242,8 @@ jobs:
         run: python3 -m pytest -q $(python3 .github/ci/shards.py simulator-tests)
 
   # The web steps after `npm ci` each run even when an earlier one failed, so one run shows every failure.
-  web:
-    name: "web${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
+  web-build:
+    name: "web-build${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
     needs: changes
     if: ${{ (github.event.action != 'edited' || github.event.changes.base) && (needs.changes.outputs.web == 'true') }}
     runs-on: ubuntu-latest
@@ -302,6 +303,27 @@ jobs:
           npm run build
           node browser_smoke.mjs
 
+  # The required check `web`. GitHub reports a skipped job under its unevaluated name (the template text),
+  # never as `web`, so a pull request that changes no web path would never report the required context
+  # and stay blocked. This job always runs (like `orchestrator`) and reports plain `web`: success when
+  # web-build passed, or was not needed because no web path changed; failure otherwise.
+  web:
+    name: "web${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
+    needs: [changes, web-build]
+    if: ${{ (github.event.action != 'edited' || github.event.changes.base) && (always()) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - env:
+          NEEDED: ${{ needs.changes.outputs.web }}
+          CHANGES: ${{ needs.changes.result }}
+          BUILD: ${{ needs.web-build.result }}
+        run: |
+          if [ "$CHANGES" != success ]; then echo "::error::the change selection did not run ($CHANGES)"; exit 1; fi
+          want=skipped; [ "$NEEDED" = true ] && want=success
+          echo "web needed=$NEEDED; web-build=$BUILD (must be $want)"
+          [ "$BUILD" = "$want" ]
+
   # The nightly's gate (orchestrator/nightly/checks.sh: prune the legacy map, the boundary and contract shards, the v1 browser
   # smoke), run on a pull request that changes what it reads, so it is exercised before the nightly relies on it.
   nightly-gate:
@@ -356,7 +378,7 @@ jobs:
   # `orchestrator`, `grep-clean` and `web`; this job is the single check to require instead.)
   gate:
     name: "gate${{ github.event.action == 'edited' && !github.event.changes.base && ' (edit)' || '' }}"
-    needs: [changes, partition, orchestrator, simulator, web, nightly-gate, grep-clean]
+    needs: [changes, partition, orchestrator, simulator, web, web-build, nightly-gate, grep-clean]
     if: ${{ (github.event.action != 'edited' || github.event.changes.base) && (always()) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -370,7 +392,8 @@ jobs:
           R_PARTITION: ${{ needs.partition.result }}
           R_ORCH: ${{ needs.orchestrator.result }}
           R_SIM: ${{ needs.simulator.result }}
-          R_WEB: ${{ needs.web.result }}
+          R_WEB: ${{ needs.web-build.result }}
+          R_WEBREQ: ${{ needs.web.result }}
           R_NIGHTLY: ${{ needs.nightly-gate.result }}
           R_GREP: ${{ needs.grep-clean.result }}
         run: |
@@ -383,7 +406,9 @@ jobs:
           }
           check partition "$WANT_ORCH" "$R_PARTITION"
           check simulator "$WANT_SIM" "$R_SIM"
-          check web "$WANT_WEB" "$R_WEB"
+          check web-build "$WANT_WEB" "$R_WEB"
+          # `web` always runs: it reports success when web-build passed or none was needed.
+          check web true "$R_WEBREQ"
           check nightly-gate "$WANT_NIGHTLY" "$R_NIGHTLY"
           check grep-clean true "$R_GREP"
           # `orchestrator` always runs: it reports success when the shards passed or none was needed.
