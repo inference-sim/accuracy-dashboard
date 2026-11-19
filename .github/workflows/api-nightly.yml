@@ -168,9 +168,7 @@ jobs:
               "https://raw.githubusercontent.com/inference-sim/blis-vllm/${vllm_module_ref}/fields.json"
             # The ledger at the same commit: every row of the window is placed in one of its
             # units (design §10.2). The units scored are the anchor units in the substrate's
-            # published list, catalog/ledger/published/anchor.yaml (cli.py nightly). TEMPORARY until
-            # the M2 substrate release lets `blis ledger --list anchor` print it, and until a command
-            # prints the full unit list with identities (catalog/ledger/units) and the ingest report.
+            # published list, catalog/ledger/published/anchor.yaml (cli.py nightly).
             LEDGER="$RUNNER_TEMP/substrate/catalog/ledger"
             # Every AgentX corpus, at the revision and full sha256 its replay workload in this
             # release's catalog pins (agentx-mvp-uncapped, agentx-mvp; X12, D3). Each point is
