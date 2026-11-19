@@ -65,8 +65,8 @@ The nightly (`.github/workflows/api-nightly.yml`) checks out this repository, bu
 but the simulator, and calls `harness/run.sh`. A repository whose pull requests run the harness
 pins a release or a commit of this repository in one pin file, as it pins any dependency, checks
 it out and runs the script. The release bot moves the pin. A figure is labelled experimental
-unless its simulator build and its data are both releases: it may be posted on a pull request,
-never published as BLIS's accuracy.
+when it used an overlay or an experiment flag, or its simulator build or data is not exactly pinned
+by a tag or a full commit: it may be posted on a pull request, never published as BLIS's accuracy.
 
 ## Layout
 

@@ -82,7 +82,7 @@ def run(a) -> int:
             "split": {"name": "development", "salt": d.SALT, "train_pct": d.TRAIN_PCT, "validation_pct": d.VALIDATION_PCT,
                       "series": "role key (every identifying field but the concurrency)",
                       "simulated": ["train", "validation"], "withheld": ["test"]},
-            "experimental": not all(cli._RELEASE_TAG.match(x) for x in (env.sim_build, a.catalog_release, a.registry_release))}
+            "experimental": not all(cli._DATA_PIN.match(x) for x in (env.sim_build, a.catalog_release, a.registry_release))}
     doc = cqs.write_outputs(Path(a.out), outcomes, prov)
     for p in doc["problems"]:
         cli._log(f"INVALID: {p}")

@@ -81,6 +81,7 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
         script("orchestrator/ingest/test_extract.py", "API ingest extractor"),
         script("orchestrator/ingest/test_score_e2e.py", "Points through score_point and write_contract, fake BLIS binaries"),
         pytest("a staged checkpoint path resolves to its catalog model", "orchestrator/ingest/test_local_checkpoint.py"),
+        pytest("A published file carries no product name of a tool the dashboard was inspired by (RFC C1)", "orchestrator/ingest/test_public_text.py"),
         pytest("A simulator refusal is a named not-scored point; a fault of the run still stops the night", "orchestrator/ingest/test_named_refusals.py"),
         pytest("configiq points and coverage by source", "orchestrator/ingest/test_configiq.py",
                "orchestrator/ingest/test_by_source.py", "orchestrator/ingest/test_configiq_score.py"),

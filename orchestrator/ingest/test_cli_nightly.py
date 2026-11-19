@@ -421,11 +421,49 @@ def _nightly_refused(tmp_path, monkeypatch, **over):
     return msgs
 
 
-def test_the_nightly_stops_before_scoring_on_a_substrate_that_is_a_pseudo_version(tmp_path, monkeypatch):
-    # A draft build pins a Go pseudo-version; it is not a release and cannot be published (X8).
-    msgs = _nightly_refused(tmp_path, monkeypatch, substrate_version="v0.0.0-20261105035832-817e83e0018b")
-    assert ("FATAL: blis-substrate v0.0.0-20261105035832-817e83e0018b in stack.json is not a release tag; "
-            "a release is scored on a tagged substrate") in msgs, msgs
+def _pseudo(commit):
+    return f"v0.15.1-0.20261118162118-{commit[:12]}"
+
+
+def test_the_nightly_scores_a_stack_pinned_by_commit_as_it_scores_a_tag(tmp_path, monkeypatch):
+    # The M3.1 release v0.18.1 pins blis-substrate by a Go pseudo-version. It is an exact pin (design X8: the number records what
+    # it came from), so the night scores it, with the catalog and registry named by the pinned commit.
+    rows = [_row("m", 1, "2026-10-01")]
+    fakes = Fakes(rows)
+    _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in rows])
+    fakes.ledger(tmp_path)
+    head = _head(tmp_path / "substrate")
+    assert cli.cmd_nightly(_args(tmp_path, substrate_version=_pseudo(head), substrate_commit=head)) == 0
+    cmd = fakes.harness_cmd
+    assert cmd[cmd.index("--catalog-release") + 1] == head and cmd[cmd.index("--registry-release") + 1] == head
+
+
+def test_the_nightly_still_stops_before_scoring_on_a_checkout_that_is_not_the_pinned_commit(tmp_path, monkeypatch):
+    other = "1" * 40
+    msgs = _nightly_refused(tmp_path, monkeypatch, substrate_version=_pseudo(other), substrate_commit=other)
+    head = _head(tmp_path / "substrate")
+    assert any("FATAL" in m and head in m and other in m and "pin is commit" in m for m in msgs), msgs
+
+
+@pytest.mark.parametrize("version,commit,fragment", [
+    ("v0.0.0-20261105035832-817e83e0018b", "", "pins no full 40-hex commit"),      # a pseudo-version with no commit
+    ("v0.0.0-20261105035832-817e83e0018b", "1" * 40, "names the commit 817e83e0018b"),   # one that names another commit
+    ("main", "1" * 40, "neither a release tag, a pseudo-version nor the pinned commit"),   # a branch
+])
+def test_the_nightly_stops_before_scoring_on_a_substrate_that_is_no_exact_pin(tmp_path, monkeypatch, version, commit, fragment):
+    msgs = _nightly_refused(tmp_path, monkeypatch, substrate_version=version, substrate_commit=commit)
+    assert any(m.startswith(f"FATAL: blis-substrate {version} in stack.json is not an exact pin") and fragment in m for m in msgs), msgs
+
+
+def test_a_figure_is_experimental_when_it_used_an_overlay_or_is_not_exactly_pinned_and_not_when_pinned_by_commit():
+    env = lambda **k: types.SimpleNamespace(**{"routers_dir": None, "assumed_router_revision": None,   # noqa: E731
+                                               "router_policy_experiment": None, "speculative_fallback_category": None,
+                                               "sim_build": "v0.18.1", "catalog_release": "a" * 40, "registry_release": "a" * 40, **k})
+    assert cli.experimental_run(env()) is False                                   # a tag and commits: exact pins
+    assert cli.experimental_run(env(sim_build="b" * 40, catalog_release="v0.15.0-rc1")) is False
+    for overlay in ({"routers_dir": "/r"}, {"assumed_router_revision": "x"}, {"router_policy_experiment": "p"},
+                    {"speculative_fallback_category": "c"}, {"catalog_release": "main"}, {"registry_release": "a" * 12}):
+        assert cli.experimental_run(env(**overlay)) is True, overlay
 
 
 def test_the_nightly_stops_before_scoring_when_the_checkout_is_not_the_tags_commit(tmp_path, monkeypatch):
@@ -806,8 +844,8 @@ def test_units_select_the_points_of_the_pull_and_name_those_it_does_not_hold(tmp
 
 
 def test_a_pre_release_tag_is_a_simulator_build_but_not_a_release_tag(tmp_path):
-    # harness/run.sh accepts vMAJOR.MINOR.PATCH-suffix; check_blis_inputs must agree, and the
-    # figures are experimental unless the build is a release tag with no suffix.
+    # harness/run.sh accepts vMAJOR.MINOR.PATCH-suffix; check_blis_inputs must agree. A suffixed tag is an exact pin like any
+    # other, so a figure at one is not experimental on that account.
     sim = tmp_path / "sim"
     _tagged_repo(sim, "v0.16.0-rc1")
     (sim / "blis").write_text("")
