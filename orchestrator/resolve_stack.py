@@ -3,10 +3,10 @@
 key=value lines for `eval` (design §11: a new release is scored with no change to the
 dashboard's code):
 
-    substrate_ref         what to check out of blis-substrate: its release tag, or in a draft build
-                          its commit; its catalog/ and registry/ are the data
-    substrate_commit      the commit stack.json names for it: empty for a release, whose tag names it
-    substrate_version     its version: a release tag, or a pseudo-version in a draft build
+    substrate_ref         what to check out of blis-substrate: its release tag, or when stack.json pins it by a
+                          commit (a pseudo-version) that commit; its catalog/ and registry/ are the data
+    substrate_commit      the commit stack.json names for it: empty when a release tag names it
+    substrate_version     its version: a release tag, or a pseudo-version when the module is pinned by commit
     vllm_module_ref       what to fetch of blis-vllm, likewise; fields.json is at its root
     vllm_module_commit    the commit stack.json names for it: empty for a release
     vllm_ref              the vLLM tag of the engine release (v + engines[kind=vllm].version)

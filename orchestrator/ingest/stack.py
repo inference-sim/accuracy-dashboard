@@ -85,8 +85,8 @@ def pins(stack: Stack) -> dict:
         m = stack.modules.get(path)
         if m is None:
             raise StackError(f"stack.json lists no module {path}")
-        # A draft build names a full commit (a pseudo-version carries twelve hex digits). A release
-        # names none: its tag does (LIF-1), so the commit is empty and `<key>_ref` is the tag.
+        # A module pinned by commit names a full commit (a pseudo-version carries twelve hex digits). A release
+        # tag names none: the tag names the commit (LIF-1), so the commit is empty and `<key>_ref` is the tag.
         commit = m["commit"]
         if commit is None and release_name(m) is not None:
             out[key] = ""
