@@ -563,6 +563,11 @@ LOCATIONS = {
     "pipeline_parallel_size": "parallel.pp",
     "data_parallel_size": "parallel.dp",
     "data_parallel_size_local": "parallel.dp_local",
+    # vLLM's three data-parallel launch flags are one choice in the Deployment, parallel.data_parallel_load_balancing
+    # (internal, hybrid, external): build() folds them into it. The "dp_lb." places are not scenario keys.
+    "data_parallel_hybrid_lb": "dp_lb.hybrid",
+    "data_parallel_external_lb": "dp_lb.external",
+    "data_parallel_multi_port_external_lb": "dp_lb.multi_port_external",
     "enable_expert_parallel": "parallel.enable_expert_parallel",
     "prefill_context_parallel_size": "parallel.pcp",
     "decode_context_parallel_size": "parallel.dcp",
@@ -1108,9 +1113,14 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
     pool = {"role": "colocated", "nodes": 1, "parallel": {}, "engine": {}}
     dep = {"kind": "Deployment", "name": name, "pools": [pool]}
     offload = {}
+    lb_flags = []
     for loc, (path, value) in sorted(d.mapped.items()):
         top = loc.split(".")[0]
         if loc in ("replay.acceptance_length", "replay.api_server_count"):
+            continue
+        if top == "dp_lb":
+            if value is True:
+                lb_flags.append(path)
             continue
         if top == "offload":
             offload[loc] = (path, value)
@@ -1120,6 +1130,12 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
             continue
         _set(pool, loc, value)
     par = pool["parallel"]
+    if len(lb_flags) > 1:
+        # vLLM refuses two launch modes at once (the run could not have started), so the record disagrees with itself.
+        b.reasons.append(f"conflict:{lb_flags[0]}")
+    elif lb_flags:
+        # A flag the run left false is the default, internal, which the Deployment states by omitting the key.
+        par["data_parallel_load_balancing"] = "hybrid" if lb_flags[0] == "data_parallel_hybrid_lb" else "external"
     # Parallelism from the run: the resolved engine config always states tp/pp/dp, so a
     # missing one means the log couldn't be read, not a default.
     for k in ("tp", "pp", "dp"):
