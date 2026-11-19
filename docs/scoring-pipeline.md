@@ -56,7 +56,7 @@ harness/run.sh --sim <tag|40-hex commit> [--sim-repo URL|PATH]
 | `--sim` | the inference-sim release tag (`vMAJOR.MINOR.PATCH[-suffix]`) or a full 40-hex commit; a branch name is refused because it moves. run.sh clones it (`--sim-repo`, default GitHub; a local path works), builds `blis` with the Go toolchain the repository's `go.mod` names, and runs the scorer. |
 | `--units` | the ledger units to score, one id per line; its SHA-256 is recorded. |
 | `--pull` | the frozen pull. |
-| `--catalog`, `--registry` | the substrate's `catalog/` and `registry/` directories, with `--catalog-release` and `--registry-release` naming what they are at (a release tag or a full 40-hex commit; a short hash or a branch is refused). A pin by commit makes the figures **experimental**, as does a simulator that is not a release tag. |
+| `--catalog`, `--registry` | the substrate's `catalog/` and `registry/` directories, with `--catalog-release` and `--registry-release` naming what they are at (a release tag or a full 40-hex commit; a short hash or a branch is refused). A pin by commit is as good as a tag: both are exact, and the figures record the pin. A figure is **experimental** only when it used an overlay or an experiment flag, or a pin that is neither a tag nor a full commit. |
 | `--corpus-dir` | the agentic corpora (`resolve_agentic_corpus.py --all` fetches them at the revisions and SHA-256 the catalog pins). |
 | `--fields` | the engine's `fields.json` at the blis-vllm release the simulator runs: which fields are modelled, and each field's estimation rule. |
 

@@ -16,7 +16,8 @@
 #                       commits). A branch name or a short hash is refused. The directories may
 #                       carry no git history (a copy of the data), so the scorer is told the
 #                       names, not left to read them, and records each exactly as given. A figure
-#                       whose data is pinned by commit is experimental, as one whose build is.
+#                       whose data is pinned by a tag or a commit is as good as the other: each is an exact pin and
+#                       the figure records it.
 #   a set of units      --units FILE, the ledger units to score, and --pull DIR, their frozen
 #                       recorded runs.
 #
