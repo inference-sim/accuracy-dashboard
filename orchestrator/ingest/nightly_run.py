@@ -35,6 +35,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 import nightly as nt  # noqa: E402
 import stack as sk  # noqa: E402
+import public_text as pt  # noqa: E402
 import pull as pl  # noqa: E402
 import update_index as ui  # noqa: E402
 
@@ -140,8 +141,10 @@ def run_night(today: date, blis_tag: str, *, work_dir: Path, data_dir: Path, sta
 
 
 def _write_summary(path: Path, summary: dict) -> None:
+    """Write a published JSON file. Every file the night publishes goes through here, and through scrub: text copied from an
+    engine's field list or a registry names no outside tool by its product name (public_text)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n")
+    path.write_text(json.dumps(pt.scrub(summary), indent=2, ensure_ascii=False) + "\n")
 
 
 def _write_state(state_path: Path, blis_tag: str, snapshot_id: str, point_ids: list[str]) -> None:
