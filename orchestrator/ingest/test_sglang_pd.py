@@ -95,7 +95,7 @@ def test_a_prefill_decode_sglang_point_whose_fields_are_accepted_is_written_as_t
         docs = list(yaml.safe_load_all(next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()))
         scen = next(d for d in docs if d["kind"] == "Scenario")
         dep = next(d for d in docs if d["kind"] == "Deployment")
-        assert scen["engine"] == {"kind": "sglang", "version": tsg.RELEASE}
+        assert scen["engine"] == {"kind": "sglang"}
         assert [p["role"] for p in dep["pools"]] == ["prefill", "decode"]
         assert [p["parallel"]["tp"] for p in dep["pools"]] == [1, 4]
         assert dep["pd_transfer"] == {"connector": "nixl"}

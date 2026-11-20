@@ -92,7 +92,7 @@ def test_an_sglang_point_with_every_field_accepted_is_graded_by_its_own_engine()
         assert o.fidelity["grade"] == "G2"          # the run's release is the engine's; every single-turn point names the send gap
         docs = list(yaml.safe_load_all(next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()))
         scen, dep = docs[0], docs[1]
-        assert scen["engine"] == {"kind": "sglang", "version": RELEASE} and "engine_version" not in scen
+        assert scen["engine"] == {"kind": "sglang"} and "engine_version" not in scen
         pool = dep["pools"][0]
         assert pool["parallel"]["tp"] == 8
         # What the run asked for is stated under SGLang's own names, and so is a resolved value of a field the engine
@@ -234,8 +234,8 @@ def test_a_vllm_point_is_unchanged_when_sglang_is_scored_too():
         scen = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
         import yaml
         assert o.fidelity["simulator"]["engine"] == {"kind": "vllm", "version": "0.31.0"}
-        # the scenario states the engine as engine: {kind, version} (SIM-1), the same pair the fidelity record names
-        assert next(d for d in yaml.safe_load_all(scen) if d and d.get("kind") == "Scenario")["engine"] == {"kind": "vllm", "version": "0.31.0"} and "engine_version" not in scen
+        # the scenario states the engine kind alone (SIM-1); the fidelity record names the release
+        assert next(d for d in yaml.safe_load_all(scen) if d and d.get("kind") == "Scenario")["engine"] == {"kind": "vllm"} and "engine_version" not in scen
     finally:
         shutil.rmtree(tmp)
 

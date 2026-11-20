@@ -424,3 +424,19 @@ def test_aiperf_itl_against_the_simulators_itl_is_refused():
 ])
 def test_a_client_field_against_another_definition_is_refused(client, field, metric):
     assert result.client_field_problems(client, field, metric, ITL_REGISTRY) != []
+
+
+# ------------------------------------------------------------------ engine.commit
+
+def test_engine_commit_is_the_results_engine_commit_and_none_when_the_result_states_none():
+    c = "0123456789abcdef0123456789abcdef01234567"
+    assert result.engine_commit(_doc(engine={"kind": "vllm", "commit": c})) == c
+    assert result.engine_commit(_doc(engine={"kind": "vllm"})) is None
+    assert result.engine_commit(_doc()) is None
+
+
+@pytest.mark.parametrize("commit", ["abc123", "0123456789ABCDEF0123456789ABCDEF01234567", "", 7, "g" * 40])
+def test_a_malformed_engine_commit_is_a_result_error_not_a_missing_commit(commit):
+    with pytest.raises(result.ResultError) as e:
+        result.engine_commit(_doc(engine={"kind": "vllm", "commit": commit}))
+    assert e.value.slug == "result_invalid"

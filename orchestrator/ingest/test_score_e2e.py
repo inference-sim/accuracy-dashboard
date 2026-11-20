@@ -37,6 +37,8 @@ import fields as fl  # noqa: E402
 import settings as st  # noqa: E402
 import support as sp  # noqa: E402
 
+ENGINE_COMMIT = "0123456789abcdef0123456789abcdef01234567"
+
 FIELDS = fl.parse((HERE / "testdata" / "fields" / "fields.json").read_bytes())
 
 LOG = (
@@ -99,6 +101,7 @@ def arg(k): return a[a.index(k) + 1]
 counts = {{"generated": 0, "completed": 0, "timed_out": 0, "in_flight_at_horizon": 0,
           "queued_at_horizon": 0, "not_started": 0, "length_capped": 0}}
 doc = {{"kind": "Result", "schema_version": 3, "name": "fake", "requests": counts,
+       "engine": {{"kind": "vllm", "commit": "{ENGINE_COMMIT}"}},
        "data": {{"catalog": {{"source": "embedded", "hash": "a" * 64, "combined_hash": "a" * 64}},
                 "registry": {{"source": "embedded", "hash": "b" * 64, "combined_hash": "b" * 64}},
                 "released_data": True, "build": "v0.16.0"}},
@@ -174,7 +177,8 @@ def _fake_blis(tmp: Path, *, validate: int = 0, drop: bool = False, early_holder
     (d / "blis_saw.json").unlink(missing_ok=True)
     return _exe(d / "blis", FAKE_BLIS.format(validate=validate, drop=drop, early_holder=early_holder,
                                                      short=short, methods=repr(methods),
-                                                     wp=repr(workload_properties), burst=burst, phases=phases))
+                                                     wp=repr(workload_properties), burst=burst, phases=phases,
+                                                     ENGINE_COMMIT=ENGINE_COMMIT))
 
 
 # A blis that answers only `catalog resolve --catalog DIR --model|--chip NAME --json`: a model
@@ -300,6 +304,7 @@ def test_a_single_turn_point_is_scored_with_the_clients_means_and_rescores_ident
         # The fake's rows: TTFT 180000 us and TPOT 9000 us on every request.
         assert float(pts[0]["pred_ttft_us"]) == 180000.0 and float(pts[0]["pred_tpot_us"]) == 9000.0
         assert float(pts[0]["meas_ttft_us"]) == 200000.0 and float(pts[0]["meas_tpot_us"]) == 10000.0
+        assert o.fidelity["engine_commit"] == ENGINE_COMMIT
         # The trace holds the client's draws for (1024, 1024, 4), in order.
         ins, outs = ix.target_lengths(1024, 1024, 4)
         tr = _trace(work, entry["point_id"])
@@ -794,6 +799,7 @@ def test_the_agentic_path_reads_the_registry_means_and_the_engine_report():
         assert float(pts[0]["pred_ttft_us"]) == 1500000.0 and float(pts[0]["pred_tpot_us"]) == 4500.0
         assert o.fidelity["resolved"][0]["blis"] == 100000 and o.fidelity["resolved"][0]["match"] == "exact"
         assert o.fidelity["blis_kernel_provenance"] == {"pool": "fake"}
+        assert o.fidelity["engine_commit"] == ENGINE_COMMIT
         assert "requests" not in o.fidelity
         argv = _saw(env)[0]["argv"]
         assert "--agentic-scenario" in argv and "--format" in argv and not any("metrics-path" in x for x in argv)
@@ -863,7 +869,7 @@ def test_the_scenario_engine_block_holds_the_runs_values_under_the_engines_own_n
         import yaml
         docs = list(yaml.safe_load_all(scen_text))
         scen, dep = docs[0], docs[1]
-        assert scen["engine"] == {"kind": "vllm", "version": "0.31.0"} and "engine_version" not in scen
+        assert scen["engine"] == {"kind": "vllm"} and "engine_version" not in scen
         eng = dep["pools"][0]["engine"]
         assert {k: eng[k] for k in ("max_num_seqs", "max_num_batched_tokens", "block_size", "max_model_len",
                                     "enable_prefix_caching", "cache_dtype")} == \

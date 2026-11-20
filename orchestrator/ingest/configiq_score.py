@@ -335,7 +335,7 @@ def catalog_context(catalog_root, model: str) -> int | None:
     return None
 
 
-def build(p: "cq.Point", *, model: str, chip: str, engine_release: str, packaging: dict,
+def build(p: "cq.Point", *, model: str, chip: str, packaging: dict,
           context: int | None = None) -> Scenario:
     """The scenario file and the requests for one provisional point. `packaging` is the catalog's packaging of the chip
     ({"gpus_per_node", "gpus_per_rack"}); a chip whose entry fixes the node size has it taken from the entry, as
@@ -366,7 +366,7 @@ def build(p: "cq.Point", *, model: str, chip: str, engine_release: str, packagin
         cluster["gpus_per_node"] = per_node
         subs.append(dict(NODE_SUBSTITUTION))
     cluster["nodes"] = max(1, -(-tp // per_node))
-    scenario = {"kind": "Scenario", "name": name, "engine": {"kind": ENGINE, "version": engine_release.lstrip("v")},
+    scenario = {"kind": "Scenario", "name": name, "engine": {"kind": ENGINE},
                 "model": model, "coefficients": list(st.COEFFICIENTS), "cluster": cluster}
     pool = {"role": "colocated", "nodes": cluster["nodes"], "parallel": {"dp": 1, "pp": 1, "tp": tp}, "engine": eng}
     deployment = {"kind": "Deployment", "name": name, "pools": [pool]}
@@ -631,7 +631,7 @@ def score_point(p: "cq.Point", env: Env, work: Path, *, simulate: bool = True) -
         o.withheld = True
         return o
     o.model = model
-    sc = build(p, model=model, chip=chip, engine_release=env.engine_release,
+    sc = build(p, model=model, chip=chip,
                packaging=env.catalog_obj.packaging(chip), context=context)
     o.requests = len(sc.input_tokens)
     work = Path(work).resolve()
