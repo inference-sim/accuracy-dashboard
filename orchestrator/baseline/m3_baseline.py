@@ -12,9 +12,11 @@ G5 with each grade's share, count and own accuracy (COV-11), and each point's gr
     m3_baseline.py issues --fields FIELDS --source TEXT --issues ISSUES.json
     m3_baseline.py report --contract DIR --sglang-lane LANE.json --ported PORTED.json --issues ISSUES.json
                           --engines ENGINES.json --out PREFIX [--recoverable RECOVERABLE.json]
+                          [--funnel FUNNEL.json]
     m3_baseline.py engines --sglang-provenance BLIS_SGLANG/provenance.go --sglang-source TEXT
                            --routers SUBSTRATE/catalog/routers --routers-source TEXT --out ENGINES.json
 
+`report --funnel` adds the scoring funnels of funnel.py and the scored count.
 `report --recoverable` adds, from recoverable.py's output, the count of anchor units whose inputs are recoverable
 (plan row 12); without it the report is unchanged.
 
@@ -47,6 +49,7 @@ sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE.parent / "ingest"))
 import ceiling as cl  # noqa: E402
 import compare as cmp  # noqa: E402
+import funnel as fnl  # noqa: E402
 import grade as gr  # noqa: E402
 import recoverable as rcv  # noqa: E402
 
@@ -304,7 +307,7 @@ def lane_report(points: list[dict], *, issues: dict, engine_version: str, ported
 
 
 def report(*, contract: Path, splits: Path | None, sglang: dict, ported: dict, issues: dict, engines: dict,
-           recoverable: dict | None = None) -> tuple[dict, dict]:
+           recoverable: dict | None = None, funnel: dict | None = None) -> tuple[dict, dict]:
     bad = check_issue_classes(issues)
     if bad:
         raise BaselineError("the issue file's reasons disagree with their classes: " + "; ".join(bad))
@@ -343,6 +346,11 @@ def report(*, contract: Path, splits: Path | None, sglang: dict, ported: dict, i
         try:
             doc["recoverable"] = rcv.check(recoverable)
         except rcv.RecoverableError as e:
+            raise BaselineError(str(e))
+    if funnel is not None:
+        try:
+            doc["funnel"] = fnl.validate(funnel)
+        except fnl.FunnelError as e:
             raise BaselineError(str(e))
     per_point = {"vllm": vceil, "sglang": sceil}
     return doc, per_point
@@ -438,6 +446,8 @@ def markdown(doc: dict) -> str:
         L.append("")
     if "recoverable" in doc:
         L += _recoverable_markdown(doc["recoverable"])
+    if "funnel" in doc:
+        L += fnl.markdown(doc["funnel"])
     return "\n".join(L) + "\n"
 
 
@@ -479,6 +489,8 @@ def main(argv=None) -> int:
     r.add_argument("--splits", type=Path)
     r.add_argument("--recoverable", type=Path, help="recoverable.py's output: adds the count of anchor units whose "
                                                     "inputs are recoverable")
+    r.add_argument("--funnel", type=Path, help="funnel.py's output: adds the InferenceX and configiq scoring funnels "
+                                               "and the scored count")
     r.add_argument("--engines", required=True, type=Path)
     e = sub.add_parser("engines")
     e.add_argument("--sglang-provenance", required=True, type=Path)
@@ -509,7 +521,8 @@ def main(argv=None) -> int:
             doc, per_point = report(contract=a.contract, splits=a.splits, sglang=json.loads(a.sglang_lane.read_text()),
                                     ported=json.loads(a.ported.read_text()), issues=json.loads(a.issues.read_text()),
                                     engines=json.loads(a.engines.read_text()),
-                                    recoverable=json.loads(a.recoverable.read_text()) if a.recoverable else None)
+                                    recoverable=json.loads(a.recoverable.read_text()) if a.recoverable else None,
+                                    funnel=json.loads(a.funnel.read_text()) if a.funnel else None)
             write(a.out, doc, per_point)
             print(f"wrote {a.out}.json, {a.out}.md and ceilings.jsonl")
     except (BaselineError, cmp.CompareError) as e:

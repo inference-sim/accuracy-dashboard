@@ -85,6 +85,9 @@ DATA_READS = {
     ("orchestrator/ingest/configiq_score.py", "load_points"):
         "TEMPORARY until an inference-sim command prints the full unit list with identities and the ingest report "
         "(see ledger.load): the configiq units are read from catalog/ledger/units, reports and sources.yaml",
+    ("orchestrator/baseline/funnel.py", "main"):
+        "TEMPORARY with ledger.load: reads the configiq units, report and sources from the ledger checkout for the "
+        "configiq funnel, until an inference-sim command prints the full unit list with identities and the ingest report",
     ("orchestrator/ingest/ledger_fake.py", "write"):
         "TEMPORARY with ledger.load: writes, for tests, the ledger layout ledger.load reads",
     ("orchestrator/ingest/support.py", "Catalog._claims"):

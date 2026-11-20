@@ -105,7 +105,7 @@ class Fakes:
         self.anchors = None       # the anchor list blis prints; None = every row's unit
 
     def api_pull(self, fetch, *, today, window_days, framework="vllm"):
-        return types.SimpleNamespace(rows=self.rows)
+        return types.SimpleNamespace(rows=[r for r in self.rows if api.in_window(r["date"], today, window_days)])
 
     def ledger(self, tmp):
         # The ledger the night reads: one unit per row, written before each night, and the blis
@@ -128,6 +128,11 @@ class Fakes:
         out.mkdir(parents=True, exist_ok=True)
         (out / "provenance.json").write_text(json.dumps({"pulled_at": "2026-10-23T00:00:00Z"}))
         return 0
+
+    @staticmethod
+    def missing_reasons(tmp):
+        m = json.loads((tmp / "work" / "manifest.json").read_text())
+        return {e["point_id"]: e["reasons"] for e in m["points"] if e["reasons"]}
 
     def cmd_pull(self, a):
         self.pulled_only = a.only
@@ -299,7 +304,7 @@ def test_an_anchor_unit_of_a_framework_no_engine_models_stays_in_the_window(tmp_
 
 def test_an_anchor_unit_the_window_holds_no_usable_row_of_is_g5_by_name_and_the_night_goes_on(tmp_path, monkeypatch):
     # COV-1: every anchor unit is graded or G5 with a reason. One the window's pull holds no row of is G5
-    # not_in_pull_window; one whose row now differs from the ledger's record is G5 row_differs_from_ledger. Neither is
+    # not_in_api_feed; one whose row now differs from the ledger's record is G5 row_differs_from_ledger. Neither is
     # fetched, and the rest are scored and published.
     import pull as pl
     kept, gone, changed = _row("m", 1, "2026-10-01"), _row("m", 2, "2026-10-01"), _row("m", 4, "2026-10-01")
@@ -316,8 +321,33 @@ def test_an_anchor_unit_the_window_holds_no_usable_row_of_is_g5_by_name_and_the_
     assert cli.cmd_nightly(_args(tmp_path)) == 0
     assert fakes.pulled_only == [ledger_fake.point_id(kept)]
     entries = {e["point_id"]: e["reasons"] for e in json.loads((tmp_path / "work" / "manifest.json").read_text())["points"]}
-    assert entries == {ledger_fake.point_id(kept): [], ledger_fake.point_id(gone): [pl.NOT_IN_WINDOW],
+    assert entries == {ledger_fake.point_id(kept): [], ledger_fake.point_id(gone): [pl.NOT_IN_FEED],
                        ledger_fake.point_id(changed): [pl.ROW_DIFFERS]}
+
+
+def test_an_anchor_unit_is_never_excluded_for_its_date(tmp_path, monkeypatch):
+    # COV-2: a unit measured a year before the night is fetched and scored like a recent one; the nightly passes
+    # no window, so no unit is G5 for its date.
+    old, recent = _row("m", 1, "2025-10-01"), _row("m", 2, "2026-10-01")
+    fakes = Fakes([old, recent])
+    _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in (old, recent)])
+    fakes.ledger(tmp_path)
+    assert cli.cmd_nightly(_args(tmp_path, window_days=None)) == 0
+    assert fakes.pulled_only == sorted(ledger_fake.point_id(r) for r in (old, recent))
+    assert fakes.missing_reasons(tmp_path) == {}
+
+
+def test_the_nightly_and_the_pull_have_no_age_limit_unless_given_one(monkeypatch):
+    got = []
+    monkeypatch.setattr(cli, "cmd_nightly", lambda a: got.append(a.window_days) or 0)
+    monkeypatch.setattr(cli, "cmd_pull", lambda a: got.append(a.window_days) or 0)
+    required = ["--blis-tag", "t", "--work-dir", "w", "--data-dir", "d", "--state", "s", "--scored", "x",
+                "--ledger", "l", "--blis", "b", "--catalog", "c", "--registry", "r", "--substrate-dir", "u",
+                "--substrate-version", "v", "--fields", "f", "--corpus-dir", "k"]
+    cli.main(["nightly", *required])
+    cli.main(["pull", "--out", "o", "--ledger", "l"])
+    cli.main(["pull", "--out", "o", "--ledger", "l", "--window-days", "7"])
+    assert got == [None, None, 7]
 
 
 def test_an_anchor_unit_the_ledger_does_not_hold_stops_the_night_before_any_fetch(tmp_path, monkeypatch):
@@ -339,13 +369,13 @@ def test_an_unpulled_anchor_is_g5_in_the_contract_without_a_simulation(tmp_path)
     import pull as pl
     import score as sc
     entry = {"point_id": "u", "identity": {}, "row": {"framework": "vllm", "benchmark_type": "single_turn"},
-             "reasons": [pl.NOT_IN_WINDOW], "files": {}}
+             "reasons": [pl.NOT_IN_FEED], "files": {}}
     o = sc.score_point(entry, tmp_path, tmp_path / "w", sc.Env(
         blis="x", blis_release="v0.17.1", blis_commit="a" * 40, catalog=tmp_path, catalog_release="c",
         registry=tmp_path, registry_release="r", kernel="k", corpora={}))
     import assess as asx
-    assert o.fidelity is None and o.reasons == [pl.NOT_IN_WINDOW]
-    assert asx.g5_of(o.reasons[0]) == {"code": "value_not_recorded", "subject": "not_in_pull_window"}
+    assert o.fidelity is None and o.reasons == [pl.NOT_IN_FEED]
+    assert asx.g5_of(o.reasons[0]) == {"code": "value_not_recorded", "subject": "not_in_api_feed"}
 
 
 def test_a_night_whose_build_publishes_no_anchor_unit_fails_and_scores_nothing(tmp_path, monkeypatch):
@@ -919,6 +949,17 @@ def test_a_failed_catalog_resolve_stops_the_score_run(tmp_path, monkeypatch):
     assert cli.cmd_score(a) == 2
     want = f"blis catalog resolve --catalog {Path(a.catalog).resolve()} --model org/m --json exited 2"
     assert any(want in m for m in msgs), msgs
+
+
+def test_an_unreadable_upgrade_report_stops_the_score_run(tmp_path):
+    a = _score_inputs(tmp_path, {})
+    a.engine_report = [str(tmp_path / "nope.json")]
+    msgs = []
+    import pytest as _p
+    with _p.MonkeyPatch.context() as mp:
+        mp.setattr(cli, "_log", msgs.append)
+        assert cli.cmd_score(a) == 2
+    assert any("nope.json" in m for m in msgs), msgs
 
 
 def test_a_repository_two_catalog_entries_claim_does_not_stop_the_night(tmp_path, monkeypatch):

@@ -250,7 +250,7 @@ def _setup(tmp: Path, *, log: str = LOG, job_log: str | None = "default", client
              if client_commit else None,
              "measurements": [{"record": "1", "metrics": row["metrics"]}],
              "files": {"server_log": {"path": "server_log.gz", "sha256": "0" * 64, "from": "api:/server-log"}},
-             "build": {"image": row["image"], "commit": "a" * 40, "source": "image_label", "ref": "v0.31.0",
+             "build": {"image": row["image"], "commit": ENGINE_COMMIT, "source": "image_label", "ref": "v0.31.0",
                        "distance": 0, "match": "exact"}}
     # The launch configuration states the node when asked: resources.gpus_per_node.
     if node_size is not None:

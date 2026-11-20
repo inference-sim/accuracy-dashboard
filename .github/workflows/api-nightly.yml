@@ -2,7 +2,7 @@ name: api-nightly
 
 # The API-ingest nightly pipeline (Discussion #15, revised 2026-10-25: the no-storage design).
 # Replaces the db-dump nightly (nightly.yml): instead of restoring a ~323 GB Postgres dump, it
-# pulls the live InferenceX API, scores the anchor units of the 180-day window (COV-2) with the
+# pulls the live InferenceX API, scores every anchor unit, with no age limit (COV-2), with the
 # resolved BLIS release, and publishes summary v3 `api` snapshots. NOTHING RAW IS PERSISTED -- no ix-store branch, no committed logs;
 # the work dir is ephemeral and summary.json IS the score store (an IX-only night merges the delta
 # into the published summary). Only the agentic artifact downloads are cached, via actions/cache
@@ -47,7 +47,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  WINDOW_DAYS: "180"
   KEEP_API: "5"
 
 jobs:
@@ -154,8 +153,7 @@ jobs:
             # (incl. the live view the merge reads) are present; cli.py nightly adds/prunes only API
             # snapshots and never touches a dump one.
             mkdir -p data state
-            # Always the full 180-day cumulative window ending the real UTC date -- never shrink it
-            # (that would prune the store).
+            # No age limit (COV-2): the pull holds every row up to the real UTC date.
             TODAY="$(date -u +%F)"
             # OOM fix (diagnosed by local profiling): a single agentic blis replay's peak RSS is
             # trace-content-driven and unpredictable -- a c64 point used 11.5GB where a c128 used
@@ -178,7 +176,7 @@ jobs:
               --blis-tag "$BLIS_TAG" \
               --work-dir "$RUNNER_TEMP/pull" --data-dir data --state state/last-run-api.json \
               --scored state/scored-releases.json \
-              --window-days "$WINDOW_DAYS" --keep-api "$KEEP_API" \
+              --keep-api "$KEEP_API" \
               --today "$TODAY" \
               --workers 4 --agentic-workers 1 --download-workers 4 --max-rss-mb 13000 \
               --cache "$RUNNER_TEMP/artifacts" --corpus-cache "$RUNNER_TEMP/corpus-cache" \
@@ -299,7 +297,7 @@ jobs:
           fi
 
       # KNOWN CEILING (accepted, documented): committing data/ to main grows main's GIT HISTORY,
-      # which neither the 180-day window nor the last-5 retention bounds -- those cap the summary's
+      # which the last-5 retention does not bound -- those cap the summary's
       # CONTENT and the working-tree snapshot COUNT, not the accumulation of nightly blobs. An
       # IX-only night rewrites latest/summary.json (~6.5 MB) and commits it; git stores a whole new
       # blob each time, so main's .git grows ~6.5 MB per active night, ~2 GB/year, while the

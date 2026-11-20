@@ -435,3 +435,10 @@ def test_every_job_that_installs_the_hashed_requirements_runs_the_python_they_ar
                 if "requirements-ci.txt" in (s.get("run") or "") and "pip install" in (s.get("run") or ""):
                     before = [x for x in steps[:k] if str(x.get("uses", "")).startswith("actions/setup-python@")]
                     assert before and str(before[-1]["with"]["python-version"]) == "3.13", f"{wf.name}: {name}"
+
+
+def test_the_commit_distance_inputs_are_accepted_and_repeatable():
+    p = check("--sim", "v0.16.0", *GOOD, "--engine-report", "a.json", "--engine-report", "b.json", "--engine-checkout", "vllm")
+    assert p.returncode == 0, p.stderr
+    p = check("--sim", "v0.16.0", *GOOD, "--engine-report")
+    assert p.returncode != 0
