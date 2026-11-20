@@ -44,6 +44,7 @@ function FigureStat({ figure, label }: { figure: Figure; label: string }) {
       <div className="stat-label">{label}</div>
       <div className="stat-hint">
         average error · {formatCount(figure.n)} point{figure.n === 1 ? '' : 's'}
+        {figure.roleKeys != null && <> · {formatCount(figure.roleKeys)} role key{figure.roleKeys === 1 ? '' : 's'}</>}
       </div>
     </div>
   )
@@ -60,6 +61,7 @@ function GradeSplit({ h }: { h: HeadlineBlock }) {
           <th scope="col">share</th>
           <th scope="col">TTFT error</th>
           <th scope="col">TPOT error</th>
+          <th scope="col">role keys</th>
         </tr>
       </thead>
       <tbody>
@@ -74,6 +76,7 @@ function GradeSplit({ h }: { h: HeadlineBlock }) {
               <td>{r.share === 'too few points' ? r.share : formatPct(r.share * 100)}</td>
               <td>{figureText(r.ttft)}</td>
               <td>{figureText(r.tpot)}</td>
+              <td>{r.ttft.roleKeys != null ? formatCount(r.ttft.roleKeys) : ''}</td>
             </tr>
           )
         })}
