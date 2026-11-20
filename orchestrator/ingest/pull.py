@@ -277,11 +277,12 @@ def freeze_launch_command(row: dict, entry: dict, frozen: "Frozen", recipes, job
     entry["launch_command"] = {"from": "script", "repo": recipes.repo, "commit": sha, "path": path}
 
 
-# The G5 reasons of an anchor unit the night's pull holds no usable row of (cli.cmd_nightly): none in the window, or
-# one whose content now differs from the ledger's record (ledger.RowDiffers). Nothing is fetched or simulated for it.
-NOT_IN_WINDOW = "value_not_recorded:not_in_pull_window"
+# The G5 reasons of an anchor unit the night's pull holds no usable row of (cli.cmd_nightly): the API no longer serves
+# its row (the date is never the reason, COV-2), or one whose content now differs from the ledger's record
+# (ledger.RowDiffers). Nothing is fetched or simulated for it.
+NOT_IN_FEED = "value_not_recorded:not_in_api_feed"
 ROW_DIFFERS = "value_not_recorded:row_differs_from_ledger"
-NOT_PULLED = (NOT_IN_WINDOW, ROW_DIFFERS)
+NOT_PULLED = (NOT_IN_FEED, ROW_DIFFERS)
 
 
 def add_unpulled(out: Path, reasons: dict, lg) -> None:

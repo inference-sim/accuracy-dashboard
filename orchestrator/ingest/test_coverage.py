@@ -184,7 +184,7 @@ def test_the_anchor_section_counts_units_on_the_list():
         anchor = tmp / "anchor.txt"
         anchor.write_text(f"{uid}\n{'f' * 64}\n")
         doc = cv.run(**kw, units_path=anchor)["anchor"]
-        assert doc["counted"] == "units" and doc["listed"] == 2 and doc["in_window"] == 1 and doc["not_in_window"] == 1
+        assert doc["counted"] == "units" and doc["listed"] == 2 and doc["in_pull"] == 1 and doc["not_in_pull"] == 1
         assert doc["grades"]["G2"] == 1
     finally:
         shutil.rmtree(tmp)

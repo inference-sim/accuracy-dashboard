@@ -46,6 +46,7 @@ import settings as st  # noqa: E402
 import supplemental  # noqa: E402
 import sglang_settings as ss  # noqa: E402
 import blis_commands as bc  # noqa: E402
+import build as bld  # noqa: E402
 import contamination  # noqa: E402
 import support as sp  # noqa: E402
 
@@ -123,6 +124,9 @@ class Env:
     vllm_defaults_release: str = ""
     # The engine release the scoring simulator runs (stack.json, LIF-6), e.g. "0.32.0".
     engine_release: str = ""
+    # The commit-distance provider (commit_distance.Distance): the upgrade reports' diffs and an engine checkout. None
+    # publishes no diff, so a run on another commit is G4.
+    distance: object = None
     # The simulator build that scores the run: a release tag, or a commit (pointrecord Simulator).
     sim_build: str = ""
     # The harness commit every point records (design §11.7, X8): the 40-hex commit of the dashboard checkout.
@@ -653,7 +657,7 @@ def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env, simulate: bool
         o = Outcome(point_id=entry["point_id"], identity=entry["identity"], row=entry["row"],
                     reasons=sorted(set(entry["reasons"] + ["blis_refused:extractor_error"])),
                     measurements=entry.get("measurements") or [], build=entry.get("build"))
-    grade_outcome(o, env.kit(o.engine).release, env.simulator(o.engine) if simulate else None)
+    grade_outcome(o, env.kit(o.engine).release, env.simulator(o.engine) if simulate else None, env.distance)
     return o
 
 
@@ -1710,7 +1714,7 @@ def substitutions(o_subs: list[dict], fidelity: dict, unevaluated=None) -> list[
         + gr.unchecked(unevaluated)
 
 
-def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None) -> None:
+def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None, distance=None) -> None:
     """Give one outcome its grade (design §11.3, §11.4; COV-4, COV-5), from data alone.
 
     A scored point is G1 to G4, its record naming every substitution, and its points.csv row
@@ -1719,7 +1723,9 @@ def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None
     simulator refused the scenario, or the scenario lost a recorded value) is neither: it is
     listed as failed (o.faults), never graded. The run's own release is recorded on every point
     (§11.2), read from its recorded build and the server log's banner, and the simulator build and
-    engine release that scored it (pointrecord's Simulator), on every point."""
+    engine release that scored it (pointrecord's Simulator), on every point. A run whose build states a commit
+    and whose Result states the commit the simulator modelled is graded by commit distance (design §11.3), asking
+    `distance` for the ported changes between the two; any other build is graded by release."""
     rel = gr.run_release(o.build or {"image": o.row.get("image")}, o.banner)
     o.run_release = rel.version
     o.simulator = simulator
@@ -1735,8 +1741,19 @@ def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None
         o.g5 = g.g5
         o.g5_reasons = sorted((dict(x) for x in g5), key=lambda r: (r["code"], r.get("subject", "")))
         return
-    g = gr.grade(engine_version=engine_release, release=rel, substitutions=substitutions(o.subs, o.fidelity, o.unevaluated))
-    o.fidelity = {**o.fidelity, "grade": g.grade, "substitutions": g.substitutions, "run_release": rel.version,
+    subs = substitutions(o.subs, o.fidelity, o.unevaluated)
+    b = o.build or {}
+    run_commit = b.get("commit")
+    if o.engine_commit and run_commit and b.get("why") in (None, bld.OUTSIDE_DISTANCE):
+        g = gr.grade_by_commit(run_commit=run_commit, scored_commit=o.engine_commit,
+                               distance=distance or (lambda *_: None), substitutions=subs)
+        if run_commit == o.engine_commit:
+            o.run_release = engine_release
+        elif distance is not None and (rec := distance.record(run_commit, o.engine_commit)):
+            o.fidelity = {**o.fidelity, "commit_distance": rec}
+    else:
+        g = gr.grade(engine_version=engine_release, release=rel, substitutions=subs)
+    o.fidelity = {**o.fidelity, "grade": g.grade, "substitutions": g.substitutions, "run_release": o.run_release,
                   "simulator": simulator}
     if o.engine_commit:
         o.fidelity["engine_commit"] = o.engine_commit

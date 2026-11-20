@@ -72,6 +72,19 @@ python3 orchestrator/baseline/m3_baseline.py report --contract docs/m2/prelimina
   --issues docs/m3/baseline/issues.json --engines docs/m3/baseline/engines.json --out docs/m3/baseline/baseline
 ```
 
+## The count of anchor units whose inputs are recoverable
+
+`recoverable.py` counts, without a simulator, the anchor units whose inputs can be fetched (requirements §3A.8). It needs the blis-substrate checkout `stack.json` pins and network access to the InferenceX API, and no token. The committed report carries no count, because no count has been measured: the check reads the API for each anchor unit, so it is run for real and its output given to `report`.
+
+```bash
+python3 orchestrator/baseline/recoverable.py --ledger SUBSTRATE/catalog/ledger \
+  --anchor SUBSTRATE/catalog/ledger/published/anchor.yaml --today YYYY-MM-DD \
+  --out recoverable.json --units-out recoverable-units.jsonl
+# the same report command as above, with --recoverable recoverable.json, adds the section "Anchor units whose inputs are recoverable"
+```
+
+A unit is *excluded* (AMD or TPU hardware, or a framework no BLIS engine runs), *recoverable* (the API's `/server-log` returned a server log for the unit's kept record) or *not recovered*, with the reason. The API's `/server-log` is the only source probed, so the count is a floor: GitHub job logs and artifacts, and the recipe at the run's commit, are not read, and a unit that needs an agentic export, a P/D recipe or an SGLang launch command is *not recovered* with a `no_probe:` reason. Probing them is the next addition to `classify` in `recoverable.py`.
+
 ## What is not done here
 
 - The same table at v0.18.0, before and after side by side, waits for v0.18.0 (accuracy-dashboard#89 stays open for it).

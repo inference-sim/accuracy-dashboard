@@ -1264,6 +1264,41 @@ def test_pull_window_boundary_keeps_today_minus_179_drops_today_minus_180():
     assert p.window == ("2026-04-27", "2026-10-23")
 
 
+def test_no_age_limit_keeps_a_row_of_any_age():
+    # COV-2: the measured date is a slice attribute, so the default pull and predicate carry no age cut.
+    today = date(2026, 10, 23)
+    for measured, kept in [
+        ("2026-10-23", True),       # today
+        ("2026-04-26", True),       # one day older than the old 180-day cut
+        ("2025-09-29", True),       # the oldest the API serves
+        ("2020-01-01", True),       # any age
+        ("2026-10-24", False),      # after today waits for a later run
+        ("not-a-date", False),      # unparseable is reported, never in
+    ]:
+        assert api.in_window(measured, today) is kept, measured
+        assert api.in_window(measured, today, None) is kept, measured
+
+
+def test_the_default_pull_holds_rows_older_than_180_days():
+    today = date(2026, 10, 23)
+    site = {"/": b'<script src="/_next/static/c/a.js"></script>',
+            "/_next/static/c/a.js": b'x={m:"M"}',
+            "/api/v1/availability": json.dumps([{"model": "m", "framework": "vllm", "date": "2026-10-20"}]).encode()}
+    rows = {"M": [{"id": "new", "model": "m", "framework": "vllm", "date": "2026-10-20"},
+                  {"id": "old", "model": "m", "framework": "vllm", "date": "2026-04-26"},
+                  {"id": "oldest", "model": "m", "framework": "vllm", "date": "2025-09-29"}]}
+
+    def fetch(url):
+        path = url[len(api.BASE):]
+        if path.startswith("/api/v1/benchmarks?model="):
+            return gzip.compress(json.dumps(rows["M"]).encode())
+        return site[path]
+
+    p = api.pull(fetch, today=today)
+    assert [r["id"] for r in p.rows] == ["new", "old", "oldest"]
+    assert api.pull(fetch, today=today, window_days=180).rows == [r for r in p.rows if r["id"] == "new"]
+
+
 def test_run_and_attempt_from_run_url():
     assert api.run_of({"run_url": "https://github.com/o/r/actions/runs/123/attempts/2"}) == ("123", 2)
     assert api.run_of({"run_url": "https://github.com/o/r/actions/runs/123"}) == ("123", 1)

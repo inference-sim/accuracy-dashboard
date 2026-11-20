@@ -4,7 +4,7 @@ run_night() composes the pieces the rest of this package builds -- the increment
 trigger decision (nightly.plan_night), the cumulative-but-cached score, the v3 summary, the
 two-retention index -- into the sequence a CI night runs (no raw store; summary.json is the store):
 
-  1. Pull the current 180-day window into the store, incrementally (reuse frozen points, freeze
+  1. Pull the current rows (no age limit, COV-2) into the store, incrementally (reuse frozen points, freeze
      new rows, drop aged-out ones). The store is rewritten to hold only the current window.
   2. Decide what the night does from #15's trigger table: compare the window's point ids and the
      resolved BLIS tag against last night's.
@@ -82,7 +82,7 @@ def run_night(today: date, blis_tag: str, *, work_dir: Path, data_dir: Path, sta
     age-out is diffed against the recorded ids, not against frozen logs.
 
     `pull_fn(work_dir, today, last_ids, blis_changed) -> (pull_date, window_ids)` lists the window
-    (window_ids = every point id the API reports in the 180 days, cheap) and fetches inputs into
+    (window_ids = every point id the API reports, cheap) and fetches inputs into
     work_dir for the points that will be scored: on an IX-only night only the new points; on a BLIS
     release (blis_changed) the whole window, to rescore it. `score_build_fn(work_dir, blis_tag,
     score_ids, pull_date, window_ids) -> (summary, scored_count)` scores the delta and returns the

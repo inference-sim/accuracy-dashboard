@@ -83,23 +83,23 @@ class Pull:
     window: tuple[str, str] = ("", "")
 
 
-# Exactly the past 180 days, both ends included: today-179 <= measured_date <= today
-# (Discussion #15, "Retention: 1. InferenceX data: exactly the past 180 days"). The window is
-# N calendar days inclusive, so its first day is today-(N-1), NOT today-N -- the old today-N
-# spanned 181 days and is the bug this fixes.
-WINDOW_DAYS = 180
+# No age limit (COV-2): a pull holds every row up to today, and the measured date is a slice attribute, not a gate.
+# A window is still available, as an explicit N-day cut: today-(N-1) <= measured_date <= today, both ends included.
+WINDOW_DAYS = None
 
 
-def window_bounds(today: date, window_days: int = WINDOW_DAYS) -> tuple[date, date]:
-    """The [start, end] of an N-day window ending today, both inclusive. end is today; start is
-    today-(N-1). One definition, so the pull, the store prune, the live view and the not-scored
-    list can never disagree on what "in the window" means."""
+def window_bounds(today: date, window_days: int | None = WINDOW_DAYS) -> tuple[date, date]:
+    """The [start, end] of a window ending today, both inclusive. end is today; start is today-(N-1), or the
+    earliest representable date when there is no limit. One definition, so the pull, the store prune, the live view
+    and the not-scored list can never disagree on what "in the window" means."""
+    if window_days is None:
+        return date.min, today
     return today - timedelta(days=window_days - 1), today
 
 
-def in_window(measured_date, today: date, window_days: int = WINDOW_DAYS) -> bool:
-    """The single predicate every stage uses (Discussion #15): is `measured_date` within the
-    N-day window ending `today`? A date that doesn't parse is never in the window."""
+def in_window(measured_date, today: date, window_days: int | None = WINDOW_DAYS) -> bool:
+    """The single predicate every stage uses: is `measured_date` within the window ending `today`? A date that
+    doesn't parse is never in the window; a date after today is not yet."""
     start, end = window_bounds(today, window_days)
     try:
         d = date.fromisoformat(str(measured_date)[:10])
@@ -108,9 +108,9 @@ def in_window(measured_date, today: date, window_days: int = WINDOW_DAYS) -> boo
     return start <= d <= end
 
 
-def pull(fetch, *, today: date, window_days: int = WINDOW_DAYS) -> Pull:
-    """Every row of every framework measured within the N-day window ending today (both ends
-    included), for every model InferenceX lists. Which frameworks the harness scores is
+def pull(fetch, *, today: date, window_days: int | None = WINDOW_DAYS) -> Pull:
+    """Every row of every framework measured up to today (within the N-day window ending today when one is given,
+    both ends included), for every model InferenceX lists. Which frameworks the harness scores is
     engines.py's table, not this pull's. Sorted by row id, so a pull is order-stable."""
     start, end = window_bounds(today, window_days)
     avail = decode(fetch(API + "/availability"))
