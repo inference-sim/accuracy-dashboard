@@ -1,0 +1,10 @@
+{
+  "kind": "AccuracyPaths",
+  "paths": [
+    ".github/stack-pins.env",
+    "harness/",
+    "orchestrator/ingest/configiq_score.py",
+    "orchestrator/ingest/score.py",
+    "orchestrator/ingest/stack.py"
+  ]
+}
