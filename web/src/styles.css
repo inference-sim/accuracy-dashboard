@@ -364,3 +364,10 @@ details.about .chips{margin:12px 0}
 .classcard .context{max-width:760px}
 .classcard table.classengines{max-width:560px;margin-top:12px}
 .classcard table.classmodels{max-width:760px;margin-top:12px}
+.slices { margin-bottom: 26px; }
+.slices-tbl td, .slices-tbl th { text-align: right; padding: 3px 12px 3px 0; }
+.slices-tbl td:first-child, .slices-tbl th:first-child { text-align: left; }
+.slices-tbl tr.on { background: var(--accent-soft); }
+.slice-units { font-size: 10.5px; color: var(--muted); font-weight: 400; max-width: 560px; }
+.slice-units summary { cursor: pointer; }
+.slice-units .mono { word-break: break-all; }

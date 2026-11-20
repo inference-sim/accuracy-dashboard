@@ -18,6 +18,8 @@ export interface MapeShape {
   ttft: number | null | TooFew
   tpot: number | null | TooFew
   n: number
+  /** Distinct role keys among the points holding the value, set where the client recomputes it (COV-13). */
+  roleKeys?: number
 }
 
 export interface MetricBlock {
@@ -290,6 +292,7 @@ export interface NotScoredPoint {
 export interface Figure {
   mape: number | TooFew
   n: number
+  roleKeys?: number
 }
 
 /** v3: the headline over every graded point, and each grade's share and accuracy. */

@@ -5,13 +5,16 @@
  *
  * Multi-node is hidden by default. The vLLM version is shown per row, never filtered on. The tier switch is applied at
  * aggregation time (a point carries its own tier), not here, so both tiers stay available.
+ * A drilled-in slice (by, sv) keeps only its own points.
  */
 import type { FlatPoint } from './aggregate'
 import type { RouteState } from './route'
+import { inSlice } from './slice'
 
 export function applyFilters(points: FlatPoint[], route: RouteState): FlatPoint[] {
   return points.filter((p) => {
     if (!route.multinode && p.isMultinode) return false
+    if (route.by && route.sv && !inSlice(p, route.by, route.sv)) return false
     return true
   })
 }

@@ -13,6 +13,8 @@ import { SummaryTable } from './components/SummaryTable'
 import { Dropdown } from './components/Dropdown'
 import { Compare } from './components/Compare'
 import { Headline } from './components/Headline'
+import { Slices } from './components/Slices'
+import { gateHeadline, MIN_ROLE_KEYS } from './slice'
 import { Classes } from './components/Classes'
 import { fetchClasses, shouldFetchClasses, type ClassesDoc } from './classes'
 import { Term } from './components/Term'
@@ -236,6 +238,11 @@ function Overview({
   // Every aggregate is recomputed over the points it keeps, so the table, the points and the
   // counts agree with the grades the control names.
   const inTier = (p: FlatPoint) => inGrade(p, route.grade)
+  // The slices are cut from the same points as the table (grade and multi-node filters), before the drilled-in slice narrows them.
+  const sliceable = useMemo(
+    () => applyFilters(allPoints, { ...route, by: null, sv: null }).filter(inTier),
+    [allPoints, route],
+  )
   const noneAtGrade = route.grade !== 'all' && visible.length > 0 && !visible.some(inTier)
 
   // The headline always describes the full latest run under the default view (every scored
@@ -296,6 +303,7 @@ function Overview({
   const selMissing = route.sel != null && selectedPoints.length === 0
 
   const cov = summary.coverage
+  const minRoleKeys = summary.min_points ?? MIN_ROLE_KEYS
 
   return (
     <>
@@ -315,8 +323,20 @@ function Overview({
         measuredRange={measuredRange(headlinePoints)}
         pulledAt={summary.provenance?.pulled_at ?? null}
         split={summary.schema_version === 2 ? headlineSplit : null}
-        graded={summary.headline ?? null}
+        graded={summary.headline ? gateHeadline(summary.headline, headlinePoints, summary.min_points ?? MIN_ROLE_KEYS) : null}
       />
+
+      {summary.schema_version === 3 && (
+        <Slices
+          points={sliceable}
+          by={route.by}
+          sv={route.sv}
+          min={minRoleKeys}
+          notScored={summary.not_scored ?? []}
+          onBy={(by) => update({ by, sv: null, sel: null })}
+          onSv={(sv) => update({ sv, sel: null })}
+        />
+      )}
 
       <h2 className="sectitle">Accuracy by model</h2>
       {/* Filters sit beside the table they change; the headline above ignores them (PR #26 review). */}
@@ -345,7 +365,12 @@ function Overview({
         expanded={expanded}
       />
 
-      <PointsTable points={selectedPoints} title={pointsTitle} selMissing={selMissing} />
+      <PointsTable
+        points={selectedPoints}
+        title={pointsTitle}
+        selMissing={selMissing}
+        minRoleKeys={summary.schema_version === 3 ? minRoleKeys : undefined}
+      />
 
       {/* Every number on this page, per point, with what each one was compared against. */}
       <a className="dl" href="data/latest/summary.json" download="blis-accuracy-results.json">

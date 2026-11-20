@@ -14,6 +14,8 @@ interface Props {
   /** true when a row IS selected (?sel=) but resolves to zero points in this snapshot/filter —
    *  shown distinctly from the "nothing selected yet" prompt (PR #3 review UI-c). */
   selMissing?: boolean
+  /** v3: the minimum role keys under COV-13, stated beside the rows; absent on v1 and v2. */
+  minRoleKeys?: number
 }
 
 // Both TTFT and TPOT render at a fixed 2 decimals — the measured/predicted values carry sub-ms
@@ -77,7 +79,7 @@ function Cell({ v, kind }: { v: number | null; kind: 'ms' | 'err' }) {
   return <>{text}</>
 }
 
-export function PointsTable({ points, title, selMissing = false }: Props) {
+export function PointsTable({ points, title, selMissing = false, minRoleKeys }: Props) {
   // Sort by concurrency, then group repeats by vLLM version, date and sweep so they read in order.
   const sorted = [...points].sort(
     (a, b) =>
@@ -215,6 +217,12 @@ export function PointsTable({ points, title, selMissing = false }: Props) {
       {shapeReason && (
         <p className="pts-note notscored-detail">
           <b>shape not scored:</b> {shapeReason}
+        </p>
+      )}
+      {sorted.length > 0 && minRoleKeys != null && (
+        <p className="pts-note">
+          Every point is listed here. No accuracy is shown over fewer than {minRoleKeys} role keys (a role key
+          is one deployment under one benchmark type), however many points they hold.
         </p>
       )}
       {sorted.length > 0 && (

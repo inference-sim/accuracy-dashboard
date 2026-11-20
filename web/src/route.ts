@@ -4,7 +4,7 @@
  * (RFC B3: deep-link, row-select → points table, default view). Reader and writer live in one
  * module so they cannot drift.
  *
- *   #/?run=<snapshot_id>&runB=<snapshot_id>&sel=<sweepKey>&grade=<G1|G2|G3|all>&mn=<0|1>
+ *   #/?run=<snapshot_id>&runB=<snapshot_id>&sel=<sweepKey>&grade=<G1|G2|G3|all>&mn=<0|1>&by=<attribute>&sv=<slice>
  *
  * `run` selects which published nightly snapshot to view (absent = the latest). Choosing a run
  * only loads older results — it never triggers a new evaluation.
@@ -17,9 +17,13 @@
  * grade: measured_or_resolved is G1, anything else is all; main.tsx rewrites such a link to
  * `grade=` so it keeps working.
  * mn (multi-node) defaults to 0 (hidden).
+ * `by` names the attribute to slice by (COV-13) and `sv` the slice drilled into; `sv` without a
+ * known `by` is ignored.
  *
  * An old link's `vllm=` parameter (a version filter that no longer exists) is ignored.
  */
+
+import { sliceAttr } from './slice'
 
 /** The cumulative grade filter: a point is shown when its grade is at or above the named one. */
 export type GradeFilter = 'G1' | 'G2' | 'G3' | 'all'
@@ -37,6 +41,9 @@ export interface RouteState {
   /** The closeness grades shown, cumulatively. */
   grade: GradeFilter
   multinode: boolean
+  /** The attribute the accuracy is sliced by (slice.ts), and the slice drilled into, or null. */
+  by: string | null
+  sv: string | null
 }
 
 export const DEFAULT_ROUTE: RouteState = {
@@ -46,6 +53,8 @@ export const DEFAULT_ROUTE: RouteState = {
   sel: null,
   grade: 'all',
   multinode: false,
+  by: null,
+  sv: null,
 }
 
 function query(hash: string): URLSearchParams {
@@ -66,6 +75,8 @@ export function parseRoute(hash: string): RouteState {
   // comparison, so old shared links keep working.
   const v = p.get('view')
   const view = v === 'dev' || (runB && runB !== '') ? 'dev' : v === 'classes' ? 'classes' : 'overview'
+  const by = sliceAttr(p.get('by'))?.id ?? null
+  const sv = p.get('sv')
   return {
     view,
     run: run && run !== '' ? run : null,
@@ -73,6 +84,8 @@ export function parseRoute(hash: string): RouteState {
     sel: sel && sel !== '' ? sel : null,
     grade,
     multinode: p.get('mn') === '1',
+    by,
+    sv: by && sv ? sv : null,
   }
 }
 
@@ -85,6 +98,8 @@ export function routeToHash(state: RouteState): string {
   if (state.sel) p.set('sel', state.sel)
   if (state.grade !== DEFAULT_ROUTE.grade) p.set('grade', state.grade)
   if (state.multinode) p.set('mn', '1')
+  if (state.by) p.set('by', state.by)
+  if (state.by && state.sv) p.set('sv', state.sv)
   const qs = p.toString()
   return qs ? `#/?${qs}` : '#/'
 }
