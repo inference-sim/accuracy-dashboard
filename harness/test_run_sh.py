@@ -404,12 +404,14 @@ def test_data_pinned_by_commit_is_recorded_as_given_and_is_as_good_as_a_tag(tmp_
 
 def test_every_action_of_every_workflow_is_pinned_to_a_commit_with_its_version_in_a_comment():
     assert len(WORKFLOWS) >= 3
+    pinned = 0
     for wf in WORKFLOWS:
-        uses = re.findall(r"^\s*-?\s*uses:\s*(\S+)(.*)$", wf.read_text(), re.M)
-        assert uses, wf
+        uses = re.findall(r"^\s*-?\s*uses:\s*(\S+)(.*)$", wf.read_text(), re.M)  # a workflow that runs only gh has none
+        pinned += len(uses)
         for ref, rest in uses:
             assert re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", ref), f"{wf.name}: {ref} is not pinned to a commit SHA"
             assert re.fullmatch(r"\s*# v\d+\.\d+\.\d+", rest), f"{wf.name}: {ref} has no version comment"
+    assert pinned, "no workflow uses an action: the pattern above matches nothing"
 
 
 def test_ci_installs_python_dependencies_only_from_the_hashed_requirements_file():
