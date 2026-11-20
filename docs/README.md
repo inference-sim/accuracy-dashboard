@@ -50,5 +50,6 @@ The dashboard asks one question of every InferenceX benchmark point it can read:
 | [The grade filter](m3/grade-filter/README.md) | The cumulative closeness-grade filter that replaced the tier toggle, the deprecated `tier` field, and how old links and v1 snapshots read. |
 | [configiq scored by simulation](m3/configiq/README.md) | Why no configiq point reached the simulator, how a dataset row becomes a scenario and a workload, what is refused by name, and the command. |
 | [The classes page](m3/classes/README.md) | The three classes of points the dashboard counts apart (regular InferenceX, InferenceX reconstructed recipe at G4, configiq), where each class's numbers come from, and how a derived file is refreshed. |
+| [The whole-run held-out gate](m3/gate/README.md) | M3.2: the rule that every accuracy change lands through one held-out evaluation, the pre-registration format, the budget ledger, what the gate job may print, and the maintainer steps. |
 
 Design terms (D7, COV-2, X8, X19 and the like) are the numbered rules of the BLIS design document; the pages say what each one means where it is used.

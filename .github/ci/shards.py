@@ -113,13 +113,18 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
                "orchestrator/test_update_index.py"),
         pytest("The M3 baseline and the grade ceilings", "orchestrator/baseline/test_ceiling.py",
                "orchestrator/baseline/test_ported_changes.py", "orchestrator/baseline/test_m3_baseline.py",
-               "orchestrator/baseline/test_release_runs.py"),
+               "orchestrator/baseline/test_release_runs.py", "orchestrator/baseline/test_recoverable.py"),
         pytest("The facts the estimation evaluator gets, the evaluator against the substrate's vectors, and the baseline row placement",
                "orchestrator/ingest/test_exact.py", "orchestrator/ingest/test_stand_in_facts.py",
                "orchestrator/baseline/test_freeze_rows.py"),
         pytest("P/D cells paired, frozen and priced, and the git recipes the anchors are read from",
                "orchestrator/baseline/test_pd_pairing.py", "orchestrator/baseline/test_pd_freeze.py",
                "orchestrator/baseline/test_pd_net.py", "orchestrator/baseline/test_git_recipes.py"),
+    ],
+    # The whole-run held-out gate: the role rule, the budget, the statistics and the aggregates-only guarantee, on a fake partition.
+    "gate": [
+        pytest("The whole-run gate: pre-registration, budget, lanes, statistics, pull-request rule, aggregates only",
+               "orchestrator/gate/test_gate_units.py", "orchestrator/gate/test_gate_run.py"),
     ],
     # The two repository-wide checks that were hidden behind earlier failures: they run on their own.
     "boundary": [

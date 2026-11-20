@@ -11,9 +11,12 @@ G5 with each grade's share, count and own accuracy (COV-11), and each point's gr
                                --catalog DIR --registry DIR --out LANE.json
     m3_baseline.py issues --fields FIELDS --source TEXT --issues ISSUES.json
     m3_baseline.py report --contract DIR --sglang-lane LANE.json --ported PORTED.json --issues ISSUES.json
-                          --engines ENGINES.json --out PREFIX
+                          --engines ENGINES.json --out PREFIX [--recoverable RECOVERABLE.json]
     m3_baseline.py engines --sglang-provenance BLIS_SGLANG/provenance.go --sglang-source TEXT
                            --routers SUBSTRATE/catalog/routers --routers-source TEXT --out ENGINES.json
+
+`report --recoverable` adds, from recoverable.py's output, the count of anchor units whose inputs are recoverable
+(plan row 12); without it the report is unchanged.
 
 `engines` records the SGLang release blis-sglang's provenance names (its `Upstream` Version) and the router table's
 entries (router, mode, policy), with the commits they were read at, so the report reads neither from a flag.
@@ -45,6 +48,7 @@ sys.path.insert(0, str(HERE.parent / "ingest"))
 import ceiling as cl  # noqa: E402
 import compare as cmp  # noqa: E402
 import grade as gr  # noqa: E402
+import recoverable as rcv  # noqa: E402
 
 FORMAT = "m3-baseline-1"
 LANES = ("vllm", "sglang")
@@ -299,7 +303,8 @@ def lane_report(points: list[dict], *, issues: dict, engine_version: str, ported
     return out, ceil
 
 
-def report(*, contract: Path, splits: Path | None, sglang: dict, ported: dict, issues: dict, engines: dict) -> tuple[dict, dict]:
+def report(*, contract: Path, splits: Path | None, sglang: dict, ported: dict, issues: dict, engines: dict,
+           recoverable: dict | None = None) -> tuple[dict, dict]:
     bad = check_issue_classes(issues)
     if bad:
         raise BaselineError("the issue file's reasons disagree with their classes: " + "; ".join(bad))
@@ -334,6 +339,11 @@ def report(*, contract: Path, splits: Path | None, sglang: dict, ported: dict, i
                                 "cited": len(ported["cited"])},
            "issues_fields_source": issues["fields"].get("source"),
            "engines_source": {"sglang": engines["sglang"]["source"], "routers": engines["routers"]["source"]}}
+    if recoverable is not None:
+        try:
+            doc["recoverable"] = rcv.check(recoverable)
+        except rcv.RecoverableError as e:
+            raise BaselineError(str(e))
     per_point = {"vllm": vceil, "sglang": sceil}
     return doc, per_point
 
@@ -347,6 +357,20 @@ def _n(x):
 def _share(n, total):
     import headline as hl
     return hl.TOO_FEW if n < hl.MIN_POINTS else f"{100 * n / total:.1f}%"
+
+
+def _recoverable_markdown(r: dict) -> list[str]:
+    t = rcv.totals(r)
+    L = ["## Anchor units whose inputs are recoverable (requirements §3A.8)", "",
+         f"Checked on {r['checked_on']} against the ledger at `{r['source']['ledger_revision']}` and the anchor list "
+         f"(sha256 `{r['source']['anchor_list_sha256']}`), without simulating. {r['source']['meaning']}", "",
+         f"**{t['recoverable']} of {t['counted']} counted anchor units have recoverable inputs** "
+         f"({r['anchor_units']} anchor units, {t['excluded']} excluded).", "",
+         "| Part | Units | Source or reason |", "|---|---|---|"]
+    for key, label in ((rcv.RECOVERABLE, "Recoverable"), (rcv.NOT_RECOVERED, "Not recovered"), (rcv.EXCLUDED, "Excluded")):
+        for detail, n in r[key].items():
+            L.append(f"| {label} | {n} | `{detail}` |")
+    return L + [""]
 
 
 def markdown(doc: dict) -> str:
@@ -412,6 +436,8 @@ def markdown(doc: dict) -> str:
               "| Reason | Blocks | Alone | Issue |", "|---|---|---|---|"]
         L += [f"| `{r['reason']}` | {r['blocks']} | {r['alone']} | {r['issue'] or 'none cited'} |" for r in lane["refused"]]
         L.append("")
+    if "recoverable" in doc:
+        L += _recoverable_markdown(doc["recoverable"])
     return "\n".join(L) + "\n"
 
 
@@ -451,6 +477,8 @@ def main(argv=None) -> int:
     for k in ("contract", "sglang-lane", "ported", "issues", "out"):
         r.add_argument(f"--{k}", required=True, type=Path)
     r.add_argument("--splits", type=Path)
+    r.add_argument("--recoverable", type=Path, help="recoverable.py's output: adds the count of anchor units whose "
+                                                    "inputs are recoverable")
     r.add_argument("--engines", required=True, type=Path)
     e = sub.add_parser("engines")
     e.add_argument("--sglang-provenance", required=True, type=Path)
@@ -480,7 +508,8 @@ def main(argv=None) -> int:
         else:
             doc, per_point = report(contract=a.contract, splits=a.splits, sglang=json.loads(a.sglang_lane.read_text()),
                                     ported=json.loads(a.ported.read_text()), issues=json.loads(a.issues.read_text()),
-                                    engines=json.loads(a.engines.read_text()))
+                                    engines=json.loads(a.engines.read_text()),
+                                    recoverable=json.loads(a.recoverable.read_text()) if a.recoverable else None)
             write(a.out, doc, per_point)
             print(f"wrote {a.out}.json, {a.out}.md and ceilings.jsonl")
     except (BaselineError, cmp.CompareError) as e:
