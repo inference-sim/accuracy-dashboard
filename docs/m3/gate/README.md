@@ -1,0 +1,166 @@
+# The whole-run held-out gate
+
+M3.2: every change that moves accuracy lands through one held-out evaluation, returned as aggregates on its
+pull request. This page is the rule, the pre-registration format, the budget ledger, what the gate job
+guarantees about its output, and the steps only a maintainer can take. The design is VAL-6 (the split and the
+success criteria are committed first), design 12.3 (a pre-registration is committed before any held-out datum
+is read) and design 13.5 (the gate, its job split and its budget).
+
+Nothing here has been run against the real partition seed. The code is exercised with a fake partition
+(`orchestrator/gate/fakepartition.py`); the first real evaluation waits for the maintainer steps below.
+
+## The rule
+
+A pull request body holds, on a line of its own, exactly one of:
+
+```
+Gate: pre-registration <id>
+Gate: not an accuracy change - <reason of at least 10 characters>
+```
+
+A change to a path listed in `state/gate/accuracy-paths.json` moves published accuracy. It must cite a
+pre-registration, and the pre-registration must already be on `main`: it is committed first, and it is never
+edited, renamed or deleted afterwards. A pre-registration added by a pull request is checked to be well
+formed; the pull request that adds it cites `not an accuracy change`. The workflow `gate-rule.yml` checks all
+of this on every pull request, with no secret, and it runs the base branch's checker (and reads the base
+branch's list of accuracy paths), so a pull request cannot loosen the rule it is judged by.
+
+The list of accuracy paths is a conservative first draft for a maintainer to review: the pin file, the
+harness, and the three scorer modules. A change that moves accuracy by a path the list misses is not caught
+by the rule; it is caught by review, and the fix is to add the path to the list.
+
+## The pre-registration
+
+`state/gate/preregistrations/<id>.json`, read strictly (an unknown or missing field is refused):
+
+```json
+{
+  "kind": "PreRegistration",
+  "id": "example-transfer-rule",
+  "partition_version": 1,
+  "hypothesis": "one sentence: what the change does and why it should help",
+  "layer": "one sentence: the layer of the model it changes",
+  "predicted_change": "one sentence: the lanes and metrics it should move, and in which direction",
+  "target_lanes": [{"engine": "vllm", "chip": "gb200"}],
+  "sources": ["inferencex"],
+  "criteria": [{"criterion": "error", "margin": 0.02}, {"criterion": "distance", "margin": 0.05}],
+  "metrics": ["tpot_us", "ttft_us"],
+  "substream": "gate/example-transfer-rule",
+  "measured_sha256": "<64 hex: the SHA-256 of the measured table, printed by the base gate-candidate run>"
+}
+```
+
+* A target lane names any of `engine`, `modelled_commit`, `chip`, `model`, `layout` (the deployment's
+  configuration hash). A lane the pattern does not name is a guard lane.
+* A target lane passes when the candidate's error is no worse than the base's, tested against "the
+  difference is at least 0"; a guard lane passes when the candidate is not worse than the base by the margin,
+  tested against "the difference is at least the margin". Both are one-sided BCa bootstrap tests with 10,000
+  resamples over role keys (the unit of independence), with the Holm correction at 0.05 over all tests of the
+  evaluation.
+* The distance criterion is recorded but judged only when per-request samples exist; today it comes back
+  `unjudged`. A verdict is `pass`, `fail` or `unjudged`.
+* A margin above the invariant registry's ceiling (recorded in the ledger) is refused. The ceiling is
+  `null` in the ledger today, so the gate refuses every evaluation until a maintainer copies the registry's
+  values into it.
+
+## The budget ledger
+
+`state/gate/ledger.json` (kind `GateLedger`) holds, for each partition version, `budget` (a whole number, or
+`null`) and the `evaluations` spent against it, each with the pre-registration, its SHA-256, the base and
+candidate commits, the gate run's id and the verdict. A `null` budget means the number is not decided (A5): the
+gate refuses to evaluate and nothing supplies a default. A pre-registration is evaluated once. When the
+budget is reached the next release uses a new partition version.
+
+The gate job pushes nothing. It writes the next `ledger.json` as an artifact, and a maintainer commits it. The
+next run refuses while any earlier successful gate run is missing from the ledger on `main`, so two
+evaluations cannot be spent against one count.
+
+## How an evaluation runs
+
+1. Commit the pre-registration to `main` (a pull request that cites `not an accuracy change`).
+2. Dispatch `gate-candidate.yml` on `main` (the base) and on the branch under test (the candidate), with the
+   same `sim`, `today` and `label`. Each scores every unit that is not on the published fit or anchor list, so
+   neither run can tell which are held, and keeps a contract, a Predictions document and a measured table.
+   The base run's summary prints the measured table's SHA-256, which goes in the pre-registration. Because
+   the pre-registration is committed before the candidate exists, the base run comes first, and the table's
+   hash is pinned by the pre-registration before any held datum is read.
+3. The pull request body cites the pre-registration. A maintainer or the agent dispatches `whole-run-gate.yml`
+   on `main` with the pre-registration, the pull request number and the two run ids (A3).
+4. The gate job checks the pull request, the runs and the artifacts, draws the roles from the seed, keeps the
+   held units, and posts the aggregates on the pull request as one comment.
+
+Lanes with fewer than 10 role keys are merged on (engine, commit, chip), then on (engine, commit), and
+otherwise only counted. A merged lane is named only by the fields its members share; a regression confined to
+one member can pass inside it. Units on a legacy side (their old labels are public) are reported apart and
+affect no verdict.
+
+## What the output may hold
+
+Only aggregates over lanes of at least 10 held role keys: lane names, counts, differences, confidence
+bounds, p-values, and a verdict. Never a unit id, a role key, a per-unit value, a role, or any part of the
+seed. This is enforced twice: the report is checked against an allow-list of keys and types
+(`orchestrator/gate/guard.py`), and every text that leaves the job (the comment, the report, the log lines
+and every error) is scrubbed against the identifiers and the seed. Any unexpected failure of the evaluation is
+reported as its exception type only. `orchestrator/gate/test_gate_run.py` runs the whole path with a fake seed
+and asserts that none of its identifiers or values appears on stdout, stderr or in any file written.
+
+## PROPOSAL: the evaluation budget (A5) - takes no effect
+
+**Proposed: 12 held evaluations for partition version 1.** This is a proposal for the maintainer. The ledger
+holds `budget: null`, the gate refuses on it, and no code reads this page.
+
+Derivation. Each pre-registered change receives one evaluation. The changes the rows pre-register (plan
+Table W):
+
+| Row | Change that moves accuracy | Pre-registrations |
+|---|---|---|
+| 3 | the blis-vllm upgrade from v0.33.0 to vLLM main `b582592d5a62`, which "has passed the whole-run gate" | 1 |
+| 7 | the cross-generation transfer rule, used only if it beats roofline on the same units | 1 |
+| 9 | the GB200 coefficients of Mistral-Large-4 and Inkling-2-Small (one change; no measured runs of these models exist, so its target lanes are expected to come back `unjudged`) | 1 |
+| 15 | the SGLang estimation rules (the settings given an estimation rule; the ones proven inert or refused are not accuracy changes) | 1 |
+| 23 | GB200 decode cost and the KV pool size (the other items of the row are not yet classified, and count once they are) | 2 |
+| 29 | the refit of each engine | 2 |
+| | planned | 8 |
+
+The reserve is 4, half the planned count. A failed or `unjudged` evaluation cannot be repeated for the same
+pre-registration, so a corrected change needs a new one, and the changes most likely to need one are the
+upgrade (row 3), the transfer rule (row 7) and the two refits (row 29): one retry each. That reserve is a
+judgement, not a measured rate. 8 planned + 4 reserve = 12.
+
+What the proposal leaves open, for the maintainer:
+
+* Whether the nightly and pre-release runs of design 13.5 (against the previous release and the best published
+  release) count against the budget. They are not implemented here; if they count, 12 is too few.
+* Whether the release of A2, which publishes the new fit list, starts a new partition version. If it does,
+  row 29 (2 planned, 1 reserve) is spent against the new version's budget and version 1 needs 9.
+* Rows 9 and 23 may add or remove pre-registrations once their items are classified.
+
+## Maintainer steps
+
+* **A1, merge.** Review and merge this change. Add `gate-rule` as a required check if the rule should block.
+  Review `state/gate/accuracy-paths.json`.
+* **A3, secret and dispatch.** Provision the environment `ledger` with the secret `LEDGER_SEED` (the 32-byte
+  seed, in hex, whose SHA-256 `ledger.yaml` records) and restrict the environment to `main`. Dispatch
+  `whole-run-gate.yml` on `main`. The workflow reads the secret by name in one step only. The agent never holds
+  it. The candidate runs read public data and need no secret. The gate job refuses a pull request from a
+  fork, since its candidate run must be a run of this repository.
+* **A5, the budget.** Decide the number and set `partitions["1"].budget` in `state/gate/ledger.json`; copy the
+  registry's margin ceilings into `margin_ceiling`. The gate refuses until both are set.
+* After each evaluation, commit the `ledger.json` artifact of the gate run to `main`.
+
+## Deviations and what is not verified
+
+* **The two candidate runs and the gate job have not been run.** `gate-candidate.yml` and `whole-run-gate.yml`
+  were written from `score-contracts.yml` and the Actions API reference, and checked only for YAML syntax and
+  for the repository's own lints; nothing was dispatched. The bindings between runs (that both froze the same
+  pull, scored under the same settings, and carry the commit the API reports) are checked by the code and
+  tested with fakes; the first real dispatch is their first real test.
+* The held-out set is the InferenceX units only; no other source has held units.
+* The harness digest that the base and candidate must share is the SHA-256 of `provenance.json` without the
+  harness commits; if two freezes of the same day differ, the gate refuses and the runs are repeated.
+* The distance criterion is `unjudged` (no per-request samples reach the gate).
+* The metrics list is required in the pre-registration because the metric registry is not available to this
+  repository.
+* Evaluations spent by a dispatch are counted when a maintainer commits the ledger; the next run refuses until
+  then. This costs a manual step for each evaluation in return for a gate job that cannot write to the
+  repository.

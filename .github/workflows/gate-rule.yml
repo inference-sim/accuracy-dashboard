@@ -1,0 +1,54 @@
+name: gate-rule
+
+# The rule that every accuracy change lands through the whole-run held-out gate (design VAL-6, Table DC
+# "Gate as the path"; docs/m3/gate/README.md). A pull request states, on a line of its own, either
+#   Gate: pre-registration <id>
+#   Gate: not an accuracy change - <reason>
+# and a change to a path in state/gate/accuracy-paths.json must cite a pre-registration that is already on
+# the base branch. This job holds no secret and reads no partition. It runs the BASE branch's checker over the
+# pull request's tree, so a pull request cannot loosen the rule it is judged by; where the base has no checker
+# yet (the change that introduces the rule) it says so and passes.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gate-rule-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  rule:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          path: head
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+      - name: Check the pull request against the rule
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [ ! -f base/orchestrator/gate/gate.py ]; then
+            echo "The base branch has no gate checker yet; the rule starts with the change that adds it."
+            exit 0
+          fi
+          printf '%s' "$PR_BODY" > "$RUNNER_TEMP/body.txt"
+          git -C head diff --name-status --no-renames "$BASE_SHA" HEAD > "$RUNNER_TEMP/changes.txt"
+          python3 base/orchestrator/gate/gate.py check-pr --body-file "$RUNNER_TEMP/body.txt" \
+            --changes-file "$RUNNER_TEMP/changes.txt" --root head --base-root base
