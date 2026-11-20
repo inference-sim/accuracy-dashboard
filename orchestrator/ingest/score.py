@@ -631,6 +631,9 @@ class Outcome:
     # What the point record (pointrecord.py) needs of the Result and the run: the Result's data block, and
     # the number of requests behind the predicted and the measured mean.
     result_data: dict | None = None
+    # The upstream commit of the engine the Result's build modelled (Result engine.commit, LIF-6): what a run on
+    # another commit is graded against, by commit distance (grade.grade_by_commit). None for a build that states none.
+    engine_commit: str | None = None
     samples: tuple | None = None
     # Set by _run_result when the simulator refused a stated value that the model never reads: the scorer runs the point once
     # more without it (_score_one) and names the omission.
@@ -995,7 +998,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     catalog_size = cat.packaging(sup.chip)["gpus_per_node"]
     node = ir.resolve(env.runner_table, row["hardware"], run_date=ident["measured_date"],
                       launch_size=st.recorded_node_size(launch), fixes_packaging=catalog_size is not None)
-    b = st.build(c, name=name, model=sup.model, part=part, engine_version=kit.release,
+    b = st.build(c, name=name, model=sup.model, part=part,
                  field_list=kit.field_list, catalog_node_size=catalog_size, node=node,
                  draft_model=sup.drafter, launch_config=launch, engine_kind=fw.engine)
     o.reasons += ss.parallel_reasons(b.reasons, c, kit.field_list) if sglang else b.reasons
@@ -1083,6 +1086,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
         return o
 
     try:
+        o.engine_commit = result.engine_commit(doc)
         o.subs += result.coefficient_substitutions(doc)
         o.subs += _acceptance_subs(b, doc, log)
     except result.ResultError as e:
@@ -1340,6 +1344,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     requests["achieved_concurrency"] = flight["achieved_concurrency"]
 
     try:
+        o.engine_commit = result.engine_commit(doc)
         o.subs += result.coefficient_substitutions(doc)
         o.subs += _acceptance_subs(b, doc, log)
     except result.ResultError as e:
@@ -1624,7 +1629,7 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
                 o.subs.append({"kind": "estimated", "subject": f"engine.{role}.max_model_len",
                                "detail": f"not stated by the recipe; vLLM resolves it to the checkpoint's max_position_embeddings, "
                                          f"{win} (the catalog model {sup.model}'s config.json)"})
-    builts = {role: st.build(decided[role], name=name, model=sup.model, part=part, engine_version=release,
+    builts = {role: st.build(decided[role], name=name, model=sup.model, part=part,
                              field_list=field_list, catalog_node_size=catalog_size, node=node,
                              draft_model=sup.drafter, launch_config=launches[role], engine_kind=fw.engine) for role in pools}
     if sglang:
@@ -1733,6 +1738,8 @@ def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None
     g = gr.grade(engine_version=engine_release, release=rel, substitutions=substitutions(o.subs, o.fidelity, o.unevaluated))
     o.fidelity = {**o.fidelity, "grade": g.grade, "substitutions": g.substitutions, "run_release": rel.version,
                   "simulator": simulator}
+    if o.engine_commit:
+        o.fidelity["engine_commit"] = o.engine_commit
     if not o.would_run_simulator:      # a point graded without the simulator has no points.csv row
         o.csv_row[contract.POINTS_HEADER.index(contract.GRADE_COLUMN)] = g.grade
 

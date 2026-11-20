@@ -14,6 +14,8 @@ import re
 import sys
 from pathlib import Path
 
+import yaml
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from gen_scenarios import DrafterError, PackagingError, emit, speculative_drafter  # noqa: E402
@@ -49,7 +51,7 @@ def sweep(model="minimax-m2.5", stated=None, gpu="h200", node=8, tp=4):
 
 
 def engine(dep, field):
-    text = emit(dep, {"1k1k"}, OPEN, "0.32.0")
+    text = emit(dep, {"1k1k"}, OPEN)
     m = re.search(rf"^ +{field}: (\S+)$", text, re.M)
     return m.group(1) if m else None
 
@@ -87,7 +89,7 @@ def stated_values_only():
             for precision, quant in (("fp8", "fp8"), ("bf16", None)):
                 dep = sweep(stated=stated)
                 dep["precision"] = precision
-                got = engine_block(emit(dep, {"1k1k"}, OPEN, "0.32.0"))
+                got = engine_block(emit(dep, {"1k1k"}, OPEN))
                 want = set(subset) | ({"quantization"} if quant else set())
                 if set(got) != want or any(k in got for k in ONCE_WRITTEN):
                     bad.append((subset, precision, sorted(got)))
@@ -152,7 +154,7 @@ def drafters():
     dep = eagle3("Inferact/MiniMax-M3-EAGLE3")
     name = speculative_drafter(cat, dep)
     ck("an EAGLE3 run names the catalog drafter its draft checkpoint is", name == "minimax-m3-eagle3", repr(name))
-    block = speculative_block(emit(dep, {"1k1k"}, OPEN, "0.32.0", name))
+    block = speculative_block(emit(dep, {"1k1k"}, OPEN, name))
     ck("its deployment drafts with that drafter",
        (block.get("method"), block.get("draft_model")) == ("eagle3", "minimax-m3-eagle3"), repr(block))
     local = eagle3("/data/models/MiniMax-M3-EAGLE3")
@@ -171,7 +173,7 @@ def drafters():
                                            "draft_model": "deepseek-ai/DeepSeek-V4-Pro"})
     ck("an MTP run that names the served model as its draft drafts with its own speculator",
        speculative_drafter(cat, mtp) is None
-       and "draft_model" not in speculative_block(emit(mtp, {"1k1k"}, OPEN, "0.32.0")))
+       and "draft_model" not in speculative_block(emit(mtp, {"1k1k"}, OPEN)))
     ck("a run that does not draft names no drafter", speculative_drafter(cat, sweep(stated={})) is None)
 
 
@@ -186,7 +188,7 @@ def main() -> int:
     ck("a recorded node of 4 is written as 4, and 8 ranks span two of them",
        cluster_of(sweep(gpu="h100", node=4, tp=8), OPEN) == {"hardware": "h100", "nodes": "2", "gpus_per_node": "4",
                                                               "fabric": "ib-400g"})
-    multi = emit(sweep(gpu="h100", node=4, tp=8), {"1k1k"}, OPEN, "0.32.0")
+    multi = emit(sweep(gpu="h100", node=4, tp=8), {"1k1k"}, OPEN)
     text = next(iter(multi.values())) if isinstance(multi, dict) else str(multi)
     ck("a multi-node scenario lists cost-model-fabric (without it the handoff is priced 23% fast)",
        "cost-model-fabric" in text and "ASSUMED" in text)
@@ -196,15 +198,15 @@ def main() -> int:
     import settings as st_
     st_.FABRIC_WHEN_UNRECORDED = "refuse"
     try:
-        refused = emit(sweep(gpu="h200", node=4, tp=8), {"1k1k"}, OPEN, "0.32.0")
+        refused = emit(sweep(gpu="h200", node=4, tp=8), {"1k1k"}, OPEN)
         ck("under the refuse switch a multi-node scenario writes no fabric and no fabric coefficient",
            "fabric: ib" not in refused and "cost-model-fabric" not in refused and "NOT WRITTEN" in refused)
     finally:
         st_.FABRIC_WHEN_UNRECORDED = "assume"
-    one = emit(sweep(gpu="h100", node=8), {"1k1k"}, OPEN, "0.32.0")
+    one = emit(sweep(gpu="h100", node=8), {"1k1k"}, OPEN)
     ck("a one-node scenario lists no fabric set", "cost-model-fabric" not in (next(iter(one.values())) if isinstance(one, dict) else str(one)))
     try:
-        emit(sweep(gpu="h100", node=None), {"1k1k"}, OPEN, "0.32.0")
+        emit(sweep(gpu="h100", node=None), {"1k1k"}, OPEN)
         ck("no recorded node size on a chip that fixes none is refused", False)
     except PackagingError as e:
         ck("no recorded node size on a chip that fixes none is refused as value_not_recorded",
@@ -216,10 +218,10 @@ def main() -> int:
        engine(sweep(stated={}), "gpu_memory_utilization") is None)
     ck("a corpus with no stated_config writes none either",
        engine(sweep(), "gpu_memory_utilization") is None)
-    for rel in ("0.32.0", "0.33.0"):
-        t = emit(sweep(stated={}), {"1k1k"}, OPEN, rel)
-        ck(f"the engine is stated as engine: {{kind, version}} at the release given ({rel}), never engine_version",
-           "engine:\n  kind: vllm\n  version: \"%s\"" % rel in t and "engine_version" not in t.replace("never engine_version", ""))
+    t = emit(sweep(stated={}), {"1k1k"}, OPEN)
+    scen = yaml.safe_load(t.split("\n---\n", 1)[0])
+    ck("the engine is stated as engine: {kind: vllm} alone: no release or commit, never engine_version (SIM-1, LIF-6)",
+       scen["engine"] == {"kind": "vllm"} and "engine_version" not in scen)
     ck("a stated block_size is written as stated",
        engine(sweep(stated={"block_size": 128}), "block_size") == "128")
     # X19, VLM-1: the engine repository owns engine defaults; a generator never writes one.
@@ -248,7 +250,7 @@ def main() -> int:
     drafters()
 
     # The relocation reworded comments but must emit valid Scenario + Deployment docs.
-    text = emit(sweep(stated={}), {"1k1k"}, OPEN, "0.32.0")
+    text = emit(sweep(stated={}), {"1k1k"}, OPEN)
     ck("emits both a Scenario and a Deployment document",
        "kind: Scenario" in text and "kind: Deployment" in text)
 

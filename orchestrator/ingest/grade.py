@@ -235,6 +235,19 @@ def grade(*, engine_version: str, release: Release, substitutions: list[dict],
     return Graded(G2 if subs else G1, _sorted(subs))
 
 
+def grade_by_commit(*, run_commit: str, scored_commit: str, distance, substitutions: list[dict],
+                    g5: list[dict] | None = None) -> Graded:
+    """The point's grade when the run and the scoring simulator are told apart by upstream commit, not release.
+
+    distance(run_commit, scored_commit) returns the ported functions that differ between the two commits,
+    or None when no diff is published for them (G4). The diff itself comes from the engine's upgrade
+    report; this function only asks.
+    """
+    changed = None if run_commit == scored_commit else distance(run_commit, scored_commit)
+    return grade(engine_version=scored_commit, release=Release(run_commit, False), substitutions=substitutions, g5=g5,
+                 ported=None if changed is None else {"changed": {run_commit: changed}})
+
+
 def check(points: list[dict], engine_version) -> list[str]:
     """COV-4, COV-5 and COV-6 over a run's points: every point has exactly one grade, every G5
     reason is on the closed list, every G2 to G4 substitution is named, each point's grade

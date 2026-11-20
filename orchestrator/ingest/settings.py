@@ -1073,14 +1073,15 @@ def recorded_node_size(launch: dict | None) -> int | None:
     return gpn if isinstance(gpn, int) and not isinstance(gpn, bool) and gpn > 0 else None
 
 
-def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str, field_list,
+def build(d: Decided, *, name: str, model: str, part: Part, field_list,
           catalog_node_size: int | None, node: ir.NodeSize, draft_model: str | None = None,
           launch_config: dict | None = None, engine_kind: str = "vllm") -> Built:
     """The Scenario + Deployment for one point, from the decided settings.
 
     Only what the run recorded is written, under the engine's own names (LOCATIONS), and the
-    substitute an estimation rule states. engine_version is the release the scoring simulator
-    runs (stack.json), not the run's own (design §11.2). A setting no source recorded is left
+    substitute an estimation rule states. The scenario names the engine kind and no release or
+    commit: the scoring build fixes them (stack.json) and its Result records them (LIF-6, SIM-1,
+    design §11.2). A setting no source recorded is left
     unset, so the engine resolves it (X19); the dashboard holds no list of the settings an
     engine needs (design §11.1). If the engine refuses the scenario for want of one, score.py
     maps its refusal to value_not_recorded, naming the field. The cluster holds the run's own
@@ -1093,9 +1094,7 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
     value_not_recorded, or value_conflict where the two sources differ, and no size is invented.
     A later record the table supplied is named as a G2 substitution.
 
-    engine_kind is the engine the run executed. A vLLM scenario names its release by engine_version, as
-    before; any other engine's names it by engine: {kind, version}, the form the scenario takes for an
-    engine other than the first. The ranks of an SGLang run are tp x pp (x dp when attention is not
+    engine_kind is the engine the run executed, written as engine: {kind}. The ranks of an SGLang run are tp x pp (x dp when attention is not
     data-parallel): with enable_dp_attention the data-parallel groups divide the tensor-parallel ranks."""
     import fields as fl
     b = Built()
@@ -1173,10 +1172,8 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
         if fabric is not None:
             cluster["fabric"] = fabric
             coefficients.append(FABRIC_COEFFICIENT)
-    # The engine the scenario runs, as engine: {kind, version} (SIM-1): inference-sim v0.18.0
-    # refuses the engine_version field this replaced.
-    b.scenario = {"kind": "Scenario", "name": name,
-                  "engine": {"kind": engine_kind, "version": engine_version.lstrip("v")},
+    # The engine kind alone: the build fixes the release and commit, and a version field is refused (SIM-1).
+    b.scenario = {"kind": "Scenario", "name": name, "engine": {"kind": engine_kind},
                   "model": model, "coefficients": coefficients, "cluster": cluster}
     if engine_kind == "vllm" and names_are_vllms(field_list):
         pool["engine"] = to_vllm_block(pool["engine"])

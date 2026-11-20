@@ -63,7 +63,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "ingest"))
 import blis_commands as bc  # noqa: E402
-import stack as sk  # noqa: E402
 import settings as st  # noqa: E402
 import support as sp  # noqa: E402
 
@@ -150,7 +149,7 @@ def node_size(dep: dict, packaging: dict) -> int:
     return recorded
 
 
-def emit(dep: dict, labels: set[str], packaging: dict, engine_release: str,
+def emit(dep: dict, labels: set[str], packaging: dict,
          drafter: str | None = None) -> str:
     """The scenario+deployment file. `packaging` is what the chip's catalog entry fixes:
     {"gpus_per_node", "gpus_per_rack"}, each the entry's value or None (Catalog.packaging).
@@ -211,11 +210,10 @@ def emit(dep: dict, labels: set[str], packaging: dict, engine_release: str,
     lines += [
         "kind: Scenario",
         f"name: {name}",
-        # The engine the scenario runs, in the form the simulator reads: engine: {kind, version}. The
-        # release is the one the scoring simulator's stack.json names (LIF-6), never a constant here.
+        # A scenario states the engine kind and no release or commit: the build fixes them (stack.json,
+        # LIF-6) and every Result records them (SIM-1).
         "engine:",
         "  kind: vllm",
-        f'  version: "{engine_release}"',
         "",
         f"model: {dep['model']}",
         f"coefficients: {COEFFICIENTS_MULTINODE if nodes > 1 and fabric is not None else COEFFICIENTS}",
@@ -281,7 +279,6 @@ def main() -> int:
     ap.add_argument("-o", "--out", required=True, help="scenario directory")
     ap.add_argument("--blis", required=True, help="the blis binary; it reports each chip's packaging")
     ap.add_argument("--catalog", required=True)
-    ap.add_argument("--stack", required=True, help="the scoring build's stack.json: the engine release the scenarios run")
     ap.add_argument("--check", action="store_true",
                     help="verify the files on disk match what would be generated")
     args = ap.parse_args()
@@ -318,7 +315,6 @@ def main() -> int:
         labels[name].add(s["label"])
 
     os.makedirs(args.out, exist_ok=True)
-    engine_release = sk.load(args.stack).engine("vllm")
     stale = []
     cat = sp.Catalog(blis=str(Path(args.blis).resolve()), root=Path(args.catalog))
     unscoreable = []
@@ -330,7 +326,7 @@ def main() -> int:
             unscoreable.append(f"{name}: {e}")
             continue
         try:
-            text = emit(dep, labels[name], cat.packaging(dep["gpu"]), engine_release, drafter)
+            text = emit(dep, labels[name], cat.packaging(dep["gpu"]), drafter)
         except (PackagingError, bc.CommandError) as e:
             return fail(str(e))
         path = os.path.join(args.out, name)

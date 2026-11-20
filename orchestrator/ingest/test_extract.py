@@ -63,7 +63,7 @@ NODE8 = ir.NodeSize(8, "cluster.gpus_per_node: launch_config")
 def _build(c, **kw):
     kw.setdefault("catalog_node_size", None)
     kw.setdefault("node", NODE8)
-    return st.build(c, name="p", model="m", part=PART_H200, engine_version="0.31.0", field_list=FIELDS, **kw)
+    return st.build(c, name="p", model="m", part=PART_H200, field_list=FIELDS, **kw)
 
 
 # ------------------------------------------------------------------ pyrepr
@@ -582,13 +582,13 @@ def test_a_setting_nothing_recorded_is_left_unset_and_no_list_of_required_settin
     assert not hasattr(st, "REQUIRED")
 
 
-def test_a_built_scenario_holds_only_recorded_values_and_states_the_engine_from_stack_json():
-    # X19: nothing the run did not record is written; the engine is vllm at the release passed in,
-    # stated as engine: {kind, version} (SIM-1), never the removed engine_version.
+def test_a_built_scenario_holds_only_recorded_values_and_states_the_engine_kind_alone():
+    # X19: nothing the run did not record is written. The engine is stated as engine: {kind} and no
+    # release or commit (SIM-1, LIF-6): the build fixes them, and a version field is refused.
     c = _classify(_log("'tensor_parallel_size': 1, 'max_num_batched_tokens': 4096"))
-    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="0.32.0", field_list=FIELDS,
+    b = st.build(c, name="p", model="m", part=PART_H200, field_list=FIELDS,
                  catalog_node_size=None, node=NODE8)
-    assert b.scenario["engine"] == {"kind": "vllm", "version": "0.32.0"}
+    assert b.scenario["engine"] == {"kind": "vllm"}
     assert "engine_version" not in b.scenario
     recorded = {loc.split(".", 1)[1] for loc in c.mapped if loc.startswith("engine.")}
     assert set(b.deployment["pools"][0]["engine"]) == recorded
@@ -600,7 +600,7 @@ def test_the_cluster_states_the_node_size_and_holds_the_runs_own_gpus():
                        RESOLVED.replace("data_parallel_size=1", "data_parallel_size=2")))
     b = _build(c)
     assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 1, "gpus_per_node": 8}
-    assert b.scenario["engine"] == {"kind": "vllm", "version": "0.31.0"}
+    assert b.scenario["engine"] == {"kind": "vllm"}
     par = b.deployment["pools"][0]["parallel"]
     assert (par["tp"], par["dp"], par["enable_expert_parallel"]) == (1, 2, True)
 
@@ -633,7 +633,7 @@ def test_the_assumed_fabric_class_follows_the_chip_generations_nic():
     c = _classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16")))
     seen = {}
     for chip in ("b300", "gb300", "b200", "gb200-nvl72", "h100", "h200", "a100-80", "l40s", "not-a-chip"):
-        b = st.build(c, name="p", model="m", part=st.Part(name=chip), engine_version="0.32.0", field_list=FIELDS,
+        b = st.build(c, name="p", model="m", part=st.Part(name=chip), field_list=FIELDS,
                      catalog_node_size=None, node=NODE8)
         sub = [x for x in b.substitutions if x["subject"] == "cluster.fabric"]
         assert len(sub) == 1 and "cost-model-fabric" in b.scenario["coefficients"]
@@ -647,7 +647,7 @@ def test_the_assumed_fabric_class_follows_the_chip_generations_nic():
     assert {k: v for k, v in seen.items() if v == "ib-800g"} == {"b300": "ib-800g", "gb300": "ib-800g"}
     assert seen["h100"] == seen["h200"] == seen["b200"] == seen["not-a-chip"] == "ib-400g"
     # a class the launch configuration records still wins over the chip's
-    b = st.build(c, name="p", model="m", part=st.Part(name="b300"), engine_version="0.32.0", field_list=FIELDS,
+    b = st.build(c, name="p", model="m", part=st.Part(name="b300"), field_list=FIELDS,
                  catalog_node_size=None, node=NODE8, launch_config={"resources": {"fabric": "roce-200g"}})
     assert b.scenario["cluster"]["fabric"] == "roce-200g"
     assert not [x for x in b.substitutions if x["subject"] == "cluster.fabric"]
@@ -938,10 +938,11 @@ def test_the_rows_gpu_count_is_read_in_inferencex_terms():
 
 
 def _graded(*, image="vllm/vllm-openai:v0.32.0", banner="0.32.0", subs=(), requests=None, reasons=(),
-            scored=True, build_match="exact"):
+            scored=True, build_match="exact", engine_commit=None):
     import score as sc
     o = sc.Outcome(point_id="p" * 64, identity={}, row={"image": image}, reasons=list(reasons),
-                   build={"image": image, "match": build_match}, banner=banner, subs=list(subs))
+                   build={"image": image, "match": build_match}, banner=banner, subs=list(subs),
+                   engine_commit=engine_commit)
     if scored:
         o.fidelity = {"build": o.build, "args": [], "resolved": [],
                       **({"requests": requests} if requests else {})}
@@ -968,6 +969,12 @@ def test_no_point_is_g1_while_four_of_the_g1_conditions_are_not_graded():
     assert o.fidelity["run_release"] == "0.32.0"
     # build.match is not a grade input: the build decides G2 or G4 through its release alone.
     assert _graded(build_match="estimated").fidelity["grade"] == "G2"
+
+
+def test_the_runs_engine_commit_is_recorded_on_the_graded_point_only_when_the_result_stated_one():
+    commit = "0123456789abcdef0123456789abcdef01234567"
+    assert _graded(engine_commit=commit).fidelity["engine_commit"] == commit
+    assert "engine_commit" not in _graded().fidelity
 
 
 def test_every_estimate_and_client_difference_is_named_and_makes_the_point_g2():
@@ -1421,7 +1428,7 @@ def test_packaging_comes_from_blis_catalog_resolve_and_falls_back_to_the_catalog
 
 def _multi(chip):
     return st.build(_classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16"))), name="p",
-                    model="m", part=st.Part(name=chip), engine_version="0.32.0", field_list=FIELDS, catalog_node_size=None, node=NODE8)
+                    model="m", part=st.Part(name=chip), field_list=FIELDS, catalog_node_size=None, node=NODE8)
 
 
 @pytest.mark.parametrize("chip,tech,cls,stands_in", [
@@ -1456,7 +1463,7 @@ def test_under_the_refuse_switch_a_multi_node_point_with_no_recorded_fabric_is_g
         assert not [x for x in b.substitutions if x["subject"] == "cluster.fabric"]
     # a class a launch configuration records is still used
     b = st.build(_classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16"))), name="p", model="m",
-                 part=st.Part(name="h200"), engine_version="0.32.0", field_list=FIELDS, catalog_node_size=None, node=NODE8,
+                 part=st.Part(name="h200"), field_list=FIELDS, catalog_node_size=None, node=NODE8,
                  launch_config={"resources": {"fabric": "roce-200g"}})
     assert b.scenario["cluster"]["fabric"] == "roce-200g" and b.reasons == []
 
@@ -1508,5 +1515,5 @@ def test_the_api_server_count_a_run_stated_is_given_to_replay_not_lost():
     assert problems == []
     c = st.decide(st.merge(readings, DEFAULTS), FL)
     assert not any("api_server_count" in r for r in c.reasons), c.reasons
-    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="0.33.0", field_list=FL, catalog_node_size=None, node=NODE8)
+    b = st.build(c, name="p", model="m", part=PART_H200, field_list=FL, catalog_node_size=None, node=NODE8)
     assert b.api_server_count == "2" and not any("api_server_count" in r for r in b.reasons), b.reasons

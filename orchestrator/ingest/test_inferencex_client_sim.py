@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -41,21 +42,11 @@ def _release(blis: str) -> str:
     return next(e["version"] for e in stack["engines"] if e["kind"] == "vllm")
 
 
-def _scenario(scen: Path, release: str) -> str:
-    """The fixture scenario at the simulator's release. A fixture that names its release itself
-    must name this one, or the run would price another engine than the test means."""
-    text = (scen / SCENARIO).read_text()
-    if "ENGINE_RELEASE" in text:
-        return text.replace("ENGINE_RELEASE", release)
-    assert f'version: "{release}"' in text, f"{SCENARIO} names an engine release other than the build's {release}"
-    return text
-
-
 def _run(tmp: Path, replay: ix.Replay) -> list[dict]:
     blis, scen = _blis()
     release = _release(blis)
     tmp.mkdir(parents=True, exist_ok=True)
-    (tmp / SCENARIO).write_text(_scenario(scen, release))
+    (tmp / SCENARIO).write_text((scen / SCENARIO).read_text())
     (tmp / ix.ROUTER_CONFIG_NAME).write_bytes(ix.router_config_bytes())
     h, d = ix.write_trace(replay, tmp)
     argv = ix.replay_argv(blis, SCENARIO, tmp, h, d, replay.sessions, replay.pool, 42,
@@ -64,7 +55,8 @@ def _run(tmp: Path, replay: ix.Replay) -> list[dict]:
     assert proc.returncode == 0, proc.stderr[-4000:]
     doc = json.loads(proc.stdout)
     assert doc.get("kind") == "Result" and doc.get("schema_version") in (2, 3)   # 3 from the M2 simulators
-    assert doc.get("engine") == {"kind": "vllm", "version": release}, doc.get("engine")
+    assert {k: doc["engine"].get(k) for k in ("kind", "version")} == {"kind": "vllm", "version": release}, doc.get("engine")
+    assert re.fullmatch(r"[0-9a-f]{40}", doc["engine"].get("commit") or ""), doc.get("engine")
     rows = doc.get("request_rows")
     assert rows, "the Result has no request_rows"
     return rows
@@ -105,9 +97,9 @@ def test_a_drained_copy_leaves_only_request_zeros_prompt_readable(tmp_path):
 
 def test_the_scenario_the_generator_writes_is_one_the_simulator_validates_and_runs(tmp_path):
     """gen_scenarios.emit is the scenario writer of run_agentic.py. Its output must be the
-    current contract, engine: {kind, version}, at the release the scoring build runs: the real
-    `blis schema validate scenario` accepts it and `blis run` loads it (the legacy engine_version
-    at a release the build does not run is refused)."""
+    current contract, engine: {kind} with no release or commit (LIF-6, SIM-1): the real
+    `blis schema validate scenario` accepts it and `blis run` loads it, and the Result records the
+    engine commit the build runs."""
     blis, _ = _blis()
     sys.path.insert(0, str(HERE.parent))
     import gen_scenarios as g
@@ -119,7 +111,7 @@ def test_the_scenario_the_generator_writes_is_one_the_simulator_validates_and_ru
            "framework": "vllm", "precision": "fp4", "serving": "aggregated", "spec_method": "none",
            "parallelism": {"tp_size": 2, "pp_size": 1, "attention_dp_size": 1, "moe_ep_size": 1, "moe_tp_size": 2},
            "stated_config": {"max_model_len": 32768, "block_size": 16}, "workload": "0:0", "gpus_per_node": 8}
-    text = g.emit(dep, {"agentx"}, {"gpus_per_node": None, "gpus_per_rack": None}, release)
+    text = g.emit(dep, {"agentx"}, {"gpus_per_node": None, "gpus_per_rack": None})
     path = tmp_path / dep["scenario"]
     path.write_text(text)
     v = subprocess.run([blis, "schema", "validate", "scenario", str(path)], capture_output=True, text=True)
@@ -128,5 +120,6 @@ def test_the_scenario_the_generator_writes_is_one_the_simulator_validates_and_ru
                           "--workload", "chatbot", "--num-requests", "8", "--seed", "1"],
                          capture_output=True, text=True, timeout=600)
     assert run.returncode == 0, run.stderr[-2000:]
-    assert json.loads(run.stdout)["engine"] == {"kind": "vllm", "version": release}
+    engine = json.loads(run.stdout)["engine"]
+    assert (engine["kind"], engine["version"]) == ("vllm", release) and re.fullmatch(r"[0-9a-f]{40}", engine["commit"])
 

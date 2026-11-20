@@ -89,7 +89,7 @@ def test_a_launcher_consistent_row_is_replayed_as_the_dataset_records_it_and_sco
     text = (Path(argv[argv.index("--scenarios") + 1]) / argv[argv.index("--scenario") + 1]).read_text()
     scen, dep = list(yaml.safe_load_all(text))
     assert scen["model"] == "gpt-oss-120b" and scen["cluster"]["hardware"] == "b200"
-    assert scen["engine"] == {"kind": "vllm", "version": "0.33.0"}
+    assert scen["engine"] == {"kind": "vllm"}
     pool = dep["pools"][0]
     assert pool["parallel"] == {"dp": 1, "pp": 1, "tp": 1}
     assert pool["engine"]["gpu_memory_utilization"] == 0.92 and pool["engine"]["enable_prefix_caching"] is True
@@ -208,7 +208,7 @@ def test_a_simulator_that_cannot_resolve_the_window_makes_the_point_a_named_g5_n
 def test_a_row_that_states_its_max_seq_len_needs_no_config_and_names_no_estimate(tmp_path):
     # The preset passes none, so a stated length makes the launch inconsistent; the scenario writer still honours it.
     pts, env = setup(tmp_path, {f"{F}:0": prow(max_seq_len="8192")}, config=False)
-    sc = cs.build(pts[0], model="gpt-oss-120b", chip="b200", engine_release="0.33.0",
+    sc = cs.build(pts[0], model="gpt-oss-120b", chip="b200",
                   packaging={"gpus_per_node": 8, "gpus_per_rack": None})
     dep = list(yaml.safe_load_all(sc.text))[1]
     assert dep["pools"][0]["engine"]["max_model_len"] == 8192
@@ -217,7 +217,7 @@ def test_a_row_that_states_its_max_seq_len_needs_no_config_and_names_no_estimate
 
 def test_a_chip_whose_catalog_entry_fixes_the_node_size_is_not_given_an_assumed_one(tmp_path):
     pts, _ = setup(tmp_path, {f"{F}:0": prow()})
-    sc = cs.build(pts[0], model="gpt-oss-120b", chip="gb200-nvl72", engine_release="0.33.0",
+    sc = cs.build(pts[0], model="gpt-oss-120b", chip="gb200-nvl72",
                   packaging={"gpus_per_node": 4, "gpus_per_rack": 72}, context=131072)
     scen = list(yaml.safe_load_all(sc.text))[0]
     assert "gpus_per_node" not in scen["cluster"] and "cluster.gpus_per_node" not in {s["subject"] for s in sc.substitutions}
