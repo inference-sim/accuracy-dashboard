@@ -136,7 +136,7 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
         Cmd("Every point id of every published snapshot maps to a ledger unit", argv=[
             "python3", "orchestrator/ingest/legacy_ids.py", "check", "--map", "data/legacy/point-ids.json", "--data", "data"]),
         pytest("BLIS is read only through the inference-sim commands: the lint's own tests", "orchestrator/test_lint_blis_boundary.py"),
-        pytest("An edit of a pull request's title or body runs no CI job", "orchestrator/test_ci_edit.py"),
+        pytest("An edit of a pull request's title or body starts no CI run", "orchestrator/test_ci_edit.py"),
         pytest("A night with more than 5 percent faulted points is not published", "orchestrator/nightly/test_night_health.py"),
         pytest("A night's notes are warnings and never stop a publish", "orchestrator/nightly/test_night_notes.py"),
         pytest("The night scores every configiq anchor unit with no split withheld", "orchestrator/nightly/test_configiq_night.py"),
