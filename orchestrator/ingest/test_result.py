@@ -54,7 +54,7 @@ def test_parse_refuses_another_kind(doc):
     assert e.value.slug == "result_unreadable"
 
 
-@pytest.mark.parametrize("version", [1, 4, None, "3", True])
+@pytest.mark.parametrize("version", [1, 5, None, "3", True])
 def test_parse_refuses_another_schema_version(version):
     with pytest.raises(result.ResultError) as e:
         result.parse(json.dumps(_doc(schema_version=version)).encode())
