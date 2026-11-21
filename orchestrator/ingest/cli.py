@@ -458,7 +458,8 @@ def cmd_score(a) -> int:
         router_policy_experiment=getattr(a, "router_policy_experiment", None),
         speculative_fallback_category=getattr(a, "speculative_fallback_category", None),
         router_checkout=Path(a.router_checkout).resolve() if getattr(a, "router_checkout", None) else None,
-        sglang=sglang_kit)
+        sglang=sglang_kit,
+        scenario_states_engine_version=bool(sk.SUBSTRATE in stack.modules or sk.VLLM_MODULE in stack.modules))
     # The build every point records: --sim-build, else the release tag the checkout is at
     # (check_blis_inputs required one), with the engine release its stack.json names (COV-6).
     env.sim_build = sim_build or env.blis_release

@@ -156,6 +156,9 @@ class Env:
     # The SGLang engine the scoring simulator runs, when stack.json names one and a published field list is given
     # (cli score --sglang-fields). Without it SGLang points are not scored (engines.scored).
     sglang: EngineKit | None = None
+    # Whether a scenario states engine.version. The module layout does; the in-tree layout (stack.json lists no
+    # blis-substrate or blis-vllm module) names the kind alone and refuses a version (cmd/engine_select.go).
+    scenario_states_engine_version: bool = True
 
     def scoring(self) -> frozenset:
         """The engines this run scores: vLLM's always, SGLang's once its release and field list are held."""
@@ -997,7 +1000,8 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
                       launch_size=st.recorded_node_size(launch), fixes_packaging=catalog_size is not None)
     b = st.build(c, name=name, model=sup.model, part=part, engine_version=kit.release,
                  field_list=kit.field_list, catalog_node_size=catalog_size, node=node,
-                 draft_model=sup.drafter, launch_config=launch, engine_kind=fw.engine)
+                 draft_model=sup.drafter, launch_config=launch, engine_kind=fw.engine,
+                 state_engine_version=env.scenario_states_engine_version)
     o.reasons += ss.parallel_reasons(b.reasons, c, kit.field_list) if sglang else b.reasons
     o.subs += b.substitutions
     b.thinking = st.recorded_thinking(c.settings)
@@ -1626,7 +1630,8 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
                                          f"{win} (the catalog model {sup.model}'s config.json)"})
     builts = {role: st.build(decided[role], name=name, model=sup.model, part=part, engine_version=release,
                              field_list=field_list, catalog_node_size=catalog_size, node=node,
-                             draft_model=sup.drafter, launch_config=launches[role], engine_kind=fw.engine) for role in pools}
+                             draft_model=sup.drafter, launch_config=launches[role], engine_kind=fw.engine,
+                             state_engine_version=env.scenario_states_engine_version) for role in pools}
     if sglang:
         for role, b_ in builts.items():
             b_.reasons = ss.parallel_reasons(b_.reasons, decided[role], field_list)

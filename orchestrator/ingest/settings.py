@@ -1075,7 +1075,7 @@ def recorded_node_size(launch: dict | None) -> int | None:
 
 def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str, field_list,
           catalog_node_size: int | None, node: ir.NodeSize, draft_model: str | None = None,
-          launch_config: dict | None = None, engine_kind: str = "vllm") -> Built:
+          launch_config: dict | None = None, engine_kind: str = "vllm", state_engine_version: bool = True) -> Built:
     """The Scenario + Deployment for one point, from the decided settings.
 
     Only what the run recorded is written, under the engine's own names (LOCATIONS), and the
@@ -1174,9 +1174,13 @@ def build(d: Decided, *, name: str, model: str, part: Part, engine_version: str,
             cluster["fabric"] = fabric
             coefficients.append(FABRIC_COEFFICIENT)
     # The engine the scenario runs, as engine: {kind, version} (SIM-1): inference-sim v0.18.0
-    # refuses the engine_version field this replaced.
+    # refuses the engine_version field this replaced. The in-tree layout states the kind alone (the build
+    # fixes the release, LIF-6) and refuses engine.version.
+    engine_block = {"kind": engine_kind}
+    if state_engine_version:
+        engine_block["version"] = engine_version.lstrip("v")
     b.scenario = {"kind": "Scenario", "name": name,
-                  "engine": {"kind": engine_kind, "version": engine_version.lstrip("v")},
+                  "engine": engine_block,
                   "model": model, "coefficients": coefficients, "cluster": cluster}
     if engine_kind == "vllm" and names_are_vllms(field_list):
         pool["engine"] = to_vllm_block(pool["engine"])

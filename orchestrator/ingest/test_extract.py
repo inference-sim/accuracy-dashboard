@@ -594,6 +594,14 @@ def test_a_built_scenario_holds_only_recorded_values_and_states_the_engine_from_
     assert set(b.deployment["pools"][0]["engine"]) == recorded
 
 
+def test_the_in_tree_layout_scenario_names_the_engine_kind_alone():
+    # The in-tree simulator refuses engine.version (cmd/engine_select.go): the build fixes the release.
+    c = _classify(_log("'tensor_parallel_size': 1, 'max_num_batched_tokens': 4096"))
+    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="0.34.0+0fda86a35419", field_list=FIELDS,
+                 catalog_node_size=None, node=NODE8, state_engine_version=False)
+    assert b.scenario["engine"] == {"kind": "vllm"}
+
+
 def test_the_cluster_states_the_node_size_and_holds_the_runs_own_gpus():
     c = _classify(_log("'tensor_parallel_size': 1, 'data_parallel_size': 2, 'enable_expert_parallel': True, "
                        "'max_num_seqs': 16, 'max_num_batched_tokens': 4096, 'block_size': 128, 'gpu_memory_utilization': 0.9",
