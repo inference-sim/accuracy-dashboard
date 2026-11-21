@@ -20,7 +20,8 @@ a unit can be scored without being counted recoverable; `unresolved` counts the 
 scored nor G5, which row 16 requires to be none.
 
     funnel.py [--ledger L --anchor A --contract C [--recoverable-units units.jsonl]]
-              [--configiq-ledger L --configiq-points configiq-points.jsonl] --out funnel.json
+              [--configiq-ledger L --configiq-points configiq-points.jsonl]
+              [--ledger-yaml ledger.yaml] [--training-ledger L] [--complete] [--strict-d9] --out funnel.json
 
 `m3_baseline.py report --funnel funnel.json` publishes it with the baseline. Run it for real after a nightly with the
 contract directory it scored and recoverable.py's --units-out.
@@ -36,7 +37,9 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "ingest"))
 
-FORMAT = "funnel-1"
+import sources as src  # noqa: E402
+
+FORMAT = "funnel-2"
 GRADED = ("G1", "G2", "G3", "G4")
 NOT_RECORDED = "value_not_recorded"
 OUT_OF_SCOPE = ("chip_not_modelled",)
@@ -55,10 +58,14 @@ def _count(items) -> dict:
     return dict(sorted(out.items()))
 
 
-def tally(source: str, rows_held: int, units: list[dict], *, left_out_rows: dict | None = None) -> dict:
+def tally(source: str, rows_held: int, units: list[dict], *, left_out_rows: dict | None = None,
+          anchor_rule: str | None = None, not_anchor: dict | None = None, lanes: bool = False) -> dict:
     """One source's funnel. Each unit is {"unit_id", "excluded": reason | None, "recoverable": True | False | None,
     "blocked": reason | None, "grade": G1..G5 | None, "provisional": bool, "failed": reason | None, "g5": code | None,
-    "withheld": reason | None}; `blocked` is the reason a not recoverable unit is."""
+    "withheld": reason | None, "lane": engine | None}; `blocked` is the reason a not recoverable unit is. `anchor_rule`
+    says how the source's anchor units were chosen (sources.py) and `not_anchor` counts the units of the ledger that rule
+    leaves out, by reason. With `lanes` the same stages are repeated for each lane (InferenceX: vllm, sglang) beside the
+    source's whole."""
     ids = [u["unit_id"] for u in units]
     if len(set(ids)) != len(ids):
         raise FunnelError(f"{source}: a unit is listed twice")
@@ -93,8 +100,9 @@ def tally(source: str, rows_held: int, units: list[dict], *, left_out_rows: dict
                 for s, d in (("g5", g5), ("failed", failed), ("withheld", withheld), ("no_outcome", no_outcome))
                 for r, n in d.items()]
     blockers.sort(key=lambda b: (-b["units"], b["stage"], b["reason"]))
-    return {
-        "source": source,
+    out = {
+        "source": source, "role": "anchor", "anchor_rule": anchor_rule or "every unit listed",
+        "not_anchor": dict(sorted((not_anchor or {}).items())),
         "stages": {"rows_held": rows_held, "units": len(units), "in_scope": len(scope),
                    "recoverable": len(recoverable) if probed else None, "scored": len(placed["scored"])},
         "left_out_rows": dict(sorted((left_out_rows or {}).items())),
@@ -105,6 +113,14 @@ def tally(source: str, rows_held: int, units: list[dict], *, left_out_rows: dict
         "unresolved": {"units": len(unresolved), "unit_ids": sorted(unresolved)[:TOP]},
         "blockers": blockers[:TOP],
     }
+    if lanes:
+        by_lane: dict[str, list] = {}
+        for u in units:
+            by_lane.setdefault(u.get("lane") or "other", []).append(u)
+        out["lanes"] = {name: {k: v for k, v in tally(f"{source}/{name}", 0, us).items()
+                               if k in ("stages", "excluded", "scored_by_grade", "provisional", "g5", "failed", "no_outcome")}
+                        for name, us in sorted(by_lane.items())}
+    return out
 
 
 def check(f: dict) -> list[str]:
@@ -128,7 +144,12 @@ def check(f: dict) -> list[str]:
     return out
 
 
-def combine(funnels: list[dict]) -> dict:
+def combine(funnels: list[dict], *, training_funnels: list[dict] | None = None, discrepancies: list[dict] | None = None,
+            complete: bool = False) -> dict:
+    """The funnel document. `discrepancies` are ledger.yaml's disagreements with D9 (sources.check_cut_points), None when
+    ledger.yaml was not read: the document says which, so an unchecked file never reads as an agreeing one. With
+    `complete` the run holds an outcome for every anchor unit (a night's contract), so an in-scope unit with neither a
+    grade nor a stated reason is a problem (plan row 16: scored, or a stated G5 reason)."""
     names = [f["source"] for f in funnels]
     if not funnels or len(set(names)) != len(names):
         raise FunnelError(f"a funnel document holds each source once, got {names}")
@@ -138,6 +159,11 @@ def combine(funnels: list[dict]) -> dict:
                       "scored without being counted recoverable; unresolved counts the recoverable units that are "
                       "neither scored nor G5. A provisional unit (capped at G3) is outside scored."}
     doc["problems"] = [p for f in funnels for p in check(f)]
+    if complete:
+        doc["problems"] += [f"{f['source']}: {sum(f['no_outcome'].values())} in-scope units have neither a grade nor a stated "
+                            f"reason ({', '.join(f['no_outcome'])})" for f in funnels if f["no_outcome"]]
+    doc["training"] = {t["source"]: t for t in sorted(training_funnels or [], key=lambda t: t["source"])}
+    doc["cut_points"] = {"checked": discrepancies is not None, "discrepancies": discrepancies or []}
     return doc
 
 
@@ -147,10 +173,22 @@ def validate(doc: dict) -> dict:
     problems = [p for f in doc["funnels"].values() for p in check(f)]
     if problems:
         raise FunnelError("; ".join(problems))
+    for t in doc.get("training", {}).values():
+        if t.get("role") != "training-only" or "accuracy" in t or "scored" in t.get("stages", {}):
+            raise FunnelError(f"{t.get('source')}: a training-only source carries no accuracy, only a labelled diagnostic")
     return doc
 
 
 # ------------------------------------------------------------------------------------------------ sources
+
+def lane_of(unit) -> str:
+    """The engine lane of an InferenceX unit: vllm or sglang, else the framework's engine or its label (never scored)."""
+    import engines
+    try:
+        return engines.lookup(unit.identity["framework"]).engine or "other"
+    except (engines.EngineError, KeyError):
+        return "other"
+
 
 def inferencex_units(anchor: dict, recoverable: list[dict] | None, outcomes: dict) -> list[dict]:
     """The anchor units, placed by recoverable.py's per-unit lines ({"unit_id", "status", "detail"}) and the scorer's
@@ -160,7 +198,8 @@ def inferencex_units(anchor: dict, recoverable: list[dict] | None, outcomes: dic
     for uid in sorted(anchor):
         r, o = rec.get(uid), outcomes.get(uid, {})
         u = {"unit_id": uid, "excluded": None, "recoverable": None, "blocked": None, "grade": o.get("grade"),
-             "provisional": False, "failed": o.get("failed"), "g5": o.get("g5"), "withheld": None}
+             "provisional": False, "failed": o.get("failed"), "g5": o.get("g5"), "withheld": None,
+             "lane": lane_of(anchor[uid])}
         if r is not None and r["status"] == "excluded":
             u["excluded"] = r["detail"]
         elif o.get("g5") in OUT_OF_SCOPE:
@@ -195,17 +234,20 @@ def inferencex(lg, anchor_ids: set, recoverable: list[dict] | None, outcomes: di
     if missing:
         raise FunnelError(f"the anchor list names {len(missing)} units the ledger does not hold, the first {missing[0]}")
     units = inferencex_units({i: lg.units[i] for i in anchor_ids}, recoverable, outcomes)
-    return tally("inferencex", len(lg.by_record), units, left_out_rows=_count(lg.left_out.values()))
+    return tally("inferencex", len(lg.by_record), units, left_out_rows=_count(lg.left_out.values()),
+                 anchor_rule=src.ANCHOR_RULE[src.INFERENCEX], lanes=True,
+                 not_anchor={"not_in_the_anchor_list": len(lg.units) - len(anchor_ids)})
 
 
-def configiq_units(lg, records: list[dict]) -> list[dict]:
-    """Every unit of the configiq ledger, placed by its record in configiq-points.jsonl (configiq_score.record)."""
+def configiq_units(lg, records: list[dict], left_out: frozenset | set = frozenset()) -> list[dict]:
+    """Every anchor unit of the configiq ledger -- every unit but those a partition-prep report left out (D9) -- placed by
+    its record in configiq-points.jsonl (configiq_score.record)."""
     by = {r["point_id"]: r for r in records}
     out = []
-    for uid in sorted(lg.units):
+    for uid in sorted(set(lg.units) - set(left_out)):
         r = by.get(uid)
         u = {"unit_id": uid, "excluded": None, "recoverable": None, "blocked": None, "grade": None,
-             "provisional": False, "failed": None, "g5": None, "withheld": None}
+             "provisional": False, "failed": None, "g5": None, "withheld": None, "lane": "vllm"}
         out.append(u)
         if r is None:
             continue
@@ -233,12 +275,39 @@ def configiq_units(lg, records: list[dict]) -> list[dict]:
     return out
 
 
-def configiq(lg, records: list[dict]) -> dict:
+def configiq(lg, records: list[dict], left_out: frozenset | set = frozenset()) -> dict:
     extra = sorted({r["point_id"] for r in records} - set(lg.units))
     if extra:
         raise FunnelError(f"configiq-points holds {len(extra)} points the ledger has no unit for, the first {extra[0]}")
-    return tally("configiq", len(lg.by_record), configiq_units(lg, records),
-                 left_out_rows=_count(lg.left_out.values()))
+    gone = sorted(set(left_out) - set(lg.units))
+    if gone:
+        raise FunnelError(f"the left-out list names {len(gone)} units the configiq ledger does not hold, the first {gone[0]}")
+    return tally("configiq", len(lg.by_record), configiq_units(lg, records, left_out),
+                 left_out_rows=_count(lg.left_out.values()), anchor_rule=src.ANCHOR_RULE[src.CONFIGIQ],
+                 not_anchor={"left_out_by_partition_prep": len(left_out)})
+
+
+def training(source: str, report: dict) -> dict:
+    """The funnel of a training-only source, from its ingest report alone: rows held, units, duplicates and the rows left
+    out by reason. It scores nothing and reports no accuracy: the source is training data (D9), so what the dashboard
+    may show of it is how the fitted model reproduces it, labelled a training diagnostic."""
+    return {"source": source, "role": "training-only", "label": src.TRAINING_LABEL,
+            "stages": {"rows_held": report["records"], "units": report["units"]},
+            "duplicates": report["duplicates"], "merged_records": report["merged"],
+            "left_out_rows": {k: len(v) if isinstance(v, list) else v for k, v in sorted((report["left_out"] or {}).items())},
+            "diagnostic": None}
+
+
+def read_training(directory: Path) -> list[dict]:
+    """The three training-only sources' funnels from <directory>/reports/<source>.yaml (blis-substrate's catalog/ledger)."""
+    import yaml
+    out = []
+    for s in src.TRAINING_ONLY:
+        rep = yaml.safe_load((Path(directory) / "reports" / f"{s}.yaml").read_text())
+        if rep.get("source") != s:
+            raise FunnelError(f"reports/{s}.yaml is the report of {rep.get('source')!r}")
+        out.append(training(s, rep))
+    return out
 
 
 # ------------------------------------------------------------------------------------------------ markdown
@@ -253,6 +322,15 @@ def markdown(doc: dict) -> list[str]:
         L += [f"| {k} | {'not probed' if v is None else v} |" for k, v in s.items()]
         L += [f"| scored {g} | {n} |" for g, n in f["scored_by_grade"].items()]
         L += [""]
+        L += [f"Anchor rule: {f['anchor_rule']}.", ""]
+        if f["not_anchor"]:
+            L += ["Units of the ledger outside the anchors: " + ", ".join(f"{k} {v}" for k, v in f["not_anchor"].items()) + ".", ""]
+        for lane, lf in f.get("lanes", {}).items():
+            ls = lf["stages"]
+            L += [f"- Lane {lane}: {ls['scored']} of {ls['in_scope']} in-scope units scored ({ls['units']} units); "
+                  f"G5 {sum(lf['g5'].values())}, failed {sum(lf['failed'].values())}, no result {sum(lf['no_outcome'].values())}."]
+        if f.get("lanes"):
+            L += [""]
         rows = [(label, r, n) for label, d in (("Excluded", f["excluded"]), ("Not recovered", f["not_recovered"]),
                                                 ("G5", f["g5"]), ("Failed", f["failed"]), ("Withheld", f["withheld"]),
                                                 ("No result", f["no_outcome"]), ("Left-out rows", f["left_out_rows"]))
@@ -260,6 +338,14 @@ def markdown(doc: dict) -> list[str]:
         if rows:
             L += ["| Part | Reason | Count |", "|---|---|---|"] + [f"| {a} | `{b}` | {n} |" for a, b, n in rows] + [""]
         L += [f"Recoverable units neither scored nor G5: {f['unresolved']['units']}.", ""]
+    for name, t in doc.get("training", {}).items():
+        L += [f"### {name} (training only)", "", f"{t['label']}. {t['stages']['units']} units, {t['stages']['rows_held']} rows held; "
+              f"no accuracy is reported for it.", ""]
+    cp = doc.get("cut_points", {"checked": False, "discrepancies": []})
+    if cp["discrepancies"]:
+        L += ["### ledger.yaml disagrees with design D9", ""] + [f"- **{d['source']}**: {d['text']}" for d in cp["discrepancies"]] + [""]
+    elif not cp["checked"]:
+        L += ["ledger.yaml was not checked against design D9 in this run.", ""]
     return L
 
 
@@ -273,9 +359,16 @@ def main(argv=None) -> int:
     ap.add_argument("--recoverable-units", type=Path, help="recoverable.py --units-out")
     ap.add_argument("--configiq-ledger", type=Path, help="the same checkout, for the configiq ledger")
     ap.add_argument("--configiq-points", type=Path, help="configiq-points.jsonl of a score-configiq run")
+    ap.add_argument("--ledger-yaml", type=Path, help="ledger.yaml, checked against design D9 (sources.py); its "
+                    "rules.configiq.left_out narrows configiq's anchors")
+    ap.add_argument("--training-ledger", type=Path, help="a checkout of catalog/ledger: adds the three training-only "
+                    "sources' funnels from reports/<source>.yaml, labelled training only")
+    ap.add_argument("--complete", action="store_true",
+                    help="the contract holds an outcome for every anchor unit (a night): a unit with none is a problem")
+    ap.add_argument("--strict-d9", action="store_true", help="exit 1 when ledger.yaml disagrees with D9 (after row 26)")
     ap.add_argument("--out", required=True, type=Path)
     a = ap.parse_args(argv)
-    funnels = []
+    funnels, found, left_out, trained = [], None, set(), []
     try:
         if a.ledger or a.anchor or a.contract:
             if not (a.ledger and a.anchor and a.contract):
@@ -285,6 +378,11 @@ def main(argv=None) -> int:
             rec = [json.loads(x) for x in a.recoverable_units.read_text().splitlines() if x.strip()] \
                 if a.recoverable_units else None
             funnels.append(inferencex(lg, ldg.read_unit_set(a.anchor, role="anchor"), rec, contract_outcomes(a.contract)))
+        if a.ledger_yaml:
+            ydoc = src.read_ledger_yaml(a.ledger_yaml)
+            found, left_out = src.check_cut_points(ydoc), src.configiq_left_out(ydoc)
+        if a.training_ledger:
+            trained = read_training(a.training_ledger)
         if a.configiq_ledger or a.configiq_points:
             if not (a.configiq_ledger and a.configiq_points):
                 raise FunnelError("the configiq funnel needs --configiq-ledger and --configiq-points")
@@ -292,16 +390,18 @@ def main(argv=None) -> int:
             d = a.configiq_ledger
             lg = cq.load(d / "units" / "configiq.jsonl.gz", d / "reports" / "configiq.yaml", d / "sources.yaml")
             recs = [json.loads(x) for x in a.configiq_points.read_text().splitlines() if x.strip()]
-            funnels.append(configiq(lg, recs))
-        doc = combine(funnels)
-    except (FunnelError, OSError, ValueError) as e:
+            funnels.append(configiq(lg, recs, left_out))
+        doc = combine(funnels, training_funnels=trained, discrepancies=found, complete=a.complete)
+    except (FunnelError, src.SourcesError, OSError, ValueError) as e:
         print(f"funnel: {e}", file=sys.stderr)
         return 2
     a.out.write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n")
     print(f"wrote {a.out}: " + ", ".join(f"{k} {v} scored" for k, v in doc["scored"].items()))
     for p in doc["problems"]:
         print(f"INVALID: {p}", file=sys.stderr)
-    return 1 if doc["problems"] else 0
+    for d in doc["cut_points"]["discrepancies"]:
+        print(f"WARNING: ledger.yaml vs D9, {d['source']}: {d['text']}", file=sys.stderr)
+    return 1 if (doc["problems"] or (a.strict_d9 and doc["cut_points"]["discrepancies"])) else 0
 
 
 if __name__ == "__main__":

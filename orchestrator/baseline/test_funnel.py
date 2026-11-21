@@ -105,7 +105,8 @@ def test_a_funnel_whose_counts_disagree_is_refused(name, damage):
 
 def _ledger(n=6, left_out=None):
     ids = [f"{i:064x}" for i in range(1, n + 1)]
-    return SimpleNamespace(units={i: SimpleNamespace(unit_id=i) for i in ids}, by_record={str(k): 1 for k in range(n + 2)},
+    fw = ["vllm", "sglang", "vllm", "dynamo-sglang", "trt", "vllm", "vllm", "sglang"]
+    return SimpleNamespace(units={i: SimpleNamespace(unit_id=i, identity={"framework": fw[k]}) for k, i in enumerate(ids)}, by_record={str(k): 1 for k in range(n + 2)},
                            left_out=left_out or {}), ids
 
 
@@ -133,7 +134,7 @@ def test_the_inferencex_funnel_places_each_anchor_unit_from_the_probe_and_the_co
 def test_an_anchor_unit_is_never_dropped_for_its_date():
     lg, ids = _ledger(2)
     for uid in ids:
-        lg.units[uid].identity = {"measured_date": "2019-01-01"}
+        lg.units[uid].identity["measured_date"] = "2019-01-01"
     f = fn.inferencex(lg, set(ids), None, {i: {"grade": "G4"} for i in ids})
     assert f["stages"]["scored"] == 2 and f["excluded"] == {} and f["no_outcome"] == {}
 
@@ -142,6 +143,34 @@ def test_an_anchor_unit_the_ledger_does_not_hold_is_refused():
     lg, ids = _ledger(1)
     with pytest.raises(fn.FunnelError, match="does not hold"):
         fn.inferencex(lg, set(ids) | {"f" * 64}, None, {})
+
+
+def test_the_inferencex_funnel_reports_the_sglang_lane_apart_from_vllm_with_its_g5_reasons():
+    lg, ids = _ledger(6)          # frameworks: vllm, sglang, vllm, dynamo-sglang, trt, vllm
+    out = {ids[0]: {"grade": "G4"}, ids[1]: {"grade": "G5", "g5": "field_unclassified"}, ids[2]: {"grade": "G3"},
+           ids[3]: {"grade": "G4"}, ids[4]: {"grade": "G5", "g5": "engine_unsupported"}, ids[5]: {"grade": "G5", "g5": "row_differs"}}
+    f = fn.inferencex(lg, set(ids), None, out)
+    lanes = f["lanes"]
+    assert sorted(lanes) == ["other", "sglang", "vllm"]
+    assert lanes["vllm"]["stages"]["scored"] == 2 and lanes["vllm"]["g5"] == {"row_differs": 1}
+    assert lanes["sglang"]["stages"]["scored"] == 1 and lanes["sglang"]["g5"] == {"field_unclassified": 1}
+    assert lanes["other"]["stages"]["scored"] == 0 and lanes["other"]["g5"] == {"engine_unsupported": 1}
+    # the lanes partition the source: no unit is counted twice or lost
+    assert sum(l["stages"]["units"] for l in lanes.values()) == f["stages"]["units"]
+    assert sum(l["stages"]["scored"] for l in lanes.values()) == f["stages"]["scored"]
+    assert f["anchor_rule"].startswith("the published anchor list") and f["not_anchor"] == {"not_in_the_anchor_list": 0}
+
+
+def test_every_unscored_anchor_unit_carries_a_g5_reason_or_a_stated_gap_when_the_run_is_complete():
+    lg, ids = _ledger(3)
+    f = fn.inferencex(lg, set(ids), None, {ids[0]: {"grade": "G4"}, ids[1]: {"grade": "G5", "g5": "not_in_feed"}})
+    assert f["no_outcome"] == {fn.NO_OUTCOME: 1}
+    assert fn.combine([f])["problems"] == []                      # a partial run may hold none
+    done = fn.combine([f], complete=True)["problems"]
+    assert len(done) == 1 and "neither a grade nor a stated reason" in done[0]
+    f2 = fn.inferencex(lg, set(ids), None, {ids[0]: {"grade": "G4"}, ids[1]: {"grade": "G5", "g5": "not_in_feed"},
+                                            ids[2]: {"grade": "G5", "g5": "row_differs"}})
+    assert fn.combine([f2], complete=True)["problems"] == []
 
 
 # ------------------------------------------------------------------------------------------------ configiq
@@ -179,6 +208,49 @@ def test_a_configiq_unit_without_a_record_has_no_result_and_a_stray_record_is_re
     assert f["no_outcome"] == {fn.NO_OUTCOME: 1} and f["stages"]["scored"] == 1
     with pytest.raises(fn.FunnelError, match="no unit for"):
         fn.configiq(lg, [_rec("z")])
+
+
+def test_configiq_anchors_are_every_unit_less_the_left_out_list_and_every_one_is_an_anchor_even_if_ledger_yaml_says_otherwise():
+    lg = SimpleNamespace(units={"a": 1, "b": 1, "c": 1}, by_record={}, left_out={})
+    recs = [_rec("a", grade="G4"), _rec("b", grade="G3"), _rec("c", grade="G4")]
+    full = fn.configiq(lg, recs)
+    assert full["stages"]["units"] == 3 and full["role"] == "anchor" and "every unit" in full["anchor_rule"]
+    cut = fn.configiq(lg, [r for r in recs if r["point_id"] != "c"], {"c"})
+    assert cut["stages"]["units"] == 2 and cut["not_anchor"] == {"left_out_by_partition_prep": 1}
+    with pytest.raises(fn.FunnelError, match="does not hold"):
+        fn.configiq(lg, recs, {"zz"})
+
+
+def _training_report(**kw):
+    return {"kind": "IngestReport", "source": "vllm-ci-perf", "records": 10, "units": 4, "duplicates": 1, "merged": 2,
+            "left_out": {"no_commit_in_image": ["row:0", "row:1"]}, **kw}
+
+
+def test_a_training_only_source_has_a_funnel_but_no_scored_count_and_is_labelled_a_training_diagnostic():
+    t = fn.training("vllm-ci-perf", _training_report())
+    assert t["role"] == "training-only" and "never accuracy" in t["label"]
+    assert t["stages"] == {"rows_held": 10, "units": 4} and t["left_out_rows"] == {"no_commit_in_image": 2}
+    d = fn.combine([fn.tally("inferencex", 9, [U("1", grade="G3")])], training_funnels=[t])
+    assert d["scored"] == {"inferencex": 1}                       # a training source is never in the scored counts
+    assert fn.validate(copy.deepcopy(d)) and "vllm-ci-perf" in d["training"]
+    md = "\n".join(fn.markdown(d))
+    assert "vllm-ci-perf (training only)" in md and "no accuracy is reported for it" in md
+    bad = copy.deepcopy(d)
+    bad["training"]["vllm-ci-perf"]["stages"]["scored"] = 3
+    with pytest.raises(fn.FunnelError, match="carries no accuracy"):
+        fn.validate(bad)
+
+
+def test_the_cut_point_disagreement_is_published_loudly_and_an_unchecked_file_is_not_an_agreeing_one():
+    f = fn.tally("inferencex", 1, [U("1", grade="G3")])
+    unchecked = fn.combine([f])
+    assert unchecked["cut_points"] == {"checked": False, "discrepancies": []}
+    assert "was not checked against design D9" in "\n".join(fn.markdown(unchecked))
+    found = [{"source": "configiq", "code": "configiq_cut_points_not_anchor_only", "text": "stale"}]
+    d = fn.combine([f], discrepancies=found)
+    assert d["cut_points"]["checked"] and d["cut_points"]["discrepancies"] == found
+    assert "ledger.yaml disagrees with design D9" in "\n".join(fn.markdown(d))
+    assert "was not checked" not in "\n".join(fn.markdown(fn.combine([f], discrepancies=[])))
 
 
 # ------------------------------------------------------------------------------------------------ publishing
