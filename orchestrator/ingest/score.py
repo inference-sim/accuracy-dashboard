@@ -29,6 +29,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 import extract_single_turn_bench_args as sx  # noqa: E402
 import assess as asx  # noqa: E402
+import commit_distance as cdist  # noqa: E402
 import contract  # noqa: E402
 import engines  # noqa: E402
 import fields as fl  # noqa: E402
@@ -1745,14 +1746,18 @@ def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None
     b = o.build or {}
     run_commit = b.get("commit")
     if o.engine_commit and run_commit and b.get("why") in (None, bld.OUTSIDE_DISTANCE):
-        g = gr.grade_by_commit(run_commit=run_commit, scored_commit=o.engine_commit,
-                               distance=distance or (lambda *_: None), substitutions=subs)
+        ask = distance or (lambda *_: None)
+        g = gr.grade_by_commit(run_commit=run_commit, scored_commit=o.engine_commit, distance=ask, substitutions=subs)
+        rec = cdist.label(run_commit, o.engine_commit, None if run_commit == o.engine_commit else ask(run_commit, o.engine_commit))
         if run_commit == o.engine_commit:
             o.run_release = engine_release
-        elif distance is not None and (rec := distance.record(run_commit, o.engine_commit)):
-            o.fidelity = {**o.fidelity, "commit_distance": rec}
+        elif counts := getattr(distance, "record", lambda *_: None)(run_commit, o.engine_commit):
+            rec = {**counts, **rec}
+        o.fidelity = {**o.fidelity, "commit_distance": rec}
     else:
         g = gr.grade(engine_version=engine_release, release=rel, substitutions=subs)
+        if o.engine_commit:
+            o.fidelity = {**o.fidelity, "commit_distance": cdist.label(run_commit, o.engine_commit, None, b.get("why"))}
     o.fidelity = {**o.fidelity, "grade": g.grade, "substitutions": g.substitutions, "run_release": o.run_release,
                   "simulator": simulator}
     if o.engine_commit:

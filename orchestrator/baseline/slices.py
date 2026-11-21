@@ -70,6 +70,8 @@ ATTRS = {
     "concurrency": ("concurrency", _one(lambda r: r["identity"].get("conc"))),
     "measured_month": ("measured month", _one(lambda r: (r["identity"].get("measured_date") or "")[:7] or None)),
     "grade": ("grade", _one(lambda r: r.get("grade"))),
+    "commit_distance": ("commit distance (run commit against the modelled commit)",
+                        lambda r: [(r.get("commit_distance") or {}).get("state") or "none"]),
     "substitution": ("substitution", _substitutions),
     "role_key": ("deployment (role key)", lambda r: [r["role_key"]]),
 }
@@ -92,9 +94,20 @@ def _error(rec: dict, metric: str):
     return None
 
 
+def _commit_distances(contract: Path) -> dict[str, dict]:
+    """point_id -> the commit-distance record of the dashboard's fidelity view (the substrate's strict point record has no
+    such field). A contract without that view, or a point it does not list, has none."""
+    p = contract / "fidelity.jsonl"
+    if not p.is_file():
+        return {}
+    rows = (json.loads(x) for x in p.read_text().splitlines() if x.strip())
+    return {r["point_id"]: r["commit_distance"] for r in rows if r.get("commit_distance")}
+
+
 def graded_records(contract: Path) -> list[dict]:
     """The graded point records (G1 to G4) of a contract directory, each with its role key."""
     path = Path(contract) / "pointrecords.jsonl"
+    states = _commit_distances(Path(contract))
     out = []
     for line in path.read_text().splitlines():
         if not line.strip():
@@ -102,6 +115,7 @@ def graded_records(contract: Path) -> list[dict]:
         r = json.loads(line)
         if r.get("grade") in gr.GRADED:
             r["role_key"] = role_key(r)
+            r["commit_distance"] = states.get(r.get("point_id"))
             out.append(r)
     return out
 

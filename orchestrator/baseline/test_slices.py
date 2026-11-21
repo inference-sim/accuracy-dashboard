@@ -203,3 +203,25 @@ def test_the_command_writes_a_valid_document_and_refuses_a_missing_contract(tmp_
     assert sl.validate(json.loads(out.read_text()))["slices"].keys() == {"chip"}
     assert sl.main(["--contract", str(tmp_path / "none"), "--out", str(out)]) == 2
     assert sl.main(["--contract", str(tmp_path), "--by", "router", "--out", str(out)]) == 2
+
+
+def _fidelity(tmp_path, recs, states):
+    (tmp_path / "fidelity.jsonl").write_text("".join(
+        json.dumps({"point_id": r["point_id"], **({"commit_distance": {"state": s}} if s else {})}) + "\n"
+        for r, s in zip(recs, states)))
+
+
+def test_a_point_is_sliced_by_the_commit_distance_its_fidelity_record_states(tmp_path):
+    recs = spread(6, 3)
+    states = ["same", "no_ported_change", "no_ported_change", "ported_change", "unpublished", None]
+    _fidelity(tmp_path, recs, states)
+    doc = sl.validate(sl.build(_contract(tmp_path, recs), by=("commit_distance",)))
+    rows = {r["value"]: r["points"] for r in doc["slices"]["commit_distance"]}
+    assert rows == {"no_ported_change": 2, "same": 1, "ported_change": 1, "unpublished": 1, "none": 1}
+    assert sum(rows.values()) == doc["points"]
+
+
+def test_a_contract_without_a_fidelity_file_slices_every_point_as_no_commit_distance(tmp_path):
+    recs = spread(3, 1)
+    doc = sl.build(_contract(tmp_path, recs), by=("commit_distance",))
+    assert [(r["value"], r["points"]) for r in doc["slices"]["commit_distance"]] == [("none", 3)]

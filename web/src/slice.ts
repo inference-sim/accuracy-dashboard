@@ -31,7 +31,7 @@ export const SLICE_ATTRS: SliceAttr[] = [
   { id: 'engine', label: 'engine', values: one((p) => p.framework) },
   { id: 'engine_version', label: 'engine version', values: one((p) => p.engineVersion) },
   { id: 'engine_commit', label: 'engine commit', values: one((p) => p.fidelity?.build.commit) },
-  { id: 'commit_distance', label: 'commit distance', values: one((p) => p.fidelity?.build.distance) },
+  { id: 'commit_distance', label: 'commit distance', values: one((p) => p.fidelity?.commit_distance?.state ?? 'none') },
   {
     id: 'topology', label: 'topology',
     values: one((p) => Object.entries(p.parallelism).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}${v}`).join(' ')),

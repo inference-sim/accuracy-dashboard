@@ -152,7 +152,7 @@ def test_a_run_on_another_commit_is_graded_by_its_commit_distance(name, build, s
     assert (grade == "G2") == ("other_release" not in got and "nightly_or_custom" not in got)
 
 
-def test_the_commit_distance_is_recorded_on_a_point_graded_by_it():
+def test_the_commit_distance_counts_are_recorded_on_a_point_graded_by_it():
     rec = {"run_commit": RUN, "scored_commit": SCORED, "merge_base": "b" * 40, "run_commits": 3, "scored_commits": 5,
            "tags": ["v0.33.0"]}
 
@@ -165,10 +165,55 @@ def test_the_commit_distance_is_recorded_on_a_point_graded_by_it():
 
     o = _outcome(build=BUILD, engine_commit=SCORED)
     sc.grade_outcome(o, "0.33.0", None, Provider())
-    assert o.fidelity["commit_distance"] == rec and o.fidelity["grade"] == "G3"
-    plain = _outcome(build=BUILD, engine_commit=SCORED)
-    sc.grade_outcome(plain, "0.33.0")
-    assert "commit_distance" not in plain.fidelity and plain.fidelity["grade"] == "G4"
+    assert o.fidelity["grade"] == "G3"
+    assert o.fidelity["commit_distance"] == {**rec, "state": "no_ported_change", "ported_changes": 0}
+
+
+STATE_CASES = [
+    # name, build, scored commit, what the provider says differs, state, ported_changes
+    ("same_commit", BUILD, RUN, "never", "same", None),
+    ("nothing_ported_differs", BUILD, SCORED, [], "no_ported_change", 0),
+    ("ported_functions_differ", BUILD, SCORED, ["function:host:f", "file:a.py"], "ported_change", 2),
+    ("no_published_diff", BUILD, SCORED, None, "unpublished", None),
+    ("outside_the_old_bound_is_by_commit", {**BUILD, "why": "outside_distance", "match": "estimated"}, SCORED, [],
+     "no_ported_change", 0),
+    ("custom_build", {**BUILD, "why": "custom_build", "match": "estimated"}, SCORED, [], "custom_build", None),
+    ("run_commit_unresolvable", {"image": IMG, "commit": None, "match": "estimated", "why": "commit_unresolvable"},
+     SCORED, [], "commit_unresolvable", None),
+    ("run_commit_in_conflict", {**BUILD, "why": "commit_conflict", "match": "estimated"}, SCORED, [],
+     "commit_conflict", None),
+]
+
+
+@pytest.mark.parametrize("name, build, scored, diff, state, n", STATE_CASES, ids=[c[0] for c in STATE_CASES])
+def test_every_point_on_a_recorded_engine_commit_is_labelled_by_its_commit_distance_without_a_checkout(
+        name, build, scored, diff, state, n):
+    """The label is the grade's own reason in one word, so a slice or a funnel can cut by it; it needs no checkout."""
+    def distance(run, sc_):
+        assert diff != "never", "asked about the same commit"
+        return diff
+
+    o = _outcome(build=build, engine_commit=scored)
+    sc.grade_outcome(o, "0.33.0", None, distance)
+    rec = o.fidelity["commit_distance"]
+    assert (rec["state"], rec.get("ported_changes")) == (state, n)
+    assert rec["scored_commit"] == scored and rec["run_commit"] == build.get("commit")
+    assert rec["state"] in cd.STATES
+
+
+def test_a_result_that_states_no_commit_has_no_commit_distance_to_record():
+    o = _outcome(build={"image": "vllm/vllm-openai:v0.33.0", "commit": RUN, "match": "exact"}, engine_commit=None)
+    sc.grade_outcome(o, "0.33.0")
+    assert "commit_distance" not in o.fidelity
+
+
+def test_the_label_agrees_with_the_grade():
+    """G1/G2 only on the modelled commit, G3 only when nothing ported differs, G4 for every other state."""
+    want = {"same": {"G1", "G2"}, "no_ported_change": {"G3"}}
+    for name, build, scored, diff, state, _ in STATE_CASES:
+        o = _outcome(build=build, engine_commit=scored)
+        sc.grade_outcome(o, "0.33.0", None, lambda r, s, d=diff: d)
+        assert o.fidelity["grade"] in want.get(state, {"G4"}), name
 
 
 def test_a_run_on_the_modelled_commit_runs_the_modelled_release():

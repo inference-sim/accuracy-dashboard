@@ -170,6 +170,18 @@ describe('slicing by any recorded attribute', () => {
     expect(rows.map((r) => [r.value, r.points])).toEqual([['a', 1], ['b', 1], ['none', 1]])
   })
 
+  it('slices by the commit-distance state a point records, and by "none" where it records none', () => {
+    const cd = (state: string) => ({ state, run_commit: 'a', scored_commit: 'b' })
+    const base = point(0, 0)
+    const p = [
+      { ...base, fidelity: { ...base.fidelity!, commit_distance: cd('no_ported_change') } },
+      { ...point(1, 1), fidelity: { ...base.fidelity!, commit_distance: cd('ported_change') } },
+      { ...point(2, 2), fidelity: { ...base.fidelity!, commit_distance: undefined } },
+    ]
+    const rows = sliceBy(p, 'commit_distance', 10)
+    expect(rows.map((r) => r.value).sort()).toEqual(['none', 'no_ported_change', 'ported_change'])
+  })
+
   it('takes coverage from the not-scored points where they record the attribute', () => {
     const rows = sliceBy(mixed(), 'chip', 10, [{ hardware: 'h200' }, { hardware: 'h200' }, { hardware: 'b200' }])
     expect(rows.find((r) => r.value === 'h200')!.coverage).toEqual({ scored: 10, total: 12 })

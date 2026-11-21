@@ -85,6 +85,19 @@ export interface Fidelity {
   grade?: GradedGrade
   substitutions?: Substitution[]
   run_release?: string | null
+  /** Where the run's commit stands against the commit BLIS models, in a word (`same`, `no_ported_change`,
+   *  `ported_change`, `unpublished`, `custom_build`, `commit_unresolvable`, `commit_conflict`), with the counts
+   *  the upgrade report and a checkout give. Absent on a point scored before the field existed. */
+  commit_distance?: {
+    state: string
+    run_commit: string | null
+    scored_commit: string
+    ported_changes?: number
+    merge_base?: string
+    run_commits?: number
+    scored_commits?: number
+    tags?: string[]
+  }
   build: {
     image: string
     commit: string | null
