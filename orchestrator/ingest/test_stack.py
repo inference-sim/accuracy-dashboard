@@ -116,6 +116,15 @@ def test_the_vllm_ref_follows_the_engine_release_with_no_code_change():
     assert sk.pins(sk.parse(json.dumps(doc)))["vllm_ref"] == "v0.33.1"
 
 
+def test_the_in_tree_layout_lists_no_substrate_or_blis_vllm_module_and_pins_nothing_to_fetch():
+    # The catalog, registry and field list are in the simulator checkout, whose commit is the pin; the vLLM
+    # tag drops a build suffix ("0.34.0+0fda86a35419" is the release 0.34.0 plus a commit).
+    doc = json.loads(SUBSTRATE_STACK.read_text())
+    doc["modules"] = [m for m in doc["modules"] if m["path"] not in (sk.SUBSTRATE, sk.VLLM_MODULE)]
+    doc["engines"][0]["version"] = "0.34.0+0fda86a35419"
+    assert sk.pins(sk.parse(json.dumps(doc))) == {"in_tree": "1", "vllm_ref": "v0.34.0"}
+
+
 def test_a_stack_without_the_substrate_or_blis_vllm_module_or_a_commit_is_refused():
     doc = json.loads(SUBSTRATE_STACK.read_text())
     for path in (sk.SUBSTRATE, sk.VLLM_MODULE):

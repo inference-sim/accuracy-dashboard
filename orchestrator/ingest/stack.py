@@ -81,6 +81,10 @@ def pins(stack: Stack) -> dict:
     release runs) and of the blis-vllm module (whose root holds fields.json), and the vLLM tag the
     engine release names. A release scored later needs no change here."""
     out = {}
+    if SUBSTRATE not in stack.modules and VLLM_MODULE not in stack.modules:
+        # The in-tree layout: the simulator's own checkout holds substrate/catalog, substrate/registry and
+        # engines/vllm/fields.json, so there is no module to fetch and the checkout's commit is the pin.
+        return {"in_tree": "1", "vllm_ref": "v" + stack.engine("vllm").split("+")[0]}
     for key, path in (("substrate_commit", SUBSTRATE), ("vllm_module_commit", VLLM_MODULE)):
         m = stack.modules.get(path)
         if m is None:
@@ -102,7 +106,7 @@ def pins(stack: Stack) -> dict:
             if not isinstance(version, str) or not re.fullmatch(r"[0-9A-Za-z._+-]+", version):
                 raise StackError(f"stack.json: module {path} has version {version!r}, want letters, digits and . _ + -")
             out["substrate_version"] = version
-    out["vllm_ref"] = "v" + stack.engine("vllm")
+    out["vllm_ref"] = "v" + stack.engine("vllm").split("+")[0]
     return out
 
 

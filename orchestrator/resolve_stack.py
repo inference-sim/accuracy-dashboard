@@ -9,7 +9,9 @@ dashboard's code):
     substrate_version     its version: a release tag, or a pseudo-version when the module is pinned by commit
     vllm_module_ref       what to fetch of blis-vllm, likewise; fields.json is at its root
     vllm_module_commit    the commit stack.json names for it: empty for a release
-    vllm_ref              the vLLM tag of the engine release (v + engines[kind=vllm].version)
+    vllm_ref              the vLLM tag of the engine release (v + engines[kind=vllm].version, less a "+build" suffix)
+    in_tree               1, and none of the substrate and blis-vllm keys, when stack.json lists neither module: the
+                          catalog, registry and engines/vllm/fields.json are in the simulator checkout
 
     python3 orchestrator/resolve_stack.py <inference-sim checkout or stack.json>
 

@@ -93,21 +93,29 @@ jobs:
           git clone -q --filter=blob:none https://github.com/inference-sim/inference-sim.git "$SIM"
           git -C "$SIM" checkout -q "$SIM_REF"
           eval "$(python3 orchestrator/resolve_stack.py "$SIM")"
-          git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
-          git -C "$RUNNER_TEMP/substrate" checkout -q "$substrate_ref"
-          SUBSTRATE_PIN="$(git -C "$RUNNER_TEMP/substrate" rev-parse HEAD)"
-          [[ "$substrate_ref" =~ ^v[0-9] ]] && SUBSTRATE_PIN="$substrate_ref"
-          FIELDS="$RUNNER_TEMP/fields.json"
-          curl -fsSL --retry 3 -o "$FIELDS" \
-            "https://raw.githubusercontent.com/inference-sim/blis-vllm/${vllm_module_ref}/fields.json"
-          python3 orchestrator/resolve_agentic_corpus.py --catalog "$RUNNER_TEMP/substrate/catalog" --all -o "$RUNNER_TEMP/corpora"
+          if [ "${in_tree:-0}" = 1 ]; then
+            # The in-tree layout: catalog, registry and the engine's field list are in the simulator checkout.
+            SUBSTRATE_DIR="$SIM/substrate"
+            SUBSTRATE_PIN="$(git -C "$SIM" rev-parse HEAD)"
+            FIELDS="$SIM/engines/vllm/fields.json"
+          else
+            git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
+            git -C "$RUNNER_TEMP/substrate" checkout -q "$substrate_ref"
+            SUBSTRATE_DIR="$RUNNER_TEMP/substrate"
+            SUBSTRATE_PIN="$(git -C "$SUBSTRATE_DIR" rev-parse HEAD)"
+            [[ "$substrate_ref" =~ ^v[0-9] ]] && SUBSTRATE_PIN="$substrate_ref"
+            FIELDS="$RUNNER_TEMP/fields.json"
+            curl -fsSL --retry 3 -o "$FIELDS" \
+              "https://raw.githubusercontent.com/inference-sim/blis-vllm/${vllm_module_ref}/fields.json"
+          fi
+          python3 orchestrator/resolve_agentic_corpus.py --catalog "$SUBSTRATE_DIR/catalog" --all -o "$RUNNER_TEMP/corpora"
           export VLLM_REF="$vllm_ref"
           mkdir -p "$RUNNER_TEMP/out"
-          python3 orchestrator/baseline/freeze.py --units-file "$UNITS" --ledger "$RUNNER_TEMP/substrate/catalog/ledger" \
+          python3 orchestrator/baseline/freeze.py --units-file "$UNITS" --ledger "$SUBSTRATE_DIR/catalog/ledger" \
             --today "$TODAY" --out "$RUNNER_TEMP/out/pull" --cache "$RUNNER_TEMP/artifacts" --download-workers 4
           bash harness/run.sh --sim "$SIM_REF" --units "$UNITS" --pull "$RUNNER_TEMP/out/pull" \
             --out "$RUNNER_TEMP/out/contract/contract" \
-            --catalog "$RUNNER_TEMP/substrate/catalog" --registry "$RUNNER_TEMP/substrate/registry" \
+            --catalog "$SUBSTRATE_DIR/catalog" --registry "$SUBSTRATE_DIR/registry" \
             --corpus-dir "$RUNNER_TEMP/corpora" --fields "$FIELDS" \
             --catalog-release "$SUBSTRATE_PIN" --registry-release "$SUBSTRATE_PIN" --max-rss-mb 13000
           python3 orchestrator/baseline/split.py splits --pull "$RUNNER_TEMP/out/pull" --out "$RUNNER_TEMP/out/contract/splits.json"
