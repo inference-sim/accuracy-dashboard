@@ -263,6 +263,79 @@ def test_a_command_is_read_through_blis_sglangs_declarations():
     assert r.values["env.SGLANG_X"] == ["1"]
 
 
+def test_a_long_option_is_read_as_the_unique_option_it_abbreviates_exactly_as_argparse_takes_it():
+    # prepare_server_args builds a plain ArgumentParser (allow_abbrev stays True), so `--tp` is accepted as `--tp-size`, the
+    # only option beginning `--tp`; the `=` form and an alias's prefix resolve the same way.
+    decl = ss.load_declarations()
+
+    def read(cmd):
+        return ss.read_launch_command("python3 -m sglang.launch_server " + cmd, decl).values
+
+    assert read("--tp 8")["tp_size"] == [8]
+    assert read("--tp=8")["tp_size"] == [8]
+    assert read("--tensor-parallel 4")["tp_size"] == [4]
+    assert read("--trust-remote")["trust_remote_code"] == [True]
+    assert [float(v) for v in read("--mem-fraction 0.5")["mem_fraction_static"]] == [0.5]
+    # A full spelling is taken as it is although it begins others (`--ep-size`, `--ep-dispatch-algorithm`).
+    assert read("--ep 2")["ep_size"] == [2]
+    assert read("--config c.yaml")["config"] == ["c.yaml"]       # an option of the parser no field declares
+
+
+def test_a_prefix_of_several_options_is_the_ambiguous_option_error_and_is_not_resolved():
+    # argparse refuses `--cuda-graph-max-bs` at 0.5.23: it begins --cuda-graph-max-bs-decode and --cuda-graph-max-bs-prefill.
+    # The launch would not start, so it is never read as either; it stays the flag as spelled, which the release lacks.
+    decl = ss.load_declarations()
+    options = set(ss._flag_map(decl)) | set(ss.PARSER_ONLY_FLAGS)
+    assert ss.resolve_abbreviation("--cuda-graph-max-bs", options) == (
+        None, ["--cuda-graph-max-bs-decode", "--cuda-graph-max-bs-prefill"])
+    r = ss.read_launch_command("python3 -m sglang.launch_server --cuda-graph-max-bs 192 --dp 2", decl)
+    assert r.values["cuda_graph_max_bs"] == [192] and "cuda_graph_max_bs_decode" not in r.values
+    assert r.values["dp_size"] == [2]
+
+
+def test_abbreviation_agrees_with_argparse_on_every_prefix_of_every_declared_option():
+    import argparse
+    import contextlib
+    import io
+
+    decl = ss.load_declarations()
+    options = sorted(set(ss._flag_map(decl)) | set(ss.PARSER_ONLY_FLAGS))
+    parser = argparse.ArgumentParser(prog="sglang serve", add_help=False)
+    for o in options:
+        parser.add_argument(o, dest=o)
+    seen = set(options)
+    for o in options:
+        for n in range(3, len(o) + 1):
+            prefix = o[:n]
+            if prefix in seen:
+                continue
+            seen.add(prefix)
+            want_option, candidates = ss.resolve_abbreviation(prefix, set(options))
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                try:
+                    got = vars(parser.parse_args([prefix, "x"]))
+                    taken = [k for k, v in got.items() if v == "x"]
+                except SystemExit:
+                    taken = None
+            if want_option is None:
+                assert taken is None and "ambiguous option" in err.getvalue(), prefix
+            else:
+                assert taken == [want_option], prefix
+
+
+def test_a_point_whose_command_abbreviates_tp_size_is_scored_as_if_it_spelled_it_in_full():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp, command=COMMAND.replace("--tp-size 8", "--tp 8"))
+        o, work = _score(tmp, entry, env)
+        assert o.fidelity is not None, o.reasons
+        dep = list(yaml.safe_load_all(next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()))[1]
+        assert dep["pools"][0]["parallel"]["tp"] == 8
+    finally:
+        shutil.rmtree(tmp)
+
+
 # ------------------------------------------------------------------ the pull
 
 def _gh(download):
