@@ -29,7 +29,7 @@ PLACEMENT = [
     ("g5", U("a", recoverable=True, g5="value_not_recorded"), ("g5", "value_not_recorded")),
     ("provisional_is_not_scored", U("a", recoverable=True, provisional=True, grade="G3"), ("provisional", "G3")),
     ("failed", U("a", recoverable=True, failed="scorer_error"), ("failed", "scorer_error")),
-    ("withheld", U("a", withheld="test_split_not_simulated"), ("withheld", "test_split_not_simulated")),
+    ("withheld", U("a", withheld="withheld_by_local_option"), ("withheld", "withheld_by_local_option")),
     ("no_result_names_why_not_recovered", U("a", recoverable=False, blocked="api_server_log_404"),
      ("no_outcome", "api_server_log_404")),
     ("no_result_at_all", U("a"), ("no_outcome", fn.NO_OUTCOME)),
@@ -188,7 +188,7 @@ CONFIGIQ = [
      {"value_not_recorded: engine max_num_seqs": 1}),
     ("provisional", _rec("a", provisional=True, grade="G3"), "provisional", {"G3": 1}),
     ("scored", _rec("a", grade="G4"), "scored_by_grade", {"G4": 1}),
-    ("withheld", _rec("a", status="withheld"), "withheld", {"test_split_not_simulated": 1}),
+    ("withheld", _rec("a", status="withheld"), "withheld", {"withheld_by_local_option": 1}),
     ("failed", _rec("a", failed=True, faults=["scorer_error:x"]), "failed", {"scorer_error": 1}),
 ]
 
@@ -320,7 +320,7 @@ def _fixture_doc() -> dict:
            ids[3]: {"grade": "G4"}, ids[4]: {"grade": "G5", "g5": "engine_unsupported"}, ids[5]: {"grade": "G5", "g5": "row_differs"}}
     ix = fn.inferencex(lg, set(ids), None, out)
     cq = fn.configiq(SimpleNamespace(units={"a": 1, "b": 1, "c": 1}, by_record={"1": 1}, left_out={}),
-                     [_rec("a", grade="G4"), _rec("b", g5_reasons=[{"code": "value_not_recorded", "subject": "engine max_num_seqs"}],
+                     [_rec("a", grade="G3", provisional=True), _rec("b", g5_reasons=[{"code": "value_not_recorded", "subject": "engine max_num_seqs"}],
                                                   g5_reason={"code": "value_not_recorded"}, grade="G5")])
     found = [{"source": "configiq", "code": "configiq_cut_points_not_anchor_only", "text": "ledger.yaml gives configiq the roles fit, select, validate, held, anchor; D9 makes every unit an anchor."}]
     return fn.combine([ix, cq], training_funnels=[fn.training("vllm-ci-perf", _training_report())], discrepancies=found)

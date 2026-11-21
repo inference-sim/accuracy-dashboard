@@ -137,6 +137,7 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
         pytest("An edit of a pull request's title or body runs no CI job", "orchestrator/test_ci_edit.py"),
         pytest("A night with more than 5 percent faulted points is not published", "orchestrator/nightly/test_night_health.py"),
         pytest("A night's notes are warnings and never stop a publish", "orchestrator/nightly/test_night_notes.py"),
+        pytest("The night scores every configiq anchor unit with no split withheld", "orchestrator/nightly/test_configiq_night.py"),
         Cmd("BLIS is read only through the inference-sim commands: the lint", argv=["python3", "orchestrator/lint_blis_boundary.py"]),
     ],
 }

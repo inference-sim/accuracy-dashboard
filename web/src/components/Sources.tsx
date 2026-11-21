@@ -88,7 +88,7 @@ function SourceCard({ f }: { f: Funnel }) {
           <div className="stat">
             <div className="stat-value">{formatCount(f.provisional.units)}</div>
             <div className="stat-label">provisional</div>
-            <div className="stat-hint">capped at G3, outside the scored count</div>
+            <div className="stat-hint">scored by simulation, capped at G3 (COV-7): still anchor units, shown apart from the scored count and the headline</div>
           </div>
         ) : null}
       </div>

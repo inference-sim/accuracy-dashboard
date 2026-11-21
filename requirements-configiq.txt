@@ -1,0 +1,5 @@
+# The one extra dependency of the nightly's configiq step (orchestrator/nightly/configiq_night.py): pyarrow reads the
+# dataset's Parquet files for blis-substrate's ledger/configiq/export.py. It has no dependencies of its own. Installed with
+# `pip install --require-hashes -r requirements-configiq.txt`; the hash is of the CPython 3.13 wheel for linux x86_64
+# (ubuntu-latest), regenerated as requirements-ci.txt's are.
+pyarrow==26.0.1 --hash=sha256:f71221bbc7707e3fad920d0478db9350791d4714ec445299ee0d56559fbc156c

@@ -12,9 +12,11 @@ The dashboard publishes accuracy on anchor units only. D9 sets the rule per sour
 
 `check_cut_points` reads a ledger.yaml and returns every way it disagrees with that rule. Today's ledger.yaml
 (partition version 1) still gives configiq InferenceX's cut-points (fit, select, validate, held, anchor), so the check
-reports it; the dashboard does not pick one silently. It scores and reports every configiq unit as D9 says, and prints
-the disagreement until row 26's partition version replaces the cut-points. The disagreement is a fact about a file; it
-is never resolved here by guessing a role, which needs the partition secret.
+reports it. The plan (blis-design m32/plan.html, Terms, 1.4, 3A.6 and 3C) is the rule where this repository, ledger.yaml
+or an earlier finding disagrees: configiq is anchor-only. The dashboard scores and reports every configiq unit as an
+anchor unit and prints the disagreement until row 26's partition version replaces the cut-points. It never reads the
+draw ledger.yaml gives configiq, and `configiq_in_training` fails when a published fit, select or validate list holds a
+configiq unit (a unit read that way is left out of the anchors, never made one).
 """
 from __future__ import annotations
 
@@ -31,7 +33,8 @@ LANES = ("sglang", "vllm")           # the engines whose InferenceX units are sc
 
 ANCHOR_RULE = {
     INFERENCEX: "the published anchor list (role anchor); held units judge pre-registered changes and are never reported",
-    CONFIGIQ: "every unit (D9), less the units the partition-prep report leaves out; none is fit, selected, validated or held",
+    CONFIGIQ: "every unit (plan: anchor-only), less the units the D2 join found read under a training role; none is fit, "
+              "selected, validated, held or withheld as a test split",
 }
 TRAINING_LABEL = "training only: never accuracy; a diagnostic of the fit, labelled as such"
 
@@ -72,10 +75,11 @@ def check_cut_points(doc: dict) -> list[dict]:
         out.append({"source": CONFIGIQ, "code": "configiq_no_rule", "text": "the ledger has no rule for configiq"})
     elif not _covers_all(cq, "anchor"):
         out.append({"source": CONFIGIQ, "code": "configiq_cut_points_not_anchor_only",
-                    "text": f"ledger.yaml (partition version {version}) gives configiq the roles {_roles(cq)}; D9 (v4.2.0) makes "
-                            f"every configiq unit an anchor unit (anchor 0 to 99). Row 26's new partition version changes it "
-                            f"(a maintainer step). Until then the dashboard scores and reports every configiq unit as an anchor "
-                            f"and does not use ledger.yaml's draw for it"})
+                    "text": f"the plan is the rule: configiq is anchor-only, every unit an anchor unit (anchor 0 to 99), never fit, "
+                            f"selected, validated or held. ledger.yaml (partition version {version}) gives configiq the roles "
+                            f"{_roles(cq)} and is wrong to that extent; row 26's new partition version corrects it (a maintainer "
+                            f"step). Until then the dashboard scores and reports every configiq unit as an anchor and does not "
+                            f"use ledger.yaml's draw for it"})
     for s in TRAINING_ONLY:
         r = rules.get(s)
         if r is None:
@@ -93,6 +97,36 @@ def configiq_left_out(doc: dict) -> set[str]:
     if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
         raise SourcesError("rules.configiq.left_out is not a list of unit ids")
     return set(ids)
+
+
+def configiq_anchor_ids(unit_ids, doc: dict | None = None) -> list[str]:
+    """The configiq units to score: every ledger id minus the left-out list (rules.configiq.left_out of a ledger.yaml, none
+    before row 26). Never read from anchor.yaml, which holds no configiq id until row 26's release. A left-out id the ledger
+    does not hold is refused."""
+    ids = set(unit_ids)
+    out = configiq_left_out(doc) if doc else set()
+    gone = sorted(out - ids)
+    if gone:
+        raise SourcesError(f"rules.configiq.left_out names {len(gone)} units the configiq ledger does not hold, "
+                           f"the first {gone[0]}")
+    return sorted(ids - out)
+
+
+def configiq_in_training(published, configiq_ids) -> list[dict]:
+    """Every configiq id found in a published list of a training role: [{"file", "role", "units": [ids]}]. `published` is a
+    directory of PublishedUnits files (fit.yaml, select.yaml, validate.yaml, ...) or one file; a list of any other role is
+    not read. An empty result is what D9 needs; a hit is a unit that was read under a training role, and the answer is to
+    leave it out of the anchors (rules.configiq.left_out), never to make it one."""
+    import yaml
+    p, ids, hits = Path(published), set(configiq_ids), []
+    for f in ([p] if p.is_file() else sorted(p.glob("*.yaml"))):
+        doc = yaml.safe_load(f.read_text())
+        if not isinstance(doc, dict) or doc.get("kind") != "PublishedUnits" or doc.get("role") not in TRAINING_ROLES:
+            continue
+        found = sorted(ids & set(doc.get("units") or []))
+        if found:
+            hits.append({"file": f.name, "role": doc["role"], "units": found})
+    return hits
 
 
 def read_ledger_yaml(path: Path) -> dict:

@@ -35,7 +35,8 @@ def test_todays_shape_configiq_with_inferencexs_cut_points_is_reported_with_its_
     found = sr.check_cut_points(STALE)
     assert [d["code"] for d in found] == ["held_outside_inferencex", "configiq_cut_points_not_anchor_only"]
     t = found[1]["text"]
-    assert "partition version 1" in t and "D9" in t and "maintainer step" in t and "fit" in t
+    assert "partition version 1" in t and "maintainer step" in t and "fit" in t
+    assert "plan is the rule" in t and "anchor-only" in t and "wrong to that extent" in t
 
 
 MUTATE = [
@@ -79,3 +80,57 @@ def test_the_cli_warns_and_exits_nonzero_only_when_strict(tmp_path, capsys):
     assert sr.main(["--ledger-yaml", str(p), "--strict"]) == 1
     p.write_text(yaml.safe_dump(GOOD))
     assert sr.main(["--ledger-yaml", str(p), "--strict"]) == 0
+
+
+# ------------------------------------------------------------------------------------------------ the units scored, and the guard
+
+IDS = [f"{i:064x}" for i in range(6)]
+
+
+def _published(directory, role, units, kind="PublishedUnits"):
+    import yaml
+    (directory / f"{role}.yaml").write_text(yaml.safe_dump({"kind": kind, "role": role, "units": list(units)}))
+
+
+def test_the_units_scored_are_every_ledger_id_less_the_left_out_list_and_never_anchor_yaml():
+    assert sr.configiq_anchor_ids(IDS) == sorted(IDS) and sr.configiq_anchor_ids(IDS, STALE) == sorted(IDS)
+    doc = {"rules": {"configiq": {"left_out": [IDS[1], IDS[4]]}}}
+    assert sr.configiq_anchor_ids(IDS, doc) == [i for i in sorted(IDS) if i not in (IDS[1], IDS[4])]
+    with pytest.raises(sr.SourcesError, match="does not hold"):
+        sr.configiq_anchor_ids(IDS, {"rules": {"configiq": {"left_out": ["f" * 64]}}})
+
+
+@pytest.mark.parametrize("role", ["fit", "select", "validate"])
+def test_a_configiq_id_in_any_training_role_list_is_found(tmp_path, role):
+    _published(tmp_path, "fit", [])
+    _published(tmp_path, "anchor", IDS[:1])             # the anchor list may hold configiq ids: it is the one role allowed
+    _published(tmp_path, role, ["e" * 64, IDS[2]])
+    assert sr.configiq_in_training(tmp_path, IDS) == [{"file": f"{role}.yaml", "role": role, "units": [IDS[2]]}]
+
+
+def test_no_configiq_id_in_a_training_list_is_the_clean_answer_and_a_held_list_is_not_read(tmp_path):
+    _published(tmp_path, "fit", ["e" * 64])
+    _published(tmp_path, "held", IDS)                   # held is InferenceX's role; this guard is for the fit/select/validate lists
+    assert sr.configiq_in_training(tmp_path, IDS) == []
+    assert sr.configiq_in_training(tmp_path / "fit.yaml", IDS) == []
+
+
+def test_the_funnel_fails_when_a_configiq_id_is_in_a_training_list_unless_it_is_left_out(tmp_path, monkeypatch):
+    """The nightly's path: funnel.py reads the published lists, and a configiq unit read under a training role is a problem."""
+    import yaml
+    from types import SimpleNamespace
+    import funnel as fn
+    fake = SimpleNamespace(load=lambda *a: SimpleNamespace(units={i: 1 for i in IDS}, by_record={"1": 1}, left_out={}))
+    monkeypatch.setitem(sys.modules, "configiq", fake)
+    pub = tmp_path / "pub"
+    pub.mkdir()
+    _published(pub, "validate", [IDS[3]])
+    pts = tmp_path / "points.jsonl"
+    pts.write_text("")
+    argv = ["--configiq-ledger", str(tmp_path), "--configiq-points", str(pts), "--published", str(pub), "--out", str(tmp_path / "o.json")]
+    assert fn.main(argv) == 1
+    assert any("validate" in p and IDS[3] in p for p in json.loads((tmp_path / "o.json").read_text())["problems"])
+    ly = tmp_path / "ledger.yaml"
+    ly.write_text(yaml.safe_dump(copy.deepcopy(GOOD) | {"rules": GOOD["rules"] | {"configiq": {"cut_points": [cp("anchor")], "left_out": [IDS[3]]}}}))
+    assert fn.main(argv + ["--ledger-yaml", str(ly)]) == 0
+    assert json.loads((tmp_path / "o.json").read_text())["funnels"]["configiq"]["not_anchor"] == {"left_out_by_partition_prep": 1}
