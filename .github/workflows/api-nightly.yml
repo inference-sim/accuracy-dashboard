@@ -21,6 +21,12 @@ name: api-nightly
 #     release is listed when its scores are published, and the list never shrinks when old
 #     snapshots are pruned.
 # A no-op night (neither trigger) writes nothing and the last good view stands.
+#
+# The database-dump lane (plan row 12): the anchor units the frozen dump `db-dump/2026-09-28` supplies are scored in the same
+# night, by the same BLIS release and harness commit, from the anchor extract (cached by dump revision + extract sha256, else
+# one streaming pass over the pinned parts). The API lane leaves those units alone. The headline publishes only if both lanes
+# were scored on one release and one harness commit; if the dump lane fails, nothing publishes and the last good night stands.
+# The dump lane's RESULTS (never its data) are kept in state/dump/ and committed with the rest of state/.
 on:
   schedule:
     - cron: "43 4 * * *" # nightly, off :00
@@ -35,6 +41,12 @@ on:
       # dispatch publish as before.
       dry_run:
         description: "Validate and print what would be published, and publish nothing"
+        type: boolean
+        default: false
+      # The dump lane reuses its last result when the BLIS release, harness commit, catalog and registry versions and the dump
+      # revision are all the same as that result's (orchestrator/ingest/dump_lane.py); this scores it again regardless.
+      force_dump:
+        description: "Score the database-dump lane again even if its last result is current"
         type: boolean
         default: false
 
@@ -98,6 +110,25 @@ jobs:
           restore-keys: |
             ix-artifacts-
 
+      # The ledger and the anchor list the dump extract is cut with are the substrate release's of the BLIS release scored: the
+      # same files the night reads (cli.py nightly). A hit on the cache does not use them; a miss reads them once.
+      - name: Fetch the ledger the dump extract is cut with
+        env:
+          BLIS_TAGS: ${{ needs.resolve.outputs.blis_tags }}
+        run: |
+          set -euo pipefail
+          BLIS_TAG="${BLIS_TAGS%% *}"
+          git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$RUNNER_TEMP/dump-sim"
+          eval "$(python3 orchestrator/resolve_stack.py "$RUNNER_TEMP/dump-sim")"
+          git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/dump-substrate"
+          git -C "$RUNNER_TEMP/dump-substrate" checkout -q "$substrate_ref"
+      - name: The anchor extract of the pinned dump
+        uses: ./.github/actions/dump-extract
+        with:
+          ledger: ${{ runner.temp }}/dump-substrate/catalog/ledger
+          anchor: ${{ runner.temp }}/dump-substrate/catalog/ledger/published/anchor.yaml
+          out: ${{ runner.temp }}/dump-extract
+
       # Score the release resolve_blis.sh named: the oldest unscored one, once (COV-9). Build blis
       # FROM SOURCE at the tag (so a per-release score is sound; #15's seed rule), fetch what it
       # pins, and run one night with it. The scoring is harness/run.sh, run from this checkout
@@ -111,6 +142,7 @@ jobs:
         env:
           BLIS_TAGS: ${{ needs.resolve.outputs.blis_tags }}
           GH_TOKEN: ${{ github.token }}
+          DUMP_FORCE: ${{ inputs.force_dump && '--dump-force' || '' }}
         run: |
           set -euo pipefail
           for BLIS_TAG in $BLIS_TAGS; do
@@ -186,7 +218,8 @@ jobs:
               --blis "$SIM/blis" --catalog "$CATALOG" --registry "$REGISTRY" \
               --substrate-dir "$RUNNER_TEMP/substrate" \
               --substrate-version "$substrate_version" --substrate-commit "$substrate_commit" \
-              --corpus-dir "$RUNNER_TEMP/corpora" --fields "$FIELDS"
+              --corpus-dir "$RUNNER_TEMP/corpora" --fields "$FIELDS" \
+              --dump-extract "$RUNNER_TEMP/dump-extract" --dump-state state/dump --dump-workers 2 $DUMP_FORCE
             echo "::endgroup::"
           done
 
@@ -208,6 +241,7 @@ jobs:
             data.tgz
             state/last-run-api.json
             state/scored-releases.json
+            state/dump
           if-no-files-found: warn
 
   # ----------------------------------------------------------------- 3. publish (hosted-safe)
@@ -336,6 +370,8 @@ jobs:
             exit 1
           fi
           mkdir -p state; cp "$STATE_IN" state/last-run-api.json; cp "$SCORED_IN" state/scored-releases.json
+          # The dump lane's last result (its results, never its data): the next night reuses it if nothing it depends on changed.
+          if [ -d incoming/state/dump ]; then rm -rf state/dump; cp -R incoming/state/dump state/dump; fi
           # This commit is [skip ci], so nothing checks it after it lands: publish.sh runs the checks it can break
           # (orchestrator/nightly/checks.sh) on this tree before it commits, and a failing check stops the step.
           if [ "$DRY_RUN" = true ]; then

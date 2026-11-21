@@ -408,8 +408,16 @@ def test_every_action_of_every_workflow_is_pinned_to_a_commit_with_its_version_i
         uses = re.findall(r"^\s*-?\s*uses:\s*(\S+)(.*)$", wf.read_text(), re.M)
         assert uses, wf
         for ref, rest in uses:
+            if ref.startswith("./.github/actions/"):
+                # this repository's own composite action, at the commit being run; its steps are checked below
+                assert (HERE.parent / ref[2:] / "action.yml").is_file(), f"{wf.name}: {ref} has no action.yml"
+                continue
             assert re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", ref), f"{wf.name}: {ref} is not pinned to a commit SHA"
             assert re.fullmatch(r"\s*# v\d+\.\d+\.\d+", rest), f"{wf.name}: {ref} has no version comment"
+    for action in (HERE.parent / ".github" / "actions").glob("*/action.yml"):
+        for ref, rest in re.findall(r"^\s*-?\s*uses:\s*(\S+)(.*)$", action.read_text(), re.M):
+            assert re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", ref), f"{action}: {ref} is not pinned to a commit SHA"
+            assert re.fullmatch(r"\s*# v\d+\.\d+\.\d+", rest), f"{action}: {ref} has no version comment"
 
 
 def test_ci_installs_python_dependencies_only_from_the_hashed_requirements_file():
@@ -442,3 +450,23 @@ def test_the_commit_distance_inputs_are_accepted_and_repeatable():
     assert p.returncode == 0, p.stderr
     p = check("--sim", "v0.16.0", *GOOD, "--engine-report")
     assert p.returncode != 0
+
+
+def mk(root, name):
+    (root / name).mkdir()
+    return root / name
+
+
+def test_the_worker_count_is_a_positive_integer_and_reaches_the_scorer_only_when_given(tmp_path):
+    assert check("--sim", "v0.16.0", *GOOD, "--workers", "2").returncode == 0
+    for bad in ("0", "-1", "two", "", "2.5"):
+        p = check("--sim", "v0.16.0", *GOOD, "--workers", bad)
+        assert p.returncode == 2 and "--workers" in p.stderr, (bad, p.stderr)
+    assert check("--sim", "v0.16.0", *GOOD, "--workers").returncode == 2
+    p, _, log, *_ = run_real(mk(tmp_path, "given"), lambda c: "v0.16.0", extra=("--workers", "2"))
+    assert p.returncode == 0, p.stderr
+    argv = log.read_text().splitlines()
+    assert argv[argv.index("--workers") + 1] == "2"
+    p, _, log, *_ = run_real(mk(tmp_path, "default"), lambda c: "v0.16.0")
+    assert p.returncode == 0, p.stderr
+    assert "--workers" not in log.read_text().splitlines()

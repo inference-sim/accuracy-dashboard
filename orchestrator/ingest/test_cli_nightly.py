@@ -1042,3 +1042,97 @@ def test_a_score_run_reads_the_field_list_file_and_scores(tmp_path, monkeypatch)
     import contract
     monkeypatch.setattr(contract, "validate_dir", lambda d: [])
     assert cli.cmd_score(a) == 0 and seen == [[]]
+
+
+# ---------------------------------------------------------------- the dump lane of the night (dump_lane.py)
+import dump_extract as dx  # noqa: E402
+import dump_lane as dl  # noqa: E402
+import test_dump_lane as tdl  # noqa: E402
+
+
+class LaneNight:
+    """A night with a dump lane: the extract holds the unit of rows[0]; the harness is a stand-in that writes the fixture
+    contract for the API lane and a contract of other units for the dump lane."""
+    def __init__(self, tmp, monkeypatch, rows, lane_rc=0):
+        self.tmp, self.lane_rc, self.lane_cmds = tmp, lane_rc, []
+        self.fakes = Fakes(rows)
+        self.units = [ledger_fake.point_id(r) for r in rows]
+        _install(monkeypatch, self.fakes, self.units)
+        self.extract = tdl.make_extract(tmp / "extract", self.units[:1])
+        self.fakes.ledger(tmp)
+        monkeypatch.setattr(dx, "load_pin", lambda *a, **k: tdl.PIN)
+        monkeypatch.setattr(dx, "verify", lambda extract, pin: [])
+        api_harness = self.fakes.run_harness
+
+        def harness(cmd):
+            if cmd[cmd.index("--pull") + 1] == str(self.extract.resolve()):
+                self.lane_cmds.append(cmd)
+                if self.lane_rc == 0:
+                    out = Path(cmd[cmd.index("--out") + 1])
+                    shutil.copytree(tdl.other_units(tdl.FIXTURE, tmp / "lane-src"), out, dirs_exist_ok=True)
+                    shutil.rmtree(tmp / "lane-src")
+                return self.lane_rc
+            rc = api_harness(cmd)
+            shutil.copytree(tdl.FIXTURE, Path(cmd[cmd.index("--out") + 1]), dirs_exist_ok=True)
+            return rc
+        monkeypatch.setattr(cli, "run_harness", harness)
+
+    def args(self, **over):
+        return _args(self.tmp, **{"dump_extract": str(self.extract), "dump_state": str(self.tmp / "dumpstate"),
+                                  "dump_force": False, "dump_workers": 2, **over})
+
+
+def test_the_dump_lane_scores_its_units_with_two_workers_and_the_api_lane_leaves_them_alone(tmp_path, monkeypatch):
+    rows = [_row("m", 1, "2026-10-01"), _row("m", 2, "2026-10-01")]
+    n = LaneNight(tmp_path, monkeypatch, rows)
+    assert cli.cmd_nightly(n.args()) == 0
+    assert len(n.lane_cmds) == 1 and n.lane_cmds[0][n.lane_cmds[0].index("--workers") + 1] == "2"
+    assert "--workers" not in n.fakes.harness_cmd                      # the API lane keeps the harness's own count
+    dump_unit, api_unit = n.units
+    assert n.fakes.pulled_only == [api_unit]                           # the API lane never pulls the dump's unit
+    from ledger import read_unit_set
+    assert read_unit_set(Path(n.fakes.scored_units), role="anchor") == {api_unit}
+    assert json.loads((tmp_path / "state.json").read_text())["point_ids"] == [api_unit]
+    lane = json.loads((tmp_path / "dumpstate" / dl.LANE_JSON).read_text())
+    assert lane["blis_release"] == "v0.12.0" and lane["harness_commit"] == cli.harness_commit_now()
+    assert (tmp_path / "data" / "latest" / "summary.json").is_file()
+    # the next night, nothing changed: the lane is not scored again
+    assert cli.cmd_nightly(n.args(today="2026-10-24")) == 0
+    assert len(n.lane_cmds) == 1
+
+
+def test_a_dump_lane_that_fails_stops_the_night_before_anything_is_fetched_or_published(tmp_path, monkeypatch):
+    n = LaneNight(tmp_path, monkeypatch, [_row("m", 1, "2026-10-01"), _row("m", 2, "2026-10-01")], lane_rc=1)
+    assert cli.cmd_nightly(n.args()) == 2
+    assert n.fakes.pulled_only is None
+    assert not (tmp_path / "data" / "index.json").exists() and not (tmp_path / "state.json").exists()
+    assert not (tmp_path / "dumpstate").exists()                       # no half-scored result is kept
+
+
+def test_the_publish_gate_stops_a_night_whose_lanes_were_scored_by_different_harness_commits(tmp_path, monkeypatch):
+    n = LaneNight(tmp_path, monkeypatch, [_row("m", 1, "2026-10-01"), _row("m", 2, "2026-10-01")])
+    import build_summary_v2
+    build = build_summary_v2.build
+
+    def other_harness(*a, **k):
+        doc = build(*a, **k)
+        doc["provenance"]["harness_commit"] = "e" * 40
+        return doc
+    monkeypatch.setattr(build_summary_v2, "build", other_harness)
+    assert cli.cmd_nightly(n.args()) == 2
+    assert not (tmp_path / "data" / "index.json").exists() and not (tmp_path / "state.json").exists()
+
+
+def test_a_forced_dump_lane_with_nothing_new_republishes_through_the_merge_with_the_lane(tmp_path, monkeypatch):
+    n = LaneNight(tmp_path, monkeypatch, [_row("m", 1, "2026-10-01"), _row("m", 2, "2026-10-01")])
+    assert cli.cmd_nightly(n.args()) == 0
+    seen = []
+    import build_summary_v2
+
+    def merged(prior, delta, window_ids, **k):
+        seen.append((set(window_ids), k.get("lane_dir")))
+        return prior
+    monkeypatch.setattr(build_summary_v2, "build_merged", merged)
+    assert cli.cmd_nightly(n.args(today="2026-10-24", dump_force=True)) == 0
+    assert len(n.lane_cmds) == 2
+    assert seen == [({n.units[1]}, tmp_path / "dumpstate")]            # the API lane's window, and the lane's result

@@ -39,7 +39,7 @@
 #   run.sh --sim <tag|commit> [--sim-repo URL] --units FILE --pull DIR --out DIR
 #          --catalog DIR --registry DIR --corpus-dir DIR
 #          --fields FILE --catalog-release PIN --registry-release PIN [--max-rss-mb N]
-          [--engine-report FILE]... [--engine-checkout DIR]
+#          [--workers N] [--engine-report FILE]... [--engine-checkout DIR]
 #   run.sh --check-args <the same flags>     validate the flags, do nothing else
 #
 # Exit status: 0 on success, 2 for a refused flag or value, otherwise the failing step's status.
@@ -54,13 +54,13 @@ refuse() {
 }
 
 sim="" sim_repo="https://github.com/inference-sim/inference-sim.git"
-units="" pull="" out="" catalog="" registry="" corpus_dir="" fields="" max_rss_mb="" check_only=0
+units="" pull="" out="" catalog="" registry="" corpus_dir="" fields="" max_rss_mb="" workers="" have_workers=0 check_only=0
 catalog_release="" registry_release="" engine_checkout="" engine_reports=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --check-args) check_only=1; shift; continue ;;
-    --sim|--sim-repo|--units|--pull|--out|--catalog|--registry|--corpus-dir|--catalog-release|--registry-release|--max-rss-mb|--fields|--engine-report|--engine-checkout)
+    --sim|--sim-repo|--units|--pull|--out|--catalog|--registry|--corpus-dir|--catalog-release|--registry-release|--max-rss-mb|--workers|--fields|--engine-report|--engine-checkout)
       [ $# -ge 2 ] || refuse "$1 needs a value"
       case "$1" in
         --sim) sim="$2" ;;
@@ -74,6 +74,7 @@ while [ $# -gt 0 ]; do
         --catalog-release) catalog_release="$2" ;;
         --registry-release) registry_release="$2" ;;
         --max-rss-mb) max_rss_mb="$2" ;;
+        --workers) workers="$2"; have_workers=1 ;;
         --fields) fields="$2" ;;
         --engine-report) engine_reports+=("$2") ;;
         --engine-checkout) engine_checkout="$2" ;;
@@ -83,6 +84,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+[ "$have_workers" = 0 ] || [[ "$workers" =~ ^[1-9][0-9]*$ ]] || refuse "--workers $workers is not a positive integer"
 [ -n "$sim" ] || refuse "--sim is required: a release tag or a full 40-hex commit of inference-sim"
 if [[ "$sim" =~ ^[0-9a-f]{40}$ ]]; then
   sim_kind=commit
@@ -177,6 +179,8 @@ args=(score --pull "$pull" --out "$out" --blis "$src/blis" --units "$units"
       --catalog-release "$catalog_release" --registry-release "$registry_release")
 # The replay memory ceiling is passed on only when given.
 [ -z "$max_rss_mb" ] || args+=(--max-rss-mb "$max_rss_mb")
+# The scorer's own default (the cores, to four) applies unless a count is given.
+[ -z "$workers" ] || args+=(--workers "$workers")
 # The commit-distance inputs likewise (design §11.3): without them a run on another commit has no published diff.
 for r in ${engine_reports[@]+"${engine_reports[@]}"}; do args+=(--engine-report "$r"); done
 [ -z "$engine_checkout" ] || args+=(--engine-checkout "$engine_checkout")

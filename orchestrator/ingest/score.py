@@ -1852,6 +1852,20 @@ def split_repeated_sweeps(scored: list[Outcome]) -> None:
                 o.facets["sweep_id"] = f"{sid}|{o.point_id[:12]}"
 
 
+def split_mixed_versions(scored: list[Outcome]) -> None:
+    """A sweep is one deployment (contract.SWEEP_SHARED), and the engine's version is part of it. One workflow run of the
+    database dump holds jobs whose engine builds differ (a nightly build; the log banner names it), which the API
+    rows never showed. The points of such a sweep split into one sweep per engine version, each a shorter curve of its own
+    build, so that the contract holds and no shape is read across two builds."""
+    by: dict = {}
+    for o in scored:
+        by.setdefault(o.facets["sweep_id"], []).append(o)
+    for sid, os_ in by.items():
+        if len({o.facets.get("vllm_version") for o in os_}) > 1:
+            for o in os_:
+                o.facets["sweep_id"] = f"{sid}|v{o.facets.get('vllm_version') or 'none'}"
+
+
 def write_contract(out: Path, outcomes: list[Outcome], provenance: dict) -> None:
     unsimulated = [o.point_id[:12] for o in outcomes if o.would_run_simulator]
     if unsimulated:
@@ -1860,6 +1874,7 @@ def write_contract(out: Path, outcomes: list[Outcome], provenance: dict) -> None
     out.mkdir(parents=True, exist_ok=True)
     scored = [o for o in outcomes if o.fidelity is not None]
     split_repeated_sweeps(scored)
+    split_mixed_versions(scored)
     rows = sorted((o.csv_row for o in scored),
                   key=lambda r: contract.points_sort_key(dict(zip(contract.POINTS_HEADER, map(str, r)))))
     buf = io.StringIO()

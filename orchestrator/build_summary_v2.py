@@ -558,7 +558,7 @@ def _prov_out_to_in(prov: dict, coverage: dict) -> dict:
 
 
 def build_merged(prior_summary: dict, delta_dir: Path, window_ids: set, *, generated_at: str,
-                 evaluator_commit: str, work: Path) -> dict:
+                 evaluator_commit: str, work: Path, lane_dir: Path | None = None) -> dict:
     """An IX-only night's summary (Discussion #15, revised: summary.json IS the store). Start from
     last night's published summary, drop points that aged out of the window, overlay the newly
     scored delta (new points win), and rebuild. Only the delta was fetched and scored; every
@@ -572,10 +572,16 @@ def build_merged(prior_summary: dict, delta_dir: Path, window_ids: set, *, gener
     the same build() as a fresh night, so the merged summary is produced by one code path. The
     merged provenance keeps the prior run's BLIS release, field list and corpus (nothing was re-scored) but takes the
     delta pull's `pulled_at` / `pull_manifest_sha256`, so the API pull date tracks the newest data
-    (issue #35)."""
+    (issue #35).
+
+      lane_dir       the dump lane's contract (dump_lane.py), added after the overlay. `window_ids` are the API
+                     lane's, so the prior's dump points are pruned and the lane's current ones take their place."""
     merged = work / "merged-contract"
     summary_to_contract(prior_summary, merged)
     _overlay_delta(merged, delta_dir, window_ids)
+    if lane_dir is not None:
+        import dump_lane
+        dump_lane.add_lane(merged, lane_dir)
     return build(merged, generated_at=generated_at, evaluator_commit=evaluator_commit)
 
 

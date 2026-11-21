@@ -91,7 +91,7 @@ def _fake_summary(entries, blis_tag, pull_date):
             "point_ids": sorted(e["point_id"] for e in entries)}
 
 
-def _run(world, tmp, today, blis_tag, keep_api=5):
+def _run(world, tmp, today, blis_tag, keep_api=5, force_publish=False):
     scored = tmp / "scored-releases.json"
     if not scored.exists():
         scored.write_text(json.dumps({"kind": "ScoredReleases", "releases": []}))
@@ -100,7 +100,7 @@ def _run(world, tmp, today, blis_tag, keep_api=5):
                         state_path=tmp / "state.json", scored_path=tmp / "scored-releases.json",
                         pull_fn=world.pull, score_build_fn=world.score,
                         backlog_fn=lambda s: {"kind": "Backlog", "snapshot_id": s["snapshot_id"], "engines": {}},
-                        snapshot_date=today, keep_api=keep_api)
+                        snapshot_date=today, keep_api=keep_api, force_publish=force_publish)
 
 
 def _index(tmp):
@@ -119,6 +119,21 @@ def test_seed_then_no_no_is_a_noop(tmp_path):
     r = _run(w, tmp_path, "2026-10-03", "v0.11.0")
     assert r.decision.is_noop
     assert _index(tmp_path)["runs"] == before["runs"]
+
+
+def test_a_night_that_changed_nothing_but_scored_the_dump_lane_again_republishes_the_live_view(tmp_path):
+    w = World()
+    w.rows = [("m", 1, "2026-10-01")]
+    _run(w, tmp_path, "2026-10-02", "v0.11.0")
+    before = _index(tmp_path)
+    marks = []
+    inner = w.score
+    w.score = lambda *a: marks.append(a[1]) or inner(*a)
+    r = _run(w, tmp_path, "2026-10-03", "v0.11.0", force_publish=True)
+    assert r.published and not r.decision.is_noop and r.snapshot_id is None
+    assert marks == ["v0.11.0"] and _index(tmp_path)["runs"] == before["runs"]      # rebuilt, no snapshot
+    marks.clear()
+    assert _run(w, tmp_path, "2026-10-04", "v0.11.0").decision.is_noop and marks == []
 
 
 def test_ix_only_scores_new_points_keeps_cache_no_snapshot(tmp_path):

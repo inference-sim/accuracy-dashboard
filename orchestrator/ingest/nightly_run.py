@@ -75,7 +75,8 @@ def snapshot_id(snapshot_date: str, blis_tag: str, pull_date: str) -> str:
 
 
 def run_night(today: date, blis_tag: str, *, work_dir: Path, data_dir: Path, state_path: Path,
-              scored_path: Path, pull_fn, score_build_fn, backlog_fn, snapshot_date: str, keep_api: int = 5) -> NightResult:
+              scored_path: Path, pull_fn, score_build_fn, backlog_fn, snapshot_date: str, keep_api: int = 5,
+              force_publish: bool = False) -> NightResult:
     """One night of the no-storage pipeline (Discussion #15, revised 2026-10-25). Nothing raw is
     persisted: `work_dir` is this run's ephemeral pull, discarded after. Trigger detection reads
     last night's point-id SET from `state_path` (tiny; no raw store needed), so an IX release or an
@@ -87,7 +88,8 @@ def run_night(today: date, blis_tag: str, *, work_dir: Path, data_dir: Path, sta
     release (blis_changed) the whole window, to rescore it. `score_build_fn(work_dir, blis_tag,
     score_ids, pull_date, window_ids) -> (summary, scored_count)` scores the delta and returns the
     summary (merging into the prior published summary on an IX-only night). `backlog_fn(summary)`
-    is the backlog published beside it (build_summary_v2.backlog_of)."""
+    is the backlog published beside it (build_summary_v2.backlog_of). `force_publish` is a night whose API lane changed nothing
+    but whose dump lane was scored again: the live view is rebuilt, as on an age-out, instead of keeping last night's."""
     work_dir, data_dir, state_path = Path(work_dir), Path(data_dir), Path(state_path)
     scored_path = Path(scored_path)
     state = _read_state(state_path)
@@ -103,6 +105,10 @@ def run_night(today: date, blis_tag: str, *, work_dir: Path, data_dir: Path, sta
 
     # 2. Decide.
     decision = nt.plan_night(window_ids, last_ids, blis_tag, last_blis)
+
+    if decision.is_noop and force_publish:
+        decision = nt.Decision(nt.AGE_OUT, update_live_view=True,
+                               reason=f"the dump lane was scored again under {blis_tag}: update the live view")
 
     # 3. No-op: keep the last good published view, write nothing.
     if decision.is_noop:

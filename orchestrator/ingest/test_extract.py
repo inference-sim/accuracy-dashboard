@@ -1143,6 +1143,21 @@ def test_two_points_left_at_one_concurrency_in_a_sweep_get_a_sweep_each():
     assert clean[0].facets["sweep_id"] == "t"
 
 
+def test_a_sweep_of_two_engine_builds_splits_into_one_sweep_per_build_and_one_build_is_left_alone():
+    import score as sc
+    outs = []
+    for conc, ver in ((1, "0.1.dev1"), (2, "0.1.dev1"), (4, "0.1.dev2"), (8, None)):
+        x = sc.Outcome.__new__(sc.Outcome)
+        x.facets = {"sweep_id": "s", "vllm_version": ver}
+        outs.append(x)
+    sc.split_mixed_versions(outs)
+    assert [x.facets["sweep_id"] for x in outs] == ["s|v0.1.dev1", "s|v0.1.dev1", "s|v0.1.dev2", "s|vnone"]
+    one = [outs[0]]
+    one[0].facets["sweep_id"] = "t"
+    sc.split_mixed_versions(one)
+    assert one[0].facets["sweep_id"] == "t"
+
+
 def test_join_reports_no_match_and_several_matches():
     arts = [_A(1, "bmk_" + RF, "t1"), _A(2, "bmk_" + RF + "2", "t2")]
     same = {"recipe_fingerprint": "f" * 64, "conc": 8}

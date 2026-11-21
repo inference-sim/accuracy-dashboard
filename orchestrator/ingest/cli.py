@@ -40,6 +40,8 @@ import clients  # noqa: E402
 import commit_distance as cdist  # noqa: E402
 import contract  # noqa: E402
 import coverage as cv  # noqa: E402
+import dump_extract as dx  # noqa: E402
+import dump_lane as dl  # noqa: E402
 import supplemental as sup  # noqa: E402
 import engines  # noqa: E402
 import fields as fl  # noqa: E402
@@ -573,7 +575,7 @@ def run_harness(cmd: list[str]) -> int:
 
 
 def harness_command(*, sim: str, units, pull, out, catalog, registry, corpus_dir, fields,
-                    catalog_release: str, registry_release: str, max_rss_mb: int = 0,
+                    catalog_release: str, registry_release: str, max_rss_mb: int = 0, workers: int = 0,
                     engine_reports=(), engine_checkout=None) -> list[str]:
     """The harness/run.sh command that scores a night (design §11.7). The harness is the script in
     this checkout, so the commit every figure records is this checkout's HEAD, which run.sh reads."""
@@ -584,6 +586,8 @@ def harness_command(*, sim: str, units, pull, out, catalog, registry, corpus_dir
            "--catalog-release", catalog_release, "--registry-release", registry_release]
     if max_rss_mb:
         cmd += ["--max-rss-mb", str(max_rss_mb)]
+    if workers:
+        cmd += ["--workers", str(workers)]
     for r in engine_reports or ():
         cmd += ["--engine-report", str(Path(r).resolve())]
     if engine_checkout:
@@ -681,6 +685,32 @@ def cmd_nightly(a) -> int:
         _log("FATAL: the blis-substrate checkout is not " + release + ": " + "; ".join(problems))
         return 2
 
+    # The dump lane (dump_lane.py): the anchor units the frozen dump supplies are scored from the restored extract, on this
+    # BLIS release and harness commit, and the API lane then leaves them alone.
+    lane, lane_dir, lane_scored = None, None, False
+    if getattr(a, "dump_extract", None):
+        def dump_score(units_file: Path, out: Path) -> int:
+            return run_harness(harness_command(
+                sim=a.blis_tag, units=units_file, pull=a.dump_extract, out=out, catalog=a.catalog, registry=a.registry,
+                corpus_dir=a.corpus_dir, fields=a.fields, catalog_release=release, registry_release=release,
+                max_rss_mb=a.max_rss_mb, workers=a.dump_workers, engine_reports=getattr(a, "engine_report", None),
+                engine_checkout=getattr(a, "engine_checkout", None)))
+        try:
+            lane_dir, lane, lane_scored, dump_units = dl.night_lane(
+                extract=Path(a.dump_extract), state=Path(a.dump_state), anchors=anchors, force=a.dump_force,
+                key_args={"blis_release": a.blis_tag, "harness_commit": harness_now, "catalog_release": release,
+                          "registry_release": release}, score=dump_score, log=_log)
+        except (dl.LaneError, dx.DumpError, OSError, ValueError) as e:
+            _log(f"FATAL: the dump lane: {e}")
+            return 2
+        anchors -= set(dump_units)
+        # the API lane scores the anchor list less the dump's units: the published list, with those units taken out
+        import yaml
+        listed = yaml.safe_load(anchor_path.read_text())
+        listed["units"] = sorted(anchors)
+        anchor_path.write_text(json.dumps(listed))
+        _log(f"nightly: {len(dump_units)} anchor units are the dump's, {len(anchors)} the API's")
+
     def score_build_fn(work: Path, blis_tag: str, score_ids, pull_date: str, window_ids: set):
         # The night scores by running harness/run.sh from this checkout (design §11.7): the
         # figures record the checkout's commit, run.sh clones and builds the release `blis_tag`,
@@ -704,15 +734,25 @@ def cmd_nightly(a) -> int:
                 and same_harness(prior, harness_now)):
             summary = bsv2.build_merged(prior, contract_dir, window_ids, generated_at=gen_at,
                                         evaluator_commit=a.evaluator_commit or "local",
-                                        work=Path(a.score_work or contract_dir.parent) / "merge")
+                                        work=Path(a.score_work or contract_dir.parent) / "merge", lane_dir=lane_dir)
         else:
-            summary = bsv2.build(contract_dir, generated_at=gen_at, evaluator_commit=a.evaluator_commit or "local")
+            whole = dl.combined(contract_dir, lane_dir, contract_dir.parent / "_contract-dump") if lane_dir else contract_dir
+            summary = bsv2.build(whole, generated_at=gen_at, evaluator_commit=a.evaluator_commit or "local")
+        if lane:
+            # The headline publishes only if both lanes are one scoring: one BLIS release, one harness commit.
+            not_one = dl.gate(summary["provenance"], lane)
+            if not_one:
+                raise dl.LaneError("publish gate: " + "; ".join(not_one))
         return summary, summary["coverage"]["graded"]
 
-    res = nr.run_night(today, a.blis_tag, work_dir=work_dir, data_dir=data_dir, state_path=state_path,
-                       scored_path=Path(a.scored), pull_fn=pull_fn, score_build_fn=score_build_fn,
-                       snapshot_date=a.today or today.isoformat(), keep_api=a.keep_api,
-                       backlog_fn=bsv2.backlog_of)
+    try:
+        res = nr.run_night(today, a.blis_tag, work_dir=work_dir, data_dir=data_dir, state_path=state_path,
+                           scored_path=Path(a.scored), pull_fn=pull_fn, score_build_fn=score_build_fn,
+                           snapshot_date=a.today or today.isoformat(), keep_api=a.keep_api,
+                           backlog_fn=bsv2.backlog_of, force_publish=lane_scored)
+    except dl.LaneError as e:
+        _log(f"FATAL: {e}; nothing is published and the headline stays at the last good night")
+        return 2
     _log(f"nightly: {res.action} -- {res.decision.reason}")
     if res.snapshot_id:
         _log(f"nightly: froze snapshot {res.snapshot_id}")
@@ -860,8 +900,15 @@ def main(argv=None) -> int:
     n.add_argument("--agentic-workers", type=int, default=0, help="agentic scoring parallelism (default 1, corpus-heavy)")
     n.add_argument("--download-workers", type=int, default=0, help="parallel artifact-download workers (default: min(2*cores, 8))")
     n.add_argument("--max-rss-mb", type=int, default=0, help="per-replay RSS ceiling MB (0=none); over-limit agentic -> not_scored:insufficient_memory")
+    n.add_argument("--dump-extract", metavar="DIR", help="the anchor extract of the database dump (dump_extract.py): its units are "
+                   "scored in the dump lane and left out of the API lane; omitted, there is no dump lane")
+    n.add_argument("--dump-state", metavar="DIR", help="where the last dump result is kept (required with --dump-extract)")
+    n.add_argument("--dump-force", action="store_true", help="score the dump lane even if its last result is current")
+    n.add_argument("--dump-workers", type=int, default=2, help="the dump lane's scoring parallelism")
 
     a = ap.parse_args(argv)
+    if a.cmd == "nightly" and bool(a.dump_extract) != bool(a.dump_state):
+        ap.error("--dump-extract and --dump-state go together")
     return {"pull": cmd_pull, "score": cmd_score, "coverage": cmd_coverage, "nightly": cmd_nightly}[a.cmd](a)
 
 
