@@ -16,6 +16,8 @@ import { Headline } from './components/Headline'
 import { Slices } from './components/Slices'
 import { gateHeadline, MIN_ROLE_KEYS } from './slice'
 import { Classes } from './components/Classes'
+import { Sources } from './components/Sources'
+import { fetchFunnel, shouldFetchFunnel, type FunnelDoc } from './sources'
 import { fetchClasses, shouldFetchClasses, type ClassesDoc } from './classes'
 import { Term } from './components/Term'
 import { GRADE_LABELS, inGrade } from './gradeFilter'
@@ -45,6 +47,8 @@ export function App({
   initialHash,
   classes = null,
   classesError = null,
+  funnel = null,
+  funnelError = null,
 }: {
   summary: Summary | null
   /** The second run's snapshot for the A-vs-B compare view; null = single-run mode. */
@@ -57,6 +61,9 @@ export function App({
   /** Test seam: the classes page's data. In the browser it is fetched when the Classes tab opens. */
   classes?: ClassesDoc | null
   classesError?: string | null
+  /** Test seam: the sources page's data (funnel.json). In the browser it is fetched when the Sources tab opens. */
+  funnel?: FunnelDoc | null
+  funnelError?: string | null
 }) {
   const [route, setRoute] = useState<RouteState>(() =>
     parseRoute(hasWindow ? window.location.hash : (initialHash ?? '')),
@@ -65,6 +72,8 @@ export function App({
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const [classesDoc, setClassesDoc] = useState<ClassesDoc | null>(classes)
   const [classesFail, setClassesFail] = useState<string | null>(classesError)
+  const [funnelDoc, setFunnelDoc] = useState<FunnelDoc | null>(funnel)
+  const [funnelFail, setFunnelFail] = useState<string | null>(funnelError)
 
   useEffect(() => {
     if (!hasWindow) return
@@ -84,6 +93,18 @@ export function App({
       live = false
     }
   }, [route.view, classesDoc, classesFail])
+
+  // The sources page's data loads when its tab opens, once, from the same site as the summary.
+  useEffect(() => {
+    if (!shouldFetchFunnel(route.view, funnelDoc, funnelFail, hasWindow)) return
+    let live = true
+    fetchFunnel()
+      .then((doc) => live && setFunnelDoc(doc))
+      .catch((e: Error) => live && setFunnelFail(e.message))
+    return () => {
+      live = false
+    }
+  }, [route.view, funnelDoc, funnelFail])
 
   const update = (next: Partial<RouteState>) => {
     const merged = { ...route, ...next }
@@ -117,6 +138,17 @@ export function App({
       <Shell view="classes" onView={(view) => update({ view, runB: null, run: null, sel: null })}>
         <ErrorBoundary resetKey={classesDoc?.generated_at ?? null}>
           <Classes doc={classesDoc} error={classesFail} />
+        </ErrorBoundary>
+      </Shell>
+    )
+  }
+
+  // The sources page reads funnel.json only, so it shows even while the summary is still loading.
+  if (route.view === 'sources') {
+    return (
+      <Shell view="sources" onView={(view) => update({ view, runB: null, run: null, sel: null })}>
+        <ErrorBoundary resetKey={null}>
+          <Sources doc={funnelDoc} error={funnelFail} />
         </ErrorBoundary>
       </Shell>
     )
@@ -184,8 +216,8 @@ function Shell({
   onView,
   children,
 }: {
-  view: 'overview' | 'classes' | 'dev'
-  onView: (v: 'overview' | 'classes' | 'dev') => void
+  view: 'overview' | 'classes' | 'sources' | 'dev'
+  onView: (v: 'overview' | 'classes' | 'sources' | 'dev') => void
   children: React.ReactNode
 }) {
   return (
@@ -196,6 +228,9 @@ function Shell({
         </button>
         <button type="button" className={`tab${view === 'classes' ? ' on' : ''}`} onClick={() => onView('classes')}>
           Classes
+        </button>
+        <button type="button" className={`tab${view === 'sources' ? ' on' : ''}`} onClick={() => onView('sources')}>
+          Sources
         </button>
         <button type="button" className={`tab${view === 'dev' ? ' on' : ''}`} onClick={() => onView('dev')}>
           For developers

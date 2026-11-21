@@ -305,3 +305,27 @@ def test_the_report_carries_the_funnels_only_when_they_are_given_and_refuses_inc
 def test_the_command_refuses_half_a_source():
     assert fn.main(["--ledger", "l", "--out", "o"]) == 2
     assert fn.main(["--configiq-points", "p", "--out", "o"]) == 2
+
+
+# ------------------------------------------------------------------------------------------------ the web consumer
+
+FIXTURE = HERE.parents[1] / "web" / "testdata" / "funnel-2.fixture.json"
+
+
+def _fixture_doc() -> dict:
+    """A funnel document of canned units that exercises every part the Sources page renders; web/src/sources.test.tsx reads
+    the committed copy, so the producer (this file) and the consumer cannot drift."""
+    lg, ids = _ledger(6)
+    out = {ids[0]: {"grade": "G4"}, ids[1]: {"grade": "G5", "g5": "field_unclassified"}, ids[2]: {"grade": "G3"},
+           ids[3]: {"grade": "G4"}, ids[4]: {"grade": "G5", "g5": "engine_unsupported"}, ids[5]: {"grade": "G5", "g5": "row_differs"}}
+    ix = fn.inferencex(lg, set(ids), None, out)
+    cq = fn.configiq(SimpleNamespace(units={"a": 1, "b": 1, "c": 1}, by_record={"1": 1}, left_out={}),
+                     [_rec("a", grade="G4"), _rec("b", g5_reasons=[{"code": "value_not_recorded", "subject": "engine max_num_seqs"}],
+                                                  g5_reason={"code": "value_not_recorded"}, grade="G5")])
+    found = [{"source": "configiq", "code": "configiq_cut_points_not_anchor_only", "text": "ledger.yaml gives configiq the roles fit, select, validate, held, anchor; D9 makes every unit an anchor."}]
+    return fn.combine([ix, cq], training_funnels=[fn.training("vllm-ci-perf", _training_report())], discrepancies=found)
+
+
+def test_the_web_fixture_is_what_funnel_py_writes():
+    want = json.loads(json.dumps(_fixture_doc(), sort_keys=True))
+    assert json.loads(FIXTURE.read_text()) == want, f"regenerate {FIXTURE} from _fixture_doc()"
