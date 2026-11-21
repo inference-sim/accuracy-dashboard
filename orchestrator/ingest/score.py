@@ -128,6 +128,8 @@ class Env:
     # The commit-distance provider (commit_distance.Distance): the upgrade reports' diffs and an engine checkout. None
     # publishes no diff, so a run on another commit is G4.
     distance: object = None
+    # Per-engine override of the commit-count bound (engine kind -> commits); unset, both engines use build.MAX_COMMIT_DISTANCE.
+    max_distance: dict | None = None
     # The simulator build that scores the run: a release tag, or a commit (pointrecord Simulator).
     sim_build: str = ""
     # The harness commit every point records (design §11.7, X8): the 40-hex commit of the dashboard checkout.
@@ -658,7 +660,8 @@ def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env, simulate: bool
         o = Outcome(point_id=entry["point_id"], identity=entry["identity"], row=entry["row"],
                     reasons=sorted(set(entry["reasons"] + ["blis_refused:extractor_error"])),
                     measurements=entry.get("measurements") or [], build=entry.get("build"))
-    grade_outcome(o, env.kit(o.engine).release, env.simulator(o.engine) if simulate else None, env.distance)
+    grade_outcome(o, env.kit(o.engine).release, env.simulator(o.engine) if simulate else None, env.distance,
+                  env.max_distance)
     return o
 
 
@@ -1715,7 +1718,8 @@ def substitutions(o_subs: list[dict], fidelity: dict, unevaluated=None) -> list[
         + gr.unchecked(unevaluated)
 
 
-def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None, distance=None) -> None:
+def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None, distance=None,
+                  max_distance: dict | None = None) -> None:
     """Give one outcome its grade (design §11.3, §11.4; COV-4, COV-5), from data alone.
 
     A scored point is G1 to G4, its record naming every substitution, and its points.csv row
@@ -1749,13 +1753,13 @@ def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None
         ask = distance or (lambda *_: None)
         same = run_commit == o.engine_commit
         counts = None if same else getattr(distance, "record", lambda *_: None)(run_commit, o.engine_commit)
-        # The one commit-count bound there is, vLLM's (build.VLLM_MAX_DISTANCE); SGLang has none.
-        bound = bld.VLLM_MAX_DISTANCE if o.engine == "vllm" else None
+        # One bound for both engines (build.MAX_COMMIT_DISTANCE), unless `max_distance` names the engine.
+        bound = bld.commit_bound(o.engine, max_distance)
         rec = cdist.label(run_commit, o.engine_commit, None if same else ask(run_commit, o.engine_commit),
                           apart=cdist.commits_apart(counts), bound=bound)
         if rec["state"] == cdist.OUTSIDE_DISTANCE:
             why = (f"{run_commit} is {rec['commits_apart']} commits from the modelled {o.engine_commit}, "
-                   f"past {bound} (build.VLLM_MAX_DISTANCE)")
+                   f"past {bound} (build.MAX_COMMIT_DISTANCE)")
             g = gr.grade(engine_version=o.engine_commit, release=gr.Release(None, True, why), substitutions=subs)
         else:
             g = gr.grade_by_commit(run_commit=run_commit, scored_commit=o.engine_commit, distance=ask, substitutions=subs)

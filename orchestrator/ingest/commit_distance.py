@@ -33,7 +33,7 @@ SAME = "same"                              # the run measured the commit the sim
 NO_PORTED_CHANGE = "no_ported_change"      # another commit, and nothing the engine ports differs (G3)
 PORTED_CHANGE = "ported_change"            # another commit, and some ported function, field or kernel differs (G4)
 UNPUBLISHED = "unpublished"                # another commit, and no diff is published for the pair (G4)
-OUTSIDE_DISTANCE = "outside_distance"      # a checkout counts more commits between the two than build.VLLM_MAX_DISTANCE (G4)
+OUTSIDE_DISTANCE = "outside_distance"      # a checkout counts more commits between the two than build.MAX_COMMIT_DISTANCE (G4)
 STATES = (SAME, NO_PORTED_CHANGE, PORTED_CHANGE, UNPUBLISHED, OUTSIDE_DISTANCE, "custom_build", "commit_unresolvable",
           "commit_conflict")
 
@@ -49,8 +49,7 @@ def label(run: str | None, scored: str, changed: list[str] | None, why: str | No
     """What the fidelity record states of a point's commit distance, from the diff the provider returned for the pair
     (`changed`: None when none is published). `why` is a build the scorer could not place by commit (custom,
     unresolvable or conflicting), which is its own state; the ported changes are then not asked. `apart` is the commit
-    count a checkout gave and `bound` the engine's limit on it (build.VLLM_MAX_DISTANCE; None for an engine with
-    none): past it the state is outside_distance, whatever the diff says."""
+    count a checkout gave and `bound` the engine's limit on it (build.MAX_COMMIT_DISTANCE, per engine): past it the state is outside_distance, whatever the diff says."""
     rec = {"run_commit": run, "scored_commit": scored}
     if why in STATES:
         return {**rec, "state": why}

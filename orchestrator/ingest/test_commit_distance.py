@@ -215,20 +215,22 @@ class Counted:
                 "scored_commits": self.n[1], "tags": []}
 
 
-BOUND = bld.VLLM_MAX_DISTANCE
+BOUND = bld.MAX_COMMIT_DISTANCE
 APART_CASES = [
     # name, engine, run commits, scored commits, state, grade
     ("at_the_bound_is_by_commit", "vllm", BOUND - 5, 5, "no_ported_change", "G3"),
     ("one_past_the_bound", "vllm", BOUND - 5, 6, "outside_distance", "G4"),
     ("counted_on_the_modelled_side", "vllm", 0, BOUND + 1, "outside_distance", "G4"),
-    ("sglang_has_no_such_bound", "sglang", BOUND + 500, BOUND + 500, "no_ported_change", "G3"),
+    ("sglang_at_the_bound_is_by_commit", "sglang", BOUND - 5, 5, "no_ported_change", "G3"),
+    ("sglang_one_past_the_bound", "sglang", BOUND - 5, 6, "outside_distance", "G4"),
+    ("sglang_counted_on_the_modelled_side", "sglang", 0, BOUND + 1, "outside_distance", "G4"),
 ]
 
 
 @pytest.mark.parametrize("name, engine, n_run, n_scored, state, grade", APART_CASES, ids=[c[0] for c in APART_CASES])
-def test_a_vllm_run_further_from_the_modelled_commit_than_the_build_bound_is_g4_outside_distance(
+def test_a_run_further_from_the_modelled_commit_than_the_one_bound_is_g4_outside_distance(
         name, engine, n_run, n_scored, state, grade):
-    """The bound is build.VLLM_MAX_DISTANCE, applied to the commits that separate the run's commit from the modelled
+    """The bound is build.MAX_COMMIT_DISTANCE, one for both engines, applied to the commits that separate the run's commit from the modelled
     one when a checkout counts them; the point is still scored, as G4 nightly_or_custom naming the distance."""
     o = _outcome(build=BUILD, engine_commit=SCORED)
     o.engine = engine
@@ -243,6 +245,24 @@ def test_a_vllm_run_further_from_the_modelled_commit_than_the_build_bound_is_g4_
         assert str(n_run + n_scored) in detail and str(BOUND) in detail
     else:
         assert "commits_apart" not in rec
+
+
+def test_the_one_bound_keeps_its_old_name_and_value_for_the_summary():
+    assert bld.VLLM_MAX_DISTANCE == bld.MAX_COMMIT_DISTANCE == 2000
+    assert bld.Resolver(registry=None, github=None).max_distance == bld.MAX_COMMIT_DISTANCE
+
+
+@pytest.mark.parametrize("override, engine, state", [
+    (None, "sglang", "no_ported_change"),                   # unset by default: the shared bound
+    ({"vllm": 10}, "sglang", "no_ported_change"),           # another engine's override is not this engine's
+    ({"sglang": 10}, "sglang", "outside_distance"),
+    ({"sglang": 10}, "vllm", "no_ported_change"),
+])
+def test_a_per_engine_override_changes_only_that_engines_bound(override, engine, state):
+    o = _outcome(build=BUILD, engine_commit=SCORED)
+    o.engine = engine
+    sc.grade_outcome(o, "0.33.0", None, Counted(100, 100), override)
+    assert o.fidelity["commit_distance"]["state"] == state
 
 
 def test_without_a_checkout_no_commit_count_is_known_so_the_bound_is_not_applied():
