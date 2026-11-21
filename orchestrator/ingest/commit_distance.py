@@ -33,18 +33,31 @@ SAME = "same"                              # the run measured the commit the sim
 NO_PORTED_CHANGE = "no_ported_change"      # another commit, and nothing the engine ports differs (G3)
 PORTED_CHANGE = "ported_change"            # another commit, and some ported function, field or kernel differs (G4)
 UNPUBLISHED = "unpublished"                # another commit, and no diff is published for the pair (G4)
-STATES = (SAME, NO_PORTED_CHANGE, PORTED_CHANGE, UNPUBLISHED, "custom_build", "commit_unresolvable", "commit_conflict")
+OUTSIDE_DISTANCE = "outside_distance"      # a checkout counts more commits between the two than build.VLLM_MAX_DISTANCE (G4)
+STATES = (SAME, NO_PORTED_CHANGE, PORTED_CHANGE, UNPUBLISHED, OUTSIDE_DISTANCE, "custom_build", "commit_unresolvable",
+          "commit_conflict")
 
 
-def label(run: str | None, scored: str, changed: list[str] | None, why: str | None = None) -> dict:
+def commits_apart(counts: dict | None) -> int | None:
+    """The commits that separate the run's commit from the modelled one: those from their merge base to each. None
+    when no checkout counted them."""
+    return None if not counts else counts["run_commits"] + counts["scored_commits"]
+
+
+def label(run: str | None, scored: str, changed: list[str] | None, why: str | None = None,
+          apart: int | None = None, bound: int | None = None) -> dict:
     """What the fidelity record states of a point's commit distance, from the diff the provider returned for the pair
     (`changed`: None when none is published). `why` is a build the scorer could not place by commit (custom,
-    unresolvable or conflicting), which is its own state; the ported changes are then not asked."""
+    unresolvable or conflicting), which is its own state; the ported changes are then not asked. `apart` is the commit
+    count a checkout gave and `bound` the engine's limit on it (build.VLLM_MAX_DISTANCE; None for an engine with
+    none): past it the state is outside_distance, whatever the diff says."""
     rec = {"run_commit": run, "scored_commit": scored}
     if why in STATES:
         return {**rec, "state": why}
     if run == scored:
         return {**rec, "state": SAME}
+    if apart is not None and bound is not None and apart > bound:
+        return {**rec, "state": OUTSIDE_DISTANCE, "commits_apart": apart, "max_distance": bound}
     if changed is None:
         return {**rec, "state": UNPUBLISHED}
     return {**rec, "state": PORTED_CHANGE if changed else NO_PORTED_CHANGE, "ported_changes": len(changed)}

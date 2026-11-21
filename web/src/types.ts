@@ -93,6 +93,9 @@ export interface Fidelity {
     run_commit: string | null
     scored_commit: string
     ported_changes?: number
+    /** outside_distance only: the commits between the two, and the bound (build.VLLM_MAX_DISTANCE) it passed. */
+    commits_apart?: number
+    max_distance?: number
     merge_base?: string
     run_commits?: number
     scored_commits?: number

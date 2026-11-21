@@ -1747,13 +1747,21 @@ def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None
     run_commit = b.get("commit")
     if o.engine_commit and run_commit and b.get("why") in (None, bld.OUTSIDE_DISTANCE):
         ask = distance or (lambda *_: None)
-        g = gr.grade_by_commit(run_commit=run_commit, scored_commit=o.engine_commit, distance=ask, substitutions=subs)
-        rec = cdist.label(run_commit, o.engine_commit, None if run_commit == o.engine_commit else ask(run_commit, o.engine_commit))
-        if run_commit == o.engine_commit:
+        same = run_commit == o.engine_commit
+        counts = None if same else getattr(distance, "record", lambda *_: None)(run_commit, o.engine_commit)
+        # The one commit-count bound there is, vLLM's (build.VLLM_MAX_DISTANCE); SGLang has none.
+        bound = bld.VLLM_MAX_DISTANCE if o.engine == "vllm" else None
+        rec = cdist.label(run_commit, o.engine_commit, None if same else ask(run_commit, o.engine_commit),
+                          apart=cdist.commits_apart(counts), bound=bound)
+        if rec["state"] == cdist.OUTSIDE_DISTANCE:
+            why = (f"{run_commit} is {rec['commits_apart']} commits from the modelled {o.engine_commit}, "
+                   f"past {bound} (build.VLLM_MAX_DISTANCE)")
+            g = gr.grade(engine_version=o.engine_commit, release=gr.Release(None, True, why), substitutions=subs)
+        else:
+            g = gr.grade_by_commit(run_commit=run_commit, scored_commit=o.engine_commit, distance=ask, substitutions=subs)
+        if same:
             o.run_release = engine_release
-        elif counts := getattr(distance, "record", lambda *_: None)(run_commit, o.engine_commit):
-            rec = {**counts, **rec}
-        o.fidelity = {**o.fidelity, "commit_distance": rec}
+        o.fidelity = {**o.fidelity, "commit_distance": {**(counts or {}), **rec}}
     else:
         g = gr.grade(engine_version=engine_release, release=rel, substitutions=subs)
         if o.engine_commit:

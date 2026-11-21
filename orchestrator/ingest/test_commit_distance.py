@@ -8,6 +8,7 @@ import pytest
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import build as bld  # noqa: E402
 import commit_distance as cd  # noqa: E402
 import score as sc  # noqa: E402
 
@@ -199,6 +200,55 @@ def test_every_point_on_a_recorded_engine_commit_is_labelled_by_its_commit_dista
     assert (rec["state"], rec.get("ported_changes")) == (state, n)
     assert rec["scored_commit"] == scored and rec["run_commit"] == build.get("commit")
     assert rec["state"] in cd.STATES
+
+
+class Counted:
+    """A provider with a checkout: the diff says nothing ported differs, and the counts are the run's and the model's."""
+    def __init__(self, run_commits, scored_commits):
+        self.n = (run_commits, scored_commits)
+
+    def __call__(self, run, scored):
+        return []
+
+    def record(self, run, scored):
+        return {"run_commit": run, "scored_commit": scored, "merge_base": "b" * 40, "run_commits": self.n[0],
+                "scored_commits": self.n[1], "tags": []}
+
+
+BOUND = bld.VLLM_MAX_DISTANCE
+APART_CASES = [
+    # name, engine, run commits, scored commits, state, grade
+    ("at_the_bound_is_by_commit", "vllm", BOUND - 5, 5, "no_ported_change", "G3"),
+    ("one_past_the_bound", "vllm", BOUND - 5, 6, "outside_distance", "G4"),
+    ("counted_on_the_modelled_side", "vllm", 0, BOUND + 1, "outside_distance", "G4"),
+    ("sglang_has_no_such_bound", "sglang", BOUND + 500, BOUND + 500, "no_ported_change", "G3"),
+]
+
+
+@pytest.mark.parametrize("name, engine, n_run, n_scored, state, grade", APART_CASES, ids=[c[0] for c in APART_CASES])
+def test_a_vllm_run_further_from_the_modelled_commit_than_the_build_bound_is_g4_outside_distance(
+        name, engine, n_run, n_scored, state, grade):
+    """The bound is build.VLLM_MAX_DISTANCE, applied to the commits that separate the run's commit from the modelled
+    one when a checkout counts them; the point is still scored, as G4 nightly_or_custom naming the distance."""
+    o = _outcome(build=BUILD, engine_commit=SCORED)
+    o.engine = engine
+    sc.grade_outcome(o, "0.33.0", None, Counted(n_run, n_scored))
+    rec = o.fidelity["commit_distance"]
+    assert (rec["state"], o.fidelity["grade"]) == (state, grade)
+    assert rec["state"] in cd.STATES
+    if state == "outside_distance":
+        assert rec["commits_apart"] == n_run + n_scored and rec["max_distance"] == BOUND
+        assert "nightly_or_custom" in KINDS(o) and not KINDS(o) & {"other_release", "changed_functions"}
+        detail = [s["detail"] for s in o.fidelity["substitutions"] if s["kind"] == "nightly_or_custom"][0]
+        assert str(n_run + n_scored) in detail and str(BOUND) in detail
+    else:
+        assert "commits_apart" not in rec
+
+
+def test_without_a_checkout_no_commit_count_is_known_so_the_bound_is_not_applied():
+    o = _outcome(build=BUILD, engine_commit=SCORED)
+    sc.grade_outcome(o, "0.33.0", None, lambda r, s: [])
+    assert o.fidelity["commit_distance"]["state"] == "no_ported_change" and o.fidelity["grade"] == "G3"
 
 
 def test_a_result_that_states_no_commit_has_no_commit_distance_to_record():
