@@ -42,8 +42,8 @@ def _runner(rc: int, stdout: str, stderr: str = ""):
 
 # ------------------------------------------------------------------ parse
 
-@pytest.mark.parametrize("version", [2, 3])
-def test_parse_reads_a_schema_version_2_or_3_result(version):
+@pytest.mark.parametrize("version", [2, 3, 4])
+def test_parse_reads_a_schema_version_2_3_or_4_result(version):
     assert result.parse(json.dumps(_doc(schema_version=version)).encode())["name"] == "x"
 
 
