@@ -32,7 +32,7 @@ export const GRADE_FILTERS: GradeFilter[] = ['G1', 'G2', 'G3', 'all']
 export interface RouteState {
   /** Which audience's page: "overview" (outside visitors, the latest run) or "dev" (BLIS
    *  developers: pick and compare runs). #23 */
-  view: 'overview' | 'classes' | 'dev'
+  view: 'overview' | 'classes' | 'sources' | 'dev'
   /** snapshot_id of the run being viewed, or null for the latest. */
   run: string | null
   /** snapshot_id of the second run to compare against (A-vs-B); null = single-run mode. */
@@ -74,7 +74,7 @@ export function parseRoute(hash: string): RouteState {
   // A link from before the developer tab existed that names a second run still opens the
   // comparison, so old shared links keep working.
   const v = p.get('view')
-  const view = v === 'dev' || (runB && runB !== '') ? 'dev' : v === 'classes' ? 'classes' : 'overview'
+  const view = v === 'dev' || (runB && runB !== '') ? 'dev' : v === 'classes' ? 'classes' : v === 'sources' ? 'sources' : 'overview'
   const by = sliceAttr(p.get('by'))?.id ?? null
   const sv = p.get('sv')
   return {
@@ -93,6 +93,7 @@ export function routeToHash(state: RouteState): string {
   const p = new URLSearchParams()
   if (state.view === 'dev') p.set('view', 'dev')
   if (state.view === 'classes') p.set('view', 'classes')
+  if (state.view === 'sources') p.set('view', 'sources')
   if (state.run) p.set('run', state.run)
   if (state.runB) p.set('runB', state.runB)
   if (state.sel) p.set('sel', state.sel)
