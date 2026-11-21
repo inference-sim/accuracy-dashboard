@@ -20,3 +20,8 @@ __pycache__/
 # local scratch notes (never commit)
 goal-api-ingest.md
 local-180day-pull.md
+
+# third-party database-dump data (never committed; CI caches the extract, only its sha256 is pinned)
+/dump-extract/
+/dump-extract.tmp/
+**/ext-dump*/

@@ -490,14 +490,15 @@ class Placed:
     unlisted: list = field(default_factory=list)    # {"record", "reason", "model", "date", ...}
 
 
-def place(rows: list[dict], lg) -> Placed:
+def place(rows: list[dict], lg, dates: dict | None = None) -> Placed:
     """Group the window's rows by ledger unit (records the ledger joins are one point) and list
     the rows the ledger holds no unit for. A row whose identity disagrees with the unit list
-    raises ledger.LedgerError: it is not the record the ledger was generated from."""
+    raises ledger.LedgerError: it is not the record the ledger was generated from. `dates` is
+    contract.run_dates over every record of the source, for a caller whose rows are a subset of them."""
     import ledger as ldg
     by_unit: dict = {}
     out = Placed()
-    window_dates = contract.run_dates(rows)
+    window_dates = contract.run_dates(rows) if dates is None else dates
     for r in sorted(rows, key=lambda r: int(r["id"])):
         rid = str(r["id"])
         p = lg.by_record.get(rid)
