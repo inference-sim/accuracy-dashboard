@@ -12,7 +12,7 @@
  "format": "funnel-2",
  "funnels": {
   "configiq": {
-   "anchor_rule": "every unit (D9), less the units the partition-prep report leaves out; none is fit, selected, validated or held",
+   "anchor_rule": "every unit (plan: anchor-only), less the units the D2 join found read under a training role; none is fit, selected, validated, held or withheld as a test split",
    "blockers": [
     {
      "reason": "value_not_recorded",
@@ -41,27 +41,31 @@
     "value_not_recorded: engine max_num_seqs": 1
    },
    "provisional": {
-    "by_grade": {},
-    "units": 0
+    "by_grade": {
+     "G3": 1
+    },
+    "units": 1
    },
    "role": "anchor",
    "scored_by_grade": {
     "G1": 0,
     "G2": 0,
     "G3": 0,
-    "G4": 1
+    "G4": 0
    },
    "source": "configiq",
    "stages": {
     "in_scope": 3,
     "recoverable": 1,
     "rows_held": 1,
-    "scored": 1,
+    "scored": 0,
     "units": 3
    },
    "unresolved": {
-    "unit_ids": [],
-    "units": 0
+    "unit_ids": [
+     "a"
+    ],
+    "units": 1
    },
    "withheld": {}
   },
@@ -203,7 +207,7 @@
  "meaning": "No unit is dropped for its date. Recoverable is a floor (recoverable.py), so a unit can be scored without being counted recoverable; unresolved counts the recoverable units that are neither scored nor G5. A provisional unit (capped at G3) is outside scored.",
  "problems": [],
  "scored": {
-  "configiq": 1,
+  "configiq": 0,
   "inferencex": 3
  },
  "training": {

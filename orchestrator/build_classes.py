@@ -151,8 +151,10 @@ def derive_contract(directory: Path, *, cid: str, label: str, note: str, kind: s
 
 def derive_configiq(directory: Path, *, cid: str, label: str, note: str, meta: dict, interim: bool = False,
                     withheld_figures: dict | None = None, plain_line: str | None = None, model_gaps: dict | None = None) -> dict:
-    """The configiq class from a score_configiq output directory (summary.json, configiq-points.jsonl). Errors are by grade over the
-    scored train and validation points; the test split is withheld and never appears.
+    """The configiq class from a score_configiq output directory (summary.json, configiq-points.jsonl). configiq is anchor-only
+    (D9): errors are by grade over every scored point, none is dropped for the split it would fall on, and the class says it is an
+    anchor source (`anchor`) and, separately, that it is provisional (`kind`, COV-7: outside the headline). Points a run withheld
+    on purpose (a local experiment, score_configiq --withhold-split) are not scored and so are not in any figure.
 
     The card shows the dataset's rows, the rows scored and the partition, and one plain line (plain_line) for the rest: no refusal is
     listed. A statistic named in withheld_figures (stat -> why) is not reported as an accuracy figure and its reason is shown instead;
@@ -169,7 +171,7 @@ def derive_configiq(directory: Path, *, cid: str, label: str, note: str, meta: d
     by_model: dict = {}
     subs: dict = {}
     for r in recs:
-        if r.get("status") != "scored" or r.get("split") == "test" or r.get("grade") not in err:
+        if r.get("status") != "scored" or r.get("grade") not in err:
             continue
         m = by_model.setdefault(r["model"], {s: [] for s in stats})
         for s in stats:
@@ -186,10 +188,13 @@ def derive_configiq(directory: Path, *, cid: str, label: str, note: str, meta: d
     models = [{"model": name, "scored": len(next(iter(v.values()))), "gap": model_gaps.get(name),
                "accuracy": {s: _figure(v[s]) for s in stats}} for name, v in by_model.items()]
     models.sort(key=lambda m: (-m["scored"], m["model"]))
-    out = {"id": cid, "label": label, "kind": "provisional", "interim": interim, "note": note,
+    held_back = (doc["provenance"]["split"].get("withheld") or [])
+    out = {"id": cid, "label": label, "kind": "provisional", "anchor": True, "interim": interim, "note": note,
            "counts": {"points": cov["points"], "scored": cov["scored"], "refused": cov["refused"], "failed": cov["failed"],
                       "withheld": cov["withheld"]},
-           "partition": "train and validation rows are simulated; the test partition is withheld",
+           "partition": ("anchor-only (D9): every row is an anchor row and every scorable row is simulated; none is fit, selected, "
+                         "validated, held or withheld as a test split" if not held_back else
+                         f"anchor-only (D9), local experiment: the {', '.join(held_back)} partition is withheld"),
            "grades": grades,
            "accuracy_by_grade": {g: {s: _figure(err[g][s]) for s in stats} for g in GRADED},
            "by_model": models,

@@ -17,7 +17,7 @@ Red Hat's configiq dataset (`redhat-performance/configiq-performance-upstream-da
 
 Refused by name, from identity alone: other engines (`engine_unsupported`), chips BLIS does not model, launches that equal no preset of the launcher, multi-turn workloads (think time and per-turn lengths are not recorded), a blank `max_seq_len` for a model whose catalog entry has no `config.json`, a simulator refusal of an unstated `block_size` (blis-vllm#68), and repeat runs that disagree.
 
-Split: the dashboard's development split applied to the unit's role key; train and validation are simulated, test is withheld and its figures are not read.
+Roles (design D9): every configiq unit is an anchor unit, less `rules.configiq.left_out` of `ledger.yaml` (the units the D2 join found read under a training role; `--ledger-yaml`). None is fit, selected, validated, held or withheld as a test set, and none judges a change. The development split is kept only as a label on each record; withholding a split is an opt-in for a local experiment (`--withhold-split`) and is recorded in the provenance. The provisional cap (G3, outside the headline, COV-7) is a separate fact from the anchor status.
 
 ## Command
 
@@ -25,7 +25,7 @@ Split: the dashboard's development split applied to the unit's role key; train a
 python3 orchestrator/ingest/score_configiq.py --ledger SUBSTRATE/catalog/ledger --rows EXPORT.jsonl --data-dir DATASET_DIR \
   --blis INFERENCE_SIM_V0_18_0/blis --catalog SUBSTRATE/catalog --registry SUBSTRATE/registry \
   --catalog-release v0.15.0 --registry-release v0.15.0 --fields BLIS_VLLM_V0_33_0_BLIS_1/fields.json \
-  --sim-build v0.18.0 --harness-commit HEAD40 --out OUT
+  --sim-build v0.18.0 --harness-commit HEAD40 --ledger-yaml SUBSTRATE/catalog/ledger/ledger.yaml --out OUT
 ```
 
 Output: `configiq-points.jsonl`, `points.csv` (the InferenceX contract's columns) and `summary.json`.
@@ -48,3 +48,5 @@ Mean TTFT is biased high (signed median +101 percent) while mean ITL is -14 perc
 Checked and ruled out as the cause: the definition (TTFT is request start to first token on both sides, and the median is biased as much as the mean: +89 percent B200, +471 percent H200); the window (the simulated steady-state TTFT, requests after the first wave, is within 20 percent of the whole-run mean); prompt length (the recorded 1004-token mean is simulated, and block and batch defaults follow the engine's, 16384 batched tokens on B200); the rate type (the dataset records only the concurrency, the simulated mean in flight is 98 percent of it, and the simulated and recorded request latencies agree within 5 percent at concurrency 100). Prefix caching is on for all 135; whether GuideLLM's synthetic prompts shared prefixes is not recorded, and the simulation has no hits.
 
 The bias is unexplained. It is load-dependent (flat fixed gap at concurrency 1, then growing), both sides run in lockstep waves (recorded request latencies spread 1-3 percent at concurrency 100), and at concurrency 1 a fixed gap remains (B200 1k prompts: 57 ms simulated, 30 ms recorded, which is of the order of the host admission cost). Remaining candidates, none tested: something specific to the configiq H200 runs (tensor-parallel size, chunked-prefill settings the row leaves blank), whether GuideLLM's synthetic prompts shared prefixes (prefix caching is on; the simulation has no hits), or the latency model under lockstep waves. No claim is made here that prefill is over-priced: on InferenceX fit units the H100 prefill slope is under-priced, the opposite sign, and H200 InferenceX cannot separate prefill from the admission constant. No scenario field was changed; these points stay provisional and outside the headline (COV-11).
+
+`orchestrator/nightly/configiq_night.py` runs the whole path (fetch at the pinned revision with sha256 checks, export, score, derive the class file, write the funnel with the scored count and the G5 count per reason). It is run by hand through `.github/workflows/score-configiq.yml`, not by the nightly: the ledger's configiq data is pinned to one dataset revision, which moves only when the pin is moved on purpose. The class file is committed by hand as `data/supplemental/classes/configiq.json`, which the nightly's classes step reads.

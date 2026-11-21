@@ -27,7 +27,7 @@ describe('the Sources page', () => {
     expect(h).toContain('field_unclassified')
     expect(h).toContain('engine_unsupported')
     expect(h).toContain('value_not_recorded')
-    expect(h).toContain('Anchor rule: every unit (D9)')
+    expect(h).toContain('Anchor rule: every unit (plan: anchor-only), less the units the D2 join found read under a training role')
   })
 
   it('shows the InferenceX vLLM and SGLang lanes apart, each with its own reasons', () => {

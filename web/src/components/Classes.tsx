@@ -7,6 +7,7 @@ import { formatCount, formatFigure, formatSignedPct } from '../format'
 import {
   CLASS_GRADES,
   GRADED,
+  anchorTag,
   kindTag,
   statsOf,
   type ClassEntry,
@@ -43,6 +44,7 @@ function ClassCard({ c }: { c: ClassEntry }) {
     <section className={`classcard kind-${c.kind}`} id={`class-${c.id}`} aria-labelledby={`class-${c.id}-h`}>
       <h2 className="sectitle" id={`class-${c.id}-h`}>
         {c.label}
+        {anchorTag(c) ? <span className="pill classtag anchor"> {anchorTag(c)}</span> : null}
         {tag ? <span className="pill classtag"> {tag}</span> : null}
         {c.interim ? <span className="pill classtag interim"> interim</span> : null}
       </h2>
@@ -59,7 +61,7 @@ function ClassCard({ c }: { c: ClassEntry }) {
             <div className="stat-label">refused, by name</div>
             <div className="stat-hint">
               {formatCount(n.failed)} failed
-              {n.withheld ? ` · ${formatCount(n.withheld)} withheld (test split)` : ''}
+              {n.withheld ? ` · ${formatCount(n.withheld)} withheld` : ''}
             </div>
           </div>
         )}

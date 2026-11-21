@@ -63,7 +63,8 @@ const DOC: ClassesDoc = {
       id: 'configiq',
       label: 'Red Hat configiq',
       kind: 'provisional',
-      counts: { points: 30, scored: 12, refused: 10, failed: 0, withheld: 8 },
+      anchor: true,
+      counts: { points: 30, scored: 12, refused: 18, failed: 0, withheld: 0 },
       grades: { G1: 0, G2: 0, G3: 12, G4: 0, G5: 10 },
       accuracy_by_grade: {
         G1: { tpot: fig(0, 'too few points'), itl: fig(0, 'too few points') },
@@ -72,7 +73,7 @@ const DOC: ClassesDoc = {
         G4: { tpot: fig(0, 'too few points'), itl: fig(0, 'too few points') },
       },
       refusals: [],
-      partition: 'train and validation rows are simulated; the test partition is withheld',
+      partition: 'anchor-only (D9): every row is an anchor row; none is withheld as a test split',
       plain_line: 'The remaining rows wait on dataset clarifications from the configiq team.',
       figure_notes: { ttft: "first-token time awaits the team's definition" },
       by_model: [
@@ -141,10 +142,20 @@ describe('the classes page', () => {
     expect(card(html, 'configiq')).toMatch(/<details class="about"><summary>What differs from the run/)
   })
 
+  it('shows anchor status and the provisional band as two separate facts, and never a withheld test split', () => {
+    const html = render(<Classes doc={DOC} error={null} />).html
+    const cq = text(card(html, 'configiq'))
+    expect(cq).toContain('anchor source: every unit is an anchor unit')
+    expect(cq).toContain('provisional, capped at G3, outside the headline')
+    expect(cq).not.toContain('test split)')
+    expect(text(card(html, 'inferencex'))).not.toContain('anchor source')
+    expect(text(card(html, 'inferencex-reconstructed'))).not.toContain('anchor source')
+  })
+
   it('shows the configiq card as rows, rows scored, partition and one plain line, with no TTFT figure and no refusal list', () => {
     const cq = text(card(render(<Classes doc={DOC} error={null} />).html, 'configiq'))
     expect(cq).toContain('12 scored of 30 rows in the dataset')
-    expect(cq).toContain('Partition: train and validation rows are simulated; the test partition is withheld.')
+    expect(cq).toContain('Partition: anchor-only (D9): every row is an anchor row; none is withheld as a test split.')
     expect(cq).toContain('The remaining rows wait on dataset clarifications from the configiq team.')
     expect(cq).toContain("TTFT: first-token time awaits the team's definition.")
     expect(cq).not.toContain('TTFT error')

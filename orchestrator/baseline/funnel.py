@@ -271,7 +271,7 @@ def configiq_units(lg, records: list[dict], left_out: frozenset | set = frozense
         elif r.get("grade") in GRADED:
             u["grade"] = r["grade"]
         elif r.get("status") == "withheld":
-            u["withheld"] = "test_split_not_simulated"
+            u["withheld"] = "withheld_by_local_option"
     return out
 
 
@@ -363,12 +363,14 @@ def main(argv=None) -> int:
                     "rules.configiq.left_out narrows configiq's anchors")
     ap.add_argument("--training-ledger", type=Path, help="a checkout of catalog/ledger: adds the three training-only "
                     "sources' funnels from reports/<source>.yaml, labelled training only")
+    ap.add_argument("--published", type=Path, help="a directory of published unit lists (fit.yaml, select.yaml, ...): a "
+                    "configiq unit in a training-role list is a problem (D9: it is left out of the anchors, never made one)")
     ap.add_argument("--complete", action="store_true",
                     help="the contract holds an outcome for every anchor unit (a night): a unit with none is a problem")
     ap.add_argument("--strict-d9", action="store_true", help="exit 1 when ledger.yaml disagrees with D9 (after row 26)")
     ap.add_argument("--out", required=True, type=Path)
     a = ap.parse_args(argv)
-    funnels, found, left_out, trained = [], None, set(), []
+    funnels, found, left_out, trained, hits = [], None, set(), [], []
     try:
         if a.ledger or a.anchor or a.contract:
             if not (a.ledger and a.anchor and a.contract):
@@ -391,12 +393,19 @@ def main(argv=None) -> int:
             lg = cq.load(d / "units" / "configiq.jsonl.gz", d / "reports" / "configiq.yaml", d / "sources.yaml")
             recs = [json.loads(x) for x in a.configiq_points.read_text().splitlines() if x.strip()]
             funnels.append(configiq(lg, recs, left_out))
+            if a.published:      # the anchors only: a left-out unit is meant to be in a training list
+                hits = src.configiq_in_training(a.published, src.configiq_anchor_ids(lg.units, {"rules": {"configiq": {"left_out": sorted(left_out)}}}))
         doc = combine(funnels, training_funnels=trained, discrepancies=found, complete=a.complete)
+        doc["problems"] += [f"configiq: {len(h['units'])} units are in the published {h['role']} list {h['file']} (first "
+                            f"{h['units'][0]}); configiq is anchor-only, so each is to be left out of the anchors "
+                            f"(rules.configiq.left_out), not made one" for h in hits]
     except (FunnelError, src.SourcesError, OSError, ValueError) as e:
         print(f"funnel: {e}", file=sys.stderr)
         return 2
     a.out.write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n")
-    print(f"wrote {a.out}: " + ", ".join(f"{k} {v} scored" for k, v in doc["scored"].items()))
+    print(f"wrote {a.out}: " + ", ".join(f"{k} {v} scored" + (f" + {doc['funnels'][k]['provisional']['units']} provisional"
+                                                          if doc["funnels"][k]["provisional"]["units"] else "")
+                                         for k, v in doc["scored"].items()))
     for p in doc["problems"]:
         print(f"INVALID: {p}", file=sys.stderr)
     for d in doc["cut_points"]["discrepancies"]:

@@ -4,6 +4,7 @@
   score_configiq.py --ledger LEDGER --rows EXPORT.jsonl --data-dir DIR --blis BLIS --catalog CAT --registry REG
                     --fields FILE --catalog-release PIN --registry-release PIN --harness-commit SHA --out DIR
                     [--sim-build TAG|SHA] [--stack FILE] [--work DIR] [--workers N] [--timeout S] [--only UNIT ...]
+                    [--ledger-yaml FILE] [--withhold-split NAME ...]
 
 LEDGER is blis-substrate's catalog/ledger (units/configiq.jsonl.gz, reports/configiq.yaml, sources.yaml). EXPORT.jsonl
 is what blis-substrate's ledger/configiq/export.py prints from the downloaded dataset files, which DIR holds; they are
@@ -11,7 +12,9 @@ checked against the ledger's pinned hashes. The simulator build, the catalog, th
 are checked as `cli.py score` checks them. No network. Writes OUT/configiq-points.jsonl (every unit: scored, refused by
 name, failed or withheld), OUT/points.csv (the scored points, in the InferenceX contract's columns) and OUT/summary.json.
 
-Only the development split's train and validation points are simulated; the test split is withheld (D7). The command is
+configiq is anchor-only (design D9; plan Terms and 3C): the units scored are every ledger unit less rules.configiq.left_out of
+--ledger-yaml (the units the D2 join found read under a training role), never read from anchor.yaml, and none is withheld
+as a test split. --withhold-split is an opt-in for a local experiment; the nightly never sets it. The command is
 a separate entry point from cli.py on purpose: cli.py's import closure is the scorer a committed InferenceX contract
 names (orchestrator/baseline/test_contracts_current.py), and this source's scoring does not change those figures.
 """
@@ -30,6 +33,8 @@ import configiq as cq  # noqa: E402
 import configiq_score as cqs  # noqa: E402
 import fields as fl  # noqa: E402
 import stack as sk  # noqa: E402
+sys.path.insert(2, str(HERE.parent / "baseline"))
+import sources as src  # noqa: E402
 import support as sp  # noqa: E402
 
 
@@ -57,12 +62,20 @@ def run(a) -> int:
     except (cq.ConfigiqError, OSError, ValueError) as e:
         cli._log(f"FATAL: {e}")
         return 2
+    if a.ledger_yaml:
+        try:
+            keep = set(src.configiq_anchor_ids([p.unit_id for p in points], src.read_ledger_yaml(a.ledger_yaml)))
+        except (src.SourcesError, OSError, ValueError) as e:
+            cli._log(f"FATAL: {e}")
+            return 2
+        points = [p for p in points if p.unit_id in keep]
     if a.only is not None:
         points = [p for p in points if any(p.unit_id.startswith(x) for x in a.only)]
     release = cli._git(sim, "describe", "--tags", "--exact-match") or "unknown"
     env = cqs.Env(blis=str(blis), catalog=catalog, registry=registry, catalog_release=a.catalog_release,
                   registry_release=a.registry_release, engine_release=engine_release, sim_build=a.sim_build or release,
-                  harness_commit=a.harness_commit, field_list=field_list, timeout_s=a.timeout)
+                  harness_commit=a.harness_commit, field_list=field_list, timeout_s=a.timeout,
+                  withhold_splits=tuple(a.withhold_split or ()))
     env.catalog_obj = sp.Catalog(blis=str(blis), root=catalog)
     env.parts = sp.registry_parts(registry)
     work = Path(a.work or Path(a.out).parent / (Path(a.out).name + "-work"))
@@ -79,9 +92,9 @@ def run(a) -> int:
             "harness_commit": a.harness_commit, "fields_sha256": fields_sha,
             "dataset": {"name": "redhat-performance/configiq-performance-upstream-data", "revision": lg.revision,
                         "assets": lg.assets, "license": "CC-BY-4.0"},
-            "split": {"name": "development", "salt": d.SALT, "train_pct": d.TRAIN_PCT, "validation_pct": d.VALIDATION_PCT,
+            "split": {"name": "none (anchor-only, D9)", "label_only": "development", "salt": d.SALT,
                       "series": "role key (every identifying field but the concurrency)",
-                      "simulated": ["train", "validation"], "withheld": ["test"]},
+                      "withheld": sorted(a.withhold_split or [])},
             "experimental": not all(cli._DATA_PIN.match(x) for x in (env.sim_build, a.catalog_release, a.registry_release))}
     doc = cqs.write_outputs(Path(a.out), outcomes, prov)
     for p in doc["problems"]:
@@ -110,6 +123,9 @@ def main(argv=None) -> int:
     ap.add_argument("--work")
     ap.add_argument("--timeout", type=int, default=3600)
     ap.add_argument("--workers", type=int, default=1)
+    ap.add_argument("--ledger-yaml", help="a ledger.yaml: its rules.configiq.left_out units are not scored (D2 join)")
+    ap.add_argument("--withhold-split", action="append", choices=("train", "validation", "test"),
+                    help="local experiment only: withhold this development split (D9 withholds none)")
     ap.add_argument("--only", nargs="*", help="score only the units whose id starts with one of these")
     return run(ap.parse_args(argv))
 
