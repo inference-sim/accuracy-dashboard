@@ -527,6 +527,24 @@ def test_a_flag_an_earlier_release_had_is_read_as_the_field_that_replaced_it_and
         shutil.rmtree(tmp)
 
 
+def test_the_old_cuda_graph_flag_with_a_value_left_to_the_shell_is_refused_not_guessed_from_the_log():
+    # v0.5.23 refuses --cuda-graph-max-bs as an ambiguous option (it begins -decode and -prefill), so with no value on the
+    # command there is nothing to translate; the log's printout of the successor is not taken as what the run asked for.
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        fields = [{**_field(f.name, f.status, f.source)} for f in FIELDS.fields.values()] + [_field("cuda_graph_max_bs_decode", "modelled")]
+        fields.sort(key=lambda f: (f["name"], f["source"]))
+        log = LOG.replace("cuda_graph_max_bs=512", "cuda_graph_max_bs_decode=512")
+        entry, env = _setup(tmp, log=log, command=COMMAND + " --cuda-graph-max-bs $CG")
+        env.sglang = sc.EngineKit("sglang", RELEASE, fl.parse(json.dumps(
+            {"kind": "FieldList", "engine": {"kind": "sglang", "version": RELEASE}, "fields": fields}).encode()), "f" * 64,
+            ss.load_declarations())
+        o, _ = _score(tmp, entry, env)
+        assert o.g5 == {"code": "field_not_in_release", "subject": "cuda_graph_max_bs"}
+    finally:
+        shutil.rmtree(tmp)
+
+
 def test_the_nsa_backend_flags_of_an_earlier_release_are_read_as_the_dsa_fields_that_replaced_them_and_named():
     # SGLang PR #25821 (8131641bc66, v0.5.13) renamed --nsa-prefill-backend and --nsa-decode-backend to --dsa-*-backend with the
     # same choices and kept the old flags as deprecated aliases; PR #38375 removed them before v0.5.23. The GLM-5 recipes on

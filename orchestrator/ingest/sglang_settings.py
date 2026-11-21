@@ -387,12 +387,17 @@ ROLES = {"model_path": "model", "served_model_name": "served_model", "speculativ
 
 # A flag or field of an earlier SGLang release that the modelled release removed, read as the field that replaced it
 # (settings.translate_removed). TEMPORARY until the engine's field list states the earlier names.
+# The entry names what a run of the earlier release set; it does not say the modelled release accepts the old spelling
+# (resolve_abbreviation: it does not).
 TRANSLATIONS = {
     "cuda_graph_max_bs": (
         "cuda_graph_max_bs_decode", st.SAME_VALUE, lambda v: v is not None,
         "SGLang's --cuda-graph-max-bs capped the decode CUDA graph's batch size; v0.5.14 split the cap by phase and kept the "
         "old flag as a deprecated alias of --cuda-graph-max-bs-decode (server_args.py at v0.5.14: new_flag="
-        "\"--cuda-graph-max-bs-decode\"), and v0.5.23 removed the alias; the prefill cap is its own field"),
+        "\"--cuda-graph-max-bs-decode\"), and v0.5.23 removed the alias; the prefill cap is its own field. The modelled release would not start with the "
+        "flag: it is a prefix of --cuda-graph-max-bs-decode and --cuda-graph-max-bs-prefill, so its argparse refuses it as an "
+        "ambiguous option. The entry is therefore only for a run of an earlier release that stated a value; a value left to "
+        "the shell is not translated, and the point stays field_not_in_release"),
     "mamba_scheduler_strategy": (
         "mamba_radix_cache_strategy", lambda v: {"auto": "no_buffer"}.get(v, v), lambda v: v in ("auto", "no_buffer", "extra_buffer"),
         "SGLang v0.5.12 and v0.5.13 named the strategy of the mamba radix cache --mamba-scheduler-strategy (auto, no_buffer, "
