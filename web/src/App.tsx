@@ -26,7 +26,7 @@ import type { RunIndex, RunRef } from './load'
 import { DEFAULT_ROUTE, GRADE_FILTERS, parseRoute, routeToHash, type RouteState } from './route'
 import { buildRows } from './tree'
 import { nextSort, sortModelKeys, type SortKey, type SortSpec } from './sort'
-import { isEstimated, type Summary, type TierKey } from './types'
+import { isEstimated, type GroundTruthSource, type Summary, type TierKey } from './types'
 
 interface Picker {
   index: RunIndex | null
@@ -357,6 +357,7 @@ function Overview({
         dataDate={summary.provenance?.ground_truth?.release_tag?.replace(/^db-dump\//, '') ?? null}
         measuredRange={measuredRange(headlinePoints)}
         pulledAt={summary.provenance?.pulled_at ?? null}
+        sources={summary.provenance?.ground_truth?.sources ?? null}
         split={summary.schema_version === 2 ? headlineSplit : null}
         graded={summary.headline ? gateHeadline(summary.headline, headlinePoints, summary.min_points ?? MIN_ROLE_KEYS) : null}
       />
@@ -543,6 +544,10 @@ function RunProvenance({ summary }: { summary: Summary }) {
       {p.ingest === 'api' ? (
         // v2: the data is a pull of the live API, not a dump. When it was pulled, and the span of
         // measurement dates it holds, are two different things, so each gets its own label.
+        // With provenance.ground_truth.sources, each source lists its own dates and its own pull date.
+        gt.sources?.length ? (
+          <SourceRows sources={gt.sources} />
+        ) : (
         <>
           <div className="kv">
             <span className="k">API pull date</span>
@@ -561,6 +566,7 @@ function RunProvenance({ summary }: { summary: Summary }) {
             <span className="v">{dash(gt.measurement_sha256, (v) => `${v.slice(0, 8)}…`)}</span>
           </div>
         </>
+        )
       ) : (
         <>
           <div className="kv">
@@ -593,6 +599,51 @@ function RunProvenance({ summary }: { summary: Summary }) {
           <span className="v">{dash(summary.generated_at, (v) => `${v.slice(11, 16)} UTC`)}</span>
         </div>
       )}
+    </>
+  )
+}
+
+const utc = (t: string) => `${t.slice(0, 10)} ${t.slice(11, 16)} UTC`
+
+/** Each ground-truth source with its own measurement dates and its own pull date, the dump's cutoff beside it. */
+function SourceRows({ sources }: { sources: GroundTruthSource[] }) {
+  return (
+    <>
+      {sources.map((x) => (
+        <div className="gt-source" key={x.id} data-source={x.id}>
+          <div className="gt-source-name">{x.id === 'dump' ? 'InferenceX database dump' : 'InferenceX API feed'}</div>
+          <div className="kv">
+            <span className="k">{x.id === 'dump' ? 'dump' : 'release'}</span>
+            <span className="v">{x.ref.replace(/^db-dump\//, '')}</span>
+          </div>
+          {x.cutoff && (
+            <div className="kv">
+              <span className="k">cutoff</span>
+              <span className="v" title="Rows measured before this date come from the dump, the rest from the API feed">
+                before {x.cutoff}
+              </span>
+            </div>
+          )}
+          <div className="kv">
+            <span className="k">{x.id === 'dump' ? 'dump pull date' : 'API pull date'}</span>
+            <span className="v">{x.pulled_at ? utc(x.pulled_at) : '—'}</span>
+          </div>
+          <div className="kv">
+            <span className="k">data range</span>
+            <span className="v">
+              {!x.measurement_date_from || !x.measurement_date_through
+                ? '—'
+                : x.measurement_date_from === x.measurement_date_through
+                  ? x.measurement_date_through
+                  : `${x.measurement_date_from} to ${x.measurement_date_through}`}
+            </span>
+          </div>
+          <div className="kv">
+            <span className="k">{x.id === 'dump' ? 'sha256' : 'pull sha256'}</span>
+            <span className="v">{x.ref_sha256 ? `${x.ref_sha256.slice(0, 8)}…` : '—'}</span>
+          </div>
+        </div>
+      ))}
     </>
   )
 }

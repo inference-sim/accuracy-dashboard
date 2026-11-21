@@ -170,6 +170,22 @@ PROVENANCE_KEYS = ("ingest", "blis", "simulator", "harness_commit", "experimenta
                    "fields_sha256", "pulled_at", "corpora", "pull_manifest_sha256", "source")
 
 
+def _dump_problems(dump) -> list[str]:
+    """provenance.dump, present only when the frozen archive supplied units: {ref: db-dump/<date>, sha256, pulled_at}."""
+    if dump is None:
+        return []
+    if not isinstance(dump, dict) or set(dump) != {"ref", "sha256", "pulled_at"}:
+        return [f"{PROVENANCE_JSON}: dump must be exactly ref, sha256 and pulled_at"]
+    out = []
+    if not re.fullmatch(r"db-dump/\d{4}-\d{2}-\d{2}", str(dump["ref"])):
+        out.append(f"{PROVENANCE_JSON}: dump.ref {dump['ref']!r} is not db-dump/<date>")
+    if not re.fullmatch(r"[0-9a-f]{64}", str(dump["sha256"])):
+        out.append(f"{PROVENANCE_JSON}: dump.sha256 is not 64 lowercase hex")
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", str(dump["pulled_at"])):
+        out.append(f"{PROVENANCE_JSON}: dump.pulled_at is not a UTC ISO-8601 time")
+    return out
+
+
 def _read_json(path: Path, problems: list[str]):
     """The parsed file, or None after recording why it couldn't be read."""
     try:
@@ -408,6 +424,7 @@ def validate_dir(directory: str | Path) -> list[str]:
                 problems.append(f"{PROVENANCE_JSON}: missing {key}")
         if prov.get("ingest", "api") != "api":
             problems.append(f"{PROVENANCE_JSON}: ingest must be 'api'")
+        problems += _dump_problems(prov.get("dump"))
 
     # ---- grades (COV-4, COV-5, COV-6) and the balance (COV-1)
     engine = ((prov or {}).get("engine") or {}).get("version")

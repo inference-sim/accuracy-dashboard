@@ -160,6 +160,8 @@ One line per G5 point, sorted by `point_id` (`schemas/summary.v3.json#/definitio
 
 `source` names what was pulled: `{"name", "url"}` (the API the pull read), copied into summary.json's `ground_truth`.
 
+`dump` is optional and present only when the frozen archive the ledger pins (`db-dump/<date>`) supplied units: `{"ref": "db-dump/<date>", "sha256": "<64 hex, the SHA256SUMS the ledger's sources.yaml pins>", "pulled_at": "<UTC ISO-8601>"}`. The dump holds the rows measured before `<date>`, so the builder gives the points measured before it to the `dump` source and the rest to the `api` source, and writes each source's own measurement dates and pull date to `ground_truth.sources`. With no `dump`, only the `api` entry is written and no date is attributed to the dump.
+
 `simulator` is the simulator build that scored the run (its release tag) and the engine release it runs. Every fidelity, G5 and failed record carries the same `simulator` (blis-substrate `contracts/spec/pointrecord` Simulator), and the validator refuses a contract whose points name more than one, or another than provenance's (COV-6).
 
 `pointrecords.jsonl` holds the substrate's PointRecord (blis-substrate `contracts/spec/pointrecord`, SUB-19), one per scored and per G5 point, assembled by `pointrecord.py`; the files above are the dashboard's reporting views of the same points and keep their shapes. Its keys are the substrate's (`settings` for `args`, `simulator.data` with the catalog and registry hashes of the Result's `data` block, `predicted_basis` and `measured_basis` on each figure, `harness_commit`); a point that failed in the simulator has none. `docs/pointrecord.md` says how each field is made and what the pulled data cannot yet say.

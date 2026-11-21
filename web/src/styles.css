@@ -371,3 +371,5 @@ details.about .chips{margin:12px 0}
 .slice-units { font-size: 10.5px; color: var(--muted); font-weight: 400; max-width: 560px; }
 .slice-units summary { cursor: pointer; }
 .slice-units .mono { word-break: break-all; }
+
+.gt-source-name{font-size:12px;font-weight:600;color:var(--ink,inherit);margin:10px 0 4px}

@@ -30,7 +30,18 @@
       "source_url": "https://inferencex.semianalysis.com/api/v1/",
       "release_tag": "api-2026-10-23",
       "measurement_date_through": "2026-10-21",
-      "measurement_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      "measurement_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "sources": [
+        {
+          "id": "api",
+          "name": "SemiAnalysis InferenceX API",
+          "ref": "api-2026-10-23",
+          "ref_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "measurement_date_from": "2026-09-03",
+          "measurement_date_through": "2026-10-21",
+          "pulled_at": "2026-10-23T00:00:00Z"
+        }
+      ]
     },
     "evaluator_commit": "local",
     "scorer": "orchestrator/ingest/score.py",

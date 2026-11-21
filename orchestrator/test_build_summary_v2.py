@@ -878,3 +878,85 @@ def test_a_single_engine_contract_builds_the_summary_it_always_did():
     assert "engines" not in doc["provenance"] and doc["provenance"]["engine"]["kind"] == "vllm"
     assert b2.scored_engines({"engine": {"kind": "vllm", "version": "0.31.0"}, "engines": [
         {"kind": "vllm", "version": "0.31.0"}]}, [{"simulator": {"engine": {"kind": "vllm", "version": "0.31.0"}}}]) is None
+
+
+# ---------------------------------------------------------------- ground_truth.sources: dates per source
+DUMP = {"ref": "db-dump/2026-10-01", "sha256": "d" * 64, "pulled_at": "2026-10-02T08:00:00Z"}
+
+
+def _contract_with_dump(tmp_path, dump=DUMP):
+    import contract as c
+    d = tmp_path / "with-dump"
+    shutil.copytree(FIXTURE / "run-a", d)
+    _set_prov(d, dump=dump)
+    return d
+
+
+def test_without_a_dump_the_api_is_the_only_source_and_carries_the_runs_dates():
+    gt = _build()["provenance"]["ground_truth"]
+    api = {"id": "api", "name": gt["source"], "ref": gt["release_tag"], "ref_sha256": gt["measurement_sha256"],
+           "measurement_date_from": "2026-09-03", "measurement_date_through": gt["measurement_date_through"],
+           "pulled_at": "2026-10-23T00:00:00Z"}
+    assert gt["sources"] == [api]
+    assert vs2.problems(_build()) == []
+
+
+def test_a_dump_and_the_api_each_show_their_own_dates_and_pull_date(tmp_path):
+    # The fixture measures from 09-03 to 09-30 (before the cutoff 10-01) and from 10-02 to 10-21 (on or after it).
+    doc = b2.build(_contract_with_dump(tmp_path), generated_at=STAMP, evaluator_commit="test")
+    dump, api = doc["provenance"]["ground_truth"]["sources"]
+    assert (dump["id"], dump["ref"], dump["ref_sha256"], dump["cutoff"]) == ("dump", "db-dump/2026-10-01", "d" * 64, "2026-10-01")
+    assert (dump["measurement_date_from"], dump["measurement_date_through"]) == ("2026-09-03", "2026-09-30")
+    assert dump["pulled_at"] == "2026-10-02T08:00:00Z"
+    assert (api["id"], api["measurement_date_from"], api["measurement_date_through"]) == ("api", "2026-10-02", "2026-10-21")
+    assert api["pulled_at"] == "2026-10-23T00:00:00Z"
+    assert vs2.problems(doc) == []
+
+
+def test_a_dump_that_supplied_no_unit_is_refused_not_given_a_made_up_date(tmp_path):
+    d = _contract_with_dump(tmp_path, {**DUMP, "ref": "db-dump/2026-09-01"})
+    with pytest.raises(b2.ContractError, match="no point was measured before 2026-09-01"):
+        b2.build(d, generated_at=STAMP, evaluator_commit="test")
+
+
+def test_a_source_pulled_before_its_own_newest_measurement_is_refused(tmp_path):
+    # COV-9 per source: the run's pull date is late enough, the dump's own is not.
+    doc = b2.build(_contract_with_dump(tmp_path), generated_at=STAMP, evaluator_commit="test")
+    doc["provenance"]["ground_truth"]["sources"][0]["pulled_at"] = "2026-09-10T00:00:00Z"
+    assert [p for p in vs2.problems(doc) if "COV-9" in p] == [
+        "source dump pulled 2026-09-10, before its newest measurement 2026-09-30 (COV-9)"]
+
+
+def test_the_sources_keep_their_side_of_the_dump_cutoff(tmp_path):
+    doc = b2.build(_contract_with_dump(tmp_path), generated_at=STAMP, evaluator_commit="test")
+    dump, api = doc["provenance"]["ground_truth"]["sources"]
+    api["measurement_date_from"] = "2026-09-30"
+    assert any("before the dump's cutoff" in p for p in vs2.problems(doc))
+    dump["measurement_date_through"] = "2026-10-01"
+    assert any("not before its cutoff" in p for p in vs2.problems(doc))
+
+
+def test_a_merge_keeps_the_dump_entry_and_takes_the_api_pull_date_from_the_delta(tmp_path):
+    full = b2.build(_contract_with_dump(tmp_path), generated_at=STAMP, evaluator_commit="test")
+    ids = {p["point_id"] for p in _points(full)} | {n["point_id"] for n in full["not_scored"]}
+    delta = tmp_path / "delta"
+    _subset_contract(FIXTURE / "run-a", delta, {p["point_id"] for p in _points(full)[:2]})
+    _set_prov(delta, pulled_at="2026-10-30T11:00:00Z", pull_manifest_sha256="b" * 64)
+    merged = b2.build_merged(full, delta, ids, generated_at="2026-10-31T06:00:00Z", evaluator_commit="test",
+                             work=tmp_path / "wk")
+    dump, api = merged["provenance"]["ground_truth"]["sources"]
+    assert dump == full["provenance"]["ground_truth"]["sources"][0]
+    assert api["pulled_at"] == "2026-10-30T11:00:00Z" and api["ref_sha256"] == "b" * 64
+    assert vs2.problems(merged) == []
+
+
+def test_the_contract_refuses_a_malformed_dump(tmp_path):
+    import contract as c
+    assert c.validate_dir(_contract_with_dump(tmp_path)) == []
+    for bad in ({**DUMP, "ref": "2026-10-01"}, {**DUMP, "sha256": "D" * 64}, {**DUMP, "pulled_at": "yesterday"},
+                {"ref": DUMP["ref"]}):
+        d = tmp_path / "bad"
+        shutil.rmtree(d, ignore_errors=True)
+        shutil.copytree(FIXTURE / "run-a", d)
+        _set_prov(d, dump=bad)
+        assert any("dump" in p for p in c.validate_dir(d)), bad

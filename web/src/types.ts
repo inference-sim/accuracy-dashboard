@@ -222,6 +222,23 @@ export interface ModelNode {
   rows: WorkloadNode[]
 }
 
+/** One ground-truth source with its own measurement dates and pull date (summary schema, groundTruthSource).
+ *  `api` is the InferenceX API feed; `dump` is the frozen database dump `db-dump/<cutoff>`, which holds the rows
+ *  measured before `cutoff`. A source that supplied no unit has no entry, and a date is never invented for it. */
+export interface GroundTruthSource {
+  id: 'api' | 'dump'
+  name: string
+  /** api: the release tag 'api-<pull date>'; dump: 'db-dump/<date>'. */
+  ref: string
+  ref_sha256?: string
+  /** dump only: rows measured before this date are the dump's, on or after it the API feed's. */
+  cutoff?: string
+  measurement_date_from: string | null
+  measurement_date_through: string | null
+  /** When this source was last fetched or verified. */
+  pulled_at: string
+}
+
 export interface Provenance {
   blis: {
     release: string
@@ -236,6 +253,8 @@ export interface Provenance {
     release_tag: string
     measurement_date_through?: string | null
     measurement_sha256: string
+    /** Optional (v3): the same facts per source, so the dump and the API feed each show their own dates. */
+    sources?: GroundTruthSource[]
   }
   evaluator_commit: string
   scorer: string
