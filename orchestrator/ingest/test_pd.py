@@ -978,3 +978,26 @@ def test_the_window_of_a_run_that_states_none_is_the_checkpoints_and_never_a_sca
     assert pdm.model_window(tmp_path, "scaled") is None
     assert pdm.model_window(tmp_path, "bare") is None
     assert pdm.model_window(tmp_path, "noconfig") is None
+
+
+def _dp_lb_diff(flag, loc, value, mode):
+    import types
+    import score as sc
+    par = {"data_parallel_load_balancing": mode} if mode else {}
+    args = [{"arg": flag, "measured": value, "source": "non_default_args", "blis_field": loc, "_value": value}]
+    return sc._diff_args(args, {"pools": [{"parallel": par}]}, types.SimpleNamespace(vllm_names=False)), args
+
+
+def test_a_data_parallel_load_balancing_flag_is_read_back_from_the_deployments_mode_not_lost():
+    # The scorer reads each recorded setting back from the scenario as written. A true flag is the Deployment's mode
+    # (hybrid, or external for the two external flags); a false flag is the default and states nothing. Neither is
+    # setting_differs (which stops the publish, COV-8), and a true flag whose mode was not written still is.
+    for flag, loc, mode in (("data_parallel_hybrid_lb", "dp_lb.hybrid", "hybrid"),
+                            ("data_parallel_external_lb", "dp_lb.external", "external"),
+                            ("data_parallel_multi_port_external_lb", "dp_lb.multi_port_external", "external")):
+        reasons, args = _dp_lb_diff(flag, loc, True, mode)
+        assert reasons == [] and args[0]["match"] == "mapped", flag
+        assert _dp_lb_diff(flag, loc, False, None)[0] == [], flag
+        assert _dp_lb_diff(flag, loc, True, None)[0] == [f"setting_differs:{flag}"], flag
+    assert _dp_lb_diff("data_parallel_hybrid_lb", "dp_lb.hybrid", True, "external")[0] == \
+        ["setting_differs:data_parallel_hybrid_lb"]
