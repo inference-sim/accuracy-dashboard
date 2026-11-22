@@ -139,9 +139,10 @@ def run_night(today: date, blis_tag: str, *, work_dir: Path, data_dir: Path, sta
         _write_summary(data_dir / "latest" / "summary.json", summary)
         published = True
     _write_state(state_path, blis_tag, snap_id, sorted(window_ids))
-    if decision.freeze_snapshot and published:
+    if decision.freeze_snapshot and published and sk.is_stable_tag(blis_tag):
         # Last, and only when the release's scores are published: the list is what the next night
-        # reads to know this release has scores (COV-9).
+        # reads to know this release has scores (COV-9). A pre-release build (a 40-hex commit, scored by a preview run) is
+        # not a release and is never listed.
         sk.record_scored(scored_path, blis_tag)
     return NightResult(decision, snapshot_id=snap_id if decision.freeze_snapshot else None,
                        scored=scored, published=published)

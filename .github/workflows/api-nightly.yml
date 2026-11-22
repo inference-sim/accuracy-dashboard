@@ -49,6 +49,14 @@ on:
         description: "Score the database-dump lane again even if its last result is current"
         type: boolean
         default: false
+      # A PRE-RELEASE PREVIEW: score this one full inference-sim commit (40 hex) instead of the oldest unscored stable
+      # release, from the branch the run is dispatched on. Meant for a scratch branch: the run commits data/ and state/ there
+      # and does NOT deploy Pages or start another run, and the build is recorded by its commit, never listed in
+      # state/scored-releases.json. Empty (the schedule and every normal dispatch): nothing changes.
+      sim_commit:
+        description: "Score this inference-sim commit (40 hex) as a pre-release preview; empty scores the stable releases"
+        type: string
+        default: ""
 
 # Least privilege: read-only by default. Only `publish` gets contents: write.
 permissions:
@@ -74,7 +82,18 @@ jobs:
       - id: r
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash orchestrator/resolve_blis.sh
+          SIM_COMMIT: ${{ inputs.sim_commit }}
+        run: |
+          set -euo pipefail
+          if [ -n "$SIM_COMMIT" ]; then
+            # A preview names its build: no stable tag is resolved, and no other release follows.
+            if ! [[ "$SIM_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "FATAL: sim_commit must be a full 40-hex commit of inference-sim, got '$SIM_COMMIT'"; exit 1
+            fi
+            { echo "blis_tags=$SIM_COMMIT"; echo "blis_tag=$SIM_COMMIT"; echo "more=false"; } >> "$GITHUB_OUTPUT"
+          else
+            bash orchestrator/resolve_blis.sh
+          fi
 
   # ----------------------------------------------------------------- 2. run the night (pull+score)
   run-night:
@@ -118,10 +137,23 @@ jobs:
         run: |
           set -euo pipefail
           BLIS_TAG="${BLIS_TAGS%% *}"
-          git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$RUNNER_TEMP/dump-sim"
+          if [[ "$BLIS_TAG" =~ ^[0-9a-f]{40}$ ]]; then
+            # A preview scores a commit: fetch exactly it (a branch or tag name is not used, it moves).
+            git init -q "$RUNNER_TEMP/dump-sim"
+            git -C "$RUNNER_TEMP/dump-sim" fetch -q --depth 1 https://github.com/inference-sim/inference-sim.git "$BLIS_TAG"
+            git -C "$RUNNER_TEMP/dump-sim" checkout -q FETCH_HEAD
+          else
+            git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$RUNNER_TEMP/dump-sim"
+          fi
           eval "$(python3 orchestrator/resolve_stack.py "$RUNNER_TEMP/dump-sim")"
-          git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/dump-substrate"
-          git -C "$RUNNER_TEMP/dump-substrate" checkout -q "$substrate_ref"
+          if [ "${substrate_embedded:-}" = true ]; then
+            # The substrate is a directory of the simulator tree itself (substrate/): the commit pins it.
+            mkdir -p "$RUNNER_TEMP/dump-substrate"
+            cp -R "$RUNNER_TEMP/dump-sim/substrate/catalog" "$RUNNER_TEMP/dump-substrate/catalog"
+          else
+            git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/dump-substrate"
+            git -C "$RUNNER_TEMP/dump-substrate" checkout -q "$substrate_ref"
+          fi
       - name: The anchor extract of the pinned dump
         uses: ./.github/actions/dump-extract
         with:
@@ -150,26 +182,40 @@ jobs:
             rm -rf "$RUNNER_TEMP/sim" "$RUNNER_TEMP/substrate" \
               "$RUNNER_TEMP/pull" "$RUNNER_TEMP/contract" "$RUNNER_TEMP/scorework"
             SIM="$RUNNER_TEMP/sim"
-            git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$SIM"
+            if [[ "$BLIS_TAG" =~ ^[0-9a-f]{40}$ ]]; then
+              # A preview scores a commit: fetch exactly it (a branch or tag name is not used, it moves).
+              git init -q "$SIM"
+              git -C "$SIM" fetch -q --depth 1 https://github.com/inference-sim/inference-sim.git "$BLIS_TAG"
+              git -C "$SIM" checkout -q FETCH_HEAD
+            else
+              git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$SIM"
+            fi
             ( cd "$SIM" && go build -o blis main.go )
             # Everything else the release runs is named by its stack.json (SIM-3, X8), so a new
             # release is scored with no change to this file: the blis-substrate commit (its
             # catalog/, registry/ and catalog/ledger) and the vLLM tag of the engine release.
             eval "$(python3 orchestrator/resolve_stack.py "$SIM")"
-            git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
-            git -C "$RUNNER_TEMP/substrate" checkout -q "$substrate_ref"
-            CATALOG="$RUNNER_TEMP/substrate/catalog"
-            REGISTRY="$RUNNER_TEMP/substrate/registry"
-            # The engine's field list: the pinned blis-vllm release's fields.json, at the commit
-            # stack.json names. TEMPORARY until the M2 substrate release lets the build print its
-            # own list (`blis fields`; inference-sim/accuracy-dashboard#52).
             FIELDS="$RUNNER_TEMP/fields.json"
-            curl -fsSL --retry 3 -o "$FIELDS" \
-              "https://raw.githubusercontent.com/inference-sim/blis-vllm/${vllm_module_ref}/fields.json"
+            if [ "${substrate_embedded:-}" = true ]; then
+              # A commit whose substrate and engine field list are directories of its own tree: the same checkout.
+              SUBSTRATE_DIR="$SIM/substrate"
+              cp "$SIM/engines/vllm/fields.json" "$FIELDS"
+            else
+              git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
+              git -C "$RUNNER_TEMP/substrate" checkout -q "$substrate_ref"
+              SUBSTRATE_DIR="$RUNNER_TEMP/substrate"
+              # The engine's field list: the pinned blis-vllm release's fields.json, at the commit
+              # stack.json names. TEMPORARY until the M2 substrate release lets the build print its
+              # own list (`blis fields`; inference-sim/accuracy-dashboard#52).
+              curl -fsSL --retry 3 -o "$FIELDS" \
+                "https://raw.githubusercontent.com/inference-sim/blis-vllm/${vllm_module_ref}/fields.json"
+            fi
+            CATALOG="$SUBSTRATE_DIR/catalog"
+            REGISTRY="$SUBSTRATE_DIR/registry"
             # The ledger at the same commit: every row of the window is placed in one of its
             # units (design §10.2). The units scored are the anchor units in the substrate's
             # published list, catalog/ledger/published/anchor.yaml (cli.py nightly).
-            LEDGER="$RUNNER_TEMP/substrate/catalog/ledger"
+            LEDGER="$SUBSTRATE_DIR/catalog/ledger"
             # Every AgentX corpus, at the revision and full sha256 its replay workload in this
             # release's catalog pins (agentx-mvp-uncapped, agentx-mvp; X12, D3). Each point is
             # replayed with the corpus its own run's client loaded (COV-12). Nothing resolves a
@@ -214,7 +260,7 @@ jobs:
               --evaluator-commit "$GITHUB_SHA" \
               --ledger "$LEDGER" \
               --blis "$SIM/blis" --catalog "$CATALOG" --registry "$REGISTRY" \
-              --substrate-dir "$RUNNER_TEMP/substrate" \
+              --substrate-dir "$SUBSTRATE_DIR" \
               --substrate-version "$substrate_version" --substrate-commit "$substrate_commit" \
               --corpus-dir "$RUNNER_TEMP/corpora" --fields "$FIELDS" \
               --dump-extract "$RUNNER_TEMP/dump-extract" --dump-state state/dump --dump-workers 2 $DUMP_FORCE
@@ -432,8 +478,9 @@ jobs:
             echo "FATAL: a check failed or the commit failed (status $rc); nothing was committed or pushed"; exit "$rc"
           fi
 
+      # A preview (sim_commit) is for a scratch branch: its data is not deployed.
       - name: Deploy the published data to Pages
-        if: ${{ steps.pub.outputs.pushed == 'true' }}
+        if: ${{ steps.pub.outputs.pushed == 'true' && inputs.sim_commit == '' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run pages.yml --ref "${GITHUB_REF_NAME}"
@@ -442,7 +489,7 @@ jobs:
       # which begins at the oldest still unlisted. Only after a successful publish, so a failed
       # release is never skipped (COV-9).
       - name: Score the next unscored release
-        if: ${{ steps.pub.outputs.pushed == 'true' && needs.resolve.outputs.more == 'true' }}
+        if: ${{ steps.pub.outputs.pushed == 'true' && needs.resolve.outputs.more == 'true' && inputs.sim_commit == '' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run api-nightly.yml --ref "${GITHUB_REF_NAME}"

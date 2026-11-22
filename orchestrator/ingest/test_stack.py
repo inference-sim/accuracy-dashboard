@@ -251,3 +251,64 @@ def test_a_release_whose_substrate_publishes_no_anchor_list_gives_way_to_its_pat
     assert sk.unscored_releases(tags[:3], {"v0.15.0"}, "v0.16.0") == ["v0.16.0", "v0.17.0"]
     # A release not in the table is never skipped.
     assert sk.unscored_releases(tags, {"v0.15.0"}, "v0.16.0", superseded={}) == ["v0.16.0", "v0.17.0", "v0.17.1"]
+
+
+# ------------------------------------------------------------------ a simulator commit whose stack embeds the substrate
+EMBEDDED = {**DOC, "modules": [{"path": "github.com/inference-sim/llm-d-router", "version": "v1.0.0-blis.5.0.20261121014725-cb8d93fcb0fa",
+                                "commit": "c" * 40}],
+            "engines": [{"kind": "vllm", "version": "0.34.0+0fda86a35419", "commit": "0fda86a35419" + "0" * 28}]}
+
+
+def test_an_engine_that_is_a_build_after_a_release_is_measured_from_its_commit():
+    s = sk.parse(json.dumps(EMBEDDED))
+    assert sk.vllm_ref(s) == "0fda86a35419" + "0" * 28
+    assert sk.vllm_ref(sk.parse(json.dumps(DOC))) == "v0.32.0"
+    no_commit = {**EMBEDDED, "engines": [{"kind": "vllm", "version": "0.34.0+0fda86a35419"}]}
+    with pytest.raises(sk.StackError, match="names no 40-hex commit"):
+        sk.vllm_ref(sk.parse(json.dumps(no_commit)))
+
+
+def test_the_commit_of_a_checkout_pins_the_substrate_it_holds_and_a_stack_that_lists_the_module_is_refused():
+    s = sk.parse(json.dumps(EMBEDDED))
+    pins = sk.embedded_pins(s, "a" * 40)
+    assert pins == {"substrate_embedded": "true", "substrate_ref": "a" * 40, "substrate_commit": "a" * 40,
+                    "substrate_version": "a" * 40, "vllm_ref": "0fda86a35419" + "0" * 28}
+    assert sk.pin_of(pins["substrate_version"], pins["substrate_commit"]) == ("a" * 40, [])
+    with pytest.raises(sk.StackError, match="not a full 40-hex commit"):
+        sk.embedded_pins(s, "abc123")
+    with pytest.raises(sk.StackError, match="fetched from it"):
+        sk.embedded_pins(sk.parse(json.dumps(DOC)), "a" * 40)
+
+
+def test_only_a_stable_tag_is_a_release_the_list_may_hold(tmp_path):
+    assert sk.is_stable_tag("v0.18.1") and not sk.is_stable_tag("a" * 40) and not sk.is_stable_tag("v0.18.1-rc1")
+    lst = tmp_path / "s.json"
+    lst.write_text(json.dumps({"kind": "ScoredReleases", "releases": []}))
+    with pytest.raises(sk.StackError, match="stable release tag"):
+        sk.record_scored(lst, "a" * 40)
+
+
+def test_resolve_stack_reads_the_substrate_a_checkout_holds_itself(tmp_path):
+    (tmp_path / "stack.json").write_text(json.dumps(EMBEDDED))
+    (tmp_path / "substrate" / "catalog").mkdir(parents=True)
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run(git + ["init", "-q"], check=True)
+    subprocess.run(git + ["commit", "-q", "--allow-empty", "-m", "x"], check=True)
+    head = subprocess.run(git + ["rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+    r = subprocess.run([sys.executable, str(ROOT / "resolve_stack.py"), str(tmp_path)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.splitlines() == ["substrate_embedded=true", f"substrate_ref={head}", f"substrate_commit={head}",
+                                     f"substrate_version={head}", "vllm_ref=0fda86a35419" + "0" * 28]
+    assert sk.verify_checkout(tmp_path / "substrate", head, head) == []
+
+
+def test_a_preview_run_names_its_commit_and_neither_deploys_nor_chains():
+    import yaml
+    text = (ROOT.parent / ".github" / "workflows" / "api-nightly.yml").read_text()
+    doc = yaml.safe_load(text)
+    inp = doc[True]["workflow_dispatch"]["inputs"]["sim_commit"]
+    assert inp["default"] == ""                                   # the schedule and a normal dispatch are unchanged
+    assert "^[0-9a-f]{40}$" in text and "FETCH_HEAD" in text
+    steps = {s.get("name"): s for s in doc["jobs"]["publish"]["steps"]}
+    for name in ("Deploy the published data to Pages", "Score the next unscored release"):
+        assert "inputs.sim_commit == ''" in steps[name]["if"], name

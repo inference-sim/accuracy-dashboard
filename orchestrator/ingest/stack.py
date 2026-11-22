@@ -118,6 +118,20 @@ def vllm_ref(stack: Stack) -> str:
     return "v" + version
 
 
+def embedded_pins(stack: Stack, sim_commit: str) -> dict:
+    """What the nightly fetches to score a simulator COMMIT whose stack.json lists no blis-substrate or blis-vllm module: the
+    substrate (catalog/, registry/, catalog/ledger) and the engine field lists are directories of the inference-sim tree itself
+    (substrate/, engines/vllm/fields.json), so the one commit pins them all. The output carries `substrate_embedded=true`, which
+    the workflow reads to take them from the checkout it already holds, not from a clone of another repository."""
+    if not _COMMIT.match(sim_commit):
+        raise StackError(f"{sim_commit!r} is not a full 40-hex commit")
+    for path in (SUBSTRATE, VLLM_MODULE):
+        if path in stack.modules:
+            raise StackError(f"stack.json lists module {path}: its release is fetched from it, not from the checkout")
+    return {"substrate_embedded": "true", "substrate_ref": sim_commit, "substrate_commit": sim_commit,
+            "substrate_version": sim_commit, "vllm_ref": vllm_ref(stack)}
+
+
 _RELEASE_NAME = re.compile(r"^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$")
 _PSEUDO = re.compile(r"(^|[.-])\d{14}-[0-9a-f]{12}$")
 
@@ -191,6 +205,12 @@ def _version(tag: str) -> tuple[int, int, int]:
     if not m:
         raise StackError(f"{tag!r} is not a stable release tag vX.Y.Z")
     return tuple(int(x) for x in m.groups())
+
+
+def is_stable_tag(tag: str) -> bool:
+    """True for a stable release tag vX.Y.Z: the only builds the list of scored releases holds. A 40-hex commit is a recorded
+    pre-release build (a preview run), never listed: the list is append-only, and a commit is not a release."""
+    return _TAG.match(tag) is not None
 
 
 # Releases that can never be scored, each with the patch release that scores its code in its

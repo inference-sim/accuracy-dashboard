@@ -458,7 +458,11 @@ def cmd_score(a) -> int:
     if a.only is not None:  # None = score the whole manifest; [] = score nothing (never "all")
         points = [p for p in points if any(p["point_id"].startswith(x) for x in a.only)]
     env = sc.Env(
-        blis=str(blis), blis_release=_git(sim, "describe", "--tags", "--exact-match") or "unknown",
+        blis=str(blis),
+        # A build named by its commit (--sim-build, checked above against the checkout) records that commit as its release: a
+        # recorded pre-release identity, the same one the dump lane and the snapshot id carry.
+        blis_release=(_git(sim, "describe", "--tags", "--exact-match")
+                      or (sim_build if sim_build and _SIM_COMMIT.match(sim_build) else "unknown")),
         blis_commit=_git(sim, "rev-parse", "HEAD"), catalog=Path(a.catalog).resolve(),
         catalog_release=a.catalog_release, registry=Path(a.registry).resolve(),
         registry_release=a.registry_release,

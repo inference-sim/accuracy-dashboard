@@ -342,3 +342,15 @@ def test_a_summary_of_realistic_points_is_written_at_half_its_indented_size(tmp_
     assert out.read_text() == c.published_dumps(summary)
     assert 3_000_000 < out.stat().st_size < indented * 0.55
     assert json.loads(out.read_text()) == summary
+
+
+def test_a_pre_release_build_named_by_its_commit_is_published_but_never_listed_as_a_scored_release(tmp_path):
+    commit = "6" * 40
+    w = World()
+    w.rows = [("m", 1, "2026-10-01")]
+    r = _run(w, tmp_path, "2026-10-02", commit)
+    assert r.published and r.snapshot_id == f"2026-10-02_blis-{commit}_ix-api-2026-10-02"
+    assert json.loads((tmp_path / "scored-releases.json").read_text())["releases"] == []
+    w.rows = [("m", 1, "2026-10-01")]
+    _run(w, tmp_path, "2026-10-03", "v0.11.0")                     # a stable release is still listed
+    assert json.loads((tmp_path / "scored-releases.json").read_text())["releases"] == ["v0.11.0"]
