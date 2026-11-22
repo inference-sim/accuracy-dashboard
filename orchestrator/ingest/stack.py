@@ -102,8 +102,20 @@ def pins(stack: Stack) -> dict:
             if not isinstance(version, str) or not re.fullmatch(r"[0-9A-Za-z._+-]+", version):
                 raise StackError(f"stack.json: module {path} has version {version!r}, want letters, digits and . _ + -")
             out["substrate_version"] = version
-    out["vllm_ref"] = "v" + stack.engine("vllm")
+    out["vllm_ref"] = vllm_ref(stack)
     return out
+
+
+def vllm_ref(stack: Stack) -> str:
+    """What the engine release is measured from: the vLLM tag v<version>, or, when the version names a build after a release
+    (<release>+<12 hex>, the form a stack takes while its engine is a commit), that engine's full commit."""
+    version = stack.engine("vllm")
+    if "+" in version:
+        commit = stack.engines["vllm"].get("commit")
+        if not re.fullmatch(r"[0-9a-f]{40}", commit or ""):
+            raise StackError(f"stack.json: vllm engine {version} is a build after a release but names no 40-hex commit ({commit!r})")
+        return commit
+    return "v" + version
 
 
 _RELEASE_NAME = re.compile(r"^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$")
