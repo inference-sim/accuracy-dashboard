@@ -428,6 +428,8 @@ def cmd_score(a) -> int:
         return 2
     manifest_text = (pull_dir / "manifest.json").read_text()
     manifest = json.loads(manifest_text)
+    # The database-dump extract is cut against one vLLM release and resolves no build; the night names its own.
+    dx.anchor_to_ref(manifest, sk.vllm_ref(stack))
     supplemental_class = None
     if getattr(a, "supplemental", None):
         # A run of the reconstructed class alone, beside the regular run and never inside it: the points are the supplemental
