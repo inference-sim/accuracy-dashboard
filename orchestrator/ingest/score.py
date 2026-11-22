@@ -579,6 +579,12 @@ def _diff_args(args: list, dep: dict, b: st.Built) -> list[str]:
                     got = f"{float(stated.pop()):g}"
         elif f == "replay.api_server_count":
             got, want = b.api_server_count, str(want)
+        elif f.startswith("dp_lb."):
+            # vLLM's data-parallel launch flags are one Deployment key, parallel.data_parallel_load_balancing, which build()
+            # writes for a flag the run set true and omits for a false one (the default, internal). Read back, a true flag is
+            # present when the written mode is that flag's mode; a false flag states nothing, so nothing was lost.
+            mode = ((dep["pools"][0].get("parallel") or {}).get("data_parallel_load_balancing"))
+            got = False if want is False else mode == ("hybrid" if f == "dp_lb.hybrid" else "external")
         elif f.startswith("offload."):
             # The offload writer converts units (per-rank bytes -> the engine's tier); its own
             # checks refused any disagreement, so the arg records what BLIS was given.
