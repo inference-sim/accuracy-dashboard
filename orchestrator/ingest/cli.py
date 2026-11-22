@@ -60,6 +60,15 @@ def _log(msg: str):
     print(msg, file=sys.stderr, flush=True)
 
 
+def _error_text(ex) -> str:
+    """repr(ex) and, for an HTTP error, the URL it came from (a signed blob URL without its query), so a
+    pull error says which request failed, not only that one did."""
+    url = getattr(ex, "url", None) or getattr(ex, "filename", None)
+    if isinstance(url, str) and "inferencex.semianalysis.com" not in url:
+        url = url.split("?")[0]
+    return (repr(ex) + (f" from {url}" if isinstance(url, str) and url else ""))[:500]
+
+
 # A row whose pull raised something unexpected (a bug, not the data): never scored as a gap.
 PULL_ERROR = "artifact_unmatched:pull_error"
 
@@ -155,7 +164,7 @@ def cmd_pull(a) -> int:
         except Exception as ex:  # noqa: BLE001 -- one point's failure is recorded with why, never kills the pull
             return pt, {"point_id": pt.point_id, "identity": dict(pt.unit.identity), "row": pt.row,
                         "records": pt.records, "measurements": pt.measurements, "files": {},
-                        "build": None, "reasons": [PULL_ERROR], "problems": [repr(ex)[:500]]}, ex
+                        "build": None, "reasons": [PULL_ERROR], "problems": [_error_text(ex)]}, ex
 
     fresh_results = {}
     if dl_workers <= 1 or len(inc.fresh) <= 1:
