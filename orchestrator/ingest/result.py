@@ -22,8 +22,9 @@ import subprocess
 import tempfile
 
 # Version 3 requires each metric to state its scope (the substrate since DEV-8); version 2 is what the
-# simulator releases before it write. The metrics the harness reads are the same in both.
-SCHEMA_VERSIONS = (2, 3)
+# simulator releases before it write. Version 4 (M3.2) adds the statement that every figure is a point
+# estimate with no interval. The metrics the harness reads are the same in all three.
+SCHEMA_VERSIONS = (2, 3, 4)
 KIND = "Result"
 TTFT_MEAN_MS = "ttft_mean_ms"
 TPOT_MEAN_MS = "tpot_mean_ms"

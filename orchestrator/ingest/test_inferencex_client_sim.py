@@ -54,7 +54,7 @@ def _run(tmp: Path, replay: ix.Replay) -> list[dict]:
     proc = subprocess.run(argv, capture_output=True, text=True, timeout=1800)
     assert proc.returncode == 0, proc.stderr[-4000:]
     doc = json.loads(proc.stdout)
-    assert doc.get("kind") == "Result" and doc.get("schema_version") in (2, 3)   # 3 from the M2 simulators
+    assert doc.get("kind") == "Result" and doc.get("schema_version") in (2, 3, 4)   # 3 from the M2 simulators, 4 from M3.2
     assert {k: doc["engine"].get(k) for k in ("kind", "version")} == {"kind": "vllm", "version": release}, doc.get("engine")
     assert re.fullmatch(r"[0-9a-f]{40}", doc["engine"].get("commit") or ""), doc.get("engine")
     rows = doc.get("request_rows")
