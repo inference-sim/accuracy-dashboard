@@ -67,7 +67,7 @@
           "properties": {
             "release": {
               "type": "string",
-              "description": "CI-resolved latest stable tag; never main/pre-release"
+              "description": "CI-resolved latest stable tag, or, for a preview run on a scratch branch, the full 40-hex commit of the build scored (a recorded pre-release identity, never published to Pages)"
             },
             "commit_sha": {
               "type": "string"

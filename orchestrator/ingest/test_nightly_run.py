@@ -312,3 +312,15 @@ def test_every_published_summary_has_its_backlog_beside_it(tmp_path):
     backlog = json.loads((latest / "backlog.json").read_text())
     assert backlog["kind"] == "Backlog"
     assert backlog["snapshot_id"] == json.loads((latest / "summary.json").read_text())["snapshot_id"]
+
+
+def test_a_pre_release_build_named_by_its_commit_is_published_but_never_listed_as_a_scored_release(tmp_path):
+    commit = "6" * 40
+    w = World()
+    w.rows = [("m", 1, "2026-10-01")]
+    r = _run(w, tmp_path, "2026-10-02", commit)
+    assert r.published and r.snapshot_id == f"2026-10-02_blis-{commit}_ix-api-2026-10-02"
+    assert json.loads((tmp_path / "scored-releases.json").read_text())["releases"] == []
+    w.rows = [("m", 1, "2026-10-01")]
+    _run(w, tmp_path, "2026-10-03", "v0.11.0")                     # a stable release is still listed
+    assert json.loads((tmp_path / "scored-releases.json").read_text())["releases"] == ["v0.11.0"]
