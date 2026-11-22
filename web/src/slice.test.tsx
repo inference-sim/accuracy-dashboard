@@ -179,7 +179,7 @@ describe('slicing by any recorded attribute', () => {
       { ...point(2, 2), fidelity: { ...base.fidelity!, commit_distance: undefined } },
     ]
     const rows = sliceBy(p, 'commit_distance', 10)
-    expect(rows.map((r) => r.value).sort()).toEqual(['none', 'no_ported_change', 'ported_change'])
+    expect(rows.map((r) => r.value).sort()).toEqual(['none', 'no_ported_change', 'ported_change'].sort())
   })
 
   it('takes coverage from the not-scored points where they record the attribute', () => {
