@@ -294,9 +294,47 @@ def test_every_location_is_a_field_blis_vllm_engine_block_or_the_deployment_name
                                              "enable_cross_layers_blocks", "lazy_offload", "blocks_per_chunk",
                                              "kv_load_failure_policy"}, (path, loc)
         else:
-            assert top in ("offload", "replay") and rest in ("connector", "spec", "tiers.cpu_dram",
-                                                             "acceptance_length", "api_server_count"), (path, loc)
+            assert top in ("offload", "replay", "dp_lb") and rest in ("connector", "spec", "tiers.cpu_dram",
+                                                                      "acceptance_length", "api_server_count", "hybrid",
+                                                                      "external", "multi_port_external"), (path, loc)
     assert st.location("env.VLLM_FLASHINFER_ALLREDUCE_BACKEND") == "engine.env.VLLM_FLASHINFER_ALLREDUCE_BACKEND"
+
+
+def _dp_lb_point(**flags):
+    names = ("tensor_parallel_size", "pipeline_parallel_size", "data_parallel_size", "data_parallel_size_local")
+    modelled = [{"name": n, "source": "config", "status": "modelled", "evidence": {"traces": ["t"]},
+                 "estimation": {"rule": "leave_unset"}} for n in sorted((*names, *flags))]
+    flist = fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.33.0"},
+                                 "fields": modelled}))
+    args = {"tensor_parallel_size": 1, "pipeline_parallel_size": 1, "data_parallel_size": 4,
+            "data_parallel_size_local": 2, **flags}
+    s = {k: st.Setting(k, v, "non_default_args", requested=True) for k, v in args.items()}
+    c = st.decide(s, flist)
+    return c, st.build(c, name="p", model="m", part=PART_H200, field_list=flist,
+                       catalog_node_size=None, node=NODE8)
+
+
+def test_a_run_launched_with_hybrid_dp_load_balancing_is_scored_as_that_mode_not_refused_as_a_lost_setting():
+    # data_parallel_hybrid_lb: the nightly for v0.18.1 stopped on one such point with setting_differs (COV-8 halts on it).
+    c, b = _dp_lb_point(data_parallel_hybrid_lb=True)
+    assert c.reasons == [] and b.reasons == []
+    assert b.deployment["pools"][0]["parallel"]["data_parallel_load_balancing"] == "hybrid"
+    assert b.deployment["pools"][0]["parallel"]["dp_local"] == 2
+
+
+def test_external_and_multi_port_external_dp_load_balancing_are_the_deployments_external_mode():
+    for flag in ("data_parallel_external_lb", "data_parallel_multi_port_external_lb"):
+        c, b = _dp_lb_point(**{flag: True})
+        assert c.reasons == [] and b.reasons == [], flag
+        assert b.deployment["pools"][0]["parallel"]["data_parallel_load_balancing"] == "external", flag
+
+
+def test_a_dp_load_balancing_flag_the_run_left_false_states_nothing_and_two_modes_at_once_are_a_conflict():
+    c, b = _dp_lb_point(data_parallel_hybrid_lb=False)
+    assert c.reasons == [] and b.reasons == []
+    assert "data_parallel_load_balancing" not in b.deployment["pools"][0]["parallel"]
+    _, b = _dp_lb_point(data_parallel_hybrid_lb=True, data_parallel_external_lb=True)
+    assert b.reasons == ["conflict:data_parallel_external_lb"]
 
 
 def test_a_local_model_path_is_named_by_the_runs_own_recipe():
