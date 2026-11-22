@@ -1486,6 +1486,20 @@ def test_an_h100_point_writes_the_node_size_the_run_recorded():
     assert b.scenario["cluster"] == {"hardware": "h200", "gpus_per_node": 2, "nodes": 2, "fabric": "ib-400g"}
 
 
+def test_catalog_resolve_accepts_the_drafters_a_model_lists_and_refuses_a_malformed_list():
+    import blis_commands as bc
+    tmp = Path(tempfile.mkdtemp())
+    blis = tmp / "blis"
+    ok = ('{"query": "m", "identity": "m", "reason": "r", "drafters": [{"name": "speculator", '
+          '"method": "mtp", "num_spec_tokens": 3}]}')
+    blis.write_text("#!/bin/sh\necho '" + ok + "'\n")
+    blis.chmod(0o755)
+    assert bc.catalog_resolve(str(blis), str(tmp), model="m") == "m"
+    blis.write_text("#!/bin/sh\necho '" + ok.replace('"num_spec_tokens": 3', '"num_spec_tokens": "3"') + "'\n")
+    with pytest.raises(bc.CommandError, match="drafters"):
+        bc.catalog_resolve(str(blis), str(tmp), model="m")
+
+
 def test_packaging_comes_from_blis_catalog_resolve_and_falls_back_to_the_catalog_files_for_an_older_blis():
     import blis_commands as bc
     tmp = Path(tempfile.mkdtemp())
