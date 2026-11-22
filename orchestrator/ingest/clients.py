@@ -35,11 +35,15 @@ class FetchFailed(RuntimeError):
     RateLimited, it stops the pull: an outage would otherwise be filed as per-row data gaps."""
 
 
+# How many times a 400 is read again before it is raised (see _get_bytes).
+BAD_REQUEST_RETRIES = 2
+
+
 def _get_bytes(url: str, headers: dict, timeout: int = 60, *, retries: int = 4, sleep=None, opener=None,
                max_total_wait: int = 900) -> bytes:
     """GET a body, retrying 5xx, connection errors, truncated reads and rate limits (429, or 403
     with no quota left) with backoff, honouring Retry-After / x-ratelimit-reset. Other HTTP errors
-    (4xx, and a redirect the opener refuses to follow) raise at once as HTTPError; retries that run
+    (4xx other than a 400, which is read again twice first, and a redirect the opener refuses to follow) raise at once as HTTPError; retries that run
     out raise RateLimited or FetchFailed.
 
     A truncated body (http.client.IncompleteRead: the host closed the connection mid-stream) is as
@@ -53,13 +57,22 @@ def _get_bytes(url: str, headers: dict, timeout: int = 60, *, retries: int = 4, 
     single request). If the next back-off would exceed the budget, give up now and fail loudly."""
     sleep = sleep or time.sleep
     open_ = opener.open if opener else urllib.request.urlopen
-    spent = 0
+    spent, bad_requests = 0, 0
     for attempt in range(retries + 1):
         req = urllib.request.Request(url, headers=headers)
         try:
             with open_(req, timeout=timeout) as resp:  # noqa: S310 (fixed hosts)
                 return resp.read()
         except urllib.error.HTTPError as e:
+            if e.code == 400 and bad_requests < BAD_REQUEST_RETRIES:
+                # Every request here is an idempotent read of a well-formed URL, so a 400 is the host
+                # refusing a request it would take a moment later (run 45066595905: 185 of 1110 points
+                # froze with "HTTP 400: Bad Request" scattered through a two-minute pull, and the same
+                # reads answered at once afterwards). Retried a couple of times, then raised as before.
+                bad_requests += 1
+                sleep(bad_requests)
+                spent += bad_requests
+                continue
             limited = e.code == 429 or (e.code == 403 and e.headers.get("x-ratelimit-remaining") == "0")
             if not (limited or e.code >= 500):
                 raise
