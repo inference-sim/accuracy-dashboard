@@ -362,3 +362,23 @@ def test_part_stream_over_http(server, monkeypatch):
     got = read_all(dx.Archive(ps.out))
     ps.close()
     assert got["other"] == [b"9"]
+
+
+def test_a_night_names_its_own_engine_ref_on_the_extracts_unresolved_builds():
+    # Run 45072844801: the dump lane's 1011 points recorded v0.32.0, the extract's ref, in a night whose engine is a
+    # commit, and the snapshot's validation refused every one. The extract never resolved a build, so it takes the
+    # night's ref; a build it did resolve, and an API-lane point, keep theirs.
+    def pt(source, why, match, ref="v0.32.0"):
+        return {"source": source, "build": {"ref": ref, "match": match, "why": why, "distance": None}}
+    manifest = {"vllm_ref": "v0.32.0", "source": "db-dump/2026-09-28 via dump_extract.py (offline adapter)",
+                "points": [pt(dx.SOURCE_LABEL, "commit_unresolvable", "estimated"),
+                           pt(dx.SOURCE_LABEL, None, "exact"),
+                           pt("api", "commit_unresolvable", "estimated")]}
+    ref = "0fda86a35419c9c70dbfada224c838c10fbb62ad"
+    assert dx.anchor_to_ref(manifest, ref) == 1
+    assert [p["build"]["ref"] for p in manifest["points"]] == [ref, "v0.32.0", "v0.32.0"]
+    assert manifest["vllm_ref"] == ref
+    assert dx.anchor_to_ref(manifest, ref) == 0
+    api_manifest = {"vllm_ref": "v0.32.0", "source": "SemiAnalysis InferenceX API", "points": []}
+    dx.anchor_to_ref(api_manifest, ref)
+    assert api_manifest["vllm_ref"] == "v0.32.0"

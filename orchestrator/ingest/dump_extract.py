@@ -625,6 +625,26 @@ class OfflineResolver:
         return b
 
 
+def anchor_to_ref(manifest: dict, ref: str) -> int:
+    """Name the engine release a night scores as the ref of the extract's builds. The extract is cut once, against
+    build.VLLM_REF, and its builds are never resolved (OfflineResolver: estimated, commit_unresolvable, no distance), so
+    its `ref` says which release they are compared with and nothing more. A night whose engine is another release
+    (a tag after v0.32.0, or a build named by its commit) must have the snapshot, the API lane and these points name
+    the same ref, as validate_summary_v2 requires. Sets the ref on those points and on the manifest, in memory (the
+    extract on disk, and its hash, are not touched); returns the number of points changed. A build the extract did
+    resolve is left as it is."""
+    n = 0
+    for e in manifest.get("points") or []:
+        b = e.get("build")
+        if (e.get("source") == SOURCE_LABEL and b and b.get("why") == build.COMMIT_UNRESOLVABLE
+                and b.get("match") == "estimated" and b.get("ref") != ref):
+            b["ref"] = ref
+            n += 1
+    if str(manifest.get("source") or "").endswith("(offline adapter)"):
+        manifest["vllm_ref"] = ref
+    return n
+
+
 def base_models(out: Path, points: list[dict], prior: dict | None, use_hub: bool) -> dict:
     """base_model of every served checkpoint repo, frozen so scoring needs no network."""
     import score as sc
