@@ -4,8 +4,8 @@
   "discrepancies": [
    {
     "code": "held_outside_inferencex",
-    "source": "aisimulate",
-    "text": "aisimulate has a held cut-point; only InferenceX may (D9)"
+    "source": "an external simulator",
+    "text": "an external simulator has a held cut-point; only InferenceX may (D9)"
    },
    {
     "code": "held_outside_inferencex",

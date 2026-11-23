@@ -213,12 +213,15 @@ def is_stable_tag(tag: str) -> bool:
     return _TAG.match(tag) is not None
 
 
-# Releases that can never be scored, each with the patch release that scores its code in its
-# place. The night scores a release's anchor units from the substrate its stack.json pins (COV-2),
-# and these pin blis-substrate v0.13.0 and v0.14.0, which publish no anchor list. A tag names one
-# commit forever (LIF-1), so only a patch release that repins the substrate can be scored. Such a
-# release is skipped only once its patch release exists, and it is never recorded as scored.
-SUPERSEDED = {"v0.16.0": "v0.17.1", "v0.17.0": "v0.17.1"}
+# Releases that can never be scored, each with the release that scores its code in its place. The
+# night scores a release's anchor units from the substrate its stack.json pins (COV-2), and
+# v0.16.0 and v0.17.0 pin blis-substrate v0.13.0 and v0.14.0, which publish no anchor list. A tag
+# names one commit forever (LIF-1), so only a patch release that repins the substrate can be
+# scored. v0.18.1 and v0.18.2 are the other kind: their simulator refuses the scenario the M3.2
+# scorer writes (the engine kind alone, SIM-1), so every run on the current harness scores them
+# at zero points and cannot publish. Such a release is skipped only once its replacement exists,
+# and it is never recorded as scored.
+SUPERSEDED = {"v0.16.0": "v0.17.1", "v0.17.0": "v0.17.1", "v0.18.1": "v0.19.0", "v0.18.2": "v0.19.0"}
 
 
 def unscored_releases(tags_in_tag_order: list[str], scored: set[str], first: str,

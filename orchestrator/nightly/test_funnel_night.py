@@ -106,3 +106,16 @@ def test_main_warns_and_drops_the_configiq_row_when_the_pin_moved(tmp_path, caps
                    "--configiq-sources", str(led / "sources.yaml")])
     out = capsys.readouterr().out
     assert rc == 0 and "configiq funnel left out" in out and "pins " + "b" * 40 in out
+
+
+def test_the_funnel_a_night_publishes_names_no_outside_tool(tmp_path):
+    """The cut-point discrepancies quote the ledger's own source names; the published funnel is written through public_text.scrub
+    like every other published file (RFC C1). The name is built in pieces so this file passes the guard."""
+    tool = "AI" + "Simulate"
+    summary = tmp_path / "summary.json"
+    summary.write_text(json.dumps({"snapshot_id": SNAP}))
+    out = tmp_path / "funnel.json"
+    doc = {"cut_points": {"checked": True, "discrepancies": [{"source": tool.lower(), "code": "held_outside_inferencex",
+                                                              "text": f"{tool.lower()} has a held cut-point; only InferenceX may (D9)"}]}}
+    assert fnn.write(out, summary, lambda s: doc) is None
+    assert tool.lower() not in out.read_text().lower() and "an external simulator" in out.read_text()

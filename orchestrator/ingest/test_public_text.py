@@ -66,3 +66,10 @@ def test_a_night_publishes_no_file_that_carries_a_tool_name(tmp_path):
         assert not GUARD.search(p.read_text()), p
     live = json.loads((tmp_path / "data" / "latest" / "summary.json").read_text())
     assert "fitted on an external simulator's vLLM rows" in live["not_scored"][0]["substitutions"][0]["detail"]
+
+
+def test_no_committed_supplemental_file_carries_a_tool_name():
+    """data/supplemental/ is committed by hand from score-configiq's output; grep-clean fails the pull request that adds a name,
+    so the same check runs here, where the author sees it first."""
+    for p in sorted((HERE.parents[1] / "data" / "supplemental").rglob("*.json")):
+        assert not GUARD.search(p.read_text()), p

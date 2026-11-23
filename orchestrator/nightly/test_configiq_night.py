@@ -98,3 +98,15 @@ def test_stamp_funnel_records_the_dataset_revision_the_nightly_compares(tmp_path
     f.write_text(json.dumps({"format": "funnel-2", "funnels": {"configiq": {}}}))
     cn.stamp_funnel(f, REF)
     assert json.loads(f.read_text())["dataset"] == REF and "funnels" in json.loads(f.read_text())
+
+
+def test_a_funnel_stamped_for_commit_names_no_outside_tool_even_when_the_ledger_does(tmp_path):
+    """A ledger source's name reaches the funnel's cut-point discrepancies; the file is committed, and grep-clean (RFC C1)
+    scans it. The name is built in pieces so this file passes the guard."""
+    tool = "AI" + "Simulate"
+    f = tmp_path / "funnel.json"
+    f.write_text(json.dumps({"format": "funnel-2", "funnels": {"configiq": {}}, "cut_points": {"checked": True, "discrepancies": [
+        {"source": tool.lower(), "code": "held_outside_inferencex", "text": f"{tool.lower()} has a held cut-point; only InferenceX may (D9)"}]}}))
+    cn.stamp_funnel(f, REF)
+    text = f.read_text()
+    assert tool.lower() not in text.lower() and "an external simulator has a held cut-point" in text
