@@ -222,7 +222,7 @@
     "heads": {
      "snapshot_id": "2026-11-23_blis-0fb85a76192eb1cb3f55aadc42d3f24876385c0c_ix-api-2026-11-23"
     },
-    "pulled_at": "2026-11-23T02:24:53Z"
+    "pulled_at": "2026-11-23T04:41:11Z"
    },
    "refusals": [
     {
@@ -1522,6 +1522,6 @@
   }
  ],
  "format": "classes-1",
- "generated_at": "2026-11-23T02:24:53Z",
+ "generated_at": "2026-11-23T04:41:11Z",
  "snapshot_id": "2026-11-23_blis-0fb85a76192eb1cb3f55aadc42d3f24876385c0c_ix-api-2026-11-23"
 }

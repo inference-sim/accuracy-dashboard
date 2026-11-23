@@ -1,0 +1,196 @@
+{
+ "cut_points": {
+  "checked": false,
+  "discrepancies": []
+ },
+ "format": "funnel-2",
+ "funnels": {
+  "inferencex": {
+   "anchor_rule": "the published anchor list (role anchor); held units judge pre-registered changes and are never reported",
+   "blockers": [
+    {
+     "reason": "value_not_recorded",
+     "stage": "g5",
+     "units": 17743
+    },
+    {
+     "reason": "field_unclassified",
+     "stage": "g5",
+     "units": 667
+    },
+    {
+     "reason": "router_unsupported",
+     "stage": "g5",
+     "units": 435
+    },
+    {
+     "reason": "engine_unsupported",
+     "stage": "g5",
+     "units": 275
+    },
+    {
+     "reason": "not_in_catalog",
+     "stage": "g5",
+     "units": 95
+    },
+    {
+     "reason": "value_conflict",
+     "stage": "g5",
+     "units": 69
+    },
+    {
+     "reason": "field_not_modelled",
+     "stage": "g5",
+     "units": 61
+    },
+    {
+     "reason": "measurement_contaminated",
+     "stage": "g5",
+     "units": 5
+    },
+    {
+     "reason": "blis_refused",
+     "stage": "g5",
+     "units": 3
+    }
+   ],
+   "excluded": {},
+   "failed": {},
+   "g5": {
+    "blis_refused": 3,
+    "engine_unsupported": 275,
+    "field_not_modelled": 61,
+    "field_unclassified": 667,
+    "measurement_contaminated": 5,
+    "not_in_catalog": 95,
+    "router_unsupported": 435,
+    "value_conflict": 69,
+    "value_not_recorded": 17743
+   },
+   "lanes": {
+    "other": {
+     "excluded": {},
+     "failed": {},
+     "g5": {
+      "engine_unsupported": 275,
+      "router_unsupported": 160,
+      "value_not_recorded": 4762
+     },
+     "no_outcome": {},
+     "provisional": {
+      "by_grade": {},
+      "units": 0
+     },
+     "scored_by_grade": {
+      "G1": 0,
+      "G2": 0,
+      "G3": 0,
+      "G4": 0
+     },
+     "stages": {
+      "in_scope": 5197,
+      "recoverable": null,
+      "rows_held": 0,
+      "scored": 0,
+      "units": 5197
+     }
+    },
+    "sglang": {
+     "excluded": {},
+     "failed": {},
+     "g5": {
+      "field_unclassified": 667,
+      "router_unsupported": 155,
+      "value_not_recorded": 4581
+     },
+     "no_outcome": {},
+     "provisional": {
+      "by_grade": {},
+      "units": 0
+     },
+     "scored_by_grade": {
+      "G1": 0,
+      "G2": 0,
+      "G3": 0,
+      "G4": 0
+     },
+     "stages": {
+      "in_scope": 5403,
+      "recoverable": null,
+      "rows_held": 0,
+      "scored": 0,
+      "units": 5403
+     }
+    },
+    "vllm": {
+     "excluded": {},
+     "failed": {},
+     "g5": {
+      "blis_refused": 3,
+      "field_not_modelled": 61,
+      "measurement_contaminated": 5,
+      "not_in_catalog": 95,
+      "router_unsupported": 120,
+      "value_conflict": 69,
+      "value_not_recorded": 8400
+     },
+     "no_outcome": {},
+     "provisional": {
+      "by_grade": {},
+      "units": 0
+     },
+     "scored_by_grade": {
+      "G1": 0,
+      "G2": 0,
+      "G3": 0,
+      "G4": 1011
+     },
+     "stages": {
+      "in_scope": 9764,
+      "recoverable": null,
+      "rows_held": 0,
+      "scored": 1011,
+      "units": 9764
+     }
+    }
+   },
+   "left_out_rows": {},
+   "no_outcome": {},
+   "not_anchor": {
+    "not_in_the_anchor_list": 61983
+   },
+   "not_recovered": {},
+   "provisional": {
+    "by_grade": {},
+    "units": 0
+   },
+   "role": "anchor",
+   "scored_by_grade": {
+    "G1": 0,
+    "G2": 0,
+    "G3": 0,
+    "G4": 1011
+   },
+   "source": "inferencex",
+   "stages": {
+    "in_scope": 20364,
+    "recoverable": null,
+    "rows_held": 85325,
+    "scored": 1011,
+    "units": 20364
+   },
+   "unresolved": {
+    "unit_ids": [],
+    "units": 0
+   },
+   "withheld": {}
+  }
+ },
+ "meaning": "No unit is dropped for its date. Recoverable is a floor (recoverable.py), so a unit can be scored without being counted recoverable; unresolved counts the recoverable units that are neither scored nor G5. A provisional unit (capped at G3) is outside scored.",
+ "problems": [],
+ "scored": {
+  "inferencex": 1011
+ },
+ "snapshot_id": "2026-11-23_blis-0fb85a76192eb1cb3f55aadc42d3f24876385c0c_ix-api-2026-11-23",
+ "training": {}
+}
