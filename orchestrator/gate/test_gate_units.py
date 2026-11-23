@@ -351,6 +351,12 @@ def base_root(tmp_path):
     return tmp_path
 
 
+def check(body, changes, root, base_root=None, **landing):
+    """rule.check_pr for a pull request #7 whose merge base holds what `root` holds, unless `landing` says otherwise."""
+    kw = {"number": 7, "head": "a" * 40, "merge_base": "b" * 40, "merge_base_root": root, **landing}
+    return rule.check_pr(body, changes, root, base_root, rule.Landing(**kw))
+
+
 CITE = "Gate: pre-registration row-99-example"
 NOT = "Gate: not an accuracy change - documentation only"
 
@@ -381,18 +387,18 @@ NOT = "Gate: not an accuracy change - documentation only"
     (NOT, [("M", "state/gate/preregistrations/row-99-example.json")], False),
 ])
 def test_the_pull_request_rule(base_root, body, changes, ok):
-    assert (rule.check_pr(body, changes, base_root) == []) == ok
+    assert (check(body, changes, base_root) == []) == ok
 
 
 def test_a_preregistration_cannot_be_added_and_cited_in_one_pull_request(base_root):
     new = good()
     new["id"] = "row-98-new"
     (base_root / pr.DIR / "row-98-new.json").write_text(json.dumps(new))
-    errs = rule.check_pr("Gate: pre-registration row-98-new", [("A", "state/gate/preregistrations/row-98-new.json"), ("M", "harness/run.sh")], base_root)
+    errs = check("Gate: pre-registration row-98-new", [("A", "state/gate/preregistrations/row-98-new.json"), ("M", "harness/run.sh")], base_root)
     assert any("must be on the base branch first" in e for e in errs)
-    assert rule.check_pr(NOT, [("A", "state/gate/preregistrations/row-98-new.json")], base_root) == []
+    assert check(NOT, [("A", "state/gate/preregistrations/row-98-new.json")], base_root) == []
     (base_root / pr.DIR / "row-98-new.json").write_text(json.dumps({**new, "metrics": []}))
-    assert rule.check_pr(NOT, [("A", "state/gate/preregistrations/row-98-new.json")], base_root)
+    assert check(NOT, [("A", "state/gate/preregistrations/row-98-new.json")], base_root)
 
 
 def test_the_list_and_the_cited_preregistration_are_the_base_branchs(base_root, tmp_path_factory):
@@ -400,11 +406,61 @@ def test_the_list_and_the_cited_preregistration_are_the_base_branchs(base_root, 
     (head / "state" / "gate" / "preregistrations").mkdir(parents=True)
     (head / rule.PATHS).write_text(json.dumps({"kind": "AccuracyPaths", "paths": ["nothing/"]}))
     (head / pr.DIR / "row-99-example.json").write_text(json.dumps(good()))
-    assert rule.check_pr(NOT, [("M", "harness/run.sh")], head) == []
-    assert rule.check_pr(NOT, [("M", "harness/run.sh")], head, base_root)
+    assert check(NOT, [("M", "harness/run.sh")], head) == []
+    assert check(NOT, [("M", "harness/run.sh")], head, base_root)
     (head / pr.DIR / "row-97-head-only.json").write_text(json.dumps({**good(), "id": "row-97-head-only"}))
-    assert rule.check_pr("Gate: pre-registration row-97-head-only", [("M", "docs/README.md")], head, base_root)
-    assert rule.check_pr("Gate: pre-registration row-97-head-only", [("M", "docs/README.md")], head) == []
+    assert check("Gate: pre-registration row-97-head-only", [("M", "docs/README.md")], head, base_root)
+    assert check("Gate: pre-registration row-97-head-only", [("M", "docs/README.md")], head) == []
+
+
+def head_tree(tmp_path, files, name="head"):
+    root = tmp_path / name
+    for rel, text in {"harness/run.sh": "run\n", "orchestrator/ingest/score.py": "score\n", **files}.items():
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(text)
+    return root
+
+
+def test_a_pull_request_that_carries_its_own_scoring_code_is_refused_whatever_the_change_list_says(base_root, tmp_path):
+    merge_base = head_tree(tmp_path, {}, "mb")
+    head = head_tree(tmp_path, {"orchestrator/ingest/score.py": "predicted = measured\n"})
+    errs = check(NOT, [("M", "docs/README.md")], head, base_root, merge_base_root=merge_base)
+    assert any("scoring surface" in e and "orchestrator/ingest/score.py" in e for e in errs)
+    assert any("scoring surface" in e for e in check(CITE, [("M", "harness/run.sh")], head, base_root, merge_base_root=merge_base))
+    same = head_tree(tmp_path, {}, "same")
+    assert not any("scoring surface" in e for e in check(NOT, [("M", "docs/README.md")], same, base_root, merge_base_root=merge_base))
+
+
+def test_a_maintainer_exception_on_the_base_branch_for_this_pull_request_and_head_covers_the_surface(base_root, tmp_path):
+    merge_base = head_tree(tmp_path, {}, "mb")
+    head = head_tree(tmp_path, {"orchestrator/ingest/score.py": "reviewed change\n"})
+    exc = {"pull_request": 7, "head": "a" * 40, "reason": "reviewed by hand: a harness fix"}
+    (base_root / rule.EXCEPTIONS).write_text(json.dumps({"kind": "GateExceptions", "exceptions": [exc]}))
+    assert check(CITE, [("M", "orchestrator/ingest/score.py")], head, base_root, merge_base_root=merge_base) == []
+    for other in ({"number": 8}, {"head": "c" * 40}):
+        assert any("scoring surface" in e for e in check(CITE, [("M", "orchestrator/ingest/score.py")], head, base_root, merge_base_root=merge_base, **other))
+    (head / rule.EXCEPTIONS).parent.mkdir(parents=True, exist_ok=True)
+    (head / rule.EXCEPTIONS).write_text(json.dumps({"kind": "GateExceptions", "exceptions": [exc]}))
+    (base_root / rule.EXCEPTIONS).unlink()
+    assert any("scoring surface" in e for e in check(CITE, [("M", "orchestrator/ingest/score.py")], head, base_root, merge_base_root=merge_base))
+
+
+@pytest.mark.parametrize("doc", [
+    {"kind": "GateExceptions", "exceptions": [{"pull_request": 7, "head": "a" * 40}]},
+    {"kind": "GateExceptions", "exceptions": [{"pull_request": "7", "head": "a" * 40, "reason": "long enough reason"}]},
+    {"kind": "GateExceptions", "exceptions": [{"pull_request": 7, "head": "main", "reason": "long enough reason"}]},
+    {"kind": "GateExceptions", "exceptions": [{"pull_request": 7, "head": "a" * 40, "reason": "short"}]},
+    {"kind": "Other", "exceptions": []},
+])
+def test_an_exceptions_file_is_well_formed_where_a_pull_request_adds_it(base_root, tmp_path, doc):
+    head = head_tree(tmp_path, {})
+    (head / rule.EXCEPTIONS).parent.mkdir(parents=True, exist_ok=True)
+    (head / rule.EXCEPTIONS).write_text(json.dumps(doc))
+    errs = check(NOT, [("M", rule.EXCEPTIONS.as_posix())], head, base_root, merge_base_root=head)
+    assert any("GateExceptions" in e for e in errs)
+    (head / rule.EXCEPTIONS).write_text(json.dumps({"kind": "GateExceptions", "exceptions": [
+        {"pull_request": 7, "head": "a" * 40, "reason": "long enough reason"}]}))
+    assert check(NOT, [("M", rule.EXCEPTIONS.as_posix())], head, base_root, merge_base_root=head) == []
 
 
 def test_parse_changes_reads_name_status_and_renames():

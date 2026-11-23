@@ -377,11 +377,12 @@ def test_check_commands_report_problems_with_a_nonzero_exit(tmp_path, capsys):
 
 def test_check_pr_reads_the_body_and_the_changes(tmp_path):
     body, ch = tmp_path / "body.md", tmp_path / "changes.txt"
+    land = ["--pr-number", "7", "--head-sha", "a" * 40, "--merge-base", "b" * 40, "--merge-base-root", str(HERE.parent.parent)]
     body.write_text("Summary\n\nGate: not an accuracy change - documentation only\n")
     ch.write_text("M\tdocs/README.md\n")
-    assert gate.main(["check-pr", "--body-file", str(body), "--changes-file", str(ch), "--root", str(HERE.parent.parent)]) == 0
+    assert gate.main(["check-pr", "--body-file", str(body), "--changes-file", str(ch), "--root", str(HERE.parent.parent), *land]) == 0
     ch.write_text("M\tharness/run.sh\n")
-    assert gate.main(["check-pr", "--body-file", str(body), "--changes-file", str(ch), "--root", str(HERE.parent.parent)]) == 1
+    assert gate.main(["check-pr", "--body-file", str(body), "--changes-file", str(ch), "--root", str(HERE.parent.parent), *land]) == 1
 
 
 def _contract(directory: Path, fake, held_ids=None):

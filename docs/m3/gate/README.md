@@ -32,6 +32,32 @@ exclusion; the scorer imports none. `orchestrator/gate/test_gate_surface.py` fai
 executes (the import closure of `harness/run.sh`'s scorer, `freeze.py` and `resolve_agentic_corpus.py`) or reads is
 outside the list, so a new scoring module cannot slip past it.
 
+### The candidate scores with main's code
+
+A candidate run executes the candidate's own harness, scorer and workflows, so the gate must know they are
+main's. `surface.py` hashes the scoring surface of a checkout: every file under the accuracy paths, without
+test modules and without `.github/stack-pins.env` (the simulator pin differs between the two sides by design;
+`check-binding` ties each side to its own pin), a symlink by its target. `gate-candidate.yml` records the hash
+(`surface.sha256`). It is never trusted from the artifact:
+
+* `whole-run-gate.yml` downloads each commit's tree through the API, recomputes the hash and refuses a run
+  that records another one, then refuses unless the candidate's hash equals the base's.
+* `gate-rule.yml` compares the merge base's tree with the head's, from the base branch's list of paths, and
+  refuses a pull request whose trees differ, whatever its change list says.
+
+So a pull request that edits scoring code does not reach an evaluation on its own. A maintainer exception
+covers it: `state/gate/exceptions.json` (kind `GateExceptions`) on `main` holds entries
+`{"pull_request": <number>, "head": "<40 hex>", "reason": "<at least 10 characters>"}`. An exception covers
+that pull request at that head only, so a later push needs a new one. It is read from the base branch, never
+from the pull request, so it is added by its own reviewed pull request (which cites `not an accuracy change`)
+that merges first. It waives the surface check in both workflows; it does not waive the pre-registration.
+The one proof implemented is the tree hash being equal to main's; "the harness commit is an ancestor of main"
+is not.
+
+`gate-rule.yml` is itself part of the pull request, and a `pull_request` workflow file is the pull request's
+own; the protection against editing it is the rule above (it is on the accuracy paths) plus review, and fully
+only a ruleset or required workflow that pins it to `main`.
+
 ## The pre-registration
 
 `state/gate/preregistrations/<id>.json`, read strictly (an unknown or missing field is refused):

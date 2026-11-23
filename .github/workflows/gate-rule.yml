@@ -27,11 +27,12 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.event.pull_request.base.ref }}
           path: base
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           path: head
           fetch-depth: 0
           persist-credentials: false
@@ -45,14 +46,20 @@ jobs:
       - name: Check the pull request against the rule
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           if [ ! -f base/orchestrator/gate/gate.py ]; then
             echo "The base branch has no gate checker yet; the rule starts with the change that adds it."
             exit 0
           fi
+          # The base is the branch's tip now (a re-run sees a later ledger or exception), the head the exact commit
+          # of the event, and the change is judged against their merge base, the commit the base run scores.
+          merge_base="$(git -C head merge-base "$(git -C base rev-parse HEAD)" "$HEAD_SHA")"
+          git -C head worktree add --detach "$RUNNER_TEMP/merge-base" "$merge_base"
           printf '%s' "$PR_BODY" > "$RUNNER_TEMP/body.txt"
-          git -C head diff --name-status --no-renames "$BASE_SHA" HEAD > "$RUNNER_TEMP/changes.txt"
+          git -C head diff --name-status --no-renames "$merge_base" "$HEAD_SHA" > "$RUNNER_TEMP/changes.txt"
           python3 base/orchestrator/gate/gate.py check-pr --body-file "$RUNNER_TEMP/body.txt" \
-            --changes-file "$RUNNER_TEMP/changes.txt" --root head --base-root base
+            --changes-file "$RUNNER_TEMP/changes.txt" --root head --base-root base \
+            --pr-number "$PR_NUMBER" --head-sha "$HEAD_SHA" --merge-base "$merge_base" --merge-base-root "$RUNNER_TEMP/merge-base"

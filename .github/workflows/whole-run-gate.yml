@@ -3,6 +3,7 @@ name: whole-run-gate
 # The whole-run held-out gate (design VAL-6, §12.3, §13.5; docs/m3/gate/README.md). It is the only job that
 # holds the partition seed. It runs on main's code, from a dispatch on main, and does this:
 #   1. checks the pull request, the pre-registration and the two gate-candidate runs through the Actions API;
+#      and that the candidate scores with main's scoring surface (surface.py), unless a maintainer exception covers it;
 #   2. refuses while an earlier successful gate run is not yet in state/gate/ledger.json on main;
 #   3. draws the roles from the seed (the one step whose environment holds LEDGER_SEED), reduces the held
 #      units to aggregates, and writes report.json, comment.md and the next ledger.json;
@@ -131,6 +132,16 @@ jobs:
           python3 orchestrator/gate/gate.py check-binding \
             --base-resolved "$RUNNER_TEMP/base-resolved.env" --base-artifact "$RUNNER_TEMP/base" \
             --cand-resolved "$RUNNER_TEMP/cand-resolved.env" --cand-artifact "$RUNNER_TEMP/cand"
+          # The scoring surface is recomputed here from each commit's own files (the Actions API tarball), never
+          # taken from the run's claim. The candidate must score with main's code unless a maintainer exception on
+          # main covers this pull request at this head.
+          for kind in base cand; do
+            sha="$base_sha"; [ "$kind" = cand ] && sha="$cand_sha"
+            mkdir "$RUNNER_TEMP/tree-${kind}"
+            gh api "repos/${REPO}/tarball/${sha}" | tar -xz --strip-components=1 -C "$RUNNER_TEMP/tree-${kind}"
+          done
+          python3 orchestrator/gate/gate.py check-surface --base-root "$RUNNER_TEMP/tree-base" --cand-root "$RUNNER_TEMP/tree-cand" \
+            --base-artifact "$RUNNER_TEMP/base" --cand-artifact "$RUNNER_TEMP/cand" --pull-request "$PR" --head "$cand_sha"
           base_data="$(sed -n 's/^DATA_DIR=//p' "$RUNNER_TEMP/base-resolved.env")"
           echo "BASE_LEDGER=${base_data}/catalog/ledger" >> "$GITHUB_ENV"
       - name: Evaluate

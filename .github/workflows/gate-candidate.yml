@@ -9,6 +9,9 @@ name: gate-candidate
 # document, the measured table, and the simulator commit, data commit and ledger digest it was scored over as
 # the artifact `gate-<label>-<sha>`. The gate job re-derives those three from the pin and refuses a mismatch.
 #
+# The artifact also holds the hash of the scoring files this commit carries (surface.sha256); the gate job
+# recomputes it from the commit and refuses a candidate whose scoring files differ from main's.
+#
 # The workflow holds no secret and no partition. The run's commit is the commit the dispatch ran on
 # (github.sha); the gate job reads it back from the Actions API and refuses a Predictions document that names
 # another commit. The converter and the unit-list command run from main's checkout, not from the commit under
@@ -98,6 +101,7 @@ jobs:
           printf '%s\n' "$DATA_COMMIT" > "$OUT/substrate.txt"
           printf '%s\n' "$SIM_COMMIT" > "$OUT/sim.txt"
           python3 trusted/orchestrator/gate/gate.py ledger-digest --ledger "$LEDGER" > "$OUT/ledger.sha256"
+          python3 trusted/orchestrator/gate/gate.py surface-hash --paths-root trusted --root repo > "$OUT/surface.sha256"
           echo "SIM_REF=$SIM_REF" >> "$GITHUB_ENV"
           echo "MEASURED_SHA=$(sha256sum "$OUT/measured.csv" | cut -d' ' -f1)" >> "$GITHUB_ENV"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

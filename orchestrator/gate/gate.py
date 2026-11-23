@@ -3,7 +3,9 @@
 
     gate.py check-prereg [FILE...]              every pre-registration (or the files named) is well formed
     gate.py check-ledger                        the budget ledger is well formed
-    gate.py check-pr --body-file F --changes-file F    the pull request follows the rule (rule.py)
+    gate.py check-pr --body-file F --changes-file F ...   the pull request follows the rule (rule.py)
+    gate.py surface-hash --root D --paths-root D   the hash of the scoring files a checkout holds (surface.py)
+    gate.py check-surface ...                   each side's recorded hash is its commit's, and the candidate's is main's
     gate.py unrecorded --run-ids F              every earlier successful gate run is in the ledger on main
     gate.py read-sim-pin --pins-file F          the SIM_REF a stack-pins.env assigns
     gate.py ledger-digest --ledger D            the SHA-256 a gate run records for the ledger it was scored over
@@ -38,6 +40,7 @@ import predictions as pd_  # noqa: E402
 import prereg as pr  # noqa: E402
 import reduce as rd  # noqa: E402
 import rule  # noqa: E402
+import surface  # noqa: E402
 
 ROOT = HERE.parent.parent
 HEX40 = pd_.HEX40
@@ -115,10 +118,37 @@ def cmd_check_ledger(a) -> int:
 
 
 def cmd_check_pr(a) -> int:
-    errs = rule.check_pr(Path(a.body_file).read_text(), rule.parse_changes(Path(a.changes_file).read_text()), a.root, a.base_root)
+    landing = rule.Landing(a.pr_number, a.head_sha, a.merge_base, Path(a.merge_base_root))
+    errs = rule.check_pr(Path(a.body_file).read_text(), rule.parse_changes(Path(a.changes_file).read_text()), a.root,
+                         a.base_root or a.root, landing)
     for e in errs:
         print(f"::error::{e}")
     print("the pull request follows the gate rule" if not errs else f"{len(errs)} problems")
+    return 1 if errs else 0
+
+
+def cmd_surface_hash(a) -> int:
+    print(surface.digest(a.root, rule.accuracy_paths(a.paths_root)))
+    return 0
+
+
+def cmd_check_surface(a) -> int:
+    """Each side's recorded surface hash is the one its commit's files give, and the candidate's is main's, or a
+    maintainer's exception covers this pull request at this head."""
+    paths, errs = rule.accuracy_paths(a.root), []
+    digests = {}
+    for label, root, art in (("base", a.base_root, a.base_artifact), ("candidate", a.cand_root, a.cand_artifact)):
+        digests[label] = surface.digest(root, paths)
+        recorded = (Path(art) / "surface.sha256").read_text().strip()
+        if recorded != digests[label]:
+            errs.append(f"the {label} run records surface hash {recorded[:12]}, but its commit's files hash to {digests[label][:12]}")
+    if digests["base"] != digests["candidate"] and not rule.excepted(a.root, a.pull_request, a.head):
+        names = surface.differing(a.base_root, a.cand_root, paths)
+        errs.append("the candidate's scoring surface differs from main's (" + ", ".join(names[:5]) + (" and more" if len(names) > 5 else "")
+                    + "); the candidate would score with its own code, which needs a maintainer exception in " + rule.EXCEPTIONS.as_posix())
+    for e in errs:
+        print(f"::error::{e}")
+    print("the candidate runs on main's scoring surface" if not errs else f"{len(errs)} problems")
     return 1 if errs else 0
 
 
@@ -291,7 +321,14 @@ def main(argv=None) -> int:
     p = sub.add_parser("check-prereg"); p.add_argument("files", nargs="*"); p.add_argument("--root", default=str(ROOT)); p.set_defaults(f=cmd_check_prereg)
     p = sub.add_parser("check-ledger"); p.add_argument("--root", default=str(ROOT)); p.set_defaults(f=cmd_check_ledger)
     p = sub.add_parser("check-pr"); p.add_argument("--body-file", required=True); p.add_argument("--changes-file", required=True)
-    p.add_argument("--root", default=str(ROOT)); p.add_argument("--base-root", default=None); p.set_defaults(f=cmd_check_pr)
+    p.add_argument("--root", default=str(ROOT)); p.add_argument("--base-root", default=None)
+    p.add_argument("--pr-number", required=True, type=int); p.add_argument("--head-sha", required=True); p.add_argument("--merge-base", required=True)
+    p.add_argument("--merge-base-root", required=True); p.set_defaults(f=cmd_check_pr)
+    p = sub.add_parser("surface-hash"); p.add_argument("--root", required=True); p.add_argument("--paths-root", required=True)
+    p.set_defaults(f=cmd_surface_hash)
+    p = sub.add_parser("check-surface"); p.add_argument("--root", default=str(ROOT)); p.add_argument("--base-root", required=True)
+    p.add_argument("--cand-root", required=True); p.add_argument("--base-artifact", required=True); p.add_argument("--cand-artifact", required=True)
+    p.add_argument("--pull-request", required=True, type=int); p.add_argument("--head", required=True); p.set_defaults(f=cmd_check_surface)
     p = sub.add_parser("unrecorded"); p.add_argument("--run-ids", required=True); p.add_argument("--root", default=str(ROOT)); p.set_defaults(f=cmd_unrecorded)
     p = sub.add_parser("read-sim-pin"); p.add_argument("--pins-file", required=True); p.set_defaults(f=cmd_read_sim_pin)
     p = sub.add_parser("ledger-digest"); p.add_argument("--ledger", required=True); p.set_defaults(f=cmd_ledger_digest)
