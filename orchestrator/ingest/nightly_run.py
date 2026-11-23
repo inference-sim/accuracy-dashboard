@@ -33,6 +33,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
+import contract  # noqa: E402
 import nightly as nt  # noqa: E402
 import stack as sk  # noqa: E402
 import public_text as pt  # noqa: E402
@@ -149,9 +150,11 @@ def run_night(today: date, blis_tag: str, *, work_dir: Path, data_dir: Path, sta
 
 def _write_summary(path: Path, summary: dict) -> None:
     """Write a published JSON file. Every file the night publishes goes through here, and through scrub: text copied from an
-    engine's field list or a registry names no outside tool by its product name (public_text)."""
+    engine's field list or a registry names no outside tool by its product name (public_text). Written with the one encoding
+    build_summary_v2.dumps uses (contract.published_dumps): compact, since indented a night of 1011 scored points was 105 MB
+    and GitHub refuses a file over 100 MB."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(pt.scrub(summary), indent=2, ensure_ascii=False) + "\n")
+    path.write_text(contract.published_dumps(pt.scrub(summary)))
 
 
 def _write_state(state_path: Path, blis_tag: str, snapshot_id: str, point_ids: list[str]) -> None:

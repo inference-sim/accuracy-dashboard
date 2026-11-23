@@ -314,6 +314,36 @@ def test_every_published_summary_has_its_backlog_beside_it(tmp_path):
     assert backlog["snapshot_id"] == json.loads((latest / "summary.json").read_text())["snapshot_id"]
 
 
+def test_every_published_json_file_is_written_compact_by_the_nights_own_writer(tmp_path):
+    # GitHub refuses a file over 100 MB: the 2026-11-22 night's summary was 105 MB written with indent=2 by this writer
+    # (not by build_summary_v2.dumps). The night's files are the one compact encoding, whatever writes them.
+    w = World()
+    w.rows = [("m", 1, "2026-10-01")]
+    r = _run(w, tmp_path, "2026-10-23", "v0.12.0")
+    published = [tmp_path / "data" / "latest" / "summary.json", tmp_path / "data" / "latest" / "backlog.json",
+                 tmp_path / "data" / "snapshots" / r.snapshot_id / "summary.json"]
+    for f in published:
+        text = f.read_text()
+        assert text == c.published_dumps(json.loads(text)), f"{f.name} is not the compact encoding"
+        assert "\n" not in text[:-1]
+
+
+def test_a_summary_of_realistic_points_is_written_at_half_its_indented_size(tmp_path):
+    # A scored point carries a fidelity record of about 33 KB (106 args, a kernel provenance, substitutions): 1000 of them
+    # were 105 MB indented. The size is asserted on points of that weight, through the night's writer.
+    arg = {"arg": "attention_config.block_size", "blis": None, "match": "resolved_not_stated", "measured": 32, "source": "args"}
+    point = {"level": "point", "point_id": "0" * 64, "fidelity": {"args": [dict(arg, arg=f"a{i}") for i in range(110)],
+             "blis_kernel_provenance": {"colocated": {"assumptions": [{"Name": f"n{i}", "Scope": "x" * 60} for i in range(70)]}},
+             "substitutions": [{"kind": "client_difference", "subject": "s", "detail": "d" * 150} for _ in range(25)]}}
+    summary = {"schema_version": 3, "matrix": [{"rows": [dict(point, point_id=f"{i:064x}") for i in range(200)]}]}
+    out = tmp_path / "summary.json"
+    nr._write_summary(out, summary)
+    indented = len(json.dumps(summary, indent=2, ensure_ascii=False).encode())
+    assert out.read_text() == c.published_dumps(summary)
+    assert 3_000_000 < out.stat().st_size < indented * 0.55
+    assert json.loads(out.read_text()) == summary
+
+
 def test_a_pre_release_build_named_by_its_commit_is_published_but_never_listed_as_a_scored_release(tmp_path):
     commit = "6" * 40
     w = World()
