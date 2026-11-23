@@ -230,6 +230,22 @@ jobs:
           if [ -f data/latest/summary.json ]; then
             python3 orchestrator/build_classes.py build --summary data/latest/summary.json --supplemental data/supplemental/classes --out data/latest/classes.json
           fi
+      - name: Build the Sources tab data (funnel.json) from the night's contract and the ledger
+        run: |
+          set -euo pipefail
+          # The funnel (format funnel-2) of what the night scored: every InferenceX unit placed by its grade, G5 reason or fault.
+          # Inputs are already on this runner (the ledger fetched above, the contract this night scored), so no secret and no new
+          # network access. The API+dump contract is _contract-dump; a night with no dump lane scored into contract itself.
+          # When the contract is not the whole of the summary (a merged night) nothing is written and a warning says why: the tab
+          # then keeps its "not published" notice. The step never fails the night.
+          if [ -f data/latest/summary.json ]; then
+            CONTRACT="$RUNNER_TEMP/_contract-dump"
+            [ -d "$CONTRACT" ] || CONTRACT="$RUNNER_TEMP/contract"
+            python3 orchestrator/nightly/funnel_night.py \
+              --ledger "$RUNNER_TEMP/dump-substrate/catalog/ledger" \
+              --anchor "$RUNNER_TEMP/dump-substrate/catalog/ledger/published/anchor.yaml" \
+              --contract "$CONTRACT" --summary data/latest/summary.json --out data/latest/funnel.json
+          fi
       - name: Package the published data for the publish job
         run: tar -czf data.tgz -C data . 2>/dev/null || tar -czf data.tgz --files-from /dev/null
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
