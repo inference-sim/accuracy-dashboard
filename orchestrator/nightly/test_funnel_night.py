@@ -53,3 +53,27 @@ def test_a_whole_night_writes_a_funnel_2_file_and_a_delta_night_writes_none_and_
 
 def _ids_of(n):
     return [f"{i:064x}" for i in range(1, n + 1)]
+
+
+def _configiq_file(tmp_path, source="configiq"):
+    units = [{"unit_id": f"c{i}", "excluded": None, "recoverable": None, "blocked": None, "grade": "G4" if i < 2 else None,
+              "provisional": False, "failed": None, "g5": None if i < 2 else "field_not_modelled", "withheld": None, "lane": "vllm"}
+             for i in range(5)]
+    path = tmp_path / "configiq.json"
+    path.write_text(json.dumps(fn.combine([fn.tally(source, 5, units)])))
+    return path
+
+
+def test_the_committed_configiq_funnel_is_the_second_source_and_an_absent_or_wrong_one_is_no_row(tmp_path):
+    lg, anchor, contract, summary, ids = _night(tmp_path, scored_ids=set(_ids_of(6)))
+    s = json.loads(summary.read_text())
+    both = fn.validate(fnn.build(lg, anchor, contract, s, fnn.read_configiq(_configiq_file(tmp_path))))
+    assert sorted(both["funnels"]) == ["configiq", "inferencex"]
+    assert both["funnels"]["configiq"]["stages"]["scored"] == 2 and both["funnels"]["inferencex"]["stages"]["scored"] == 2
+
+    assert fnn.read_configiq(None) is None and fnn.read_configiq(tmp_path / "absent.json") is None
+    assert sorted(fnn.build(lg, anchor, contract, s)["funnels"]) == ["inferencex"]
+    # a file that is some other source is refused, never shown as configiq
+    import pytest
+    with pytest.raises(fn.FunnelError):
+        fnn.read_configiq(_configiq_file(tmp_path, source="inferencex"))

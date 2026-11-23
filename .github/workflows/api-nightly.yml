@@ -245,6 +245,7 @@ jobs:
               --ledger "$RUNNER_TEMP/dump-substrate/catalog/ledger" \
               --anchor "$RUNNER_TEMP/dump-substrate/catalog/ledger/published/anchor.yaml" \
               --contract "$CONTRACT" --summary data/latest/summary.json --out data/latest/funnel.json \
+              --configiq data/supplemental/funnels/configiq.json \
               || echo "::warning title=funnel.json not written::funnel_night.py exited $?"
           fi
       - name: Package the published data for the publish job
