@@ -54,6 +54,29 @@ def _flag_map(decl: dict) -> dict:
     return {flag: name for name, f in decl["fields"].items() for flag in f["flags"]}
 
 
+# The long options the engine's parser registers that no ServerArgs field declares: `--config`
+# (server_args.py:401-405 at 297e54fd) and the `--help` argparse adds to `ArgumentParser(prog="sglang serve")`
+# (server_args.py:679). They take part in abbreviation as options of the same parser.
+PARSER_ONLY_FLAGS = ("--config", "--help")
+
+
+def resolve_abbreviation(flag: str, options) -> tuple[str | None, list[str]]:
+    """(the option `flag` names, []) as SGLang's parser takes it, or (None, the options it is a prefix of).
+
+    prepare_server_args builds `argparse.ArgumentParser(prog="sglang serve")` (server_args.py:679) and no parser of the
+    release sets allow_abbrev=False, so a long option is accepted as any unambiguous prefix of a registered one
+    (`--tp` for `--tp-size`, the only option beginning `--tp`). An option spelled in full is taken as it is, even
+    when it is also a prefix of others (`--ep` beside `--ep-size`). A prefix of several options is argparse's
+    "ambiguous option" error and the launch does not start: it resolves to nothing, and the caller reads the flag as it is
+    spelled, a flag the release does not declare. `flag` is the word before any `=`."""
+    if flag in options:
+        return flag, []
+    if len(flag) <= 2 or not flag.startswith("--"):
+        return None, []
+    matches = sorted(o for o in options if o.startswith(flag))
+    return (matches[0], []) if len(matches) == 1 else (None, matches)
+
+
 # ------------------------------------------------------------------ reading each source
 
 def read_server_args(log: str) -> st.Reading:
@@ -179,6 +202,7 @@ def read_launch_command(text: str | None, decl: dict) -> st.Reading:
     if not text:
         return r
     flags = _flag_map(decl)
+    options = frozenset(flags) | frozenset(PARSER_ONLY_FLAGS)
     for line in text.splitlines():
         line = line.strip()
         if not line:
@@ -216,6 +240,7 @@ def read_launch_command(text: str | None, decl: dict) -> st.Reading:
                 continue
             flag, eq, val = t.partition("=")
             negated = False
+            flag = resolve_abbreviation(flag, options)[0] or flag
             name = flags.get(flag)
             if name is None and flag.startswith("--no-") and flags.get("--" + flag[5:]) is not None:
                 name, negated = flags["--" + flag[5:]], True
@@ -362,12 +387,17 @@ ROLES = {"model_path": "model", "served_model_name": "served_model", "speculativ
 
 # A flag or field of an earlier SGLang release that the modelled release removed, read as the field that replaced it
 # (settings.translate_removed). TEMPORARY until the engine's field list states the earlier names.
+# The entry names what a run of the earlier release set; it does not say the modelled release accepts the old spelling
+# (resolve_abbreviation: it does not).
 TRANSLATIONS = {
     "cuda_graph_max_bs": (
         "cuda_graph_max_bs_decode", st.SAME_VALUE, lambda v: v is not None,
         "SGLang's --cuda-graph-max-bs capped the decode CUDA graph's batch size; v0.5.14 split the cap by phase and kept the "
         "old flag as a deprecated alias of --cuda-graph-max-bs-decode (server_args.py at v0.5.14: new_flag="
-        "\"--cuda-graph-max-bs-decode\"), and v0.5.23 removed the alias; the prefill cap is its own field"),
+        "\"--cuda-graph-max-bs-decode\"), and v0.5.23 removed the alias; the prefill cap is its own field. The modelled release would not start with the "
+        "flag: it is a prefix of --cuda-graph-max-bs-decode and --cuda-graph-max-bs-prefill, so its argparse refuses it as an "
+        "ambiguous option. The entry is therefore only for a run of an earlier release that stated a value; a value left to "
+        "the shell is not translated, and the point stays field_not_in_release"),
     "mamba_scheduler_strategy": (
         "mamba_radix_cache_strategy", lambda v: {"auto": "no_buffer"}.get(v, v), lambda v: v in ("auto", "no_buffer", "extra_buffer"),
         "SGLang v0.5.12 and v0.5.13 named the strategy of the mamba radix cache --mamba-scheduler-strategy (auto, no_buffer, "

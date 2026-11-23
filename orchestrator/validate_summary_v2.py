@@ -126,6 +126,35 @@ def problems(doc: dict) -> list[str]:
     return out + tree_problems(doc)
 
 
+def _source_problems(prov: dict) -> list[str]:
+    """provenance.ground_truth.sources, where present: COV-9 per source (a source is not pulled before its own newest
+    measurement), a source's dates in order, and the dump and the API feed on their own sides of the dump's cutoff."""
+    out = []
+    srcs = prov["ground_truth"].get("sources") or []
+    ids = [x["id"] for x in srcs]
+    if len(set(ids)) != len(ids):
+        out.append(f"ground_truth.sources lists a source twice: {ids}")
+    for x in srcs:
+        lo, hi, pulled = x["measurement_date_from"], x["measurement_date_through"], x["pulled_at"][:10]
+        if (lo is None) != (hi is None) or (lo and hi and lo > hi):
+            out.append(f"source {x['id']}: measurement dates {lo}..{hi} are not a range")
+        if hi and pulled < hi:
+            out.append(f"source {x['id']} pulled {pulled}, before its newest measurement {hi} (COV-9)")
+        cut = x.get("cutoff")
+        if x["id"] == "dump":
+            if not cut or x["ref"] != f"db-dump/{cut}":
+                out.append(f"source dump: ref {x['ref']} is not db-dump/<cutoff {cut}>")
+            elif hi and hi >= cut:
+                out.append(f"source dump: newest measurement {hi} is not before its cutoff {cut}")
+        elif cut:
+            out.append(f"source {x['id']}: only the dump has a cutoff")
+    dump = next((x for x in srcs if x["id"] == "dump"), None)
+    api = next((x for x in srcs if x["id"] == "api"), None)
+    if dump and api and api["measurement_date_from"] and dump.get("cutoff") and api["measurement_date_from"] < dump["cutoff"]:
+        out.append(f"source api: oldest measurement {api['measurement_date_from']} is before the dump's cutoff {dump['cutoff']}")
+    return out
+
+
 def _v3_problems(doc: dict, pts: list[dict]) -> list[str]:
     """What schema v3 adds: the grades, headline, coverage and backlog agree with the points."""
     out = []
@@ -153,6 +182,7 @@ def _v3_problems(doc: dict, pts: list[dict]) -> list[str]:
     if gt.get("measurement_date_through") and doc["provenance"]["pulled_at"][:10] < gt["measurement_date_through"]:
         out.append(f"pulled {doc['provenance']['pulled_at'][:10]}, before its newest measurement "
                    f"{gt['measurement_date_through']} (COV-9)")
+    out += _source_problems(doc["provenance"])
     sim = doc["provenance"]["simulator"]
     build = lambda s: {k: v for k, v in (s or {}).items() if k != "engine"}
     if any(build(x.get("simulator")) != build(sim) for x in runs + g5 + failed):

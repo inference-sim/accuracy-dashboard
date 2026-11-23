@@ -67,7 +67,7 @@
           "properties": {
             "release": {
               "type": "string",
-              "description": "CI-resolved latest stable tag; never main/pre-release"
+              "description": "CI-resolved latest stable tag, or, for a preview run on a scratch branch, the full 40-hex commit of the build scored (a recorded pre-release identity, never published to Pages)"
             },
             "commit_sha": {
               "type": "string"
@@ -114,6 +114,14 @@
             "measurement_sha256": {
               "type": "string",
               "description": "sha256 of the frozen pull manifest (every point's frozen inputs and their sha256s). On an IX-only merge this is the newest (delta) pull's manifest, which does not cover the carried-over prior points; a whole-window manifest exists only on a seed or BLIS-release rebuild."
+            },
+            "sources": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/definitions/groundTruthSource"
+              },
+              "description": "Optional. One entry per ground-truth source that supplied units, each with its own measurement dates and pull date: 'api' (the InferenceX API feed; ref is its release_tag) and, when the frozen archive was scored, 'dump' (ref db-dump/<date>, which holds the rows measured before <date>; ref_sha256 is the SHA256SUMS the ledger pins). A source that supplied no unit has no entry. ground_truth.measurement_date_through and provenance.pulled_at stay the whole run's."
             }
           }
         },
@@ -1317,6 +1325,68 @@
       "type": "string",
       "pattern": "^[0-9a-f]{64}$",
       "description": "sha256 of the point's canonical identity (orchestrator/ingest/CONTRACT.md)"
+    },
+    "groundTruthSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "ref",
+        "measurement_date_from",
+        "measurement_date_through",
+        "pulled_at"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "api",
+            "dump"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string",
+          "description": "api: the release_tag 'api-<pull date>'; dump: 'db-dump/<date>'"
+        },
+        "ref_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "api: sha256 of the pull manifest; dump: sha256 of the pinned SHA256SUMS"
+        },
+        "cutoff": {
+          "$ref": "#/definitions/isoDate"
+        },
+        "measurement_date_from": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/isoDate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "earliest measurement date of the units this source supplied"
+        },
+        "measurement_date_through": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/isoDate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "latest measurement date of the units this source supplied"
+        },
+        "pulled_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "when this source was last fetched or verified"
+        }
+      }
     },
     "isoDate": {
       "type": "string",

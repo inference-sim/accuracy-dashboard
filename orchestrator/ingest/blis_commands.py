@@ -27,7 +27,9 @@ def _catalog_resolve(blis: str, catalog: str, model: str | None, chip: str | Non
     """`blis catalog resolve --catalog <catalog> --model|--chip <name> --json`, checked. The
     command prints {"query", "identity", "reason"}, with identity null when no entry exists, and
     exits non-zero when a name is ambiguous. A resolved chip also prints "packaging" (inference-sim
-    m1/packaging): {"gpus_per_node", "gpus_per_rack"}, each the value its entry fixes or null."""
+    m1/packaging): {"gpus_per_node", "gpus_per_rack"}, each the value its entry fixes or null. A
+    resolved model that lists drafters (inference-sim#2141, M3.2) also prints "drafters": a list of
+    {"name", "method", "num_spec_tokens"}; the dashboard does not use it."""
     if (model is None) == (chip is None):
         raise CommandError("catalog resolve takes exactly one of model and chip")
     flag, query = ("--model", model) if model is not None else ("--chip", chip)
@@ -38,7 +40,7 @@ def _catalog_resolve(blis: str, catalog: str, model: str | None, chip: str | Non
     except json.JSONDecodeError as e:
         raise CommandError(f"blis {' '.join(args)} printed no JSON: {e}") from None
     base = {"query", "identity", "reason"}
-    if not isinstance(doc, dict) or not base <= set(doc) or set(doc) - base - {"packaging"}:
+    if not isinstance(doc, dict) or not base <= set(doc) or set(doc) - base - {"packaging", "drafters"}:
         raise CommandError(f"blis {' '.join(args)} printed {text.strip()[:200]!r}, "
                            f"not an object of query, identity and reason")
     if doc["query"] != query or not (doc["identity"] is None or isinstance(doc["identity"], str)):
@@ -51,6 +53,15 @@ def _catalog_resolve(blis: str, catalog: str, model: str | None, chip: str | Non
         if not ok:
             raise CommandError(f"blis {' '.join(args)} printed packaging {pk!r}; want gpus_per_node and "
                                f"gpus_per_rack, each a positive integer or null")
+    dr = doc.get("drafters")
+    if dr is not None:
+        ok = isinstance(dr, list) and all(
+            isinstance(d, dict) and isinstance(d.get("name"), str) and isinstance(d.get("method"), str)
+            and isinstance(d.get("num_spec_tokens"), int) and not isinstance(d.get("num_spec_tokens"), bool)
+            for d in dr)
+        if not ok:
+            raise CommandError(f"blis {' '.join(args)} printed drafters {dr!r}; want a list of "
+                               f"name, method and num_spec_tokens")
     return doc
 
 

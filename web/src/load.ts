@@ -73,7 +73,16 @@ export function validateSummary(raw: unknown): Summary {
   }
   const prov = obj(doc.provenance, 'provenance')
   need(obj(prov.blis, 'provenance.blis'), ['release', 'commit_sha', 'catalog', 'registry', 'extractor_version'], 'provenance.blis')
-  need(obj(prov.ground_truth, 'provenance.ground_truth'), ['source', 'release_tag', 'measurement_sha256'], 'provenance.ground_truth')
+  const gtObj = obj(prov.ground_truth, 'provenance.ground_truth')
+  need(gtObj, ['source', 'release_tag', 'measurement_sha256'], 'provenance.ground_truth')
+  if ('sources' in gtObj) {
+    // Optional per-source dates. Checked here so a malformed entry fails loud instead of throwing in the rail.
+    if (!Array.isArray(gtObj.sources)) throw new SummaryLoadError('summary.json "provenance.ground_truth.sources" is not an array')
+    gtObj.sources.forEach((s, i) => {
+      const path = `provenance.ground_truth.sources[${i}]`
+      need(obj(s, path), ['id', 'ref', 'measurement_date_from', 'measurement_date_through', 'pulled_at'], path)
+    })
+  }
   const totals = obj(doc.totals, 'totals')
   for (const tier of ['measured_or_resolved', 'all']) obj(totals[tier], `totals.${tier}`)
   need(obj(doc.coverage, 'coverage'), doc.schema_version === 3 ? ['points', 'graded', 'not_scored', 'failed'] : ['scored', 'not_scored'], 'coverage')

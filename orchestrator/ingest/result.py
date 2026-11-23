@@ -17,12 +17,14 @@ standard error, so the caller can name the simulator's own refusal.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import tempfile
 
 # Version 3 requires each metric to state its scope (the substrate since DEV-8); version 2 is what the
-# simulator releases before it write. The metrics the harness reads are the same in both.
-SCHEMA_VERSIONS = (2, 3)
+# simulator releases before it write. Version 4 (M3.2) adds the statement that every figure is a point
+# estimate with no interval. The metrics the harness reads are the same in all three.
+SCHEMA_VERSIONS = (2, 3, 4)
 KIND = "Result"
 TTFT_MEAN_MS = "ttft_mean_ms"
 TPOT_MEAN_MS = "tpot_mean_ms"
@@ -250,6 +252,18 @@ def data_block(doc: dict) -> dict | None:
     record states it as `simulator.data`. None when the Result carries none."""
     d = doc.get("data")
     return d if isinstance(d, dict) and isinstance(d.get("catalog"), dict) and isinstance(d.get("registry"), dict) else None
+
+
+def engine_commit(doc: dict) -> str | None:
+    """The upstream commit of the engine the Result's build modelled (engine.commit, LIF-6): 40 lowercase
+    hex digits. None when the Result states none (a build before row 3 of M3.2). Anything else is a
+    malformed Result, never a missing commit."""
+    c = (doc.get("engine") or {}).get("commit")
+    if c is None:
+        return None
+    if not isinstance(c, str) or not re.fullmatch(r"[0-9a-f]{40}", c):
+        raise ResultError(f"the Result's engine.commit {c!r} is not a 40-digit lowercase hex commit", "result_invalid")
+    return c
 
 
 def rows(doc: dict) -> list[dict]:

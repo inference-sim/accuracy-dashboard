@@ -404,12 +404,22 @@ def test_data_pinned_by_commit_is_recorded_as_given_and_is_as_good_as_a_tag(tmp_
 
 def test_every_action_of_every_workflow_is_pinned_to_a_commit_with_its_version_in_a_comment():
     assert len(WORKFLOWS) >= 3
+    pinned = 0
     for wf in WORKFLOWS:
-        uses = re.findall(r"^\s*-?\s*uses:\s*(\S+)(.*)$", wf.read_text(), re.M)
-        assert uses, wf
+        uses = re.findall(r"^\s*-?\s*uses:\s*(\S+)(.*)$", wf.read_text(), re.M)  # a workflow that runs only gh has none
+        pinned += len(uses)
         for ref, rest in uses:
+            if ref.startswith("./.github/actions/"):
+                # this repository's own composite action, at the commit being run; its steps are checked below
+                assert (HERE.parent / ref[2:] / "action.yml").is_file(), f"{wf.name}: {ref} has no action.yml"
+                continue
             assert re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", ref), f"{wf.name}: {ref} is not pinned to a commit SHA"
             assert re.fullmatch(r"\s*# v\d+\.\d+\.\d+", rest), f"{wf.name}: {ref} has no version comment"
+    for action in (HERE.parent / ".github" / "actions").glob("*/action.yml"):
+        for ref, rest in re.findall(r"^\s*-?\s*uses:\s*(\S+)(.*)$", action.read_text(), re.M):
+            assert re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", ref), f"{action}: {ref} is not pinned to a commit SHA"
+            assert re.fullmatch(r"\s*# v\d+\.\d+\.\d+", rest), f"{action}: {ref} has no version comment"
+    assert pinned, "no workflow uses an action: the pattern above matches nothing"
 
 
 def test_ci_installs_python_dependencies_only_from_the_hashed_requirements_file():
@@ -435,3 +445,30 @@ def test_every_job_that_installs_the_hashed_requirements_runs_the_python_they_ar
                 if "requirements-ci.txt" in (s.get("run") or "") and "pip install" in (s.get("run") or ""):
                     before = [x for x in steps[:k] if str(x.get("uses", "")).startswith("actions/setup-python@")]
                     assert before and str(before[-1]["with"]["python-version"]) == "3.13", f"{wf.name}: {name}"
+
+
+def test_the_commit_distance_inputs_are_accepted_and_repeatable():
+    p = check("--sim", "v0.16.0", *GOOD, "--engine-report", "a.json", "--engine-report", "b.json", "--engine-checkout", "vllm")
+    assert p.returncode == 0, p.stderr
+    p = check("--sim", "v0.16.0", *GOOD, "--engine-report")
+    assert p.returncode != 0
+
+
+def mk(root, name):
+    (root / name).mkdir()
+    return root / name
+
+
+def test_the_worker_count_is_a_positive_integer_and_reaches_the_scorer_only_when_given(tmp_path):
+    assert check("--sim", "v0.16.0", *GOOD, "--workers", "2").returncode == 0
+    for bad in ("0", "-1", "two", "", "2.5"):
+        p = check("--sim", "v0.16.0", *GOOD, "--workers", bad)
+        assert p.returncode == 2 and "--workers" in p.stderr, (bad, p.stderr)
+    assert check("--sim", "v0.16.0", *GOOD, "--workers").returncode == 2
+    p, _, log, *_ = run_real(mk(tmp_path, "given"), lambda c: "v0.16.0", extra=("--workers", "2"))
+    assert p.returncode == 0, p.stderr
+    argv = log.read_text().splitlines()
+    assert argv[argv.index("--workers") + 1] == "2"
+    p, _, log, *_ = run_real(mk(tmp_path, "default"), lambda c: "v0.16.0")
+    assert p.returncode == 0, p.stderr
+    assert "--workers" not in log.read_text().splitlines()

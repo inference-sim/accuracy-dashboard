@@ -7,6 +7,7 @@ import { formatCount, formatFigure, formatSignedPct } from '../format'
 import {
   CLASS_GRADES,
   GRADED,
+  anchorTag,
   kindTag,
   statsOf,
   type ClassEntry,
@@ -43,6 +44,7 @@ function ClassCard({ c }: { c: ClassEntry }) {
     <section className={`classcard kind-${c.kind}`} id={`class-${c.id}`} aria-labelledby={`class-${c.id}-h`}>
       <h2 className="sectitle" id={`class-${c.id}-h`}>
         {c.label}
+        {anchorTag(c) ? <span className="pill classtag anchor"> {anchorTag(c)}</span> : null}
         {tag ? <span className="pill classtag"> {tag}</span> : null}
         {c.interim ? <span className="pill classtag interim"> interim</span> : null}
       </h2>
@@ -59,20 +61,21 @@ function ClassCard({ c }: { c: ClassEntry }) {
             <div className="stat-label">refused, by name</div>
             <div className="stat-hint">
               {formatCount(n.failed)} failed
-              {n.withheld ? ` · ${formatCount(n.withheld)} withheld (test split)` : ''}
+              {n.withheld ? ` · ${formatCount(n.withheld)} withheld` : ''}
             </div>
           </div>
         )}
       </div>
       {c.partition ? <p className="context">{`Partition: ${c.partition}.`}</p> : null}
       {c.plain_line ? <p className="context">{c.plain_line}</p> : null}
-      <table className="grades" aria-label={`${c.label}: points and accuracy by grade`}>
+      <div className="tscroll gradebox">
+      <table className="readout gradetbl" aria-label={`${c.label}: points and accuracy by grade`}>
         <thead>
           <tr>
             <th scope="col">Grade</th>
-            <th scope="col">Points</th>
+            <th scope="col" className="num">Points</th>
             {stats.map((s) => (
-              <th scope="col" key={s}>
+              <th scope="col" key={s} className="num">
                 {STAT_LABEL[s]} error
               </th>
             ))}
@@ -98,6 +101,7 @@ function ClassCard({ c }: { c: ClassEntry }) {
           ))}
         </tbody>
       </table>
+      </div>
       {Object.entries(c.figure_notes ?? {}).map(([stat, why]) => (
         <p className="context" key={stat}>
           {`${STAT_LABEL[stat as ClassStat]}: ${why}.`}
@@ -183,7 +187,7 @@ function ClassCard({ c }: { c: ClassEntry }) {
         </details>
       ) : null}
       {c.substitutions.length > 0 ? (
-        <details className="about" open={c.kind === 'reconstructed'}>
+        <details className="about">
           <summary>What differs from the run ({formatCount(c.substitutions.length)} named substitutions)</summary>
           <table className="readout">
             <thead>

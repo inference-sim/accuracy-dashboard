@@ -587,6 +587,46 @@ def test_registry_treats_404_as_no_label_but_raises_on_other_errors():
         clients.urllib.request.urlopen, clients.time.sleep = orig, orig_sleep
 
 
+def test_a_400_is_read_again_twice_then_raised_with_its_url():
+    # Run 45066595905: 185 of a pull's 1110 points froze with "HTTP 400: Bad Request" at random, and the same
+    # reads answered afterwards. A read is idempotent, so a 400 is tried twice more; a lasting one still raises.
+    import io
+    import urllib.error
+    import clients as cl
+    import cli
+    slept, script = [], []
+
+    class Resp(io.BytesIO):
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def bad(url="https://h/x"):
+        return urllib.error.HTTPError(url, 400, "Bad Request", {}, io.BytesIO(b""))
+
+    def fake_open(req, timeout):
+        e = script.pop(0)
+        if isinstance(e, Exception):
+            raise e
+        return Resp(e)
+    orig = cl.urllib.request.urlopen
+    try:
+        cl.urllib.request.urlopen = fake_open
+        script[:] = [bad(), bad(), b"body"]
+        assert cl._get_bytes("https://h/x", {}, sleep=slept.append) == b"body"
+        assert slept == [1, 2]
+        script[:] = [bad(), bad(), bad()]
+        try:
+            cl._get_bytes("https://h/x", {}, sleep=slept.append)
+            raise AssertionError("a lasting 400 was swallowed")
+        except urllib.error.HTTPError as e:
+            assert e.code == 400 and not script
+    finally:
+        cl.urllib.request.urlopen = orig
+    assert "from https://h/x" in cli._error_text(bad("https://h/x?sig=SECRET"))
+    assert "SECRET" not in cli._error_text(bad("https://h/x?sig=SECRET"))
+    assert "id=7" in cli._error_text(bad("https://inferencex.semianalysis.com/api/v1/server-log?id=7"))
+
+
 if __name__ == "__main__":
     import traceback
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]

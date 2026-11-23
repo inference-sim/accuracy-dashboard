@@ -71,6 +71,13 @@ def canonical_dumps(value) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
+def published_dumps(value) -> str:
+    """The one JSON text every published summary file is written as (build_summary_v2.dumps and the night's _write_summary):
+    compact, key order kept, UTF-8 kept, one trailing newline. Each scored point carries its whole fidelity record (about 33 KB),
+    so indented, a night of 1011 scored points was 105 MB and GitHub refuses a file over 100 MB; compact it is 51 MB."""
+    return json.dumps(value, separators=(",", ":"), sort_keys=False, ensure_ascii=False) + "\n"
+
+
 def benchmark_run(run_url) -> int | None:
     """The numeric GitHub Actions run id in a run_url, without its attempt number; None when the
     record has no run_url or the URL names no run."""
@@ -168,6 +175,22 @@ def points_sort_key(row: dict) -> tuple:
 PULL_ERROR = "artifact_unmatched:pull_error"
 PROVENANCE_KEYS = ("ingest", "blis", "simulator", "harness_commit", "experimental", "units", "engine", "points", "left_out_records", "vllm_ref", "vllm_max_distance",
                    "fields_sha256", "pulled_at", "corpora", "pull_manifest_sha256", "source")
+
+
+def _dump_problems(dump) -> list[str]:
+    """provenance.dump, present only when the frozen archive supplied units: {ref: db-dump/<date>, sha256, pulled_at}."""
+    if dump is None:
+        return []
+    if not isinstance(dump, dict) or set(dump) != {"ref", "sha256", "pulled_at"}:
+        return [f"{PROVENANCE_JSON}: dump must be exactly ref, sha256 and pulled_at"]
+    out = []
+    if not re.fullmatch(r"db-dump/\d{4}-\d{2}-\d{2}", str(dump["ref"])):
+        out.append(f"{PROVENANCE_JSON}: dump.ref {dump['ref']!r} is not db-dump/<date>")
+    if not re.fullmatch(r"[0-9a-f]{64}", str(dump["sha256"])):
+        out.append(f"{PROVENANCE_JSON}: dump.sha256 is not 64 lowercase hex")
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", str(dump["pulled_at"])):
+        out.append(f"{PROVENANCE_JSON}: dump.pulled_at is not a UTC ISO-8601 time")
+    return out
 
 
 def _read_json(path: Path, problems: list[str]):
@@ -408,6 +431,7 @@ def validate_dir(directory: str | Path) -> list[str]:
                 problems.append(f"{PROVENANCE_JSON}: missing {key}")
         if prov.get("ingest", "api") != "api":
             problems.append(f"{PROVENANCE_JSON}: ingest must be 'api'")
+        problems += _dump_problems(prov.get("dump"))
 
     # ---- grades (COV-4, COV-5, COV-6) and the balance (COV-1)
     engine = ((prov or {}).get("engine") or {}).get("version")

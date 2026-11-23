@@ -229,8 +229,8 @@ def report(*, rows: list[dict], placed: pl.Placed, records: list[dict], missing:
     if anchor is not None:
         mine = [u for u in units if u["point_id"] in anchor]
         c = Counter(u["grade"] for u in mine)
-        out["anchor"] = {"counted": "units", "listed": len(anchor), "in_window": len(mine),
-                         "not_in_window": len(anchor) - len(mine), "grades": {g: c[g] for g in GRADE_KEYS},
+        out["anchor"] = {"counted": "units", "listed": len(anchor), "in_pull": len(mine),
+                         "not_in_pull": len(anchor) - len(mine), "grades": {g: c[g] for g in GRADE_KEYS},
                          "would_run_simulator": sum(1 for u in mine if u.get("would_run_simulator"))}
     total = sum(out["units"]["grades"].values())
     if total != len(units):

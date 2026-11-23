@@ -17,7 +17,7 @@ import { buildRows } from './tree'
 import { ProvenanceBody } from './components/Provenance'
 import { Compare } from './components/Compare'
 import { Headline } from './components/Headline'
-import { isEstimated, type Summary } from './types'
+import { isEstimated, type GroundTruthSource, type Summary } from './types'
 
 const load = (name: string): Summary =>
   validateSummary(JSON.parse(readFileSync(fileURLToPath(new URL(`../testdata/${name}`, import.meta.url)), 'utf8')))
@@ -56,8 +56,8 @@ describe('a v3 snapshot renders', () => {
     const h = headline(render(<App summary={v3a()} loadError={null} initialHash="#/" />).html)
     for (const g of ['G1', 'G2', 'G3', 'G4']) expect(h).toContain(`<th scope="row">${g} `)
     // Under the minimum a grade shows its count and no share (COV-11): G1, G2 and G4 hold 3 points, G3 none.
-    expect(h).toContain('<td>3</td><td>too few points</td>')
-    expect(h).toContain('<td>0</td><td>too few points</td>')
+    expect(h).toContain('<td class="num">3</td><td class="num toofew">too few points</td>')
+    expect(h).toContain('<td class="num">0</td><td class="num toofew">too few points</td>')
     expect(h).not.toContain('33.3%')
   })
 
@@ -163,5 +163,74 @@ describe('Compare across v3 runs applies the minimum point count to the overall 
     a.min_points = 1
     b.min_points = 10
     expect(overall(a, b)).toContain('too few points')
+  })
+})
+
+// ------------------------------------------------ ground_truth.sources: a date range and pull date per source
+const DUMP: GroundTruthSource = {
+  id: 'dump', name: 'SemiAnalysis InferenceX database dump', ref: 'db-dump/2026-10-01', ref_sha256: 'd'.repeat(64),
+  cutoff: '2026-10-01', measurement_date_from: '2026-09-03', measurement_date_through: '2026-09-30',
+  pulled_at: '2026-10-02T08:00:00Z',
+}
+const API: GroundTruthSource = {
+  id: 'api', name: 'SemiAnalysis InferenceX API', ref: 'api-2026-10-23', ref_sha256: '2'.repeat(64),
+  measurement_date_from: '2026-10-02', measurement_date_through: '2026-10-21', pulled_at: '2026-10-23T00:00:00Z',
+}
+const withSources = (sources: GroundTruthSource[]): Summary => {
+  const s = v3a()
+  s.provenance!.ground_truth.sources = sources
+  return s
+}
+const about = (s: Summary) => {
+  const html = render(<App summary={s} loadError={null} initialHash="#/" />).html
+  return html.slice(html.indexOf('class="about-prov"'))
+}
+
+describe('ground-truth sources show their own dates', () => {
+  it('lists the dump and the API feed, each with its range and pull date, and the dump cutoff', () => {
+    const html = about(withSources([DUMP, API]))
+    const dump = html.slice(html.indexOf('data-source="dump"'), html.indexOf('data-source="api"'))
+    const api = html.slice(html.indexOf('data-source="api"'))
+    expect(dump).toContain('>2026-10-01<')
+    expect(dump).toContain('before 2026-10-01')
+    expect(dump).toContain('2026-09-03 to 2026-09-30')
+    expect(dump).toContain('2026-10-02 08:00 UTC')
+    expect(api).toContain('2026-10-02 to 2026-10-21')
+    expect(api).toContain('2026-10-23 00:00 UTC')
+    expect(api).not.toContain('cutoff')
+  })
+
+  it('names the dump and the API feed in the headline, each with its own range', () => {
+    const h = render(<App summary={withSources([DUMP, API])} loadError={null} initialHash="#/" />).html.match(
+      /<p class="context">[\s\S]*?<\/p>/)![0]
+    expect(h).toContain('InferenceX dump 2026-10-01 data range 2026-09-03 to 2026-09-30, pulled 2026-10-02')
+    expect(h).toContain('InferenceX API feed data range 2026-10-02 to 2026-10-21, API pull date 2026-10-23')
+  })
+
+  it('shows no dump and no dump date when the summary has no dump entry', () => {
+    const html = about(withSources([API]))
+    expect(html).not.toContain('data-source="dump"')
+    expect(html).not.toContain('cutoff')
+    expect(html).toContain('2026-10-23 00:00 UTC')
+    // The committed shape, with no sources at all, still renders the one pull date and range.
+    const bare = v3a()
+    delete bare.provenance!.ground_truth.sources
+    const old = about(bare)
+    expect(old).not.toContain('data-source=')
+    expect(old).toContain('>API pull date<')
+    expect(old).toContain('>data range<')
+  })
+
+  it('shows a dash, not a date, for a source with no measurement dates', () => {
+    const html = about(withSources([{ ...API, measurement_date_from: null, measurement_date_through: null }]))
+    expect(html).toMatch(/data range<\/span><span class="v">—<\/span>/)
+  })
+
+  it('refuses a malformed sources list instead of failing in the rail', () => {
+    const raw = JSON.parse(readFileSync(fileURLToPath(new URL('../testdata/render-fixture.v3.summary.json', import.meta.url)), 'utf8'))
+    raw.provenance.ground_truth.sources = [{ id: 'dump' }]
+    expect(() => validateSummary(raw)).toThrow(/sources\[0\]\.ref/)
+    raw.provenance.ground_truth.sources = 'dump'
+    expect(() => validateSummary(raw)).toThrow(/sources/)
   })
 })

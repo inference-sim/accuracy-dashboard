@@ -78,7 +78,6 @@ from extract_agentic_replay_args import (AGENTX_SCENARIO, _nested, parse_job_log
                                          parse_server_log)
 from gen_scenarios import DrafterError, PackagingError, emit, speculative_drafter  # noqa: E402
 import blis_commands as bc  # noqa: E402
-import stack as sk  # noqa: E402
 import support as sp  # noqa: E402
 from resolve_agentic_corpus import CorpusError, catalog_entry, check  # noqa: E402
 from settings import recorded_node_size  # noqa: E402
@@ -487,9 +486,6 @@ def main() -> int:
     ap.add_argument("--blis", required=True, help="the blis binary; it runs in its own directory")
     ap.add_argument("--catalog", required=True)
     ap.add_argument("--registry", required=True)
-    ap.add_argument("--stack", default=None,
-                    help="the scoring build's stack.json, for the engine release the scenario runs "
-                         "(default: the one beside the blis binary)")
     ap.add_argument("--launch-config", default=None,
                     help="the run's launch_config JSON; its resources.gpus_per_node is the node size, "
                          "needed for a chip whose catalog entry fixes none")
@@ -568,9 +564,7 @@ def main() -> int:
     try:
         cat = sp.Catalog(blis=blis, root=Path(args.catalog).resolve())
         packaging = cat.packaging(sweep["gpu"])
-        stack_path = Path(args.stack) if args.stack else Path(blis).parent / "stack.json"
-        engine_release = sk.load(stack_path).engine("vllm")
-        text = emit(sweep, {AGENTIC_LABEL}, packaging, engine_release, speculative_drafter(cat, sweep))
+        text = emit(sweep, {AGENTIC_LABEL}, packaging, speculative_drafter(cat, sweep))
     except DrafterError as e:
         # The run drafts with a checkpoint the catalog has no drafter entry for: pricing it
         # without the draft would score a drafting run as plain decoding.

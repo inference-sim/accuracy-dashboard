@@ -37,7 +37,9 @@ export interface ClassEntry {
   refusals: { code: string; subject: string; points: number }[]
   substitutions: { kind: string; subject: string; detail: string; points: number }[]
   engines?: { engine: string; points: number; graded: number; grades: Record<string, number>; note?: string }[]
-  /** The partition the class's points were scored on (configiq: train and validation; the test partition is withheld). */
+  /** true for an anchor-only source (configiq, D9: every unit is an anchor unit). Separate from `kind`: provisional only says the class is outside the headline (COV-7). */
+  anchor?: boolean
+  /** The partition the class's points were scored on (configiq: anchor-only, no split is withheld). */
   partition?: string
   /** A statistic not shown as an accuracy figure, with the sentence shown instead (stat -> reason). */
   figure_notes?: Partial<Record<ClassStat, string>>
@@ -73,6 +75,11 @@ export function validateClasses(raw: unknown): ClassesDoc {
     if (!KINDS.includes(String(c.kind))) throw new ClassesLoadError(`classes.json class ${id} has the unknown kind ${JSON.stringify(c.kind)}`)
   }
   return raw as ClassesDoc
+}
+
+/** The tag for an anchor-only source. It says nothing about the headline: that is `kindTag`'s, and a separate fact. */
+export function anchorTag(c: Pick<ClassEntry, 'anchor'>): string | null {
+  return c.anchor ? 'anchor source: every unit is an anchor unit' : null
 }
 
 /** The plain-words tag shown beside a class's name, so a reconstructed or provisional class can never read as a regular one. */

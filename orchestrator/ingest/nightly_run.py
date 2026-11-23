@@ -4,7 +4,7 @@ run_night() composes the pieces the rest of this package builds -- the increment
 trigger decision (nightly.plan_night), the cumulative-but-cached score, the v3 summary, the
 two-retention index -- into the sequence a CI night runs (no raw store; summary.json is the store):
 
-  1. Pull the current 180-day window into the store, incrementally (reuse frozen points, freeze
+  1. Pull the current rows (no age limit, COV-2) into the store, incrementally (reuse frozen points, freeze
      new rows, drop aged-out ones). The store is rewritten to hold only the current window.
   2. Decide what the night does from #15's trigger table: compare the window's point ids and the
      resolved BLIS tag against last night's.
@@ -33,6 +33,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
+import contract  # noqa: E402
 import nightly as nt  # noqa: E402
 import stack as sk  # noqa: E402
 import public_text as pt  # noqa: E402
@@ -75,19 +76,21 @@ def snapshot_id(snapshot_date: str, blis_tag: str, pull_date: str) -> str:
 
 
 def run_night(today: date, blis_tag: str, *, work_dir: Path, data_dir: Path, state_path: Path,
-              scored_path: Path, pull_fn, score_build_fn, backlog_fn, snapshot_date: str, keep_api: int = 5) -> NightResult:
+              scored_path: Path, pull_fn, score_build_fn, backlog_fn, snapshot_date: str, keep_api: int = 5,
+              force_publish: bool = False) -> NightResult:
     """One night of the no-storage pipeline (Discussion #15, revised 2026-10-25). Nothing raw is
     persisted: `work_dir` is this run's ephemeral pull, discarded after. Trigger detection reads
     last night's point-id SET from `state_path` (tiny; no raw store needed), so an IX release or an
     age-out is diffed against the recorded ids, not against frozen logs.
 
     `pull_fn(work_dir, today, last_ids, blis_changed) -> (pull_date, window_ids)` lists the window
-    (window_ids = every point id the API reports in the 180 days, cheap) and fetches inputs into
+    (window_ids = every point id the API reports, cheap) and fetches inputs into
     work_dir for the points that will be scored: on an IX-only night only the new points; on a BLIS
     release (blis_changed) the whole window, to rescore it. `score_build_fn(work_dir, blis_tag,
     score_ids, pull_date, window_ids) -> (summary, scored_count)` scores the delta and returns the
     summary (merging into the prior published summary on an IX-only night). `backlog_fn(summary)`
-    is the backlog published beside it (build_summary_v2.backlog_of)."""
+    is the backlog published beside it (build_summary_v2.backlog_of). `force_publish` is a night whose API lane changed nothing
+    but whose dump lane was scored again: the live view is rebuilt, as on an age-out, instead of keeping last night's."""
     work_dir, data_dir, state_path = Path(work_dir), Path(data_dir), Path(state_path)
     scored_path = Path(scored_path)
     state = _read_state(state_path)
@@ -103,6 +106,10 @@ def run_night(today: date, blis_tag: str, *, work_dir: Path, data_dir: Path, sta
 
     # 2. Decide.
     decision = nt.plan_night(window_ids, last_ids, blis_tag, last_blis)
+
+    if decision.is_noop and force_publish:
+        decision = nt.Decision(nt.AGE_OUT, update_live_view=True,
+                               reason=f"the dump lane was scored again under {blis_tag}: update the live view")
 
     # 3. No-op: keep the last good published view, write nothing.
     if decision.is_noop:
@@ -132,9 +139,10 @@ def run_night(today: date, blis_tag: str, *, work_dir: Path, data_dir: Path, sta
         _write_summary(data_dir / "latest" / "summary.json", summary)
         published = True
     _write_state(state_path, blis_tag, snap_id, sorted(window_ids))
-    if decision.freeze_snapshot and published:
+    if decision.freeze_snapshot and published and sk.is_stable_tag(blis_tag):
         # Last, and only when the release's scores are published: the list is what the next night
-        # reads to know this release has scores (COV-9).
+        # reads to know this release has scores (COV-9). A pre-release build (a 40-hex commit, scored by a preview run) is
+        # not a release and is never listed.
         sk.record_scored(scored_path, blis_tag)
     return NightResult(decision, snapshot_id=snap_id if decision.freeze_snapshot else None,
                        scored=scored, published=published)
@@ -142,9 +150,11 @@ def run_night(today: date, blis_tag: str, *, work_dir: Path, data_dir: Path, sta
 
 def _write_summary(path: Path, summary: dict) -> None:
     """Write a published JSON file. Every file the night publishes goes through here, and through scrub: text copied from an
-    engine's field list or a registry names no outside tool by its product name (public_text)."""
+    engine's field list or a registry names no outside tool by its product name (public_text). Written with the one encoding
+    build_summary_v2.dumps uses (contract.published_dumps): compact, since indented a night of 1011 scored points was 105 MB
+    and GitHub refuses a file over 100 MB."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(pt.scrub(summary), indent=2, ensure_ascii=False) + "\n")
+    path.write_text(contract.published_dumps(pt.scrub(summary)))
 
 
 def _write_state(state_path: Path, blis_tag: str, snapshot_id: str, point_ids: list[str]) -> None:

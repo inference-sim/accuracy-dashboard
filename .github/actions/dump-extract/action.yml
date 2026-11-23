@@ -1,0 +1,58 @@
+name: dump-extract
+description: >
+  The anchor-unit extract of the pinned database dump, from the Actions cache or, on a miss, from one streaming pass over the
+  public release. The cache key is the dump revision plus the sha256 of the extract the pin names; a restored extract is
+  checked against that sha256 before it is used, and a miss is saved only after the same check passed.
+
+inputs:
+  ledger:
+    description: Directory of the ledger (catalog/ledger of the pinned substrate checkout)
+    required: true
+  anchor:
+    description: The published anchor list (catalog/ledger/published/anchor.yaml)
+    required: true
+  out:
+    description: Where the extract is placed
+    required: true
+
+outputs:
+  cache-hit:
+    description: "true when the extract came from the cache"
+    value: ${{ steps.cache.outputs.cache-hit == 'true' && steps.hit.outputs.ok == 'true' }}
+
+runs:
+  using: composite
+  steps:
+    - id: key
+      shell: bash
+      run: echo "key=$(python3 "$GITHUB_ACTION_PATH/../../../orchestrator/ingest/dump_extract.py" cache-key)" >> "$GITHUB_OUTPUT"
+
+    - id: cache
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ inputs.out }}
+        key: ${{ steps.key.outputs.key }}
+
+    # A restored directory is used only if it is the pinned extract; a corrupt or stale one is discarded and rebuilt.
+    - id: hit
+      if: steps.cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: |
+        if python3 "$GITHUB_ACTION_PATH/../../../orchestrator/ingest/dump_extract.py" verify --extract "${{ inputs.out }}"; then
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "::warning::the cached extract does not match the pin; rebuilding it from the release"
+          rm -rf "${{ inputs.out }}"
+          echo "ok=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    # The release is 17 zstd parts (about 31 GB) read once in order, each part's sha256 checked against the pin; only the anchor
+    # units' rows are kept, so neither the dump nor a database is ever on the runner's disk. Fails (and so is not cached) unless the
+    # extract's content sha256 is the pinned one.
+    - if: steps.cache.outputs.cache-hit != 'true' || steps.hit.outputs.ok != 'true'
+      shell: bash
+      run: |
+        command -v zstd >/dev/null || sudo apt-get install -y --no-install-recommends zstd
+        python3 "$GITHUB_ACTION_PATH/../../../orchestrator/ingest/dump_extract.py" extract \
+          --ledger "${{ inputs.ledger }}" --anchor "${{ inputs.anchor }}" --out "${{ inputs.out }}" \
+          --tmp "$RUNNER_TEMP/dump-extract.tmp" --download --workers 2

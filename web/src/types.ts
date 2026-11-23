@@ -18,6 +18,8 @@ export interface MapeShape {
   ttft: number | null | TooFew
   tpot: number | null | TooFew
   n: number
+  /** Distinct role keys among the points holding the value, set where the client recomputes it (COV-13). */
+  roleKeys?: number
 }
 
 export interface MetricBlock {
@@ -83,6 +85,23 @@ export interface Fidelity {
   grade?: GradedGrade
   substitutions?: Substitution[]
   run_release?: string | null
+  /** Where the run's commit stands against the commit BLIS models, in a word (`same`, `no_ported_change`,
+   *  `ported_change`, `unpublished`, `outside_distance`, `custom_build`, `commit_unresolvable`,
+   *  `commit_conflict`), with the counts
+   *  the upgrade report and a checkout give. Absent on a point scored before the field existed. */
+  commit_distance?: {
+    state: string
+    run_commit: string | null
+    scored_commit: string
+    ported_changes?: number
+    /** outside_distance only: the commits between the two, and the bound (build.MAX_COMMIT_DISTANCE) it passed. */
+    commits_apart?: number
+    max_distance?: number
+    merge_base?: string
+    run_commits?: number
+    scored_commits?: number
+    tags?: string[]
+  }
   build: {
     image: string
     commit: string | null
@@ -220,6 +239,23 @@ export interface ModelNode {
   rows: WorkloadNode[]
 }
 
+/** One ground-truth source with its own measurement dates and pull date (summary schema, groundTruthSource).
+ *  `api` is the InferenceX API feed; `dump` is the frozen database dump `db-dump/<cutoff>`, which holds the rows
+ *  measured before `cutoff`. A source that supplied no unit has no entry, and a date is never invented for it. */
+export interface GroundTruthSource {
+  id: 'api' | 'dump'
+  name: string
+  /** api: the release tag 'api-<pull date>'; dump: 'db-dump/<date>'. */
+  ref: string
+  ref_sha256?: string
+  /** dump only: rows measured before this date are the dump's, on or after it the API feed's. */
+  cutoff?: string
+  measurement_date_from: string | null
+  measurement_date_through: string | null
+  /** When this source was last fetched or verified. */
+  pulled_at: string
+}
+
 export interface Provenance {
   blis: {
     release: string
@@ -234,6 +270,8 @@ export interface Provenance {
     release_tag: string
     measurement_date_through?: string | null
     measurement_sha256: string
+    /** Optional (v3): the same facts per source, so the dump and the API feed each show their own dates. */
+    sources?: GroundTruthSource[]
   }
   evaluator_commit: string
   scorer: string
@@ -290,6 +328,7 @@ export interface NotScoredPoint {
 export interface Figure {
   mape: number | TooFew
   n: number
+  roleKeys?: number
 }
 
 /** v3: the headline over every graded point, and each grade's share and accuracy. */

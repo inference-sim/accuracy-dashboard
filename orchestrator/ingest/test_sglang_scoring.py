@@ -92,7 +92,7 @@ def test_an_sglang_point_with_every_field_accepted_is_graded_by_its_own_engine()
         assert o.fidelity["grade"] == "G2"          # the run's release is the engine's; every single-turn point names the send gap
         docs = list(yaml.safe_load_all(next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()))
         scen, dep = docs[0], docs[1]
-        assert scen["engine"] == {"kind": "sglang", "version": RELEASE} and "engine_version" not in scen
+        assert scen["engine"] == {"kind": "sglang"} and "engine_version" not in scen
         pool = dep["pools"][0]
         assert pool["parallel"]["tp"] == 8
         # What the run asked for is stated under SGLang's own names, and so is a resolved value of a field the engine
@@ -234,8 +234,8 @@ def test_a_vllm_point_is_unchanged_when_sglang_is_scored_too():
         scen = next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()
         import yaml
         assert o.fidelity["simulator"]["engine"] == {"kind": "vllm", "version": "0.31.0"}
-        # the scenario states the engine as engine: {kind, version} (SIM-1), the same pair the fidelity record names
-        assert next(d for d in yaml.safe_load_all(scen) if d and d.get("kind") == "Scenario")["engine"] == {"kind": "vllm", "version": "0.31.0"} and "engine_version" not in scen
+        # the scenario states the engine kind alone (SIM-1); the fidelity record names the release
+        assert next(d for d in yaml.safe_load_all(scen) if d and d.get("kind") == "Scenario")["engine"] == {"kind": "vllm"} and "engine_version" not in scen
     finally:
         shutil.rmtree(tmp)
 
@@ -261,6 +261,79 @@ def test_a_command_is_read_through_blis_sglangs_declarations():
     assert r.values["chunked_prefill_size"] == [4096]
     assert r.values["model_path"] == [None]              # left to the shell: a request with the value the log resolved
     assert r.values["env.SGLANG_X"] == ["1"]
+
+
+def test_a_long_option_is_read_as_the_unique_option_it_abbreviates_exactly_as_argparse_takes_it():
+    # prepare_server_args builds a plain ArgumentParser (allow_abbrev stays True), so `--tp` is accepted as `--tp-size`, the
+    # only option beginning `--tp`; the `=` form and an alias's prefix resolve the same way.
+    decl = ss.load_declarations()
+
+    def read(cmd):
+        return ss.read_launch_command("python3 -m sglang.launch_server " + cmd, decl).values
+
+    assert read("--tp 8")["tp_size"] == [8]
+    assert read("--tp=8")["tp_size"] == [8]
+    assert read("--tensor-parallel 4")["tp_size"] == [4]
+    assert read("--trust-remote")["trust_remote_code"] == [True]
+    assert [float(v) for v in read("--mem-fraction 0.5")["mem_fraction_static"]] == [0.5]
+    # A full spelling is taken as it is although it begins others (`--ep-size`, `--ep-dispatch-algorithm`).
+    assert read("--ep 2")["ep_size"] == [2]
+    assert read("--config c.yaml")["config"] == ["c.yaml"]       # an option of the parser no field declares
+
+
+def test_a_prefix_of_several_options_is_the_ambiguous_option_error_and_is_not_resolved():
+    # argparse refuses `--cuda-graph-max-bs` at 0.5.23: it begins --cuda-graph-max-bs-decode and --cuda-graph-max-bs-prefill.
+    # The launch would not start, so it is never read as either; it stays the flag as spelled, which the release lacks.
+    decl = ss.load_declarations()
+    options = set(ss._flag_map(decl)) | set(ss.PARSER_ONLY_FLAGS)
+    assert ss.resolve_abbreviation("--cuda-graph-max-bs", options) == (
+        None, ["--cuda-graph-max-bs-decode", "--cuda-graph-max-bs-prefill"])
+    r = ss.read_launch_command("python3 -m sglang.launch_server --cuda-graph-max-bs 192 --dp 2", decl)
+    assert r.values["cuda_graph_max_bs"] == [192] and "cuda_graph_max_bs_decode" not in r.values
+    assert r.values["dp_size"] == [2]
+
+
+def test_abbreviation_agrees_with_argparse_on_every_prefix_of_every_declared_option():
+    import argparse
+    import contextlib
+    import io
+
+    decl = ss.load_declarations()
+    options = sorted(set(ss._flag_map(decl)) | set(ss.PARSER_ONLY_FLAGS))
+    parser = argparse.ArgumentParser(prog="sglang serve", add_help=False)
+    for o in options:
+        parser.add_argument(o, dest=o)
+    seen = set(options)
+    for o in options:
+        for n in range(3, len(o) + 1):
+            prefix = o[:n]
+            if prefix in seen:
+                continue
+            seen.add(prefix)
+            want_option, candidates = ss.resolve_abbreviation(prefix, set(options))
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                try:
+                    got = vars(parser.parse_args([prefix, "x"]))
+                    taken = [k for k, v in got.items() if v == "x"]
+                except SystemExit:
+                    taken = None
+            if want_option is None:
+                assert taken is None and "ambiguous option" in err.getvalue(), prefix
+            else:
+                assert taken == [want_option], prefix
+
+
+def test_a_point_whose_command_abbreviates_tp_size_is_scored_as_if_it_spelled_it_in_full():
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        entry, env = _setup(tmp, command=COMMAND.replace("--tp-size 8", "--tp 8"))
+        o, work = _score(tmp, entry, env)
+        assert o.fidelity is not None, o.reasons
+        dep = list(yaml.safe_load_all(next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()))[1]
+        assert dep["pools"][0]["parallel"]["tp"] == 8
+    finally:
+        shutil.rmtree(tmp)
 
 
 # ------------------------------------------------------------------ the pull
@@ -450,6 +523,24 @@ def test_a_flag_an_earlier_release_had_is_read_as_the_field_that_replaced_it_and
         assert sub["kind"] == "resolved_differs" and "cuda_graph_max_bs_decode=192" in sub["detail"]
         dep = list(yaml.safe_load_all(next((work / "single_turn" / entry["point_id"]).glob("p-*.yaml")).read_text()))[1]
         assert dep["pools"][0]["engine"]["cuda_graph_max_bs_decode"] == 192
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_the_old_cuda_graph_flag_with_a_value_left_to_the_shell_is_refused_not_guessed_from_the_log():
+    # v0.5.23 refuses --cuda-graph-max-bs as an ambiguous option (it begins -decode and -prefill), so with no value on the
+    # command there is nothing to translate; the log's printout of the successor is not taken as what the run asked for.
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        fields = [{**_field(f.name, f.status, f.source)} for f in FIELDS.fields.values()] + [_field("cuda_graph_max_bs_decode", "modelled")]
+        fields.sort(key=lambda f: (f["name"], f["source"]))
+        log = LOG.replace("cuda_graph_max_bs=512", "cuda_graph_max_bs_decode=512")
+        entry, env = _setup(tmp, log=log, command=COMMAND + " --cuda-graph-max-bs $CG")
+        env.sglang = sc.EngineKit("sglang", RELEASE, fl.parse(json.dumps(
+            {"kind": "FieldList", "engine": {"kind": "sglang", "version": RELEASE}, "fields": fields}).encode()), "f" * 64,
+            ss.load_declarations())
+        o, _ = _score(tmp, entry, env)
+        assert o.g5 == {"code": "field_not_in_release", "subject": "cuda_graph_max_bs"}
     finally:
         shutil.rmtree(tmp)
 

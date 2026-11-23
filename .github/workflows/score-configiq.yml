@@ -1,0 +1,105 @@
+name: score-configiq
+
+# Scores the configiq anchor units (plan Table W rows 16 and 26; design D9). It is run by hand, and not by the nightly:
+# the configiq ledger is pinned to one dataset revision, and it changes only when that pin is moved on purpose (a
+# manually triggered version bump of the ledger's configiq data), so the same units would be scored again every night
+# for nothing. Run it after the pin moves, after rules.configiq.left_out changes (the D2 join), or for a new simulator
+# release.
+#
+# One run does the whole path on the runner, and nothing is taken from a developer's machine:
+#   1. checks out the harness commit asked for;
+#   2. reads the simulator's stack.json for the blis-substrate commit (catalog, registry, ledger) and the blis-vllm fields.json;
+#   3. fetches the dataset files at the revision the ledger pins, refusing any whose sha256 differs, and exports them;
+#   4. scores every configiq ledger unit less rules.configiq.left_out of ledger.yaml, none withheld (orchestrator/nightly/configiq_night.py);
+#   5. keeps the derived class file (configiq.json) and the funnel (funnel.json) as an artifact.
+#
+# The derived files are then committed by hand from the artifact: configiq.json as data/supplemental/classes/configiq.json and
+# funnel.json as data/supplemental/funnels/configiq.json, beside the work that asked for them; the nightly's classes step and
+# funnel step read those committed files. Both carry the dataset revision they were scored at; when the ledger's pin moves, the
+# nightly leaves the stale Sources row out and warns ("configiq funnel left out", "configiq class file is stale") until both
+# are re-run and committed, so a pin bump cannot pass unnoticed. The dataset is third-party data (X12): it is
+# an artifact of this run, never committed. configiq is anchor-only, and the run fails when a published fit, select or
+# validate list holds a configiq id.
+
+on:
+  workflow_dispatch:
+    inputs:
+      harness_commit:
+        description: "accuracy-dashboard commit to score with (40 hex)"
+        required: true
+      sim:
+        description: "inference-sim release tag (vMAJOR.MINOR.PATCH) or 40-hex commit"
+        required: true
+      label:
+        description: "the run's name, [a-z0-9.-]+ (names the artifact)"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: score-configiq-${{ inputs.label }}
+  cancel-in-progress: false
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 345
+    steps:
+      - name: Check the inputs
+        env:
+          HARNESS_COMMIT: ${{ inputs.harness_commit }}
+          SIM_REF: ${{ inputs.sim }}
+          LABEL: ${{ inputs.label }}
+        run: |
+          set -euo pipefail
+          [[ "$HARNESS_COMMIT" =~ ^[0-9a-f]{40}$ ]] || { echo "harness_commit is not a full 40-hex commit"; exit 2; }
+          [[ "$SIM_REF" =~ ^(v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?|[0-9a-f]{40})$ ]] || { echo "sim is not a release tag or a 40-hex commit"; exit 2; }
+          [[ "$LABEL" =~ ^[a-z0-9.-]+$ ]] || { echo "label is not [a-z0-9.-]+"; exit 2; }
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.harness_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Read the Go release from the pin file
+        id: go
+        run: grep -E '^GO_VERSION=' harness/harness.pin >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: ${{ steps.go.outputs.GO_VERSION }}
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+      - run: pip install --quiet --require-hashes -r requirements-ci.txt -r requirements-configiq.txt
+      - name: Fetch, score and derive
+        env:
+          HARNESS_COMMIT: ${{ inputs.harness_commit }}
+          SIM_REF: ${{ inputs.sim }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$HARNESS_COMMIT"
+          SIM="$RUNNER_TEMP/sim"
+          git clone -q --filter=blob:none https://github.com/inference-sim/inference-sim.git "$SIM"
+          git -C "$SIM" checkout -q "$SIM_REF"
+          ( cd "$SIM" && go build -o blis main.go )
+          eval "$(python3 orchestrator/resolve_stack.py "$SIM")"
+          git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
+          git -C "$RUNNER_TEMP/substrate" checkout -q "$substrate_ref"
+          FIELDS="$RUNNER_TEMP/fields.json"
+          curl -fsSL --retry 3 -o "$FIELDS" \
+            "https://raw.githubusercontent.com/inference-sim/blis-vllm/${vllm_module_ref}/fields.json"
+          python3 orchestrator/nightly/configiq_night.py \
+            --substrate "$RUNNER_TEMP/substrate" --blis "$SIM/blis" \
+            --catalog "$RUNNER_TEMP/substrate/catalog" --registry "$RUNNER_TEMP/substrate/registry" \
+            --fields "$FIELDS" --substrate-version "$substrate_version" --substrate-commit "$substrate_commit" \
+            --sim-build "$SIM_REF" --harness-commit "$HARNESS_COMMIT" --workers 2 --out "$RUNNER_TEMP/configiq"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: configiq-${{ inputs.label }}
+          path: |
+            ${{ runner.temp }}/configiq/classes/configiq.json
+            ${{ runner.temp }}/configiq/funnel.json
+            ${{ runner.temp }}/configiq/score/summary.json
+            ${{ runner.temp }}/configiq/score/configiq-points.jsonl
+          retention-days: 90
+          if-no-files-found: error

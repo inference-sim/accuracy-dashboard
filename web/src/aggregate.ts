@@ -12,7 +12,7 @@
  * child-node means.
  */
 import { TOO_FEW } from './types'
-import type { Fidelity, Metric, MetricBlock, MetricBlockPair, PointNode, Summary, TierKey } from './types'
+import type { Fidelity, LegacyPointIdentity, Metric, MetricBlock, MetricBlockPair, PointIdentity, PointNode, Summary, TierKey, UnitIdentity } from './types'
 
 /** A leaf point flattened out of the tree with its full ancestry, for filtering + regrouping. */
 export interface FlatPoint {
@@ -52,6 +52,28 @@ export interface FlatPoint {
   /** v2: the InferenceX runs this measurement averages, when there was more than one. */
   repeats?: PointNode['repeats']
   fidelity?: Fidelity
+  /** v2 and v3: the point's identity, from which its role key (COV-13) is read. */
+  identity?: PointIdentity
+}
+
+/**
+ * The point's role key (design Table 1.4): one deployment under one benchmark type, however many
+ * concurrencies, dates or runs measured it. A snapshot published before unit ids names the
+ * configuration `recipe`; a v1 point has no identity and its deployment stands in.
+ */
+export function roleKeyOf(p: FlatPoint): string {
+  const id = p.identity
+  if (!id) return `${p.sweepKey}|${p.engineVersion ?? ''}`
+  const unit = id as Partial<UnitIdentity>
+  const legacy = id as Partial<LegacyPointIdentity>
+  return [
+    unit.source ?? 'inferencex', id.model, id.hardware, id.precision, id.framework, id.benchmark_type,
+    unit.configuration_hash ?? legacy.recipe ?? '',
+  ].join('|')
+}
+
+export function countRoleKeys(points: FlatPoint[]): number {
+  return new Set(points.map(roleKeyOf)).size
 }
 
 /** Flatten the whole matrix into leaf points carrying their ancestry. */
@@ -95,6 +117,7 @@ export function flattenPoints(summary: Summary): FlatPoint[] {
               ...(p.sweep_id ? { sweepId: p.sweep_id } : {}),
               ...(p.repeats ? { repeats: p.repeats } : {}),
               ...(p.fidelity ? { fidelity: p.fidelity } : {}),
+              ...(p.identity ? { identity: p.identity } : {}),
             })
           }
         }
@@ -139,31 +162,41 @@ function supersedes(a: FlatPoint, b: FlatPoint): boolean {
   return (a.pointId ?? '') > (b.pointId ?? '')
 }
 
-function meanAbs(values: (number | null)[]): { mean: number | null; n: number } {
+function meanAbs(points: FlatPoint[], pick: (p: FlatPoint) => number | null): { mean: number | null; n: number; keys: number } {
   let acc = 0
   let n = 0
-  for (const v of values) {
+  const keys = new Set<string>()
+  for (const p of points) {
+    const v = pick(p)
     if (v != null && Number.isFinite(v)) {
       acc += Math.abs(v)
       n++
+      keys.add(roleKeyOf(p))
     }
   }
-  return n > 0 ? { mean: acc / n, n } : { mean: null, n: 0 }
+  return n > 0 ? { mean: acc / n, n, keys: keys.size } : { mean: null, n: 0, keys: 0 }
 }
 
 /** A metricBlock recomputed from a flat list of points, for one tier. */
 export function aggregate(points: FlatPoint[], tier: TierKey, minPoints = 0): MetricBlock {
   const scoped = tier === 'measured_or_resolved' ? points.filter((p) => p.tier === 'measured_or_resolved') : points
-  const mapeTtft = meanAbs(scoped.map((p) => p.errTtft))
-  const mapeTpot = meanAbs(scoped.map((p) => p.errTpot))
-  const shapeTtft = meanAbs(scoped.map((p) => p.shapeTtft))
-  const shapeTpot = meanAbs(scoped.map((p) => p.shapeTpot))
-  // v3 (COV-11): a mean over fewer than minPoints points is "too few points", never a number.
-  // minPoints is 0 for v1 and v2, whose figures render as they always have.
-  const fig = (r: { mean: number | null; n: number }) => (r.n > 0 && r.n < minPoints ? TOO_FEW : r.mean)
+  const mapeTtft = meanAbs(scoped, (p) => p.errTtft)
+  const mapeTpot = meanAbs(scoped, (p) => p.errTpot)
+  const shapeTtft = meanAbs(scoped, (p) => p.shapeTtft)
+  const shapeTpot = meanAbs(scoped, (p) => p.shapeTpot)
+  // v3 (COV-11, COV-13): a mean over fewer than minPoints role keys is "too few points", never a
+  // number; many points of one deployment are one role key. minPoints is 0 for v1 and v2, whose
+  // figures render as they always have.
+  const fig = (r: { mean: number | null; keys: number }) => (r.keys > 0 && r.keys < minPoints ? TOO_FEW : r.mean)
   return {
-    mape: { ttft: fig(mapeTtft), tpot: fig(mapeTpot), n: Math.max(mapeTtft.n, mapeTpot.n) },
-    shape: { ttft: fig(shapeTtft), tpot: fig(shapeTpot), n: Math.max(shapeTtft.n, shapeTpot.n) },
+    mape: {
+      ttft: fig(mapeTtft), tpot: fig(mapeTpot), n: Math.max(mapeTtft.n, mapeTpot.n),
+      roleKeys: Math.max(mapeTtft.keys, mapeTpot.keys),
+    },
+    shape: {
+      ttft: fig(shapeTtft), tpot: fig(shapeTpot), n: Math.max(shapeTtft.n, shapeTpot.n),
+      roleKeys: Math.max(shapeTtft.keys, shapeTpot.keys),
+    },
   }
 }
 

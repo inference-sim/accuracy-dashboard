@@ -13,7 +13,11 @@ import { SummaryTable } from './components/SummaryTable'
 import { Dropdown } from './components/Dropdown'
 import { Compare } from './components/Compare'
 import { Headline } from './components/Headline'
+import { Slices } from './components/Slices'
+import { gateHeadline, MIN_ROLE_KEYS } from './slice'
 import { Classes } from './components/Classes'
+import { Sources } from './components/Sources'
+import { FunnelNotPublished, fetchFunnel, shouldFetchFunnel, type FunnelDoc } from './sources'
 import { fetchClasses, shouldFetchClasses, type ClassesDoc } from './classes'
 import { Term } from './components/Term'
 import { GRADE_LABELS, inGrade } from './gradeFilter'
@@ -22,7 +26,7 @@ import type { RunIndex, RunRef } from './load'
 import { DEFAULT_ROUTE, GRADE_FILTERS, parseRoute, routeToHash, type RouteState } from './route'
 import { buildRows } from './tree'
 import { nextSort, sortModelKeys, type SortKey, type SortSpec } from './sort'
-import { isEstimated, type Summary, type TierKey } from './types'
+import { isEstimated, type GroundTruthSource, type Summary, type TierKey } from './types'
 
 interface Picker {
   index: RunIndex | null
@@ -43,6 +47,8 @@ export function App({
   initialHash,
   classes = null,
   classesError = null,
+  funnel = null,
+  funnelError = null,
 }: {
   summary: Summary | null
   /** The second run's snapshot for the A-vs-B compare view; null = single-run mode. */
@@ -55,6 +61,9 @@ export function App({
   /** Test seam: the classes page's data. In the browser it is fetched when the Classes tab opens. */
   classes?: ClassesDoc | null
   classesError?: string | null
+  /** Test seam: the sources page's data (funnel.json). In the browser it is fetched when the Sources tab opens. */
+  funnel?: FunnelDoc | null
+  funnelError?: string | null
 }) {
   const [route, setRoute] = useState<RouteState>(() =>
     parseRoute(hasWindow ? window.location.hash : (initialHash ?? '')),
@@ -63,6 +72,9 @@ export function App({
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const [classesDoc, setClassesDoc] = useState<ClassesDoc | null>(classes)
   const [classesFail, setClassesFail] = useState<string | null>(classesError)
+  const [funnelDoc, setFunnelDoc] = useState<FunnelDoc | null>(funnel)
+  const [funnelFail, setFunnelFail] = useState<string | null>(funnelError)
+  const [funnelMissing, setFunnelMissing] = useState(false)
 
   useEffect(() => {
     if (!hasWindow) return
@@ -82,6 +94,22 @@ export function App({
       live = false
     }
   }, [route.view, classesDoc, classesFail])
+
+  // The sources page's data loads when its tab opens, once, from the same site as the summary.
+  useEffect(() => {
+    if (!shouldFetchFunnel(route.view, funnelDoc, funnelFail, hasWindow)) return
+    let live = true
+    fetchFunnel()
+      .then((doc) => live && setFunnelDoc(doc))
+      .catch((e: Error) => {
+        if (!live) return
+        setFunnelMissing(e instanceof FunnelNotPublished)
+        setFunnelFail(e.message)
+      })
+    return () => {
+      live = false
+    }
+  }, [route.view, funnelDoc, funnelFail])
 
   const update = (next: Partial<RouteState>) => {
     const merged = { ...route, ...next }
@@ -115,6 +143,17 @@ export function App({
       <Shell view="classes" onView={(view) => update({ view, runB: null, run: null, sel: null })}>
         <ErrorBoundary resetKey={classesDoc?.generated_at ?? null}>
           <Classes doc={classesDoc} error={classesFail} />
+        </ErrorBoundary>
+      </Shell>
+    )
+  }
+
+  // The sources page reads funnel.json only, so it shows even while the summary is still loading.
+  if (route.view === 'sources') {
+    return (
+      <Shell view="sources" onView={(view) => update({ view, runB: null, run: null, sel: null })}>
+        <ErrorBoundary resetKey={null}>
+          <Sources doc={funnelDoc} error={funnelFail} notPublished={funnelMissing} />
         </ErrorBoundary>
       </Shell>
     )
@@ -182,8 +221,8 @@ function Shell({
   onView,
   children,
 }: {
-  view: 'overview' | 'classes' | 'dev'
-  onView: (v: 'overview' | 'classes' | 'dev') => void
+  view: 'overview' | 'classes' | 'sources' | 'dev'
+  onView: (v: 'overview' | 'classes' | 'sources' | 'dev') => void
   children: React.ReactNode
 }) {
   return (
@@ -194,6 +233,9 @@ function Shell({
         </button>
         <button type="button" className={`tab${view === 'classes' ? ' on' : ''}`} onClick={() => onView('classes')}>
           Classes
+        </button>
+        <button type="button" className={`tab${view === 'sources' ? ' on' : ''}`} onClick={() => onView('sources')}>
+          Sources
         </button>
         <button type="button" className={`tab${view === 'dev' ? ' on' : ''}`} onClick={() => onView('dev')}>
           For developers
@@ -236,6 +278,11 @@ function Overview({
   // Every aggregate is recomputed over the points it keeps, so the table, the points and the
   // counts agree with the grades the control names.
   const inTier = (p: FlatPoint) => inGrade(p, route.grade)
+  // The slices are cut from the same points as the table (grade and multi-node filters), before the drilled-in slice narrows them.
+  const sliceable = useMemo(
+    () => applyFilters(allPoints, { ...route, by: null, sv: null }).filter(inTier),
+    [allPoints, route],
+  )
   const noneAtGrade = route.grade !== 'all' && visible.length > 0 && !visible.some(inTier)
 
   // The headline always describes the full latest run under the default view (every scored
@@ -296,6 +343,7 @@ function Overview({
   const selMissing = route.sel != null && selectedPoints.length === 0
 
   const cov = summary.coverage
+  const minRoleKeys = summary.min_points ?? MIN_ROLE_KEYS
 
   return (
     <>
@@ -314,9 +362,22 @@ function Overview({
         dataDate={summary.provenance?.ground_truth?.release_tag?.replace(/^db-dump\//, '') ?? null}
         measuredRange={measuredRange(headlinePoints)}
         pulledAt={summary.provenance?.pulled_at ?? null}
+        sources={summary.provenance?.ground_truth?.sources ?? null}
         split={summary.schema_version === 2 ? headlineSplit : null}
-        graded={summary.headline ?? null}
+        graded={summary.headline ? gateHeadline(summary.headline, headlinePoints, summary.min_points ?? MIN_ROLE_KEYS) : null}
       />
+
+      {summary.schema_version === 3 && (
+        <Slices
+          points={sliceable}
+          by={route.by}
+          sv={route.sv}
+          min={minRoleKeys}
+          notScored={summary.not_scored ?? []}
+          onBy={(by) => update({ by, sv: null, sel: null })}
+          onSv={(sv) => update({ sv, sel: null })}
+        />
+      )}
 
       <h2 className="sectitle">Accuracy by model</h2>
       {/* Filters sit beside the table they change; the headline above ignores them (PR #26 review). */}
@@ -345,7 +406,12 @@ function Overview({
         expanded={expanded}
       />
 
-      <PointsTable points={selectedPoints} title={pointsTitle} selMissing={selMissing} />
+      <PointsTable
+        points={selectedPoints}
+        title={pointsTitle}
+        selMissing={selMissing}
+        minRoleKeys={summary.schema_version === 3 ? minRoleKeys : undefined}
+      />
 
       {/* Every number on this page, per point, with what each one was compared against. */}
       <a className="dl" href="data/latest/summary.json" download="blis-accuracy-results.json">
@@ -431,9 +497,10 @@ function RunProvenance({ summary }: { summary: Summary }) {
   const gt = p.ground_truth ?? ({} as Partial<NonNullable<typeof p.ground_truth>>)
   const dash = (s: string | null | undefined, fn: (v: string) => string = (v) => v) => (s ? fn(s) : '—')
   const range = measuredRange(flattenPoints(summary))
-  // Each identifier links to exactly what was run, so nobody has to hunt for the release or
-  // commit by hand (PR #26 review). Missing values stay a plain em dash, never a dead link.
-  const gh = 'https://github.com/inference-sim'
+  // Only identifiers whose page exists are links: a release tag (vX.Y.Z; a build by commit has no release page, its "release"
+  // is the commit), the commit, the InferenceX site and a dump's release page. The catalog, kernel and registry repositories
+  // are not published, so those stay text. A missing value is a plain em dash, never a dead link.
+  const gh = 'https://github.com/inference-sim/inference-sim'
   const link = (text: string, href: string | null) =>
     href ? (
       <a href={href} target="_blank" rel="noreferrer">
@@ -442,47 +509,52 @@ function RunProvenance({ summary }: { summary: Summary }) {
     ) : (
       text
     )
-  const kernel = b.extractor_version?.replace(/^.*@/, '') ?? null
+  // The kernel row names a released kernel. A build the extractor could not name ("...@unknown", which
+  // is every build by commit) has no kernel to show, and "unknown" says nothing: no row then.
+  const kernelRaw = b.extractor_version?.replace(/^.*@/, '') ?? null
+  const kernel = kernelRaw && kernelRaw.toLowerCase() !== 'unknown' ? kernelRaw : null
   return (
     <>
       <div className="seclabel">BLIS release (CI-resolved)</div>
       <span className="pill">
-        {b.release ? link(b.release, `${gh}/inference-sim/releases/tag/${encodeURIComponent(b.release)}`) : '—'}
+        {b.release ? link(b.release, /^v\d/.test(b.release) ? `${gh}/releases/tag/${encodeURIComponent(b.release)}` : null) : '—'}
       </span>
       <div className="kv" style={{ marginTop: 10 }}>
         <span className="k">commit</span>
         <span className="v">
-          {b.commit_sha ? link(`${b.commit_sha.slice(0, 7)}…`, `${gh}/inference-sim/commit/${b.commit_sha}`) : '—'}
+          {b.commit_sha ? link(`${b.commit_sha.slice(0, 7)}…`, `${gh}/commit/${b.commit_sha}`) : '—'}
         </span>
       </div>
       <div className="kv">
         <span className="k">catalog</span>
         <span className="v">
-          {b.catalog ? link(b.catalog, `${gh}/blis-catalog/tree/${encodeURIComponent(b.catalog)}`) : '—'}
+          {b.catalog ?? '—'}
         </span>
       </div>
-      <div className="kv">
-        <span className="k">kernel</span>
-        <span className="v">
-          {kernel ? link(kernel, `${gh}/blis-latency-kernel/releases/tag/${encodeURIComponent(kernel)}`) : '—'}
-        </span>
-      </div>
+      {kernel ? (
+        <div className="kv">
+          <span className="k">kernel</span>
+          <span className="v">{kernel}</span>
+        </div>
+      ) : null}
       <div className="kv">
         <span className="k">registry</span>
         <span className="v">
-          {b.registry ? link(b.registry, `${gh}/blis-registry/releases/tag/${encodeURIComponent(b.registry)}`) : '—'}
+          {b.registry ?? '—'}
         </span>
       </div>
       <div className="seclabel">Ground truth</div>
       <div className="kv">
         <span className="k">source</span>
-        <span className="v">
-          {p.ingest === 'api' ? link('InferenceX', INFERENCEX_SITE) : 'InferenceX'}
-        </span>
+        <span className="v">{p.ingest === 'api' ? link('InferenceX', INFERENCEX_SITE) : 'InferenceX'}</span>
       </div>
       {p.ingest === 'api' ? (
         // v2: the data is a pull of the live API, not a dump. When it was pulled, and the span of
         // measurement dates it holds, are two different things, so each gets its own label.
+        // With provenance.ground_truth.sources, each source lists its own dates and its own pull date.
+        gt.sources?.length ? (
+          <SourceRows sources={gt.sources} />
+        ) : (
         <>
           <div className="kv">
             <span className="k">API pull date</span>
@@ -501,6 +573,7 @@ function RunProvenance({ summary }: { summary: Summary }) {
             <span className="v">{dash(gt.measurement_sha256, (v) => `${v.slice(0, 8)}…`)}</span>
           </div>
         </>
+        )
       ) : (
         <>
           <div className="kv">
@@ -537,8 +610,50 @@ function RunProvenance({ summary }: { summary: Summary }) {
   )
 }
 
-/** The public InferenceX site the API ingest pulls from (its API root isn't a page to visit). */
-const INFERENCEX_SITE = 'https://inferencex.semianalysis.com/'
+const utc = (t: string) => `${t.slice(0, 10)} ${t.slice(11, 16)} UTC`
+
+/** Each ground-truth source with its own measurement dates and its own pull date, the dump's cutoff beside it. */
+function SourceRows({ sources }: { sources: GroundTruthSource[] }) {
+  return (
+    <>
+      {sources.map((x) => (
+        <div className="gt-source" key={x.id} data-source={x.id}>
+          <div className="gt-source-name">{x.id === 'dump' ? 'InferenceX database dump' : 'InferenceX API feed'}</div>
+          <div className="kv">
+            <span className="k">{x.id === 'dump' ? 'dump' : 'release'}</span>
+            <span className="v">{x.ref.replace(/^db-dump\//, '')}</span>
+          </div>
+          {x.cutoff && (
+            <div className="kv">
+              <span className="k">cutoff</span>
+              <span className="v" title="Rows measured before this date come from the dump, the rest from the API feed">
+                before {x.cutoff}
+              </span>
+            </div>
+          )}
+          <div className="kv">
+            <span className="k">{x.id === 'dump' ? 'dump pull date' : 'API pull date'}</span>
+            <span className="v">{x.pulled_at ? utc(x.pulled_at) : '—'}</span>
+          </div>
+          <div className="kv">
+            <span className="k">data range</span>
+            <span className="v">
+              {!x.measurement_date_from || !x.measurement_date_through
+                ? '—'
+                : x.measurement_date_from === x.measurement_date_through
+                  ? x.measurement_date_through
+                  : `${x.measurement_date_from} to ${x.measurement_date_through}`}
+            </span>
+          </div>
+          <div className="kv">
+            <span className="k">{x.id === 'dump' ? 'sha256' : 'pull sha256'}</span>
+            <span className="v">{x.ref_sha256 ? `${x.ref_sha256.slice(0, 8)}…` : '—'}</span>
+          </div>
+        </div>
+      ))}
+    </>
+  )
+}
 
 /**
  * A picker option's label: date · BLIS release · ingest. The ingest tag (· API / · dump) is what
@@ -550,6 +665,9 @@ function runLabel(r: RunRef): string {
   const ingest = (r.ingest ?? 'db-dump') === 'api' ? 'API' : 'dump'
   return `${r.snapshot_id.slice(0, 10)} · ${r.blis_release ?? '?'} · ${ingest}`
 }
+
+/** The public InferenceX site the API ingest pulls from (its API root isn't a page to visit). */
+const INFERENCEX_SITE = 'https://inferencex.semianalysis.com/'
 
 /** source_url comes from the data file, so only an http(s) URL becomes a link. */
 function safeUrl(u: string | null | undefined): string | null {

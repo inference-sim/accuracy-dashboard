@@ -39,6 +39,7 @@
         "id": {"type": "string"}, "label": {"type": "string"},
         "kind": {"enum": ["regular", "reconstructed", "provisional"]},
         "interim": {"type": "boolean", "description": "true while the file is from a census that is not the final one"},
+        "anchor": {"type": "boolean", "description": "true for an anchor-only source (configiq, D9): every unit is an anchor unit. A fact separate from kind: kind provisional says the class is outside the headline (COV-7)"},
         "note": {"type": "string"},
         "counts": {"$ref": "#/definitions/counts"},
         "grades": {

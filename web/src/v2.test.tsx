@@ -149,6 +149,18 @@ describe('dates are labelled for what they are', () => {
     expect(html).not.toContain('InferenceX data from')
   })
 
+  it('the run details name the kernel release when there is one and omit the row for a build the extractor could not name', () => {
+    const named = render(<App summary={v2a()} loadError={null} initialHash="#/?tier=all" />).html
+    expect(named).toContain('>kernel<')
+    expect(named).toContain('>v0.3.0<')
+    const s = v2a()
+    s.provenance.blis.extractor_version = 'blis-latency-kernel@unknown'
+    const unnamed = render(<App summary={s} loadError={null} initialHash="#/?tier=all" />).html
+    expect(unnamed).not.toContain('>kernel<')
+    expect(unnamed).not.toContain('unknown')
+    expect(unnamed).toContain('>registry<')
+  })
+
   it('the run details say API pull date / data range, not dump / through', () => {
     const { html } = render(<App summary={v2a()} loadError={null} initialHash="#/?tier=all" />)
     expect(html).toContain('>API pull date<')
@@ -273,12 +285,11 @@ describe('the results download', () => {
   })
 })
 
-describe('run details link InferenceX itself, not its API root', () => {
-  it('source links the InferenceX site; the API pull date is plain text', () => {
+describe('run details show the source and the API pull date', () => {
+  it('links the InferenceX site, never the API root', () => {
     const html = renderToStaticMarkup(<App summary={v2a()} loadError={null} />)
     const about = html.slice(html.indexOf('class="about-prov"'))
     expect(about).toContain('href="https://inferencex.semianalysis.com/"')
-    expect(about).toContain('>InferenceX</a>')
     expect(html).not.toContain('inferencex.semianalysis.com/api')
     expect(about).toMatch(/API pull date<\/span><span class="v">2026-10-23 00:00 UTC<\/span>/)
   })

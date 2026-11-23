@@ -1,0 +1,230 @@
+{
+ "cut_points": {
+  "checked": true,
+  "discrepancies": [
+   {
+    "code": "configiq_cut_points_not_anchor_only",
+    "source": "configiq",
+    "text": "ledger.yaml gives configiq the roles fit, select, validate, held, anchor; D9 makes every unit an anchor."
+   }
+  ]
+ },
+ "format": "funnel-2",
+ "funnels": {
+  "configiq": {
+   "anchor_rule": "every unit (plan: anchor-only), less the units the D2 join found read under a training role; none is fit, selected, validated, held or withheld as a test split",
+   "blockers": [
+    {
+     "reason": "value_not_recorded",
+     "stage": "g5",
+     "units": 1
+    },
+    {
+     "reason": "no_result_in_this_run",
+     "stage": "no_outcome",
+     "units": 1
+    }
+   ],
+   "excluded": {},
+   "failed": {},
+   "g5": {
+    "value_not_recorded": 1
+   },
+   "left_out_rows": {},
+   "no_outcome": {
+    "no_result_in_this_run": 1
+   },
+   "not_anchor": {
+    "left_out_by_partition_prep": 0
+   },
+   "not_recovered": {
+    "value_not_recorded: engine max_num_seqs": 1
+   },
+   "provisional": {
+    "by_grade": {
+     "G3": 1
+    },
+    "units": 1
+   },
+   "role": "anchor",
+   "scored_by_grade": {
+    "G1": 0,
+    "G2": 0,
+    "G3": 0,
+    "G4": 0
+   },
+   "source": "configiq",
+   "stages": {
+    "in_scope": 3,
+    "recoverable": 1,
+    "rows_held": 1,
+    "scored": 0,
+    "units": 3
+   },
+   "unresolved": {
+    "unit_ids": [
+     "a"
+    ],
+    "units": 1
+   },
+   "withheld": {}
+  },
+  "inferencex": {
+   "anchor_rule": "the published anchor list (role anchor); held units judge pre-registered changes and are never reported",
+   "blockers": [
+    {
+     "reason": "engine_unsupported",
+     "stage": "g5",
+     "units": 1
+    },
+    {
+     "reason": "field_unclassified",
+     "stage": "g5",
+     "units": 1
+    },
+    {
+     "reason": "row_differs",
+     "stage": "g5",
+     "units": 1
+    }
+   ],
+   "excluded": {},
+   "failed": {},
+   "g5": {
+    "engine_unsupported": 1,
+    "field_unclassified": 1,
+    "row_differs": 1
+   },
+   "lanes": {
+    "other": {
+     "excluded": {},
+     "failed": {},
+     "g5": {
+      "engine_unsupported": 1
+     },
+     "no_outcome": {},
+     "provisional": {
+      "by_grade": {},
+      "units": 0
+     },
+     "scored_by_grade": {
+      "G1": 0,
+      "G2": 0,
+      "G3": 0,
+      "G4": 0
+     },
+     "stages": {
+      "in_scope": 1,
+      "recoverable": null,
+      "rows_held": 0,
+      "scored": 0,
+      "units": 1
+     }
+    },
+    "sglang": {
+     "excluded": {},
+     "failed": {},
+     "g5": {
+      "field_unclassified": 1
+     },
+     "no_outcome": {},
+     "provisional": {
+      "by_grade": {},
+      "units": 0
+     },
+     "scored_by_grade": {
+      "G1": 0,
+      "G2": 0,
+      "G3": 0,
+      "G4": 1
+     },
+     "stages": {
+      "in_scope": 2,
+      "recoverable": null,
+      "rows_held": 0,
+      "scored": 1,
+      "units": 2
+     }
+    },
+    "vllm": {
+     "excluded": {},
+     "failed": {},
+     "g5": {
+      "row_differs": 1
+     },
+     "no_outcome": {},
+     "provisional": {
+      "by_grade": {},
+      "units": 0
+     },
+     "scored_by_grade": {
+      "G1": 0,
+      "G2": 0,
+      "G3": 1,
+      "G4": 1
+     },
+     "stages": {
+      "in_scope": 3,
+      "recoverable": null,
+      "rows_held": 0,
+      "scored": 2,
+      "units": 3
+     }
+    }
+   },
+   "left_out_rows": {},
+   "no_outcome": {},
+   "not_anchor": {
+    "not_in_the_anchor_list": 0
+   },
+   "not_recovered": {},
+   "provisional": {
+    "by_grade": {},
+    "units": 0
+   },
+   "role": "anchor",
+   "scored_by_grade": {
+    "G1": 0,
+    "G2": 0,
+    "G3": 1,
+    "G4": 2
+   },
+   "source": "inferencex",
+   "stages": {
+    "in_scope": 6,
+    "recoverable": null,
+    "rows_held": 8,
+    "scored": 3,
+    "units": 6
+   },
+   "unresolved": {
+    "unit_ids": [],
+    "units": 0
+   },
+   "withheld": {}
+  }
+ },
+ "meaning": "No unit is dropped for its date. Recoverable is a floor (recoverable.py), so a unit can be scored without being counted recoverable; unresolved counts the recoverable units that are neither scored nor G5. A provisional unit (capped at G3) is outside scored.",
+ "problems": [],
+ "scored": {
+  "configiq": 0,
+  "inferencex": 3
+ },
+ "training": {
+  "vllm-ci-perf": {
+   "diagnostic": null,
+   "duplicates": 1,
+   "label": "training only: never accuracy; a diagnostic of the fit, labelled as such",
+   "left_out_rows": {
+    "no_commit_in_image": 2
+   },
+   "merged_records": 2,
+   "role": "training-only",
+   "source": "vllm-ci-perf",
+   "stages": {
+    "rows_held": 10,
+    "units": 4
+   }
+  }
+ }
+}

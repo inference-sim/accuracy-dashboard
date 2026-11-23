@@ -1,4 +1,4 @@
-"""configiq points scored by simulation (configiq_score.py; design §10.1-10.3, §11, COV-7, COV-10, COV-11, D7).
+"""configiq points scored by simulation (configiq_score.py; design §10.1-10.3, §11, COV-7, COV-10, COV-11, D9).
 
 Every dataset row here is synthetic (X12). The simulator is a fake `blis` that answers `replay` with one Result of
 per-request rows (test_score_e2e.FAKE_BLIS): what is asserted is what the scorer asked of it and what it made of the
@@ -9,6 +9,7 @@ Run: python3 -m pytest orchestrator/ingest/test_configiq_score.py
 """
 import csv
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -41,7 +42,7 @@ def prow(**set_):
     return cols
 
 
-def setup(tmp_path, rows: dict, *, fake=None, models=None, chips=None, engine_release="0.33.0", config=True):
+def setup(tmp_path, rows: dict, *, fake=None, models=None, chips=None, engine_release="0.33.0", config=True, withhold=()):
     """Points from a synthetic ledger and an Env whose simulator is the fake blis."""
     lg = cq.load(*tc.ledger_files(tmp_path, rows))
     pts = cq.points(lg, rows, CATALOG)
@@ -55,7 +56,7 @@ def setup(tmp_path, rows: dict, *, fake=None, models=None, chips=None, engine_re
     blis = fake or e2e._fake_blis(tmp_path)
     env = cs.Env(blis=blis, catalog=cat_root, registry=tmp_path / "registry", catalog_release="v0.15.0",
                  registry_release="v0.15.0", engine_release=engine_release, sim_build="v0.18.0",
-                 harness_commit="c" * 40)
+                 harness_commit="c" * 40, withhold_splits=withhold)
     env.catalog_obj = e2e._catalog(tmp_path, models or {MODEL: "gpt-oss-120b"}, chips or {"b200": (None, None)}, {})
     env.parts = set(chips or {"b200"})
     return pts, env
@@ -89,7 +90,7 @@ def test_a_launcher_consistent_row_is_replayed_as_the_dataset_records_it_and_sco
     text = (Path(argv[argv.index("--scenarios") + 1]) / argv[argv.index("--scenario") + 1]).read_text()
     scen, dep = list(yaml.safe_load_all(text))
     assert scen["model"] == "gpt-oss-120b" and scen["cluster"]["hardware"] == "b200"
-    assert scen["engine"] == {"kind": "vllm", "version": "0.33.0"}
+    assert scen["engine"] == {"kind": "vllm"}
     pool = dep["pools"][0]
     assert pool["parallel"] == {"dp": 1, "pp": 1, "tp": 1}
     assert pool["engine"]["gpu_memory_utilization"] == 0.92 and pool["engine"]["enable_prefix_caching"] is True
@@ -208,7 +209,7 @@ def test_a_simulator_that_cannot_resolve_the_window_makes_the_point_a_named_g5_n
 def test_a_row_that_states_its_max_seq_len_needs_no_config_and_names_no_estimate(tmp_path):
     # The preset passes none, so a stated length makes the launch inconsistent; the scenario writer still honours it.
     pts, env = setup(tmp_path, {f"{F}:0": prow(max_seq_len="8192")}, config=False)
-    sc = cs.build(pts[0], model="gpt-oss-120b", chip="b200", engine_release="0.33.0",
+    sc = cs.build(pts[0], model="gpt-oss-120b", chip="b200",
                   packaging={"gpus_per_node": 8, "gpus_per_rack": None})
     dep = list(yaml.safe_load_all(sc.text))[1]
     assert dep["pools"][0]["engine"]["max_model_len"] == 8192
@@ -217,7 +218,7 @@ def test_a_row_that_states_its_max_seq_len_needs_no_config_and_names_no_estimate
 
 def test_a_chip_whose_catalog_entry_fixes_the_node_size_is_not_given_an_assumed_one(tmp_path):
     pts, _ = setup(tmp_path, {f"{F}:0": prow()})
-    sc = cs.build(pts[0], model="gpt-oss-120b", chip="gb200-nvl72", engine_release="0.33.0",
+    sc = cs.build(pts[0], model="gpt-oss-120b", chip="gb200-nvl72",
                   packaging={"gpus_per_node": 4, "gpus_per_rack": 72}, context=131072)
     scen = list(yaml.safe_load_all(sc.text))[0]
     assert "gpus_per_node" not in scen["cluster"] and "cluster.gpus_per_node" not in {s["subject"] for s in sc.substitutions}
@@ -234,14 +235,27 @@ def _test_split_rows():
     return out
 
 
-def test_a_point_on_the_test_split_is_withheld_not_simulated_and_its_figures_are_not_in_its_record(tmp_path):
+def test_a_point_on_the_dev_splits_test_set_is_scored_like_any_other_because_configiq_is_anchor_only(tmp_path):
+    """D9: every configiq unit is an anchor unit. The dashboard's development split (D7) is a label on the record, never a
+    reason to withhold; a unit is not fit, selected, validated, held or kept back as a test set."""
     isl = _test_split_rows()["test"]
     _, outs, env = run(tmp_path, {f"{F}:0": prow(isl=float(isl))})
     (o,) = outs
-    assert o.split == "test" and o.status == "withheld" and replays(env) == []
+    assert o.split == "test" and o.status == "scored" and len(replays(env)) == 1
+    r = cs.record(o)
+    assert r["measured"] is not None and r["split"] == "test" and r["provisional"] is True and r["grade"] in ("G3", "G4")
+    assert cs.figures(outs)["points"] == 1                       # and it is in the error figures
+
+
+def test_withholding_a_split_is_an_opt_in_of_a_local_experiment_and_never_the_default(tmp_path):
+    isl = _test_split_rows()["test"]
+    _, outs, env = run(tmp_path, {f"{F}:0": prow(isl=float(isl))}, withhold=("test",))
+    (o,) = outs
+    assert o.status == "withheld" and replays(env) == []
     r = cs.record(o)
     assert r["measured"] is None and r["whole_runs"] == [] and r["turn_slices"] == []
-    assert r["grade"] is None and r["provisional"] is True      # awaiting evaluation, in the provisional band
+    assert r["grade"] is None and r["provisional"] is True
+    assert cs.Env.__dataclass_fields__["withhold_splits"].default == ()
 
 
 def test_one_sweep_and_its_remeasurements_are_on_one_split():
@@ -298,7 +312,7 @@ def test_coverage_counts_what_ran_what_was_refused_by_reason_and_what_was_withhe
             f"{F}:1": prow(isl=float(t["train"]), concurrency=8.0),      # scored (same sweep)
             f"{F}:2": prow(backend="trtllm", isl=float(t["train"])),     # refused: engine
             f"{F}:3": prow(isl=float(t["test"]))}                        # withheld
-    _, outs, _ = run(tmp_path, rows)
+    _, outs, _ = run(tmp_path, rows, withhold=("test",))          # the opt-in: D9 withholds none by default
     c = cs.coverage(outs)
     assert (c["points"], c["scored"], c["refused"], c["withheld"], c["failed"]) == (4, 2, 1, 1, 0)
     assert c["runnable"] == 3 and c["runnable_share"] == 0.75
@@ -415,17 +429,41 @@ def test_the_command_turns_a_configiq_dataset_row_into_a_scored_point_and_refuse
     out = tmp_path / "out"
     recs = {r["identity"]["concurrency"] + (1000 if r["identity"]["isl"] == t["test"] else 0): r
             for r in map(json.loads, (out / "configiq-points.jsonl").read_text().splitlines())}
-    scored, engine, launch, withheld = recs[4], recs[8], recs[16], recs[1004]
+    scored, engine, launch, on_test = recs[4], recs[8], recs[16], recs[1004]
     assert scored["status"] == "scored" and scored["grade"] in ("G3", "G4") and scored["provisional"] is True
     assert scored["errors_pct"]["ttft_mean"] == pytest.approx((FAKE_TTFT_MS - 200.0) / 200.0 * 100)
     assert engine["g5_reason"]["code"] == "engine_unsupported" and "trtllm" in engine["g5_reason"]["subject"]
     assert launch["g5_reason"]["code"] == "value_not_recorded" and "tensor parallel size 4" in launch["g5_reason"]["subject"]
-    assert withheld["status"] == "withheld" and withheld["measured"] is None
+    assert on_test["status"] == "scored" and on_test["measured"] is not None     # D9: no unit is withheld as a test split
     doc = json.loads((out / "summary.json").read_text())
     c = doc["coverage"]
-    assert (c["points"], c["scored"], c["refused"], c["withheld"]) == (4, 1, 2, 1) and doc["problems"] == []
-    assert doc["provenance"]["simulator"]["build"] == "v0.18.0" and doc["provenance"]["split"]["withheld"] == ["test"]
-    assert len(list(csv.DictReader((out / "points.csv").open()))) == 1
+    assert (c["points"], c["scored"], c["refused"], c["withheld"]) == (4, 2, 2, 0) and doc["problems"] == []
+    assert doc["provenance"]["simulator"]["build"] == "v0.18.0" and doc["provenance"]["split"]["withheld"] == []
+    assert len(list(csv.DictReader((out / "points.csv").open()))) == 2
+
+
+def test_the_command_scores_every_unit_less_the_left_out_list_and_can_withhold_a_split_only_on_request(tmp_path):
+    import score_configiq as cmd
+    import yaml
+    t = _test_split_rows()
+    rows = {f"{F}:0": prow(isl=float(t["train"])), f"{F}:1": prow(isl=float(t["train"]), concurrency=8.0)}
+    args = _command_fixture(tmp_path, rows)
+    assert cmd.main(args) == 0
+    out = tmp_path / "out"
+    pts = [json.loads(x) for x in (out / "configiq-points.jsonl").read_text().splitlines()]
+    gone = next(r["point_id"] for r in pts if r["identity"]["concurrency"] == 8.0)
+    ly = tmp_path / "ledger.yaml"
+    ly.write_text(yaml.safe_dump({"kind": "Ledger", "rules": {"configiq": {"cut_points": [], "left_out": [gone]}}}))
+    shutil.rmtree(out)
+    assert cmd.main(args + ["--ledger-yaml", str(ly)]) == 0
+    kept = [json.loads(x)["point_id"] for x in (out / "configiq-points.jsonl").read_text().splitlines()]
+    assert gone not in kept and len(kept) == 1                                   # left out: not scored, not made an anchor
+    ly.write_text(yaml.safe_dump({"kind": "Ledger", "rules": {"configiq": {"left_out": ["f" * 64]}}}))
+    shutil.rmtree(out)
+    assert cmd.main(args + ["--ledger-yaml", str(ly)]) == 2                      # a left-out id the ledger does not hold
+    shutil.rmtree(out, ignore_errors=True)
+    assert cmd.main(args + ["--withhold-split", "test"]) == 0
+    assert json.loads((out / "summary.json").read_text())["provenance"]["split"]["withheld"] == ["test"]
 
 
 def test_the_command_refuses_a_simulator_checkout_that_is_not_at_the_named_build(tmp_path):

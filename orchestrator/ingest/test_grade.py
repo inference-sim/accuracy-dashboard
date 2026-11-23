@@ -163,3 +163,30 @@ def test_a_substitution_names_the_keys_of_its_kind_and_no_others():
         with pytest.raises(g.GradeError):
             _g([bad])
     assert _g([{"kind": "resolved_differs", "subject": "block_size", "detail": "the run resolved 32"}]).grade == "G2"
+
+
+A, B = "a" * 40, "b" * 40
+
+
+def test_the_run_on_the_scored_commit_is_graded_without_asking_for_a_distance():
+    def never(*_):
+        raise AssertionError("the distance is asked only between two commits")
+    assert g.grade_by_commit(run_commit=A, scored_commit=A, distance=never, substitutions=[]).grade == g.G1
+    assert g.grade_by_commit(run_commit=A, scored_commit=A, distance=never, substitutions=[EST]).grade == g.G2
+
+
+def test_another_commit_is_g3_when_no_ported_function_differs_and_g4_when_one_does_or_no_diff_is_published():
+    asked = []
+
+    def distance(run, scored):
+        asked.append((run, scored))
+        return {A: [], B: ["Scheduler.schedule"]}.get(run)
+
+    three = g.grade_by_commit(run_commit=A, scored_commit="c" * 40, distance=distance, substitutions=[])
+    assert three.grade == g.G3 and [s["kind"] for s in three.substitutions] == ["other_release"]
+    four = g.grade_by_commit(run_commit=B, scored_commit="c" * 40, distance=distance, substitutions=[])
+    assert four.grade == g.G4 and any(s["kind"] == "changed_functions" and "Scheduler.schedule" in s["detail"]
+                                      for s in four.substitutions)
+    none = g.grade_by_commit(run_commit="d" * 40, scored_commit="c" * 40, distance=distance, substitutions=[])
+    assert none.grade == g.G4 and any(s["kind"] == "ported_functions_unpublished" for s in none.substitutions)
+    assert asked == [(A, "c" * 40), (B, "c" * 40), ("d" * 40, "c" * 40)]

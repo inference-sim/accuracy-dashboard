@@ -2,7 +2,7 @@ name: api-nightly
 
 # The API-ingest nightly pipeline (Discussion #15, revised 2026-10-25: the no-storage design).
 # Replaces the db-dump nightly (nightly.yml): instead of restoring a ~323 GB Postgres dump, it
-# pulls the live InferenceX API, scores the anchor units of the 180-day window (COV-2) with the
+# pulls the live InferenceX API, scores every anchor unit, with no age limit (COV-2), with the
 # resolved BLIS release, and publishes summary v3 `api` snapshots. NOTHING RAW IS PERSISTED -- no ix-store branch, no committed logs;
 # the work dir is ephemeral and summary.json IS the score store (an IX-only night merges the delta
 # into the published summary). Only the agentic artifact downloads are cached, via actions/cache
@@ -21,6 +21,12 @@ name: api-nightly
 #     release is listed when its scores are published, and the list never shrinks when old
 #     snapshots are pruned.
 # A no-op night (neither trigger) writes nothing and the last good view stands.
+#
+# The database-dump lane (plan row 12): the anchor units the frozen dump `db-dump/2026-09-28` supplies are scored in the same
+# night, by the same BLIS release and harness commit, from the anchor extract (cached by dump revision + extract sha256, else
+# one streaming pass over the pinned parts). The API lane leaves those units alone. The headline publishes only if both lanes
+# were scored on one release and one harness commit; if the dump lane fails, nothing publishes and the last good night stands.
+# The dump lane's RESULTS (never its data) are kept in state/dump/ and committed with the rest of state/.
 on:
   schedule:
     - cron: "43 4 * * *" # nightly, off :00
@@ -37,6 +43,28 @@ on:
         description: "Validate and print what would be published, and publish nothing"
         type: boolean
         default: false
+      # The dump lane reuses its last result when the BLIS release, harness commit, catalog and registry versions and the dump
+      # revision are all the same as that result's (orchestrator/ingest/dump_lane.py); this scores it again regardless.
+      force_dump:
+        description: "Score the database-dump lane again even if its last result is current"
+        type: boolean
+        default: false
+      # A PRE-RELEASE PREVIEW: score this one full inference-sim commit (40 hex) instead of the oldest unscored stable
+      # release, from the branch the run is dispatched on. Meant for a scratch branch: the run commits data/ and state/ there
+      # and does NOT deploy Pages or start another run, and the build is recorded by its commit, never listed in
+      # state/scored-releases.json. Empty (the schedule and every normal dispatch): nothing changes.
+      sim_commit:
+        description: "Score this inference-sim commit (40 hex) as a pre-release preview; empty scores the stable releases"
+        type: string
+        default: ""
+      # A STOP-GAP for a pre-release preview only (needs sim_commit): also score the configiq anchor units with that same build
+      # (orchestrator/nightly/configiq_night.py, as score-configiq.yml does) and publish the result with the night, so the preview's
+      # classes and Sources tab carry configiq. Nothing is committed under data/supplemental/; the files stay in the run. A failure
+      # leaves the night as it would have been without configiq. The real refresh is the merge-time score-configiq run.
+      configiq_preview:
+        description: "Pre-release preview only: also score configiq with the same build and publish it with the night"
+        type: boolean
+        default: false
 
 # Least privilege: read-only by default. Only `publish` gets contents: write.
 permissions:
@@ -47,7 +75,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  WINDOW_DAYS: "180"
   KEEP_API: "5"
 
 jobs:
@@ -63,7 +90,18 @@ jobs:
       - id: r
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash orchestrator/resolve_blis.sh
+          SIM_COMMIT: ${{ inputs.sim_commit }}
+        run: |
+          set -euo pipefail
+          if [ -n "$SIM_COMMIT" ]; then
+            # A preview names its build: no stable tag is resolved, and no other release follows.
+            if ! [[ "$SIM_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "FATAL: sim_commit must be a full 40-hex commit of inference-sim, got '$SIM_COMMIT'"; exit 1
+            fi
+            { echo "blis_tags=$SIM_COMMIT"; echo "blis_tag=$SIM_COMMIT"; echo "more=false"; } >> "$GITHUB_OUTPUT"
+          else
+            bash orchestrator/resolve_blis.sh
+          fi
 
   # ----------------------------------------------------------------- 2. run the night (pull+score)
   run-night:
@@ -85,6 +123,9 @@ jobs:
         with:
           python-version: "3.13"
       - run: pip install --quiet --require-hashes -r requirements-ci.txt
+      - name: Install what the configiq export reads (parquet)
+        if: ${{ inputs.configiq_preview && inputs.sim_commit != '' }}
+        run: pip install --quiet --require-hashes -r requirements-ci.txt -r requirements-configiq.txt
 
       # The ONLY thing cached across runs: the agentic artifact-download zips, keyed by artifact id
       # on disk (GitHubArtifacts.download). Ephemeral and NOT committed -- a cold cache just means a
@@ -99,6 +140,38 @@ jobs:
           restore-keys: |
             ix-artifacts-
 
+      # The ledger and the anchor list the dump extract is cut with are the substrate release's of the BLIS release scored: the
+      # same files the night reads (cli.py nightly). A hit on the cache does not use them; a miss reads them once.
+      - name: Fetch the ledger the dump extract is cut with
+        env:
+          BLIS_TAGS: ${{ needs.resolve.outputs.blis_tags }}
+        run: |
+          set -euo pipefail
+          BLIS_TAG="${BLIS_TAGS%% *}"
+          if [[ "$BLIS_TAG" =~ ^[0-9a-f]{40}$ ]]; then
+            # A preview scores a commit: fetch exactly it (a branch or tag name is not used, it moves).
+            git init -q "$RUNNER_TEMP/dump-sim"
+            git -C "$RUNNER_TEMP/dump-sim" fetch -q --depth 1 https://github.com/inference-sim/inference-sim.git "$BLIS_TAG"
+            git -C "$RUNNER_TEMP/dump-sim" checkout -q FETCH_HEAD
+          else
+            git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$RUNNER_TEMP/dump-sim"
+          fi
+          eval "$(python3 orchestrator/resolve_stack.py "$RUNNER_TEMP/dump-sim")"
+          if [ "${substrate_embedded:-}" = true ]; then
+            # The substrate is a directory of the simulator tree itself (substrate/): the commit pins it.
+            mkdir -p "$RUNNER_TEMP/dump-substrate"
+            cp -R "$RUNNER_TEMP/dump-sim/substrate/catalog" "$RUNNER_TEMP/dump-substrate/catalog"
+          else
+            git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/dump-substrate"
+            git -C "$RUNNER_TEMP/dump-substrate" checkout -q "$substrate_ref"
+          fi
+      - name: The anchor extract of the pinned dump
+        uses: ./.github/actions/dump-extract
+        with:
+          ledger: ${{ runner.temp }}/dump-substrate/catalog/ledger
+          anchor: ${{ runner.temp }}/dump-substrate/catalog/ledger/published/anchor.yaml
+          out: ${{ runner.temp }}/dump-extract
+
       # Score the release resolve_blis.sh named: the oldest unscored one, once (COV-9). Build blis
       # FROM SOURCE at the tag (so a per-release score is sound; #15's seed rule), fetch what it
       # pins, and run one night with it. The scoring is harness/run.sh, run from this checkout
@@ -112,6 +185,7 @@ jobs:
         env:
           BLIS_TAGS: ${{ needs.resolve.outputs.blis_tags }}
           GH_TOKEN: ${{ github.token }}
+          DUMP_FORCE: ${{ inputs.force_dump && '--dump-force' || '' }}
         run: |
           set -euo pipefail
           for BLIS_TAG in $BLIS_TAGS; do
@@ -119,28 +193,40 @@ jobs:
             rm -rf "$RUNNER_TEMP/sim" "$RUNNER_TEMP/substrate" \
               "$RUNNER_TEMP/pull" "$RUNNER_TEMP/contract" "$RUNNER_TEMP/scorework"
             SIM="$RUNNER_TEMP/sim"
-            git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$SIM"
+            if [[ "$BLIS_TAG" =~ ^[0-9a-f]{40}$ ]]; then
+              # A preview scores a commit: fetch exactly it (a branch or tag name is not used, it moves).
+              git init -q "$SIM"
+              git -C "$SIM" fetch -q --depth 1 https://github.com/inference-sim/inference-sim.git "$BLIS_TAG"
+              git -C "$SIM" checkout -q FETCH_HEAD
+            else
+              git clone -q --depth 1 --branch "$BLIS_TAG" https://github.com/inference-sim/inference-sim.git "$SIM"
+            fi
             ( cd "$SIM" && go build -o blis main.go )
             # Everything else the release runs is named by its stack.json (SIM-3, X8), so a new
             # release is scored with no change to this file: the blis-substrate commit (its
             # catalog/, registry/ and catalog/ledger) and the vLLM tag of the engine release.
             eval "$(python3 orchestrator/resolve_stack.py "$SIM")"
-            git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
-            git -C "$RUNNER_TEMP/substrate" checkout -q "$substrate_ref"
-            CATALOG="$RUNNER_TEMP/substrate/catalog"
-            REGISTRY="$RUNNER_TEMP/substrate/registry"
-            # The engine's field list: the pinned blis-vllm release's fields.json, at the commit
-            # stack.json names. TEMPORARY until the M2 substrate release lets the build print its
-            # own list (`blis fields`; inference-sim/accuracy-dashboard#52).
             FIELDS="$RUNNER_TEMP/fields.json"
-            curl -fsSL --retry 3 -o "$FIELDS" \
-              "https://raw.githubusercontent.com/inference-sim/blis-vllm/${vllm_module_ref}/fields.json"
+            if [ "${substrate_embedded:-}" = true ]; then
+              # A commit whose substrate and engine field list are directories of its own tree: the same checkout.
+              SUBSTRATE_DIR="$SIM/substrate"
+              cp "$SIM/engines/vllm/fields.json" "$FIELDS"
+            else
+              git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
+              git -C "$RUNNER_TEMP/substrate" checkout -q "$substrate_ref"
+              SUBSTRATE_DIR="$RUNNER_TEMP/substrate"
+              # The engine's field list: the pinned blis-vllm release's fields.json, at the commit
+              # stack.json names. TEMPORARY until the M2 substrate release lets the build print its
+              # own list (`blis fields`; inference-sim/accuracy-dashboard#52).
+              curl -fsSL --retry 3 -o "$FIELDS" \
+                "https://raw.githubusercontent.com/inference-sim/blis-vllm/${vllm_module_ref}/fields.json"
+            fi
+            CATALOG="$SUBSTRATE_DIR/catalog"
+            REGISTRY="$SUBSTRATE_DIR/registry"
             # The ledger at the same commit: every row of the window is placed in one of its
             # units (design §10.2). The units scored are the anchor units in the substrate's
-            # published list, catalog/ledger/published/anchor.yaml (cli.py nightly). TEMPORARY until
-            # the M2 substrate release lets `blis ledger --list anchor` print it, and until a command
-            # prints the full unit list with identities (catalog/ledger/units) and the ingest report.
-            LEDGER="$RUNNER_TEMP/substrate/catalog/ledger"
+            # published list, catalog/ledger/published/anchor.yaml (cli.py nightly).
+            LEDGER="$SUBSTRATE_DIR/catalog/ledger"
             # Every AgentX corpus, at the revision and full sha256 its replay workload in this
             # release's catalog pins (agentx-mvp-uncapped, agentx-mvp; X12, D3). Each point is
             # replayed with the corpus its own run's client loaded (COV-12). Nothing resolves a
@@ -154,8 +240,7 @@ jobs:
             # (incl. the live view the merge reads) are present; cli.py nightly adds/prunes only API
             # snapshots and never touches a dump one.
             mkdir -p data state
-            # Always the full 180-day cumulative window ending the real UTC date -- never shrink it
-            # (that would prune the store).
+            # No age limit (COV-2): the pull holds every row up to the real UTC date.
             TODAY="$(date -u +%F)"
             # OOM fix (diagnosed by local profiling): a single agentic blis replay's peak RSS is
             # trace-content-driven and unpredictable -- a c64 point used 11.5GB where a c128 used
@@ -178,7 +263,7 @@ jobs:
               --blis-tag "$BLIS_TAG" \
               --work-dir "$RUNNER_TEMP/pull" --data-dir data --state state/last-run-api.json \
               --scored state/scored-releases.json \
-              --window-days "$WINDOW_DAYS" --keep-api "$KEEP_API" \
+              --keep-api "$KEEP_API" \
               --today "$TODAY" \
               --workers 4 --agentic-workers 1 --download-workers 4 --max-rss-mb 13000 \
               --cache "$RUNNER_TEMP/artifacts" --corpus-cache "$RUNNER_TEMP/corpus-cache" \
@@ -186,20 +271,70 @@ jobs:
               --evaluator-commit "$GITHUB_SHA" \
               --ledger "$LEDGER" \
               --blis "$SIM/blis" --catalog "$CATALOG" --registry "$REGISTRY" \
-              --substrate-dir "$RUNNER_TEMP/substrate" \
+              --substrate-dir "$SUBSTRATE_DIR" \
               --substrate-version "$substrate_version" --substrate-commit "$substrate_commit" \
-              --corpus-dir "$RUNNER_TEMP/corpora" --fields "$FIELDS"
+              --corpus-dir "$RUNNER_TEMP/corpora" --fields "$FIELDS" \
+              --dump-extract "$RUNNER_TEMP/dump-extract" --dump-state state/dump --dump-workers 2 $DUMP_FORCE
             echo "::endgroup::"
           done
+
+      # The stop-gap configiq run of a pre-release preview (input configiq_preview): the build, substrate, engine field list and
+      # harness commit this night just used, scoring every configiq anchor unit as score-configiq.yml does. continue-on-error: a
+      # failure here publishes the night without configiq, and the next two steps then use the committed files only.
+      - name: Score configiq with the preview's build (stop-gap)
+        if: ${{ inputs.configiq_preview && inputs.sim_commit != '' }}
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          SIM="$RUNNER_TEMP/sim"
+          eval "$(python3 orchestrator/resolve_stack.py "$SIM")"
+          [ "${substrate_embedded:-}" = true ] || { echo "::error::the stop-gap needs a build whose substrate is in its tree"; exit 1; }
+          SUBSTRATE_DIR="$SIM/substrate"
+          python3 orchestrator/nightly/configiq_night.py \
+            --substrate "$SUBSTRATE_DIR" --blis "$SIM/blis" \
+            --catalog "$SUBSTRATE_DIR/catalog" --registry "$SUBSTRATE_DIR/registry" \
+            --fields "$RUNNER_TEMP/fields.json" --substrate-version "$substrate_version" --substrate-commit "$substrate_commit" \
+            --sim-build "${{ inputs.sim_commit }}" --harness-commit "$GITHUB_SHA" --workers 2 --out "$RUNNER_TEMP/configiq"
 
       - name: Build the classes page data from the night's summary and the committed derived files
         run: |
           set -euo pipefail
+          SUPP=data/supplemental/classes
+          if [ -f "$RUNNER_TEMP/configiq/classes/configiq.json" ]; then
+            # The stop-gap's configiq class file stands in for the committed one, in this run only.
+            mkdir -p "$RUNNER_TEMP/supplemental"
+            cp data/supplemental/classes/*.json "$RUNNER_TEMP/supplemental/"
+            cp "$RUNNER_TEMP/configiq/classes/configiq.json" "$RUNNER_TEMP/supplemental/configiq.json"
+            SUPP="$RUNNER_TEMP/supplemental"
+          fi
           # data/supplemental/classes/ holds the derived files of the reconstructed-recipe and configiq classes (committed, with the
           # command and heads that made them); no configiq or reconstructed point is scored here. The night's summary supplies the
           # regular class, so classes.json is always the summary's own snapshot.
           if [ -f data/latest/summary.json ]; then
-            python3 orchestrator/build_classes.py build --summary data/latest/summary.json --supplemental data/supplemental/classes --out data/latest/classes.json
+            python3 orchestrator/build_classes.py build --summary data/latest/summary.json --supplemental "$SUPP" --out data/latest/classes.json
+          fi
+      - name: Build the Sources tab data (funnel.json) from the night's contract and the ledger
+        run: |
+          set -euo pipefail
+          # The funnel (format funnel-2) of what the night scored: every InferenceX unit placed by its grade, G5 reason or fault.
+          # Inputs are already on this runner (the ledger fetched above, the contract this night scored), so no secret and no new
+          # network access. The API+dump contract is _contract-dump; a night with no dump lane scored into contract itself.
+          # When the contract is not the whole of the summary (a merged night) nothing is written and a warning says why: the tab
+          # then keeps its "not published" notice. The step never fails the night.
+          if [ -f data/latest/summary.json ]; then
+            CIQ=data/supplemental/funnels/configiq.json; CIQ_CLASS=data/supplemental/classes/configiq.json
+            if [ -f "$RUNNER_TEMP/configiq/funnel.json" ]; then
+              CIQ="$RUNNER_TEMP/configiq/funnel.json"; CIQ_CLASS="$RUNNER_TEMP/configiq/classes/configiq.json"
+            fi
+            CONTRACT="$RUNNER_TEMP/_contract-dump"
+            [ -d "$CONTRACT" ] || CONTRACT="$RUNNER_TEMP/contract"
+            python3 orchestrator/nightly/funnel_night.py \
+              --ledger "$RUNNER_TEMP/dump-substrate/catalog/ledger" \
+              --anchor "$RUNNER_TEMP/dump-substrate/catalog/ledger/published/anchor.yaml" \
+              --contract "$CONTRACT" --summary data/latest/summary.json --out data/latest/funnel.json \
+              --configiq "$CIQ" --configiq-class "$CIQ_CLASS" \
+              --configiq-sources "$RUNNER_TEMP/dump-substrate/catalog/ledger/sources.yaml" \
+              || echo "::warning title=funnel.json not written::funnel_night.py exited $?"
           fi
       - name: Package the published data for the publish job
         run: tar -czf data.tgz -C data . 2>/dev/null || tar -czf data.tgz --files-from /dev/null
@@ -210,6 +345,7 @@ jobs:
             data.tgz
             state/last-run-api.json
             state/scored-releases.json
+            state/dump
           if-no-files-found: warn
 
   # ----------------------------------------------------------------- 3. publish (hosted-safe)
@@ -299,7 +435,7 @@ jobs:
           fi
 
       # KNOWN CEILING (accepted, documented): committing data/ to main grows main's GIT HISTORY,
-      # which neither the 180-day window nor the last-5 retention bounds -- those cap the summary's
+      # which the last-5 retention does not bound -- those cap the summary's
       # CONTENT and the working-tree snapshot COUNT, not the accumulation of nightly blobs. An
       # IX-only night rewrites latest/summary.json (~6.5 MB) and commits it; git stores a whole new
       # blob each time, so main's .git grows ~6.5 MB per active night, ~2 GB/year, while the
@@ -338,6 +474,8 @@ jobs:
             exit 1
           fi
           mkdir -p state; cp "$STATE_IN" state/last-run-api.json; cp "$SCORED_IN" state/scored-releases.json
+          # The dump lane's last result (its results, never its data): the next night reuses it if nothing it depends on changed.
+          if [ -d incoming/state/dump ]; then rm -rf state/dump; cp -R incoming/state/dump state/dump; fi
           # This commit is [skip ci], so nothing checks it after it lands: publish.sh runs the checks it can break
           # (orchestrator/nightly/checks.sh) on this tree before it commits, and a failing check stops the step.
           if [ "$DRY_RUN" = true ]; then
@@ -381,8 +519,9 @@ jobs:
             echo "FATAL: a check failed or the commit failed (status $rc); nothing was committed or pushed"; exit "$rc"
           fi
 
+      # A preview (sim_commit) is for a scratch branch: its data is not deployed.
       - name: Deploy the published data to Pages
-        if: ${{ steps.pub.outputs.pushed == 'true' }}
+        if: ${{ steps.pub.outputs.pushed == 'true' && inputs.sim_commit == '' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run pages.yml --ref "${GITHUB_REF_NAME}"
@@ -391,7 +530,7 @@ jobs:
       # which begins at the oldest still unlisted. Only after a successful publish, so a failed
       # release is never skipped (COV-9).
       - name: Score the next unscored release
-        if: ${{ steps.pub.outputs.pushed == 'true' && needs.resolve.outputs.more == 'true' }}
+        if: ${{ steps.pub.outputs.pushed == 'true' && needs.resolve.outputs.more == 'true' && inputs.sim_commit == '' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run api-nightly.yml --ref "${GITHUB_REF_NAME}"

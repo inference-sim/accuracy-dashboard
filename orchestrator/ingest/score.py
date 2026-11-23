@@ -29,6 +29,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 import extract_single_turn_bench_args as sx  # noqa: E402
 import assess as asx  # noqa: E402
+import commit_distance as cdist  # noqa: E402
 import contract  # noqa: E402
 import engines  # noqa: E402
 import fields as fl  # noqa: E402
@@ -46,6 +47,7 @@ import settings as st  # noqa: E402
 import supplemental  # noqa: E402
 import sglang_settings as ss  # noqa: E402
 import blis_commands as bc  # noqa: E402
+import build as bld  # noqa: E402
 import contamination  # noqa: E402
 import support as sp  # noqa: E402
 
@@ -123,6 +125,11 @@ class Env:
     vllm_defaults_release: str = ""
     # The engine release the scoring simulator runs (stack.json, LIF-6), e.g. "0.32.0".
     engine_release: str = ""
+    # The commit-distance provider (commit_distance.Distance): the upgrade reports' diffs and an engine checkout. None
+    # publishes no diff, so a run on another commit is G4.
+    distance: object = None
+    # Per-engine override of the commit-count bound (engine kind -> commits); unset, both engines use build.MAX_COMMIT_DISTANCE.
+    max_distance: dict | None = None
     # The simulator build that scores the run: a release tag, or a commit (pointrecord Simulator).
     sim_build: str = ""
     # The harness commit every point records (design §11.7, X8): the 40-hex commit of the dashboard checkout.
@@ -572,6 +579,12 @@ def _diff_args(args: list, dep: dict, b: st.Built) -> list[str]:
                     got = f"{float(stated.pop()):g}"
         elif f == "replay.api_server_count":
             got, want = b.api_server_count, str(want)
+        elif f.startswith("dp_lb."):
+            # vLLM's data-parallel launch flags are one Deployment key, parallel.data_parallel_load_balancing, which build()
+            # writes for a flag the run set true and omits for a false one (the default, internal). Read back, a true flag is
+            # present when the written mode is that flag's mode; a false flag states nothing, so nothing was lost.
+            mode = ((dep["pools"][0].get("parallel") or {}).get("data_parallel_load_balancing"))
+            got = False if want is False else mode == ("hybrid" if f == "dp_lb.hybrid" else "external")
         elif f.startswith("offload."):
             # The offload writer converts units (per-rank bytes -> the engine's tier); its own
             # checks refused any disagreement, so the arg records what BLIS was given.
@@ -631,6 +644,9 @@ class Outcome:
     # What the point record (pointrecord.py) needs of the Result and the run: the Result's data block, and
     # the number of requests behind the predicted and the measured mean.
     result_data: dict | None = None
+    # The upstream commit of the engine the Result's build modelled (Result engine.commit, LIF-6): what a run on
+    # another commit is graded against, by commit distance (grade.grade_by_commit). None for a build that states none.
+    engine_commit: str | None = None
     samples: tuple | None = None
     # Set by _run_result when the simulator refused a stated value that the model never reads: the scorer runs the point once
     # more without it (_score_one) and names the omission.
@@ -650,7 +666,8 @@ def _score_one(entry: dict, pull_dir: Path, work: Path, env: Env, simulate: bool
         o = Outcome(point_id=entry["point_id"], identity=entry["identity"], row=entry["row"],
                     reasons=sorted(set(entry["reasons"] + ["blis_refused:extractor_error"])),
                     measurements=entry.get("measurements") or [], build=entry.get("build"))
-    grade_outcome(o, env.kit(o.engine).release, env.simulator(o.engine) if simulate else None)
+    grade_outcome(o, env.kit(o.engine).release, env.simulator(o.engine) if simulate else None, env.distance,
+                  env.max_distance)
     return o
 
 
@@ -995,7 +1012,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
     catalog_size = cat.packaging(sup.chip)["gpus_per_node"]
     node = ir.resolve(env.runner_table, row["hardware"], run_date=ident["measured_date"],
                       launch_size=st.recorded_node_size(launch), fixes_packaging=catalog_size is not None)
-    b = st.build(c, name=name, model=sup.model, part=part, engine_version=kit.release,
+    b = st.build(c, name=name, model=sup.model, part=part,
                  field_list=kit.field_list, catalog_node_size=catalog_size, node=node,
                  draft_model=sup.drafter, launch_config=launch, engine_kind=fw.engine)
     o.reasons += ss.parallel_reasons(b.reasons, c, kit.field_list) if sglang else b.reasons
@@ -1083,6 +1100,7 @@ def score_point(entry: dict, pull_dir: Path, work: Path, env: Env, *, simulate: 
         return o
 
     try:
+        o.engine_commit = result.engine_commit(doc)
         o.subs += result.coefficient_substitutions(doc)
         o.subs += _acceptance_subs(b, doc, log)
     except result.ResultError as e:
@@ -1340,6 +1358,7 @@ def score_single_turn(o: Outcome, entry: dict, env: Env, work: Path, b: st.Built
     requests["achieved_concurrency"] = flight["achieved_concurrency"]
 
     try:
+        o.engine_commit = result.engine_commit(doc)
         o.subs += result.coefficient_substitutions(doc)
         o.subs += _acceptance_subs(b, doc, log)
     except result.ResultError as e:
@@ -1624,7 +1643,7 @@ def score_pd(o: Outcome, entry: dict, pdir: Path, env: Env, work: Path, fw, *, s
                 o.subs.append({"kind": "estimated", "subject": f"engine.{role}.max_model_len",
                                "detail": f"not stated by the recipe; vLLM resolves it to the checkpoint's max_position_embeddings, "
                                          f"{win} (the catalog model {sup.model}'s config.json)"})
-    builts = {role: st.build(decided[role], name=name, model=sup.model, part=part, engine_version=release,
+    builts = {role: st.build(decided[role], name=name, model=sup.model, part=part,
                              field_list=field_list, catalog_node_size=catalog_size, node=node,
                              draft_model=sup.drafter, launch_config=launches[role], engine_kind=fw.engine) for role in pools}
     if sglang:
@@ -1705,7 +1724,8 @@ def substitutions(o_subs: list[dict], fidelity: dict, unevaluated=None) -> list[
         + gr.unchecked(unevaluated)
 
 
-def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None) -> None:
+def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None, distance=None,
+                  max_distance: dict | None = None) -> None:
     """Give one outcome its grade (design §11.3, §11.4; COV-4, COV-5), from data alone.
 
     A scored point is G1 to G4, its record naming every substitution, and its points.csv row
@@ -1714,7 +1734,9 @@ def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None
     simulator refused the scenario, or the scenario lost a recorded value) is neither: it is
     listed as failed (o.faults), never graded. The run's own release is recorded on every point
     (§11.2), read from its recorded build and the server log's banner, and the simulator build and
-    engine release that scored it (pointrecord's Simulator), on every point."""
+    engine release that scored it (pointrecord's Simulator), on every point. A run whose build states a commit
+    and whose Result states the commit the simulator modelled is graded by commit distance (design §11.3), asking
+    `distance` for the ported changes between the two; any other build is graded by release."""
     rel = gr.run_release(o.build or {"image": o.row.get("image")}, o.banner)
     o.run_release = rel.version
     o.simulator = simulator
@@ -1730,9 +1752,34 @@ def grade_outcome(o: Outcome, engine_release: str, simulator: dict | None = None
         o.g5 = g.g5
         o.g5_reasons = sorted((dict(x) for x in g5), key=lambda r: (r["code"], r.get("subject", "")))
         return
-    g = gr.grade(engine_version=engine_release, release=rel, substitutions=substitutions(o.subs, o.fidelity, o.unevaluated))
-    o.fidelity = {**o.fidelity, "grade": g.grade, "substitutions": g.substitutions, "run_release": rel.version,
+    subs = substitutions(o.subs, o.fidelity, o.unevaluated)
+    b = o.build or {}
+    run_commit = b.get("commit")
+    if o.engine_commit and run_commit and b.get("why") in (None, bld.OUTSIDE_DISTANCE):
+        ask = distance or (lambda *_: None)
+        same = run_commit == o.engine_commit
+        counts = None if same else getattr(distance, "record", lambda *_: None)(run_commit, o.engine_commit)
+        # One bound for both engines (build.MAX_COMMIT_DISTANCE), unless `max_distance` names the engine.
+        bound = bld.commit_bound(o.engine, max_distance)
+        rec = cdist.label(run_commit, o.engine_commit, None if same else ask(run_commit, o.engine_commit),
+                          apart=cdist.commits_apart(counts), bound=bound)
+        if rec["state"] == cdist.OUTSIDE_DISTANCE:
+            why = (f"{run_commit} is {rec['commits_apart']} commits from the modelled {o.engine_commit}, "
+                   f"past {bound} (build.MAX_COMMIT_DISTANCE)")
+            g = gr.grade(engine_version=o.engine_commit, release=gr.Release(None, True, why), substitutions=subs)
+        else:
+            g = gr.grade_by_commit(run_commit=run_commit, scored_commit=o.engine_commit, distance=ask, substitutions=subs)
+        if same:
+            o.run_release = engine_release
+        o.fidelity = {**o.fidelity, "commit_distance": {**(counts or {}), **rec}}
+    else:
+        g = gr.grade(engine_version=engine_release, release=rel, substitutions=subs)
+        if o.engine_commit:
+            o.fidelity = {**o.fidelity, "commit_distance": cdist.label(run_commit, o.engine_commit, None, b.get("why"))}
+    o.fidelity = {**o.fidelity, "grade": g.grade, "substitutions": g.substitutions, "run_release": o.run_release,
                   "simulator": simulator}
+    if o.engine_commit:
+        o.fidelity["engine_commit"] = o.engine_commit
     if not o.would_run_simulator:      # a point graded without the simulator has no points.csv row
         o.csv_row[contract.POINTS_HEADER.index(contract.GRADE_COLUMN)] = g.grade
 
@@ -1811,6 +1858,20 @@ def split_repeated_sweeps(scored: list[Outcome]) -> None:
                 o.facets["sweep_id"] = f"{sid}|{o.point_id[:12]}"
 
 
+def split_mixed_versions(scored: list[Outcome]) -> None:
+    """A sweep is one deployment (contract.SWEEP_SHARED), and the engine's version is part of it. One workflow run of the
+    database dump holds jobs whose engine builds differ (a nightly build; the log banner names it), which the API
+    rows never showed. The points of such a sweep split into one sweep per engine version, each a shorter curve of its own
+    build, so that the contract holds and no shape is read across two builds."""
+    by: dict = {}
+    for o in scored:
+        by.setdefault(o.facets["sweep_id"], []).append(o)
+    for sid, os_ in by.items():
+        if len({o.facets.get("vllm_version") for o in os_}) > 1:
+            for o in os_:
+                o.facets["sweep_id"] = f"{sid}|v{o.facets.get('vllm_version') or 'none'}"
+
+
 def write_contract(out: Path, outcomes: list[Outcome], provenance: dict) -> None:
     unsimulated = [o.point_id[:12] for o in outcomes if o.would_run_simulator]
     if unsimulated:
@@ -1819,6 +1880,7 @@ def write_contract(out: Path, outcomes: list[Outcome], provenance: dict) -> None
     out.mkdir(parents=True, exist_ok=True)
     scored = [o for o in outcomes if o.fidelity is not None]
     split_repeated_sweeps(scored)
+    split_mixed_versions(scored)
     rows = sorted((o.csv_row for o in scored),
                   key=lambda r: contract.points_sort_key(dict(zip(contract.POINTS_HEADER, map(str, r)))))
     buf = io.StringIO()

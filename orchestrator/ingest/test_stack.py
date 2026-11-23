@@ -302,3 +302,15 @@ def test_resolve_stack_reads_the_substrate_a_checkout_holds_itself(tmp_path):
     assert r.stdout.splitlines() == ["substrate_embedded=true", f"substrate_ref={head}", f"substrate_commit={head}",
                                      f"substrate_version={head}", "vllm_ref=0fda86a35419" + "0" * 28]
     assert sk.verify_checkout(tmp_path / "substrate", head, head) == []
+
+
+def test_a_preview_run_names_its_commit_and_neither_deploys_nor_chains():
+    import yaml
+    text = (ROOT.parent / ".github" / "workflows" / "api-nightly.yml").read_text()
+    doc = yaml.safe_load(text)
+    inp = doc[True]["workflow_dispatch"]["inputs"]["sim_commit"]
+    assert inp["default"] == ""                                   # the schedule and a normal dispatch are unchanged
+    assert "^[0-9a-f]{40}$" in text and "FETCH_HEAD" in text
+    steps = {s.get("name"): s for s in doc["jobs"]["publish"]["steps"]}
+    for name in ("Deploy the published data to Pages", "Score the next unscored release"):
+        assert "inputs.sim_commit == ''" in steps[name]["if"], name

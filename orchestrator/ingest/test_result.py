@@ -42,8 +42,8 @@ def _runner(rc: int, stdout: str, stderr: str = ""):
 
 # ------------------------------------------------------------------ parse
 
-@pytest.mark.parametrize("version", [2, 3])
-def test_parse_reads_a_schema_version_2_or_3_result(version):
+@pytest.mark.parametrize("version", [2, 3, 4])
+def test_parse_reads_a_schema_version_2_3_or_4_result(version):
     assert result.parse(json.dumps(_doc(schema_version=version)).encode())["name"] == "x"
 
 
@@ -54,7 +54,7 @@ def test_parse_refuses_another_kind(doc):
     assert e.value.slug == "result_unreadable"
 
 
-@pytest.mark.parametrize("version", [1, 4, None, "3", True])
+@pytest.mark.parametrize("version", [1, 5, None, "3", True])
 def test_parse_refuses_another_schema_version(version):
     with pytest.raises(result.ResultError) as e:
         result.parse(json.dumps(_doc(schema_version=version)).encode())
@@ -424,3 +424,19 @@ def test_aiperf_itl_against_the_simulators_itl_is_refused():
 ])
 def test_a_client_field_against_another_definition_is_refused(client, field, metric):
     assert result.client_field_problems(client, field, metric, ITL_REGISTRY) != []
+
+
+# ------------------------------------------------------------------ engine.commit
+
+def test_engine_commit_is_the_results_engine_commit_and_none_when_the_result_states_none():
+    c = "0123456789abcdef0123456789abcdef01234567"
+    assert result.engine_commit(_doc(engine={"kind": "vllm", "commit": c})) == c
+    assert result.engine_commit(_doc(engine={"kind": "vllm"})) is None
+    assert result.engine_commit(_doc()) is None
+
+
+@pytest.mark.parametrize("commit", ["abc123", "0123456789ABCDEF0123456789ABCDEF01234567", "", 7, "g" * 40])
+def test_a_malformed_engine_commit_is_a_result_error_not_a_missing_commit(commit):
+    with pytest.raises(result.ResultError) as e:
+        result.engine_commit(_doc(engine={"kind": "vllm", "commit": commit}))
+    assert e.value.slug == "result_invalid"

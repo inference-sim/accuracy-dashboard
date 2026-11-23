@@ -69,30 +69,44 @@ def test_a_figure_under_ten_points_is_too_few(tmp_path):
     assert c["accuracy_by_grade"]["G4"]["ttft"] == {"n": 3, "mape": bc.TOO_FEW, "signed_median": bc.TOO_FEW}
 
 
-def _configiq_dir(tmp_path, n_train=10, n_test=4):
+def _configiq_dir(tmp_path, n_train=10, n_test=4, withheld_split=()):
+    """A score_configiq directory. n_test scored points fall on the dev split's test set; D9 scores them like any other. With
+    withheld_split the run withheld that split on request (a local experiment): those points are not scored."""
     d = tmp_path / "cq"
     d.mkdir()
-    cov = {"points": n_train + n_test + 2, "scored": n_train, "refused": 1, "failed": 1, "withheld": n_test,
+    n_scored = n_train + (0 if withheld_split else n_test)
+    cov = {"points": n_train + n_test + 2, "scored": n_scored, "refused": 1, "failed": 1, "withheld": n_test if withheld_split else 0,
            "refusals_by_reason": {"field_not_in_release: engine.max_model_len": 1}}
-    br = {"provisional_grades": {"G3": n_train}, "grades": {"G5": 1}}
+    br = {"provisional_grades": {"G3": n_scored}, "grades": {"G5": 1}}
     (d / "summary.json").write_text(json.dumps({"coverage": cov, "by_source": br,
-                                                "provenance": {"dataset": {"revision": "rev"}, "split": {"name": "dev"}}}))
+                                                "provenance": {"dataset": {"revision": "rev"},
+                                                               "split": {"name": "dev", "withheld": list(withheld_split)}}}))
     recs = [{"status": "scored", "split": "train", "grade": "G3", "model": "m/a" if i < 7 else "m/b", "substitutions": [SUB],
              "errors_pct": {"ttft_mean": 100.0, "itl_mean": -10.0, "tpot_median": 5.0}} for i in range(n_train)]
-    # test-split points are never simulated, but if one were present it must not move any figure
-    recs += [{"status": "scored", "split": "test", "grade": "G3", "model": "m/a", "errors_pct": {"ttft_mean": 9999.0, "itl_mean": 9999.0, "tpot_median": 9999.0}}
-             for _ in range(n_test)]
+    if withheld_split:
+        recs += [{"status": "withheld", "split": "test", "grade": None, "model": "m/a"} for _ in range(n_test)]
+    else:
+        recs += [{"status": "scored", "split": "test", "grade": "G3", "model": "m/a", "substitutions": [SUB],
+                  "errors_pct": {"ttft_mean": 1.0, "itl_mean": -1.0, "tpot_median": 1.0}} for _ in range(n_test)]
     jl(d / "configiq-points.jsonl", recs)
     return d
 
 
-def test_configiq_class_uses_its_own_statistics_and_excludes_the_test_split(tmp_path):
+def test_configiq_class_is_an_anchor_source_that_is_also_provisional_and_drops_no_split(tmp_path):
+    """D9: every configiq unit is an anchor unit, so the test-split points are in the figures. anchor and kind are two facts."""
     c = bc.derive_configiq(_configiq_dir(tmp_path), cid="configiq", label="L", note="N", meta=META)
-    assert c["kind"] == "provisional"
-    assert c["counts"] == {"points": 16, "scored": 10, "refused": 1, "failed": 1, "withheld": 4}
+    assert c["kind"] == "provisional" and c["anchor"] is True
+    assert c["counts"] == {"points": 16, "scored": 14, "refused": 1, "failed": 1, "withheld": 0}
     acc = c["accuracy_by_grade"]["G3"]
-    assert (acc["ttft"]["mape"], acc["itl"]["mape"], acc["tpot"]["mape"]) == (100.0, 10.0, 5.0)
-    assert acc["itl"]["signed_median"] == -10.0
+    assert acc["ttft"]["n"] == 14 and acc["ttft"]["mape"] == pytest.approx((10 * 100.0 + 4 * 1.0) / 14)
+    assert "anchor-only" in c["partition"] and "test partition" not in c["partition"]
+    assert bc.check(_doc(_regular(), c)) == []
+
+
+def test_a_split_withheld_on_request_is_not_scored_and_is_named_in_the_partition(tmp_path):
+    c = bc.derive_configiq(_configiq_dir(tmp_path, withheld_split=("test",)), cid="configiq", label="L", note="N", meta=META)
+    assert c["counts"]["scored"] == 10 and c["counts"]["withheld"] == 4 and c["accuracy_by_grade"]["G3"]["ttft"]["n"] == 10
+    assert "local experiment" in c["partition"] and "test partition is withheld" in c["partition"]
     assert bc.check(_doc(_regular(), c)) == []
 
 
@@ -105,12 +119,12 @@ def test_configiq_card_withholds_the_named_figure_and_lists_no_refusal(tmp_path)
     assert c["refusals"] == []
     assert set(c["accuracy_by_grade"]["G3"]) == {"tpot", "itl"}
     assert c["figure_notes"] == {"ttft": "awaits the definition"}
-    assert c["plain_line"] == "the rest wait" and "test partition" in c["partition"]
-    assert c["counts"]["scored"] == 10 and c["counts"]["points"] == 16
+    assert c["plain_line"] == "the rest wait" and "anchor-only" in c["partition"]
+    assert c["counts"]["scored"] == 14 and c["counts"]["points"] == 16
     by = {m["model"]: m for m in c["by_model"]}
-    assert (by["m/a"]["scored"], by["m/b"]["scored"]) == (7, 3)  # the withheld test rows are in neither
+    assert (by["m/a"]["scored"], by["m/b"]["scored"]) == (11, 3)  # the four test-split rows are m/a's, scored like the rest
     assert by["m/b"]["gap"] == "ours" and by["m/a"]["gap"] is None
-    assert "ttft" not in by["m/a"]["accuracy"] and by["m/a"]["accuracy"]["itl"]["mape"] == bc.TOO_FEW  # 7 points: under the minimum
+    assert "ttft" not in by["m/a"]["accuracy"] and by["m/a"]["accuracy"]["itl"]["mape"] != bc.TOO_FEW  # 11 points: over the minimum
     assert not any("ttft" in json.dumps(g) for g in c["accuracy_by_grade"].values())
 
 

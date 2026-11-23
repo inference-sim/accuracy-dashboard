@@ -91,7 +91,7 @@ def _fake_summary(entries, blis_tag, pull_date):
             "point_ids": sorted(e["point_id"] for e in entries)}
 
 
-def _run(world, tmp, today, blis_tag, keep_api=5):
+def _run(world, tmp, today, blis_tag, keep_api=5, force_publish=False):
     scored = tmp / "scored-releases.json"
     if not scored.exists():
         scored.write_text(json.dumps({"kind": "ScoredReleases", "releases": []}))
@@ -100,7 +100,7 @@ def _run(world, tmp, today, blis_tag, keep_api=5):
                         state_path=tmp / "state.json", scored_path=tmp / "scored-releases.json",
                         pull_fn=world.pull, score_build_fn=world.score,
                         backlog_fn=lambda s: {"kind": "Backlog", "snapshot_id": s["snapshot_id"], "engines": {}},
-                        snapshot_date=today, keep_api=keep_api)
+                        snapshot_date=today, keep_api=keep_api, force_publish=force_publish)
 
 
 def _index(tmp):
@@ -119,6 +119,21 @@ def test_seed_then_no_no_is_a_noop(tmp_path):
     r = _run(w, tmp_path, "2026-10-03", "v0.11.0")
     assert r.decision.is_noop
     assert _index(tmp_path)["runs"] == before["runs"]
+
+
+def test_a_night_that_changed_nothing_but_scored_the_dump_lane_again_republishes_the_live_view(tmp_path):
+    w = World()
+    w.rows = [("m", 1, "2026-10-01")]
+    _run(w, tmp_path, "2026-10-02", "v0.11.0")
+    before = _index(tmp_path)
+    marks = []
+    inner = w.score
+    w.score = lambda *a: marks.append(a[1]) or inner(*a)
+    r = _run(w, tmp_path, "2026-10-03", "v0.11.0", force_publish=True)
+    assert r.published and not r.decision.is_noop and r.snapshot_id is None
+    assert marks == ["v0.11.0"] and _index(tmp_path)["runs"] == before["runs"]      # rebuilt, no snapshot
+    marks.clear()
+    assert _run(w, tmp_path, "2026-10-04", "v0.11.0").decision.is_noop and marks == []
 
 
 def test_ix_only_scores_new_points_keeps_cache_no_snapshot(tmp_path):
@@ -297,3 +312,45 @@ def test_every_published_summary_has_its_backlog_beside_it(tmp_path):
     backlog = json.loads((latest / "backlog.json").read_text())
     assert backlog["kind"] == "Backlog"
     assert backlog["snapshot_id"] == json.loads((latest / "summary.json").read_text())["snapshot_id"]
+
+
+def test_every_published_json_file_is_written_compact_by_the_nights_own_writer(tmp_path):
+    # GitHub refuses a file over 100 MB: the 2026-11-22 night's summary was 105 MB written with indent=2 by this writer
+    # (not by build_summary_v2.dumps). The night's files are the one compact encoding, whatever writes them.
+    w = World()
+    w.rows = [("m", 1, "2026-10-01")]
+    r = _run(w, tmp_path, "2026-10-23", "v0.12.0")
+    published = [tmp_path / "data" / "latest" / "summary.json", tmp_path / "data" / "latest" / "backlog.json",
+                 tmp_path / "data" / "snapshots" / r.snapshot_id / "summary.json"]
+    for f in published:
+        text = f.read_text()
+        assert text == c.published_dumps(json.loads(text)), f"{f.name} is not the compact encoding"
+        assert "\n" not in text[:-1]
+
+
+def test_a_summary_of_realistic_points_is_written_at_half_its_indented_size(tmp_path):
+    # A scored point carries a fidelity record of about 33 KB (106 args, a kernel provenance, substitutions): 1000 of them
+    # were 105 MB indented. The size is asserted on points of that weight, through the night's writer.
+    arg = {"arg": "attention_config.block_size", "blis": None, "match": "resolved_not_stated", "measured": 32, "source": "args"}
+    point = {"level": "point", "point_id": "0" * 64, "fidelity": {"args": [dict(arg, arg=f"a{i}") for i in range(110)],
+             "blis_kernel_provenance": {"colocated": {"assumptions": [{"Name": f"n{i}", "Scope": "x" * 60} for i in range(70)]}},
+             "substitutions": [{"kind": "client_difference", "subject": "s", "detail": "d" * 150} for _ in range(25)]}}
+    summary = {"schema_version": 3, "matrix": [{"rows": [dict(point, point_id=f"{i:064x}") for i in range(200)]}]}
+    out = tmp_path / "summary.json"
+    nr._write_summary(out, summary)
+    indented = len(json.dumps(summary, indent=2, ensure_ascii=False).encode())
+    assert out.read_text() == c.published_dumps(summary)
+    assert 3_000_000 < out.stat().st_size < indented * 0.55
+    assert json.loads(out.read_text()) == summary
+
+
+def test_a_pre_release_build_named_by_its_commit_is_published_but_never_listed_as_a_scored_release(tmp_path):
+    commit = "6" * 40
+    w = World()
+    w.rows = [("m", 1, "2026-10-01")]
+    r = _run(w, tmp_path, "2026-10-02", commit)
+    assert r.published and r.snapshot_id == f"2026-10-02_blis-{commit}_ix-api-2026-10-02"
+    assert json.loads((tmp_path / "scored-releases.json").read_text())["releases"] == []
+    w.rows = [("m", 1, "2026-10-01")]
+    _run(w, tmp_path, "2026-10-03", "v0.11.0")                     # a stable release is still listed
+    assert json.loads((tmp_path / "scored-releases.json").read_text())["releases"] == ["v0.11.0"]

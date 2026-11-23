@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """InferenceX API ingest -> BLIS scoring -> contract directory (Discussion #28, issue #29).
 
-  cli.py pull  --window-days N --out PULL [--today YYYY-MM-DD] [--cache DIR]
+  cli.py pull  [--window-days N] --out PULL [--today YYYY-MM-DD] [--cache DIR]
       Pull the API, resolve builds, join and freeze artifacts. Network: InferenceX API,
       GitHub (artifacts + vllm-project/vllm), Docker Hub, HuggingFace (base_model only).
 
@@ -37,8 +37,11 @@ import artifacts as art  # noqa: E402
 import blis_commands as bc  # noqa: E402
 import build  # noqa: E402
 import clients  # noqa: E402
+import commit_distance as cdist  # noqa: E402
 import contract  # noqa: E402
 import coverage as cv  # noqa: E402
+import dump_extract as dx  # noqa: E402
+import dump_lane as dl  # noqa: E402
 import supplemental as sup  # noqa: E402
 import engines  # noqa: E402
 import fields as fl  # noqa: E402
@@ -55,6 +58,15 @@ import support as sp  # noqa: E402
 
 def _log(msg: str):
     print(msg, file=sys.stderr, flush=True)
+
+
+def _error_text(ex) -> str:
+    """repr(ex) and, for an HTTP error, the URL it came from (a signed blob URL without its query), so a
+    pull error says which request failed, not only that one did."""
+    url = getattr(ex, "url", None) or getattr(ex, "filename", None)
+    if isinstance(url, str) and "inferencex.semianalysis.com" not in url:
+        url = url.split("?")[0]
+    return (repr(ex) + (f" from {url}" if isinstance(url, str) and url else ""))[:500]
 
 
 # A row whose pull raised something unexpected (a bug, not the data): never scored as a gap.
@@ -152,7 +164,7 @@ def cmd_pull(a) -> int:
         except Exception as ex:  # noqa: BLE001 -- one point's failure is recorded with why, never kills the pull
             return pt, {"point_id": pt.point_id, "identity": dict(pt.unit.identity), "row": pt.row,
                         "records": pt.records, "measurements": pt.measurements, "files": {},
-                        "build": None, "reasons": [PULL_ERROR], "problems": [repr(ex)[:500]]}, ex
+                        "build": None, "reasons": [PULL_ERROR], "problems": [_error_text(ex)]}, ex
 
     fresh_results = {}
     if dl_workers <= 1 or len(inc.fresh) <= 1:
@@ -392,7 +404,10 @@ def cmd_score(a) -> int:
     bad += check_harness_commit(getattr(a, "harness_commit", None))
     if not bad:
         bad += check_metric_definitions(blis)
+    distance = None
     try:
+        if getattr(a, "engine_report", None) or getattr(a, "engine_checkout", None):
+            distance = cdist.Distance.load(getattr(a, "engine_report", None), getattr(a, "engine_checkout", None))
         sglang_kit = None
         stack = read_stack(blis, getattr(a, "stack", None))
         engine_release = stack.engine("vllm")
@@ -413,6 +428,8 @@ def cmd_score(a) -> int:
         return 2
     manifest_text = (pull_dir / "manifest.json").read_text()
     manifest = json.loads(manifest_text)
+    # The database-dump extract is cut against one vLLM release and resolves no build; the night names its own.
+    dx.anchor_to_ref(manifest, sk.vllm_ref(stack))
     supplemental_class = None
     if getattr(a, "supplemental", None):
         # A run of the reconstructed class alone, beside the regular run and never inside it: the points are the supplemental
@@ -441,7 +458,11 @@ def cmd_score(a) -> int:
     if a.only is not None:  # None = score the whole manifest; [] = score nothing (never "all")
         points = [p for p in points if any(p["point_id"].startswith(x) for x in a.only)]
     env = sc.Env(
-        blis=str(blis), blis_release=_git(sim, "describe", "--tags", "--exact-match") or "unknown",
+        blis=str(blis),
+        # A build named by its commit (--sim-build, checked above against the checkout) records that commit as its release: a
+        # recorded pre-release identity, the same one the dump lane and the snapshot id carry.
+        blis_release=(_git(sim, "describe", "--tags", "--exact-match")
+                      or (sim_build if sim_build and _SIM_COMMIT.match(sim_build) else "unknown")),
         blis_commit=_git(sim, "rev-parse", "HEAD"), catalog=Path(a.catalog).resolve(),
         catalog_release=a.catalog_release, registry=Path(a.registry).resolve(),
         registry_release=a.registry_release,
@@ -458,7 +479,8 @@ def cmd_score(a) -> int:
         router_policy_experiment=getattr(a, "router_policy_experiment", None),
         speculative_fallback_category=getattr(a, "speculative_fallback_category", None),
         router_checkout=Path(a.router_checkout).resolve() if getattr(a, "router_checkout", None) else None,
-        sglang=sglang_kit)
+        sglang=sglang_kit,
+        distance=distance)
     # The build every point records: --sim-build, else the release tag the checkout is at
     # (check_blis_inputs required one), with the engine release its stack.json names (COV-6).
     env.sim_build = sim_build or env.blis_release
@@ -568,7 +590,8 @@ def run_harness(cmd: list[str]) -> int:
 
 
 def harness_command(*, sim: str, units, pull, out, catalog, registry, corpus_dir, fields,
-                    catalog_release: str, registry_release: str, max_rss_mb: int = 0) -> list[str]:
+                    catalog_release: str, registry_release: str, max_rss_mb: int = 0, workers: int = 0,
+                    engine_reports=(), engine_checkout=None) -> list[str]:
     """The harness/run.sh command that scores a night (design §11.7). The harness is the script in
     this checkout, so the commit every figure records is this checkout's HEAD, which run.sh reads."""
     cmd = ["bash", str(HARNESS_RUN), "--sim", sim, "--units", str(Path(units).resolve()),
@@ -578,12 +601,18 @@ def harness_command(*, sim: str, units, pull, out, catalog, registry, corpus_dir
            "--catalog-release", catalog_release, "--registry-release", registry_release]
     if max_rss_mb:
         cmd += ["--max-rss-mb", str(max_rss_mb)]
+    if workers:
+        cmd += ["--workers", str(workers)]
+    for r in engine_reports or ():
+        cmd += ["--engine-report", str(Path(r).resolve())]
+    if engine_checkout:
+        cmd += ["--engine-checkout", str(Path(engine_checkout).resolve())]
     return cmd
 
 
 def cmd_nightly(a) -> int:
     """One night of the no-storage API-ingest pipeline (Discussion #15, revised 2026-10-25):
-    list the 180-day window, fetch+score only the delta (or the whole window on a BLIS release),
+    list every API row, fetch+score only the delta (or the whole window on a BLIS release),
     merge into last night's published summary, and publish. Nothing raw is persisted -- the work
     dir is ephemeral and summary.json IS the score store. Wires the real pull/score/build as the
     closures nightly_run.run_night orchestrates (and unit-tests with fakes). Resolve the BLIS tag
@@ -621,7 +650,7 @@ def cmd_nightly(a) -> int:
     missing: dict = {}
 
     def pull_fn(work: Path, today_: date, last_ids: set, blis_changed: bool):
-        # List the whole window (cheap -- api.pull hits only the REST API, no artifacts); its points
+        # List every row (cheap -- api.pull hits only the REST API, no artifacts); its points
         # are the anchor units, all of which its rows must hold. Then fetch inputs for the points
         # to score: every point on a BLIS release AND on the seed (no prior ids), otherwise only
         # the new points. A row the pull itself can't read fails the run (cmd_pull returns
@@ -639,7 +668,7 @@ def cmd_nightly(a) -> int:
                                   f"(first: {unknown[0]}); the anchor list and the ledger are not one release's")
         changed = {lg.by_record[str(r["id"])].unit.unit_id for r in differing if str(r["id"]) in lg.by_record}
         missing.clear()
-        missing.update({u: pl.ROW_DIFFERS if u in changed else pl.NOT_IN_WINDOW for u in anchors - listed})
+        missing.update({u: pl.ROW_DIFFERS if u in changed else pl.NOT_IN_FEED for u in anchors - listed})
         window_ids = set(anchors)
         prior = json.loads(latest_path.read_text()) if latest_path.is_file() else None
         whole = (blis_changed or not last_ids or not mergeable(prior, bsv2.SCHEMA_VERSION)
@@ -648,7 +677,7 @@ def cmd_nightly(a) -> int:
         _log(f"nightly: window {len(listed)} units, {len(window_ids)} of them anchor units; "
              f"fetch {'every one' if whole else f'{len(to_fetch)} new'}")
         _log(f"nightly: {len(missing)} anchor units are G5 without a pull: "
-             f"{sum(v == pl.NOT_IN_WINDOW for v in missing.values())} not in the window, "
+             f"{sum(v == pl.NOT_IN_FEED for v in missing.values())} no longer in the API feed, "
              f"{sum(v == pl.ROW_DIFFERS for v in missing.values())} whose row differs from the ledger")
         rc = cmd_pull(types.SimpleNamespace(out=str(work), today=today_.isoformat(),
                                             window_days=a.window_days, cache=a.cache, prior=None,
@@ -671,6 +700,32 @@ def cmd_nightly(a) -> int:
         _log("FATAL: the blis-substrate checkout is not " + release + ": " + "; ".join(problems))
         return 2
 
+    # The dump lane (dump_lane.py): the anchor units the frozen dump supplies are scored from the restored extract, on this
+    # BLIS release and harness commit, and the API lane then leaves them alone.
+    lane, lane_dir, lane_scored = None, None, False
+    if getattr(a, "dump_extract", None):
+        def dump_score(units_file: Path, out: Path) -> int:
+            return run_harness(harness_command(
+                sim=a.blis_tag, units=units_file, pull=a.dump_extract, out=out, catalog=a.catalog, registry=a.registry,
+                corpus_dir=a.corpus_dir, fields=a.fields, catalog_release=release, registry_release=release,
+                max_rss_mb=a.max_rss_mb, workers=a.dump_workers, engine_reports=getattr(a, "engine_report", None),
+                engine_checkout=getattr(a, "engine_checkout", None)))
+        try:
+            lane_dir, lane, lane_scored, dump_units = dl.night_lane(
+                extract=Path(a.dump_extract), state=Path(a.dump_state), anchors=anchors, force=a.dump_force,
+                key_args={"blis_release": a.blis_tag, "harness_commit": harness_now, "catalog_release": release,
+                          "registry_release": release}, score=dump_score, log=_log)
+        except (dl.LaneError, dx.DumpError, OSError, ValueError) as e:
+            _log(f"FATAL: the dump lane: {e}")
+            return 2
+        anchors -= set(dump_units)
+        # the API lane scores the anchor list less the dump's units: the published list, with those units taken out
+        import yaml
+        listed = yaml.safe_load(anchor_path.read_text())
+        listed["units"] = sorted(anchors)
+        anchor_path.write_text(json.dumps(listed))
+        _log(f"nightly: {len(dump_units)} anchor units are the dump's, {len(anchors)} the API's")
+
     def score_build_fn(work: Path, blis_tag: str, score_ids, pull_date: str, window_ids: set):
         # The night scores by running harness/run.sh from this checkout (design §11.7): the
         # figures record the checkout's commit, run.sh clones and builds the release `blis_tag`,
@@ -680,7 +735,8 @@ def cmd_nightly(a) -> int:
             sim=blis_tag, units=anchor_path, pull=work, out=contract_dir,
             catalog=a.catalog, registry=a.registry, corpus_dir=a.corpus_dir, fields=a.fields,
             catalog_release=release, registry_release=release,
-            max_rss_mb=a.max_rss_mb))
+            max_rss_mb=a.max_rss_mb, engine_reports=getattr(a, "engine_report", None),
+            engine_checkout=getattr(a, "engine_checkout", None)))
         if rc != 0:
             raise RuntimeError(f"score failed (rc={rc})")
         prov = json.loads((contract_dir / contract.PROVENANCE_JSON).read_text())
@@ -693,15 +749,25 @@ def cmd_nightly(a) -> int:
                 and same_harness(prior, harness_now)):
             summary = bsv2.build_merged(prior, contract_dir, window_ids, generated_at=gen_at,
                                         evaluator_commit=a.evaluator_commit or "local",
-                                        work=Path(a.score_work or contract_dir.parent) / "merge")
+                                        work=Path(a.score_work or contract_dir.parent) / "merge", lane_dir=lane_dir)
         else:
-            summary = bsv2.build(contract_dir, generated_at=gen_at, evaluator_commit=a.evaluator_commit or "local")
+            whole = dl.combined(contract_dir, lane_dir, contract_dir.parent / "_contract-dump") if lane_dir else contract_dir
+            summary = bsv2.build(whole, generated_at=gen_at, evaluator_commit=a.evaluator_commit or "local")
+        if lane:
+            # The headline publishes only if both lanes are one scoring: one BLIS release, one harness commit.
+            not_one = dl.gate(summary["provenance"], lane)
+            if not_one:
+                raise dl.LaneError("publish gate: " + "; ".join(not_one))
         return summary, summary["coverage"]["graded"]
 
-    res = nr.run_night(today, a.blis_tag, work_dir=work_dir, data_dir=data_dir, state_path=state_path,
-                       scored_path=Path(a.scored), pull_fn=pull_fn, score_build_fn=score_build_fn,
-                       snapshot_date=a.today or today.isoformat(), keep_api=a.keep_api,
-                       backlog_fn=bsv2.backlog_of)
+    try:
+        res = nr.run_night(today, a.blis_tag, work_dir=work_dir, data_dir=data_dir, state_path=state_path,
+                           scored_path=Path(a.scored), pull_fn=pull_fn, score_build_fn=score_build_fn,
+                           snapshot_date=a.today or today.isoformat(), keep_api=a.keep_api,
+                           backlog_fn=bsv2.backlog_of, force_publish=lane_scored)
+    except dl.LaneError as e:
+        _log(f"FATAL: {e}; nothing is published and the headline stays at the last good night")
+        return 2
     _log(f"nightly: {res.action} -- {res.decision.reason}")
     if res.snapshot_id:
         _log(f"nightly: froze snapshot {res.snapshot_id}")
@@ -712,7 +778,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("pull")
-    p.add_argument("--window-days", type=int, required=True)
+    p.add_argument("--window-days", type=int, default=None, help="an explicit N-day cut; omitted, there is no age limit")
     p.add_argument("--out", required=True)
     p.add_argument("--today")
     p.add_argument("--cache")
@@ -767,6 +833,11 @@ def main(argv=None) -> int:
                    help="each AgentX corpus at <dir>/<workload>/<file>, as resolve_agentic_corpus.py --all "
                         "fetched it at the revision its catalog replay workload pins")
     s.add_argument("--corpus-cache")
+    s.add_argument("--engine-report", action="append", metavar="FILE",
+                   help="an upgrade report (JSON) for a pair of engine commits: the ported changes that grade a run on one of them "
+                        "against the simulator's commit (G3 or G4). Repeatable; a pair no report names is G4")
+    s.add_argument("--engine-checkout", metavar="DIR",
+                   help="a git checkout of the engine's source holding the commits: each point's commit distance is recorded from it")
     s.add_argument("--router-table", help="a directory of router table entries to read in place of <catalog>/routers: for an "
                                           "experiment with a candidate entry. The run is then experimental.")
     s.add_argument("--assume-router-revision", help="a 40-hex commit of the router build to assume where a run records only "
@@ -817,7 +888,7 @@ def main(argv=None) -> int:
     n.add_argument("--state", required=True, help="state/last-run.json for the API pipeline")
     n.add_argument("--scored", required=True, help="state/scored-releases.json: the releases with published scores; "
                                                    "this night appends its release when it publishes the scores")
-    n.add_argument("--window-days", type=int, default=180)
+    n.add_argument("--window-days", type=int, default=None, help="an explicit N-day cut; omitted, there is no age limit")
     n.add_argument("--keep-api", type=int, default=5)
     n.add_argument("--today")
     n.add_argument("--cache")
@@ -837,13 +908,22 @@ def main(argv=None) -> int:
     n.add_argument("--stack", help="TEMPORARY until the pinned inference-sim release (see score --stack)")
     n.add_argument("--corpus-dir", required=True, help="see score --corpus-dir")
     n.add_argument("--corpus-cache")
+    n.add_argument("--engine-report", action="append", metavar="FILE", help="see score --engine-report")
+    n.add_argument("--engine-checkout", metavar="DIR", help="see score --engine-checkout")
     n.add_argument("--timeout", type=int, default=7200)
     n.add_argument("--workers", type=int, default=0, help="single-turn scoring parallelism (default: min(cores, 4))")
     n.add_argument("--agentic-workers", type=int, default=0, help="agentic scoring parallelism (default 1, corpus-heavy)")
     n.add_argument("--download-workers", type=int, default=0, help="parallel artifact-download workers (default: min(2*cores, 8))")
     n.add_argument("--max-rss-mb", type=int, default=0, help="per-replay RSS ceiling MB (0=none); over-limit agentic -> not_scored:insufficient_memory")
+    n.add_argument("--dump-extract", metavar="DIR", help="the anchor extract of the database dump (dump_extract.py): its units are "
+                   "scored in the dump lane and left out of the API lane; omitted, there is no dump lane")
+    n.add_argument("--dump-state", metavar="DIR", help="where the last dump result is kept (required with --dump-extract)")
+    n.add_argument("--dump-force", action="store_true", help="score the dump lane even if its last result is current")
+    n.add_argument("--dump-workers", type=int, default=2, help="the dump lane's scoring parallelism")
 
     a = ap.parse_args(argv)
+    if a.cmd == "nightly" and bool(a.dump_extract) != bool(a.dump_state):
+        ap.error("--dump-extract and --dump-state go together")
     return {"pull": cmd_pull, "score": cmd_score, "coverage": cmd_coverage, "nightly": cmd_nightly}[a.cmd](a)
 
 

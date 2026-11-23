@@ -398,7 +398,10 @@ NOT = "Gate: not an accuracy change - documentation only"
     (NOT, [("M", "state/gate/ledger.json")], True),                # the ledger is committed as data, after each evaluation
     (NOT, [("M", "orchestrator/ingest/test_result.py")], True),    # a test file is not scoring code
     (NOT, [("M", "orchestrator/ingest/testdata/inferencex-workloads/seed0.json")], False),   # data the scorer reads
-    ("no statement", [("M", "docs/README.md")], False),
+    ("no statement", [("M", "docs/README.md")], True),             # a change that touches no accuracy path needs no statement
+    ("", [("M", "web/src/App.tsx")], True),
+    ("no statement", [("M", "harness/run.sh")], False),            # an accuracy path must state its gate
+    ("no statement", [("M", "orchestrator/gate/rule.py")], False),
     (CITE + "\n" + NOT, [("M", "docs/README.md")], False),
     ("Gate: pre-registration row-00-missing", [("M", "harness/run.sh")], False),
     (CITE, [("M", "state/gate/preregistrations/row-99-example.json")], False),     # edited after it was committed

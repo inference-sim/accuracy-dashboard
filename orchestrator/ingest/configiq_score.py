@@ -1,4 +1,4 @@
-"""Scoring Red Hat's configiq points by simulation (design §10.1-10.3, §11, COV-7, COV-10, COV-11, D7).
+"""Scoring Red Hat's configiq points by simulation (design §10.1-10.3, §11, COV-7, COV-10, COV-11, D9).
 
 configiq.py turns the ledger's units into points and decides, from the unit's identity alone, which are consistent
 with the launcher that published the dataset (the provisional band). Nothing consumed those points: no scenario was
@@ -24,9 +24,11 @@ substitution on the point (never silent): the launcher's parallelism and blank f
 record, the node size, the constant length standing for a recorded length distribution, the engine release.
 
 The grade is the one grade.grade gives the point's standard substitutions, capped at G3 (COV-7): a provisional point
-is never better than G3, and never counts toward the headline (COV-11). A point on the development split's test set
-is never simulated by this module and its figures are not read (D7); the split is the dashboard's development split,
-applied to the point's role key.
+is never better than G3, and never counts toward the headline (COV-11). configiq is ANCHOR-ONLY (design D9, plan
+Terms and 3C): every unit is an anchor unit, scored, and none is fit, selected, validated, held or withheld as a
+"test" split. The dashboard's development split (D7) is therefore not applied: `Env.withhold_splits` is empty by
+default, and each record still carries the split its series would fall on, as a label only. Naming splits in
+`withhold_splits` is an opt-in for a local experiment and is never the nightly's setting.
 
 Figures. GuideLLM records, per row, percentiles of TTFT, ITL, TPOT and request latency (configiq.METRICS). The
 simulator's request rows give the same per-request quantities, and the same statistics are computed from them by
@@ -335,7 +337,7 @@ def catalog_context(catalog_root, model: str) -> int | None:
     return None
 
 
-def build(p: "cq.Point", *, model: str, chip: str, engine_release: str, packaging: dict,
+def build(p: "cq.Point", *, model: str, chip: str, packaging: dict,
           context: int | None = None) -> Scenario:
     """The scenario file and the requests for one provisional point. `packaging` is the catalog's packaging of the chip
     ({"gpus_per_node", "gpus_per_rack"}); a chip whose entry fixes the node size has it taken from the entry, as
@@ -366,7 +368,7 @@ def build(p: "cq.Point", *, model: str, chip: str, engine_release: str, packagin
         cluster["gpus_per_node"] = per_node
         subs.append(dict(NODE_SUBSTITUTION))
     cluster["nodes"] = max(1, -(-tp // per_node))
-    scenario = {"kind": "Scenario", "name": name, "engine": {"kind": ENGINE, "version": engine_release.lstrip("v")},
+    scenario = {"kind": "Scenario", "name": name, "engine": {"kind": ENGINE},
                 "model": model, "coefficients": list(st.COEFFICIENTS), "cluster": cluster}
     pool = {"role": "colocated", "nodes": cluster["nodes"], "parallel": {"dp": 1, "pp": 1, "tp": tp}, "engine": eng}
     deployment = {"kind": "Deployment", "name": name, "pools": [pool]}
@@ -475,6 +477,7 @@ class Env:
     catalog_obj: object = None
     parts: set = field(default_factory=set)
     max_rss_mb: int = 0
+    withhold_splits: tuple = ()    # D9: empty. Every configiq unit is an anchor unit; none is withheld as "test".
 
     def simulator(self) -> dict:
         return {"build": self.sim_build, "engine": {"kind": ENGINE, "version": self.engine_release},
@@ -617,9 +620,8 @@ def resolve(p: "cq.Point", env: Env) -> tuple[str | None, str | None, list[dict]
 
 def score_point(p: "cq.Point", env: Env, work: Path, *, simulate: bool = True) -> Outcome:
     """One point: refused, or simulated and compared. Every refusal that identity decides is decided first, for every
-    split. A test-split point is then withheld: it is never simulated here and its figures are never read (D7). The
-    logged evaluation of the test set (baseline/compare.evaluation_log) is a release's single test evaluation and is not
-    wired for this source."""
+    split. A point whose split is named in env.withhold_splits is then withheld (never simulated, figures not read); the
+    default withholds none (D9: configiq is anchor-only)."""
     o = Outcome(point=p, split=split_of(p.identity))
     o.g5 = refusals(p)
     if o.g5:
@@ -627,11 +629,11 @@ def score_point(p: "cq.Point", env: Env, work: Path, *, simulate: bool = True) -
     model, chip, o.g5, context = resolve(p, env)
     if o.g5:
         return o
-    if o.split == "test":
+    if o.split in env.withhold_splits:
         o.withheld = True
         return o
     o.model = model
-    sc = build(p, model=model, chip=chip, engine_release=env.engine_release,
+    sc = build(p, model=model, chip=chip,
                packaging=env.catalog_obj.packaging(chip), context=context)
     o.requests = len(sc.input_tokens)
     work = Path(work).resolve()
@@ -694,8 +696,8 @@ def ident_release(p: "cq.Point") -> str:
 def record(o: Outcome) -> dict:
     """The point's record for the summary: configiq.record's fields, completed by what scoring found."""
     r = cq.record(o.point)
-    if o.split == "test":
-        # The test set's figures are not read here (D7): the record keeps the unit's identity and what was decided
+    if o.withheld:
+        # A withheld point's figures are not read: the record keeps the unit's identity and what was decided
         # from it, not the measurement.
         r["measured"], r["repeat_spread"], r["turn_slices"], r["whole_runs"] = None, {}, [], []
     r["split"] = o.split
@@ -749,7 +751,7 @@ MIN_POINTS = 10
 TOO_FEW = "too few points"
 
 
-def figures(outcomes: list["Outcome"], splits=("train", "validation")) -> dict:
+def figures(outcomes: list["Outcome"], splits=("train", "validation", "test")) -> dict:
     """Error figures over the scored points of the given splits: for each statistic, the count, the mean absolute
     percentage error and the median signed error. Under MIN_POINTS a figure is "too few points" (COV-11). Reported, not
     gated."""
@@ -781,7 +783,7 @@ def coverage(outcomes: list["Outcome"]) -> dict:
             key = f"{r['code']}: {_reason_key(r['subject'])}"
             reasons[key] = reasons.get(key, 0) + 1
     runnable = c["scored"] + c["withheld"] + c["failed"]
-    dev = [o for o in outcomes if o.split != "test"]
+    dev = [o for o in outcomes if not o.withheld]
     dev_ran = sum(1 for o in dev if o.status == "scored")
     return {**c, "runnable": runnable,
             "runnable_share": runnable / total if total else None,
@@ -851,7 +853,7 @@ def score_all(points: list, env: Env, work: Path, *, workers: int = 1, log=lambd
 
 def summary(outcomes: list["Outcome"], provenance: dict) -> dict:
     """The run's summary: the coverage counts, the by_source breakdown (by_source.py: provisional points are outside the
-    headline), the error figures over train and validation, and the problems found checking them."""
+    headline), the error figures over every scored point (D9: no split is withheld), and the problems found checking them."""
     import by_source as bs
     recs = [record(o) for o in outcomes]
     br = bs.by_source(recs)[SOURCE]

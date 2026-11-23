@@ -5,7 +5,7 @@
  * figure with its point count, and "too few points" for a figure under the summary's minimum.
  */
 import { formatCount, formatFigure, formatPct } from '../format'
-import type { Figure, HeadlineBlock, MetricBlockPair, TierKey } from '../types'
+import type { Figure, GroundTruthSource, HeadlineBlock, MetricBlockPair, TierKey } from '../types'
 
 interface Props {
   totals: MetricBlockPair
@@ -18,6 +18,8 @@ interface Props {
    *  API was pulled. Shown instead of `dataDate`, which for v1 is the database dump's date. */
   measuredRange?: { from: string; to: string } | null
   pulledAt?: string | null
+  /** The per-source dates, when the summary has them: with a dump, each source states its own range and pull date. */
+  sources?: GroundTruthSource[] | null
   /** v2: how many of the points are exact and how many estimated. The headline averages both
    *  (the "all" tier), so it says so next to the count. */
   split?: { exact: number; estimated: number } | null
@@ -44,22 +46,28 @@ function FigureStat({ figure, label }: { figure: Figure; label: string }) {
       <div className="stat-label">{label}</div>
       <div className="stat-hint">
         average error · {formatCount(figure.n)} point{figure.n === 1 ? '' : 's'}
+        {figure.roleKeys != null && <> · {formatCount(figure.roleKeys)} role key{figure.roleKeys === 1 ? '' : 's'}</>}
       </div>
     </div>
   )
 }
 
+/** A cell's class: right-aligned, and muted when it holds "too few points" rather than a figure. */
+const numClass = (v: unknown) => (typeof v === 'number' ? 'num' : 'num toofew')
+
 /** v3: each graded grade's share of the graded points, its count and its own accuracy. */
 function GradeSplit({ h }: { h: HeadlineBlock }) {
   return (
-    <table className="grades" aria-label="accuracy by grade">
+    <div className="tscroll gradebox">
+    <table className="readout gradetbl" aria-label="accuracy by grade">
       <thead>
         <tr>
-          <th scope="col">grade</th>
-          <th scope="col">points</th>
-          <th scope="col">share</th>
-          <th scope="col">TTFT error</th>
-          <th scope="col">TPOT error</th>
+          <th scope="col">Grade</th>
+          <th scope="col" className="num">Points</th>
+          <th scope="col" className="num">Share</th>
+          <th scope="col" className="num">TTFT error</th>
+          <th scope="col" className="num">TPOT error</th>
+          <th scope="col" className="num">Role keys</th>
         </tr>
       </thead>
       <tbody>
@@ -70,15 +78,17 @@ function GradeSplit({ h }: { h: HeadlineBlock }) {
               <th scope="row">
                 {g} <span className="facet">{GRADE_LABEL[g]}</span>
               </th>
-              <td>{formatCount(r.points)}</td>
-              <td>{r.share === 'too few points' ? r.share : formatPct(r.share * 100)}</td>
-              <td>{figureText(r.ttft)}</td>
-              <td>{figureText(r.tpot)}</td>
+              <td className="num">{formatCount(r.points)}</td>
+              <td className={numClass(r.share)}>{r.share === 'too few points' ? r.share : formatPct(r.share * 100)}</td>
+              <td className={numClass(r.ttft.mape)}>{figureText(r.ttft)}</td>
+              <td className={numClass(r.tpot.mape)}>{figureText(r.tpot)}</td>
+              <td className="num">{r.ttft.roleKeys != null ? formatCount(r.ttft.roleKeys) : ''}</td>
             </tr>
           )
         })}
       </tbody>
     </table>
+    </div>
   )
 }
 
@@ -92,7 +102,13 @@ function Stat({ value, label, hint }: { value: number | null | 'too few points';
   )
 }
 
-export function Headline({ totals, tier, points, models, blisRelease, dataDate, measuredRange, pulledAt, split, graded }: Props) {
+function rangeText(x: GroundTruthSource): string {
+  const { measurement_date_from: from, measurement_date_through: to } = x
+  if (!from || !to) return 'no measurements'
+  return `data range ${from === to ? to : `${from} to ${to}`}`
+}
+
+export function Headline({ totals, tier, points, models, blisRelease, dataDate, measuredRange, pulledAt, sources, split, graded }: Props) {
   const t = totals[tier]
   return (
     <section className="headline" aria-label="Overall accuracy">
@@ -124,7 +140,14 @@ export function Headline({ totals, tier, points, models, blisRelease, dataDate, 
         )}{' '}
         · {models} model{models === 1 ? '' : 's'}
         {blisRelease && <> · BLIS {blisRelease}</>}
-        {measuredRange ? (
+        {sources?.some((x) => x.id === 'dump') ? (
+          sources.map((x) => (
+            <span key={x.id}>
+              {' '}· {x.id === 'dump' ? `InferenceX dump ${x.ref.replace(/^db-dump\//, '')}` : 'InferenceX API feed'}{' '}
+              {rangeText(x)}, {x.id === 'dump' ? 'pulled' : 'API pull date'} {x.pulled_at.slice(0, 10)}
+            </span>
+          ))
+        ) : measuredRange ? (
           <>
             {' '}· InferenceX data range{' '}
             {measuredRange.from === measuredRange.to ? measuredRange.to : `${measuredRange.from} to ${measuredRange.to}`}

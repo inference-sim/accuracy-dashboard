@@ -88,6 +88,15 @@ DATA_READS = {
     ("orchestrator/ingest/configiq_score.py", "load_points"):
         "TEMPORARY until an inference-sim command prints the full unit list with identities and the ingest report "
         "(see ledger.load): the configiq units are read from catalog/ledger/units, reports and sources.yaml",
+    ("orchestrator/baseline/funnel.py", "read_training"):
+        "TEMPORARY with ledger.load: reads the training-only sources' units and reports from the ledger checkout for their "
+        "labelled diagnostic funnels, until an inference-sim command prints the full unit list and the ingest report",
+    ("orchestrator/nightly/configiq_night.py", "main"):
+        "TEMPORARY with the api-nightly.yml substrate checkout and ledger.load: the nightly's configiq step reads the "
+        "ledger's sources.yaml, ledger.yaml and published lists from that checkout, until an inference-sim command prints them",
+    ("orchestrator/baseline/funnel.py", "main"):
+        "TEMPORARY with ledger.load: reads the configiq units, report and sources from the ledger checkout for the "
+        "configiq funnel, until an inference-sim command prints the full unit list with identities and the ingest report",
     ("orchestrator/ingest/ledger_fake.py", "write"):
         "TEMPORARY with ledger.load: writes, for tests, the ledger layout ledger.load reads",
     ("orchestrator/ingest/support.py", "Catalog._claims"):
@@ -148,6 +157,10 @@ TEXT_READS = {
         "TEMPORARY until an inference-sim command prints the full unit list with identities and the "
         "ingest report (`blis ledger --list` prints only the published unit ids): the job checks out "
         "blis-substrate at the commit stack.json pins, for catalog/, registry/ and catalog/ledger",
+    (".github/workflows/score-configiq.yml", "clone"):
+        "TEMPORARY with the api-nightly.yml substrate checkout: the manual configiq run checks out blis-substrate at the "
+        "commit the simulator's stack.json pins, for catalog/, registry/ and catalog/ledger, until an inference-sim command "
+        "prints them",
     (".github/workflows/score-contracts.yml", "clone"):
         "TEMPORARY with the api-nightly.yml substrate checkout: the contract-scoring job checks out "
         "blis-substrate at the commit the simulator's stack.json pins, for catalog/, registry/ and "
@@ -158,6 +171,9 @@ TEXT_READS = {
         "release lets the build print them",
     ("orchestrator/resolve_stack.py", "pins"):
         "TEMPORARY with the api-nightly.yml substrate checkout: prints the commit it clones",
+    ("orchestrator/nightly/configiq_night.py", "pins"):
+        "TEMPORARY with the api-nightly.yml substrate checkout: main names stack.json's substrate commit to derive the "
+        "release the data is at (stack.pin_of), as cli.py nightly does",
     ("orchestrator/ingest/cli.py", "pins"):
         "TEMPORARY with the api-nightly.yml substrate checkout: the nightly checks that checkout is "
         "the release stack.json names",

@@ -63,7 +63,7 @@ NODE8 = ir.NodeSize(8, "cluster.gpus_per_node: launch_config")
 def _build(c, **kw):
     kw.setdefault("catalog_node_size", None)
     kw.setdefault("node", NODE8)
-    return st.build(c, name="p", model="m", part=PART_H200, engine_version="0.31.0", field_list=FIELDS, **kw)
+    return st.build(c, name="p", model="m", part=PART_H200, field_list=FIELDS, **kw)
 
 
 # ------------------------------------------------------------------ pyrepr
@@ -294,9 +294,47 @@ def test_every_location_is_a_field_blis_vllm_engine_block_or_the_deployment_name
                                              "enable_cross_layers_blocks", "lazy_offload", "blocks_per_chunk",
                                              "kv_load_failure_policy"}, (path, loc)
         else:
-            assert top in ("offload", "replay") and rest in ("connector", "spec", "tiers.cpu_dram",
-                                                             "acceptance_length", "api_server_count"), (path, loc)
+            assert top in ("offload", "replay", "dp_lb") and rest in ("connector", "spec", "tiers.cpu_dram",
+                                                                      "acceptance_length", "api_server_count", "hybrid",
+                                                                      "external", "multi_port_external"), (path, loc)
     assert st.location("env.VLLM_FLASHINFER_ALLREDUCE_BACKEND") == "engine.env.VLLM_FLASHINFER_ALLREDUCE_BACKEND"
+
+
+def _dp_lb_point(**flags):
+    names = ("tensor_parallel_size", "pipeline_parallel_size", "data_parallel_size", "data_parallel_size_local")
+    modelled = [{"name": n, "source": "config", "status": "modelled", "evidence": {"traces": ["t"]},
+                 "estimation": {"rule": "leave_unset"}} for n in sorted((*names, *flags))]
+    flist = fl.parse(json.dumps({"kind": "FieldList", "engine": {"kind": "vllm", "version": "0.33.0"},
+                                 "fields": modelled}))
+    args = {"tensor_parallel_size": 1, "pipeline_parallel_size": 1, "data_parallel_size": 4,
+            "data_parallel_size_local": 2, **flags}
+    s = {k: st.Setting(k, v, "non_default_args", requested=True) for k, v in args.items()}
+    c = st.decide(s, flist)
+    return c, st.build(c, name="p", model="m", part=PART_H200, field_list=flist,
+                       catalog_node_size=None, node=NODE8)
+
+
+def test_a_run_launched_with_hybrid_dp_load_balancing_is_scored_as_that_mode_not_refused_as_a_lost_setting():
+    # data_parallel_hybrid_lb: the nightly for v0.18.1 stopped on one such point with setting_differs (COV-8 halts on it).
+    c, b = _dp_lb_point(data_parallel_hybrid_lb=True)
+    assert c.reasons == [] and b.reasons == []
+    assert b.deployment["pools"][0]["parallel"]["data_parallel_load_balancing"] == "hybrid"
+    assert b.deployment["pools"][0]["parallel"]["dp_local"] == 2
+
+
+def test_external_and_multi_port_external_dp_load_balancing_are_the_deployments_external_mode():
+    for flag in ("data_parallel_external_lb", "data_parallel_multi_port_external_lb"):
+        c, b = _dp_lb_point(**{flag: True})
+        assert c.reasons == [] and b.reasons == [], flag
+        assert b.deployment["pools"][0]["parallel"]["data_parallel_load_balancing"] == "external", flag
+
+
+def test_a_dp_load_balancing_flag_the_run_left_false_states_nothing_and_two_modes_at_once_are_a_conflict():
+    c, b = _dp_lb_point(data_parallel_hybrid_lb=False)
+    assert c.reasons == [] and b.reasons == []
+    assert "data_parallel_load_balancing" not in b.deployment["pools"][0]["parallel"]
+    _, b = _dp_lb_point(data_parallel_hybrid_lb=True, data_parallel_external_lb=True)
+    assert b.reasons == ["conflict:data_parallel_external_lb"]
 
 
 def test_a_local_model_path_is_named_by_the_runs_own_recipe():
@@ -582,13 +620,13 @@ def test_a_setting_nothing_recorded_is_left_unset_and_no_list_of_required_settin
     assert not hasattr(st, "REQUIRED")
 
 
-def test_a_built_scenario_holds_only_recorded_values_and_states_the_engine_from_stack_json():
-    # X19: nothing the run did not record is written; the engine is vllm at the release passed in,
-    # stated as engine: {kind, version} (SIM-1), never the removed engine_version.
+def test_a_built_scenario_holds_only_recorded_values_and_states_the_engine_kind_alone():
+    # X19: nothing the run did not record is written. The engine is stated as engine: {kind} and no
+    # release or commit (SIM-1, LIF-6): the build fixes them, and a version field is refused.
     c = _classify(_log("'tensor_parallel_size': 1, 'max_num_batched_tokens': 4096"))
-    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="0.32.0", field_list=FIELDS,
+    b = st.build(c, name="p", model="m", part=PART_H200, field_list=FIELDS,
                  catalog_node_size=None, node=NODE8)
-    assert b.scenario["engine"] == {"kind": "vllm", "version": "0.32.0"}
+    assert b.scenario["engine"] == {"kind": "vllm"}
     assert "engine_version" not in b.scenario
     recorded = {loc.split(".", 1)[1] for loc in c.mapped if loc.startswith("engine.")}
     assert set(b.deployment["pools"][0]["engine"]) == recorded
@@ -600,7 +638,7 @@ def test_the_cluster_states_the_node_size_and_holds_the_runs_own_gpus():
                        RESOLVED.replace("data_parallel_size=1", "data_parallel_size=2")))
     b = _build(c)
     assert b.scenario["cluster"] == {"hardware": "h200", "nodes": 1, "gpus_per_node": 8}
-    assert b.scenario["engine"] == {"kind": "vllm", "version": "0.31.0"}
+    assert b.scenario["engine"] == {"kind": "vllm"}
     par = b.deployment["pools"][0]["parallel"]
     assert (par["tp"], par["dp"], par["enable_expert_parallel"]) == (1, 2, True)
 
@@ -633,7 +671,7 @@ def test_the_assumed_fabric_class_follows_the_chip_generations_nic():
     c = _classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16")))
     seen = {}
     for chip in ("b300", "gb300", "b200", "gb200-nvl72", "h100", "h200", "a100-80", "l40s", "not-a-chip"):
-        b = st.build(c, name="p", model="m", part=st.Part(name=chip), engine_version="0.32.0", field_list=FIELDS,
+        b = st.build(c, name="p", model="m", part=st.Part(name=chip), field_list=FIELDS,
                      catalog_node_size=None, node=NODE8)
         sub = [x for x in b.substitutions if x["subject"] == "cluster.fabric"]
         assert len(sub) == 1 and "cost-model-fabric" in b.scenario["coefficients"]
@@ -647,7 +685,7 @@ def test_the_assumed_fabric_class_follows_the_chip_generations_nic():
     assert {k: v for k, v in seen.items() if v == "ib-800g"} == {"b300": "ib-800g", "gb300": "ib-800g"}
     assert seen["h100"] == seen["h200"] == seen["b200"] == seen["not-a-chip"] == "ib-400g"
     # a class the launch configuration records still wins over the chip's
-    b = st.build(c, name="p", model="m", part=st.Part(name="b300"), engine_version="0.32.0", field_list=FIELDS,
+    b = st.build(c, name="p", model="m", part=st.Part(name="b300"), field_list=FIELDS,
                  catalog_node_size=None, node=NODE8, launch_config={"resources": {"fabric": "roce-200g"}})
     assert b.scenario["cluster"]["fabric"] == "roce-200g"
     assert not [x for x in b.substitutions if x["subject"] == "cluster.fabric"]
@@ -938,10 +976,11 @@ def test_the_rows_gpu_count_is_read_in_inferencex_terms():
 
 
 def _graded(*, image="vllm/vllm-openai:v0.32.0", banner="0.32.0", subs=(), requests=None, reasons=(),
-            scored=True, build_match="exact"):
+            scored=True, build_match="exact", engine_commit=None):
     import score as sc
     o = sc.Outcome(point_id="p" * 64, identity={}, row={"image": image}, reasons=list(reasons),
-                   build={"image": image, "match": build_match}, banner=banner, subs=list(subs))
+                   build={"image": image, "match": build_match}, banner=banner, subs=list(subs),
+                   engine_commit=engine_commit)
     if scored:
         o.fidelity = {"build": o.build, "args": [], "resolved": [],
                       **({"requests": requests} if requests else {})}
@@ -968,6 +1007,12 @@ def test_no_point_is_g1_while_four_of_the_g1_conditions_are_not_graded():
     assert o.fidelity["run_release"] == "0.32.0"
     # build.match is not a grade input: the build decides G2 or G4 through its release alone.
     assert _graded(build_match="estimated").fidelity["grade"] == "G2"
+
+
+def test_the_runs_engine_commit_is_recorded_on_the_graded_point_only_when_the_result_stated_one():
+    commit = "0123456789abcdef0123456789abcdef01234567"
+    assert _graded(engine_commit=commit).fidelity["engine_commit"] == commit
+    assert "engine_commit" not in _graded().fidelity
 
 
 def test_every_estimate_and_client_difference_is_named_and_makes_the_point_g2():
@@ -1136,6 +1181,21 @@ def test_two_points_left_at_one_concurrency_in_a_sweep_get_a_sweep_each():
     assert clean[0].facets["sweep_id"] == "t"
 
 
+def test_a_sweep_of_two_engine_builds_splits_into_one_sweep_per_build_and_one_build_is_left_alone():
+    import score as sc
+    outs = []
+    for conc, ver in ((1, "0.1.dev1"), (2, "0.1.dev1"), (4, "0.1.dev2"), (8, None)):
+        x = sc.Outcome.__new__(sc.Outcome)
+        x.facets = {"sweep_id": "s", "vllm_version": ver}
+        outs.append(x)
+    sc.split_mixed_versions(outs)
+    assert [x.facets["sweep_id"] for x in outs] == ["s|v0.1.dev1", "s|v0.1.dev1", "s|v0.1.dev2", "s|vnone"]
+    one = [outs[0]]
+    one[0].facets["sweep_id"] = "t"
+    sc.split_mixed_versions(one)
+    assert one[0].facets["sweep_id"] == "t"
+
+
 def test_join_reports_no_match_and_several_matches():
     arts = [_A(1, "bmk_" + RF, "t1"), _A(2, "bmk_" + RF + "2", "t2")]
     same = {"recipe_fingerprint": "f" * 64, "conc": 8}
@@ -1255,6 +1315,41 @@ def test_pull_window_boundary_keeps_today_minus_179_drops_today_minus_180():
     p = api.pull(fetch, today=today, window_days=180)
     assert [r["id"] for r in p.rows] == ["keep"]
     assert p.window == ("2026-04-27", "2026-10-23")
+
+
+def test_no_age_limit_keeps_a_row_of_any_age():
+    # COV-2: the measured date is a slice attribute, so the default pull and predicate carry no age cut.
+    today = date(2026, 10, 23)
+    for measured, kept in [
+        ("2026-10-23", True),       # today
+        ("2026-04-26", True),       # one day older than the old 180-day cut
+        ("2025-09-29", True),       # the oldest the API serves
+        ("2020-01-01", True),       # any age
+        ("2026-10-24", False),      # after today waits for a later run
+        ("not-a-date", False),      # unparseable is reported, never in
+    ]:
+        assert api.in_window(measured, today) is kept, measured
+        assert api.in_window(measured, today, None) is kept, measured
+
+
+def test_the_default_pull_holds_rows_older_than_180_days():
+    today = date(2026, 10, 23)
+    site = {"/": b'<script src="/_next/static/c/a.js"></script>',
+            "/_next/static/c/a.js": b'x={m:"M"}',
+            "/api/v1/availability": json.dumps([{"model": "m", "framework": "vllm", "date": "2026-10-20"}]).encode()}
+    rows = {"M": [{"id": "new", "model": "m", "framework": "vllm", "date": "2026-10-20"},
+                  {"id": "old", "model": "m", "framework": "vllm", "date": "2026-04-26"},
+                  {"id": "oldest", "model": "m", "framework": "vllm", "date": "2025-09-29"}]}
+
+    def fetch(url):
+        path = url[len(api.BASE):]
+        if path.startswith("/api/v1/benchmarks?model="):
+            return gzip.compress(json.dumps(rows["M"]).encode())
+        return site[path]
+
+    p = api.pull(fetch, today=today)
+    assert [r["id"] for r in p.rows] == ["new", "old", "oldest"]
+    assert api.pull(fetch, today=today, window_days=180).rows == [r for r in p.rows if r["id"] == "new"]
 
 
 def test_run_and_attempt_from_run_url():
@@ -1391,6 +1486,20 @@ def test_an_h100_point_writes_the_node_size_the_run_recorded():
     assert b.scenario["cluster"] == {"hardware": "h200", "gpus_per_node": 2, "nodes": 2, "fabric": "ib-400g"}
 
 
+def test_catalog_resolve_accepts_the_drafters_a_model_lists_and_refuses_a_malformed_list():
+    import blis_commands as bc
+    tmp = Path(tempfile.mkdtemp())
+    blis = tmp / "blis"
+    ok = ('{"query": "m", "identity": "m", "reason": "r", "drafters": [{"name": "speculator", '
+          '"method": "mtp", "num_spec_tokens": 3}]}')
+    blis.write_text("#!/bin/sh\necho '" + ok + "'\n")
+    blis.chmod(0o755)
+    assert bc.catalog_resolve(str(blis), str(tmp), model="m") == "m"
+    blis.write_text("#!/bin/sh\necho '" + ok.replace('"num_spec_tokens": 3', '"num_spec_tokens": "3"') + "'\n")
+    with pytest.raises(bc.CommandError, match="drafters"):
+        bc.catalog_resolve(str(blis), str(tmp), model="m")
+
+
 def test_packaging_comes_from_blis_catalog_resolve_and_falls_back_to_the_catalog_files_for_an_older_blis():
     import blis_commands as bc
     tmp = Path(tempfile.mkdtemp())
@@ -1421,7 +1530,7 @@ def test_packaging_comes_from_blis_catalog_resolve_and_falls_back_to_the_catalog
 
 def _multi(chip):
     return st.build(_classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16"))), name="p",
-                    model="m", part=st.Part(name=chip), engine_version="0.32.0", field_list=FIELDS, catalog_node_size=None, node=NODE8)
+                    model="m", part=st.Part(name=chip), field_list=FIELDS, catalog_node_size=None, node=NODE8)
 
 
 @pytest.mark.parametrize("chip,tech,cls,stands_in", [
@@ -1456,7 +1565,7 @@ def test_under_the_refuse_switch_a_multi_node_point_with_no_recorded_fabric_is_g
         assert not [x for x in b.substitutions if x["subject"] == "cluster.fabric"]
     # a class a launch configuration records is still used
     b = st.build(_classify(_log(RANKS, RESOLVED.replace("tensor_parallel_size=1", "tensor_parallel_size=16"))), name="p", model="m",
-                 part=st.Part(name="h200"), engine_version="0.32.0", field_list=FIELDS, catalog_node_size=None, node=NODE8,
+                 part=st.Part(name="h200"), field_list=FIELDS, catalog_node_size=None, node=NODE8,
                  launch_config={"resources": {"fabric": "roce-200g"}})
     assert b.scenario["cluster"]["fabric"] == "roce-200g" and b.reasons == []
 
@@ -1508,5 +1617,5 @@ def test_the_api_server_count_a_run_stated_is_given_to_replay_not_lost():
     assert problems == []
     c = st.decide(st.merge(readings, DEFAULTS), FL)
     assert not any("api_server_count" in r for r in c.reasons), c.reasons
-    b = st.build(c, name="p", model="m", part=PART_H200, engine_version="0.33.0", field_list=FL, catalog_node_size=None, node=NODE8)
+    b = st.build(c, name="p", model="m", part=PART_H200, field_list=FL, catalog_node_size=None, node=NODE8)
     assert b.api_server_count == "2" and not any("api_server_count" in r for r in b.reasons), b.reasons

@@ -105,7 +105,7 @@ class Fakes:
         self.anchors = None       # the anchor list blis prints; None = every row's unit
 
     def api_pull(self, fetch, *, today, window_days, framework="vllm"):
-        return types.SimpleNamespace(rows=self.rows)
+        return types.SimpleNamespace(rows=[r for r in self.rows if api.in_window(r["date"], today, window_days)])
 
     def ledger(self, tmp):
         # The ledger the night reads: one unit per row, written before each night, and the blis
@@ -128,6 +128,11 @@ class Fakes:
         out.mkdir(parents=True, exist_ok=True)
         (out / "provenance.json").write_text(json.dumps({"pulled_at": "2026-10-23T00:00:00Z"}))
         return 0
+
+    @staticmethod
+    def missing_reasons(tmp):
+        m = json.loads((tmp / "work" / "manifest.json").read_text())
+        return {e["point_id"]: e["reasons"] for e in m["points"] if e["reasons"]}
 
     def cmd_pull(self, a):
         self.pulled_only = a.only
@@ -299,7 +304,7 @@ def test_an_anchor_unit_of_a_framework_no_engine_models_stays_in_the_window(tmp_
 
 def test_an_anchor_unit_the_window_holds_no_usable_row_of_is_g5_by_name_and_the_night_goes_on(tmp_path, monkeypatch):
     # COV-1: every anchor unit is graded or G5 with a reason. One the window's pull holds no row of is G5
-    # not_in_pull_window; one whose row now differs from the ledger's record is G5 row_differs_from_ledger. Neither is
+    # not_in_api_feed; one whose row now differs from the ledger's record is G5 row_differs_from_ledger. Neither is
     # fetched, and the rest are scored and published.
     import pull as pl
     kept, gone, changed = _row("m", 1, "2026-10-01"), _row("m", 2, "2026-10-01"), _row("m", 4, "2026-10-01")
@@ -316,8 +321,33 @@ def test_an_anchor_unit_the_window_holds_no_usable_row_of_is_g5_by_name_and_the_
     assert cli.cmd_nightly(_args(tmp_path)) == 0
     assert fakes.pulled_only == [ledger_fake.point_id(kept)]
     entries = {e["point_id"]: e["reasons"] for e in json.loads((tmp_path / "work" / "manifest.json").read_text())["points"]}
-    assert entries == {ledger_fake.point_id(kept): [], ledger_fake.point_id(gone): [pl.NOT_IN_WINDOW],
+    assert entries == {ledger_fake.point_id(kept): [], ledger_fake.point_id(gone): [pl.NOT_IN_FEED],
                        ledger_fake.point_id(changed): [pl.ROW_DIFFERS]}
+
+
+def test_an_anchor_unit_is_never_excluded_for_its_date(tmp_path, monkeypatch):
+    # COV-2: a unit measured a year before the night is fetched and scored like a recent one; the nightly passes
+    # no window, so no unit is G5 for its date.
+    old, recent = _row("m", 1, "2025-10-01"), _row("m", 2, "2026-10-01")
+    fakes = Fakes([old, recent])
+    _install(monkeypatch, fakes, [ledger_fake.point_id(r) for r in (old, recent)])
+    fakes.ledger(tmp_path)
+    assert cli.cmd_nightly(_args(tmp_path, window_days=None)) == 0
+    assert fakes.pulled_only == sorted(ledger_fake.point_id(r) for r in (old, recent))
+    assert fakes.missing_reasons(tmp_path) == {}
+
+
+def test_the_nightly_and_the_pull_have_no_age_limit_unless_given_one(monkeypatch):
+    got = []
+    monkeypatch.setattr(cli, "cmd_nightly", lambda a: got.append(a.window_days) or 0)
+    monkeypatch.setattr(cli, "cmd_pull", lambda a: got.append(a.window_days) or 0)
+    required = ["--blis-tag", "t", "--work-dir", "w", "--data-dir", "d", "--state", "s", "--scored", "x",
+                "--ledger", "l", "--blis", "b", "--catalog", "c", "--registry", "r", "--substrate-dir", "u",
+                "--substrate-version", "v", "--fields", "f", "--corpus-dir", "k"]
+    cli.main(["nightly", *required])
+    cli.main(["pull", "--out", "o", "--ledger", "l"])
+    cli.main(["pull", "--out", "o", "--ledger", "l", "--window-days", "7"])
+    assert got == [None, None, 7]
 
 
 def test_an_anchor_unit_the_ledger_does_not_hold_stops_the_night_before_any_fetch(tmp_path, monkeypatch):
@@ -339,13 +369,13 @@ def test_an_unpulled_anchor_is_g5_in_the_contract_without_a_simulation(tmp_path)
     import pull as pl
     import score as sc
     entry = {"point_id": "u", "identity": {}, "row": {"framework": "vllm", "benchmark_type": "single_turn"},
-             "reasons": [pl.NOT_IN_WINDOW], "files": {}}
+             "reasons": [pl.NOT_IN_FEED], "files": {}}
     o = sc.score_point(entry, tmp_path, tmp_path / "w", sc.Env(
         blis="x", blis_release="v0.17.1", blis_commit="a" * 40, catalog=tmp_path, catalog_release="c",
         registry=tmp_path, registry_release="r", kernel="k", corpora={}))
     import assess as asx
-    assert o.fidelity is None and o.reasons == [pl.NOT_IN_WINDOW]
-    assert asx.g5_of(o.reasons[0]) == {"code": "value_not_recorded", "subject": "not_in_pull_window"}
+    assert o.fidelity is None and o.reasons == [pl.NOT_IN_FEED]
+    assert asx.g5_of(o.reasons[0]) == {"code": "value_not_recorded", "subject": "not_in_api_feed"}
 
 
 def test_a_night_whose_build_publishes_no_anchor_unit_fails_and_scores_nothing(tmp_path, monkeypatch):
@@ -921,6 +951,17 @@ def test_a_failed_catalog_resolve_stops_the_score_run(tmp_path, monkeypatch):
     assert any(want in m for m in msgs), msgs
 
 
+def test_an_unreadable_upgrade_report_stops_the_score_run(tmp_path):
+    a = _score_inputs(tmp_path, {})
+    a.engine_report = [str(tmp_path / "nope.json")]
+    msgs = []
+    import pytest as _p
+    with _p.MonkeyPatch.context() as mp:
+        mp.setattr(cli, "_log", msgs.append)
+        assert cli.cmd_score(a) == 2
+    assert any("nope.json" in m for m in msgs), msgs
+
+
 def test_a_repository_two_catalog_entries_claim_does_not_stop_the_night(tmp_path, monkeypatch):
     # Two entries claim org/m, and `blis catalog resolve --model org/m` refuses it. The night's catalog check asks
     # each entry by name and does not ask that repository: each run is matched to the entry its deployment is, and a
@@ -1001,3 +1042,97 @@ def test_a_score_run_reads_the_field_list_file_and_scores(tmp_path, monkeypatch)
     import contract
     monkeypatch.setattr(contract, "validate_dir", lambda d: [])
     assert cli.cmd_score(a) == 0 and seen == [[]]
+
+
+# ---------------------------------------------------------------- the dump lane of the night (dump_lane.py)
+import dump_extract as dx  # noqa: E402
+import dump_lane as dl  # noqa: E402
+import test_dump_lane as tdl  # noqa: E402
+
+
+class LaneNight:
+    """A night with a dump lane: the extract holds the unit of rows[0]; the harness is a stand-in that writes the fixture
+    contract for the API lane and a contract of other units for the dump lane."""
+    def __init__(self, tmp, monkeypatch, rows, lane_rc=0):
+        self.tmp, self.lane_rc, self.lane_cmds = tmp, lane_rc, []
+        self.fakes = Fakes(rows)
+        self.units = [ledger_fake.point_id(r) for r in rows]
+        _install(monkeypatch, self.fakes, self.units)
+        self.extract = tdl.make_extract(tmp / "extract", self.units[:1])
+        self.fakes.ledger(tmp)
+        monkeypatch.setattr(dx, "load_pin", lambda *a, **k: tdl.PIN)
+        monkeypatch.setattr(dx, "verify", lambda extract, pin: [])
+        api_harness = self.fakes.run_harness
+
+        def harness(cmd):
+            if cmd[cmd.index("--pull") + 1] == str(self.extract.resolve()):
+                self.lane_cmds.append(cmd)
+                if self.lane_rc == 0:
+                    out = Path(cmd[cmd.index("--out") + 1])
+                    shutil.copytree(tdl.other_units(tdl.FIXTURE, tmp / "lane-src"), out, dirs_exist_ok=True)
+                    shutil.rmtree(tmp / "lane-src")
+                return self.lane_rc
+            rc = api_harness(cmd)
+            shutil.copytree(tdl.FIXTURE, Path(cmd[cmd.index("--out") + 1]), dirs_exist_ok=True)
+            return rc
+        monkeypatch.setattr(cli, "run_harness", harness)
+
+    def args(self, **over):
+        return _args(self.tmp, **{"dump_extract": str(self.extract), "dump_state": str(self.tmp / "dumpstate"),
+                                  "dump_force": False, "dump_workers": 2, **over})
+
+
+def test_the_dump_lane_scores_its_units_with_two_workers_and_the_api_lane_leaves_them_alone(tmp_path, monkeypatch):
+    rows = [_row("m", 1, "2026-10-01"), _row("m", 2, "2026-10-01")]
+    n = LaneNight(tmp_path, monkeypatch, rows)
+    assert cli.cmd_nightly(n.args()) == 0
+    assert len(n.lane_cmds) == 1 and n.lane_cmds[0][n.lane_cmds[0].index("--workers") + 1] == "2"
+    assert "--workers" not in n.fakes.harness_cmd                      # the API lane keeps the harness's own count
+    dump_unit, api_unit = n.units
+    assert n.fakes.pulled_only == [api_unit]                           # the API lane never pulls the dump's unit
+    from ledger import read_unit_set
+    assert read_unit_set(Path(n.fakes.scored_units), role="anchor") == {api_unit}
+    assert json.loads((tmp_path / "state.json").read_text())["point_ids"] == [api_unit]
+    lane = json.loads((tmp_path / "dumpstate" / dl.LANE_JSON).read_text())
+    assert lane["blis_release"] == "v0.12.0" and lane["harness_commit"] == cli.harness_commit_now()
+    assert (tmp_path / "data" / "latest" / "summary.json").is_file()
+    # the next night, nothing changed: the lane is not scored again
+    assert cli.cmd_nightly(n.args(today="2026-10-24")) == 0
+    assert len(n.lane_cmds) == 1
+
+
+def test_a_dump_lane_that_fails_stops_the_night_before_anything_is_fetched_or_published(tmp_path, monkeypatch):
+    n = LaneNight(tmp_path, monkeypatch, [_row("m", 1, "2026-10-01"), _row("m", 2, "2026-10-01")], lane_rc=1)
+    assert cli.cmd_nightly(n.args()) == 2
+    assert n.fakes.pulled_only is None
+    assert not (tmp_path / "data" / "index.json").exists() and not (tmp_path / "state.json").exists()
+    assert not (tmp_path / "dumpstate").exists()                       # no half-scored result is kept
+
+
+def test_the_publish_gate_stops_a_night_whose_lanes_were_scored_by_different_harness_commits(tmp_path, monkeypatch):
+    n = LaneNight(tmp_path, monkeypatch, [_row("m", 1, "2026-10-01"), _row("m", 2, "2026-10-01")])
+    import build_summary_v2
+    build = build_summary_v2.build
+
+    def other_harness(*a, **k):
+        doc = build(*a, **k)
+        doc["provenance"]["harness_commit"] = "e" * 40
+        return doc
+    monkeypatch.setattr(build_summary_v2, "build", other_harness)
+    assert cli.cmd_nightly(n.args()) == 2
+    assert not (tmp_path / "data" / "index.json").exists() and not (tmp_path / "state.json").exists()
+
+
+def test_a_forced_dump_lane_with_nothing_new_republishes_through_the_merge_with_the_lane(tmp_path, monkeypatch):
+    n = LaneNight(tmp_path, monkeypatch, [_row("m", 1, "2026-10-01"), _row("m", 2, "2026-10-01")])
+    assert cli.cmd_nightly(n.args()) == 0
+    seen = []
+    import build_summary_v2
+
+    def merged(prior, delta, window_ids, **k):
+        seen.append((set(window_ids), k.get("lane_dir")))
+        return prior
+    monkeypatch.setattr(build_summary_v2, "build_merged", merged)
+    assert cli.cmd_nightly(n.args(today="2026-10-24", dump_force=True)) == 0
+    assert len(n.lane_cmds) == 2
+    assert seen == [({n.units[1]}, tmp_path / "dumpstate")]            # the API lane's window, and the lane's result

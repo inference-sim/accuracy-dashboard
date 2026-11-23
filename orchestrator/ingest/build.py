@@ -38,7 +38,16 @@ from typing import Protocol
 # never this constant, whenever a ref is resolved. Keep it current with the latest release as a
 # sensible default for local runs.
 VLLM_REF = "v0.32.0"
-VLLM_MAX_DISTANCE = 2000
+# The commit-count bound both engines read: how many commits a build may sit from the commit it is compared with. It is
+# VLLM_MAX_DISTANCE under its old name, which summary.json keeps as `vllm_max_distance`.
+MAX_COMMIT_DISTANCE = 2000
+VLLM_MAX_DISTANCE = MAX_COMMIT_DISTANCE
+
+
+def commit_bound(engine: str, override: dict | None = None) -> int:
+    """The commit-count bound for one engine kind: MAX_COMMIT_DISTANCE unless `override` (engine kind -> bound) names
+    that engine. No override is set by default."""
+    return (override or {}).get(engine, MAX_COMMIT_DISTANCE)
 VLLM_REPO = "vllm-project/vllm"
 OFFICIAL_IMAGES = ("vllm/vllm-openai", "vllm/vllm-openai-rocm")
 

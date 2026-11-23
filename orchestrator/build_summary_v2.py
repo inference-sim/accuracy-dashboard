@@ -391,6 +391,7 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
     engines = scored_engines(prov_in, list(fidelity.values()) + not_scored + failed)
     pull_date = prov_in["pulled_at"][:10]
     dates = sorted({p["measured_date"] for p in flat} | {ns["measured_date"] for ns in not_scored})
+    gt_sources = ground_truth_sources(prov_in, dates, release_tag=f"api-{pull_date}")
     provenance = {
         "blis": prov_in["blis"],
         "simulator": prov_in["simulator"],
@@ -403,7 +404,8 @@ def build(directory: Path, *, generated_at: str, evaluator_commit: str) -> dict:
         "ground_truth": {"source": prov_in["source"]["name"], "source_url": prov_in["source"]["url"],
                          "release_tag": f"api-{pull_date}",
                          "measurement_date_through": dates[-1] if dates else None,
-                         "measurement_sha256": prov_in["pull_manifest_sha256"]},
+                         "measurement_sha256": prov_in["pull_manifest_sha256"],
+                         "sources": gt_sources},
         "evaluator_commit": evaluator_commit, "scorer": "orchestrator/ingest/score.py", "ingest": "api",
         "vllm_ref": prov_in["vllm_ref"], "vllm_max_distance": prov_in["vllm_max_distance"],
         "fields_sha256": prov_in["fields_sha256"], "pulled_at": prov_in["pulled_at"], "corpora": prov_in["corpora"],
@@ -508,6 +510,35 @@ def summary_to_contract(summary: dict, out: Path) -> None:
         contract.canonical_dumps(_prov_out_to_in(summary["provenance"], summary["coverage"])) + "\n")
 
 
+DUMP_SOURCE_NAME = "SemiAnalysis InferenceX database dump"
+
+
+def ground_truth_sources(prov_in: dict, dates: list[str], *, release_tag: str) -> list[dict]:
+    """provenance.ground_truth.sources: one entry per ground-truth source with its own measurement dates and its own
+    pull date. With no `dump` in the contract's provenance the API feed supplies every unit, and the list holds the
+    `api` entry alone. With one (the frozen archive `db-dump/<D>` the ledger pins, scored in its own lane), the dump
+    supplies the units measured before D, the day it was cut, and the API feed the units measured on or after D; a
+    source with no unit has no entry and no date. `dates` are the measurement dates of every point, sorted."""
+    dump = prov_in.get("dump")
+    cutoff = dump["ref"].split("/", 1)[1] if dump else None
+    api_dates = [d for d in dates if cutoff is None or d >= cutoff]
+    out = []
+    if dump:
+        dump_dates = [d for d in dates if d < cutoff]
+        if not dump_dates:
+            raise ContractError(f"provenance.dump names {dump['ref']}, but no point was measured before {cutoff}")
+        out.append({"id": "dump", "name": DUMP_SOURCE_NAME, "ref": dump["ref"], "ref_sha256": dump["sha256"],
+                    "cutoff": cutoff, "measurement_date_from": dump_dates[0], "measurement_date_through": dump_dates[-1],
+                    "pulled_at": dump["pulled_at"]})
+    if api_dates or not dump:
+        out.append({"id": "api", "name": prov_in["source"]["name"], "ref": release_tag,
+                    "ref_sha256": prov_in["pull_manifest_sha256"],
+                    "measurement_date_from": api_dates[0] if api_dates else None,
+                    "measurement_date_through": api_dates[-1] if api_dates else None,
+                    "pulled_at": prov_in["pulled_at"]})
+    return out
+
+
 def _prov_out_to_in(prov: dict, coverage: dict) -> dict:
     """The summary's provenance back to the contract's provenance.json shape build() expects."""
     gt = prov.get("ground_truth", {})
@@ -520,11 +551,14 @@ def _prov_out_to_in(prov: dict, coverage: dict) -> dict:
             "vllm_max_distance": prov["vllm_max_distance"], "fields_sha256": prov["fields_sha256"],
             "pulled_at": prov["pulled_at"], "corpora": prov["corpora"],
             "pull_manifest_sha256": gt.get("measurement_sha256", ""),
-            "source": {"name": gt.get("source", ""), "url": gt.get("source_url", "")}}
+            "source": {"name": gt.get("source", ""), "url": gt.get("source_url", "")},
+            # The dump is a frozen archive, so a merge carries its entry over as it was.
+            **({"dump": {"ref": dump["ref"], "sha256": dump["ref_sha256"], "pulled_at": dump["pulled_at"]}}
+               if (dump := next((x for x in gt.get("sources") or [] if x["id"] == "dump"), None)) else {})}
 
 
 def build_merged(prior_summary: dict, delta_dir: Path, window_ids: set, *, generated_at: str,
-                 evaluator_commit: str, work: Path) -> dict:
+                 evaluator_commit: str, work: Path, lane_dir: Path | None = None) -> dict:
     """An IX-only night's summary (Discussion #15, revised: summary.json IS the store). Start from
     last night's published summary, drop points that aged out of the window, overlay the newly
     scored delta (new points win), and rebuild. Only the delta was fetched and scored; every
@@ -538,10 +572,16 @@ def build_merged(prior_summary: dict, delta_dir: Path, window_ids: set, *, gener
     the same build() as a fresh night, so the merged summary is produced by one code path. The
     merged provenance keeps the prior run's BLIS release, field list and corpus (nothing was re-scored) but takes the
     delta pull's `pulled_at` / `pull_manifest_sha256`, so the API pull date tracks the newest data
-    (issue #35)."""
+    (issue #35).
+
+      lane_dir       the dump lane's contract (dump_lane.py), added after the overlay. `window_ids` are the API
+                     lane's, so the prior's dump points are pruned and the lane's current ones take their place."""
     merged = work / "merged-contract"
     summary_to_contract(prior_summary, merged)
     _overlay_delta(merged, delta_dir, window_ids)
+    if lane_dir is not None:
+        import dump_lane
+        dump_lane.add_lane(merged, lane_dir)
     return build(merged, generated_at=generated_at, evaluator_commit=evaluator_commit)
 
 
@@ -626,7 +666,9 @@ def backlog_of(summary: dict) -> dict:
 
 
 def dumps(summary: dict) -> str:
-    return json.dumps(summary, indent=2, sort_keys=False, ensure_ascii=False) + "\n"
+    """The published text (contract.published_dumps, which the night's own writer uses too). orchestrator/nightly/file_size.py
+    stops a publish before GitHub's 100 MB limit for one file."""
+    return contract.published_dumps(summary)
 
 
 def main(argv=None) -> int:

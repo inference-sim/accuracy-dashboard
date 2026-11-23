@@ -2,7 +2,7 @@
 
 A pure function of four facts a night knows before it does any real work:
 
-  * the point ids the current 180-day pull holds (window_ids),
+  * the anchor point ids the current pull holds (window_ids),
   * the point ids last night's store held (last_ids),
   * the BLIS release resolved for tonight (blis_tag),
   * the BLIS release last night scored (last_blis_tag).

@@ -20,7 +20,7 @@ N_RUNS = 12
 
 def build(image, log):
     """What build.Resolver.resolve(...).record() gives an official release image (no network in a test)."""
-    return {"image": image, "commit": "a" * 40, "source": "image_label", "ref": "v0.31.0", "distance": 0, "match": "exact"}
+    return {"image": image, "commit": e2e.ENGINE_COMMIT, "source": "image_label", "ref": "v0.31.0", "distance": 0, "match": "exact"}
 
 
 def row(conc=4, metrics=None, **kw):
