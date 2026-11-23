@@ -102,6 +102,7 @@ def test_main_warns_and_drops_the_configiq_row_when_the_pin_moved(tmp_path, caps
     lg, anchor, contract, summary, ids = _night(tmp_path, scored_ids=set(_ids_of(6)))
     stale = _configiq_file(tmp_path, dataset="a" * 40)
     rc = fnn.main(["--ledger", str(led), "--anchor", str(tmp_path / "none.yaml"), "--contract", str(contract),
-                   "--summary", str(summary), "--out", str(tmp_path / "f.json"), "--configiq", str(stale)])
+                   "--summary", str(summary), "--out", str(tmp_path / "f.json"), "--configiq", str(stale),
+                   "--configiq-sources", str(led / "sources.yaml")])
     out = capsys.readouterr().out
     assert rc == 0 and "configiq funnel left out" in out and "pins " + "b" * 40 in out
