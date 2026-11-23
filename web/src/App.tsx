@@ -17,7 +17,7 @@ import { Slices } from './components/Slices'
 import { gateHeadline, MIN_ROLE_KEYS } from './slice'
 import { Classes } from './components/Classes'
 import { Sources } from './components/Sources'
-import { fetchFunnel, shouldFetchFunnel, type FunnelDoc } from './sources'
+import { FunnelNotPublished, fetchFunnel, shouldFetchFunnel, type FunnelDoc } from './sources'
 import { fetchClasses, shouldFetchClasses, type ClassesDoc } from './classes'
 import { Term } from './components/Term'
 import { GRADE_LABELS, inGrade } from './gradeFilter'
@@ -74,6 +74,7 @@ export function App({
   const [classesFail, setClassesFail] = useState<string | null>(classesError)
   const [funnelDoc, setFunnelDoc] = useState<FunnelDoc | null>(funnel)
   const [funnelFail, setFunnelFail] = useState<string | null>(funnelError)
+  const [funnelMissing, setFunnelMissing] = useState(false)
 
   useEffect(() => {
     if (!hasWindow) return
@@ -100,7 +101,11 @@ export function App({
     let live = true
     fetchFunnel()
       .then((doc) => live && setFunnelDoc(doc))
-      .catch((e: Error) => live && setFunnelFail(e.message))
+      .catch((e: Error) => {
+        if (!live) return
+        setFunnelMissing(e instanceof FunnelNotPublished)
+        setFunnelFail(e.message)
+      })
     return () => {
       live = false
     }
@@ -148,7 +153,7 @@ export function App({
     return (
       <Shell view="sources" onView={(view) => update({ view, runB: null, run: null, sel: null })}>
         <ErrorBoundary resetKey={null}>
-          <Sources doc={funnelDoc} error={funnelFail} />
+          <Sources doc={funnelDoc} error={funnelFail} notPublished={funnelMissing} />
         </ErrorBoundary>
       </Shell>
     )

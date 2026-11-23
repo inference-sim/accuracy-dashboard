@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { App } from './App'
 import { Sources } from './components/Sources'
-import { FunnelLoadError, fetchFunnel, shouldFetchFunnel, unscoredReasons, validateFunnel, type FunnelDoc } from './sources'
+import { FunnelLoadError, FunnelNotPublished, fetchFunnel, shouldFetchFunnel, unscoredReasons, validateFunnel, type FunnelDoc } from './sources'
 import { parseRoute, routeToHash } from './route'
 
 const raw = JSON.parse(readFileSync(fileURLToPath(new URL('../testdata/funnel-2.fixture.json', import.meta.url)), 'utf8'))
@@ -108,5 +108,20 @@ describe('the funnel data', () => {
     expect(shouldFetchFunnel('sources', null, null, false)).toBe(false)
     await expect(fetchFunnel((async () => ({ ok: false, status: 404 })) as unknown as typeof fetch)).rejects.toThrow(/404/)
     await expect(fetchFunnel((async () => ({ ok: true, json: async () => raw })) as unknown as typeof fetch)).resolves.toMatchObject({ format: 'funnel-2' })
+  })
+
+  it('treats a funnel the site does not publish as not published, not as a fault, and still refuses a bad document', async () => {
+    const none = (async () => ({ ok: false, status: 404 })) as unknown as typeof fetch
+    const page = (async () => ({ ok: true, json: async () => { throw new SyntaxError('Unexpected token <') } })) as unknown as typeof fetch
+    await expect(fetchFunnel(none)).rejects.toBeInstanceOf(FunnelNotPublished)
+    await expect(fetchFunnel(page)).rejects.toBeInstanceOf(FunnelNotPublished)
+    const bad = (async () => ({ ok: true, json: async () => ({ format: 'funnel-1' }) })) as unknown as typeof fetch
+    const err = await fetchFunnel(bad).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(FunnelLoadError)
+    expect(err).not.toBeInstanceOf(FunnelNotPublished)
+    const h = renderToStaticMarkup(<Sources doc={null} error="x" notPublished />)
+    expect(h).toContain('not published for this run yet')
+    expect(h).not.toContain('Could not load')
+    expect(html(null, 'x')).toContain('Could not load the per-source funnels')
   })
 })
