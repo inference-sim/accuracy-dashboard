@@ -52,18 +52,22 @@ function FigureStat({ figure, label }: { figure: Figure; label: string }) {
   )
 }
 
+/** A cell's class: right-aligned, and muted when it holds "too few points" rather than a figure. */
+const numClass = (v: unknown) => (typeof v === 'number' ? 'num' : 'num toofew')
+
 /** v3: each graded grade's share of the graded points, its count and its own accuracy. */
 function GradeSplit({ h }: { h: HeadlineBlock }) {
   return (
-    <table className="grades" aria-label="accuracy by grade">
+    <div className="tscroll gradebox">
+    <table className="readout gradetbl" aria-label="accuracy by grade">
       <thead>
         <tr>
-          <th scope="col">grade</th>
-          <th scope="col">points</th>
-          <th scope="col">share</th>
-          <th scope="col">TTFT error</th>
-          <th scope="col">TPOT error</th>
-          <th scope="col">role keys</th>
+          <th scope="col">Grade</th>
+          <th scope="col" className="num">Points</th>
+          <th scope="col" className="num">Share</th>
+          <th scope="col" className="num">TTFT error</th>
+          <th scope="col" className="num">TPOT error</th>
+          <th scope="col" className="num">Role keys</th>
         </tr>
       </thead>
       <tbody>
@@ -74,16 +78,17 @@ function GradeSplit({ h }: { h: HeadlineBlock }) {
               <th scope="row">
                 {g} <span className="facet">{GRADE_LABEL[g]}</span>
               </th>
-              <td>{formatCount(r.points)}</td>
-              <td>{r.share === 'too few points' ? r.share : formatPct(r.share * 100)}</td>
-              <td>{figureText(r.ttft)}</td>
-              <td>{figureText(r.tpot)}</td>
-              <td>{r.ttft.roleKeys != null ? formatCount(r.ttft.roleKeys) : ''}</td>
+              <td className="num">{formatCount(r.points)}</td>
+              <td className={numClass(r.share)}>{r.share === 'too few points' ? r.share : formatPct(r.share * 100)}</td>
+              <td className={numClass(r.ttft.mape)}>{figureText(r.ttft)}</td>
+              <td className={numClass(r.tpot.mape)}>{figureText(r.tpot)}</td>
+              <td className="num">{r.ttft.roleKeys != null ? formatCount(r.ttft.roleKeys) : ''}</td>
             </tr>
           )
         })}
       </tbody>
     </table>
+    </div>
   )
 }
 

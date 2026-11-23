@@ -384,3 +384,14 @@ table.sources-table tbody tr:last-child td{border-bottom:none}
 table.sources-table tr.src td{font-weight:600}
 table.sources-table tr.lane td{background:#fcfdfb}
 details.about .tscroll{margin-top:10px}
+/* ---- grade tables (overview headline, class cards): the same bordered readout, figures right-aligned, "too few points" muted ---- */
+.gradebox{margin-top:12px;max-width:760px}
+table.gradetbl th,table.gradetbl td{border-right:1px solid var(--line)}
+table.gradetbl th:last-child,table.gradetbl td:last-child{border-right:none}
+table.gradetbl thead th{background:#eef1ec;font-size:11px;font-weight:600;color:var(--ink);border-bottom:2px solid var(--line-strong)}
+table.gradetbl th.num,table.gradetbl td.num{text-align:right}
+table.gradetbl td.num{font-variant-numeric:tabular-nums}
+table.gradetbl tbody th[scope=row]{font-weight:600;background:var(--panel)}
+table.gradetbl tbody th[scope=row] .facet,table.gradetbl tbody th[scope=row] .stat-hint{font-weight:400;color:var(--muted);margin-left:4px}
+table.gradetbl td.toofew{color:var(--muted);font-size:11.5px}
+table.gradetbl tbody tr:last-child th,table.gradetbl tbody tr:last-child td{border-bottom:none}

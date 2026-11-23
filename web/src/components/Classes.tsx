@@ -68,13 +68,14 @@ function ClassCard({ c }: { c: ClassEntry }) {
       </div>
       {c.partition ? <p className="context">{`Partition: ${c.partition}.`}</p> : null}
       {c.plain_line ? <p className="context">{c.plain_line}</p> : null}
-      <table className="grades" aria-label={`${c.label}: points and accuracy by grade`}>
+      <div className="tscroll gradebox">
+      <table className="readout gradetbl" aria-label={`${c.label}: points and accuracy by grade`}>
         <thead>
           <tr>
             <th scope="col">Grade</th>
-            <th scope="col">Points</th>
+            <th scope="col" className="num">Points</th>
             {stats.map((s) => (
-              <th scope="col" key={s}>
+              <th scope="col" key={s} className="num">
                 {STAT_LABEL[s]} error
               </th>
             ))}
@@ -100,6 +101,7 @@ function ClassCard({ c }: { c: ClassEntry }) {
           ))}
         </tbody>
       </table>
+      </div>
       {Object.entries(c.figure_notes ?? {}).map(([stat, why]) => (
         <p className="context" key={stat}>
           {`${STAT_LABEL[stat as ClassStat]}: ${why}.`}
