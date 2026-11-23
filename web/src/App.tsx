@@ -508,7 +508,10 @@ function RunProvenance({ summary }: { summary: Summary }) {
     ) : (
       text
     )
-  const kernel = b.extractor_version?.replace(/^.*@/, '') ?? null
+  // The kernel row names a released kernel and links to its tag. A build the extractor could not name ("...@unknown", which
+  // is every build by commit) has no kernel to show, and "unknown" would link to a tag that does not exist: no row then.
+  const kernelRaw = b.extractor_version?.replace(/^.*@/, '') ?? null
+  const kernel = kernelRaw && kernelRaw.toLowerCase() !== 'unknown' ? kernelRaw : null
   return (
     <>
       <div className="seclabel">BLIS release (CI-resolved)</div>
@@ -527,12 +530,12 @@ function RunProvenance({ summary }: { summary: Summary }) {
           {b.catalog ? link(b.catalog, `${gh}/blis-catalog/tree/${encodeURIComponent(b.catalog)}`) : '—'}
         </span>
       </div>
-      <div className="kv">
-        <span className="k">kernel</span>
-        <span className="v">
-          {kernel ? link(kernel, `${gh}/blis-latency-kernel/releases/tag/${encodeURIComponent(kernel)}`) : '—'}
-        </span>
-      </div>
+      {kernel ? (
+        <div className="kv">
+          <span className="k">kernel</span>
+          <span className="v">{link(kernel, `${gh}/blis-latency-kernel/releases/tag/${encodeURIComponent(kernel)}`)}</span>
+        </div>
+      ) : null}
       <div className="kv">
         <span className="k">registry</span>
         <span className="v">
