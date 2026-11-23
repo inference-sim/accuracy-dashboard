@@ -185,7 +185,7 @@ function ClassCard({ c }: { c: ClassEntry }) {
         </details>
       ) : null}
       {c.substitutions.length > 0 ? (
-        <details className="about" open={c.kind === 'reconstructed'}>
+        <details className="about">
           <summary>What differs from the run ({formatCount(c.substitutions.length)} named substitutions)</summary>
           <table className="readout">
             <thead>

@@ -137,8 +137,8 @@ describe('the classes page', () => {
     const { html } = render(<Classes doc={DOC} error={null} />)
     expect(text(card(html, 'inferencex-reconstructed'))).toContain('client_difference send_gap 213 closed loop')
     expect(text(card(html, 'inferencex'))).toContain('field_not_modelled moe_runner_backend 6')
-    // the reconstructed class's substitutions are open by default; another class's are not
-    expect(card(html, 'inferencex-reconstructed')).toMatch(/<details class="about" open="">\s*<summary>What differs from the run/)
+    // every class's substitutions are collapsed by default (the reader expands them); the names stay in the markup
+    expect(card(html, 'inferencex-reconstructed')).toMatch(/<details class="about"><summary>What differs from the run/)
     expect(card(html, 'configiq')).toMatch(/<details class="about"><summary>What differs from the run/)
   })
 
