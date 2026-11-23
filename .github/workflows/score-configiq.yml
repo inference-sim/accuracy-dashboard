@@ -83,14 +83,20 @@ jobs:
           git -C "$SIM" checkout -q "$SIM_REF"
           ( cd "$SIM" && go build -o blis main.go )
           eval "$(python3 orchestrator/resolve_stack.py "$SIM")"
-          git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
-          git -C "$RUNNER_TEMP/substrate" checkout -q "$substrate_ref"
           FIELDS="$RUNNER_TEMP/fields.json"
-          curl -fsSL --retry 3 -o "$FIELDS" \
-            "https://raw.githubusercontent.com/inference-sim/blis-vllm/${vllm_module_ref}/fields.json"
+          if [ "${substrate_embedded:-}" = true ]; then
+            SUBSTRATE_DIR="$SIM/substrate"
+            cp "$SIM/engines/vllm/fields.json" "$FIELDS"
+          else
+            git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
+            git -C "$RUNNER_TEMP/substrate" checkout -q "$substrate_ref"
+            SUBSTRATE_DIR="$RUNNER_TEMP/substrate"
+            curl -fsSL --retry 3 -o "$FIELDS" \
+              "https://raw.githubusercontent.com/inference-sim/blis-vllm/${vllm_module_ref}/fields.json"
+          fi
           python3 orchestrator/nightly/configiq_night.py \
-            --substrate "$RUNNER_TEMP/substrate" --blis "$SIM/blis" \
-            --catalog "$RUNNER_TEMP/substrate/catalog" --registry "$RUNNER_TEMP/substrate/registry" \
+            --substrate "$SUBSTRATE_DIR" --blis "$SIM/blis" \
+            --catalog "$SUBSTRATE_DIR/catalog" --registry "$SUBSTRATE_DIR/registry" \
             --fields "$FIELDS" --substrate-version "$substrate_version" --substrate-commit "$substrate_commit" \
             --sim-build "$SIM_REF" --harness-commit "$HARNESS_COMMIT" --workers 2 --out "$RUNNER_TEMP/configiq"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
