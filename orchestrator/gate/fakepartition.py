@@ -127,7 +127,7 @@ def prereg_doc(sha: str, **over) -> dict:
     doc = {"kind": "PreRegistration", "id": "row-99-example", "partition_version": 1,
            "hypothesis": "the new term lowers the error on lane A", "layer": "prefill step time",
            "target_lanes": [{"engine": "vllm", "chip": "h100"}], "sources": ["inferencex"],
-           "criteria": [{"criterion": "error", "margin": 0.02}], "metrics": ["tpot"],
+           "criteria": [{"criterion": "error", "margin": 0.02}, {"criterion": "distance", "margin": 0.02}], "metrics": ["tpot"],
            "substream": "gate/row-99", "predicted_change": "error falls by at least 0.05 on lane A", "measured_sha256": sha}
     doc.update(over)
     return doc

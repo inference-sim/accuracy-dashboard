@@ -69,7 +69,7 @@ def validate(doc) -> list[str]:
         errs.append(f"sources: {list(SOURCES)} (only InferenceX units are held-out end to end)")
     crit = doc["criteria"]
     if not isinstance(crit, list) or not crit:
-        errs.append("criteria: at least one")
+        errs.append("criteria: exactly one of each of " + ", ".join(CRITERIA))
     else:
         seen = set()
         for i, c in enumerate(crit):
@@ -82,6 +82,8 @@ def validate(doc) -> list[str]:
             if c["criterion"] in seen:
                 errs.append(f"criteria[{i}]: {c['criterion']} is listed twice")
             seen.add(c["criterion"])
+        if seen != set(CRITERIA):
+            errs.append(f"criteria: exactly one of each of {', '.join(CRITERIA)} (VAL-6); an omitted criterion cannot be left unjudged")
     metrics = doc["metrics"]
     if (not isinstance(metrics, list) or not metrics or len(set(metrics)) != len(metrics)
             or not all(isinstance(m, str) and METRIC.match(m) for m in metrics)):

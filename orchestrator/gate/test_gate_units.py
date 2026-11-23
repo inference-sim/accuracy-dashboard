@@ -112,8 +112,10 @@ def test_a_good_preregistration_validates():
 @pytest.mark.parametrize("edit", [
     {"kind": "Other"}, {"id": "Bad Id"}, {"partition_version": 0}, {"hypothesis": "short"}, {"target_lanes": []},
     {"target_lanes": [{"gpu": "h100"}]}, {"target_lanes": [{}]}, {"sources": ["othersource"]},
-    {"criteria": []}, {"criteria": [{"criterion": "error", "margin": -1}]},
+    {"criteria": []}, {"criteria": [{"criterion": "error", "margin": -1}, {"criterion": "distance", "margin": 0.1}]},
     {"criteria": [{"criterion": "error", "margin": 0.1}, {"criterion": "error", "margin": 0.1}]},
+    {"criteria": [{"criterion": "error", "margin": 0.1}]}, {"criteria": [{"criterion": "distance", "margin": 0.1}]},
+    {"criteria": [{"criterion": "error", "margin": 0.1}, {"criterion": "error", "margin": 0.1}, {"criterion": "distance", "margin": 0.1}]},
     {"criteria": [{"criterion": "other", "margin": 0.1}]}, {"metrics": []}, {"metrics": ["TPOT"]},
     {"substream": "x"}, {"measured_sha256": "abc"},
 ])

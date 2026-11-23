@@ -50,6 +50,8 @@ by the rule; it is caught by review, and the fix is to add the path to the list.
 }
 ```
 
+* A pre-registration lists exactly one `error` and exactly one `distance` criterion (VAL-6). One that omits
+  either is refused, so an omitted criterion cannot turn unjudged evidence into a pass.
 * A target lane names any of `engine`, `modelled_commit`, `chip`, `model`, `layout` (the deployment's
   configuration hash). A lane the pattern does not name is a guard lane.
 * A target lane passes when the candidate's error is no worse than the base's, tested against "the
@@ -58,7 +60,8 @@ by the rule; it is caught by review, and the fix is to add the path to the list.
   resamples over role keys (the unit of independence), with the Holm correction at 0.05 over all tests of the
   evaluation.
 * The distance criterion is recorded but judged only when per-request samples exist; today it comes back
-  `unjudged`. A verdict is `pass`, `fail` or `unjudged`.
+  `unjudged`, and with it every verdict that is not a `fail`. Until it is judged, no evaluation returns `pass`, and
+  a change lands only by the maintainer exception below. A verdict is `pass`, `fail` or `unjudged`.
 * A margin above the invariant registry's ceiling (recorded in the ledger) is refused. The ceiling is
   `null` in the ledger today, so the gate refuses every evaluation until a maintainer copies the registry's
   values into it.
