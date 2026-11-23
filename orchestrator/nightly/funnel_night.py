@@ -117,10 +117,14 @@ def main(argv=None) -> int:
     ap.add_argument("--summary", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--configiq", type=Path, help="the committed funnel of a score-configiq run; no row when the file is absent")
+    ap.add_argument("--configiq-sources", type=Path, help="the ledger's sources.yaml, which pins the configiq dataset revision the "
+                    "committed configiq files are checked against (required with --configiq)")
     ap.add_argument("--configiq-class", type=Path, help="the committed configiq class file; warns when its dataset revision is stale")
     a = ap.parse_args(argv)
     try:
-        dataset = cn.pins(a.ledger / "sources.yaml")[0] if a.configiq else None
+        if a.configiq and not a.configiq_sources:
+            raise ValueError("--configiq needs --configiq-sources, the ledger's sources.yaml")
+        dataset = cn.pins(a.configiq_sources)[0] if a.configiq else None
         configiq = read_configiq(a.configiq, dataset)
         stale = class_file_stale(a.configiq_class, dataset) if dataset else None
         if stale:
