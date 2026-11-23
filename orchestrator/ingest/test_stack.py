@@ -86,8 +86,10 @@ def test_the_committed_list_holds_every_release_with_a_published_snapshot():
     # Seeded from data/snapshots and data/index.json (v0.10.0 to v0.15.0).
     import re
     data = ROOT.parent / "data"
-    in_dirs = {re.match(r"^\d{4}-\d{2}-\d{2}_blis-(v[^_]+)_", p.name).group(1) for p in (data / "snapshots").iterdir()}
-    in_index = {r["blis_release"] for r in json.loads((data / "index.json").read_text())["runs"]}
+    # A pre-release preview scores an exact commit (sim_commit), not a release: its snapshot and index run are named by the
+    # 40-hex commit, and it is not in the list of scored releases (the next release is still scored).
+    in_dirs = {m.group(1) for m in (re.match(r"^\d{4}-\d{2}-\d{2}_blis-(v[^_]+)_", p.name) for p in (data / "snapshots").iterdir()) if m}
+    in_index = {r["blis_release"] for r in json.loads((data / "index.json").read_text())["runs"] if r["blis_release"].startswith("v")}
     assert in_dirs == in_index
     assert set(sk.read_scored(ROOT.parent / "state" / "scored-releases.json")) >= in_dirs
 
@@ -251,3 +253,52 @@ def test_a_release_whose_substrate_publishes_no_anchor_list_gives_way_to_its_pat
     assert sk.unscored_releases(tags[:3], {"v0.15.0"}, "v0.16.0") == ["v0.16.0", "v0.17.0"]
     # A release not in the table is never skipped.
     assert sk.unscored_releases(tags, {"v0.15.0"}, "v0.16.0", superseded={}) == ["v0.16.0", "v0.17.0", "v0.17.1"]
+
+
+# ------------------------------------------------------------------ a simulator commit whose stack embeds the substrate
+EMBEDDED = {**DOC, "modules": [{"path": "github.com/inference-sim/llm-d-router", "version": "v1.0.0-blis.5.0.20261121014725-cb8d93fcb0fa",
+                                "commit": "c" * 40}],
+            "engines": [{"kind": "vllm", "version": "0.34.0+0fda86a35419", "commit": "0fda86a35419" + "0" * 28}]}
+
+
+def test_an_engine_that_is_a_build_after_a_release_is_measured_from_its_commit():
+    s = sk.parse(json.dumps(EMBEDDED))
+    assert sk.vllm_ref(s) == "0fda86a35419" + "0" * 28
+    assert sk.vllm_ref(sk.parse(json.dumps(DOC))) == "v0.32.0"
+    no_commit = {**EMBEDDED, "engines": [{"kind": "vllm", "version": "0.34.0+0fda86a35419"}]}
+    with pytest.raises(sk.StackError, match="names no 40-hex commit"):
+        sk.vllm_ref(sk.parse(json.dumps(no_commit)))
+
+
+def test_the_commit_of_a_checkout_pins_the_substrate_it_holds_and_a_stack_that_lists_the_module_is_refused():
+    s = sk.parse(json.dumps(EMBEDDED))
+    pins = sk.embedded_pins(s, "a" * 40)
+    assert pins == {"substrate_embedded": "true", "substrate_ref": "a" * 40, "substrate_commit": "a" * 40,
+                    "substrate_version": "a" * 40, "vllm_ref": "0fda86a35419" + "0" * 28}
+    assert sk.pin_of(pins["substrate_version"], pins["substrate_commit"]) == ("a" * 40, [])
+    with pytest.raises(sk.StackError, match="not a full 40-hex commit"):
+        sk.embedded_pins(s, "abc123")
+    with pytest.raises(sk.StackError, match="fetched from it"):
+        sk.embedded_pins(sk.parse(json.dumps(DOC)), "a" * 40)
+
+
+def test_only_a_stable_tag_is_a_release_the_list_may_hold(tmp_path):
+    assert sk.is_stable_tag("v0.18.1") and not sk.is_stable_tag("a" * 40) and not sk.is_stable_tag("v0.18.1-rc1")
+    lst = tmp_path / "s.json"
+    lst.write_text(json.dumps({"kind": "ScoredReleases", "releases": []}))
+    with pytest.raises(sk.StackError, match="stable release tag"):
+        sk.record_scored(lst, "a" * 40)
+
+
+def test_resolve_stack_reads_the_substrate_a_checkout_holds_itself(tmp_path):
+    (tmp_path / "stack.json").write_text(json.dumps(EMBEDDED))
+    (tmp_path / "substrate" / "catalog").mkdir(parents=True)
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run(git + ["init", "-q"], check=True)
+    subprocess.run(git + ["commit", "-q", "--allow-empty", "-m", "x"], check=True)
+    head = subprocess.run(git + ["rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+    r = subprocess.run([sys.executable, str(ROOT / "resolve_stack.py"), str(tmp_path)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.splitlines() == ["substrate_embedded=true", f"substrate_ref={head}", f"substrate_commit={head}",
+                                     f"substrate_version={head}", "vllm_ref=0fda86a35419" + "0" * 28]
+    assert sk.verify_checkout(tmp_path / "substrate", head, head) == []
