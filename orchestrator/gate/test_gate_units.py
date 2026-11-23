@@ -348,7 +348,14 @@ def base_root(tmp_path):
     (tmp_path / "state" / "gate" / "preregistrations").mkdir(parents=True)
     (tmp_path / rule.PATHS).write_text((REPO / rule.PATHS).read_text())
     (tmp_path / pr.DIR / "row-99-example.json").write_text(json.dumps(good()))
+    write_ledger(tmp_path, "pass")
     return tmp_path
+
+
+def write_ledger(root, verdict, *, prereg="row-99-example", head="a" * 40, base="b" * 40):
+    """The base branch's ledger holding one evaluation of the pre-registration, of the head and merge base `check` uses by default."""
+    doc = budget.record(ledger(), prereg, pr.digest(good()), base, head, 5, 1, verdict) if verdict else ledger()
+    (root / budget.PATH).write_text(budget.dumps(doc))
 
 
 def check(body, changes, root, base_root=None, **landing):
@@ -410,7 +417,7 @@ def test_the_list_and_the_cited_preregistration_are_the_base_branchs(base_root, 
     assert check(NOT, [("M", "harness/run.sh")], head, base_root)
     (head / pr.DIR / "row-97-head-only.json").write_text(json.dumps({**good(), "id": "row-97-head-only"}))
     assert check("Gate: pre-registration row-97-head-only", [("M", "docs/README.md")], head, base_root)
-    assert check("Gate: pre-registration row-97-head-only", [("M", "docs/README.md")], head) == []
+    assert not any("base branch" in e and "pre-registration" in e for e in check("Gate: pre-registration row-97-head-only", [("M", "docs/README.md")], head))
 
 
 def head_tree(tmp_path, files, name="head"):
@@ -461,6 +468,66 @@ def test_an_exceptions_file_is_well_formed_where_a_pull_request_adds_it(base_roo
     (head / rule.EXCEPTIONS).write_text(json.dumps({"kind": "GateExceptions", "exceptions": [
         {"pull_request": 7, "head": "a" * 40, "reason": "long enough reason"}]}))
     assert check(NOT, [("M", rule.EXCEPTIONS.as_posix())], head, base_root, merge_base_root=head) == []
+
+
+@pytest.mark.parametrize("ledger_args,ok", [
+    (dict(verdict="pass"), True),
+    (dict(verdict=None), False),                                  # no evaluation recorded
+    (dict(verdict="unjudged"), False),
+    (dict(verdict="fail"), False),
+    (dict(verdict="pass", head="c" * 40), False),                 # the evaluation scored another head
+    (dict(verdict="pass", base="c" * 40), False),                 # ... or another merge base
+    (dict(verdict="pass", prereg="row-98-other"), False),         # ... or another pre-registration
+])
+def test_a_cited_preregistration_needs_a_passing_evaluation_of_this_head_and_merge_base(base_root, ledger_args, ok):
+    write_ledger(base_root, **ledger_args)
+    errs = check(CITE, [("M", "harness/run.sh")], base_root)
+    assert (errs == []) == ok
+    assert ok or any("evaluat" in e for e in errs)
+
+
+def test_the_evaluation_is_the_base_branchs_ledger_not_the_pull_requests(base_root, tmp_path_factory):
+    head = tmp_path_factory.mktemp("head")
+    (head / "state" / "gate").mkdir(parents=True)
+    write_ledger(head, "pass")
+    (base_root / budget.PATH).unlink()
+    assert check(CITE, [("M", "harness/run.sh")], head, base_root)
+    write_ledger(base_root, None)
+    assert check(CITE, [("M", "state/gate/ledger.json")], head, base_root)
+
+
+def test_an_evaluation_of_an_edited_preregistration_does_not_count(base_root):
+    other = {**good(), "hypothesis": "a different hypothesis than the one that was evaluated"}
+    (base_root / pr.DIR / "row-99-example.json").write_text(json.dumps(other))
+    assert any("evaluation" in e for e in check(CITE, [("M", "harness/run.sh")], base_root))
+
+
+def test_a_ledger_that_cannot_be_read_refuses_rather_than_passes(base_root):
+    (base_root / budget.PATH).write_text("{")
+    assert any("ledger" in e for e in check(CITE, [("M", "harness/run.sh")], base_root))
+    (base_root / budget.PATH).unlink()
+    assert any("ledger" in e for e in check(CITE, [("M", "harness/run.sh")], base_root))
+
+
+def test_a_maintainer_exception_stands_in_for_a_missing_or_failing_evaluation(base_root):
+    exc = {"pull_request": 7, "head": "a" * 40, "reason": "the distance criterion is unjudged; accepted by hand"}
+    for verdict in (None, "unjudged", "fail"):
+        write_ledger(base_root, verdict)
+        (base_root / rule.EXCEPTIONS).unlink(missing_ok=True)
+        assert check(CITE, [("M", "harness/run.sh")], base_root)
+        (base_root / rule.EXCEPTIONS).write_text(json.dumps({"kind": "GateExceptions", "exceptions": [exc]}))
+        assert check(CITE, [("M", "harness/run.sh")], base_root) == []
+    assert check(CITE, [("M", "harness/run.sh")], base_root, head="c" * 40)
+    assert check(CITE, [("M", "harness/run.sh")], base_root, number=8)
+
+
+def test_the_pull_request_that_adds_a_preregistration_needs_no_evaluation(base_root):
+    write_ledger(base_root, None)
+    new = {**good(), "id": "row-98-new"}
+    head = base_root.parent / "head-new"
+    (head / pr.DIR).mkdir(parents=True)
+    (head / pr.DIR / "row-98-new.json").write_text(json.dumps(new))
+    assert check(NOT, [("A", "state/gate/preregistrations/row-98-new.json")], head, base_root, merge_base_root=base_root) == []
 
 
 def test_parse_changes_reads_name_status_and_renames():

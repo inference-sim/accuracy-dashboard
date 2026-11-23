@@ -17,6 +17,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+import budget
 import prereg as pr
 import surface
 from surface import is_test
@@ -81,6 +82,25 @@ class Landing:
     merge_base_root: Path
 
 
+def evaluation_errors(base_root: Path, pre: dict, landing: Landing) -> list[str]:
+    """A cited pre-registration must have been evaluated, and passed, on this head over this merge base: the base
+    branch's ledger records the gate's evaluation (its verdict, never a claim in the pull request)."""
+    try:
+        doc = budget.load(base_root / budget.PATH)
+    except (budget.Refused, OSError, ValueError) as e:
+        return [f"{budget.PATH.as_posix()} on the base branch cannot be read ({e}); an evaluation of {pre['id']} cannot be checked"]
+    digest = pr.digest(pre)
+    for part in doc["partitions"].values():
+        for e in part["evaluations"]:
+            if (e["preregistration"], e["preregistration_sha256"], e["candidate"], e["base"]) == (pre["id"], digest, landing.head, landing.merge_base):
+                if e["verdict"] == "pass":
+                    return []
+                return [f"the whole-run gate evaluated {pre['id']} on this head and returned {e['verdict']}; only a pass lands, "
+                        f"or a maintainer exception in {EXCEPTIONS.as_posix()}"]
+    return [f"no evaluation of {pre['id']} on head {landing.head[:12]} over merge base {landing.merge_base[:12]} is recorded in "
+            f"{budget.PATH.as_posix()} on the base branch; run the whole-run gate and commit its ledger.json to main first"]
+
+
 def check_pr(body: str, changes: list[tuple[str, str]], root, base_root, landing: Landing) -> list[str]:
     """Every way the pull request breaks the rule; empty when it follows it. `root` is the checkout of the pull
     request's head; `base_root` the base branch's (the list of accuracy paths, the cited pre-registration and the
@@ -131,7 +151,10 @@ def check_pr(body: str, changes: list[tuple[str, str]], root, base_root, landing
             errs.append(f"pre-registration {cited} is added by this pull request; it must be on the base branch first")
         else:
             try:
-                pr.load(base_root / path)
+                pre = pr.load(base_root / path)
             except (pr.PreRegistrationError, OSError):
                 errs.append(f"pre-registration {cited} is not on the base branch")
+            else:
+                if not waived:
+                    errs += evaluation_errors(base_root, pre, landing)
     return errs

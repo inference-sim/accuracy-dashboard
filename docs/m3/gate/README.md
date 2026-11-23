@@ -21,7 +21,11 @@ Gate: not an accuracy change - <reason of at least 10 characters>
 A change to a path listed in `state/gate/accuracy-paths.json` moves published accuracy. It must cite a
 pre-registration, and the pre-registration must already be on `main`: it is committed first, and it is never
 edited, renamed or deleted afterwards. A pre-registration added by a pull request is checked to be well
-formed; the pull request that adds it cites `not an accuracy change`. The workflow `gate-rule.yml` checks all
+formed; the pull request that adds it cites `not an accuracy change` and needs no evaluation. A pull request
+that cites a pre-registration must also show that the gate evaluated it and passed it: `state/gate/ledger.json`
+on `main` must hold an evaluation of that pre-registration (the same SHA-256) with verdict `pass`, whose
+candidate is the pull request's head commit and whose base is its merge base with `main`. A merged change
+therefore always has a recorded passing run of exactly its commits, or a maintainer exception (below). The workflow `gate-rule.yml` checks all
 of this on every pull request, with no secret, and it runs the base branch's checker (and reads the base
 branch's list of accuracy paths), so a pull request cannot loosen the rule it is judged by.
 
@@ -50,7 +54,9 @@ covers it: `state/gate/exceptions.json` (kind `GateExceptions`) on `main` holds 
 `{"pull_request": <number>, "head": "<40 hex>", "reason": "<at least 10 characters>"}`. An exception covers
 that pull request at that head only, so a later push needs a new one. It is read from the base branch, never
 from the pull request, so it is added by its own reviewed pull request (which cites `not an accuracy change`)
-that merges first. It waives the surface check in both workflows; it does not waive the pre-registration.
+that merges first. It waives the surface check in both workflows and the passing-evaluation requirement of `gate-rule` (the case of an
+unjudged or failing verdict that a maintainer accepts); it does not waive the pre-registration, which must still be cited
+and on `main`.
 The one proof implemented is the tree hash being equal to main's; "the harness commit is an ancestor of main"
 is not.
 
@@ -132,6 +138,14 @@ evaluations cannot be spent against one count.
    the same ledger: the held-out partition is one thing for both. The simulator, engine, vLLM ref, field-table,
    pull-manifest and corpus provenance are bound that way and left out of the harness digest; the units, pull
    date, ingest and everything else must still agree.
+
+5. A maintainer commits the run's `ledger.json` artifact to `main` (one pull request, which cites `not an accuracy
+   change`). Only then does `gate-rule` pass for the evaluated pull request: it reads the ledger from the tip of
+   `main`, and re-running the check after that commit sees it. The ledger commit moves the tip of `main` but not
+   the pull request's merge base, so the evaluation still binds. A new push to the pull request, or a merge of
+   `main` into it, changes the head or the merge base, and the change needs a new evaluation. Because the
+   distance criterion is unjudged today, the verdict is not `pass` yet; until it is, the change lands through a
+   maintainer exception that names its pull request and head.
 
 Lanes with fewer than 10 role keys are merged on (engine, commit, chip), then on (engine, commit), and
 otherwise only counted. A merged lane is named only by the fields its members share; a regression confined to
