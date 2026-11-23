@@ -1,9 +1,13 @@
 name: gate-candidate
 
 # One side of a whole-run gate evaluation (docs/m3/gate/README.md). Dispatch it twice: on main (the base) and
-# on the branch under test (the candidate), with the same sim, today and label. Each run scores every ledger
-# unit that is not on the published fit or anchor list, so it cannot tell which are held, and keeps the contract,
-# the predictions as a gate Predictions document, and the measured table as the artifact `gate-<label>-<sha>`.
+# on the branch under test (the candidate), with the same today and label. Each side scores with the simulator
+# its own commit pins (SIM_REF in .github/stack-pins.env at the commit dispatched), over the catalog, registry,
+# ledger and engine fields that simulator carries, so a change to the pin or to the simulator is evaluated as
+# the old build against the new one. Each run scores every ledger unit that is not on the published fit or
+# anchor list, so it cannot tell which are held, and keeps the contract, the predictions as a gate Predictions
+# document, the measured table, and the simulator commit, data commit and ledger digest it was scored over as
+# the artifact `gate-<label>-<sha>`. The gate job re-derives those three from the pin and refuses a mismatch.
 #
 # The workflow holds no secret and no partition. The run's commit is the commit the dispatch ran on
 # (github.sha); the gate job reads it back from the Actions API and refuses a Predictions document that names
@@ -13,9 +17,6 @@ name: gate-candidate
 on:
   workflow_dispatch:
     inputs:
-      sim:
-        description: "inference-sim release tag (vMAJOR.MINOR.PATCH) or 40-hex commit"
-        required: true
       today:
         description: "the freeze's window end, YYYY-MM-DD (the API rows are read as of this date)"
         required: true
@@ -37,12 +38,10 @@ jobs:
     steps:
       - name: Check the inputs
         env:
-          SIM_REF: ${{ inputs.sim }}
           TODAY: ${{ inputs.today }}
           LABEL: ${{ inputs.label }}
         run: |
           set -euo pipefail
-          [[ "$SIM_REF" =~ ^(v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?|[0-9a-f]{40})$ ]] || { echo "sim is not a release tag or a 40-hex commit"; exit 2; }
           [[ "$TODAY" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo "today is not YYYY-MM-DD"; exit 2; }
           [[ "$LABEL" =~ ^[a-z0-9.-]+$ ]] || { echo "label is not [a-z0-9.-]+"; exit 2; }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -69,43 +68,37 @@ jobs:
       - name: Freeze and score
         env:
           GH_TOKEN: ${{ github.token }}
-          SIM_REF: ${{ inputs.sim }}
           TODAY: ${{ inputs.today }}
         run: |
           set -euo pipefail
           test "$(git -C repo rev-parse HEAD)" = "$GITHUB_SHA"
-          SIM="$RUNNER_TEMP/sim"
-          git clone -q --filter=blob:none https://github.com/inference-sim/inference-sim.git "$SIM"
-          git -C "$SIM" checkout -q "$SIM_REF"
-          eval "$(python3 repo/orchestrator/resolve_stack.py "$SIM")"
-          git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
-          git -C "$RUNNER_TEMP/substrate" checkout -q "$substrate_ref"
-          SUBSTRATE_COMMIT="$(git -C "$RUNNER_TEMP/substrate" rev-parse HEAD)"
-          SUBSTRATE_PIN="$SUBSTRATE_COMMIT"
-          [[ "$substrate_ref" =~ ^v[0-9] ]] && SUBSTRATE_PIN="$substrate_ref"
-          FIELDS="$RUNNER_TEMP/fields.json"
-          curl -fsSL --retry 3 -o "$FIELDS" \
-            "https://raw.githubusercontent.com/inference-sim/blis-vllm/${vllm_module_ref}/fields.json"
-          python3 repo/orchestrator/resolve_agentic_corpus.py --catalog "$RUNNER_TEMP/substrate/catalog" --all -o "$RUNNER_TEMP/corpora"
-          export VLLM_REF="$vllm_ref"
+          # The simulator this side scores with: the pin at the commit dispatched, resolved to its data by
+          # main's resolve_data.sh (the gate job runs the same script over the same pin).
+          SIM_REF="$(python3 trusted/orchestrator/gate/gate.py read-sim-pin --pins-file repo/.github/stack-pins.env)"
+          bash trusted/orchestrator/gate/resolve_data.sh "$SIM_REF" "$RUNNER_TEMP/data" > "$RUNNER_TEMP/resolved.env"
+          set -a; . "$RUNNER_TEMP/resolved.env"; set +a
+          LEDGER="$DATA_DIR/catalog/ledger"
+          python3 repo/orchestrator/resolve_agentic_corpus.py --catalog "$DATA_DIR/catalog" --all -o "$RUNNER_TEMP/corpora"
+          export VLLM_REF
           OUT="$RUNNER_TEMP/out"
           mkdir -p "$OUT"
-          python3 trusted/orchestrator/gate/gate.py handed-units --ledger "$RUNNER_TEMP/substrate/catalog/ledger" --out "$OUT/units.txt"
-          python3 repo/orchestrator/baseline/freeze.py --units-file "$OUT/units.txt" --ledger "$RUNNER_TEMP/substrate/catalog/ledger" \
+          python3 trusted/orchestrator/gate/gate.py handed-units --ledger "$LEDGER" --out "$OUT/units.txt"
+          python3 repo/orchestrator/baseline/freeze.py --units-file "$OUT/units.txt" --ledger "$LEDGER" \
             --today "$TODAY" --out "$RUNNER_TEMP/pull" --cache "$RUNNER_TEMP/artifacts" --download-workers 4
           bash repo/harness/run.sh --sim "$SIM_REF" --units "$OUT/units.txt" --pull "$RUNNER_TEMP/pull" \
             --out "$OUT/contract" \
-            --catalog "$RUNNER_TEMP/substrate/catalog" --registry "$RUNNER_TEMP/substrate/registry" \
+            --catalog "$DATA_DIR/catalog" --registry "$DATA_DIR/registry" \
             --corpus-dir "$RUNNER_TEMP/corpora" --fields "$FIELDS" \
-            --catalog-release "$SUBSTRATE_PIN" --registry-release "$SUBSTRATE_PIN" --max-rss-mb 13000
-          SIM_COMMIT="$(git -C "$SIM" rev-parse HEAD)"
+            --catalog-release "$DATA_PIN" --registry-release "$DATA_PIN" --max-rss-mb 13000
           python3 trusted/orchestrator/gate/gate.py contract-to-predictions --contract "$OUT/contract" --handed "$OUT/units.txt" \
             --candidate "$GITHUB_SHA" --out "$OUT/predictions.json"
           python3 trusted/orchestrator/gate/gate.py build-measured --contract "$OUT/contract" \
-            --ledger "$RUNNER_TEMP/substrate/catalog/ledger" --modelled-commit "$SIM_COMMIT" --out "$OUT/measured.csv" \
+            --ledger "$LEDGER" --modelled-commit "$SIM_COMMIT" --out "$OUT/measured.csv" \
             | tee "$RUNNER_TEMP/measured.txt"
-          printf '%s\n' "$SUBSTRATE_COMMIT" > "$OUT/substrate.txt"
+          printf '%s\n' "$DATA_COMMIT" > "$OUT/substrate.txt"
           printf '%s\n' "$SIM_COMMIT" > "$OUT/sim.txt"
+          python3 trusted/orchestrator/gate/gate.py ledger-digest --ledger "$LEDGER" > "$OUT/ledger.sha256"
+          echo "SIM_REF=$SIM_REF" >> "$GITHUB_ENV"
           echo "MEASURED_SHA=$(sha256sum "$OUT/measured.csv" | cut -d' ' -f1)" >> "$GITHUB_ENV"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -116,7 +109,6 @@ jobs:
       - name: Record the run
         env:
           LABEL: ${{ inputs.label }}
-          SIM_REF: ${{ inputs.sim }}
         run: |
           {
             echo "### ${LABEL}"

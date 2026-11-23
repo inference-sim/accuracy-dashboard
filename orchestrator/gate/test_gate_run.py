@@ -408,16 +408,25 @@ def test_build_measured_and_contract_to_predictions(tmp_path, fake, capsys):
     capsys.readouterr()
 
 
-def test_harness_digest_ignores_only_the_commit(tmp_path):
+def test_harness_digest_ignores_the_commit_and_what_binds_a_side_to_its_simulator(tmp_path):
     def digest(doc):
         p = tmp_path / "p.json"
         p.write_text(json.dumps(doc))
         return gate.harness_digest(p)
-    a = {"harness_commit": "a" * 40, "simulator": {"harness_commit": "a" * 40, "build": "v1"}, "ingest": "api", "points": 14}
+    a = {"harness_commit": "a" * 40, "simulator": {"harness_commit": "a" * 40, "build": "v1"}, "ingest": "api", "points": 14,
+         "units": 7, "pulled_at": "2026-11-01", "blis": {"release": "v1", "commit_sha": "a" * 40}, "engine": {"kind": "vllm", "version": "0.33.0"},
+         "vllm_ref": "v0.33.0", "vllm_max_distance": 10, "fields_sha256": "1" * 64, "pull_manifest_sha256": "2" * 64,
+         "corpora": {"x": "y"}, "experimental": False}
     b = {**a, "harness_commit": "b" * 40, "simulator": {"harness_commit": "b" * 40, "build": "v1"}}
     assert digest(a) == digest(b)
-    assert digest(a) != digest({**a, "points": 15})
-    assert digest(a) != digest({**a, "simulator": {"harness_commit": "a" * 40, "build": "v2"}})
+    # a different simulator build and the data it carries do not make two sides different harnesses ...
+    other_sim = {**a, "simulator": {"harness_commit": "a" * 40, "build": "v2"}, "blis": {"release": "v2", "commit_sha": "c" * 40},
+                 "engine": {"kind": "vllm", "version": "0.34.0"}, "vllm_ref": "v0.34.0", "fields_sha256": "3" * 64,
+                 "pull_manifest_sha256": "4" * 64, "corpora": {"x": "z"}, "experimental": True, "engines": [{"kind": "sglang"}]}
+    assert digest(a) == digest(other_sim)
+    # ... but anything else about the run does: the units handed out, the pull, the ingest, and any key not named as side-bound
+    for change in ({"points": 15}, {"units": 8}, {"pulled_at": "2026-11-02"}, {"ingest": "dump"}, {"new_setting": 1}):
+        assert digest(a) != digest({**a, **change}), change
 
 
 def test_handed_units_exclude_published_fit_and_anchor(tmp_path, fake, capsys):

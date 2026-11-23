@@ -116,22 +116,29 @@ jobs:
             [ -n "$name" ] || { echo "run ${id} holds no single gate artifact for ${sha}"; exit 1; }
             gh run download "$id" --repo "$REPO" -n "$name" -D "$RUNNER_TEMP/$kind"
           done
-          for f in substrate.txt sim.txt; do
-            cmp -s "$RUNNER_TEMP/base/$f" "$RUNNER_TEMP/cand/$f" || { echo "the two runs differ in $f"; exit 1; }
+          # Each side is bound to the simulator its own commit pins. The pin is read through the API at that
+          # commit, resolved to a simulator commit, data commit and ledger by main's own resolve_data.sh, and the
+          # run's recorded sim.txt, substrate.txt and ledger.sha256 must be exactly those. The two ledgers must
+          # be one ledger; the simulators and the data around them may differ.
+          for kind in base cand; do
+            sha="$base_sha"; [ "$kind" = cand ] && sha="$cand_sha"
+            gh api -H "Accept: application/vnd.github.raw" "repos/${REPO}/contents/.github/stack-pins.env?ref=${sha}" \
+              > "$RUNNER_TEMP/${kind}-pins.env"
+            ref="$(python3 orchestrator/gate/gate.py read-sim-pin --pins-file "$RUNNER_TEMP/${kind}-pins.env")"
+            echo "${kind}: ${sha} pins the simulator ${ref}"
+            bash orchestrator/gate/resolve_data.sh "$ref" "$RUNNER_TEMP/data-${kind}" > "$RUNNER_TEMP/${kind}-resolved.env"
           done
-          [[ "$(cat "$RUNNER_TEMP/base/substrate.txt")" =~ ^[0-9a-f]{40}$ ]] || { echo "substrate.txt is not a commit"; exit 1; }
-          echo "SUBSTRATE_COMMIT=$(cat "$RUNNER_TEMP/base/substrate.txt")" >> "$GITHUB_ENV"
-      - name: Check out the ledger the two runs were scored over
-        run: |
-          set -euo pipefail
-          git clone -q --filter=blob:none https://github.com/inference-sim/blis-substrate.git "$RUNNER_TEMP/substrate"
-          git -C "$RUNNER_TEMP/substrate" checkout -q "$SUBSTRATE_COMMIT"
+          python3 orchestrator/gate/gate.py check-binding \
+            --base-resolved "$RUNNER_TEMP/base-resolved.env" --base-artifact "$RUNNER_TEMP/base" \
+            --cand-resolved "$RUNNER_TEMP/cand-resolved.env" --cand-artifact "$RUNNER_TEMP/cand"
+          base_data="$(sed -n 's/^DATA_DIR=//p' "$RUNNER_TEMP/base-resolved.env")"
+          echo "BASE_LEDGER=${base_data}/catalog/ledger" >> "$GITHUB_ENV"
       - name: Evaluate
         env:
           LEDGER_SEED: ${{ secrets.LEDGER_SEED }}
           PREREG: ${{ inputs.preregistration }}
         run: |
-          python3 orchestrator/gate/gate.py evaluate --ledger "$RUNNER_TEMP/substrate/catalog/ledger" \
+          python3 orchestrator/gate/gate.py evaluate --ledger "$BASE_LEDGER" \
             --prereg "$PREREG" --measured "$RUNNER_TEMP/base/measured.csv" \
             --base-predictions "$RUNNER_TEMP/base/predictions.json" --candidate-predictions "$RUNNER_TEMP/cand/predictions.json" \
             --base "$base_sha" --candidate "$cand_sha" --run-id "$GITHUB_RUN_ID" --seed-env LEDGER_SEED --out "$RUNNER_TEMP/gate-out"
