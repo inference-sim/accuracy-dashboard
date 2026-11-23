@@ -1,0 +1,84 @@
+name: gate-rule
+
+# The rule that every accuracy change lands through the whole-run held-out gate (design VAL-6, Table DC
+# "Gate as the path"; docs/m3/gate/README.md). A pull request states, on a line of its own, either
+#   Gate: pre-registration <id>
+#   Gate: not an accuracy change - <reason>
+# and a change to a path in state/gate/accuracy-paths.json must cite a pre-registration that is already on
+# the base branch, evaluated on this head over this merge base.
+#
+# This workflow is the required check `gate-rule / rule`, so it must come from trusted code. It is a
+# `pull_request_target` workflow: GitHub reads it from the BASE branch, so a pull request cannot replace it, and
+# it checks out only the base branch. It never checks out, imports or executes anything of the pull request. The
+# pull request's body, its list of changed files and its trees reach the checker as DATA, fetched through the API
+# at the head commit and written outside the checkout. The job holds no secret and reads no partition. Where the
+# base has no checker yet (the change that introduces the rule) it says so and passes.
+# orchestrator/gate/test_gate_workflow.py fails if this trigger or checkout changes.
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: gate-rule-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  rule:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # The only checkout: the base branch's tip, so a re-run sees a ledger or an exception committed since.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          path: base
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+      # The base checker imports numpy through gate.py. The pinned requirements are the base branch's own, never
+      # the pull request's, so a pull request cannot choose the packages its own check runs on.
+      - run: pip install --quiet --require-hashes -r requirements-ci.txt
+        working-directory: base
+      - name: Check the pull request against the rule
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [ ! -f base/orchestrator/gate/gate.py ]; then
+            echo "The base branch has no gate checker yet; the rule starts with the change that adds it."
+            exit 0
+          fi
+          data="$RUNNER_TEMP/pr-data"
+          mkdir "$data"
+          # The body and the changed files come from the API, as they are now. A rename is a delete and an add.
+          pr_json="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}")"
+          jq -r '.body // ""' <<<"$pr_json" > "$data/body.txt"
+          gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/files?per_page=100" --jq '.[]' > "$data/files.ndjson"
+          jq -r 'if .status == "renamed" then (["D", .previous_filename], ["A", .filename])
+                 elif .status == "removed" then ["D", .filename]
+                 elif .status == "added" or .status == "copied" then ["A", .filename]
+                 else ["M", .filename] end | @tsv' "$data/files.ndjson" > "$data/changes.txt"
+          expected="$(jq -r .changed_files <<<"$pr_json")"
+          listed="$(wc -l < "$data/files.ndjson" | tr -d ' ')"
+          [ "$expected" = "$listed" ] || { echo "::error::the API lists ${listed} of the pull request's ${expected} changed files; the rule cannot be checked"; exit 1; }
+          # The change is judged against the merge base of the base branch's tip and the head commit of the event.
+          base_tip="$(git -C base rev-parse HEAD)"
+          merge_base="$(gh api "repos/${REPO}/compare/${base_tip}...${HEAD_SHA}" --jq .merge_base_commit.sha)"
+          # Each tree is unpacked from the API's tarball, outside the checkout, and only ever read as data.
+          for kind in head merge-base; do
+            sha="$HEAD_SHA"; [ "$kind" = merge-base ] && sha="$merge_base"
+            mkdir "$data/$kind"
+            gh api "repos/${REPO}/tarball/${sha}" | tar -xz --strip-components=1 -C "$data/$kind"
+          done
+          python3 base/orchestrator/gate/gate.py check-pr --body-file "$data/body.txt" \
+            --changes-file "$data/changes.txt" --root "$data/head" --base-root base \
+            --pr-number "$PR_NUMBER" --head-sha "$HEAD_SHA" --merge-base "$merge_base" --merge-base-root "$data/merge-base"

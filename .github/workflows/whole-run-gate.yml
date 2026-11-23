@@ -1,0 +1,166 @@
+name: whole-run-gate
+
+# The whole-run held-out gate (design VAL-6, §12.3, §13.5; docs/m3/gate/README.md). It is the only job that
+# holds the partition seed. It runs on main's code, from a dispatch on main, and does this:
+#   1. checks the pull request, the pre-registration and the two gate-candidate runs through the Actions API;
+#      and that the candidate scores with main's scoring surface (surface.py), unless a maintainer exception covers it;
+#   2. refuses while an earlier successful gate run is not yet in state/gate/ledger.json on main;
+#   3. draws the roles from the seed (the one step whose environment holds LEDGER_SEED), reduces the held
+#      units to aggregates, and writes report.json, comment.md and the next ledger.json;
+#   4. keeps those three as an artifact and posts comment.md, which holds aggregates only, on the pull request.
+# It pushes nothing. A maintainer commits ledger.json to main; that commit is what spends the evaluation
+# (the budget is checked against the ledger on main, and step 2 keeps two runs from racing).
+#
+# The environment `ledger` and its secret LEDGER_SEED are provisioned by a maintainer (A3); this workflow reads
+# the secret by name only, in the evaluation step's env, and prints nothing from it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      preregistration:
+        description: "the pre-registration id (state/gate/preregistrations/<id>.json on main)"
+        required: true
+      pull_request:
+        description: "the pull request number whose change is evaluated"
+        required: true
+      base_run:
+        description: "run id of the gate-candidate run dispatched on main"
+        required: true
+      candidate_run:
+        description: "run id of the gate-candidate run dispatched on the pull request's branch"
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+
+concurrency:
+  group: whole-run-gate
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: ledger
+    steps:
+      - name: Check the inputs
+        env:
+          PREREG: ${{ inputs.preregistration }}
+          PR: ${{ inputs.pull_request }}
+          BASE_RUN: ${{ inputs.base_run }}
+          CAND_RUN: ${{ inputs.candidate_run }}
+        run: |
+          set -euo pipefail
+          [[ "$PREREG" =~ ^[a-z0-9][a-z0-9.-]{2,63}$ ]] || { echo "preregistration is not an id"; exit 2; }
+          [[ "$PR" =~ ^[1-9][0-9]{0,8}$ ]] || { echo "pull_request is not a number"; exit 2; }
+          [[ "$BASE_RUN" =~ ^[1-9][0-9]{0,18}$ ]] || { echo "base_run is not a run id"; exit 2; }
+          [[ "$CAND_RUN" =~ ^[1-9][0-9]{0,18}$ ]] || { echo "candidate_run is not a run id"; exit 2; }
+          [ "$BASE_RUN" != "$CAND_RUN" ] || { echo "base_run and candidate_run are the same run"; exit 2; }
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+      - run: pip install --quiet --require-hashes -r requirements-ci.txt
+      - name: Check the pull request, the pre-registration and the two runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PREREG: ${{ inputs.preregistration }}
+          PR: ${{ inputs.pull_request }}
+          BASE_RUN: ${{ inputs.base_run }}
+          CAND_RUN: ${{ inputs.candidate_run }}
+        run: |
+          set -euo pipefail
+          python3 orchestrator/gate/gate.py check-prereg "state/gate/preregistrations/${PREREG}.json"
+          python3 orchestrator/gate/gate.py check-ledger
+          pr_json="$(gh api "repos/${REPO}/pulls/${PR}")"
+          [ "$(jq -r .state <<<"$pr_json")" = open ] || { echo "the pull request is not open"; exit 1; }
+          [ "$(jq -r .base.ref <<<"$pr_json")" = main ] || { echo "the pull request does not target main"; exit 1; }
+          [ "$(jq -r .head.repo.full_name <<<"$pr_json")" = "$REPO" ] || { echo "the pull request is from a fork"; exit 1; }
+          jq -r '.body // ""' <<<"$pr_json" > "$RUNNER_TEMP/body.txt"
+          grep -Eq "^[[:space:]]*Gate:[[:space:]]*pre-registration[[:space:]]+${PREREG}[[:space:]]*$" "$RUNNER_TEMP/body.txt" \
+            || { echo "the pull request body does not state 'Gate: pre-registration ${PREREG}'"; exit 1; }
+          cand_sha="$(jq -r .head.sha <<<"$pr_json")"
+          for kind in base cand; do
+            id="${BASE_RUN}"; [ "$kind" = cand ] && id="${CAND_RUN}"
+            run_json="$(gh api "repos/${REPO}/actions/runs/${id}")"
+            [ "$(jq -r .conclusion <<<"$run_json")" = success ] || { echo "run ${id} did not succeed"; exit 1; }
+            [ "$(jq -r .event <<<"$run_json")" = workflow_dispatch ] || { echo "run ${id} was not dispatched"; exit 1; }
+            [ "$(jq -r '.path | split("@")[0]' <<<"$run_json")" = .github/workflows/gate-candidate.yml ] || { echo "run ${id} is not a gate-candidate run"; exit 1; }
+            [ "$(jq -r .repository.full_name <<<"$run_json")" = "$REPO" ] || { echo "run ${id} is from another repository"; exit 1; }
+            if [ "$kind" = base ]; then
+              [ "$(jq -r .head_branch <<<"$run_json")" = main ] || { echo "the base run was not dispatched on main"; exit 1; }
+              base_sha="$(jq -r .head_sha <<<"$run_json")"
+            else
+              run_cand_sha="$(jq -r .head_sha <<<"$run_json")"
+            fi
+          done
+          [ "$run_cand_sha" = "$cand_sha" ] || { echo "the candidate run was not dispatched on the pull request's current head"; exit 1; }
+          printf 'base_sha=%s\ncand_sha=%s\n' "$base_sha" "$cand_sha" >> "$GITHUB_ENV"
+          git merge-base --is-ancestor "$base_sha" origin/main || { echo "the base run is not on main"; exit 1; }
+          [ "$(gh api "repos/${REPO}/compare/${base_sha}...${cand_sha}" --jq .merge_base_commit.sha)" = "$base_sha" ] \
+            || { echo "the base run's commit is not the pull request's merge base"; exit 1; }
+          gh api --paginate "repos/${REPO}/actions/workflows/whole-run-gate.yml/runs?status=success&per_page=100" \
+            --jq '.workflow_runs[].id' | grep -vx "$GITHUB_RUN_ID" > "$RUNNER_TEMP/earlier.txt" || true
+          python3 orchestrator/gate/gate.py unrecorded --run-ids "$RUNNER_TEMP/earlier.txt"
+          for kind in base cand; do
+            id="${BASE_RUN}"; sha="$base_sha"
+            if [ "$kind" = cand ]; then id="${CAND_RUN}"; sha="$cand_sha"; fi
+            name="$(gh api "repos/${REPO}/actions/runs/${id}/artifacts" --jq "[.artifacts[].name | select(startswith(\"gate-\") and endswith(\"-${sha}\"))] | if length == 1 then .[0] else empty end")"
+            [ -n "$name" ] || { echo "run ${id} holds no single gate artifact for ${sha}"; exit 1; }
+            gh run download "$id" --repo "$REPO" -n "$name" -D "$RUNNER_TEMP/$kind"
+          done
+          # Each side is bound to the simulator its own commit pins. The pin is read through the API at that
+          # commit, resolved to a simulator commit, data commit and ledger by main's own resolve_data.sh, and the
+          # run's recorded sim.txt, substrate.txt and ledger.sha256 must be exactly those. The two ledgers must
+          # be one ledger; the simulators and the data around them may differ.
+          for kind in base cand; do
+            sha="$base_sha"; [ "$kind" = cand ] && sha="$cand_sha"
+            gh api -H "Accept: application/vnd.github.raw" "repos/${REPO}/contents/.github/stack-pins.env?ref=${sha}" \
+              > "$RUNNER_TEMP/${kind}-pins.env"
+            ref="$(python3 orchestrator/gate/gate.py read-sim-pin --pins-file "$RUNNER_TEMP/${kind}-pins.env")"
+            echo "${kind}: ${sha} pins the simulator ${ref}"
+            bash orchestrator/gate/resolve_data.sh "$ref" "$RUNNER_TEMP/data-${kind}" > "$RUNNER_TEMP/${kind}-resolved.env"
+          done
+          python3 orchestrator/gate/gate.py check-binding \
+            --base-resolved "$RUNNER_TEMP/base-resolved.env" --base-artifact "$RUNNER_TEMP/base" \
+            --cand-resolved "$RUNNER_TEMP/cand-resolved.env" --cand-artifact "$RUNNER_TEMP/cand"
+          # The scoring surface is recomputed here from each commit's own files (the Actions API tarball), never
+          # taken from the run's claim. The candidate must score with main's code unless a maintainer exception on
+          # main covers this pull request at this head.
+          for kind in base cand; do
+            sha="$base_sha"; [ "$kind" = cand ] && sha="$cand_sha"
+            mkdir "$RUNNER_TEMP/tree-${kind}"
+            gh api "repos/${REPO}/tarball/${sha}" | tar -xz --strip-components=1 -C "$RUNNER_TEMP/tree-${kind}"
+          done
+          python3 orchestrator/gate/gate.py check-surface --base-root "$RUNNER_TEMP/tree-base" --cand-root "$RUNNER_TEMP/tree-cand" \
+            --base-artifact "$RUNNER_TEMP/base" --cand-artifact "$RUNNER_TEMP/cand" --pull-request "$PR" --head "$cand_sha"
+          base_data="$(sed -n 's/^DATA_DIR=//p' "$RUNNER_TEMP/base-resolved.env")"
+          echo "BASE_LEDGER=${base_data}/catalog/ledger" >> "$GITHUB_ENV"
+      - name: Evaluate
+        env:
+          LEDGER_SEED: ${{ secrets.LEDGER_SEED }}
+          PREREG: ${{ inputs.preregistration }}
+        run: |
+          python3 orchestrator/gate/gate.py evaluate --ledger "$BASE_LEDGER" \
+            --prereg "$PREREG" --measured "$RUNNER_TEMP/base/measured.csv" \
+            --base-predictions "$RUNNER_TEMP/base/predictions.json" --candidate-predictions "$RUNNER_TEMP/cand/predictions.json" \
+            --base "$base_sha" --candidate "$cand_sha" --run-id "$GITHUB_RUN_ID" --seed-env LEDGER_SEED --out "$RUNNER_TEMP/gate-out"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: gate-result-${{ inputs.preregistration }}
+          path: ${{ runner.temp }}/gate-out
+          retention-days: 90
+          if-no-files-found: error
+      - name: Post the aggregates on the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ inputs.pull_request }}
+        run: gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/gate-out/comment.md"

@@ -56,6 +56,21 @@ GO_IMPORTS = {
 # (file, function) pairs that build a path inside a BLIS data checkout, and the command whose
 # absence keeps each.
 DATA_READS = {
+    ("orchestrator/gate/partition.py", "load_config"):
+        "TEMPORARY until blis-substrate ships a command that assigns ledger roles from a seed read from the environment "
+        "(its ledger/assign.go does so in-process): the whole-run gate job re-derives the roles of the held units from "
+        "ledger.yaml's cut-points and the seed it alone holds",
+    ("orchestrator/gate/partition.py", "load_units"):
+        "TEMPORARY with partition.load_config: reads catalog/ledger/units, the units the roles are drawn over",
+    ("orchestrator/gate/partition.py", "load_published"):
+        "TEMPORARY with partition.load_config: reads the published fit and anchor lists, which a measured table may not hold",
+    ("orchestrator/gate/partition.py", "load_legacy_sides"):
+        "TEMPORARY with partition.load_config: reads legacy-map.yaml, the old side of a unit whose role is not blind",
+    ("orchestrator/gate/binding.py", "check_side"):
+        "TEMPORARY with partition.load_config: digests catalog/ledger of the data a side's simulator pins, to prove both "
+        "sides were scored over one held-out partition",
+    ("orchestrator/gate/fakepartition.py", "build"):
+        "TEMPORARY with ledger_fake.write: writes, for tests, the ledger layout partition.py reads",
     ("orchestrator/ingest/ledger.py", "load"):
         "TEMPORARY until an inference-sim command prints the full unit list with identities "
         "(catalog/ledger/units) and the ingest report (catalog/ledger/reports); `blis ledger --list` "
@@ -125,6 +140,10 @@ DATA_READS = {
 # Rule 4. (file, rule) pairs, and the command whose absence keeps each. Rules: clone, go_doc,
 # go_list, installation (shell and workflows), pins (Python).
 TEXT_READS = {
+    ("orchestrator/gate/resolve_data.sh", "clone"):
+        "TEMPORARY with the api-nightly.yml substrate checkout: gate-candidate.yml and whole-run-gate.yml resolve a side's "
+        "simulator ref to its data here, cloning blis-substrate at the commit the simulator's stack.json pins when it does "
+        "not embed it, for catalog/, registry/ and catalog/ledger, until an inference-sim command prints them",
     (".github/workflows/api-nightly.yml", "clone"):
         "TEMPORARY until an inference-sim command prints the full unit list with identities and the "
         "ingest report (`blis ledger --list` prints only the published unit ids): the job checks out "

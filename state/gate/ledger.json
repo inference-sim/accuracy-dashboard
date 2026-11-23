@@ -1,0 +1,13 @@
+{
+  "kind": "GateLedger",
+  "margin_ceiling": {
+    "distance": null,
+    "error": null
+  },
+  "partitions": {
+    "1": {
+      "budget": null,
+      "evaluations": []
+    }
+  }
+}
