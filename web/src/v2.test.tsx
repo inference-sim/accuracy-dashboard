@@ -285,12 +285,11 @@ describe('the results download', () => {
   })
 })
 
-describe('run details show the source and the API pull date as plain text', () => {
-  it('names InferenceX without a link, and the API root is never shown', () => {
+describe('run details show the source and the API pull date', () => {
+  it('links the InferenceX site, never the API root', () => {
     const html = renderToStaticMarkup(<App summary={v2a()} loadError={null} />)
     const about = html.slice(html.indexOf('class="about-prov"'))
-    expect(about).toContain('>InferenceX<')
-    expect(about).not.toContain('<a ')
+    expect(about).toContain('href="https://inferencex.semianalysis.com/"')
     expect(html).not.toContain('inferencex.semianalysis.com/api')
     expect(about).toMatch(/API pull date<\/span><span class="v">2026-10-23 00:00 UTC<\/span>/)
   })
