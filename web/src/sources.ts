@@ -1,8 +1,8 @@
 /**
  * The sources page's data (data/latest/funnel.json, written by orchestrator/baseline/funnel.py, format funnel-2): for each anchor
  * source its funnel (units, in scope, scored), the scored count, the reason of every unscored unit, and for InferenceX the
- * vLLM and SGLang lanes apart; the training-only sources as labelled training diagnostics (never accuracy); and where
- * ledger.yaml disagrees with design D9. Validation is loud, like the summary's.
+ * vLLM and SGLang lanes apart. The file also carries training-only sources and a ledger cut-point check; the page shows neither.
+ * Validation is loud, like the summary's.
  */
 export const FUNNEL_URL = 'data/latest/funnel.json'
 export const FUNNEL_FORMAT = 'funnel-2'
@@ -52,8 +52,9 @@ export interface FunnelDoc {
   format: typeof FUNNEL_FORMAT
   funnels: Record<string, Funnel>
   scored: Record<string, number>
-  training: Record<string, TrainingFunnel>
-  cut_points: { checked: boolean; discrepancies: Discrepancy[] }
+  /** Present in funnel.json, never shown: a training-only source has no accuracy and no place on the page. */
+  training?: Record<string, TrainingFunnel>
+  cut_points?: { checked: boolean; discrepancies: Discrepancy[] }
   problems: string[]
   meaning: string
 }
@@ -77,17 +78,31 @@ export function validateFunnel(raw: unknown): FunnelDoc {
       if (f == null || !(k in f)) throw new FunnelLoadError(`funnel.json funnel ${name} lacks "${k}"`)
     }
   }
-  for (const [name, t] of Object.entries((doc.training ?? {}) as Record<string, Record<string, unknown>>)) {
-    // A training-only source is never accuracy: a file that gives one a scored count is refused, not shown.
-    if (t.role !== 'training-only' || 'scored' in ((t.stages as object) ?? {}) || 'accuracy' in t) {
-      throw new FunnelLoadError(`funnel.json training source ${name} must be training-only and carry no scored count or accuracy`)
-    }
-  }
-  const cp = doc.cut_points as { checked?: boolean; discrepancies?: unknown } | undefined
-  if (cp == null || typeof cp.checked !== 'boolean' || !Array.isArray(cp.discrepancies)) {
-    throw new FunnelLoadError('funnel.json lacks cut_points (whether ledger.yaml was checked against D9, and what disagreed)')
-  }
   return raw as FunnelDoc
+}
+
+/** One row of the Sources table: a source, or one engine lane of it (`lane` set, `role` null). */
+export interface SourceRow {
+  id: string
+  source: string
+  lane: string | null
+  role: string | null
+  stages: FunnelStages
+  scored_by_grade: Record<string, number>
+  g5: Record<string, number>
+  failed: Record<string, number>
+  no_outcome: Record<string, number>
+  withheld?: Record<string, number>
+}
+
+/** The table's rows from the document: each source in the order it is published, its lanes right after it. */
+export function sourceRows(doc: FunnelDoc): SourceRow[] {
+  return Object.values(doc.funnels).flatMap((f) => [
+    { id: f.source, source: f.source, lane: null, role: f.role, stages: f.stages, scored_by_grade: f.scored_by_grade, g5: f.g5, failed: f.failed, no_outcome: f.no_outcome, withheld: f.withheld },
+    ...Object.entries(f.lanes ?? {}).map(([lane, l]) => ({
+      id: `${f.source}/${lane}`, source: f.source, lane, role: null, stages: l.stages, scored_by_grade: l.scored_by_grade, g5: l.g5, failed: l.failed, no_outcome: l.no_outcome,
+    })),
+  ])
 }
 
 /** The reason of every unit that is in scope and not scored, largest first: G5 (by code), failed, withheld and no result. */
