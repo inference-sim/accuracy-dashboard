@@ -37,6 +37,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "ingest"))
 
+import public_text as pt  # noqa: E402
 import sources as src  # noqa: E402
 
 FORMAT = "funnel-2"
@@ -402,7 +403,7 @@ def main(argv=None) -> int:
     except (FunnelError, src.SourcesError, OSError, ValueError) as e:
         print(f"funnel: {e}", file=sys.stderr)
         return 2
-    a.out.write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n")
+    a.out.write_text(json.dumps(pt.scrub(doc), indent=1, sort_keys=True) + "\n")
     print(f"wrote {a.out}: " + ", ".join(f"{k} {v} scored" + (f" + {doc['funnels'][k]['provisional']['units']} provisional"
                                                           if doc["funnels"][k]["provisional"]["units"] else "")
                                          for k, v in doc["scored"].items()))

@@ -36,6 +36,7 @@ sys.path.insert(0, str(HERE.parent / "ingest"))
 import configiq_night as cn  # noqa: E402
 import funnel as fn  # noqa: E402
 import ledger as ldg  # noqa: E402
+import public_text as pt  # noqa: E402
 
 REFRESH = ("re-run score-configiq at the new pin and commit its funnel.json as data/supplemental/funnels/configiq.json and its "
            "configiq.json as data/supplemental/classes/configiq.json")
@@ -91,13 +92,12 @@ def write(out: Path, summary_path: Path, make) -> str | None:
     try:
         summary = json.loads(Path(summary_path).read_text())
         doc = make(summary)
+        out.write_text(json.dumps(pt.scrub(doc), indent=1, sort_keys=True) + "\n")
+        return None
     except Skip as e:
         reason = str(e)
     except Exception as e:  # noqa: BLE001 -- a view of the scoring never fails the night; the type and message are the warning
         reason = f"{type(e).__name__}: {e}"
-    else:
-        out.write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n")
-        return None
     if out.is_file():
         try:
             current = json.loads(Path(summary_path).read_text()).get("snapshot_id")

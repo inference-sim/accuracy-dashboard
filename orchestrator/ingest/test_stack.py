@@ -255,6 +255,19 @@ def test_a_release_whose_substrate_publishes_no_anchor_list_gives_way_to_its_pat
     assert sk.unscored_releases(tags, {"v0.15.0"}, "v0.16.0", superseded={}) == ["v0.16.0", "v0.17.0", "v0.17.1"]
 
 
+def test_the_night_scores_v0_19_0_not_the_v0_18_patches_the_m3_2_scorer_cannot_run():
+    # The night that scored v0.18.1 got zero points: its simulator refuses the engine-kind-only scenario of the current scorer,
+    # so nothing published and the next night picked the same release. v0.19.0 scores their code; they are never listed.
+    tags = ["v0.17.1", "v0.18.0", "v0.18.1", "v0.18.2", "v0.19.0"]
+    done = {"v0.17.1", "v0.18.0"}
+    assert sk.unscored_releases(tags, done, "v0.16.0") == ["v0.19.0"]
+    # Until v0.19.0 is tagged they stay visible, as the other superseded releases do.
+    assert sk.unscored_releases(tags[:4], done, "v0.16.0") == ["v0.18.1", "v0.18.2"]
+    # Once v0.19.0 is scored nothing is left, and a later release is scored in its turn.
+    assert sk.unscored_releases(tags, done | {"v0.19.0"}, "v0.16.0") == []
+    assert sk.unscored_releases(tags + ["v0.19.1"], done | {"v0.19.0"}, "v0.16.0") == ["v0.19.1"]
+
+
 # ------------------------------------------------------------------ a simulator commit whose stack embeds the substrate
 EMBEDDED = {**DOC, "modules": [{"path": "github.com/inference-sim/llm-d-router", "version": "v1.0.0-blis.5.0.20261121014725-cb8d93fcb0fa",
                                 "commit": "c" * 40}],

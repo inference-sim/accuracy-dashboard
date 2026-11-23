@@ -35,6 +35,7 @@ HERE = Path(__file__).resolve().parent
 ORCH = HERE.parent
 sys.path.insert(0, str(ORCH / "baseline"))
 sys.path.insert(0, str(ORCH / "ingest"))
+import public_text as pt  # noqa: E402
 import sources as src  # noqa: E402
 import stack as sk  # noqa: E402
 
@@ -74,7 +75,7 @@ def stamp_funnel(path: Path, ref: str) -> None:
     revision the ledger pins on the night and leaves a stale configiq row out, so a pin moved without a re-run is flagged."""
     doc = json.loads(Path(path).read_text())
     doc["dataset"] = ref
-    Path(path).write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n")
+    Path(path).write_text(json.dumps(pt.scrub(doc), indent=1, sort_keys=True) + "\n")
 
 
 def fetch(ref: str, assets, dest: Path, opener=urllib.request.urlopen) -> None:
