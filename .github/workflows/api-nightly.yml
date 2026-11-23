@@ -125,7 +125,7 @@ jobs:
       - run: pip install --quiet --require-hashes -r requirements-ci.txt
       - name: Install what the configiq export reads (parquet)
         if: ${{ inputs.configiq_preview && inputs.sim_commit != '' }}
-        run: pip install --quiet --require-hashes -r requirements-configiq.txt
+        run: pip install --quiet --require-hashes -r requirements-ci.txt -r requirements-configiq.txt
 
       # The ONLY thing cached across runs: the agentic artifact-download zips, keyed by artifact id
       # on disk (GitHubArtifacts.download). Ephemeral and NOT committed -- a cold cache just means a
