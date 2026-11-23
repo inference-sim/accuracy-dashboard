@@ -71,6 +71,13 @@ def canonical_dumps(value) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
+def published_dumps(value) -> str:
+    """The one JSON text every published summary file is written as (build_summary_v2.dumps and the night's _write_summary):
+    compact, key order kept, UTF-8 kept, one trailing newline. Each scored point carries its whole fidelity record (about 33 KB),
+    so indented, a night of 1011 scored points was 105 MB and GitHub refuses a file over 100 MB; compact it is 51 MB."""
+    return json.dumps(value, separators=(",", ":"), sort_keys=False, ensure_ascii=False) + "\n"
+
+
 def benchmark_run(run_url) -> int | None:
     """The numeric GitHub Actions run id in a run_url, without its attempt number; None when the
     record has no run_url or the URL names no run."""

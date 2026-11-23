@@ -666,10 +666,9 @@ def backlog_of(summary: dict) -> dict:
 
 
 def dumps(summary: dict) -> str:
-    """The published text. Compact: the summary is read by the page and by tools, not by eye, and every scored point carries
-    its whole fidelity record, so indenting it more than doubled the file (a night of 1011 scored points was 105 MB indented,
-    53 MB compact; GitHub refuses a file over 100 MB). orchestrator/nightly/file_size.py stops a publish before the limit."""
-    return json.dumps(summary, separators=(",", ":"), sort_keys=False, ensure_ascii=False) + "\n"
+    """The published text (contract.published_dumps, which the night's own writer uses too). orchestrator/nightly/file_size.py
+    stops a publish before GitHub's 100 MB limit for one file."""
+    return contract.published_dumps(summary)
 
 
 def main(argv=None) -> int:
