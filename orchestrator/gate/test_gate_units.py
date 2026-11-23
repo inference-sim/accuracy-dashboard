@@ -360,6 +360,18 @@ NOT = "Gate: not an accuracy change - documentation only"
     (NOT, [("M", "docs/README.md")], True),
     (NOT, [("M", "harness/run.sh")], False),                      # an accuracy path cannot claim to be no change
     (NOT, [("M", "orchestrator/ingest/score.py")], False),
+    (NOT, [("M", "orchestrator/ingest/result.py")], False),       # extracts the predicted metric from the Result
+    (NOT, [("M", "orchestrator/ingest/pointrecord.py")], False),
+    (NOT, [("A", "orchestrator/ingest/new_module.py")], False),
+    (NOT, [("M", "orchestrator/baseline/freeze.py")], False),
+    (NOT, [("M", "orchestrator/resolve_agentic_corpus.py")], False),
+    (NOT, [("M", "orchestrator/vllm_defaults.json")], False),
+    (NOT, [("M", "schemas/summary.v3.json")], False),
+    (NOT, [("M", ".github/workflows/gate-candidate.yml")], False),
+    (NOT, [("M", ".github/workflows/gate-rule.yml")], False),
+    (NOT, [("M", ".github/workflows/whole-run-gate.yml")], False),
+    (NOT, [("M", "orchestrator/ingest/test_result.py")], True),    # a test file is not scoring code
+    (NOT, [("M", "orchestrator/ingest/testdata/inferencex-workloads/seed0.json")], False),   # data the scorer reads
     ("no statement", [("M", "docs/README.md")], False),
     (CITE + "\n" + NOT, [("M", "docs/README.md")], False),
     ("Gate: pre-registration row-00-missing", [("M", "harness/run.sh")], False),

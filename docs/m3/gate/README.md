@@ -25,9 +25,12 @@ formed; the pull request that adds it cites `not an accuracy change`. The workfl
 of this on every pull request, with no secret, and it runs the base branch's checker (and reads the base
 branch's list of accuracy paths), so a pull request cannot loosen the rule it is judged by.
 
-The list of accuracy paths is a conservative first draft for a maintainer to review: the pin file, the
-harness, and the three scorer modules. A change that moves accuracy by a path the list misses is not caught
-by the rule; it is caught by review, and the fix is to add the path to the list.
+The list of accuracy paths is the whole scoring surface, as directory rules: the pin file, the three gate
+workflows, `harness/`, `orchestrator/ingest/`, `orchestrator/baseline/`, `schemas/`, and the top-level
+`orchestrator` modules and data files the candidate run imports or reads. A test module (`test_*.py`) is the one
+exclusion; the scorer imports none. `orchestrator/gate/test_gate_surface.py` fails when a file the candidate run
+executes (the import closure of `harness/run.sh`'s scorer, `freeze.py` and `resolve_agentic_corpus.py`) or reads is
+outside the list, so a new scoring module cannot slip past it.
 
 ## The pre-registration
 

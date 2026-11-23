@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import prereg as pr
 
@@ -42,8 +42,14 @@ def parse_changes(text: str) -> list[tuple[str, str]]:
     return out
 
 
+def is_test(path: str) -> bool:
+    name = PurePosixPath(path).name
+    return name.startswith("test_") and name.endswith(".py")
+
+
 def touches(path: str, prefixes: list[str]) -> bool:
-    return any(path.startswith(p) if p.endswith("/") else path == p for p in prefixes)
+    """A test module is never scoring code (no scoring module is one: test_gate_surface.py); a data file under a directory is."""
+    return not is_test(path) and any(path.startswith(p) if p.endswith("/") else path == p for p in prefixes)
 
 
 def check_pr(body: str, changes: list[tuple[str, str]], root, base_root=None) -> list[str]:

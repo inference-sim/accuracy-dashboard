@@ -125,7 +125,7 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
     "gate": [
         pytest("The whole-run gate: pre-registration, budget, lanes, statistics, pull-request rule, aggregates only",
                "orchestrator/gate/test_gate_units.py", "orchestrator/gate/test_gate_run.py",
-               "orchestrator/gate/test_gate_binding.py"),
+               "orchestrator/gate/test_gate_binding.py", "orchestrator/gate/test_gate_surface.py"),
     ],
     # The two repository-wide checks that were hidden behind earlier failures: they run on their own.
     "boundary": [
