@@ -79,15 +79,27 @@ evaluations cannot be spent against one count.
 
 1. Commit the pre-registration to `main` (a pull request that cites `not an accuracy change`).
 2. Dispatch `gate-candidate.yml` on `main` (the base) and on the branch under test (the candidate), with the
-   same `sim`, `today` and `label`. Each scores every unit that is not on the published fit or anchor list, so
-   neither run can tell which are held, and keeps a contract, a Predictions document and a measured table.
-   The base run's summary prints the measured table's SHA-256, which goes in the pre-registration. Because
-   the pre-registration is committed before the candidate exists, the base run comes first, and the table's
-   hash is pinned by the pre-registration before any held datum is read.
+   same `today` and `label`. There is no `sim` input: each side scores the simulator that `SIM_REF` in its own
+   `.github/stack-pins.env` names (the merge base's pin for the base, the pull request head's pin for the
+   candidate), over the catalog, registry, ledger and engine fields that simulator's `stack.json` pins
+   (`orchestrator/gate/resolve_data.sh`). A pull request that moves the simulator pin or its data is therefore
+   evaluated as old build against new build. The base's simulator also defines the lane (`modelled_commit`), so
+   the pre-registration is written against the merge base's `SIM_REF`. Each side scores every unit that is not
+   on the published fit or anchor list, so neither run can tell which are held, and keeps a contract, a
+   Predictions document and a measured table. The base run's summary prints the measured table's SHA-256,
+   which goes in the pre-registration. Because the pre-registration is committed before the candidate exists,
+   the base run comes first, and the table's hash is pinned by the pre-registration before any held datum is
+   read.
 3. The pull request body cites the pre-registration. A maintainer or the agent dispatches `whole-run-gate.yml`
    on `main` with the pre-registration, the pull request number and the two run ids (A3).
 4. The gate job checks the pull request, the runs and the artifacts, draws the roles from the seed, keeps the
-   held units, and posts the aggregates on the pull request as one comment.
+   held units, and posts the aggregates on the pull request as one comment. It does not believe what a run
+   recorded about its simulator: it reads each side's `SIM_REF` through the Actions API at that side's commit,
+   resolves the simulator and data with main's own `resolve_data.sh`, and refuses unless the run's simulator
+   commit, data commit and ledger digest are the resolved ones (`gate.py check-binding`). Both sides must carry
+   the same ledger: the held-out partition is one thing for both. The simulator, engine, vLLM ref, field-table,
+   pull-manifest and corpus provenance are bound that way and left out of the harness digest; the units, pull
+   date, ingest and everything else must still agree.
 
 Lanes with fewer than 10 role keys are merged on (engine, commit, chip), then on (engine, commit), and
 otherwise only counted. A merged lane is named only by the fields its members share; a regression confined to

@@ -5,6 +5,9 @@
     gate.py check-ledger                        the budget ledger is well formed
     gate.py check-pr --body-file F --changes-file F    the pull request follows the rule (rule.py)
     gate.py unrecorded --run-ids F              every earlier successful gate run is in the ledger on main
+    gate.py read-sim-pin --pins-file F          the SIM_REF a stack-pins.env assigns
+    gate.py ledger-digest --ledger D            the SHA-256 a gate run records for the ledger it was scored over
+    gate.py check-binding ...                   each side was scored over what its commit's simulator pin names
     gate.py contract-to-predictions ...         a contract's points.csv as a Predictions document (candidate job)
     gate.py handed-units --ledger D --out F      every unit that is not a published fit or anchor (what a candidate run scores)
     gate.py build-measured ...                  the measured table from a contract and the ledger's units
@@ -27,6 +30,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "ingest"))
+import binding  # noqa: E402
 import budget  # noqa: E402
 import guard as gd  # noqa: E402
 import partition  # noqa: E402
@@ -119,13 +123,47 @@ def cmd_check_pr(a) -> int:
 
 
 def harness_digest(provenance: Path) -> str:
-    """The settings a run was scored under, without the commit that ran it: the base and the candidate
-    differ in their harness commit by construction and must agree on everything else."""
+    """The settings a run was scored under, without the commit that ran it and without what names its simulator
+    build or data (binding.SIDE_BOUND): the base and the candidate differ in those by construction, and
+    binding.check_side ties each to its own pin. Everything else (the units, the pull, the ingest) must agree."""
     doc = json.loads(provenance.read_text())
     doc.pop("harness_commit", None)
+    for k in binding.SIDE_BOUND:
+        doc.pop(k, None)
     if isinstance(doc.get("simulator"), dict):
         doc["simulator"].pop("harness_commit", None)
     return hashlib.sha256(json.dumps(doc, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def cmd_read_sim_pin(a) -> int:
+    try:
+        print(binding.read_sim_pin(Path(a.pins_file).read_text()))
+    except (binding.BindingError, OSError) as e:
+        print(f"::error::{e}")
+        return 1
+    return 0
+
+
+def cmd_ledger_digest(a) -> int:
+    try:
+        print(binding.ledger_digest(Path(a.ledger)))
+    except (binding.BindingError, OSError) as e:
+        print(f"::error::{e}")
+        return 1
+    return 0
+
+
+def cmd_check_binding(a) -> int:
+    """Both sides against what their pins resolve to (resolve_data.sh output files), then against each other."""
+    try:
+        ledgers = [binding.check_side(label, binding.parse_resolved(Path(res).read_text()), Path(art))
+                   for label, res, art in (("base", a.base_resolved, a.base_artifact), ("candidate", a.cand_resolved, a.cand_artifact))]
+        binding.check_pair(*ledgers)
+    except (binding.BindingError, OSError) as e:
+        print(f"::error::{e}")
+        return 1
+    print("both runs are bound to the simulator and the ledger their commits pin")
+    return 0
 
 
 def cmd_unrecorded(a) -> int:
@@ -255,6 +293,10 @@ def main(argv=None) -> int:
     p = sub.add_parser("check-pr"); p.add_argument("--body-file", required=True); p.add_argument("--changes-file", required=True)
     p.add_argument("--root", default=str(ROOT)); p.add_argument("--base-root", default=None); p.set_defaults(f=cmd_check_pr)
     p = sub.add_parser("unrecorded"); p.add_argument("--run-ids", required=True); p.add_argument("--root", default=str(ROOT)); p.set_defaults(f=cmd_unrecorded)
+    p = sub.add_parser("read-sim-pin"); p.add_argument("--pins-file", required=True); p.set_defaults(f=cmd_read_sim_pin)
+    p = sub.add_parser("ledger-digest"); p.add_argument("--ledger", required=True); p.set_defaults(f=cmd_ledger_digest)
+    p = sub.add_parser("check-binding"); p.add_argument("--base-resolved", required=True); p.add_argument("--base-artifact", required=True)
+    p.add_argument("--cand-resolved", required=True); p.add_argument("--cand-artifact", required=True); p.set_defaults(f=cmd_check_binding)
     p = sub.add_parser("contract-to-predictions"); p.add_argument("--contract", required=True); p.add_argument("--handed", required=True)
     p.add_argument("--candidate", required=True); p.add_argument("--out", required=True); p.set_defaults(f=cmd_contract_to_predictions)
     p = sub.add_parser("handed-units"); p.add_argument("--ledger", required=True); p.add_argument("--out", required=True); p.set_defaults(f=cmd_handed_units)
