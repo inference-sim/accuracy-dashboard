@@ -40,13 +40,13 @@
     },
     "G4": {
      "tpot": {
-      "mape": 24.24975025891889,
-      "n": 238,
+      "mape": 16.88988497870902,
+      "n": 1011,
       "signed_median": null
      },
      "ttft": {
-      "mape": 26.286762728425913,
-      "n": 238,
+      "mape": 23.73446616853393,
+      "n": 1011,
       "signed_median": null
      }
     }
@@ -54,8 +54,8 @@
    "counts": {
     "failed": 0,
     "points": 20364,
-    "refused": 20126,
-    "scored": 238,
+    "refused": 19353,
+    "scored": 1011,
     "withheld": 0
    },
    "engines": [
@@ -182,13 +182,13 @@
     },
     {
      "engine": "vllm",
-     "graded": 238,
+     "graded": 1011,
      "grades": {
       "G1": 0,
       "G2": 0,
       "G3": 0,
-      "G4": 238,
-      "G5": 9202
+      "G4": 1011,
+      "G5": 8429
      },
      "points": 9440
     },
@@ -209,8 +209,8 @@
     "G1": 0,
     "G2": 0,
     "G3": 0,
-    "G4": 238,
-    "G5": 20126
+    "G4": 1011,
+    "G5": 19353
    },
    "id": "inferencex",
    "interim": false,
@@ -220,49 +220,54 @@
    "provenance": {
     "command": "orchestrator/build_summary_v2.py (the nightly)",
     "heads": {
-     "snapshot_id": "2026-11-18_blis-v0.18.0_ix-api-2026-11-18"
+     "snapshot_id": "2026-11-23_blis-0fb85a76192eb1cb3f55aadc42d3f24876385c0c_ix-api-2026-11-23"
     },
-    "pulled_at": "2026-11-18T21:44:51Z"
+    "pulled_at": "2026-11-23T02:24:53Z"
    },
    "refusals": [
     {
      "code": "value_not_recorded",
-     "points": 19524,
-     "subject": ""
-    },
-    {
-     "code": "router_unsupported",
-     "points": 263,
+     "points": 17743,
      "subject": ""
     },
     {
      "code": "field_unclassified",
-     "points": 143,
+     "points": 667,
+     "subject": ""
+    },
+    {
+     "code": "router_unsupported",
+     "points": 435,
      "subject": ""
     },
     {
      "code": "engine_unsupported",
-     "points": 92,
-     "subject": ""
-    },
-    {
-     "code": "field_not_modelled",
-     "points": 46,
+     "points": 275,
      "subject": ""
     },
     {
      "code": "not_in_catalog",
-     "points": 45,
+     "points": 95,
      "subject": ""
     },
     {
-     "code": "field_not_in_release",
-     "points": 12,
+     "code": "value_conflict",
+     "points": 69,
+     "subject": ""
+    },
+    {
+     "code": "field_not_modelled",
+     "points": 61,
      "subject": ""
     },
     {
      "code": "measurement_contaminated",
-     "points": 1,
+     "points": 5,
+     "subject": ""
+    },
+    {
+     "code": "blis_refused",
+     "points": 3,
      "subject": ""
     }
    ],
@@ -1517,6 +1522,6 @@
   }
  ],
  "format": "classes-1",
- "generated_at": "2026-11-18T21:44:51Z",
- "snapshot_id": "2026-11-18_blis-v0.18.0_ix-api-2026-11-18"
+ "generated_at": "2026-11-23T02:24:53Z",
+ "snapshot_id": "2026-11-23_blis-0fb85a76192eb1cb3f55aadc42d3f24876385c0c_ix-api-2026-11-23"
 }
