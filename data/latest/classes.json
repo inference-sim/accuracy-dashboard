@@ -40,13 +40,13 @@
     },
     "G4": {
      "tpot": {
-      "mape": 24.24975025891889,
-      "n": 238,
+      "mape": 16.88988497870902,
+      "n": 1011,
       "signed_median": null
      },
      "ttft": {
-      "mape": 26.286762728425913,
-      "n": 238,
+      "mape": 23.73446616853393,
+      "n": 1011,
       "signed_median": null
      }
     }
@@ -54,8 +54,8 @@
    "counts": {
     "failed": 0,
     "points": 20364,
-    "refused": 20126,
-    "scored": 238,
+    "refused": 19353,
+    "scored": 1011,
     "withheld": 0
    },
    "engines": [
@@ -182,13 +182,13 @@
     },
     {
      "engine": "vllm",
-     "graded": 238,
+     "graded": 1011,
      "grades": {
       "G1": 0,
       "G2": 0,
       "G3": 0,
-      "G4": 238,
-      "G5": 9202
+      "G4": 1011,
+      "G5": 8429
      },
      "points": 9440
     },
@@ -209,8 +209,8 @@
     "G1": 0,
     "G2": 0,
     "G3": 0,
-    "G4": 238,
-    "G5": 20126
+    "G4": 1011,
+    "G5": 19353
    },
    "id": "inferencex",
    "interim": false,
@@ -220,49 +220,54 @@
    "provenance": {
     "command": "orchestrator/build_summary_v2.py (the nightly)",
     "heads": {
-     "snapshot_id": "2026-11-18_blis-v0.18.0_ix-api-2026-11-18"
+     "snapshot_id": "2026-11-23_blis-v0.19.0_ix-api-2026-11-23"
     },
-    "pulled_at": "2026-11-18T21:44:51Z"
+    "pulled_at": "2026-11-23T22:10:29Z"
    },
    "refusals": [
     {
      "code": "value_not_recorded",
-     "points": 19524,
-     "subject": ""
-    },
-    {
-     "code": "router_unsupported",
-     "points": 263,
+     "points": 17743,
      "subject": ""
     },
     {
      "code": "field_unclassified",
-     "points": 143,
+     "points": 667,
+     "subject": ""
+    },
+    {
+     "code": "router_unsupported",
+     "points": 435,
      "subject": ""
     },
     {
      "code": "engine_unsupported",
-     "points": 92,
-     "subject": ""
-    },
-    {
-     "code": "field_not_modelled",
-     "points": 46,
+     "points": 275,
      "subject": ""
     },
     {
      "code": "not_in_catalog",
-     "points": 45,
+     "points": 95,
      "subject": ""
     },
     {
-     "code": "field_not_in_release",
-     "points": 12,
+     "code": "value_conflict",
+     "points": 69,
+     "subject": ""
+    },
+    {
+     "code": "field_not_modelled",
+     "points": 61,
      "subject": ""
     },
     {
      "code": "measurement_contaminated",
-     "points": 1,
+     "points": 5,
+     "subject": ""
+    },
+    {
+     "code": "blis_refused",
+     "points": 3,
      "subject": ""
     }
    ],
@@ -1123,109 +1128,110 @@
     },
     "G3": {
      "itl": {
-      "mape": 16.879705992765974,
-      "n": 15,
-      "signed_median": -16.24163214208431
+      "mape": "too few points",
+      "n": 0,
+      "signed_median": "too few points"
      },
      "tpot": {
-      "mape": 15.279751409268412,
-      "n": 15,
-      "signed_median": -14.341182681453796
+      "mape": "too few points",
+      "n": 0,
+      "signed_median": "too few points"
      }
     },
     "G4": {
      "itl": {
-      "mape": 24.596303524614274,
-      "n": 208,
-      "signed_median": -3.0428417212714995
+      "mape": 25.78217327603712,
+      "n": 267,
+      "signed_median": -2.323856957862576
      },
      "tpot": {
-      "mape": 24.739334721324163,
-      "n": 208,
-      "signed_median": -0.6307115501220042
+      "mape": 26.28531123302425,
+      "n": 267,
+      "signed_median": 1.075196756734844
      }
     }
    },
+   "anchor": true,
    "by_model": [
     {
      "accuracy": {
       "itl": {
-       "mape": 19.966074540619108,
-       "n": 135,
-       "signed_median": -14.975496926541265
+       "mape": 19.685639850707425,
+       "n": 150,
+       "signed_median": -15.121353290682922
       },
       "tpot": {
-       "mape": 20.593874061651913,
-       "n": 135,
-       "signed_median": -10.263496287832448
+       "mape": 20.106300535339983,
+       "n": 150,
+       "signed_median": -11.551000726605698
       }
      },
      "gap": null,
      "model": "openai/gpt-oss-120b",
-     "scored": 135
+     "scored": 150
     },
     {
      "accuracy": {
       "itl": {
-       "mape": 56.835065628182555,
-       "n": 27,
-       "signed_median": 42.99504910004917
+       "mape": 67.90671996308566,
+       "n": 36,
+       "signed_median": 49.1458812304811
       },
       "tpot": {
-       "mape": 54.84002691338479,
-       "n": 27,
-       "signed_median": 46.11508451052547
+       "mape": 68.15182694600541,
+       "n": 36,
+       "signed_median": 48.689677928280304
       }
      },
-     "gap": "model-side gap in our simulator: this model's error is larger than the others'",
+     "gap": null,
      "model": "google/gemma-4-31B-it",
-     "scored": 27
+     "scored": 36
     },
     {
      "accuracy": {
       "itl": {
-       "mape": 25.235594414556395,
-       "n": 25,
-       "signed_median": -13.344296222079988
+       "mape": 14.573841345046532,
+       "n": 35,
+       "signed_median": 10.276743494311782
       },
       "tpot": {
-       "mape": 24.03489077252962,
-       "n": 25,
-       "signed_median": -16.088788486302246
-      }
-     },
-     "gap": "model-side gap in our simulator",
-     "model": "RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic",
-     "scored": 25
-    },
-    {
-     "accuracy": {
-      "itl": {
-       "mape": 12.551828975896106,
-       "n": 20,
-       "signed_median": 6.024584250637638
-      },
-      "tpot": {
-       "mape": 17.380943215882915,
-       "n": 20,
-       "signed_median": 10.961198378076773
+       "mape": 18.024386586772007,
+       "n": 35,
+       "signed_median": 11.413892556266457
       }
      },
      "gap": null,
      "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
-     "scored": 20
+     "scored": 35
     },
     {
      "accuracy": {
       "itl": {
-       "mape": 16.083340511557353,
-       "n": 16,
-       "signed_median": -19.67039766823421
+       "mape": 25.942548065370076,
+       "n": 30,
+       "signed_median": -18.014567164629966
       },
       "tpot": {
-       "mape": 10.352064659947267,
+       "mape": 25.07628613405131,
+       "n": 30,
+       "signed_median": -17.354480055436927
+      }
+     },
+     "gap": null,
+     "model": "RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic",
+     "scored": 30
+    },
+    {
+     "accuracy": {
+      "itl": {
+       "mape": 12.374467461686386,
        "n": 16,
-       "signed_median": -8.056202692445876
+       "signed_median": -11.213859231446321
+      },
+      "tpot": {
+       "mape": 10.351570893857685,
+       "n": 16,
+       "signed_median": 3.511049690581333
       }
      },
      "gap": null,
@@ -1237,8 +1243,8 @@
     "failed": 0,
     "points": 1702,
     "refused": 1435,
-    "scored": 223,
-    "withheld": 44
+    "scored": 267,
+    "withheld": 0
    },
    "figure_notes": {
     "ttft": "first-token time awaits the team's definition"
@@ -1246,247 +1252,246 @@
    "grades": {
     "G1": 0,
     "G2": 0,
-    "G3": 15,
-    "G4": 208,
+    "G3": 0,
+    "G4": 267,
     "G5": 1435
    },
    "id": "configiq",
    "interim": false,
    "kind": "provisional",
    "label": "Red Hat configiq (scored by simulation)",
-   "note": "Red Hat's configiq dataset (CC BY 4.0), scored by simulation: each row is simulated as a closed loop at its recorded concurrency and request count, with the substitutions named below. Train and validation rows are simulated; the test partition is withheld. Provisional: graded no better than G3 and outside the headline. TPOT is GuideLLM's median (it counts the first token) and ITL its mean (the per-request time per output token after the first). First-token time (TTFT) is not shown as an accuracy figure, because its definition (client-side delay) is unconfirmed; that was decided on the clarity of the data, before any error was looked at, and nothing else is hidden.",
-   "partition": "train and validation rows are simulated; the test partition is withheld",
+   "note": "Red Hat's configiq dataset (CC BY 4.0), scored by simulation: each row is simulated as a closed loop at its recorded concurrency and request count, with the substitutions named below. configiq is anchor-only: every row is an anchor row and none is fit, selected, validated, held or withheld as a test set. Provisional: graded no better than G3 and outside the headline. TPOT is GuideLLM's median (it counts the first token) and ITL its mean (the per-request time per output token after the first). First-token time (TTFT) is not shown as an accuracy figure, because its definition (client-side delay) is unconfirmed; that was decided on the clarity of the data, before any error was looked at, and nothing else is hidden.",
+   "partition": "anchor-only (D9): every row is an anchor row and every scorable row is simulated; none is fit, selected, validated, held or withheld as a test split",
    "plain_line": "The remaining rows wait on dataset clarifications from the configiq team.",
    "provenance": {
-    "command": "orchestrator/ingest/score_configiq.py over the dataset's rows in the final census (train and validation), then orchestrator/build_classes.py derive-configiq",
+    "command": "orchestrator/nightly/configiq_night.py: score_configiq.py over every configiq anchor unit, then build_classes.py derive-configiq",
     "dataset": "21cc6eb06b1934485a83b17a93e634ef38b5799e",
-    "derived_at": "2026-11-18",
     "heads": {
-     "blis-substrate": "fa28d5116739dc582efdb7694acf15a294cdc62b",
-     "blis-vllm": "8dbf92b0f881262da2adf286a30c43800ceb2722",
-     "census_run": "final2-cheap (censusfinal2-20261118-075416)",
-     "harness": "f78235d8da50f36acbff3288d049a48649d75bfe",
-     "inference-sim": "f6543b3d0e01c0dce8ac8f1d82792acbe4a73220"
+     "blis": "e7597a8c9510f876653d7d87bd8baf195c37c5c7",
+     "catalog": "e7597a8c9510f876653d7d87bd8baf195c37c5c7",
+     "dataset": "21cc6eb06b1934485a83b17a93e634ef38b5799e",
+     "harness": "060ffabe9a0c07f776a8f1d46e81a62163343f9b",
+     "registry": "e7597a8c9510f876653d7d87bd8baf195c37c5c7"
     },
-    "pulled_at": "2026-11-16",
-    "split": "development"
+    "pulled_at": "2026-11-23",
+    "split": "none (anchor-only, D9)"
    },
    "refusals": [],
    "substitutions": [
     {
      "detail": "",
      "kind": "client_difference",
-     "points": 223,
+     "points": 267,
      "subject": "client release"
     },
     {
      "detail": "",
      "kind": "client_difference",
-     "points": 223,
+     "points": 267,
      "subject": "frame"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 223,
+     "points": 267,
      "subject": "cost-model-attention/attention_decode_floor_mla"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 223,
+     "points": 267,
      "subject": "cost-model-host-overheads/host_admission_per_request"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 223,
+     "points": 267,
      "subject": "cost-model-host-overheads/host_admission_per_token"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 223,
+     "points": 267,
      "subject": "cost-model-host-overheads/host_completion"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 223,
+     "points": 267,
      "subject": "cost-model-host-overheads/host_launch_eager_per_layer"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 223,
+     "points": 267,
      "subject": "cost-model-host-overheads/host_launch_per_kernel"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 223,
+     "points": 267,
      "subject": "cost-model-host-overheads/host_output_token"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 223,
+     "points": 267,
      "subject": "cost-model-host-overheads/host_replay_graph_per_step"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 223,
+     "points": 267,
      "subject": "cost-model-memory/activation_scratch_floor_bytes"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 223,
+     "points": 267,
      "subject": "cost-model-memory/cudagraph_capture_bytes_full_and_piecewise"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 223,
+     "points": 267,
      "subject": "cost-model-primitives/engine_workspace_bytes"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 223,
+     "points": 267,
      "subject": "cost-model-primitives/hbm_derate"
     },
     {
      "detail": "",
      "kind": "estimated",
-     "points": 223,
+     "points": 267,
      "subject": "cluster.gpus_per_node"
     },
     {
      "detail": "",
      "kind": "estimated",
-     "points": 223,
+     "points": 267,
      "subject": "engine flags the row leaves blank"
     },
     {
      "detail": "",
      "kind": "estimated",
-     "points": 223,
+     "points": 267,
      "subject": "engine.max_model_len"
     },
     {
      "detail": "",
-     "kind": "provisional_blank_flags",
-     "points": 223,
-     "subject": "engine flags the row leaves blank"
-    },
-    {
-     "detail": "",
-     "kind": "provisional_frame",
-     "points": 223,
-     "subject": "frame"
-    },
-    {
-     "detail": "",
-     "kind": "provisional_parallelism",
-     "points": 223,
-     "subject": "parallelism"
-    },
-    {
-     "detail": "",
-     "kind": "unevaluated",
-     "points": 223,
-     "subject": "coefficient_range"
-    },
-    {
-     "detail": "",
-     "kind": "unevaluated",
-     "points": 223,
-     "subject": "kernel_hash"
-    },
-    {
-     "detail": "",
-     "kind": "unevaluated",
-     "points": 223,
-     "subject": "resolved_differs"
-    },
-    {
-     "detail": "",
-     "kind": "unevaluated",
-     "points": 223,
-     "subject": "value_class"
-    },
-    {
-     "detail": "",
      "kind": "other_release",
-     "points": 208,
+     "points": 267,
      "subject": "engine release"
     },
     {
      "detail": "",
      "kind": "ported_functions_unpublished",
-     "points": 208,
+     "points": 267,
      "subject": "engine release"
     },
     {
      "detail": "",
+     "kind": "provisional_blank_flags",
+     "points": 267,
+     "subject": "engine flags the row leaves blank"
+    },
+    {
+     "detail": "",
+     "kind": "provisional_frame",
+     "points": 267,
+     "subject": "frame"
+    },
+    {
+     "detail": "",
+     "kind": "provisional_parallelism",
+     "points": 267,
+     "subject": "parallelism"
+    },
+    {
+     "detail": "",
+     "kind": "unevaluated",
+     "points": 267,
+     "subject": "coefficient_range"
+    },
+    {
+     "detail": "",
+     "kind": "unevaluated",
+     "points": 267,
+     "subject": "kernel_hash"
+    },
+    {
+     "detail": "",
+     "kind": "unevaluated",
+     "points": 267,
+     "subject": "resolved_differs"
+    },
+    {
+     "detail": "",
+     "kind": "unevaluated",
+     "points": 267,
+     "subject": "value_class"
+    },
+    {
+     "detail": "",
      "kind": "client_difference",
-     "points": 158,
+     "points": 197,
      "subject": "request lengths"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 135,
+     "points": 150,
      "subject": "cost-model-memory/activation_buffer_count_moe_1rank"
     },
     {
      "detail": "",
+     "kind": "coefficient_method",
+     "points": 147,
+     "subject": "cost-model-primitives/host_gather_rate_uva"
+    },
+    {
+     "detail": "",
      "kind": "client_difference",
-     "points": 127,
+     "points": 142,
      "subject": "errored requests"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 118,
-     "subject": "cost-model-primitives/host_gather_rate_uva"
-    },
-    {
-     "detail": "",
-     "kind": "coefficient_method",
-     "points": 45,
+     "points": 65,
      "subject": "cost-model-primitives/gemm_eps_max_fp8_grouped_triton"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 45,
+     "points": 65,
      "subject": "cost-model-primitives/gemm_floor_fp8_grouped_triton"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 45,
+     "points": 65,
      "subject": "cost-model-primitives/gemm_m_half_fp8_grouped_triton"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 40,
+     "points": 60,
      "subject": "cost-model-memory/activation_buffer_count_moe_2rank"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 40,
+     "points": 60,
      "subject": "cost-model-primitives/nccl_communicator_bytes_2rank"
     },
     {
      "detail": "",
      "kind": "coefficient_method",
-     "points": 27,
+     "points": 36,
      "subject": "cost-model-memory/activation_buffer_count_dense_1rank"
     },
     {
@@ -1517,6 +1522,6 @@
   }
  ],
  "format": "classes-1",
- "generated_at": "2026-11-18T21:44:51Z",
- "snapshot_id": "2026-11-18_blis-v0.18.0_ix-api-2026-11-18"
+ "generated_at": "2026-11-23T22:10:29Z",
+ "snapshot_id": "2026-11-23_blis-v0.19.0_ix-api-2026-11-23"
 }
