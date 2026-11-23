@@ -56,8 +56,8 @@ describe('a v3 snapshot renders', () => {
     const h = headline(render(<App summary={v3a()} loadError={null} initialHash="#/" />).html)
     for (const g of ['G1', 'G2', 'G3', 'G4']) expect(h).toContain(`<th scope="row">${g} `)
     // Under the minimum a grade shows its count and no share (COV-11): G1, G2 and G4 hold 3 points, G3 none.
-    expect(h).toContain('<td>3</td><td>too few points</td>')
-    expect(h).toContain('<td>0</td><td>too few points</td>')
+    expect(h).toContain('<td class="num">3</td><td class="num toofew">too few points</td>')
+    expect(h).toContain('<td class="num">0</td><td class="num toofew">too few points</td>')
     expect(h).not.toContain('33.3%')
   })
 
