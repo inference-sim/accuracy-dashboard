@@ -140,6 +140,7 @@ python3 orchestrator/ingest/contract.py orchestrator/ingest/testdata/contract/ru
         pytest("A night with more than 5 percent faulted points is not published", "orchestrator/nightly/test_night_health.py"),
         pytest("No committed file is near GitHub's 100 MB limit; the summary is written compact", "orchestrator/nightly/test_file_size.py"),
         pytest("A night's notes are warnings and never stop a publish", "orchestrator/nightly/test_night_notes.py"),
+        pytest("A night publishes the Sources tab data (funnel-2) when its contract is the whole summary, and none otherwise", "orchestrator/nightly/test_funnel_night.py"),
         pytest("The night scores every configiq anchor unit with no split withheld", "orchestrator/nightly/test_configiq_night.py"),
         Cmd("BLIS is read only through the inference-sim commands: the lint", argv=["python3", "orchestrator/lint_blis_boundary.py"]),
     ],
