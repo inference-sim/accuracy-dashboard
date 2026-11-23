@@ -173,9 +173,11 @@ def check_pr(body: str, changes: list[tuple[str, str]], root, base_root, landing
     root, errs = Path(root), []
     base_root = Path(base_root) if base_root is not None else root
     found = list(STATEMENT.finditer(body or ""))
+    moves = sorted({p for s, p in changes if touches(p, accuracy_paths(base_root))})
     if len(found) != 1:
-        errs.append("the body must hold exactly one line 'Gate: pre-registration <id>' or "
-                    "'Gate: not an accuracy change - <reason>' (a reason of at least 10 characters)")
+        if found or moves:
+            errs.append("the body must hold exactly one line 'Gate: pre-registration <id>' or "
+                        "'Gate: not an accuracy change - <reason>' (a reason of at least 10 characters)")
         stated = None
     else:
         stated = found[0]
@@ -225,7 +227,6 @@ def check_pr(body: str, changes: list[tuple[str, str]], root, base_root, landing
                     errs.append(str(e))
             else:
                 errs.append(f"{path}: only <id>.json files live in {pre_dir}")
-    moves = sorted({p for s, p in changes if touches(p, accuracy_paths(base_root))})
     if moves and stated is not None and cited is None:
         errs.append("the change touches " + ", ".join(moves[:5]) + (" and more" if len(moves) > 5 else "")
                     + ", which moves accuracy; it must cite a pre-registration")

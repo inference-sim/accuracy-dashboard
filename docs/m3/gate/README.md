@@ -11,7 +11,7 @@ Nothing here has been run against the real partition seed. The code is exercised
 
 ## The rule
 
-A pull request body holds, on a line of its own, exactly one of:
+A pull request that changes a path listed in `state/gate/accuracy-paths.json` holds, in its body and on a line of its own, exactly one of the lines below. A pull request that changes no such path needs no `Gate:` line (it may add one; two lines are always refused):
 
 ```
 Gate: pre-registration <id>
