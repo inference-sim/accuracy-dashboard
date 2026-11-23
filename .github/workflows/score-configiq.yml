@@ -1,10 +1,10 @@
 name: score-configiq
 
-# Scores the configiq anchor units (plan Table W rows 16 and 26; design D9). It is run by hand, and not by the nightly:
-# the configiq ledger is pinned to one dataset revision, and it changes only when that pin is moved on purpose (a
-# manually triggered version bump of the ledger's configiq data), so the same units would be scored again every night
-# for nothing. Run it after the pin moves, after rules.configiq.left_out changes (the D2 join), or for a new simulator
-# release.
+# Scores the configiq anchor units (plan Table W rows 16 and 26; design D9). The nightly scores them too, but only on the night
+# that scores the newest simulator release for the first time (api-nightly.yml; the same configiq_night.py), and commits the
+# two derived files itself: the configiq ledger is pinned to one dataset revision, so the same units would be scored again
+# every night for nothing. Run this by hand after the pin moves, after rules.configiq.left_out changes (the D2 join), or when
+# the release night's configiq step failed and left the committed files describing an older release.
 #
 # One run does the whole path on the runner, and nothing is taken from a developer's machine:
 #   1. checks out the harness commit asked for;

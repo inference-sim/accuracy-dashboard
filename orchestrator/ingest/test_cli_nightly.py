@@ -633,14 +633,16 @@ def test_resolve_blis_names_every_unscored_release_oldest_first_else_the_newest(
     (bin_ / "python3").symlink_to(_sys.executable)
     # One release per run, the oldest unscored, and `more` says the run must start another: each
     # release is published before the next begins (COV-9), so a later failure cannot lose it.
-    assert run() == {"blis_tags": "v0.16.0", "blis_tag": "v0.17.0", "more": "true"}
+    # configiq is rescored only on the night the newest release is scored for the first time: not on an earlier release of the
+    # backlog, and not on an IX-only night.
+    assert run() == {"blis_tags": "v0.16.0", "blis_tag": "v0.17.0", "more": "true", "configiq": "false"}
     # v0.16.0 published and listed; the next run starts at v0.17.0, the last, so nothing follows it.
     listed("v0.15.0", "v0.16.0")
-    assert run() == {"blis_tags": "v0.17.0", "blis_tag": "v0.17.0", "more": "false"}
+    assert run() == {"blis_tags": "v0.17.0", "blis_tag": "v0.17.0", "more": "false", "configiq": "true"}
     # v0.17.0 FAILED: nothing was listed for it, so the next run starts at it again, not at v0.16.0.
-    assert run() == {"blis_tags": "v0.17.0", "blis_tag": "v0.17.0", "more": "false"}
+    assert run() == {"blis_tags": "v0.17.0", "blis_tag": "v0.17.0", "more": "false", "configiq": "true"}
     listed("v0.15.0", "v0.16.0", "v0.17.0")
-    assert run() == {"blis_tags": "v0.17.0", "blis_tag": "v0.17.0", "more": "false"}
+    assert run() == {"blis_tags": "v0.17.0", "blis_tag": "v0.17.0", "more": "false", "configiq": "false"}
 
 
 def test_resolve_blis_skips_a_superseded_release_once_its_patch_release_is_tagged(tmp_path):
@@ -672,12 +674,12 @@ def test_resolve_blis_skips_a_superseded_release_once_its_patch_release_is_tagge
         return dict(line.split("=", 1) for line in out.read_text().splitlines())
 
     before = ["v0.15.0", "v0.16.0", "v0.17.0"]
-    assert run(before, ["v0.15.0"]) == {"blis_tags": "v0.16.0", "blis_tag": "v0.17.0", "more": "true"}
+    assert run(before, ["v0.15.0"]) == {"blis_tags": "v0.16.0", "blis_tag": "v0.17.0", "more": "true", "configiq": "false"}
     after = before + ["v0.17.1"]
-    assert run(after, ["v0.15.0"]) == {"blis_tags": "v0.17.1", "blis_tag": "v0.17.1", "more": "false"}
+    assert run(after, ["v0.15.0"]) == {"blis_tags": "v0.17.1", "blis_tag": "v0.17.1", "more": "false", "configiq": "true"}
     # v0.17.1 published and listed: nothing is left, so the night scores the newest release's delta; the two it
     # replaced are still not listed as scored.
-    assert run(after, ["v0.15.0", "v0.17.1"]) == {"blis_tags": "v0.17.1", "blis_tag": "v0.17.1", "more": "false"}
+    assert run(after, ["v0.15.0", "v0.17.1"]) == {"blis_tags": "v0.17.1", "blis_tag": "v0.17.1", "more": "false", "configiq": "false"}
     assert json.loads((state / "scored-releases.json").read_text())["releases"] == ["v0.15.0", "v0.17.1"]
 
 

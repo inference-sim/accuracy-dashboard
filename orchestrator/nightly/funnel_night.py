@@ -12,9 +12,9 @@ that case, and when an input is missing or refused, nothing is written, the reas
 an earlier snapshot is removed, so the tab shows its "not published" notice and never another night's table. This never fails
 a night: the funnel is a view of the scoring, not part of it.
 
-configiq is not scored by the nightly (its ledger is pinned to one dataset revision), so its row is not built here: it is the
-configiq funnel that a score-configiq run wrote (configiq_night.py's funnel.json), committed by hand beside the class file as
-data/supplemental/funnels/configiq.json and passed with --configiq. It is added to the night's file as the second source. When
+configiq is not scored by this step (its ledger is pinned to one dataset revision), so its row is not built here: it is the
+configiq funnel that a score-configiq run or a release night wrote (configiq_night.py's funnel.json), committed beside the class
+file as data/supplemental/funnels/configiq.json and passed with --configiq. It is added to the night's file as the second source. When
 the file is absent the tab has no configiq row; when it is unreadable the night warns and the row is left out.
 
 The file carries the dataset revision it was scored at (configiq_night.py stamps `dataset`). The night compares it with the

@@ -15,6 +15,9 @@
 #   blis_tags  the release to score in this run: the oldest unscored one, else the newest (never empty)
 #   blis_tag   the newest stable inference-sim release (never main, never a pre-release)
 #   more       true when releases remain after the one in blis_tags
+#   configiq   true when this run scores the newest stable release for the first time (its release night), so the
+#              configiq anchor units are scored with the same build; false on an earlier release of a backlog and on
+#              an IX-only night (nothing unscored), which never rescore configiq
 set -euo pipefail
 
 out="${GITHUB_OUTPUT:-/dev/stdout}"
@@ -35,12 +38,15 @@ UNSCORED=$(python3 "$here/ingest/stack.py" --tags "$tags" --scored "$here/../sta
 if [[ -n "$UNSCORED" ]]; then
   TONIGHT="${UNSCORED%% *}"
   if [[ "$UNSCORED" == *" "* ]]; then MORE=true; else MORE=false; fi
+  if [[ "$TONIGHT" == "$NEWEST" ]]; then CONFIGIQ=true; else CONFIGIQ=false; fi
 else
   TONIGHT="$NEWEST"
   MORE=false
+  CONFIGIQ=false
 fi
 
 echo "blis_tags=${TONIGHT}" | tee -a "$out"
 echo "blis_tag=${NEWEST}" | tee -a "$out"
 echo "more=${MORE}" | tee -a "$out"
-echo "resolved BLIS: score ${TONIGHT} (newest stable ${NEWEST}; more after it: ${MORE})" >&2
+echo "configiq=${CONFIGIQ}" | tee -a "$out"
+echo "resolved BLIS: score ${TONIGHT} (newest stable ${NEWEST}; more after it: ${MORE}; configiq: ${CONFIGIQ})" >&2
