@@ -20,6 +20,11 @@ name: api-nightly
 #     the earlier ones published and listed and the next run starts at the one that failed. A
 #     release is listed when its scores are published, and the list never shrinks when old
 #     snapshots are pruned.
+# The configiq anchor units are not in the night's summary: they are scored by orchestrator/nightly/configiq_night.py and kept as
+# two derived files, data/supplemental/classes/configiq.json and data/supplemental/funnels/configiq.json. On the night that scores
+# the newest release for the first time (resolve_blis.sh output `configiq`), the same build, substrate, field list and harness
+# commit rescore them and replace both files, so the classes page and the Sources tab never describe an older release. An IX-only
+# night and the earlier releases of a backlog read the committed files unchanged. score-configiq.yml remains the by-hand route.
 # A no-op night (neither trigger) writes nothing and the last good view stands.
 #
 # The database-dump lane (plan row 12): the anchor units the frozen dump `db-dump/2026-09-28` supplies are scored in the same
@@ -57,12 +62,12 @@ on:
         description: "Score this inference-sim commit (40 hex) as a pre-release preview; empty scores the stable releases"
         type: string
         default: ""
-      # A STOP-GAP for a pre-release preview only (needs sim_commit): also score the configiq anchor units with that same build
-      # (orchestrator/nightly/configiq_night.py, as score-configiq.yml does) and publish the result with the night, so the preview's
-      # classes and Sources tab carry configiq. Nothing is committed under data/supplemental/; the files stay in the run. A failure
-      # leaves the night as it would have been without configiq. The real refresh is the merge-time score-configiq run.
+      # A pre-release preview (needs sim_commit) also scores the configiq anchor units with that build, as a release night does
+      # (see the header), so the preview's classes and Sources tab carry configiq. The files are committed under
+      # data/supplemental/ on the scratch branch the run is dispatched on, like the rest of the preview. A failure leaves the
+      # branch's committed files as they were.
       configiq_preview:
-        description: "Pre-release preview only: also score configiq with the same build and publish it with the night"
+        description: "Pre-release preview only: also score configiq with the same build and commit it with the night"
         type: boolean
         default: false
 
@@ -85,12 +90,14 @@ jobs:
       blis_tag: ${{ steps.r.outputs.blis_tag }}
       blis_tags: ${{ steps.r.outputs.blis_tags }}
       more: ${{ steps.r.outputs.more }}
+      configiq: ${{ steps.r.outputs.configiq }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - id: r
         env:
           GH_TOKEN: ${{ github.token }}
           SIM_COMMIT: ${{ inputs.sim_commit }}
+          CONFIGIQ_PREVIEW: ${{ inputs.configiq_preview }}
         run: |
           set -euo pipefail
           if [ -n "$SIM_COMMIT" ]; then
@@ -98,7 +105,7 @@ jobs:
             if ! [[ "$SIM_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
               echo "FATAL: sim_commit must be a full 40-hex commit of inference-sim, got '$SIM_COMMIT'"; exit 1
             fi
-            { echo "blis_tags=$SIM_COMMIT"; echo "blis_tag=$SIM_COMMIT"; echo "more=false"; } >> "$GITHUB_OUTPUT"
+            { echo "blis_tags=$SIM_COMMIT"; echo "blis_tag=$SIM_COMMIT"; echo "more=false"; echo "configiq=$CONFIGIQ_PREVIEW"; } >> "$GITHUB_OUTPUT"
           else
             bash orchestrator/resolve_blis.sh
           fi
@@ -124,7 +131,7 @@ jobs:
           python-version: "3.13"
       - run: pip install --quiet --require-hashes -r requirements-ci.txt
       - name: Install what the configiq export reads (parquet)
-        if: ${{ inputs.configiq_preview && inputs.sim_commit != '' }}
+        if: ${{ needs.resolve.outputs.configiq == 'true' }}
         run: pip install --quiet --require-hashes -r requirements-ci.txt -r requirements-configiq.txt
 
       # The ONLY thing cached across runs: the agentic artifact-download zips, keyed by artifact id
@@ -278,40 +285,49 @@ jobs:
             echo "::endgroup::"
           done
 
-      # The stop-gap configiq run of a pre-release preview (input configiq_preview): the build, substrate, engine field list and
-      # harness commit this night just used, scoring every configiq anchor unit as score-configiq.yml does. continue-on-error: a
-      # failure here publishes the night without configiq, and the next two steps then use the committed files only.
-      - name: Score configiq with the preview's build (stop-gap)
-        if: ${{ inputs.configiq_preview && inputs.sim_commit != '' }}
+      # Score the configiq anchor units with the build, substrate, engine field list and harness commit this night just used
+      # (resolve_blis.sh output `configiq`: the newest release's first night, or a preview that asked), as score-configiq.yml does.
+      # configiq_night.py writes into a scratch directory; only when it wrote BOTH derived files do they replace the committed
+      # ones, so the classes page and the Sources tab can never come from different builds. A failure keeps the committed pair and
+      # says so; it never fails the night.
+      - name: Score configiq with the night's build
+        if: ${{ needs.resolve.outputs.configiq == 'true' }}
         continue-on-error: true
+        env:
+          BLIS_TAG: ${{ needs.resolve.outputs.blis_tags }}
         run: |
           set -euo pipefail
           SIM="$RUNNER_TEMP/sim"
+          OUT="$RUNNER_TEMP/configiq"
+          rm -rf "$OUT"
           eval "$(python3 orchestrator/resolve_stack.py "$SIM")"
-          [ "${substrate_embedded:-}" = true ] || { echo "::error::the stop-gap needs a build whose substrate is in its tree"; exit 1; }
+          if [ "${substrate_embedded:-}" != true ]; then
+            echo "::warning title=configiq not rescored::$BLIS_TAG keeps its substrate outside its tree; the committed configiq files stand"
+            exit 0
+          fi
           SUBSTRATE_DIR="$SIM/substrate"
-          python3 orchestrator/nightly/configiq_night.py \
-            --substrate "$SUBSTRATE_DIR" --blis "$SIM/blis" \
-            --catalog "$SUBSTRATE_DIR/catalog" --registry "$SUBSTRATE_DIR/registry" \
-            --fields "$RUNNER_TEMP/fields.json" --substrate-version "$substrate_version" --substrate-commit "$substrate_commit" \
-            --sim-build "${{ inputs.sim_commit }}" --harness-commit "$GITHUB_SHA" --workers 2 --out "$RUNNER_TEMP/configiq"
+          if python3 orchestrator/nightly/configiq_night.py \
+              --substrate "$SUBSTRATE_DIR" --blis "$SIM/blis" \
+              --catalog "$SUBSTRATE_DIR/catalog" --registry "$SUBSTRATE_DIR/registry" \
+              --fields "$RUNNER_TEMP/fields.json" --substrate-version "$substrate_version" --substrate-commit "$substrate_commit" \
+              --sim-build "$BLIS_TAG" --harness-commit "$GITHUB_SHA" --workers 2 --out "$OUT" \
+            && [ -s "$OUT/classes/configiq.json" ] && [ -s "$OUT/funnel.json" ]; then
+            mkdir -p data/supplemental/classes data/supplemental/funnels
+            cp "$OUT/classes/configiq.json" data/supplemental/classes/configiq.json
+            cp "$OUT/funnel.json" data/supplemental/funnels/configiq.json
+            echo "configiq rescored with $BLIS_TAG"
+          else
+            echo "::warning title=configiq not rescored::scoring with $BLIS_TAG failed or wrote only part of its output; the committed configiq files stand and now describe an older build"
+          fi
 
       - name: Build the classes page data from the night's summary and the committed derived files
         run: |
           set -euo pipefail
-          SUPP=data/supplemental/classes
-          if [ -f "$RUNNER_TEMP/configiq/classes/configiq.json" ]; then
-            # The stop-gap's configiq class file stands in for the committed one, in this run only.
-            mkdir -p "$RUNNER_TEMP/supplemental"
-            cp data/supplemental/classes/*.json "$RUNNER_TEMP/supplemental/"
-            cp "$RUNNER_TEMP/configiq/classes/configiq.json" "$RUNNER_TEMP/supplemental/configiq.json"
-            SUPP="$RUNNER_TEMP/supplemental"
-          fi
           # data/supplemental/classes/ holds the derived files of the reconstructed-recipe and configiq classes (committed, with the
-          # command and heads that made them); no configiq or reconstructed point is scored here. The night's summary supplies the
-          # regular class, so classes.json is always the summary's own snapshot.
+          # command and heads that made them); no configiq or reconstructed point is scored here except by the step above on a
+          # release night. The night's summary supplies the regular class, so classes.json is always the summary's own snapshot.
           if [ -f data/latest/summary.json ]; then
-            python3 orchestrator/build_classes.py build --summary data/latest/summary.json --supplemental "$SUPP" --out data/latest/classes.json
+            python3 orchestrator/build_classes.py build --summary data/latest/summary.json --supplemental data/supplemental/classes --out data/latest/classes.json
           fi
       - name: Build the Sources tab data (funnel.json) from the night's contract and the ledger
         run: |
@@ -323,9 +339,6 @@ jobs:
           # then keeps its "not published" notice. The step never fails the night.
           if [ -f data/latest/summary.json ]; then
             CIQ=data/supplemental/funnels/configiq.json; CIQ_CLASS=data/supplemental/classes/configiq.json
-            if [ -f "$RUNNER_TEMP/configiq/funnel.json" ]; then
-              CIQ="$RUNNER_TEMP/configiq/funnel.json"; CIQ_CLASS="$RUNNER_TEMP/configiq/classes/configiq.json"
-            fi
             CONTRACT="$RUNNER_TEMP/_contract-dump"
             [ -d "$CONTRACT" ] || CONTRACT="$RUNNER_TEMP/contract"
             python3 orchestrator/nightly/funnel_night.py \

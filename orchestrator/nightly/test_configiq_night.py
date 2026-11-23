@@ -110,3 +110,82 @@ def test_a_funnel_stamped_for_commit_names_no_outside_tool_even_when_the_ledger_
     cn.stamp_funnel(f, REF)
     text = f.read_text()
     assert tool.lower() not in text.lower() and "an external simulator has a held cut-point" in text
+
+
+# ---- the workflow step that scores configiq on a release night (api-nightly.yml) ----
+
+WORKFLOW = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "api-nightly.yml"
+
+
+def _workflow_step(name):
+    import yaml
+    wf = yaml.safe_load(WORKFLOW.read_text())
+    steps = [s for s in wf["jobs"]["run-night"]["steps"] if s.get("name") == name]
+    assert len(steps) == 1, name
+    return steps[0]
+
+
+def _run_step(tmp_path, mode, embedded="true"):
+    """Run the step's script in a scratch repo whose scorer is a stub that writes what `mode` says."""
+    import os
+    import subprocess
+    repo = tmp_path / "repo"
+    (repo / "orchestrator" / "nightly").mkdir(parents=True)
+    (repo / "data" / "supplemental" / "classes").mkdir(parents=True)
+    (repo / "data" / "supplemental" / "funnels").mkdir(parents=True)
+    (repo / "data" / "supplemental" / "classes" / "configiq.json").write_text("OLD-CLASS")
+    (repo / "data" / "supplemental" / "funnels" / "configiq.json").write_text("OLD-FUNNEL")
+    (repo / "orchestrator" / "resolve_stack.py").write_text(
+        f"print('substrate_embedded={embedded}\\nsubstrate_version=sv\\nsubstrate_commit=sc')\n")
+    (repo / "orchestrator" / "nightly" / "configiq_night.py").write_text(
+        "import os, sys, pathlib\n"
+        "out = pathlib.Path(sys.argv[sys.argv.index('--out') + 1])\n"
+        "assert sys.argv[sys.argv.index('--sim-build') + 1] == 'v9.9.9'\n"
+        f"mode = {mode!r}\n"
+        "(out / 'classes').mkdir(parents=True)\n"
+        "if mode in ('both', 'classes_then_fail'):\n"
+        "    (out / 'classes' / 'configiq.json').write_text('NEW-CLASS')\n"
+        "if mode == 'both':\n"
+        "    (out / 'funnel.json').write_text('NEW-FUNNEL')\n"
+        "sys.exit(1 if mode == 'classes_then_fail' else 0)\n")
+    script = tmp_path / "step.sh"
+    script.write_text(_workflow_step("Score configiq with the night's build")["run"])
+    env = {**os.environ, "RUNNER_TEMP": str(tmp_path / "tmp"), "GITHUB_SHA": "h" * 40, "BLIS_TAG": "v9.9.9"}
+    r = subprocess.run(["bash", str(script)], cwd=repo, env=env, capture_output=True, text=True)
+    cls = (repo / "data/supplemental/classes/configiq.json").read_text()
+    fun = (repo / "data/supplemental/funnels/configiq.json").read_text()
+    return r, cls, fun
+
+
+def test_release_night_replaces_both_derived_files_together(tmp_path):
+    r, cls, fun = _run_step(tmp_path, "both")
+    assert r.returncode == 0, r.stderr
+    assert (cls, fun) == ("NEW-CLASS", "NEW-FUNNEL")
+
+
+@pytest.mark.parametrize("mode", ["classes_then_fail", "nothing_then_ok"])
+def test_a_failed_or_partial_score_keeps_the_committed_pair_and_warns(tmp_path, mode):
+    # configiq_night.py writes the class file before the funnel: a failure between the two must not leave
+    # a class file of the new build beside a funnel of the old one.
+    r, cls, fun = _run_step(tmp_path, mode)
+    assert r.returncode == 0, r.stderr
+    assert (cls, fun) == ("OLD-CLASS", "OLD-FUNNEL")
+    assert "::warning title=configiq not rescored" in r.stdout
+
+
+def test_a_build_with_its_substrate_outside_its_tree_is_skipped_with_a_warning(tmp_path):
+    r, cls, fun = _run_step(tmp_path, "both", embedded="false")
+    assert r.returncode == 0, r.stderr
+    assert (cls, fun) == ("OLD-CLASS", "OLD-FUNNEL")
+    assert "::warning title=configiq not rescored" in r.stdout
+
+
+def test_workflow_scores_configiq_only_when_resolve_says_so_and_later_steps_read_the_committed_paths():
+    step = _workflow_step("Score configiq with the night's build")
+    assert step["if"].replace(" ", "") == "${{needs.resolve.outputs.configiq=='true'}}"
+    assert step["continue-on-error"] is True
+    assert _workflow_step("Install what the configiq export reads (parquet)")["if"] == step["if"]
+    for later in ("Build the classes page data from the night's summary and the committed derived files",
+                  "Build the Sources tab data (funnel.json) from the night's contract and the ledger"):
+        # the files the classes page and the Sources tab read are the committed pair, never a scratch copy
+        assert "RUNNER_TEMP/configiq" not in _workflow_step(later)["run"]

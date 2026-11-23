@@ -16,9 +16,10 @@ substrate's sources.yaml pins, and a mismatch stops the run):
   5 baseline/funnel.py -> OUT/funnel.json: the scored count (the provisional band, outside the headline) and the G5
     count per reason; with --published DIR it fails when a configiq id is in a published fit, select or validate list.
 
-Run by hand through .github/workflows/score-configiq.yml, not by the nightly: the ledger's configiq data is pinned to one
-dataset revision and moves only when that pin is moved on purpose, so a nightly would score the same units again. The class
-file it writes is committed by hand as data/supplemental/classes/configiq.json, which the nightly's classes step reads.
+Run by the nightly on the night it scores the newest simulator release for the first time (api-nightly.yml, which then
+replaces the two committed files), and by hand through .github/workflows/score-configiq.yml after the dataset pin moves: the
+ledger's configiq data is pinned to one dataset revision, so scoring it on every night would repeat the same units. The class
+file it writes is data/supplemental/classes/configiq.json, which the nightly's classes step reads.
 """
 from __future__ import annotations
 
