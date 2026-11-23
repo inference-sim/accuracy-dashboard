@@ -6,7 +6,7 @@
   },
   "partitions": {
     "1": {
-      "budget": null,
+      "budget": 12,
       "evaluations": []
     }
   }

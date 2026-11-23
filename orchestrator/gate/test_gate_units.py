@@ -155,10 +155,11 @@ def ledger(b=2, ceiling=0.05):
             "partitions": {"1": {"budget": b, "evaluations": []}}}
 
 
-def test_the_committed_ledger_has_no_budget_and_the_gate_refuses_on_it():
+def test_the_committed_ledger_has_a_budget_but_no_ceiling_and_the_gate_refuses_on_it():
     doc = budget.load(REPO / budget.PATH)
-    assert doc["partitions"]["1"]["budget"] is None and doc["partitions"]["1"]["evaluations"] == []
-    with pytest.raises(budget.Refused, match="no budget"):
+    assert doc["partitions"]["1"]["budget"] == 12 and doc["partitions"]["1"]["evaluations"] == []
+    assert doc["margin_ceiling"] == {"error": None, "distance": None}
+    with pytest.raises(budget.Refused, match="no margin ceiling"):
         budget.check_may_evaluate(doc, good())
 
 
