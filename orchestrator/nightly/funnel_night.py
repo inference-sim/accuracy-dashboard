@@ -53,7 +53,7 @@ def write(out: Path, summary_path: Path, make) -> str | None:
         doc = make(summary)
     except Skip as e:
         reason = str(e)
-    except (fn.FunnelError, ldg.LedgerError, OSError, ValueError, KeyError) as e:
+    except Exception as e:  # noqa: BLE001 -- a view of the scoring never fails the night; the type and message are the warning
         reason = f"{type(e).__name__}: {e}"
     else:
         out.write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n")
