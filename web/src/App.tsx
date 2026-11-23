@@ -497,56 +497,47 @@ function RunProvenance({ summary }: { summary: Summary }) {
   const gt = p.ground_truth ?? ({} as Partial<NonNullable<typeof p.ground_truth>>)
   const dash = (s: string | null | undefined, fn: (v: string) => string = (v) => v) => (s ? fn(s) : '—')
   const range = measuredRange(flattenPoints(summary))
-  // Each identifier links to exactly what was run, so nobody has to hunt for the release or
-  // commit by hand (PR #26 review). Missing values stay a plain em dash, never a dead link.
-  const gh = 'https://github.com/inference-sim'
-  const link = (text: string, href: string | null) =>
-    href ? (
-      <a href={href} target="_blank" rel="noreferrer">
-        {text}
-      </a>
-    ) : (
-      text
-    )
-  // The kernel row names a released kernel and links to its tag. A build the extractor could not name ("...@unknown", which
-  // is every build by commit) has no kernel to show, and "unknown" would link to a tag that does not exist: no row then.
+  // The rail shows each identifier as text: the release, commit, catalog and registry pages it used to link to are not
+  // published at those addresses, so those links failed. A missing value is a plain em dash.
+  // The kernel row names a released kernel. A build the extractor could not name ("...@unknown", which
+  // is every build by commit) has no kernel to show, and "unknown" says nothing: no row then.
   const kernelRaw = b.extractor_version?.replace(/^.*@/, '') ?? null
   const kernel = kernelRaw && kernelRaw.toLowerCase() !== 'unknown' ? kernelRaw : null
   return (
     <>
       <div className="seclabel">BLIS release (CI-resolved)</div>
       <span className="pill">
-        {b.release ? link(b.release, `${gh}/inference-sim/releases/tag/${encodeURIComponent(b.release)}`) : '—'}
+        {b.release ?? '—'}
       </span>
       <div className="kv" style={{ marginTop: 10 }}>
         <span className="k">commit</span>
         <span className="v">
-          {b.commit_sha ? link(`${b.commit_sha.slice(0, 7)}…`, `${gh}/inference-sim/commit/${b.commit_sha}`) : '—'}
+          {dash(b.commit_sha, (v) => `${v.slice(0, 7)}…`)}
         </span>
       </div>
       <div className="kv">
         <span className="k">catalog</span>
         <span className="v">
-          {b.catalog ? link(b.catalog, `${gh}/blis-catalog/tree/${encodeURIComponent(b.catalog)}`) : '—'}
+          {b.catalog ?? '—'}
         </span>
       </div>
       {kernel ? (
         <div className="kv">
           <span className="k">kernel</span>
-          <span className="v">{link(kernel, `${gh}/blis-latency-kernel/releases/tag/${encodeURIComponent(kernel)}`)}</span>
+          <span className="v">{kernel}</span>
         </div>
       ) : null}
       <div className="kv">
         <span className="k">registry</span>
         <span className="v">
-          {b.registry ? link(b.registry, `${gh}/blis-registry/releases/tag/${encodeURIComponent(b.registry)}`) : '—'}
+          {b.registry ?? '—'}
         </span>
       </div>
       <div className="seclabel">Ground truth</div>
       <div className="kv">
         <span className="k">source</span>
         <span className="v">
-          {p.ingest === 'api' ? link('InferenceX', INFERENCEX_SITE) : 'InferenceX'}
+          InferenceX
         </span>
       </div>
       {p.ingest === 'api' ? (
@@ -580,7 +571,7 @@ function RunProvenance({ summary }: { summary: Summary }) {
           <div className="kv">
             <span className="k">dump</span>
             <span className="v">
-              {gt.release_tag ? link(gt.release_tag.replace('db-dump/', ''), safeUrl(gt.source_url)) : '—'}
+              {dash(gt.release_tag, (v) => v.replace('db-dump/', ''))}
             </span>
           </div>
           {gt.measurement_date_through && (
@@ -656,9 +647,6 @@ function SourceRows({ sources }: { sources: GroundTruthSource[] }) {
   )
 }
 
-/** The public InferenceX site the API ingest pulls from (its API root isn't a page to visit). */
-const INFERENCEX_SITE = 'https://inferencex.semianalysis.com/'
-
 /**
  * A picker option's label: date · BLIS release · ingest. The ingest tag (· API / · dump) is what
  * #15 asks for, so a reader can tell an API-ingest run from a legacy db-dump one at a glance (and
@@ -668,11 +656,6 @@ const INFERENCEX_SITE = 'https://inferencex.semianalysis.com/'
 function runLabel(r: RunRef): string {
   const ingest = (r.ingest ?? 'db-dump') === 'api' ? 'API' : 'dump'
   return `${r.snapshot_id.slice(0, 10)} · ${r.blis_release ?? '?'} · ${ingest}`
-}
-
-/** source_url comes from the data file, so only an http(s) URL becomes a link. */
-function safeUrl(u: string | null | undefined): string | null {
-  return u && /^https?:\/\//.test(u) ? u : null
 }
 
 /** The GitHub mark (Octicon path), for the repo link in the rail. aria-hidden: the link text names it. */
