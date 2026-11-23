@@ -103,3 +103,11 @@ def test_a_workflow_that_the_pull_request_could_replace_or_that_runs_its_code_is
     mutated = edit(original)
     assert mutated != original, name
     assert violations(mutated), name
+
+
+def test_the_rule_runs_only_when_a_reviewer_labels_the_pull_request():
+    body = code(WORKFLOW.read_text())
+    assert "if: contains(github.event.pull_request.labels.*.name, 'gate-rule')" in body
+    assert "labeled" in "".join(block(body, "on"))
+    # an unrelated label must not cancel a rule run in progress
+    assert "github.event.label.name != 'gate-rule' && github.run_id" in body

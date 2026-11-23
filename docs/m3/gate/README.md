@@ -25,7 +25,7 @@ formed; the pull request that adds it cites `not an accuracy change` and needs n
 that cites a pre-registration must also show that the gate evaluated it and passed it: `state/gate/ledger.json`
 on `main` must hold an evaluation of that pre-registration (the same SHA-256) with verdict `pass`, whose
 candidate is the pull request's head commit and whose base is its merge base with `main`. A merged change
-therefore always has a recorded passing run of exactly its commits, or a maintainer exception (below). The workflow `gate-rule.yml` checks all of this on every pull request, with no secret. It is a
+therefore always has a recorded passing run of exactly its commits, or a maintainer exception (below). The workflow `gate-rule.yml` checks all of this, with no secret, on a pull request that a reviewer has labelled `gate-rule` (opt-in; unlabelled pull requests skip it). It is a
 `pull_request_target` workflow, so GitHub reads it from the base branch and a pull request cannot replace it; it
 checks out only the base branch and runs the base branch's checker, reading the base branch's list of accuracy
 paths, so a pull request cannot loosen the rule it is judged by. It never checks out or executes the pull
