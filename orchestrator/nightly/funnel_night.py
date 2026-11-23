@@ -2,14 +2,20 @@
 """Write data/latest/funnel.json, the Sources tab's data, from what the night itself scored.
 
     funnel_night.py --ledger LEDGER_DIR --anchor anchor.yaml --contract CONTRACT_DIR \
-                    --summary data/latest/summary.json --out data/latest/funnel.json
+                    --summary data/latest/summary.json --out data/latest/funnel.json \
+                    [--configiq data/supplemental/funnels/configiq.json]
 
 The file is funnel.py's InferenceX funnel (format funnel-2) placed by the night's own contract (every point's grade, G5 reason
 or fault), plus the id of the snapshot it describes. It is written only when the contract is the whole of the summary: a night
 that merged a delta into the last summary holds a contract of the delta alone, and a funnel built from it would be wrong. In
 that case, and when an input is missing or refused, nothing is written, the reason is a workflow warning, and a funnel left by
 an earlier snapshot is removed, so the tab shows its "not published" notice and never another night's table. This never fails
-a night: the funnel is a view of the scoring, not part of it. configiq is not scored by the nightly, so it has no row here.
+a night: the funnel is a view of the scoring, not part of it.
+
+configiq is not scored by the nightly (its ledger is pinned to one dataset revision), so its row is not built here: it is the
+configiq funnel that a score-configiq run wrote (configiq_night.py's funnel.json), committed by hand beside the class file as
+data/supplemental/funnels/configiq.json and passed with --configiq. It is added to the night's file as the second source. When
+the file is absent the tab has no configiq row; when it is unreadable the night warns and the row is left out.
 """
 from __future__ import annotations
 
@@ -30,14 +36,26 @@ class Skip(Exception):
     """The funnel is not written, for this reason."""
 
 
-def build(lg, anchor_ids: set, contract: Path, summary: dict) -> dict:
-    """The funnel document of the night: the InferenceX funnel placed by `contract`, stamped with the summary's snapshot."""
+def read_configiq(path: Path | None) -> dict | None:
+    """The configiq funnel of a committed score-configiq run (a funnel-2 document holding the one source `configiq`), None when
+    there is no file. A file that is not a valid configiq funnel raises, and the caller leaves the row out with a warning."""
+    if path is None or not Path(path).is_file():
+        return None
+    doc = fn.validate(json.loads(Path(path).read_text()))
+    if list(doc["funnels"]) != ["configiq"]:
+        raise fn.FunnelError(f"{path} holds the sources {sorted(doc['funnels'])}, not configiq alone")
+    return doc["funnels"]["configiq"]
+
+
+def build(lg, anchor_ids: set, contract: Path, summary: dict, configiq: dict | None = None) -> dict:
+    """The funnel document of the night: the InferenceX funnel placed by `contract`, with the committed configiq funnel when given,
+    stamped with the summary's snapshot."""
     outcomes = fn.contract_outcomes(contract)
     points = (summary.get("coverage") or {}).get("points")
     if not outcomes or len(outcomes) != points:
         raise Skip(f"the contract holds {len(outcomes)} points and the summary {points}: it is not the whole of this snapshot "
                    "(a night that merged a delta holds the delta alone)")
-    doc = fn.combine([fn.inferencex(lg, anchor_ids, None, outcomes)], complete=True)
+    doc = fn.combine([fn.inferencex(lg, anchor_ids, None, outcomes), *([configiq] if configiq else [])], complete=True)
     if doc["problems"]:
         raise Skip("the funnel does not add up: " + "; ".join(doc["problems"][:3]))
     doc["snapshot_id"] = summary["snapshot_id"]
@@ -76,8 +94,15 @@ def main(argv=None) -> int:
     ap.add_argument("--contract", required=True, type=Path, help="the contract directory the whole night was scored into")
     ap.add_argument("--summary", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path)
+    ap.add_argument("--configiq", type=Path, help="the committed funnel of a score-configiq run; no row when the file is absent")
     a = ap.parse_args(argv)
-    reason = write(a.out, a.summary, lambda s: build(ldg.load(a.ledger), ldg.read_unit_set(a.anchor, role="anchor"), a.contract, s))
+    try:
+        configiq = read_configiq(a.configiq)
+    except Exception as e:  # noqa: BLE001 -- a bad configiq file leaves its row out; it never takes the InferenceX table with it
+        configiq = None
+        print(f"::warning title=configiq funnel left out::{a.configiq}: {type(e).__name__}: {e}")
+    reason = write(a.out, a.summary,
+                   lambda s: build(ldg.load(a.ledger), ldg.read_unit_set(a.anchor, role="anchor"), a.contract, s, configiq))
     if reason:
         print(f"::warning title=funnel.json not written::{reason}")
         print(f"funnel_night: not written ({reason})", file=sys.stderr)
