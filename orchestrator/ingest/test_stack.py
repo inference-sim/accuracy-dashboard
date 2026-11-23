@@ -86,8 +86,10 @@ def test_the_committed_list_holds_every_release_with_a_published_snapshot():
     # Seeded from data/snapshots and data/index.json (v0.10.0 to v0.15.0).
     import re
     data = ROOT.parent / "data"
-    in_dirs = {re.match(r"^\d{4}-\d{2}-\d{2}_blis-(v[^_]+)_", p.name).group(1) for p in (data / "snapshots").iterdir()}
-    in_index = {r["blis_release"] for r in json.loads((data / "index.json").read_text())["runs"]}
+    # A pre-release preview scores an exact commit (sim_commit), not a release: its snapshot and index run are named by the
+    # 40-hex commit, and it is not in the list of scored releases (the next release is still scored).
+    in_dirs = {m.group(1) for m in (re.match(r"^\d{4}-\d{2}-\d{2}_blis-(v[^_]+)_", p.name) for p in (data / "snapshots").iterdir()) if m}
+    in_index = {r["blis_release"] for r in json.loads((data / "index.json").read_text())["runs"] if r["blis_release"].startswith("v")}
     assert in_dirs == in_index
     assert set(sk.read_scored(ROOT.parent / "state" / "scored-releases.json")) >= in_dirs
 
