@@ -16,6 +16,11 @@ configiq is not scored by the nightly (its ledger is pinned to one dataset revis
 configiq funnel that a score-configiq run wrote (configiq_night.py's funnel.json), committed by hand beside the class file as
 data/supplemental/funnels/configiq.json and passed with --configiq. It is added to the night's file as the second source. When
 the file is absent the tab has no configiq row; when it is unreadable the night warns and the row is left out.
+
+The file carries the dataset revision it was scored at (configiq_night.py stamps `dataset`). The night compares it with the
+revision the ledger it reads pins for configiq (sources.yaml): after a version bump of the configiq data, until the funnel is
+re-run (score-configiq) and committed again, the old row is not shown as current; the night leaves it out and warns, and warns
+the same when the committed class file (--configiq-class) was derived at another revision.
 """
 from __future__ import annotations
 
@@ -28,23 +33,40 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "baseline"))
 sys.path.insert(0, str(HERE.parent / "ingest"))
 
+import configiq_night as cn  # noqa: E402
 import funnel as fn  # noqa: E402
 import ledger as ldg  # noqa: E402
+
+REFRESH = ("re-run score-configiq at the new pin and commit its funnel.json as data/supplemental/funnels/configiq.json and its "
+           "configiq.json as data/supplemental/classes/configiq.json")
 
 
 class Skip(Exception):
     """The funnel is not written, for this reason."""
 
 
-def read_configiq(path: Path | None) -> dict | None:
+def read_configiq(path: Path | None, dataset: str | None = None) -> dict | None:
     """The configiq funnel of a committed score-configiq run (a funnel-2 document holding the one source `configiq`), None when
-    there is no file. A file that is not a valid configiq funnel raises, and the caller leaves the row out with a warning."""
+    there is no file. A file that is not a valid configiq funnel, or (when `dataset`, the revision the ledger pins, is given) one
+    scored at another revision or carrying none, raises, and the caller leaves the row out with a warning."""
     if path is None or not Path(path).is_file():
         return None
     doc = fn.validate(json.loads(Path(path).read_text()))
     if list(doc["funnels"]) != ["configiq"]:
         raise fn.FunnelError(f"{path} holds the sources {sorted(doc['funnels'])}, not configiq alone")
+    if dataset is not None and doc.get("dataset") != dataset:
+        raise fn.FunnelError(f"it was scored at configiq dataset {doc.get('dataset') or '(no revision recorded)'} but the ledger "
+                             f"pins {dataset}: {REFRESH}")
     return doc["funnels"]["configiq"]
+
+
+def class_file_stale(path: Path | None, dataset: str) -> str | None:
+    """A reason when the committed configiq class file was derived at another dataset revision than `dataset`, else None."""
+    if path is None or not Path(path).is_file():
+        return None
+    got = (json.loads(Path(path).read_text()).get("provenance") or {}).get("dataset")
+    return None if got == dataset else (f"derived at configiq dataset {got or '(no revision recorded)'} but the ledger pins "
+                                       f"{dataset}: {REFRESH}")
 
 
 def build(lg, anchor_ids: set, contract: Path, summary: dict, configiq: dict | None = None) -> dict:
@@ -95,9 +117,14 @@ def main(argv=None) -> int:
     ap.add_argument("--summary", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--configiq", type=Path, help="the committed funnel of a score-configiq run; no row when the file is absent")
+    ap.add_argument("--configiq-class", type=Path, help="the committed configiq class file; warns when its dataset revision is stale")
     a = ap.parse_args(argv)
     try:
-        configiq = read_configiq(a.configiq)
+        dataset = cn.pins(a.ledger / "sources.yaml")[0] if a.configiq else None
+        configiq = read_configiq(a.configiq, dataset)
+        stale = class_file_stale(a.configiq_class, dataset) if dataset else None
+        if stale:
+            print(f"::warning title=configiq class file is stale::{a.configiq_class}: {stale}")
     except Exception as e:  # noqa: BLE001 -- a bad configiq file leaves its row out; it never takes the InferenceX table with it
         configiq = None
         print(f"::warning title=configiq funnel left out::{a.configiq}: {type(e).__name__}: {e}")

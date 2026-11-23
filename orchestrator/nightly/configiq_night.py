@@ -69,6 +69,14 @@ def pins(sources_yaml: Path) -> tuple[str, list[tuple[str, str]]]:
     return ref, assets
 
 
+def stamp_funnel(path: Path, ref: str) -> None:
+    """Record the dataset revision the funnel was scored at, as the document's `dataset`. funnel_night.py compares it with the
+    revision the ledger pins on the night and leaves a stale configiq row out, so a pin moved without a re-run is flagged."""
+    doc = json.loads(Path(path).read_text())
+    doc["dataset"] = ref
+    Path(path).write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n")
+
+
 def fetch(ref: str, assets, dest: Path, opener=urllib.request.urlopen) -> None:
     """Download each pinned file and check its sha256; a mismatch deletes the file and stops the run."""
     for name, want in assets:
@@ -133,6 +141,7 @@ def main(argv=None) -> int:
                "--out", out / "funnel.json"]
         published = a.published or (str(led / "published") if (led / "published").is_dir() else None)
         _run(cmd + (["--published", published] if published else []))
+        stamp_funnel(out / "funnel.json", ref)
     except (NightError, src.SourcesError, OSError, subprocess.CalledProcessError, KeyError, ValueError) as e:
         print(f"configiq_night: {e}", file=sys.stderr)
         return 1

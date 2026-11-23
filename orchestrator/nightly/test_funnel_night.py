@@ -55,12 +55,12 @@ def _ids_of(n):
     return [f"{i:064x}" for i in range(1, n + 1)]
 
 
-def _configiq_file(tmp_path, source="configiq"):
+def _configiq_file(tmp_path, source="configiq", dataset=None):
     units = [{"unit_id": f"c{i}", "excluded": None, "recoverable": None, "blocked": None, "grade": "G4" if i < 2 else None,
               "provisional": False, "failed": None, "g5": None if i < 2 else "field_not_modelled", "withheld": None, "lane": "vllm"}
              for i in range(5)]
     path = tmp_path / "configiq.json"
-    path.write_text(json.dumps(fn.combine([fn.tally(source, 5, units)])))
+    path.write_text(json.dumps({**fn.combine([fn.tally(source, 5, units)]), **({"dataset": dataset} if dataset else {})}))
     return path
 
 
@@ -77,3 +77,31 @@ def test_the_committed_configiq_funnel_is_the_second_source_and_an_absent_or_wro
     import pytest
     with pytest.raises(fn.FunnelError):
         fnn.read_configiq(_configiq_file(tmp_path, source="inferencex"))
+
+
+def test_a_configiq_funnel_or_class_file_from_another_dataset_revision_is_left_out_not_shown_as_current(tmp_path):
+    """After a configiq version bump (the ledger pins a new dataset revision) the committed files are stale until score-configiq
+    is re-run: the funnel row is refused, naming how to refresh, and a stale class file is reported."""
+    import pytest
+    old, new = "a" * 40, "b" * 40
+    assert fnn.read_configiq(_configiq_file(tmp_path, dataset=old), old)["stages"]["scored"] == 2
+    for stale in (_configiq_file(tmp_path, dataset=old), _configiq_file(tmp_path)):
+        with pytest.raises(fn.FunnelError, match="score-configiq"):
+            fnn.read_configiq(stale, new)
+    cls = tmp_path / "class.json"
+    cls.write_text(json.dumps({"provenance": {"dataset": old}}))
+    assert fnn.class_file_stale(cls, old) is None and fnn.class_file_stale(None, old) is None
+    assert "score-configiq" in fnn.class_file_stale(cls, new)
+
+
+def test_main_warns_and_drops_the_configiq_row_when_the_pin_moved(tmp_path, capsys):
+    led = tmp_path / "led"
+    led.mkdir()
+    (led / "sources.yaml").write_text("sources:\n  - id: configiq\n    revision:\n      ref: " + "b" * 40 + "\n      assets:\n"
+                                      "        - {name: m.json, sha256: \"" + "0" * 64 + "\"}\n")
+    lg, anchor, contract, summary, ids = _night(tmp_path, scored_ids=set(_ids_of(6)))
+    stale = _configiq_file(tmp_path, dataset="a" * 40)
+    rc = fnn.main(["--ledger", str(led), "--anchor", str(tmp_path / "none.yaml"), "--contract", str(contract),
+                   "--summary", str(summary), "--out", str(tmp_path / "f.json"), "--configiq", str(stale)])
+    out = capsys.readouterr().out
+    assert rc == 0 and "configiq funnel left out" in out and "pins " + "b" * 40 in out

@@ -13,8 +13,11 @@ name: score-configiq
 #   4. scores every configiq ledger unit less rules.configiq.left_out of ledger.yaml, none withheld (orchestrator/nightly/configiq_night.py);
 #   5. keeps the derived class file (configiq.json) and the funnel (funnel.json) as an artifact.
 #
-# The derived files are then committed by hand from the artifact (data/supplemental/classes/configiq.json), beside the work
-# that asked for them; the nightly's classes step reads that committed file. The dataset is third-party data (X12): it is
+# The derived files are then committed by hand from the artifact: configiq.json as data/supplemental/classes/configiq.json and
+# funnel.json as data/supplemental/funnels/configiq.json, beside the work that asked for them; the nightly's classes step and
+# funnel step read those committed files. Both carry the dataset revision they were scored at; when the ledger's pin moves, the
+# nightly leaves the stale Sources row out and warns ("configiq funnel left out", "configiq class file is stale") until both
+# are re-run and committed, so a pin bump cannot pass unnoticed. The dataset is third-party data (X12): it is
 # an artifact of this run, never committed. configiq is anchor-only, and the run fails when a published fit, select or
 # validate list holds a configiq id.
 
