@@ -59,6 +59,8 @@ export interface FunnelDoc {
 }
 
 export class FunnelLoadError extends Error {}
+/** The site publishes no funnel.json (a 404, or a host that answers a missing path with the page): not a fault of the data. */
+export class FunnelNotPublished extends FunnelLoadError {}
 
 export function validateFunnel(raw: unknown): FunnelDoc {
   if (raw == null || typeof raw !== 'object') throw new FunnelLoadError('funnel.json is not a JSON object')
@@ -103,6 +105,13 @@ export function shouldFetchFunnel(view: string, doc: FunnelDoc | null, error: st
 
 export async function fetchFunnel(fetcher: typeof fetch = fetch, url: string = FUNNEL_URL): Promise<FunnelDoc> {
   const r = await fetcher(url, { cache: 'no-cache' })
-  if (!r.ok) throw new FunnelLoadError(`${url} answered ${r.status}: the per-source funnels are not published for this site yet`)
-  return validateFunnel(await r.json())
+  if (!r.ok) throw new FunnelNotPublished(`${url} answered ${r.status}: the per-source funnels are not published for this site yet`)
+  let raw: unknown
+  try {
+    raw = await r.json()
+  } catch {
+    // A static host that answers a missing path with index.html: the body is not JSON.
+    throw new FunnelNotPublished(`${url} is not JSON: the per-source funnels are not published for this site yet`)
+  }
+  return validateFunnel(raw)
 }

@@ -125,7 +125,7 @@ function TrainingCard({ t }: { t: TrainingFunnel }) {
   )
 }
 
-export function Sources({ doc, error }: { doc: FunnelDoc | null; error: string | null }) {
+export function Sources({ doc, error, notPublished = false }: { doc: FunnelDoc | null; error: string | null; notPublished?: boolean }) {
   const cp = doc?.cut_points
   return (
     <div className="classes">
@@ -134,7 +134,12 @@ export function Sources({ doc, error }: { doc: FunnelDoc | null; error: string |
         Accuracy is published on anchor units only. Each anchor source is counted on its own, with the reason for every unit not
         scored; the training-only sources are shown as training diagnostics and never as accuracy.
       </p>
-      {error ? (
+      {error && notPublished ? (
+        <p className="context" role="status">
+          The per-source funnels are not published for this run yet. They are written by the baseline report, not by the nightly,
+          so this page fills in when a baseline publishes them.
+        </p>
+      ) : error ? (
         <div className="viewerror" role="alert">
           <h3>Could not load the per-source funnels.</h3>
           <pre>
