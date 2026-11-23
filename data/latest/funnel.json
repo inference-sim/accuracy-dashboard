@@ -5,6 +5,105 @@
  },
  "format": "funnel-2",
  "funnels": {
+  "configiq": {
+   "anchor_rule": "every unit (plan: anchor-only), less the units the D2 join found read under a training role; none is fit, selected, validated, held or withheld as a test split",
+   "blockers": [
+    {
+     "reason": "value_not_recorded",
+     "stage": "g5",
+     "units": 964
+    },
+    {
+     "reason": "value_conflict",
+     "stage": "g5",
+     "units": 26
+    }
+   ],
+   "excluded": {
+    "chip_not_modelled": 445
+   },
+   "failed": {},
+   "g5": {
+    "value_conflict": 26,
+    "value_not_recorded": 964
+   },
+   "left_out_rows": {
+    "no_successful_requests": 8
+   },
+   "no_outcome": {},
+   "not_anchor": {
+    "left_out_by_partition_prep": 0
+   },
+   "not_recovered": {
+    "value_not_recorded: launch: gpu_memory_utilization '0.9' is not what any preset ": 23,
+    "value_not_recorded: launch: kv_quantization 'fp8' is not what any preset of goog": 10,
+    "value_not_recorded: launch: kv_quantization 'fp8' is not what any preset of nvid": 6,
+    "value_not_recorded: launch: max_seq_len '34816' is not what any preset of nvidia": 6,
+    "value_not_recorded: launch: max_seq_len '67584' is not what any preset of nvidia": 6,
+    "value_not_recorded: launch: max_seq_len '8192' is not what any preset of deepsee": 5,
+    "value_not_recorded: launch: no preset of google/gemma-4-31B-it sets tensor paral": 23,
+    "value_not_recorded: launch: no preset of openai/gpt-oss-120b sets tensor paralle": 21,
+    "value_not_recorded: launch: no preset of the launcher names model RedHatAI/gemma": 94,
+    "value_not_recorded: launch: no preset of the launcher names model moonshotai/Kim": 18,
+    "value_not_recorded: launch: precision 'auto' is not what any preset of nvidia/NV": 20,
+    "value_not_recorded: launch: vLLM-0.11.0 predates the launcher's history (2026-06": 37,
+    "value_not_recorded: launch: vLLM-0.11.2 predates the launcher's history (2026-06": 23,
+    "value_not_recorded: launch: vLLM-0.13.0 predates the launcher's history (2026-06": 40,
+    "value_not_recorded: launch: vLLM-0.14.1 predates the launcher's history (2026-06": 30,
+    "value_not_recorded: launch: vLLM-0.16.0 predates the launcher's history (2026-06": 30,
+    "value_not_recorded: launch: vLLM-0.17.0 predates the launcher's history (2026-06": 5,
+    "value_not_recorded: launch: vLLM-0.17.1 predates the launcher's history (2026-06": 10,
+    "value_not_recorded: launch: vLLM-0.18.0 predates the launcher's history (2026-06": 90,
+    "value_not_recorded: launch: vLLM-0.19.0 predates the launcher's history (2026-06": 50,
+    "value_not_recorded: launch: vLLM-0.19.1 predates the launcher's history (2026-06": 59,
+    "value_not_recorded: launch: vLLM-0.20.0 predates the launcher's history (2026-06": 50,
+    "value_not_recorded: launch: vLLM-0.20.2 predates the launcher's history (2026-06": 22,
+    "value_not_recorded: launch: vLLM-0.21.0 predates the launcher's history (2026-06": 85,
+    "value_not_recorded: launch: vLLM-0.22.0 predates the launcher's history (2026-06": 40,
+    "value_not_recorded: launch: vLLM-0.24.0 was published after the last preset of d": 15,
+    "value_not_recorded: launch: vLLM-0.24.0 was published after the last preset of n": 31,
+    "value_not_recorded: launch: vLLM-0.24.0 was published after the last preset of o": 5,
+    "value_not_recorded: workload: multi-turn sessions with a shared prefix (4 turns,": 8,
+    "value_not_recorded: workload: multi-turn sessions with a shared prefix (5 turns,": 102
+   },
+   "provisional": {
+    "by_grade": {
+     "G4": 267
+    },
+    "units": 267
+   },
+   "role": "anchor",
+   "scored_by_grade": {
+    "G1": 0,
+    "G2": 0,
+    "G3": 0,
+    "G4": 0
+   },
+   "source": "configiq",
+   "stages": {
+    "in_scope": 1257,
+    "recoverable": 293,
+    "rows_held": 2801,
+    "scored": 0,
+    "units": 1702
+   },
+   "unresolved": {
+    "unit_ids": [
+     "00a2a3344b5ce53834cde01bbdc00e6a258d8304b8c7da5f92a470332feff7d9",
+     "0243d6abeda0df4fb5160e122ed434d396b942b511c67df3bec093a8c32e1730",
+     "0376bd2ea30d3a4c08f5137e40b381ffb4ad083fa6bda364d725d46a3d0f2722",
+     "04353280edecc7b456769364a7d014ca34ecd82cfba16f45ae348a09d3a72737",
+     "0568868e2361afe4afc4c5f4227f00dc59630aa205de35cc8c8d6ddd02b9e15e",
+     "0568ed3e9d0ac61b0c9bd4ad0bec6b91eda01509099676ede16a8628da24c1ed",
+     "065888eba20a7883e861073528edec0b528f357582fbbe61a9b999177c8a7c06",
+     "07cb074e63b03da50762e8aefd5df718dbea8e80767ee7ec4c1c93ec17182916",
+     "0b05749569781ef5258d3bad08f6e7ae961db2058ff624180c0ed68d7f64e184",
+     "0b5df178d073e6937b8935d8a725aefbbb4aeb26d2beb3e2d4025823a8f6741f"
+    ],
+    "units": 267
+   },
+   "withheld": {}
+  },
   "inferencex": {
    "anchor_rule": "the published anchor list (role anchor); held units judge pre-registered changes and are never reported",
    "blockers": [
@@ -189,6 +288,7 @@
  "meaning": "No unit is dropped for its date. Recoverable is a floor (recoverable.py), so a unit can be scored without being counted recoverable; unresolved counts the recoverable units that are neither scored nor G5. A provisional unit (capped at G3) is outside scored.",
  "problems": [],
  "scored": {
+  "configiq": 0,
   "inferencex": 1011
  },
  "snapshot_id": "2026-11-23_blis-0fb85a76192eb1cb3f55aadc42d3f24876385c0c_ix-api-2026-11-23",
