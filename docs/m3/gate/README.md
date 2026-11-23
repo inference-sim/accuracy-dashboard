@@ -25,9 +25,16 @@ formed; the pull request that adds it cites `not an accuracy change` and needs n
 that cites a pre-registration must also show that the gate evaluated it and passed it: `state/gate/ledger.json`
 on `main` must hold an evaluation of that pre-registration (the same SHA-256) with verdict `pass`, whose
 candidate is the pull request's head commit and whose base is its merge base with `main`. A merged change
-therefore always has a recorded passing run of exactly its commits, or a maintainer exception (below). The workflow `gate-rule.yml` checks all
-of this on every pull request, with no secret, and it runs the base branch's checker (and reads the base
-branch's list of accuracy paths), so a pull request cannot loosen the rule it is judged by.
+therefore always has a recorded passing run of exactly its commits, or a maintainer exception (below). The workflow `gate-rule.yml` checks all of this on every pull request, with no secret. It is a
+`pull_request_target` workflow, so GitHub reads it from the base branch and a pull request cannot replace it; it
+checks out only the base branch and runs the base branch's checker, reading the base branch's list of accuracy
+paths, so a pull request cannot loosen the rule it is judged by. It never checks out or executes the pull
+request's code: the body and the changed-file list come from the API (`gh api`), and the head's and the merge base's
+trees are unpacked from the API's tarballs outside the checkout and read only as data (hashed, or parsed as JSON for a
+pre-registration or an exceptions file). Its permissions are `contents: read` and `pull-requests: read`.
+`orchestrator/gate/test_gate_workflow.py` fails if the trigger is anything but `pull_request_target`, if there is more
+than one checkout or one that is not of the base ref, or if the workflow holds a secret, a write permission or a
+command that brings head code in. The job and check names are unchanged (`gate-rule / rule`).
 
 The list of accuracy paths is the whole scoring surface, as directory rules: the pin file, the three gate
 workflows, `harness/`, `orchestrator/ingest/`, `orchestrator/baseline/`, `schemas/`, and the top-level
@@ -75,9 +82,9 @@ one that carries the defect. It does not waive the pre-registration, which must 
 The one proof implemented is the tree hash being equal to main's; "the harness commit is an ancestor of main"
 is not.
 
-`gate-rule.yml` is itself part of the pull request, and a `pull_request` workflow file is the pull request's
-own; the protection against editing it is the rule above (it is on the accuracy paths) plus review, and fully
-only a ruleset or required workflow that pins it to `main`.
+Because the workflow runs from the base branch, a pull request that edits `gate-rule.yml` changes only its own
+diff: the check that judges it is still main's. The workflow file is also on the accuracy paths, so editing it needs
+a recorded evaluation or an exception bound to one.
 
 ## The pre-registration
 
@@ -210,8 +217,10 @@ What the proposal leaves open, for the maintainer:
 
 ## Maintainer steps
 
-* **A1, merge.** Review and merge this change. Add `gate-rule` as a required check if the rule should block.
-  Review `state/gate/accuracy-paths.json`.
+* **A1, merge.** Review and merge this change. Then pin `gate-rule / rule` as a required status check on `main` (a
+  branch protection rule or ruleset that requires that check name); until it is required, the rule reports but does
+  not block. Enforcement comes from base code through `pull_request_target`, and the ruleset is what makes it
+  mandatory. Review `state/gate/accuracy-paths.json`.
 * **A3, secret and dispatch.** Provision the environment `ledger` with the secret `LEDGER_SEED` (the 32-byte
   seed, in hex, whose SHA-256 `ledger.yaml` records) and restrict the environment to `main`. Dispatch
   `whole-run-gate.yml` on `main`. The workflow reads the secret by name in one step only. The agent never holds
