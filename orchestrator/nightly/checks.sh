@@ -8,6 +8,8 @@ set -euo pipefail
 python3 orchestrator/nightly/night_health.py data/latest/summary.json
 # Named simulator refusals never stop a night; a refusal code not met before, or many unclassified ones, is a warning to read.
 python3 orchestrator/nightly/night_notes.py data/latest/summary.json
+# No file may be near GitHub's 100 MB limit: its pre-receive hook refuses the whole push, after the night is scored.
+python3 orchestrator/nightly/file_size.py data state
 # The classes page is built from this summary (a missing or stale classes.json would show another night beside it).
 python3 orchestrator/build_classes.py check data/latest/classes.json
 python3 - <<'PY'
