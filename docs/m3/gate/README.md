@@ -227,10 +227,13 @@ What the proposal leaves open, for the maintainer:
 
 ## Maintainer steps
 
-* **A1, merge.** Review and merge this change. Then pin `gate-rule / rule` as a required status check on `main` (a
-  branch protection rule or ruleset that requires that check name); until it is required, the rule reports but does
-  not block. Enforcement comes from base code through `pull_request_target`, and the ruleset is what makes it
-  mandatory. Review `state/gate/accuracy-paths.json`.
+* **A1, merge, and require the check.** Review and merge this change. `gate-rule` is a `pull_request_target`
+  workflow, so it runs from the base branch only once this change is on `main` (the run on this pull request's
+  own head cannot use it). **It is not yet required:** the active ruleset `main protection` requires only
+  `orchestrator`, `grep-clean` and `web`, with no required-workflow rule and no parent ruleset, so until a
+  maintainer adds the status context `rule` (the job `rule` of workflow `gate-rule`, shown as `gate-rule / rule`)
+  to that ruleset, the rule reports and does not block. Base code makes the check trustworthy; only the ruleset
+  makes it mandatory, and no code in this repository can set it. Review `state/gate/accuracy-paths.json`.
 * **A3, secret and dispatch.** Provision the environment `ledger` with the secret `LEDGER_SEED` (the 32-byte
   seed, in hex, whose SHA-256 `ledger.yaml` records) and restrict the environment to `main`. Dispatch
   `whole-run-gate.yml` on `main`. The workflow reads the secret by name in one step only. The agent never holds
