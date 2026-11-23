@@ -39,19 +39,30 @@ command that brings head code in. The job and check names are unchanged (`gate-r
 The list of accuracy paths is the whole scoring surface plus the gate itself, as directory rules: the pin file,
 the three gate workflows, `harness/`, `orchestrator/ingest/`, `orchestrator/baseline/`, `schemas/`, the top-level
 `orchestrator` modules and data files the candidate run imports or reads, and the gate's own policy and checker:
-`state/gate/accuracy-paths.json`, `state/gate/exceptions.json` and `orchestrator/gate/`. A test module
+`state/gate/accuracy-paths.json` and `orchestrator/gate/`. A test module
 (`test_*.py`) is the one exclusion; the scorer imports none, and the checker's tests are not the checker.
 `orchestrator/gate/test_gate_surface.py` fails when a file the candidate run
 executes (the import closure of `harness/run.sh`'s scorer, `freeze.py` and `resolve_agentic_corpus.py`) or reads is
 outside the list, so a new scoring module cannot slip past it. `state/gate/ledger.json` and the
-pre-registrations are data the gate commits after the fact and are not on the list.
+pre-registrations are data the gate commits after the fact and are not on the list. So is
+`state/gate/exceptions.json` (see below).
 
-**A change to the gate itself is an accuracy change.** A pull request that deletes a path from the list, weakens
-`rule.py` or `surface.py`, or edits `exceptions.json` to grant itself an exception cannot say `Gate: not an accuracy
-change`: it must cite a pre-registration, and that needs a recorded evaluation of its head and merge base or a
-maintainer exception bound to one (below). Otherwise every later pull request would be judged by the weakened `main`.
-The first such change, and any change the gate cannot evaluate, is merged by the maintainer, who has bypass on the
-required check for that bootstrap; the exception file is then added by its own reviewed pull request.
+**A change to the gate itself is an accuracy change.** A pull request that deletes a path from the list or weakens
+`rule.py` or `surface.py` cannot say `Gate: not an accuracy change`: it must cite a pre-registration, and that needs
+a recorded evaluation of its head and merge base or a maintainer exception bound to one (below) already on the base
+branch. Otherwise every later pull request would be judged by the weakened `main`. A change the gate cannot
+evaluate lands the same way: through a maintainer exception that an earlier, reviewed pull request put on `main`,
+with every required check green. Nothing is merged by bypassing the required check.
+
+**Exceptions land by a normal pull request.** `state/gate/exceptions.json` is not an accuracy path, so a pull
+request that edits only that file may state `Gate: not an accuracy change - <reason>` and passes the required
+check when the head document is a well-formed `GateExceptions` document (no unknown fields; each entry has the
+shape and the verdict and defect rules below). A malformed edit fails the check. Exceptions are read only from the
+base branch: the head's version is validated and never used to satisfy the pull request's own check, so a single
+pull request that changes the scoring surface and adds an exception for its own head still fails. The
+exception takes effect for later pull requests once its pull request is on `main`; the maintainer reviews it like
+any other change. A pull request that edits `exceptions.json` and also touches an accuracy path is an accuracy
+change and is judged as one.
 
 ### The candidate scores with main's code
 

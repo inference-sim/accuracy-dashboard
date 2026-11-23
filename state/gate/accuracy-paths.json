@@ -20,7 +20,6 @@
     "orchestrator/update_index.py",
     "orchestrator/vllm_defaults.json",
     "schemas/",
-    "state/gate/accuracy-paths.json",
-    "state/gate/exceptions.json"
+    "state/gate/accuracy-paths.json"
   ]
 }

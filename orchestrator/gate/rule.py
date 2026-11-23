@@ -9,6 +9,11 @@ A change to a path in state/gate/accuracy-paths.json moves published accuracy an
 pre-registration, which must already be on the base branch: it is committed first, before any held-out
 datum is read, and a pre-registration is never edited or deleted after it is committed. Pre-registrations
 are checked to be well formed wherever they are added.
+
+state/gate/exceptions.json is not an accuracy path: it holds decisions on recorded evaluations, not scoring code. A
+pull request that edits it is checked for a well-formed GateExceptions document (from its own head) but its entries
+are read only from the base branch, so an exception takes effect for later pull requests and a pull request cannot
+grant itself one. The exception that waives a pull request's scoring-surface change therefore always predates it.
 """
 from __future__ import annotations
 
@@ -205,6 +210,7 @@ def check_pr(body: str, changes: list[tuple[str, str]], root, base_root, landing
     pre_dir = pr.DIR.as_posix() + "/"
     for status, path in changes:
         if path == EXCEPTIONS.as_posix() and status != "D":
+            # strict validation of the head document; it is never consumed here (entries come from base_root only)
             try:
                 exceptions(root)
             except (ValueError, OSError):
