@@ -290,7 +290,8 @@ jobs:
             python3 orchestrator/nightly/funnel_night.py \
               --ledger "$RUNNER_TEMP/dump-substrate/catalog/ledger" \
               --anchor "$RUNNER_TEMP/dump-substrate/catalog/ledger/published/anchor.yaml" \
-              --contract "$CONTRACT" --summary data/latest/summary.json --out data/latest/funnel.json
+              --contract "$CONTRACT" --summary data/latest/summary.json --out data/latest/funnel.json \
+              || echo "::warning title=funnel.json not written::funnel_night.py exited $?"
           fi
       - name: Package the published data for the publish job
         run: tar -czf data.tgz -C data . 2>/dev/null || tar -czf data.tgz --files-from /dev/null
