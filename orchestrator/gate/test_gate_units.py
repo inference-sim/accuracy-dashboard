@@ -383,6 +383,14 @@ NOT = "Gate: not an accuracy change - documentation only"
     (NOT, [("M", ".github/workflows/gate-candidate.yml")], False),
     (NOT, [("M", ".github/workflows/gate-rule.yml")], False),
     (NOT, [("M", ".github/workflows/whole-run-gate.yml")], False),
+    (NOT, [("M", "state/gate/accuracy-paths.json")], False),       # the gate's own policy and checker are on the list
+    (NOT, [("M", "state/gate/exceptions.json")], False),
+    (NOT, [("M", "orchestrator/gate/rule.py")], False),
+    (NOT, [("M", "orchestrator/gate/surface.py")], False),
+    (NOT, [("A", "orchestrator/gate/new_check.py")], False),
+    (NOT, [("D", "orchestrator/gate/gate.py")], False),
+    (NOT, [("M", "orchestrator/gate/test_gate_units.py")], True),  # a test module is not the checker
+    (NOT, [("M", "state/gate/ledger.json")], True),                # the ledger is committed as data, after each evaluation
     (NOT, [("M", "orchestrator/ingest/test_result.py")], True),    # a test file is not scoring code
     (NOT, [("M", "orchestrator/ingest/testdata/inferencex-workloads/seed0.json")], False),   # data the scorer reads
     ("no statement", [("M", "docs/README.md")], False),
@@ -485,9 +493,11 @@ def test_an_exceptions_file_is_well_formed_where_a_pull_request_adds_it(base_roo
     (head / rule.EXCEPTIONS).write_text(json.dumps(doc))
     errs = check(NOT, [("M", rule.EXCEPTIONS.as_posix())], head, base_root, merge_base_root=head)
     assert any("GateExceptions" in e for e in errs)
+    assert any("must cite a pre-registration" in e for e in errs)          # and the file is on the accuracy paths
     for good_entry in (EXC, {**EXC, "verdict": "fail", "defect": 190}, {**EXC, "verdict": "fail", "defect": DEFECT}):
         grant(head, good_entry)
-        assert check(NOT, [("M", rule.EXCEPTIONS.as_posix())], head, base_root, merge_base_root=head) == []
+        errs = check(NOT, [("M", rule.EXCEPTIONS.as_posix())], head, base_root, merge_base_root=head)
+        assert not any("GateExceptions" in e for e in errs)
 
 
 @pytest.mark.parametrize("ledger_args,ok", [
@@ -610,13 +620,65 @@ def test_a_passing_evaluation_needs_no_exception_and_an_exception_does_not_cover
     assert any("scoring surface" in e for e in check(CITE, [("M", "orchestrator/ingest/score.py")], head, base_root, merge_base_root=merge_base))
 
 
+# ---- the gate cannot be weakened by a pull request that calls itself no accuracy change ----
+
+def gate_trees(base_root, tmp_path, edit):
+    """A merge base holding the gate as main has it, and a head that differs by `edit` (path -> new text, None deletes)."""
+    files = {rel: (REPO / rel).read_text() for rel in ("state/gate/accuracy-paths.json", "orchestrator/gate/rule.py", "orchestrator/gate/surface.py")}
+    files["state/gate/exceptions.json"] = json.dumps({"kind": "GateExceptions", "exceptions": []})
+    merge_base = head_tree(tmp_path, files, "mb")
+    head = head_tree(tmp_path, {k: v for k, v in {**files, **edit}.items() if v is not None}, "head")
+    for rel, text in edit.items():
+        if text is None:
+            (head / rel).unlink(missing_ok=True)
+    return merge_base, head
+
+
+@pytest.mark.parametrize("name,rel,edit", [
+    ("deleting a scoring path from the list", "state/gate/accuracy-paths.json",
+     lambda t: json.dumps({"kind": "AccuracyPaths", "paths": [p for p in json.loads(t)["paths"] if p != "harness/"]})),
+    ("weakening rule.py", "orchestrator/gate/rule.py", lambda t: t + "\ndef check_pr(*a, **k):\n    return []\n"),
+    ("weakening surface.py", "orchestrator/gate/surface.py", lambda t: t + "\ndef differing(*a, **k):\n    return []\n"),
+    ("self-granting an exception", "state/gate/exceptions.json",
+     lambda t: json.dumps({"kind": "GateExceptions", "exceptions": [{**EXC, "head": "a" * 40}]})),
+])
+def test_a_pull_request_cannot_weaken_the_gate_by_calling_itself_no_accuracy_change(base_root, tmp_path, name, rel, edit):
+    original = {"state/gate/exceptions.json": json.dumps({"kind": "GateExceptions", "exceptions": []})}.get(rel) or (REPO / rel).read_text()
+    merge_base, head = gate_trees(base_root, tmp_path, {rel: edit(original)})
+    # the change list names the file: the rule needs a citation, which `not an accuracy change` is not
+    errs = check(NOT, [("M", rel)], head, base_root, merge_base_root=merge_base)
+    assert any("must cite a pre-registration" in e for e in errs), name
+    # the change list lies (it names a document only): the trees still differ on the scoring surface
+    errs = check(NOT, [("M", "docs/README.md")], head, base_root, merge_base_root=merge_base)
+    assert any("scoring surface" in e and rel in e for e in errs), name
+    # citing a pre-registration does not help without a recorded evaluation or an exception bound to one
+    write_ledger(base_root, None)
+    assert check(CITE, [("M", rel)], head, base_root, merge_base_root=merge_base), name
+    # the self-granted exception sits on the pull request's branch, never on the base branch, and does not count
+    if rel == "state/gate/exceptions.json":
+        assert any("scoring surface" in e for e in check(CITE, [("M", rel)], head, base_root, merge_base_root=merge_base))
+    # an evaluation recorded for this head and merge base plus a bound exception on the base branch lets it land
+    write_ledger(base_root, "unjudged")
+    grant(base_root, EXC)
+    assert check(CITE, [("M", rel)], head, base_root, merge_base_root=merge_base) == [], name
+
+
+def test_the_gate_is_on_the_accuracy_paths():
+    paths = rule.accuracy_paths(REPO)
+    for f in ("state/gate/accuracy-paths.json", "state/gate/exceptions.json", "orchestrator/gate/rule.py", "orchestrator/gate/surface.py",
+              "orchestrator/gate/gate.py", ".github/workflows/gate-rule.yml"):
+        assert rule.touches(f, paths), f
+    assert not rule.touches("orchestrator/gate/test_gate_units.py", paths)
+    assert not rule.touches("state/gate/ledger.json", paths) and not rule.touches("state/gate/preregistrations/x.json", paths)
+
+
 def test_the_pull_request_that_adds_a_preregistration_needs_no_evaluation(base_root):
     write_ledger(base_root, None)
     new = {**good(), "id": "row-98-new"}
     head = base_root.parent / "head-new"
     (head / pr.DIR).mkdir(parents=True)
     (head / pr.DIR / "row-98-new.json").write_text(json.dumps(new))
-    assert check(NOT, [("A", "state/gate/preregistrations/row-98-new.json")], head, base_root, merge_base_root=base_root) == []
+    assert check(NOT, [("A", "state/gate/preregistrations/row-98-new.json")], head, base_root, merge_base_root=head) == []
 
 
 def test_parse_changes_reads_name_status_and_renames():

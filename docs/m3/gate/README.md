@@ -36,12 +36,22 @@ pre-registration or an exceptions file). Its permissions are `contents: read` an
 than one checkout or one that is not of the base ref, or if the workflow holds a secret, a write permission or a
 command that brings head code in. The job and check names are unchanged (`gate-rule / rule`).
 
-The list of accuracy paths is the whole scoring surface, as directory rules: the pin file, the three gate
-workflows, `harness/`, `orchestrator/ingest/`, `orchestrator/baseline/`, `schemas/`, and the top-level
-`orchestrator` modules and data files the candidate run imports or reads. A test module (`test_*.py`) is the one
-exclusion; the scorer imports none. `orchestrator/gate/test_gate_surface.py` fails when a file the candidate run
+The list of accuracy paths is the whole scoring surface plus the gate itself, as directory rules: the pin file,
+the three gate workflows, `harness/`, `orchestrator/ingest/`, `orchestrator/baseline/`, `schemas/`, the top-level
+`orchestrator` modules and data files the candidate run imports or reads, and the gate's own policy and checker:
+`state/gate/accuracy-paths.json`, `state/gate/exceptions.json` and `orchestrator/gate/`. A test module
+(`test_*.py`) is the one exclusion; the scorer imports none, and the checker's tests are not the checker.
+`orchestrator/gate/test_gate_surface.py` fails when a file the candidate run
 executes (the import closure of `harness/run.sh`'s scorer, `freeze.py` and `resolve_agentic_corpus.py`) or reads is
-outside the list, so a new scoring module cannot slip past it.
+outside the list, so a new scoring module cannot slip past it. `state/gate/ledger.json` and the
+pre-registrations are data the gate commits after the fact and are not on the list.
+
+**A change to the gate itself is an accuracy change.** A pull request that deletes a path from the list, weakens
+`rule.py` or `surface.py`, or edits `exceptions.json` to grant itself an exception cannot say `Gate: not an accuracy
+change`: it must cite a pre-registration, and that needs a recorded evaluation of its head and merge base or a
+maintainer exception bound to one (below). Otherwise every later pull request would be judged by the weakened `main`.
+The first such change, and any change the gate cannot evaluate, is merged by the maintainer, who has bypass on the
+required check for that bootstrap; the exception file is then added by its own reviewed pull request.
 
 ### The candidate scores with main's code
 

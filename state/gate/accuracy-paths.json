@@ -12,12 +12,15 @@
     "orchestrator/build_summary_v2.py",
     "orchestrator/extract_agentic_replay_args.py",
     "orchestrator/extract_single_turn_bench_args.py",
+    "orchestrator/gate/",
     "orchestrator/ingest/",
     "orchestrator/resolve_agentic_corpus.py",
     "orchestrator/resolve_blis.sh",
     "orchestrator/sglang_declarations.json",
     "orchestrator/update_index.py",
     "orchestrator/vllm_defaults.json",
-    "schemas/"
+    "schemas/",
+    "state/gate/accuracy-paths.json",
+    "state/gate/exceptions.json"
   ]
 }
