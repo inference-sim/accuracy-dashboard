@@ -28,6 +28,10 @@ STATEMENT = re.compile(
 PATHS = Path("state") / "gate" / "accuracy-paths.json"
 EXCEPTIONS = Path("state") / "gate" / "exceptions.json"
 HEX40 = re.compile(r"[0-9a-f]{40}")
+PREREG_ID = re.compile(r"[a-z0-9][a-z0-9.-]{2,63}")
+DEFECT_URL = re.compile(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/[1-9][0-9]*")
+WAIVABLE = ("unjudged", "fail")  # a pass needs no exception
+ENTRY_KEYS = {"pull_request", "head", "reason", "preregistration", "verdict"}
 
 
 def accuracy_paths(root: Path) -> list[str]:
@@ -37,23 +41,45 @@ def accuracy_paths(root: Path) -> list[str]:
     return doc["paths"]
 
 
+def defect_ok(d) -> bool:
+    """A linked defect: an issue number, or the URL of an issue on GitHub (a shape check; nothing is fetched)."""
+    return (type(d) is int and d > 0) or (isinstance(d, str) and DEFECT_URL.fullmatch(d) is not None)
+
+
+def entry_ok(e) -> bool:
+    if not isinstance(e, dict) or not ENTRY_KEYS <= set(e) <= ENTRY_KEYS | {"defect"}:
+        return False
+    if not (type(e["pull_request"]) is int and isinstance(e["head"], str) and HEX40.fullmatch(e["head"])
+            and isinstance(e["reason"], str) and len(e["reason"]) >= 10
+            and isinstance(e["preregistration"], str) and PREREG_ID.fullmatch(e["preregistration"])
+            and e["verdict"] in WAIVABLE):
+        return False
+    # An unjudged verdict is waived on the maintainer's word; a failing one only with the defect it was traced to (VAL-6, VAL-11).
+    return defect_ok(e.get("defect")) if e["verdict"] == "fail" else "defect" not in e
+
+
 def exceptions(root) -> list[dict]:
-    """The maintainer exceptions on the branch `root` checks out: a pull request and the one head it covers."""
+    """The maintainer exceptions on the branch `root` checks out. An entry records a decision on one recorded
+    evaluation: the pull request and head it covers, the pre-registration evaluated, the verdict waived
+    (`unjudged`, or `fail` with a `defect`), and a reason."""
     path = Path(root) / EXCEPTIONS
     if not path.exists():
         return []
     doc = json.loads(path.read_text())
     ok = isinstance(doc, dict) and set(doc) == {"kind", "exceptions"} and doc["kind"] == "GateExceptions" and isinstance(doc["exceptions"], list)
-    ok = ok and all(isinstance(e, dict) and set(e) == {"pull_request", "head", "reason"} and type(e["pull_request"]) is int
-                    and isinstance(e["head"], str) and HEX40.fullmatch(e["head"]) and isinstance(e["reason"], str) and len(e["reason"]) >= 10
-                    for e in doc["exceptions"])
-    if not ok:
-        raise ValueError(f"{EXCEPTIONS} is not a GateExceptions document of {{pull_request, head, reason}} entries")
+    if not (ok and all(entry_ok(e) for e in doc["exceptions"])):
+        raise ValueError(f"{EXCEPTIONS} is not a GateExceptions document of {{pull_request, head, reason, preregistration, verdict[, defect]}} entries "
+                         "(verdict unjudged, or fail with a defect that is an issue number or URL)")
     return doc["exceptions"]
 
 
 def excepted(root, pull_request: int, head: str) -> bool:
-    return any(e["pull_request"] == pull_request and e["head"] == head for e in exceptions(root))
+    """Some maintainer exception names this pull request at this head (what the whole-run gate asks before an evaluation exists)."""
+    return exception_for(root, pull_request, head) is not None
+
+
+def exception_for(root, pull_request: int, head: str) -> dict | None:
+    return next((e for e in exceptions(root) if e["pull_request"] == pull_request and e["head"] == head), None)
 
 
 def parse_changes(text: str) -> list[tuple[str, str]]:
@@ -82,30 +108,63 @@ class Landing:
     merge_base_root: Path
 
 
-def evaluation_errors(base_root: Path, pre: dict, landing: Landing) -> list[str]:
-    """A cited pre-registration must have been evaluated, and passed, on this head over this merge base: the base
-    branch's ledger records the gate's evaluation (its verdict, never a claim in the pull request)."""
+def find_evaluation(base_root: Path, pre: dict, landing: Landing) -> dict:
+    """The ledger's record of this pre-registration (id and SHA-256) scored on this head over this merge base. Raises
+    LookupError, saying why, when the ledger cannot be read or holds none."""
     try:
-        doc = budget.load(base_root / budget.PATH)
+        doc = budget.load(Path(base_root) / budget.PATH)
     except (budget.Refused, OSError, ValueError) as e:
-        return [f"{budget.PATH.as_posix()} on the base branch cannot be read ({e}); an evaluation of {pre['id']} cannot be checked"]
+        raise LookupError(f"{budget.PATH.as_posix()} on the base branch cannot be read ({e}); an evaluation of {pre['id']} cannot be checked") from e
     digest = pr.digest(pre)
     for part in doc["partitions"].values():
         for e in part["evaluations"]:
             if (e["preregistration"], e["preregistration_sha256"], e["candidate"], e["base"]) == (pre["id"], digest, landing.head, landing.merge_base):
-                if e["verdict"] == "pass":
-                    return []
-                return [f"the whole-run gate evaluated {pre['id']} on this head and returned {e['verdict']}; only a pass lands, "
-                        f"or a maintainer exception in {EXCEPTIONS.as_posix()}"]
-    return [f"no evaluation of {pre['id']} on head {landing.head[:12]} over merge base {landing.merge_base[:12]} is recorded in "
-            f"{budget.PATH.as_posix()} on the base branch; run the whole-run gate and commit its ledger.json to main first"]
+                return e
+    raise LookupError(f"no evaluation of {pre['id']} on head {landing.head[:12]} over merge base {landing.merge_base[:12]} is recorded in "
+                      f"{budget.PATH.as_posix()} on the base branch; run the whole-run gate and commit its ledger.json to main first")
+
+
+def evaluation_errors(base_root: Path, pre: dict, landing: Landing) -> list[str]:
+    """A cited pre-registration must have been evaluated, and passed, on this head over this merge base: the base
+    branch's ledger records the gate's evaluation (its verdict, never a claim in the pull request)."""
+    try:
+        e = find_evaluation(base_root, pre, landing)
+    except LookupError as err:
+        return [str(err)]
+    if e["verdict"] == "pass":
+        return []
+    return [f"the whole-run gate evaluated {pre['id']} on this head and returned {e['verdict']}; only a pass lands, "
+            f"or a maintainer exception in {EXCEPTIONS.as_posix()} that records that verdict"
+            + (" and the defect it was traced to" if e["verdict"] == "fail" else "")]
+
+
+def waiver_errors(base_root: Path, entry: dict, pre: dict | None, landing: Landing) -> list[str]:
+    """Why a maintainer exception does not hold; empty when it does. An exception records a decision on a held
+    evaluation (VAL-6), it never replaces one: the ledger on the base branch must hold an evaluation of the
+    pre-registration the pull request cites (same SHA-256) whose candidate is this head and whose base is this merge
+    base, and its verdict must be the one the exception waives. Only `unjudged` is waived on the maintainer's word;
+    `fail` needs the linked defect (checked for shape with the entry); a `pass` needs no exception."""
+    if pre is None:
+        return ["the exception binds to an evaluation of the cited pre-registration, and the pull request cites none that is on the base branch"]
+    if entry["preregistration"] != pre["id"]:
+        return [f"the exception is for pre-registration {entry['preregistration']}, the pull request cites {pre['id']}"]
+    try:
+        e = find_evaluation(base_root, pre, landing)
+    except LookupError as err:
+        return [f"the exception covers no evaluation: {err}"]
+    if e["verdict"] == "pass":
+        return ["the evaluation passed; an exception is not needed and does not stand in for the other conditions of the rule"]
+    if e["verdict"] != entry["verdict"]:
+        return [f"the exception waives a {entry['verdict']} verdict; the ledger records {e['verdict']} for this evaluation"]
+    return []
 
 
 def check_pr(body: str, changes: list[tuple[str, str]], root, base_root, landing: Landing) -> list[str]:
     """Every way the pull request breaks the rule; empty when it follows it. `root` is the checkout of the pull
-    request's head; `base_root` the base branch's (the list of accuracy paths, the cited pre-registration and the
-    maintainer exceptions are read from it, so a pull request cannot shorten the list it is judged by or grant itself
-    an exception), and defaults to `root`."""
+    request's head; `base_root` the base branch's (the list of accuracy paths, the cited pre-registration, the
+    ledger and the maintainer exceptions are read from it, so a pull request cannot shorten the list it is judged by
+    or grant itself an exception), and defaults to `root`. An exception never replaces the evaluation: it records a
+    maintainer's decision on the one the ledger holds for this head and merge base (waiver_errors)."""
     root, errs = Path(root), []
     base_root = Path(base_root) if base_root is not None else root
     found = list(STATEMENT.finditer(body or ""))
@@ -115,20 +174,41 @@ def check_pr(body: str, changes: list[tuple[str, str]], root, base_root, landing
         stated = None
     else:
         stated = found[0]
-    waived = excepted(base_root, landing.number, landing.head)
+    cited = stated.group("id") if stated is not None else None
+    added = {p for s, p in changes if s in "AMDR"}
+    pre = None
+    if cited is not None:
+        path = pr.DIR / f"{cited}.json"
+        if path.as_posix() in added:
+            errs.append(f"pre-registration {cited} is added by this pull request; it must be on the base branch first")
+        else:
+            try:
+                pre = pr.load(base_root / path)
+            except (pr.PreRegistrationError, OSError):
+                errs.append(f"pre-registration {cited} is not on the base branch")
+    try:
+        entry = exception_for(base_root, landing.number, landing.head)
+    except (ValueError, OSError):
+        entry = None
+        errs.append(f"{EXCEPTIONS.as_posix()} on the base branch is not a readable GateExceptions document; no exception can be applied")
+    waived = False
+    if entry is not None:
+        why = waiver_errors(base_root, entry, pre, landing)
+        errs += [f"the maintainer exception in {EXCEPTIONS.as_posix()} for this head does not hold: {w}" for w in why]
+        waived = not why
     if not waived:
         diff = surface.differing(landing.merge_base_root, root, accuracy_paths(base_root))
         if diff:
             errs.append("the change alters the scoring surface (" + ", ".join(diff[:5]) + (" and more" if len(diff) > 5 else "")
                         + "): the candidate run would score with its own code, not main's; it needs a maintainer exception in "
-                        + EXCEPTIONS.as_posix() + " on the base branch")
+                        + EXCEPTIONS.as_posix() + " on the base branch that records the decision on a recorded evaluation of this head and merge base")
     pre_dir = pr.DIR.as_posix() + "/"
     for status, path in changes:
         if path == EXCEPTIONS.as_posix() and status != "D":
             try:
                 exceptions(root)
             except (ValueError, OSError):
-                errs.append(f"{path} is not a GateExceptions document of {{pull_request, head, reason}} entries")
+                errs.append(f"{path} is not a GateExceptions document of {{pull_request, head, reason, preregistration, verdict[, defect]}} entries")
         if path.startswith(pre_dir):
             if status != "A":
                 errs.append(f"{path}: a pre-registration is never edited, renamed or deleted after it is committed")
@@ -140,21 +220,9 @@ def check_pr(body: str, changes: list[tuple[str, str]], root, base_root, landing
             else:
                 errs.append(f"{path}: only <id>.json files live in {pre_dir}")
     moves = sorted({p for s, p in changes if touches(p, accuracy_paths(base_root))})
-    cited = stated.group("id") if stated is not None else None
     if moves and stated is not None and cited is None:
         errs.append("the change touches " + ", ".join(moves[:5]) + (" and more" if len(moves) > 5 else "")
                     + ", which moves accuracy; it must cite a pre-registration")
-    if cited is not None:
-        added = {p for s, p in changes if s in "AMDR"}
-        path = pr.DIR / f"{cited}.json"
-        if path.as_posix() in added:
-            errs.append(f"pre-registration {cited} is added by this pull request; it must be on the base branch first")
-        else:
-            try:
-                pre = pr.load(base_root / path)
-            except (pr.PreRegistrationError, OSError):
-                errs.append(f"pre-registration {cited} is not on the base branch")
-            else:
-                if not waived:
-                    errs += evaluation_errors(base_root, pre, landing)
+    if pre is not None and not waived:
+        errs += evaluation_errors(base_root, pre, landing)
     return errs

@@ -50,13 +50,28 @@ test modules and without `.github/stack-pins.env` (the simulator pin differs bet
   refuses a pull request whose trees differ, whatever its change list says.
 
 So a pull request that edits scoring code does not reach an evaluation on its own. A maintainer exception
-covers it: `state/gate/exceptions.json` (kind `GateExceptions`) on `main` holds entries
-`{"pull_request": <number>, "head": "<40 hex>", "reason": "<at least 10 characters>"}`. An exception covers
-that pull request at that head only, so a later push needs a new one. It is read from the base branch, never
-from the pull request, so it is added by its own reviewed pull request (which cites `not an accuracy change`)
-that merges first. It waives the surface check in both workflows and the passing-evaluation requirement of `gate-rule` (the case of an
-unjudged or failing verdict that a maintainer accepts); it does not waive the pre-registration, which must still be cited
-and on `main`.
+covers it, and an exception records a decision on a held evaluation; it never replaces one (VAL-6).
+`state/gate/exceptions.json` (kind `GateExceptions`) on `main` holds entries
+
+```json
+{"pull_request": 170, "head": "<40 hex>", "reason": "<at least 10 characters>",
+ "preregistration": "<the evaluated pre-registration's id>", "verdict": "unjudged"}
+```
+
+with `"verdict": "fail"` and a `"defect": <issue number or the URL of a GitHub issue>` when the evaluation failed.
+Entries are read strictly (an unknown field is refused). `gate-rule` lets an exception stand in for a passing
+evaluation, or for the surface check, only when `state/gate/ledger.json` on `main` holds an evaluation of the
+pull request's cited pre-registration (the same id and SHA-256) whose candidate is the pull request's head and whose
+base is its merge base now, and the entry's `verdict` is that evaluation's verdict. With no such evaluation the exception does not make the
+check pass. Only `unjudged` is waived on the maintainer's word; a `fail` also needs the defect it was traced to
+another term for (VAL-11), checked here for shape only; a `pass` needs no exception. An exception covers that
+pull request at that head only, so any new push voids a recorded evaluation and its exception. It is read from
+the base branch, never from the pull request, so it is added by its own reviewed pull request that merges first.
+`whole-run-gate.yml` still asks only whether an entry names the pull request and head before it will score a
+candidate whose surface differs from main's (no evaluation exists yet at that point), so for such a change the
+sequence is: commit an entry with `"verdict": "unjudged"` (the verdict the gate returns until the distance
+criterion is judged), evaluate, commit the ledger, and, if the gate returned `fail` instead, replace the entry with
+one that carries the defect. It does not waive the pre-registration, which must still be cited and on `main`.
 The one proof implemented is the tree hash being equal to main's; "the harness commit is an ancestor of main"
 is not.
 
@@ -145,7 +160,7 @@ evaluations cannot be spent against one count.
    the pull request's merge base, so the evaluation still binds. A new push to the pull request, or a merge of
    `main` into it, changes the head or the merge base, and the change needs a new evaluation. Because the
    distance criterion is unjudged today, the verdict is not `pass` yet; until it is, the change lands through a
-   maintainer exception that names its pull request and head.
+   maintainer exception that names its pull request and head and records the `unjudged` verdict of its evaluation.
 
 Lanes with fewer than 10 role keys are merged on (engine, commit, chip), then on (engine, commit), and
 otherwise only counted. A merged lane is named only by the fields its members share; a regression confined to

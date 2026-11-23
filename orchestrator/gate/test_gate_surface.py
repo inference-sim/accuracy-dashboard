@@ -178,7 +178,8 @@ def test_a_candidate_with_its_own_scoring_code_is_refused(tmp_path, capsys):
 
 
 def test_a_maintainer_exception_for_this_pull_request_and_head_lets_a_differing_tree_proceed(tmp_path, capsys):
-    exc = {"pull_request": 7, "head": HEX, "reason": "the harness fix is reviewed by hand"}
+    exc = {"pull_request": 7, "head": HEX, "reason": "the harness fix is reviewed by hand",
+           "preregistration": "row-99-example", "verdict": "unjudged"}
     change = {"orchestrator/ingest/score.py": "reviewed change\n"}
     assert gate.main(sides(tmp_path / "ok", change, exception=exc)) == 0
     assert gate.main(sides(tmp_path / "other-pr", change, exception={**exc, "pull_request": 8})) == 1

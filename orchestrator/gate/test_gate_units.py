@@ -438,25 +438,45 @@ def test_a_pull_request_that_carries_its_own_scoring_code_is_refused_whatever_th
     assert not any("scoring surface" in e for e in check(NOT, [("M", "docs/README.md")], same, base_root, merge_base_root=merge_base))
 
 
-def test_a_maintainer_exception_on_the_base_branch_for_this_pull_request_and_head_covers_the_surface(base_root, tmp_path):
+EXC = {"pull_request": 7, "head": "a" * 40, "reason": "the distance criterion is unjudged; accepted by hand",
+       "preregistration": "row-99-example", "verdict": "unjudged"}
+DEFECT = "https://github.com/inference-sim/accuracy-dashboard/issues/190"
+
+
+def grant(root, *entries):
+    (root / rule.EXCEPTIONS).write_text(json.dumps({"kind": "GateExceptions", "exceptions": list(entries)}))
+
+
+def test_a_maintainer_exception_bound_to_a_recorded_evaluation_covers_the_surface(base_root, tmp_path):
     merge_base = head_tree(tmp_path, {}, "mb")
     head = head_tree(tmp_path, {"orchestrator/ingest/score.py": "reviewed change\n"})
-    exc = {"pull_request": 7, "head": "a" * 40, "reason": "reviewed by hand: a harness fix"}
-    (base_root / rule.EXCEPTIONS).write_text(json.dumps({"kind": "GateExceptions", "exceptions": [exc]}))
-    assert check(CITE, [("M", "orchestrator/ingest/score.py")], head, base_root, merge_base_root=merge_base) == []
-    for other in ({"number": 8}, {"head": "c" * 40}):
-        assert any("scoring surface" in e for e in check(CITE, [("M", "orchestrator/ingest/score.py")], head, base_root, merge_base_root=merge_base, **other))
+    write_ledger(base_root, "unjudged")
+    grant(base_root, EXC)
+    change = [("M", "orchestrator/ingest/score.py")]
+    assert check(CITE, change, head, base_root, merge_base_root=merge_base) == []
+    for other in ({"number": 8}, {"head": "c" * 40}, {"merge_base": "c" * 40}):
+        assert any("scoring surface" in e or "exception" in e for e in check(CITE, change, head, base_root, merge_base_root=merge_base, **other))
     (head / rule.EXCEPTIONS).parent.mkdir(parents=True, exist_ok=True)
-    (head / rule.EXCEPTIONS).write_text(json.dumps({"kind": "GateExceptions", "exceptions": [exc]}))
+    grant(head, EXC)
     (base_root / rule.EXCEPTIONS).unlink()
-    assert any("scoring surface" in e for e in check(CITE, [("M", "orchestrator/ingest/score.py")], head, base_root, merge_base_root=merge_base))
+    assert any("scoring surface" in e for e in check(CITE, change, head, base_root, merge_base_root=merge_base))
 
 
 @pytest.mark.parametrize("doc", [
     {"kind": "GateExceptions", "exceptions": [{"pull_request": 7, "head": "a" * 40}]},
-    {"kind": "GateExceptions", "exceptions": [{"pull_request": "7", "head": "a" * 40, "reason": "long enough reason"}]},
-    {"kind": "GateExceptions", "exceptions": [{"pull_request": 7, "head": "main", "reason": "long enough reason"}]},
-    {"kind": "GateExceptions", "exceptions": [{"pull_request": 7, "head": "a" * 40, "reason": "short"}]},
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "pull_request": "7"}]},
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "head": "main"}]},
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "reason": "short"}]},
+    {"kind": "GateExceptions", "exceptions": [{k: v for k, v in EXC.items() if k != "preregistration"}]},   # not bound to an evaluation
+    {"kind": "GateExceptions", "exceptions": [{k: v for k, v in EXC.items() if k != "verdict"}]},
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "preregistration": "Not An Id"}]},
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "verdict": "pass"}]},                  # a pass needs no exception
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "verdict": "fail"}]},                  # a fail needs its defect
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "verdict": "fail", "defect": "later"}]},
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "verdict": "fail", "defect": 0}]},
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "verdict": "fail", "defect": "https://example.com/issues/3"}]},
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "defect": 12}]},                       # an unjudged verdict has no defect
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "extra": 1}]},
     {"kind": "Other", "exceptions": []},
 ])
 def test_an_exceptions_file_is_well_formed_where_a_pull_request_adds_it(base_root, tmp_path, doc):
@@ -465,9 +485,9 @@ def test_an_exceptions_file_is_well_formed_where_a_pull_request_adds_it(base_roo
     (head / rule.EXCEPTIONS).write_text(json.dumps(doc))
     errs = check(NOT, [("M", rule.EXCEPTIONS.as_posix())], head, base_root, merge_base_root=head)
     assert any("GateExceptions" in e for e in errs)
-    (head / rule.EXCEPTIONS).write_text(json.dumps({"kind": "GateExceptions", "exceptions": [
-        {"pull_request": 7, "head": "a" * 40, "reason": "long enough reason"}]}))
-    assert check(NOT, [("M", rule.EXCEPTIONS.as_posix())], head, base_root, merge_base_root=head) == []
+    for good_entry in (EXC, {**EXC, "verdict": "fail", "defect": 190}, {**EXC, "verdict": "fail", "defect": DEFECT}):
+        grant(head, good_entry)
+        assert check(NOT, [("M", rule.EXCEPTIONS.as_posix())], head, base_root, merge_base_root=head) == []
 
 
 @pytest.mark.parametrize("ledger_args,ok", [
@@ -509,16 +529,85 @@ def test_a_ledger_that_cannot_be_read_refuses_rather_than_passes(base_root):
     assert any("ledger" in e for e in check(CITE, [("M", "harness/run.sh")], base_root))
 
 
-def test_a_maintainer_exception_stands_in_for_a_missing_or_failing_evaluation(base_root):
-    exc = {"pull_request": 7, "head": "a" * 40, "reason": "the distance criterion is unjudged; accepted by hand"}
-    for verdict in (None, "unjudged", "fail"):
+def test_a_maintainer_exception_records_a_decision_on_a_held_evaluation(base_root):
+    """VAL-6: an unjudged verdict may be waived on the maintainer's word; a fail only with its defect; a pass needs nothing."""
+    change = [("M", "harness/run.sh")]
+    for verdict, entry in (("unjudged", EXC), ("fail", {**EXC, "verdict": "fail", "defect": DEFECT}),
+                           ("fail", {**EXC, "verdict": "fail", "defect": 190})):
         write_ledger(base_root, verdict)
         (base_root / rule.EXCEPTIONS).unlink(missing_ok=True)
-        assert check(CITE, [("M", "harness/run.sh")], base_root)
-        (base_root / rule.EXCEPTIONS).write_text(json.dumps({"kind": "GateExceptions", "exceptions": [exc]}))
-        assert check(CITE, [("M", "harness/run.sh")], base_root) == []
-    assert check(CITE, [("M", "harness/run.sh")], base_root, head="c" * 40)
-    assert check(CITE, [("M", "harness/run.sh")], base_root, number=8)
+        assert check(CITE, change, base_root)
+        grant(base_root, entry)
+        assert check(CITE, change, base_root) == []
+        assert check(CITE, change, base_root, head="c" * 40)
+        assert check(CITE, change, base_root, number=8)
+
+
+def test_an_exception_with_no_recorded_evaluation_does_not_pass(base_root):
+    """The exception never replaces the evaluation (the case the review found: an empty ledger and an exception passed)."""
+    write_ledger(base_root, None)
+    grant(base_root, EXC)
+    errs = check(CITE, [("M", "harness/run.sh")], base_root)
+    assert any("exception" in e and "evaluation" in e for e in errs)
+    grant(base_root, {**EXC, "verdict": "fail", "defect": DEFECT})
+    assert check(CITE, [("M", "harness/run.sh")], base_root)
+    (base_root / budget.PATH).unlink()
+    assert check(CITE, [("M", "harness/run.sh")], base_root)       # an unreadable ledger holds no evaluation either
+
+
+@pytest.mark.parametrize("ledger_args", [
+    dict(verdict="unjudged", head="c" * 40),                      # the evaluation scored another head
+    dict(verdict="unjudged", base="c" * 40),                      # ... or another merge base
+    dict(verdict="unjudged", prereg="row-98-other"),              # ... or another pre-registration
+])
+def test_an_exception_does_not_cover_an_evaluation_of_another_head_base_or_preregistration(base_root, ledger_args):
+    write_ledger(base_root, **ledger_args)
+    grant(base_root, EXC)
+    assert check(CITE, [("M", "harness/run.sh")], base_root)
+
+
+def test_an_exception_does_not_cover_an_evaluation_of_an_edited_preregistration(base_root):
+    write_ledger(base_root, "unjudged")
+    (base_root / pr.DIR / "row-99-example.json").write_text(json.dumps({**good(), "hypothesis": "a different hypothesis than the evaluated one"}))
+    grant(base_root, EXC)
+    assert check(CITE, [("M", "harness/run.sh")], base_root)
+
+
+def test_an_exception_whose_verdict_is_not_the_ledgers_does_not_pass(base_root):
+    write_ledger(base_root, "fail")
+    grant(base_root, EXC)                                         # states unjudged; the gate returned fail
+    assert any("ledger records fail" in e for e in check(CITE, [("M", "harness/run.sh")], base_root))
+    write_ledger(base_root, "unjudged")
+    grant(base_root, {**EXC, "verdict": "fail", "defect": DEFECT})  # states fail; the gate returned unjudged
+    assert any("ledger records unjudged" in e for e in check(CITE, [("M", "harness/run.sh")], base_root))
+
+
+def test_an_exception_for_a_failing_evaluation_without_a_defect_is_refused(base_root):
+    write_ledger(base_root, "fail")
+    (base_root / rule.EXCEPTIONS).write_text(json.dumps({"kind": "GateExceptions", "exceptions": [{**EXC, "verdict": "fail"}]}))
+    assert check(CITE, [("M", "harness/run.sh")], base_root)
+
+
+def test_an_exception_for_another_preregistration_does_not_cover_this_one(base_root):
+    write_ledger(base_root, "unjudged")
+    grant(base_root, {**EXC, "preregistration": "row-98-other"})
+    assert any("row-98-other" in e for e in check(CITE, [("M", "harness/run.sh")], base_root))
+
+
+def test_an_exception_does_not_waive_the_citation_of_a_preregistration(base_root):
+    write_ledger(base_root, "unjudged")
+    grant(base_root, EXC)
+    assert check(NOT, [("M", "harness/run.sh")], base_root)
+    assert check("Gate: pre-registration row-00-missing", [("M", "harness/run.sh")], base_root)
+
+
+def test_a_passing_evaluation_needs_no_exception_and_an_exception_does_not_cover_the_surface_for_it(base_root, tmp_path):
+    write_ledger(base_root, "pass")
+    assert check(CITE, [("M", "harness/run.sh")], base_root) == []
+    merge_base = head_tree(tmp_path, {}, "mb")
+    head = head_tree(tmp_path, {"orchestrator/ingest/score.py": "changed\n"})
+    grant(base_root, EXC)
+    assert any("scoring surface" in e for e in check(CITE, [("M", "orchestrator/ingest/score.py")], head, base_root, merge_base_root=merge_base))
 
 
 def test_the_pull_request_that_adds_a_preregistration_needs_no_evaluation(base_root):
