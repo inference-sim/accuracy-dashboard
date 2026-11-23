@@ -12,6 +12,8 @@ import sys
 from datetime import date
 from pathlib import Path
 
+import pytest
+
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import nightly_run as nr  # noqa: E402
@@ -32,12 +34,21 @@ def test_a_note_naming_a_tool_reads_the_same_without_its_name():
     assert pt.scrub_text("nothing to hide: a word like maic or aichi stays") == "nothing to hide: a word like maic or aichi stays"
 
 
-def test_scrub_reaches_every_string_and_leaves_keys_and_numbers():
+def test_scrub_reaches_every_string_and_leaves_numbers_and_ordinary_keys():
     doc = {"a": [{"detail": NOTE, "n": 3, "ok": True, "none": None}], "b": {"note": NOTE}}
     out = pt.scrub(doc)
     assert not GUARD.search(json.dumps(out))
     assert out["a"][0]["n"] == 3 and out["a"][0]["ok"] is True and out["a"][0]["none"] is None
     assert set(out) == {"a", "b"}
+
+
+def test_scrub_reaches_a_key_that_names_a_tool_and_refuses_two_keys_that_become_one():
+    named = "AI" + "Simulate"
+    out = pt.scrub({named: {"AI" + "C": [1]}, "plain": 2, 7: "int key"})
+    assert not GUARD.search(json.dumps(out))
+    assert out == {"an external simulator": {"an external tool": [1]}, "plain": 2, 7: "int key"}
+    with pytest.raises(ValueError, match="two keys"):
+        pt.scrub({named: 1, "an external simulator": 2})
 
 
 def test_a_night_publishes_no_file_that_carries_a_tool_name(tmp_path):

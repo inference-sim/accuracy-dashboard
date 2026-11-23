@@ -31,12 +31,19 @@ def scrub_text(text: str) -> str:
 
 
 def scrub(value):
-    """`value` with every string in it (dict values, list items, nested) passed through scrub_text. Keys are left as they are:
-    they are the schema's, never copied from a source."""
+    """`value` with every string in it (dict keys and values, list items, nested) passed through scrub_text. A key is scrubbed
+    too: a funnel's source name is a key (baseline/funnel.py combine). Two keys that scrub to one name are refused, since one
+    would silently replace the other."""
     if isinstance(value, str):
         return scrub_text(value)
     if isinstance(value, list):
         return [scrub(v) for v in value]
     if isinstance(value, dict):
-        return {k: scrub(v) for k, v in value.items()}
+        out = {}
+        for k, v in value.items():
+            key = scrub_text(k) if isinstance(k, str) else k
+            if key in out:
+                raise ValueError(f"two keys read {key!r} once their tool names are replaced")
+            out[key] = scrub(v)
+        return out
     return value

@@ -51,6 +51,24 @@ def test_a_whole_night_writes_a_funnel_2_file_and_a_delta_night_writes_none_and_
     assert reason and "not the whole" in reason and not out.exists()
 
 
+def test_a_failure_while_scrubbing_or_writing_is_a_warning_and_a_funnel_of_another_snapshot_is_dropped(tmp_path, monkeypatch):
+    lg, anchor, contract, summary, ids = _night(tmp_path, scored_ids=set(_ids_of(6)))
+    out = tmp_path / "funnel.json"
+    out.write_text(json.dumps({"snapshot_id": "an-older-snapshot"}))
+
+    def broken(_doc):
+        raise ValueError("a key that cannot be scrubbed")
+
+    monkeypatch.setattr(fnn.pt, "scrub", broken)
+    reason = fnn.write(out, summary, lambda s: fnn.build(lg, anchor, contract, s))
+    assert reason == "ValueError: a key that cannot be scrubbed" and not out.exists()
+
+    monkeypatch.undo()
+    (tmp_path / "as_dir").mkdir()
+    reason = fnn.write(tmp_path / "as_dir", summary, lambda s: fnn.build(lg, anchor, contract, s))
+    assert reason and "Error" in reason
+
+
 def _ids_of(n):
     return [f"{i:064x}" for i in range(1, n + 1)]
 
