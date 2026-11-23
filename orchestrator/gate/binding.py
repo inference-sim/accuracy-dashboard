@@ -102,4 +102,3 @@ def check_pair(base_ledger: str, cand_ledger: str) -> None:
     if base_ledger != cand_ledger:
         raise BindingError("the base and the candidate simulators carry different ledgers; the held-out partition "
                            "must be one ledger for both sides")
-
