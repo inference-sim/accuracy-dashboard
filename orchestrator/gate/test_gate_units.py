@@ -111,9 +111,11 @@ def test_a_good_preregistration_validates():
 
 @pytest.mark.parametrize("edit", [
     {"kind": "Other"}, {"id": "Bad Id"}, {"partition_version": 0}, {"hypothesis": "short"}, {"target_lanes": []},
-    {"target_lanes": [{"gpu": "h100"}]}, {"target_lanes": [{}]}, {"sources": ["another-source"]},
-    {"criteria": []}, {"criteria": [{"criterion": "error", "margin": -1}]},
+    {"target_lanes": [{"gpu": "h100"}]}, {"target_lanes": [{}]}, {"sources": ["othersource"]},
+    {"criteria": []}, {"criteria": [{"criterion": "error", "margin": -1}, {"criterion": "distance", "margin": 0.1}]},
     {"criteria": [{"criterion": "error", "margin": 0.1}, {"criterion": "error", "margin": 0.1}]},
+    {"criteria": [{"criterion": "error", "margin": 0.1}]}, {"criteria": [{"criterion": "distance", "margin": 0.1}]},
+    {"criteria": [{"criterion": "error", "margin": 0.1}, {"criterion": "error", "margin": 0.1}, {"criterion": "distance", "margin": 0.1}]},
     {"criteria": [{"criterion": "other", "margin": 0.1}]}, {"metrics": []}, {"metrics": ["TPOT"]},
     {"substream": "x"}, {"measured_sha256": "abc"},
 ])
@@ -346,7 +348,20 @@ def base_root(tmp_path):
     (tmp_path / "state" / "gate" / "preregistrations").mkdir(parents=True)
     (tmp_path / rule.PATHS).write_text((REPO / rule.PATHS).read_text())
     (tmp_path / pr.DIR / "row-99-example.json").write_text(json.dumps(good()))
+    write_ledger(tmp_path, "pass")
     return tmp_path
+
+
+def write_ledger(root, verdict, *, prereg="row-99-example", head="a" * 40, base="b" * 40):
+    """The base branch's ledger holding one evaluation of the pre-registration, of the head and merge base `check` uses by default."""
+    doc = budget.record(ledger(), prereg, pr.digest(good()), base, head, 5, 1, verdict) if verdict else ledger()
+    (root / budget.PATH).write_text(budget.dumps(doc))
+
+
+def check(body, changes, root, base_root=None, **landing):
+    """rule.check_pr for a pull request #7 whose merge base holds what `root` holds, unless `landing` says otherwise."""
+    kw = {"number": 7, "head": "a" * 40, "merge_base": "b" * 40, "merge_base_root": root, **landing}
+    return rule.check_pr(body, changes, root, base_root, rule.Landing(**kw))
 
 
 CITE = "Gate: pre-registration row-99-example"
@@ -358,6 +373,26 @@ NOT = "Gate: not an accuracy change - documentation only"
     (NOT, [("M", "docs/README.md")], True),
     (NOT, [("M", "harness/run.sh")], False),                      # an accuracy path cannot claim to be no change
     (NOT, [("M", "orchestrator/ingest/score.py")], False),
+    (NOT, [("M", "orchestrator/ingest/result.py")], False),       # extracts the predicted metric from the Result
+    (NOT, [("M", "orchestrator/ingest/pointrecord.py")], False),
+    (NOT, [("A", "orchestrator/ingest/new_module.py")], False),
+    (NOT, [("M", "orchestrator/baseline/freeze.py")], False),
+    (NOT, [("M", "orchestrator/resolve_agentic_corpus.py")], False),
+    (NOT, [("M", "orchestrator/vllm_defaults.json")], False),
+    (NOT, [("M", "schemas/summary.v3.json")], False),
+    (NOT, [("M", ".github/workflows/gate-candidate.yml")], False),
+    (NOT, [("M", ".github/workflows/gate-rule.yml")], False),
+    (NOT, [("M", ".github/workflows/whole-run-gate.yml")], False),
+    (NOT, [("M", "state/gate/accuracy-paths.json")], False),       # the gate's own policy and checker are on the list
+    (NOT, [("M", "state/gate/exceptions.json")], True),            # decisions on recorded evaluations, not scoring code; validated, read from base only
+    (NOT, [("M", "orchestrator/gate/rule.py")], False),
+    (NOT, [("M", "orchestrator/gate/surface.py")], False),
+    (NOT, [("A", "orchestrator/gate/new_check.py")], False),
+    (NOT, [("D", "orchestrator/gate/gate.py")], False),
+    (NOT, [("M", "orchestrator/gate/test_gate_units.py")], True),  # a test module is not the checker
+    (NOT, [("M", "state/gate/ledger.json")], True),                # the ledger is committed as data, after each evaluation
+    (NOT, [("M", "orchestrator/ingest/test_result.py")], True),    # a test file is not scoring code
+    (NOT, [("M", "orchestrator/ingest/testdata/inferencex-workloads/seed0.json")], False),   # data the scorer reads
     ("no statement", [("M", "docs/README.md")], False),
     (CITE + "\n" + NOT, [("M", "docs/README.md")], False),
     ("Gate: pre-registration row-00-missing", [("M", "harness/run.sh")], False),
@@ -367,18 +402,18 @@ NOT = "Gate: not an accuracy change - documentation only"
     (NOT, [("M", "state/gate/preregistrations/row-99-example.json")], False),
 ])
 def test_the_pull_request_rule(base_root, body, changes, ok):
-    assert (rule.check_pr(body, changes, base_root) == []) == ok
+    assert (check(body, changes, base_root) == []) == ok
 
 
 def test_a_preregistration_cannot_be_added_and_cited_in_one_pull_request(base_root):
     new = good()
     new["id"] = "row-98-new"
     (base_root / pr.DIR / "row-98-new.json").write_text(json.dumps(new))
-    errs = rule.check_pr("Gate: pre-registration row-98-new", [("A", "state/gate/preregistrations/row-98-new.json"), ("M", "harness/run.sh")], base_root)
+    errs = check("Gate: pre-registration row-98-new", [("A", "state/gate/preregistrations/row-98-new.json"), ("M", "harness/run.sh")], base_root)
     assert any("must be on the base branch first" in e for e in errs)
-    assert rule.check_pr(NOT, [("A", "state/gate/preregistrations/row-98-new.json")], base_root) == []
+    assert check(NOT, [("A", "state/gate/preregistrations/row-98-new.json")], base_root) == []
     (base_root / pr.DIR / "row-98-new.json").write_text(json.dumps({**new, "metrics": []}))
-    assert rule.check_pr(NOT, [("A", "state/gate/preregistrations/row-98-new.json")], base_root)
+    assert check(NOT, [("A", "state/gate/preregistrations/row-98-new.json")], base_root)
 
 
 def test_the_list_and_the_cited_preregistration_are_the_base_branchs(base_root, tmp_path_factory):
@@ -386,11 +421,294 @@ def test_the_list_and_the_cited_preregistration_are_the_base_branchs(base_root, 
     (head / "state" / "gate" / "preregistrations").mkdir(parents=True)
     (head / rule.PATHS).write_text(json.dumps({"kind": "AccuracyPaths", "paths": ["nothing/"]}))
     (head / pr.DIR / "row-99-example.json").write_text(json.dumps(good()))
-    assert rule.check_pr(NOT, [("M", "harness/run.sh")], head) == []
-    assert rule.check_pr(NOT, [("M", "harness/run.sh")], head, base_root)
+    assert check(NOT, [("M", "harness/run.sh")], head) == []
+    assert check(NOT, [("M", "harness/run.sh")], head, base_root)
     (head / pr.DIR / "row-97-head-only.json").write_text(json.dumps({**good(), "id": "row-97-head-only"}))
-    assert rule.check_pr("Gate: pre-registration row-97-head-only", [("M", "docs/README.md")], head, base_root)
-    assert rule.check_pr("Gate: pre-registration row-97-head-only", [("M", "docs/README.md")], head) == []
+    assert check("Gate: pre-registration row-97-head-only", [("M", "docs/README.md")], head, base_root)
+    assert not any("base branch" in e and "pre-registration" in e for e in check("Gate: pre-registration row-97-head-only", [("M", "docs/README.md")], head))
+
+
+def head_tree(tmp_path, files, name="head"):
+    root = tmp_path / name
+    for rel, text in {"harness/run.sh": "run\n", "orchestrator/ingest/score.py": "score\n", **files}.items():
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(text)
+    return root
+
+
+def test_a_pull_request_that_carries_its_own_scoring_code_is_refused_whatever_the_change_list_says(base_root, tmp_path):
+    merge_base = head_tree(tmp_path, {}, "mb")
+    head = head_tree(tmp_path, {"orchestrator/ingest/score.py": "predicted = measured\n"})
+    errs = check(NOT, [("M", "docs/README.md")], head, base_root, merge_base_root=merge_base)
+    assert any("scoring surface" in e and "orchestrator/ingest/score.py" in e for e in errs)
+    assert any("scoring surface" in e for e in check(CITE, [("M", "harness/run.sh")], head, base_root, merge_base_root=merge_base))
+    same = head_tree(tmp_path, {}, "same")
+    assert not any("scoring surface" in e for e in check(NOT, [("M", "docs/README.md")], same, base_root, merge_base_root=merge_base))
+
+
+EXC = {"pull_request": 7, "head": "a" * 40, "reason": "the distance criterion is unjudged; accepted by hand",
+       "preregistration": "row-99-example", "verdict": "unjudged"}
+DEFECT = "https://github.com/inference-sim/accuracy-dashboard/issues/190"
+
+
+def grant(root, *entries):
+    (root / rule.EXCEPTIONS).parent.mkdir(parents=True, exist_ok=True)
+    (root / rule.EXCEPTIONS).write_text(json.dumps({"kind": "GateExceptions", "exceptions": list(entries)}))
+
+
+def test_a_maintainer_exception_bound_to_a_recorded_evaluation_covers_the_surface(base_root, tmp_path):
+    merge_base = head_tree(tmp_path, {}, "mb")
+    head = head_tree(tmp_path, {"orchestrator/ingest/score.py": "reviewed change\n"})
+    write_ledger(base_root, "unjudged")
+    grant(base_root, EXC)
+    change = [("M", "orchestrator/ingest/score.py")]
+    assert check(CITE, change, head, base_root, merge_base_root=merge_base) == []
+    for other in ({"number": 8}, {"head": "c" * 40}, {"merge_base": "c" * 40}):
+        assert any("scoring surface" in e or "exception" in e for e in check(CITE, change, head, base_root, merge_base_root=merge_base, **other))
+    (head / rule.EXCEPTIONS).parent.mkdir(parents=True, exist_ok=True)
+    grant(head, EXC)
+    (base_root / rule.EXCEPTIONS).unlink()
+    assert any("scoring surface" in e for e in check(CITE, change, head, base_root, merge_base_root=merge_base))
+
+
+@pytest.mark.parametrize("doc", [
+    {"kind": "GateExceptions", "exceptions": [{"pull_request": 7, "head": "a" * 40}]},
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "pull_request": "7"}]},
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "head": "main"}]},
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "reason": "short"}]},
+    {"kind": "GateExceptions", "exceptions": [{k: v for k, v in EXC.items() if k != "preregistration"}]},   # not bound to an evaluation
+    {"kind": "GateExceptions", "exceptions": [{k: v for k, v in EXC.items() if k != "verdict"}]},
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "preregistration": "Not An Id"}]},
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "verdict": "pass"}]},                  # a pass needs no exception
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "verdict": "fail"}]},                  # a fail needs its defect
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "verdict": "fail", "defect": "later"}]},
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "verdict": "fail", "defect": 0}]},
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "verdict": "fail", "defect": "https://example.com/issues/3"}]},
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "defect": 12}]},                       # an unjudged verdict has no defect
+    {"kind": "GateExceptions", "exceptions": [{**EXC, "extra": 1}]},
+    {"kind": "Other", "exceptions": []},
+])
+def test_an_exceptions_file_is_well_formed_where_a_pull_request_adds_it(base_root, tmp_path, doc):
+    head = head_tree(tmp_path, {})
+    (head / rule.EXCEPTIONS).parent.mkdir(parents=True, exist_ok=True)
+    (head / rule.EXCEPTIONS).write_text(json.dumps(doc))
+    errs = check(NOT, [("M", rule.EXCEPTIONS.as_posix())], head, base_root, merge_base_root=head)
+    assert any("GateExceptions" in e for e in errs)                         # a malformed edit fails the rule check
+    for good_entry in (EXC, {**EXC, "verdict": "fail", "defect": 190}, {**EXC, "verdict": "fail", "defect": DEFECT}):
+        grant(head, good_entry)
+        errs = check(NOT, [("M", rule.EXCEPTIONS.as_posix())], head, base_root, merge_base_root=head)
+        assert errs == []                                                   # a valid edit, declared not an accuracy change, passes
+
+
+def test_a_pull_request_that_only_adds_a_valid_exception_lands_with_a_passing_check(base_root, tmp_path):
+    """The reviewed exception needs no evaluation of its own: it takes effect for later pull requests once on base."""
+    (base_root / rule.EXCEPTIONS).unlink(missing_ok=True)
+    merge_base = head_tree(tmp_path, {}, "mb")
+    head = head_tree(tmp_path, {})
+    grant(head, EXC)
+    assert check(NOT, [("A", rule.EXCEPTIONS.as_posix())], head, base_root, merge_base_root=merge_base) == []
+    assert check(NOT, [("M", rule.EXCEPTIONS.as_posix())], head, base_root, merge_base_root=merge_base) == []
+    # the head's document is validated, never consumed: it does not stand in for the pull request's own check
+    assert rule.exceptions(base_root) == [] and rule.exception_for(base_root, 7, "a" * 40) is None
+
+
+def test_an_exception_pull_request_that_also_touches_an_accuracy_path_is_an_accuracy_change(base_root, tmp_path):
+    merge_base = head_tree(tmp_path, {}, "mb")
+    head = head_tree(tmp_path, {})
+    grant(head, EXC)
+    changes = [("M", rule.EXCEPTIONS.as_posix()), ("M", "harness/run.sh")]
+    assert any("must cite a pre-registration" in e for e in check(NOT, changes, head, base_root, merge_base_root=merge_base))
+
+
+def test_a_pull_request_cannot_grant_itself_the_exception_for_its_own_scoring_change(base_root, tmp_path):
+    """Known bad: one pull request changes the scoring surface and adds the exception for its own head."""
+    merge_base = head_tree(tmp_path, {}, "mb")
+    head = head_tree(tmp_path, {"orchestrator/ingest/score.py": "predicted = measured\n"}, "head")
+    (base_root / rule.EXCEPTIONS).unlink(missing_ok=True)
+    write_ledger(base_root, "unjudged")
+    grant(head, EXC)                                                         # on the head only, bound to this head
+    change = [("M", "orchestrator/ingest/score.py"), ("A", rule.EXCEPTIONS.as_posix())]
+    for body in (CITE, NOT):
+        assert any("scoring surface" in e for e in check(body, change, head, base_root, merge_base_root=merge_base)), body
+    # and for a change that moves no surface, the head's exception does not waive the evaluation either
+    assert check(CITE, [("M", "harness/run.sh"), ("A", rule.EXCEPTIONS.as_posix())], head, base_root, merge_base_root=merge_base)
+
+
+@pytest.mark.parametrize("ledger_args,ok", [
+    (dict(verdict="pass"), True),
+    (dict(verdict=None), False),                                  # no evaluation recorded
+    (dict(verdict="unjudged"), False),
+    (dict(verdict="fail"), False),
+    (dict(verdict="pass", head="c" * 40), False),                 # the evaluation scored another head
+    (dict(verdict="pass", base="c" * 40), False),                 # ... or another merge base
+    (dict(verdict="pass", prereg="row-98-other"), False),         # ... or another pre-registration
+])
+def test_a_cited_preregistration_needs_a_passing_evaluation_of_this_head_and_merge_base(base_root, ledger_args, ok):
+    write_ledger(base_root, **ledger_args)
+    errs = check(CITE, [("M", "harness/run.sh")], base_root)
+    assert (errs == []) == ok
+    assert ok or any("evaluat" in e for e in errs)
+
+
+def test_the_evaluation_is_the_base_branchs_ledger_not_the_pull_requests(base_root, tmp_path_factory):
+    head = tmp_path_factory.mktemp("head")
+    (head / "state" / "gate").mkdir(parents=True)
+    write_ledger(head, "pass")
+    (base_root / budget.PATH).unlink()
+    assert check(CITE, [("M", "harness/run.sh")], head, base_root)
+    write_ledger(base_root, None)
+    assert check(CITE, [("M", "state/gate/ledger.json")], head, base_root)
+
+
+def test_an_evaluation_of_an_edited_preregistration_does_not_count(base_root):
+    other = {**good(), "hypothesis": "a different hypothesis than the one that was evaluated"}
+    (base_root / pr.DIR / "row-99-example.json").write_text(json.dumps(other))
+    assert any("evaluation" in e for e in check(CITE, [("M", "harness/run.sh")], base_root))
+
+
+def test_a_ledger_that_cannot_be_read_refuses_rather_than_passes(base_root):
+    (base_root / budget.PATH).write_text("{")
+    assert any("ledger" in e for e in check(CITE, [("M", "harness/run.sh")], base_root))
+    (base_root / budget.PATH).unlink()
+    assert any("ledger" in e for e in check(CITE, [("M", "harness/run.sh")], base_root))
+
+
+def test_a_maintainer_exception_records_a_decision_on_a_held_evaluation(base_root):
+    """VAL-6: an unjudged verdict may be waived on the maintainer's word; a fail only with its defect; a pass needs nothing."""
+    change = [("M", "harness/run.sh")]
+    for verdict, entry in (("unjudged", EXC), ("fail", {**EXC, "verdict": "fail", "defect": DEFECT}),
+                           ("fail", {**EXC, "verdict": "fail", "defect": 190})):
+        write_ledger(base_root, verdict)
+        (base_root / rule.EXCEPTIONS).unlink(missing_ok=True)
+        assert check(CITE, change, base_root)
+        grant(base_root, entry)
+        assert check(CITE, change, base_root) == []
+        assert check(CITE, change, base_root, head="c" * 40)
+        assert check(CITE, change, base_root, number=8)
+
+
+def test_an_exception_with_no_recorded_evaluation_does_not_pass(base_root):
+    """The exception never replaces the evaluation (the case the review found: an empty ledger and an exception passed)."""
+    write_ledger(base_root, None)
+    grant(base_root, EXC)
+    errs = check(CITE, [("M", "harness/run.sh")], base_root)
+    assert any("exception" in e and "evaluation" in e for e in errs)
+    grant(base_root, {**EXC, "verdict": "fail", "defect": DEFECT})
+    assert check(CITE, [("M", "harness/run.sh")], base_root)
+    (base_root / budget.PATH).unlink()
+    assert check(CITE, [("M", "harness/run.sh")], base_root)       # an unreadable ledger holds no evaluation either
+
+
+@pytest.mark.parametrize("ledger_args", [
+    dict(verdict="unjudged", head="c" * 40),                      # the evaluation scored another head
+    dict(verdict="unjudged", base="c" * 40),                      # ... or another merge base
+    dict(verdict="unjudged", prereg="row-98-other"),              # ... or another pre-registration
+])
+def test_an_exception_does_not_cover_an_evaluation_of_another_head_base_or_preregistration(base_root, ledger_args):
+    write_ledger(base_root, **ledger_args)
+    grant(base_root, EXC)
+    assert check(CITE, [("M", "harness/run.sh")], base_root)
+
+
+def test_an_exception_does_not_cover_an_evaluation_of_an_edited_preregistration(base_root):
+    write_ledger(base_root, "unjudged")
+    (base_root / pr.DIR / "row-99-example.json").write_text(json.dumps({**good(), "hypothesis": "a different hypothesis than the evaluated one"}))
+    grant(base_root, EXC)
+    assert check(CITE, [("M", "harness/run.sh")], base_root)
+
+
+def test_an_exception_whose_verdict_is_not_the_ledgers_does_not_pass(base_root):
+    write_ledger(base_root, "fail")
+    grant(base_root, EXC)                                         # states unjudged; the gate returned fail
+    assert any("ledger records fail" in e for e in check(CITE, [("M", "harness/run.sh")], base_root))
+    write_ledger(base_root, "unjudged")
+    grant(base_root, {**EXC, "verdict": "fail", "defect": DEFECT})  # states fail; the gate returned unjudged
+    assert any("ledger records unjudged" in e for e in check(CITE, [("M", "harness/run.sh")], base_root))
+
+
+def test_an_exception_for_a_failing_evaluation_without_a_defect_is_refused(base_root):
+    write_ledger(base_root, "fail")
+    (base_root / rule.EXCEPTIONS).write_text(json.dumps({"kind": "GateExceptions", "exceptions": [{**EXC, "verdict": "fail"}]}))
+    assert check(CITE, [("M", "harness/run.sh")], base_root)
+
+
+def test_an_exception_for_another_preregistration_does_not_cover_this_one(base_root):
+    write_ledger(base_root, "unjudged")
+    grant(base_root, {**EXC, "preregistration": "row-98-other"})
+    assert any("row-98-other" in e for e in check(CITE, [("M", "harness/run.sh")], base_root))
+
+
+def test_an_exception_does_not_waive_the_citation_of_a_preregistration(base_root):
+    write_ledger(base_root, "unjudged")
+    grant(base_root, EXC)
+    assert check(NOT, [("M", "harness/run.sh")], base_root)
+    assert check("Gate: pre-registration row-00-missing", [("M", "harness/run.sh")], base_root)
+
+
+def test_a_passing_evaluation_needs_no_exception_and_an_exception_does_not_cover_the_surface_for_it(base_root, tmp_path):
+    write_ledger(base_root, "pass")
+    assert check(CITE, [("M", "harness/run.sh")], base_root) == []
+    merge_base = head_tree(tmp_path, {}, "mb")
+    head = head_tree(tmp_path, {"orchestrator/ingest/score.py": "changed\n"})
+    grant(base_root, EXC)
+    assert any("scoring surface" in e for e in check(CITE, [("M", "orchestrator/ingest/score.py")], head, base_root, merge_base_root=merge_base))
+
+
+# ---- the gate cannot be weakened by a pull request that calls itself no accuracy change ----
+
+def gate_trees(base_root, tmp_path, edit):
+    """A merge base holding the gate as main has it, and a head that differs by `edit` (path -> new text, None deletes)."""
+    files = {rel: (REPO / rel).read_text() for rel in ("state/gate/accuracy-paths.json", "orchestrator/gate/rule.py", "orchestrator/gate/surface.py")}
+    files["state/gate/exceptions.json"] = json.dumps({"kind": "GateExceptions", "exceptions": []})
+    merge_base = head_tree(tmp_path, files, "mb")
+    head = head_tree(tmp_path, {k: v for k, v in {**files, **edit}.items() if v is not None}, "head")
+    for rel, text in edit.items():
+        if text is None:
+            (head / rel).unlink(missing_ok=True)
+    return merge_base, head
+
+
+@pytest.mark.parametrize("name,rel,edit", [
+    ("deleting a scoring path from the list", "state/gate/accuracy-paths.json",
+     lambda t: json.dumps({"kind": "AccuracyPaths", "paths": [p for p in json.loads(t)["paths"] if p != "harness/"]})),
+    ("weakening rule.py", "orchestrator/gate/rule.py", lambda t: t + "\ndef check_pr(*a, **k):\n    return []\n"),
+    ("weakening surface.py", "orchestrator/gate/surface.py", lambda t: t + "\ndef differing(*a, **k):\n    return []\n"),
+])
+def test_a_pull_request_cannot_weaken_the_gate_by_calling_itself_no_accuracy_change(base_root, tmp_path, name, rel, edit):
+    original = (REPO / rel).read_text()
+    merge_base, head = gate_trees(base_root, tmp_path, {rel: edit(original)})
+    # the change list names the file: the rule needs a citation, which `not an accuracy change` is not
+    errs = check(NOT, [("M", rel)], head, base_root, merge_base_root=merge_base)
+    assert any("must cite a pre-registration" in e for e in errs), name
+    # the change list lies (it names a document only): the trees still differ on the scoring surface
+    errs = check(NOT, [("M", "docs/README.md")], head, base_root, merge_base_root=merge_base)
+    assert any("scoring surface" in e and rel in e for e in errs), name
+    # citing a pre-registration does not help without a recorded evaluation or an exception bound to one
+    write_ledger(base_root, None)
+    assert check(CITE, [("M", rel)], head, base_root, merge_base_root=merge_base), name
+    # an evaluation recorded for this head and merge base plus a bound exception on the base branch lets it land
+    write_ledger(base_root, "unjudged")
+    grant(base_root, EXC)
+    assert check(CITE, [("M", rel)], head, base_root, merge_base_root=merge_base) == [], name
+
+
+def test_the_gate_is_on_the_accuracy_paths():
+    paths = rule.accuracy_paths(REPO)
+    for f in ("state/gate/accuracy-paths.json", "orchestrator/gate/rule.py", "orchestrator/gate/surface.py",
+              "orchestrator/gate/gate.py", ".github/workflows/gate-rule.yml"):
+        assert rule.touches(f, paths), f
+    assert not rule.touches("orchestrator/gate/test_gate_units.py", paths)
+    assert not rule.touches("state/gate/ledger.json", paths) and not rule.touches("state/gate/preregistrations/x.json", paths)
+    assert not rule.touches("state/gate/exceptions.json", paths)             # reviewed data, validated and read from base only
+
+
+def test_the_pull_request_that_adds_a_preregistration_needs_no_evaluation(base_root):
+    write_ledger(base_root, None)
+    new = {**good(), "id": "row-98-new"}
+    head = base_root.parent / "head-new"
+    (head / pr.DIR).mkdir(parents=True)
+    (head / pr.DIR / "row-98-new.json").write_text(json.dumps(new))
+    assert check(NOT, [("A", "state/gate/preregistrations/row-98-new.json")], head, base_root, merge_base_root=head) == []
 
 
 def test_parse_changes_reads_name_status_and_renames():

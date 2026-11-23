@@ -88,8 +88,15 @@ class World:
 H100 = lambda u: u.identity["hardware"] == "h100"  # noqa: E731
 
 
-def test_a_pass_returns_aggregates_and_records_one_evaluation(tmp_path, fake, monkeypatch, capsys):
-    w = World(tmp_path, fake, cand=lambda u: 1.05 if H100(u) else 1.10)
+@pytest.fixture
+def error_only(monkeypatch):
+    """The only way to a `pass` while distance is unjudged: a test-world gate that requires the error criterion alone."""
+    monkeypatch.setattr(pr, "CRITERIA", ("error",))
+    return {"criteria": [{"criterion": "error", "margin": 0.02}]}
+
+
+def test_a_pass_returns_aggregates_and_records_one_evaluation(tmp_path, fake, monkeypatch, capsys, error_only):
+    w = World(tmp_path, fake, cand=lambda u: 1.05 if H100(u) else 1.10, over=error_only)
     code, out, err = w.run(monkeypatch, capsys)
     assert code == 0 and "pass: evaluation 1 of 3" in out
     rep = w.report()
@@ -140,9 +147,9 @@ def test_a_target_lane_that_does_not_improve_fails(tmp_path, fake, monkeypatch, 
     assert w.run(monkeypatch, capsys)[0] == 0 and w.report()["verdict"] == "fail"
 
 
-def test_a_regression_on_units_that_are_not_blind_does_not_change_the_verdict(tmp_path, fake, monkeypatch, capsys):
+def test_a_regression_on_units_that_are_not_blind_does_not_change_the_verdict(tmp_path, fake, monkeypatch, capsys, error_only):
     legacy_keys = {u.role_key for u in fake.units if fake.assigned[u.unit_id].not_blind}
-    w = World(tmp_path, fake, cand=lambda u: (1.50 if u.role_key in legacy_keys else 1.05) if H100(u) else 1.10)
+    w = World(tmp_path, fake, cand=lambda u: (1.50 if u.role_key in legacy_keys else 1.05) if H100(u) else 1.10, over=error_only)
     assert w.run(monkeypatch, capsys)[0] == 0
     rep = w.report()
     assert rep["verdict"] == "pass"
@@ -152,12 +159,17 @@ def test_a_regression_on_units_that_are_not_blind_does_not_change_the_verdict(tm
 
 
 def test_a_criterion_that_cannot_be_judged_gives_unjudged_not_pass(tmp_path, fake, monkeypatch, capsys):
-    over = {"criteria": [{"criterion": "error", "margin": 0.02}, {"criterion": "distance", "margin": 0.02}]}
-    w = World(tmp_path, fake, cand=lambda u: 1.05 if H100(u) else 1.10, over=over)
+    w = World(tmp_path, fake, cand=lambda u: 1.05 if H100(u) else 1.10)
     assert w.run(monkeypatch, capsys)[0] == 0
     rep = w.report()
     assert rep["verdict"] == "unjudged" and rep["target_unjudged"]
     assert all(r["criterion"] == "error" for l in rep["lanes"] for r in l["results"])
+
+
+def test_a_preregistration_that_omits_a_criterion_is_not_evaluated(tmp_path, fake, monkeypatch, capsys):
+    w = World(tmp_path, fake, cand=lambda u: 1.05 if H100(u) else 1.10, over={"criteria": [{"criterion": "error", "margin": 0.02}]})
+    code, *_ = w.run(monkeypatch, capsys)
+    assert "exactly one of each of error, distance" in str(code) and not w.out.exists()
 
 
 def test_lanes_are_named_by_their_shared_fields_and_never_list_their_members(tmp_path, fake, monkeypatch, capsys):
@@ -365,11 +377,12 @@ def test_check_commands_report_problems_with_a_nonzero_exit(tmp_path, capsys):
 
 def test_check_pr_reads_the_body_and_the_changes(tmp_path):
     body, ch = tmp_path / "body.md", tmp_path / "changes.txt"
+    land = ["--pr-number", "7", "--head-sha", "a" * 40, "--merge-base", "b" * 40, "--merge-base-root", str(HERE.parent.parent)]
     body.write_text("Summary\n\nGate: not an accuracy change - documentation only\n")
     ch.write_text("M\tdocs/README.md\n")
-    assert gate.main(["check-pr", "--body-file", str(body), "--changes-file", str(ch), "--root", str(HERE.parent.parent)]) == 0
+    assert gate.main(["check-pr", "--body-file", str(body), "--changes-file", str(ch), "--root", str(HERE.parent.parent), *land]) == 0
     ch.write_text("M\tharness/run.sh\n")
-    assert gate.main(["check-pr", "--body-file", str(body), "--changes-file", str(ch), "--root", str(HERE.parent.parent)]) == 1
+    assert gate.main(["check-pr", "--body-file", str(body), "--changes-file", str(ch), "--root", str(HERE.parent.parent), *land]) == 1
 
 
 def _contract(directory: Path, fake, held_ids=None):

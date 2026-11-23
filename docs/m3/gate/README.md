@@ -21,13 +21,91 @@ Gate: not an accuracy change - <reason of at least 10 characters>
 A change to a path listed in `state/gate/accuracy-paths.json` moves published accuracy. It must cite a
 pre-registration, and the pre-registration must already be on `main`: it is committed first, and it is never
 edited, renamed or deleted afterwards. A pre-registration added by a pull request is checked to be well
-formed; the pull request that adds it cites `not an accuracy change`. The workflow `gate-rule.yml` checks all
-of this on every pull request, with no secret, and it runs the base branch's checker (and reads the base
-branch's list of accuracy paths), so a pull request cannot loosen the rule it is judged by.
+formed; the pull request that adds it cites `not an accuracy change` and needs no evaluation. A pull request
+that cites a pre-registration must also show that the gate evaluated it and passed it: `state/gate/ledger.json`
+on `main` must hold an evaluation of that pre-registration (the same SHA-256) with verdict `pass`, whose
+candidate is the pull request's head commit and whose base is its merge base with `main`. A merged change
+therefore always has a recorded passing run of exactly its commits, or a maintainer exception (below). The workflow `gate-rule.yml` checks all of this on every pull request, with no secret. It is a
+`pull_request_target` workflow, so GitHub reads it from the base branch and a pull request cannot replace it; it
+checks out only the base branch and runs the base branch's checker, reading the base branch's list of accuracy
+paths, so a pull request cannot loosen the rule it is judged by. It never checks out or executes the pull
+request's code: the body and the changed-file list come from the API (`gh api`), and the head's and the merge base's
+trees are unpacked from the API's tarballs outside the checkout and read only as data (hashed, or parsed as JSON for a
+pre-registration or an exceptions file). Its permissions are `contents: read` and `pull-requests: read`.
+`orchestrator/gate/test_gate_workflow.py` fails if the trigger is anything but `pull_request_target`, if there is more
+than one checkout or one that is not of the base ref, or if the workflow holds a secret, a write permission or a
+command that brings head code in. The job and check names are unchanged (`gate-rule / rule`).
 
-The list of accuracy paths is a conservative first draft for a maintainer to review: the pin file, the
-harness, and the three scorer modules. A change that moves accuracy by a path the list misses is not caught
-by the rule; it is caught by review, and the fix is to add the path to the list.
+The list of accuracy paths is the whole scoring surface plus the gate itself, as directory rules: the pin file,
+the three gate workflows, `harness/`, `orchestrator/ingest/`, `orchestrator/baseline/`, `schemas/`, the top-level
+`orchestrator` modules and data files the candidate run imports or reads, and the gate's own policy and checker:
+`state/gate/accuracy-paths.json` and `orchestrator/gate/`. A test module
+(`test_*.py`) is the one exclusion; the scorer imports none, and the checker's tests are not the checker.
+`orchestrator/gate/test_gate_surface.py` fails when a file the candidate run
+executes (the import closure of `harness/run.sh`'s scorer, `freeze.py` and `resolve_agentic_corpus.py`) or reads is
+outside the list, so a new scoring module cannot slip past it. `state/gate/ledger.json` and the
+pre-registrations are data the gate commits after the fact and are not on the list. So is
+`state/gate/exceptions.json` (see below).
+
+**A change to the gate itself is an accuracy change.** A pull request that deletes a path from the list or weakens
+`rule.py` or `surface.py` cannot say `Gate: not an accuracy change`: it must cite a pre-registration, and that needs
+a recorded evaluation of its head and merge base or a maintainer exception bound to one (below) already on the base
+branch. Otherwise every later pull request would be judged by the weakened `main`. A change the gate cannot
+evaluate lands the same way: through a maintainer exception that an earlier, reviewed pull request put on `main`,
+with every required check green. Nothing is merged by bypassing the required check.
+
+**Exceptions land by a normal pull request.** `state/gate/exceptions.json` is not an accuracy path, so a pull
+request that edits only that file may state `Gate: not an accuracy change - <reason>` and passes the required
+check when the head document is a well-formed `GateExceptions` document (no unknown fields; each entry has the
+shape and the verdict and defect rules below). A malformed edit fails the check. Exceptions are read only from the
+base branch: the head's version is validated and never used to satisfy the pull request's own check, so a single
+pull request that changes the scoring surface and adds an exception for its own head still fails. The
+exception takes effect for later pull requests once its pull request is on `main`; the maintainer reviews it like
+any other change. A pull request that edits `exceptions.json` and also touches an accuracy path is an accuracy
+change and is judged as one.
+
+### The candidate scores with main's code
+
+A candidate run executes the candidate's own harness, scorer and workflows, so the gate must know they are
+main's. `surface.py` hashes the scoring surface of a checkout: every file under the accuracy paths, without
+test modules and without `.github/stack-pins.env` (the simulator pin differs between the two sides by design;
+`check-binding` ties each side to its own pin), a symlink by its target. `gate-candidate.yml` records the hash
+(`surface.sha256`). It is never trusted from the artifact:
+
+* `whole-run-gate.yml` downloads each commit's tree through the API, recomputes the hash and refuses a run
+  that records another one, then refuses unless the candidate's hash equals the base's.
+* `gate-rule.yml` compares the merge base's tree with the head's, from the base branch's list of paths, and
+  refuses a pull request whose trees differ, whatever its change list says.
+
+So a pull request that edits scoring code does not reach an evaluation on its own. A maintainer exception
+covers it, and an exception records a decision on a held evaluation; it never replaces one (VAL-6).
+`state/gate/exceptions.json` (kind `GateExceptions`) on `main` holds entries
+
+```json
+{"pull_request": 170, "head": "<40 hex>", "reason": "<at least 10 characters>",
+ "preregistration": "<the evaluated pre-registration's id>", "verdict": "unjudged"}
+```
+
+with `"verdict": "fail"` and a `"defect": <issue number or the URL of a GitHub issue>` when the evaluation failed.
+Entries are read strictly (an unknown field is refused). `gate-rule` lets an exception stand in for a passing
+evaluation, or for the surface check, only when `state/gate/ledger.json` on `main` holds an evaluation of the
+pull request's cited pre-registration (the same id and SHA-256) whose candidate is the pull request's head and whose
+base is its merge base now, and the entry's `verdict` is that evaluation's verdict. With no such evaluation the exception does not make the
+check pass. Only `unjudged` is waived on the maintainer's word; a `fail` also needs the defect it was traced to
+another term for (VAL-11), checked here for shape only; a `pass` needs no exception. An exception covers that
+pull request at that head only, so any new push voids a recorded evaluation and its exception. It is read from
+the base branch, never from the pull request, so it is added by its own reviewed pull request that merges first.
+`whole-run-gate.yml` still asks only whether an entry names the pull request and head before it will score a
+candidate whose surface differs from main's (no evaluation exists yet at that point), so for such a change the
+sequence is: commit an entry with `"verdict": "unjudged"` (the verdict the gate returns until the distance
+criterion is judged), evaluate, commit the ledger, and, if the gate returned `fail` instead, replace the entry with
+one that carries the defect. It does not waive the pre-registration, which must still be cited and on `main`.
+The one proof implemented is the tree hash being equal to main's; "the harness commit is an ancestor of main"
+is not.
+
+Because the workflow runs from the base branch, a pull request that edits `gate-rule.yml` changes only its own
+diff: the check that judges it is still main's. The workflow file is also on the accuracy paths, so editing it needs
+a recorded evaluation or an exception bound to one.
 
 ## The pre-registration
 
@@ -50,6 +128,8 @@ by the rule; it is caught by review, and the fix is to add the path to the list.
 }
 ```
 
+* A pre-registration lists exactly one `error` and exactly one `distance` criterion (VAL-6). One that omits
+  either is refused, so an omitted criterion cannot turn unjudged evidence into a pass.
 * A target lane names any of `engine`, `modelled_commit`, `chip`, `model`, `layout` (the deployment's
   configuration hash). A lane the pattern does not name is a guard lane.
 * A target lane passes when the candidate's error is no worse than the base's, tested against "the
@@ -58,7 +138,8 @@ by the rule; it is caught by review, and the fix is to add the path to the list.
   resamples over role keys (the unit of independence), with the Holm correction at 0.05 over all tests of the
   evaluation.
 * The distance criterion is recorded but judged only when per-request samples exist; today it comes back
-  `unjudged`. A verdict is `pass`, `fail` or `unjudged`.
+  `unjudged`, and with it every verdict that is not a `fail`. Until it is judged, no evaluation returns `pass`, and
+  a change lands only by the maintainer exception below. A verdict is `pass`, `fail` or `unjudged`.
 * A margin above the invariant registry's ceiling (recorded in the ledger) is refused. The ceiling is
   `null` in the ledger today, so the gate refuses every evaluation until a maintainer copies the registry's
   values into it.
@@ -100,6 +181,14 @@ evaluations cannot be spent against one count.
    the same ledger: the held-out partition is one thing for both. The simulator, engine, vLLM ref, field-table,
    pull-manifest and corpus provenance are bound that way and left out of the harness digest; the units, pull
    date, ingest and everything else must still agree.
+
+5. A maintainer commits the run's `ledger.json` artifact to `main` (one pull request, which cites `not an accuracy
+   change`). Only then does `gate-rule` pass for the evaluated pull request: it reads the ledger from the tip of
+   `main`, and re-running the check after that commit sees it. The ledger commit moves the tip of `main` but not
+   the pull request's merge base, so the evaluation still binds. A new push to the pull request, or a merge of
+   `main` into it, changes the head or the merge base, and the change needs a new evaluation. Because the
+   distance criterion is unjudged today, the verdict is not `pass` yet; until it is, the change lands through a
+   maintainer exception that names its pull request and head and records the `unjudged` verdict of its evaluation.
 
 Lanes with fewer than 10 role keys are merged on (engine, commit, chip), then on (engine, commit), and
 otherwise only counted. A merged lane is named only by the fields its members share; a regression confined to
@@ -149,8 +238,13 @@ What the proposal leaves open, for the maintainer:
 
 ## Maintainer steps
 
-* **A1, merge.** Review and merge this change. Add `gate-rule` as a required check if the rule should block.
-  Review `state/gate/accuracy-paths.json`.
+* **A1, merge, and require the check.** Review and merge this change. `gate-rule` is a `pull_request_target`
+  workflow, so it runs from the base branch only once this change is on `main` (the run on this pull request's
+  own head cannot use it). **It is not yet required:** the active ruleset `main protection` requires only
+  `orchestrator`, `grep-clean` and `web`, with no required-workflow rule and no parent ruleset, so until a
+  maintainer adds the status context `rule` (the job `rule` of workflow `gate-rule`, shown as `gate-rule / rule`)
+  to that ruleset, the rule reports and does not block. Base code makes the check trustworthy; only the ruleset
+  makes it mandatory, and no code in this repository can set it. Review `state/gate/accuracy-paths.json`.
 * **A3, secret and dispatch.** Provision the environment `ledger` with the secret `LEDGER_SEED` (the 32-byte
   seed, in hex, whose SHA-256 `ledger.yaml` records) and restrict the environment to `main`. Dispatch
   `whole-run-gate.yml` on `main`. The workflow reads the secret by name in one step only. The agent never holds
