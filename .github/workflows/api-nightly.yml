@@ -130,8 +130,11 @@ jobs:
         with:
           python-version: "3.13"
       - run: pip install --quiet --require-hashes -r requirements-ci.txt
+      # A failed install only means the scoring step below cannot read the parquet and keeps the committed configiq files.
       - name: Install what the configiq export reads (parquet)
         if: ${{ needs.resolve.outputs.configiq == 'true' }}
+        continue-on-error: true
+        timeout-minutes: 10
         run: pip install --quiet --require-hashes -r requirements-ci.txt -r requirements-configiq.txt
 
       # The ONLY thing cached across runs: the agentic artifact-download zips, keyed by artifact id
@@ -288,37 +291,75 @@ jobs:
       # Score the configiq anchor units with the build, substrate, engine field list and harness commit this night just used
       # (resolve_blis.sh output `configiq`: the newest release's first night, or a preview that asked), as score-configiq.yml does.
       # configiq_night.py writes into a scratch directory; only when it wrote BOTH derived files do they replace the committed
-      # ones, so the classes page and the Sources tab can never come from different builds. A failure keeps the committed pair and
-      # says so; it never fails the night.
+      # ones, and the replacement is all or nothing: both new files are staged beside their destinations, the old pair is kept,
+      # and any failure while swapping puts the old pair back (or, if even that fails, removes both: a page with no configiq row
+      # beats one whose class file and funnel come from different builds). Nothing in this step can fail the night: no `set -e`,
+      # every command is checked, the scorer runs under a timeout, and the step ends 0 with a warning when it did not rescore.
       - name: Score configiq with the night's build
         if: ${{ needs.resolve.outputs.configiq == 'true' }}
         continue-on-error: true
+        timeout-minutes: 50
         env:
           BLIS_TAG: ${{ needs.resolve.outputs.blis_tags }}
         run: |
-          set -euo pipefail
+          set -u
           SIM="$RUNNER_TEMP/sim"
           OUT="$RUNNER_TEMP/configiq"
-          rm -rf "$OUT"
-          eval "$(python3 orchestrator/resolve_stack.py "$SIM")"
-          if [ "${substrate_embedded:-}" != true ]; then
-            echo "::warning title=configiq not rescored::$BLIS_TAG keeps its substrate outside its tree; the committed configiq files stand"
-            exit 0
-          fi
-          SUBSTRATE_DIR="$SIM/substrate"
-          if python3 orchestrator/nightly/configiq_night.py \
-              --substrate "$SUBSTRATE_DIR" --blis "$SIM/blis" \
-              --catalog "$SUBSTRATE_DIR/catalog" --registry "$SUBSTRATE_DIR/registry" \
-              --fields "$RUNNER_TEMP/fields.json" --substrate-version "$substrate_version" --substrate-commit "$substrate_commit" \
-              --sim-build "$BLIS_TAG" --harness-commit "$GITHUB_SHA" --workers 2 --out "$OUT" \
-            && [ -s "$OUT/classes/configiq.json" ] && [ -s "$OUT/funnel.json" ]; then
-            mkdir -p data/supplemental/classes data/supplemental/funnels
-            cp "$OUT/classes/configiq.json" data/supplemental/classes/configiq.json
-            cp "$OUT/funnel.json" data/supplemental/funnels/configiq.json
+          CLS=data/supplemental/classes/configiq.json
+          FUN=data/supplemental/funnels/configiq.json
+          warn() { echo "::warning title=configiq not rescored::$1"; }
+
+          restore() {
+            if [ "$HAD" = 1 ] && cp -f "$OUT/old-class" "$CLS" && cp -f "$OUT/old-funnel" "$FUN"; then return 0; fi
+            rm -f "$CLS" "$FUN"
+            return 1
+          }
+          swap_pair() {
+            HAD=0; [ -f "$CLS" ] && [ -f "$FUN" ] && HAD=1
+            rm -f "$CLS.new" "$FUN.new"
+            mkdir -p data/supplemental/classes data/supplemental/funnels || return 1
+            cp "$OUT/classes/configiq.json" "$CLS.new" || return 1
+            cp "$OUT/funnel.json" "$FUN.new" || return 1
+            if [ "$HAD" = 1 ]; then
+              cp "$CLS" "$OUT/old-class" || return 1
+              cp "$FUN" "$OUT/old-funnel" || return 1
+            fi
+            mv -f "$CLS.new" "$CLS" || return 1
+            mv -f "$FUN.new" "$FUN" || return 2
+          }
+          rescore() {
+            rm -rf "$OUT"
+            eval "$(python3 orchestrator/resolve_stack.py "$SIM")" || return 1
+            if [ "${substrate_embedded:-}" != true ]; then
+              warn "$BLIS_TAG keeps its substrate outside its tree; the committed configiq files stand"
+              return 0
+            fi
+            SUBSTRATE_DIR="$SIM/substrate"
+            T=""; command -v timeout >/dev/null 2>&1 && T="timeout 40m"
+            $T python3 orchestrator/nightly/configiq_night.py \
+                --substrate "$SUBSTRATE_DIR" --blis "$SIM/blis" \
+                --catalog "$SUBSTRATE_DIR/catalog" --registry "$SUBSTRATE_DIR/registry" \
+                --fields "$RUNNER_TEMP/fields.json" --substrate-version "$substrate_version" --substrate-commit "$substrate_commit" \
+                --sim-build "$BLIS_TAG" --harness-commit "$GITHUB_SHA" --workers 2 --out "$OUT" || return 1
+            [ -s "$OUT/classes/configiq.json" ] && [ -s "$OUT/funnel.json" ] || return 1
+            swap_pair
+            rc=$?
+            if [ "$rc" != 0 ]; then
+              rm -f "$CLS.new" "$FUN.new"
+              if restore; then
+                warn "replacing the configiq pair with the $BLIS_TAG build failed; the committed pair was put back"
+              else
+                warn "replacing the configiq pair with the $BLIS_TAG build failed and the old pair could not be put back; both files were removed so the classes page and the Sources tab show no configiq row"
+              fi
+              return 0
+            fi
             echo "configiq rescored with $BLIS_TAG"
-          else
-            echo "::warning title=configiq not rescored::scoring with $BLIS_TAG failed or wrote only part of its output; the committed configiq files stand and now describe an older build"
+          }
+          if ! rescore; then
+            rm -f "$CLS.new" "$FUN.new"
+            warn "scoring with $BLIS_TAG failed or wrote only part of its output; the committed configiq files stand and now describe an older build"
           fi
+          exit 0
 
       - name: Build the classes page data from the night's summary and the committed derived files
         run: |

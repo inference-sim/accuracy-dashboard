@@ -125,8 +125,10 @@ def _workflow_step(name):
     return steps[0]
 
 
-def _run_step(tmp_path, mode, embedded="true"):
-    """Run the step's script in a scratch repo whose scorer is a stub that writes what `mode` says."""
+def _run_step(tmp_path, mode, embedded="true", fail_at=None, sticky=False):
+    """Run the step's script in a scratch repo whose scorer is a stub that writes what `mode` says. With `fail_at=N` the Nth
+    `cp`/`mv` the script runs fails (and every later one too when `sticky`), the way a full disk or a bad mount would."""
+    import shutil
     import os
     import subprocess
     repo = tmp_path / "repo"
@@ -151,9 +153,26 @@ def _run_step(tmp_path, mode, embedded="true"):
     script = tmp_path / "step.sh"
     script.write_text(_workflow_step("Score configiq with the night's build")["run"])
     env = {**os.environ, "RUNNER_TEMP": str(tmp_path / "tmp"), "GITHUB_SHA": "h" * 40, "BLIS_TAG": "v9.9.9"}
+    if fail_at is not None:
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        counter = tmp_path / "calls"
+        counter.write_text("0")
+        for tool in ("cp", "mv"):
+            stub = bin_dir / tool
+            stub.write_text(
+                "#!/bin/bash\n"
+                f"n=$(( $(cat {counter}) + 1 )); echo $n > {counter}\n"
+                f"if [ $n -eq {fail_at} ] || {{ [ {int(sticky)} = 1 ] && [ $n -gt {fail_at} ]; }}; then exit 1; fi\n"
+                f"exec {shutil.which(tool)} \"$@\"\n")
+            stub.chmod(0o755)
+        env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
     r = subprocess.run(["bash", str(script)], cwd=repo, env=env, capture_output=True, text=True)
-    cls = (repo / "data/supplemental/classes/configiq.json").read_text()
-    fun = (repo / "data/supplemental/funnels/configiq.json").read_text()
+    read = lambda f: (repo / f).read_text() if (repo / f).exists() else None
+    cls = read("data/supplemental/classes/configiq.json")
+    fun = read("data/supplemental/funnels/configiq.json")
+    leftovers = sorted(q.name for q in (repo / "data").rglob("*.new"))
+    assert not leftovers, leftovers
     return r, cls, fun
 
 
@@ -173,6 +192,33 @@ def test_a_failed_or_partial_score_keeps_the_committed_pair_and_warns(tmp_path, 
     assert "::warning title=configiq not rescored" in r.stdout
 
 
+@pytest.mark.parametrize("sticky", [False, True])
+@pytest.mark.parametrize("fail_at", range(1, 11))
+def test_a_failure_anywhere_in_the_replacement_never_leaves_a_mixed_pair_and_never_fails_the_step(tmp_path, fail_at, sticky):
+    # The review's case is fail_at=6 (the first copy or move succeeds, the second fails). Whatever call fails, and whether
+    # the failure persists into the restore, the pair is wholly new, wholly old, or wholly absent; the step exits 0.
+    r, cls, fun = _run_step(tmp_path, "both", fail_at=fail_at, sticky=sticky)
+    assert r.returncode == 0, r.stderr
+    assert (cls, fun) in {("NEW-CLASS", "NEW-FUNNEL"), ("OLD-CLASS", "OLD-FUNNEL"), (None, None)}, (cls, fun)
+    if (cls, fun) != ("NEW-CLASS", "NEW-FUNNEL"):
+        assert "::warning title=configiq not rescored" in r.stdout
+
+
+def test_a_failure_on_the_second_replacement_puts_the_committed_pair_back(tmp_path):
+    # 4 copies stage and back up, the 5th call moves the class file in, the 6th is the funnel move that fails.
+    r, cls, fun = _run_step(tmp_path, "both", fail_at=6)
+    assert r.returncode == 0, r.stderr
+    assert (cls, fun) == ("OLD-CLASS", "OLD-FUNNEL")
+    assert "the committed pair was put back" in r.stdout
+
+
+def test_a_failure_that_also_breaks_the_restore_removes_both_files(tmp_path):
+    r, cls, fun = _run_step(tmp_path, "both", fail_at=6, sticky=True)
+    assert r.returncode == 0, r.stderr
+    assert (cls, fun) == (None, None)
+    assert "both files were removed" in r.stdout
+
+
 def test_a_build_with_its_substrate_outside_its_tree_is_skipped_with_a_warning(tmp_path):
     r, cls, fun = _run_step(tmp_path, "both", embedded="false")
     assert r.returncode == 0, r.stderr
@@ -184,7 +230,12 @@ def test_workflow_scores_configiq_only_when_resolve_says_so_and_later_steps_read
     step = _workflow_step("Score configiq with the night's build")
     assert step["if"].replace(" ", "") == "${{needs.resolve.outputs.configiq=='true'}}"
     assert step["continue-on-error"] is True
-    assert _workflow_step("Install what the configiq export reads (parquet)")["if"] == step["if"]
+    install = _workflow_step("Install what the configiq export reads (parquet)")
+    assert install["if"] == step["if"]
+    # neither configiq step can fail the night, nor hold it past a bound
+    assert install["continue-on-error"] is True and install["timeout-minutes"] <= 10
+    assert step["timeout-minutes"] <= 60
+    assert "set -e" not in step["run"] and step["run"].rstrip().endswith("exit 0")
     for later in ("Build the classes page data from the night's summary and the committed derived files",
                   "Build the Sources tab data (funnel.json) from the night's contract and the ledger"):
         # the files the classes page and the Sources tab read are the committed pair, never a scratch copy
