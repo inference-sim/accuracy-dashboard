@@ -201,7 +201,6 @@ def test_content_hash_ignores_when_and_how_the_extract_was_cut_and_nothing_else(
     a, b = make_extract(tmp_path / "a"), make_extract(tmp_path / "b", pulled_at="2027-01-01T00:00:00Z")
     assert dx.content_sha256(a) == dx.content_sha256(b)
     m = json.loads((b / "manifest.json").read_text())
-    m["base_models"] = {"other": 1}
     m["source"] = "elsewhere"
     (b / "manifest.json").write_text(json.dumps(m))
     assert dx.content_sha256(a) == dx.content_sha256(b)
@@ -210,6 +209,19 @@ def test_content_hash_ignores_when_and_how_the_extract_was_cut_and_nothing_else(
     assert dx.content_sha256(a) != dx.content_sha256(b)
     c = make_extract(tmp_path / "c", logs=("log one\n", "log two\n"))
     assert dx.content_sha256(a) != dx.content_sha256(c)         # a log that differs only by a CR is another extract
+
+
+def test_content_hash_covers_base_models_because_scoring_reads_them(tmp_path):
+    """A lookup_failed (or an edited base_model) turns a point into a G5 refusal, so two extracts that differ only there
+    must not both match one pin."""
+    a, b = make_extract(tmp_path / "a"), make_extract(tmp_path / "b")
+    m = json.loads((b / "manifest.json").read_text())
+    for changed in ({"org/m": "org/base"}, {"org/m": {"lookup_failed": "HTTP 429"}}):
+        m["base_models"] = changed
+        (b / "manifest.json").write_text(json.dumps(m))
+        assert dx.content_sha256(a) != dx.content_sha256(b)
+    assert not dx.verify(a, pin_for(a))
+    assert dx.verify(b, pin_for(a))
 
 
 def test_verify_passes_an_intact_extract(tmp_path):

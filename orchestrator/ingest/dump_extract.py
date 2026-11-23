@@ -67,7 +67,9 @@ LANE_FRAMEWORKS = ("vllm", "sglang")
 EXCLUDED_HARDWARE_PREFIX = "mi"
 SELECTED_TYPE = "single_turn"
 # Fields of manifest.json that say when or how the extract was cut, not what it holds: left out of the content hash.
-VOLATILE = ("pulled_at", "base_models", "source")
+# base_models is not one of them: scoring reads it (a lookup_failed entry is a G5 refusal), so a re-cut whose hub lookups
+# differ from the pinned ones is another extract and must fail verify, not be cached under the pin.
+VOLATILE = ("pulled_at", "source")
 TABLES = ("benchmark_results", "configs", "server_logs", "workflow_runs")
 
 
@@ -740,7 +742,8 @@ def write_extract(out: Path, points: list[dict], pin: dict, lg, bases: dict, pul
 # ---------------------------------------------------------------- hashes and verification
 def content_sha256(extract: Path) -> str:
     """sha256 of the manifest without the fields that say when or how it was cut (VOLATILE). The manifest holds each frozen
-    file's sha256, so this covers every byte the score reads; `check_files` ties the files on disk to those."""
+    file's sha256 and the frozen base_models, so this covers every input the score reads; `check_files` ties the files on
+    disk to those."""
     m = json.loads((Path(extract) / "manifest.json").read_text())
     for k in VOLATILE:
         m.pop(k, None)
