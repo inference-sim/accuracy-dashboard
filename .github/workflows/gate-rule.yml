@@ -38,6 +38,10 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.13"
+      # The base checker imports numpy through gate.py. The pinned requirements are the base branch's own, never
+      # the pull request's, so a pull request cannot choose the packages its own check runs on.
+      - run: pip install --quiet --require-hashes -r requirements-ci.txt
+        working-directory: base
       - name: Check the pull request against the rule
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
