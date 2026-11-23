@@ -1,139 +1,71 @@
 /**
- * The sources page: one card per anchor source (InferenceX with its vLLM and SGLang lanes apart, configiq), each with its funnel,
- * its scored count and the reason of every unit not scored; the training-only sources as labelled training diagnostics, never
- * accuracy; and a loud note where ledger.yaml disagrees with design D9. The numbers are the published funnel.json's.
+ * The sources page: one table, a row per anchor source (InferenceX's vLLM and SGLang lanes follow it as their own rows), with
+ * how many units it holds, how many are scored and why the rest are not. The rows come from funnel.json (sourceRows); the
+ * columns are the COLUMNS list below, so a new column is one entry. A source with no units is still a row.
  */
+import type { ReactNode } from 'react'
 import { formatCount } from '../format'
-import { unscoredReasons, type Funnel, type FunnelDoc, type FunnelLane, type TrainingFunnel } from '../sources'
+import { sourceRows, unscoredReasons, type FunnelDoc, type SourceRow } from '../sources'
 
-const STAGES: [keyof FunnelLane['stages'], string][] = [
-  ['rows_held', 'rows held'],
-  ['units', 'anchor units'],
-  ['in_scope', 'in scope'],
-  ['recoverable', 'recoverable (a floor)'],
-  ['scored', 'scored'],
+interface Column {
+  key: string
+  header: string
+  num?: boolean
+  cell: (r: SourceRow) => ReactNode
+}
+
+const notScored = (r: SourceRow) => unscoredReasons(r).reduce((n, x) => n + x.units, 0)
+
+const COLUMNS: Column[] = [
+  { key: 'source', header: 'Source', cell: (r) => (r.lane ? <span style={{ paddingLeft: 16 }}>{r.lane} engine</span> : r.source) },
+  { key: 'role', header: 'Role', cell: (r) => r.role ?? '' },
+  { key: 'units', header: 'Units', num: true, cell: (r) => formatCount(r.stages.units) },
+  { key: 'in_scope', header: 'In scope', num: true, cell: (r) => formatCount(r.stages.in_scope) },
+  { key: 'scored', header: 'Scored', num: true, cell: (r) => formatCount(r.stages.scored) },
+  { key: 'not_scored', header: 'Not scored', num: true, cell: (r) => formatCount(notScored(r)) },
+  { key: 'main_reason', header: 'Main reason not scored', cell: (r) => {
+    const top = unscoredReasons(r)[0]
+    return top ? <><code>{top.reason}</code> ({formatCount(top.units)})</> : 'none'
+  } },
 ]
 
-function StageTable({ lane }: { lane: Pick<FunnelLane, 'stages' | 'scored_by_grade'> }) {
+function Reasons({ rows }: { rows: SourceRow[] }) {
+  const all = rows.flatMap((r) => unscoredReasons(r).map((x) => ({ ...x, where: r.lane ? `${r.source}, ${r.lane}` : r.source, id: r.id })))
+  if (all.length === 0) return null
   return (
-    <table className="slices">
-      <thead>
-        <tr>
-          <th>Stage</th>
-          <th className="num">Units</th>
-        </tr>
-      </thead>
-      <tbody>
-        {STAGES.map(([k, label]) => (
-          <tr key={k}>
-            <td>{label}</td>
-            <td className="num">{lane.stages[k] == null ? 'not probed' : formatCount(lane.stages[k] as number)}</td>
+    <details className="about">
+      <summary>All reasons units were not scored</summary>
+      <table className="slices">
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Stage</th>
+            <th>Reason</th>
+            <th className="num">Units</th>
           </tr>
-        ))}
-        {Object.entries(lane.scored_by_grade).map(([g, n]) => (
-          <tr key={g}>
-            <td>{`scored ${g}`}</td>
-            <td className="num">{formatCount(n)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
-}
-
-function Reasons({ lane }: { lane: Parameters<typeof unscoredReasons>[0] }) {
-  const rows = unscoredReasons(lane)
-  if (rows.length === 0) return <p className="stat-hint">Every in-scope unit is scored.</p>
-  return (
-    <table className="slices">
-      <thead>
-        <tr>
-          <th>Not scored</th>
-          <th>Reason</th>
-          <th className="num">Units</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr key={`${r.part}/${r.reason}`}>
-            <td>{r.part}</td>
-            <td>
-              <code>{r.reason}</code>
-            </td>
-            <td className="num">{formatCount(r.units)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
-}
-
-function SourceCard({ f }: { f: Funnel }) {
-  const s = f.stages
-  const lanes = Object.entries(f.lanes ?? {})
-  return (
-    <section className="classcard" id={`source-${f.source}`} aria-labelledby={`source-${f.source}-h`}>
-      <h2 className="sectitle" id={`source-${f.source}-h`}>
-        {f.source}
-        <span className="pill classtag"> anchor source</span>
-      </h2>
-      <p className="context">{`Anchor rule: ${f.anchor_rule}.`}</p>
-      <div className="stats">
-        <div className="stat">
-          <div className="stat-value">{formatCount(s.scored)}</div>
-          <div className="stat-label">scored</div>
-          <div className="stat-hint">{`of ${formatCount(s.in_scope)} in-scope anchor units (${formatCount(s.units)} anchor units)`}</div>
-        </div>
-        {f.provisional.units > 0 ? (
-          <div className="stat">
-            <div className="stat-value">{formatCount(f.provisional.units)}</div>
-            <div className="stat-label">provisional</div>
-            <div className="stat-hint">scored by simulation, capped at G3 (COV-7): still anchor units, shown apart from the scored count and the headline</div>
-          </div>
-        ) : null}
-      </div>
-      {Object.keys(f.not_anchor).length > 0 ? (
-        <p className="stat-hint">{`Units outside the anchors: ${Object.entries(f.not_anchor).map(([k, v]) => `${k.replace(/_/g, ' ')} ${formatCount(v)}`).join(', ')}.`}</p>
-      ) : null}
-      <StageTable lane={f} />
-      <Reasons lane={f} />
-      {lanes.length > 0 ? (
-        <>
-          <h3 className="subtitle">By engine lane</h3>
-          {lanes.map(([name, l]) => (
-            <div key={name} className="lane" id={`source-${f.source}-lane-${name}`}>
-              <h4>{`${f.source}, ${name} lane`}</h4>
-              <p className="stat-hint">{`${formatCount(l.stages.scored)} scored of ${formatCount(l.stages.in_scope)} in scope (${formatCount(l.stages.units)} units)`}</p>
-              <Reasons lane={l} />
-            </div>
+        </thead>
+        <tbody>
+          {all.map((x) => (
+            <tr key={`${x.id}/${x.part}/${x.reason}`}>
+              <td>{x.where}</td>
+              <td>{x.part}</td>
+              <td>
+                <code>{x.reason}</code>
+              </td>
+              <td className="num">{formatCount(x.units)}</td>
+            </tr>
           ))}
-        </>
-      ) : null}
-    </section>
-  )
-}
-
-function TrainingCard({ t }: { t: TrainingFunnel }) {
-  return (
-    <section className="classcard kind-provisional" id={`training-${t.source}`}>
-      <h3 className="sectitle">
-        {t.source}
-        <span className="pill classtag"> training only</span>
-      </h3>
-      <p className="context">{`${t.label}. ${formatCount(t.stages.units)} units from ${formatCount(t.stages.rows_held)} rows. No accuracy is reported for this source.`}</p>
-    </section>
+        </tbody>
+      </table>
+    </details>
   )
 }
 
 export function Sources({ doc, error, notPublished = false }: { doc: FunnelDoc | null; error: string | null; notPublished?: boolean }) {
-  const cp = doc?.cut_points
+  const rows = doc ? sourceRows(doc) : []
   return (
     <div className="classes">
-      <h2 className="viewhead">Anchor sources</h2>
-      <p className="context">
-        Accuracy is published on anchor units only. Each anchor source is counted on its own, with the reason for every unit not
-        scored; the training-only sources are shown as training diagnostics and never as accuracy.
-      </p>
+      <h2 className="viewhead">Sources</h2>
       {error && notPublished ? (
         <p className="context" role="status">
           The per-source funnels are not published for this run yet. They are written by the baseline report, not by the nightly,
@@ -150,31 +82,29 @@ export function Sources({ doc, error, notPublished = false }: { doc: FunnelDoc |
         <div className="loading">Loading the per-source funnels…</div>
       ) : (
         <>
-          {cp && cp.discrepancies.length > 0 ? (
-            <div className="viewerror" role="alert">
-              <h3>ledger.yaml disagrees with design D9</h3>
-              <ul>
-                {cp.discrepancies.map((d) => (
-                  <li key={d.code + d.source}>
-                    <strong>{d.source}</strong>: {d.text}
-                  </li>
+          <table className="slices sources-table">
+            <thead>
+              <tr>
+                {COLUMNS.map((c) => (
+                  <th key={c.key} className={c.num ? 'num' : undefined}>
+                    {c.header}
+                  </th>
                 ))}
-              </ul>
-            </div>
-          ) : cp && !cp.checked ? (
-            <p className="stat-hint">ledger.yaml was not checked against design D9 in this run.</p>
-          ) : null}
-          {Object.values(doc.funnels).map((f) => (
-            <SourceCard key={f.source} f={f} />
-          ))}
-          {Object.keys(doc.training).length > 0 ? (
-            <>
-              <h2 className="viewhead">Training-only sources</h2>
-              {Object.values(doc.training).map((t) => (
-                <TrainingCard key={t.source} t={t} />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  {COLUMNS.map((c) => (
+                    <td key={c.key} className={c.num ? 'num' : undefined}>
+                      {c.cell(r)}
+                    </td>
+                  ))}
+                </tr>
               ))}
-            </>
-          ) : null}
+            </tbody>
+          </table>
+          <Reasons rows={rows} />
         </>
       )}
     </div>
