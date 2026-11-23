@@ -373,3 +373,14 @@ details.about .chips{margin:12px 0}
 .slice-units .mono { word-break: break-all; }
 
 .gt-source-name{font-size:12px;font-weight:600;color:var(--ink,inherit);margin:10px 0 4px}
+
+/* ---- sources page: bordered tables with header band, row rules and column rules, numbers right-aligned ---- */
+table.sources-table th,table.sources-table td{border-right:1px solid var(--line)}
+table.sources-table th:last-child,table.sources-table td:last-child{border-right:none}
+table.sources-table thead th{background:#eef1ec;font-size:11px;font-weight:600;color:var(--ink);border-bottom:2px solid var(--line-strong)}
+table.sources-table th.num,table.sources-table td.num{text-align:right}
+table.sources-table td.num{font-family:var(--font-mono)}
+table.sources-table tbody tr:last-child td{border-bottom:none}
+table.sources-table tr.src td{font-weight:600}
+table.sources-table tr.lane td{background:#fcfdfb}
+details.about .tscroll{margin-top:10px}
