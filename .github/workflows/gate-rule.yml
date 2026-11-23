@@ -7,7 +7,10 @@ name: gate-rule
 # and a change to a path in state/gate/accuracy-paths.json must cite a pre-registration that is already on
 # the base branch, evaluated on this head over this merge base.
 #
-# This workflow is the required check `gate-rule / rule`, so it must come from trusted code. It is a
+# It is opt-in: a reviewer (anyone who can label) puts the label `gate-rule` on a pull request to run it, and it
+# then re-runs on every push and body edit. Without the label the job is skipped, which a branch ruleset counts as
+# passing, so it may be made required without blocking the pull requests that do not need it. It must come from
+# trusted code. It is a
 # `pull_request_target` workflow: GitHub reads it from the BASE branch, so a pull request cannot replace it, and
 # it checks out only the base branch. It never checks out, imports or executes anything of the pull request. The
 # pull request's body, its list of changed files and its trees reach the checker as DATA, fetched through the API
@@ -17,18 +20,19 @@ name: gate-rule
 
 on:
   pull_request_target:
-    types: [opened, edited, synchronize, reopened, ready_for_review]
+    types: [opened, edited, synchronize, reopened, ready_for_review, labeled]
 
 permissions:
   contents: read
   pull-requests: read
 
 concurrency:
-  group: gate-rule-${{ github.event.pull_request.number }}
+  group: gate-rule-${{ github.event.pull_request.number }}-${{ github.event.action == 'labeled' && github.event.label.name != 'gate-rule' && github.run_id || 'rule' }}
   cancel-in-progress: true
 
 jobs:
   rule:
+    if: contains(github.event.pull_request.labels.*.name, 'gate-rule')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
