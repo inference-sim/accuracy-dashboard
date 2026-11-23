@@ -5,7 +5,7 @@
  * the headline, so no aggregate from the headline to a drilled-in slice stands on a few
  * deployments counted as many points.
  */
-import { aggregate, countRoleKeys, roleKeyOf, type FlatPoint } from './aggregate'
+import { aggregate, countRoleKeys, type FlatPoint } from './aggregate'
 import { TOO_FEW, type Figure, type HeadlineBlock, type GradedGrade, type TooFew, type UnitIdentity } from './types'
 
 /** min_points of the design (COV-13): distinct role keys, not points. Summaries publish it too. */
@@ -53,7 +53,6 @@ export const SLICE_ATTRS: SliceAttr[] = [
       return kinds.length > 0 ? kinds : ['none']
     },
   },
-  { id: 'role_key', label: 'deployment (role key)', values: (p) => [roleKeyOf(p)] },
 ]
 
 /** Attributes COV-13 names that no point records in this snapshot yet; listed, not sliceable. */

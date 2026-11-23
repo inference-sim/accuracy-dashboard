@@ -247,13 +247,15 @@ describe('the vLLM version is shown, never filtered on', () => {
     expect(pts).toContain('BLIS predicted higher than measured')
   })
 
-  it('links each provenance identifier to its source (PR #26 review)', () => {
+  it('shows each provenance identifier as text, and links to none of the pages that are not published', () => {
     const summary = loadFixture()
     const html = renderToStaticMarkup(<App summary={summary} loadError={null} />)
     const b = summary.provenance!.blis!
-    expect(html).toContain(`href="https://github.com/inference-sim/inference-sim/releases/tag/${b.release}"`)
-    expect(html).toContain(`href="https://github.com/inference-sim/inference-sim/commit/${b.commit_sha}"`)
-    expect(html).toContain(`href="${summary.provenance!.ground_truth!.source_url}"`)
+    const rail = html.slice(html.indexOf('class="about-prov"'))
+    expect(rail).toContain(b.release)
+    expect(rail).toContain(`${b.commit_sha.slice(0, 7)}…`)
+    expect(rail).not.toMatch(/href="https:\/\/github\.com\/inference-sim\/(inference-sim|blis-)/)
+    expect(rail).not.toContain('<a ')
   })
 
   it('totals recompute from visible points (not the stored node metrics)', () => {
