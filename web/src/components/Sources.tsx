@@ -35,7 +35,8 @@ function Reasons({ rows }: { rows: SourceRow[] }) {
   return (
     <details className="about">
       <summary>All reasons units were not scored</summary>
-      <table className="slices">
+      <div className="tscroll">
+      <table className="readout sources-table">
         <thead>
           <tr>
             <th>Source</th>
@@ -57,6 +58,7 @@ function Reasons({ rows }: { rows: SourceRow[] }) {
           ))}
         </tbody>
       </table>
+      </div>
     </details>
   )
 }
@@ -82,7 +84,8 @@ export function Sources({ doc, error, notPublished = false }: { doc: FunnelDoc |
         <div className="loading">Loading the per-source funnels…</div>
       ) : (
         <>
-          <table className="slices sources-table">
+          <div className="tscroll">
+          <table className="readout sources-table">
             <thead>
               <tr>
                 {COLUMNS.map((c) => (
@@ -94,7 +97,7 @@ export function Sources({ doc, error, notPublished = false }: { doc: FunnelDoc |
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id}>
+                <tr key={r.id} className={r.lane ? 'lane' : 'src'}>
                   {COLUMNS.map((c) => (
                     <td key={c.key} className={c.num ? 'num' : undefined}>
                       {c.cell(r)}
@@ -104,6 +107,7 @@ export function Sources({ doc, error, notPublished = false }: { doc: FunnelDoc |
               ))}
             </tbody>
           </table>
+          </div>
           <Reasons rows={rows} />
         </>
       )}
