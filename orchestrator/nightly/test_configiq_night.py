@@ -78,6 +78,8 @@ def test_every_ledger_unit_is_scored_less_the_left_out_and_none_is_withheld(tmp_
             out = Path(cmd[cmd.index("--out") + 1])
             out.mkdir(parents=True)
             (out / "summary.json").write_text(json.dumps({"provenance": {"blis": {"commit_sha": "d" * 40}}}))
+        if any(c.endswith("funnel.py") for c in cmd):
+            Path(cmd[cmd.index("--out") + 1]).write_text(json.dumps({"format": "funnel-2", "funnels": {"configiq": {}}}))
     monkeypatch.setattr(cn, "_run", run)
     assert cn.main(_args(tmp_path, published=str(tmp_path / "pub"))) == 0
     score = next(c for c in calls if any(x.endswith("score_configiq.py") for x in c))
@@ -88,3 +90,11 @@ def test_every_ledger_unit_is_scored_less_the_left_out_and_none_is_withheld(tmp_
     assert funnel[funnel.index("--ledger-yaml") + 1] == str(led / "ledger.yaml")
     assert funnel[funnel.index("--published") + 1] == str(tmp_path / "pub")
     assert "--configiq-points" in funnel
+    assert json.loads((tmp_path / "out" / "funnel.json").read_text())["dataset"] == REF  # stamped for the nightly's stale check
+
+
+def test_stamp_funnel_records_the_dataset_revision_the_nightly_compares(tmp_path):
+    f = tmp_path / "funnel.json"
+    f.write_text(json.dumps({"format": "funnel-2", "funnels": {"configiq": {}}}))
+    cn.stamp_funnel(f, REF)
+    assert json.loads(f.read_text())["dataset"] == REF and "funnels" in json.loads(f.read_text())
