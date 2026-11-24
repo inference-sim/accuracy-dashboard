@@ -8,10 +8,20 @@ loader reads through `strict_loads` so the refusal is the same wherever a docume
 from __future__ import annotations
 
 import json
+import math
 
 
 def _reject(constant: str):
     raise ValueError(f"the JSON literal {constant} is not allowed")
+
+
+def _finite_float(s: str):
+    # `parse_constant` only sees the words NaN/Infinity/-Infinity; a plain number such as 1e999
+    # reaches `parse_float` and overflows to inf, so refuse any non-finite result here too.
+    v = float(s)
+    if not math.isfinite(v):
+        raise ValueError(f"the JSON number {s} is not finite")
+    return v
 
 
 def _no_dupes(pairs):
@@ -25,4 +35,4 @@ def _no_dupes(pairs):
 
 def strict_loads(text):
     """Parse JSON text, refusing NaN/Infinity and duplicate object keys with a ValueError that names the cause."""
-    return json.loads(text, parse_constant=_reject, object_pairs_hook=_no_dupes)
+    return json.loads(text, parse_constant=_reject, parse_float=_finite_float, object_pairs_hook=_no_dupes)

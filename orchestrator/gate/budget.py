@@ -56,10 +56,13 @@ def validate(doc) -> list[str]:
             if not isinstance(e, dict) or set(e) != ENTRY_KEYS:
                 errs.append(f"partitions[{pv}].evaluations[{i}]: not a record of {sorted(ENTRY_KEYS)}")
                 continue
-            if (e["n"] != i + 1 or not HEX40.match(str(e["base"])) or not HEX40.match(str(e["candidate"]))
+            if (e["n"] != i + 1 or not isinstance(e["preregistration"], str)
+                    or not HEX40.match(str(e["base"])) or not HEX40.match(str(e["candidate"]))
                     or not HEX64.match(str(e["preregistration_sha256"])) or e["verdict"] not in VERDICTS
                     or not isinstance(e["run_id"], int) or isinstance(e["run_id"], bool)):
                 errs.append(f"partitions[{pv}].evaluations[{i}]: a field is malformed or n is not {i + 1}")
+                if not isinstance(e["preregistration"], str):
+                    continue  # cannot go into the duplicate-detection set (a list would raise TypeError)
             if e["preregistration"] in ids:
                 errs.append(f"partitions[{pv}].evaluations[{i}]: {e['preregistration']} is evaluated twice")
             ids.add(e["preregistration"])

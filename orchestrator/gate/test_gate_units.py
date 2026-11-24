@@ -740,6 +740,16 @@ def test_strict_loads_refuses_a_non_finite_literal(text):
         jsonstrict.strict_loads(text)
 
 
+@pytest.mark.parametrize("text", ['{"a": 1e999}', '{"a": -1e999}'])
+def test_strict_loads_refuses_a_number_that_overflows_to_infinity(text):
+    with pytest.raises(ValueError, match="not finite"):
+        jsonstrict.strict_loads(text)
+
+
+def test_strict_loads_keeps_a_large_but_finite_number():
+    assert jsonstrict.strict_loads('{"a": 1e300}') == {"a": 1e300}
+
+
 def test_strict_loads_refuses_a_duplicate_key():
     with pytest.raises(ValueError, match="more than once"):
         jsonstrict.strict_loads('{"a": 1, "a": 2}')
@@ -793,6 +803,29 @@ def test_check_ledger_prints_a_concise_refusal_not_a_traceback(tmp_path, capsys)
         root = str(tmp_path)
     (tmp_path / "state" / "gate").mkdir(parents=True)
     (tmp_path / budget.PATH).write_text('{"kind": "GateLedger", "margin_ceiling": {"error": Infinity, "distance": 0.05}, "partitions": {}}')
+    assert gate.cmd_check_ledger(A()) == 1
+    out = capsys.readouterr().out
+    assert "::error::" in out and "Traceback" not in out
+
+
+def test_the_ledger_loader_refuses_a_non_string_preregistration_without_a_traceback(tmp_path):
+    entry = {"n": 1, "preregistration": ["x"], "preregistration_sha256": "a" * 64,
+             "base": "b" * 40, "candidate": "c" * 40, "run_id": 7, "verdict": "pass"}
+    doc = {"kind": "GateLedger", "margin_ceiling": {"error": 0.05, "distance": 0.05},
+           "partitions": {"1": {"budget": 2, "evaluations": [entry]}}}
+    with pytest.raises(budget.Refused):
+        budget.load(_write_ledger(tmp_path, json.dumps(doc)))
+
+
+def test_check_ledger_refuses_a_non_string_preregistration_not_a_traceback(tmp_path, capsys):
+    class A:
+        root = str(tmp_path)
+    (tmp_path / "state" / "gate").mkdir(parents=True)
+    entry = {"n": 1, "preregistration": ["x"], "preregistration_sha256": "a" * 64,
+             "base": "b" * 40, "candidate": "c" * 40, "run_id": 7, "verdict": "pass"}
+    doc = {"kind": "GateLedger", "margin_ceiling": {"error": 0.05, "distance": 0.05},
+           "partitions": {"1": {"budget": 2, "evaluations": [entry]}}}
+    (tmp_path / budget.PATH).write_text(json.dumps(doc))
     assert gate.cmd_check_ledger(A()) == 1
     out = capsys.readouterr().out
     assert "::error::" in out and "Traceback" not in out
