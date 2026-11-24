@@ -9,7 +9,11 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import jsonstrict  # noqa: E402
 
 PATH = Path("state") / "gate" / "ledger.json"
 KIND = "GateLedger"
@@ -33,13 +37,20 @@ def validate(doc) -> list[str]:
         for k, v in mc.items():
             if v is not None and (not isinstance(v, (int, float)) or isinstance(v, bool) or v < 0):
                 errs.append(f"margin_ceiling.{k}: a number, zero or more, or null")
-    for pv, part in (doc["partitions"] or {}).items():
+    partitions = doc["partitions"]
+    if partitions is not None and not isinstance(partitions, dict):
+        errs.append("partitions: an object of positive-integer keys, or null")
+        return errs
+    for pv, part in (partitions or {}).items():
         if not re.fullmatch(r"[1-9][0-9]*", pv) or not isinstance(part, dict) or set(part) != {"budget", "evaluations"}:
             errs.append(f"partitions[{pv}]: {{budget, evaluations}} under a positive-integer key")
             continue
         b = part["budget"]
         if b is not None and (not isinstance(b, int) or isinstance(b, bool) or b < 0):
             errs.append(f"partitions[{pv}].budget: a whole number or null (null: A5 not yet decided)")
+        if not isinstance(part["evaluations"], list):
+            errs.append(f"partitions[{pv}].evaluations: a list")
+            continue
         ids = set()
         for i, e in enumerate(part["evaluations"]):
             if not isinstance(e, dict) or set(e) != ENTRY_KEYS:
@@ -58,7 +69,10 @@ def validate(doc) -> list[str]:
 
 
 def load(path) -> dict:
-    doc = json.loads(Path(path).read_text())
+    try:
+        doc = jsonstrict.strict_loads(Path(path).read_text())
+    except ValueError as e:
+        raise Refused(f"the budget ledger is not strict JSON: {e}") from None
     errs = validate(doc)
     if errs:
         raise Refused("the budget ledger is malformed: " + "; ".join(errs))

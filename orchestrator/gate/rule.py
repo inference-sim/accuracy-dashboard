@@ -17,12 +17,12 @@ grant itself one. The exception that waives a pull request's scoring-surface cha
 """
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
 
 import budget
+import jsonstrict
 import prereg as pr
 import surface
 from surface import is_test
@@ -40,7 +40,7 @@ ENTRY_KEYS = {"pull_request", "head", "reason", "preregistration", "verdict"}
 
 
 def accuracy_paths(root: Path) -> list[str]:
-    doc = json.loads((Path(root) / PATHS).read_text())
+    doc = jsonstrict.strict_loads((Path(root) / PATHS).read_text())
     if set(doc) != {"kind", "paths"} or doc["kind"] != "AccuracyPaths" or not all(isinstance(p, str) and p for p in doc["paths"]):
         raise ValueError(f"{PATHS} is not an AccuracyPaths document")
     return doc["paths"]
@@ -70,7 +70,7 @@ def exceptions(root) -> list[dict]:
     path = Path(root) / EXCEPTIONS
     if not path.exists():
         return []
-    doc = json.loads(path.read_text())
+    doc = jsonstrict.strict_loads(path.read_text())
     ok = isinstance(doc, dict) and set(doc) == {"kind", "exceptions"} and doc["kind"] == "GateExceptions" and isinstance(doc["exceptions"], list)
     if not (ok and all(entry_ok(e) for e in doc["exceptions"])):
         raise ValueError(f"{EXCEPTIONS} is not a GateExceptions document of {{pull_request, head, reason, preregistration, verdict[, defect]}} entries "

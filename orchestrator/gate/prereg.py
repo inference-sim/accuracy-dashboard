@@ -8,7 +8,6 @@ pre-registration. The file is read strictly: an unknown field is refused (SUB-12
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 import re
 import sys
@@ -16,6 +15,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ingest"))
 import contract  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import jsonstrict  # noqa: E402
 
 KIND = "PreRegistration"
 CRITERIA = ("error", "distance")
@@ -85,8 +87,9 @@ def validate(doc) -> list[str]:
         if seen != set(CRITERIA):
             errs.append(f"criteria: exactly one of each of {', '.join(CRITERIA)} (VAL-6); an omitted criterion cannot be left unjudged")
     metrics = doc["metrics"]
-    if (not isinstance(metrics, list) or not metrics or len(set(metrics)) != len(metrics)
-            or not all(isinstance(m, str) and METRIC.match(m) for m in metrics)):
+    if (not isinstance(metrics, list) or not metrics
+            or not all(isinstance(m, str) and METRIC.match(m) for m in metrics)
+            or len(set(metrics)) != len(metrics)):
         errs.append("metrics: a non-empty list of distinct metric names")
     if not isinstance(doc["substream"], str) or not SUBSTREAM.match(doc["substream"]):
         errs.append("substream: the name of the gate's bootstrap substream (X6), 3 to 64 characters of [a-z0-9._/-]")
@@ -103,7 +106,7 @@ def digest(doc: dict) -> str:
 def load(path) -> dict:
     p = Path(path)
     try:
-        doc = json.loads(p.read_text(), parse_constant=lambda c: (_ for _ in ()).throw(ValueError(c)))
+        doc = jsonstrict.strict_loads(p.read_text())
     except (OSError, ValueError) as e:
         raise PreRegistrationError(f"{p.name}: cannot be read as JSON ({type(e).__name__})") from None
     errs = validate(doc)

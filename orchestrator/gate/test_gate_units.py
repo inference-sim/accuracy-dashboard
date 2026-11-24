@@ -727,3 +727,82 @@ def test_parse_changes_reads_name_status_and_renames():
 def test_the_committed_accuracy_paths_exist_or_are_prefixes():
     for p in rule.accuracy_paths(REPO):
         assert (REPO / p).exists(), p
+
+
+# ---- strict reading of every gate document ----
+import jsonstrict  # noqa: E402
+import gate  # noqa: E402
+
+
+@pytest.mark.parametrize("text", ['{"a": NaN}', '{"a": Infinity}', '{"a": -Infinity}'])
+def test_strict_loads_refuses_a_non_finite_literal(text):
+    with pytest.raises(ValueError, match="not allowed"):
+        jsonstrict.strict_loads(text)
+
+
+def test_strict_loads_refuses_a_duplicate_key():
+    with pytest.raises(ValueError, match="more than once"):
+        jsonstrict.strict_loads('{"a": 1, "a": 2}')
+    assert jsonstrict.strict_loads('{"a": 1, "b": 2}') == {"a": 1, "b": 2}
+
+
+def _write_ledger(tmp_path, body):
+    p = tmp_path / "ledger.json"
+    p.write_text(body)
+    return p
+
+
+def test_the_ledger_loader_refuses_a_non_finite_ceiling_and_a_duplicate_key(tmp_path):
+    body = json.dumps(ledger()).replace('"error": 0.05', '"error": NaN')
+    with pytest.raises(budget.Refused, match="not allowed"):
+        budget.load(_write_ledger(tmp_path, body))
+    dup = '{"kind": "GateLedger", "margin_ceiling": {"error": 0.05, "distance": 0.05}, "partitions": {}, "partitions": {}}'
+    with pytest.raises(budget.Refused, match="more than once"):
+        budget.load(_write_ledger(tmp_path, dup))
+
+
+@pytest.mark.parametrize("partitions", ['[]', '"x"', '5'])
+def test_the_ledger_loader_refuses_non_object_partitions_without_a_traceback(tmp_path, partitions):
+    body = '{"kind": "GateLedger", "margin_ceiling": {"error": 0.05, "distance": 0.05}, "partitions": %s}' % partitions
+    with pytest.raises(budget.Refused):
+        budget.load(_write_ledger(tmp_path, body))
+
+
+def test_the_ledger_loader_refuses_non_list_evaluations_without_a_traceback(tmp_path):
+    body = '{"kind": "GateLedger", "margin_ceiling": {"error": 0.05, "distance": 0.05}, "partitions": {"1": {"budget": 2, "evaluations": {}}}}'
+    with pytest.raises(budget.Refused):
+        budget.load(_write_ledger(tmp_path, body))
+
+
+@pytest.mark.parametrize("metrics", ['[["a"]]', '[{"x": 1}]', '[1]'])
+def test_a_preregistration_with_a_non_string_metric_is_refused_without_a_traceback(metrics):
+    d = good()
+    d["metrics"] = json.loads(metrics)
+    assert any("metric" in e for e in pr.validate(d))
+
+
+def test_the_preregistration_loader_refuses_a_non_finite_or_duplicate_key(tmp_path):
+    p = tmp_path / "row-99-example.json"
+    p.write_text(json.dumps(good()).replace('"partition_version": 1', '"partition_version": 1, "partition_version": 2'))
+    with pytest.raises(pr.PreRegistrationError, match="cannot be read"):
+        pr.load(p)
+
+
+def test_check_ledger_prints_a_concise_refusal_not_a_traceback(tmp_path, capsys):
+    class A:
+        root = str(tmp_path)
+    (tmp_path / "state" / "gate").mkdir(parents=True)
+    (tmp_path / budget.PATH).write_text('{"kind": "GateLedger", "margin_ceiling": {"error": Infinity, "distance": 0.05}, "partitions": {}}')
+    assert gate.cmd_check_ledger(A()) == 1
+    out = capsys.readouterr().out
+    assert "::error::" in out and "Traceback" not in out
+
+
+def test_check_prereg_prints_a_concise_refusal_not_a_traceback(tmp_path, capsys):
+    class A:
+        root = str(tmp_path)
+        files = [str(tmp_path / "row-99-example.json")]
+    (tmp_path / "row-99-example.json").write_text('{"kind": "PreRegistration", "metrics": [NaN]}')
+    assert gate.cmd_check_prereg(A()) == 1
+    out = capsys.readouterr().out
+    assert "::error::" in out and "Traceback" not in out

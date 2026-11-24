@@ -35,6 +35,7 @@ sys.path.insert(0, str(HERE.parent / "ingest"))
 import binding  # noqa: E402
 import budget  # noqa: E402
 import guard as gd  # noqa: E402
+import jsonstrict  # noqa: E402
 import partition  # noqa: E402
 import predictions as pd_  # noqa: E402
 import prereg as pr  # noqa: E402
@@ -156,7 +157,7 @@ def harness_digest(provenance: Path) -> str:
     """The settings a run was scored under, without the commit that ran it and without what names its simulator
     build or data (binding.SIDE_BOUND): the base and the candidate differ in those by construction, and
     binding.check_side ties each to its own pin. Everything else (the units, the pull, the ingest) must agree."""
-    doc = json.loads(provenance.read_text())
+    doc = jsonstrict.strict_loads(provenance.read_text())
     doc.pop("harness_commit", None)
     for k in binding.SIDE_BOUND:
         doc.pop(k, None)
