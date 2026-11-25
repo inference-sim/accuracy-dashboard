@@ -283,6 +283,17 @@ def test_an_engine_that_is_a_build_after_a_release_is_measured_from_its_commit()
         sk.vllm_ref(sk.parse(json.dumps(no_commit)))
 
 
+def test_a_build_suffix_that_does_not_match_its_engine_commit_is_refused():
+    # A matching <release>+<12hex> resolves to the full commit; the suffix must be commit[:12].
+    good = {**EMBEDDED, "engines": [{"kind": "vllm", "version": "0.34.0+abcabcabcabc",
+                                     "commit": "abcabcabcabc" + "0" * 28}]}
+    assert sk.vllm_ref(sk.parse(json.dumps(good))) == "abcabcabcabc" + "0" * 28
+    mismatch = {**EMBEDDED, "engines": [{"kind": "vllm", "version": "0.34.0+abcabcabcabc",
+                                         "commit": "0fda86a35419" + "0" * 28}]}
+    with pytest.raises(sk.StackError, match="build suffix does not match"):
+        sk.vllm_ref(sk.parse(json.dumps(mismatch)))
+
+
 def test_the_commit_of_a_checkout_pins_the_substrate_it_holds_and_a_stack_that_lists_the_module_is_refused():
     s = sk.parse(json.dumps(EMBEDDED))
     pins = sk.embedded_pins(s, "a" * 40)

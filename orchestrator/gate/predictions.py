@@ -8,11 +8,14 @@ come from the gate's own side. Error messages name a field and a count, never a 
 """
 from __future__ import annotations
 
-import json
 import math
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import jsonstrict  # noqa: E402
 
 MAX_BYTES = 64 * 1024 * 1024
 KIND = "Predictions"
@@ -39,9 +42,9 @@ def load(path, want_candidate: str, want_units: set) -> Predictions:
     if size > MAX_BYTES:
         raise PredictionsError(f"the document is {size} bytes; the cap is {MAX_BYTES}")
     try:
-        doc = json.loads(p.read_bytes(), parse_constant=lambda c: (_ for _ in ()).throw(ValueError(c)))
+        doc = jsonstrict.strict_loads(p.read_bytes())
     except ValueError:
-        raise PredictionsError("not JSON, or holds a NaN or an infinity") from None
+        raise PredictionsError("not JSON, holds a NaN or an infinity, or repeats an object key") from None
     if not isinstance(doc, dict) or set(doc) != DOC_KEYS:
         raise PredictionsError(f"the fields are not exactly {sorted(DOC_KEYS)}")
     if doc["kind"] != KIND:

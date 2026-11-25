@@ -114,6 +114,9 @@ def vllm_ref(stack: Stack) -> str:
         commit = stack.engines["vllm"].get("commit")
         if not re.fullmatch(r"[0-9a-f]{40}", commit or ""):
             raise StackError(f"stack.json: vllm engine {version} is a build after a release but names no 40-hex commit ({commit!r})")
+        suffix = version.split("+", 1)[1]
+        if not re.fullmatch(r"[0-9a-f]{12}", suffix) or commit[:12] != suffix:
+            raise StackError(f"stack.json: vllm engine version {version} build suffix does not match engine commit {commit}")
         return commit
     return "v" + version
 
