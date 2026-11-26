@@ -1,9 +1,17 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-25T15:59:53Z",
+  "generated_at": "2026-11-26T15:34:06Z",
   "keep_api": 5,
-  "latest": "2026-11-23_blis-v0.19.0_ix-api-2026-11-23",
+  "latest": "2026-11-26_blis-v0.19.1_ix-api-2026-11-26",
   "runs": [
+    {
+      "snapshot_id": "2026-11-26_blis-v0.19.1_ix-api-2026-11-26",
+      "generated_at": "2026-11-26T15:30:30Z",
+      "blis_release": "v0.19.1",
+      "ix_release": "api-2026-11-26",
+      "ingest": "api",
+      "path": "snapshots/2026-11-26_blis-v0.19.1_ix-api-2026-11-26/summary.json"
+    },
     {
       "snapshot_id": "2026-11-23_blis-v0.19.0_ix-api-2026-11-23",
       "generated_at": "2026-11-23T22:10:29Z",
@@ -35,14 +43,6 @@
       "ix_release": "api-2026-10-31",
       "ingest": "api",
       "path": "snapshots/2026-10-31_blis-v0.15.0_ix-api-2026-10-31/summary.json"
-    },
-    {
-      "snapshot_id": "2026-10-29_blis-v0.14.0_ix-api-2026-10-29",
-      "generated_at": "2026-10-29T11:25:44Z",
-      "blis_release": "v0.14.0",
-      "ix_release": "api-2026-10-29",
-      "ingest": "api",
-      "path": "snapshots/2026-10-29_blis-v0.14.0_ix-api-2026-10-29/summary.json"
     },
     {
       "snapshot_id": "2026-10-22_blis-v0.12.0_ix-2026-09-28",

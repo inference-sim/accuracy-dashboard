@@ -165,13 +165,13 @@
   "command": "orchestrator/nightly/configiq_night.py: score_configiq.py over every configiq anchor unit, then build_classes.py derive-configiq",
   "dataset": "21cc6eb06b1934485a83b17a93e634ef38b5799e",
   "heads": {
-   "blis": "e7597a8c9510f876653d7d87bd8baf195c37c5c7",
-   "catalog": "e7597a8c9510f876653d7d87bd8baf195c37c5c7",
+   "blis": "c9c5b98d57bb3478269bdda86d666a885495cf16",
+   "catalog": "c9c5b98d57bb3478269bdda86d666a885495cf16",
    "dataset": "21cc6eb06b1934485a83b17a93e634ef38b5799e",
-   "harness": "060ffabe9a0c07f776a8f1d46e81a62163343f9b",
-   "registry": "e7597a8c9510f876653d7d87bd8baf195c37c5c7"
+   "harness": "467e2d0845f6241b1c038ad39eb1f1ab05e96ab0",
+   "registry": "c9c5b98d57bb3478269bdda86d666a885495cf16"
   },
-  "pulled_at": "2026-11-23",
+  "pulled_at": "2026-11-26",
   "split": "none (anchor-only, D9)"
  },
  "refusals": [],
