@@ -110,7 +110,7 @@
     {
      "reason": "value_not_recorded",
      "stage": "g5",
-     "units": 17743
+     "units": 17744
     },
     {
      "reason": "field_unclassified",
@@ -120,7 +120,7 @@
     {
      "reason": "router_unsupported",
      "stage": "g5",
-     "units": 435
+     "units": 434
     },
     {
      "reason": "engine_unsupported",
@@ -162,9 +162,9 @@
     "field_unclassified": 667,
     "measurement_contaminated": 5,
     "not_in_catalog": 95,
-    "router_unsupported": 435,
+    "router_unsupported": 434,
     "value_conflict": 69,
-    "value_not_recorded": 17743
+    "value_not_recorded": 17744
    },
    "lanes": {
     "other": {
@@ -199,8 +199,8 @@
      "failed": {},
      "g5": {
       "field_unclassified": 667,
-      "router_unsupported": 155,
-      "value_not_recorded": 4581
+      "router_unsupported": 154,
+      "value_not_recorded": 4582
      },
      "no_outcome": {},
      "provisional": {
@@ -291,6 +291,6 @@
   "configiq": 0,
   "inferencex": 1011
  },
- "snapshot_id": "2026-11-26_blis-v0.19.1_ix-api-2026-11-26",
+ "snapshot_id": "2026-11-27_blis-v0.19.1_ix-api-2026-11-27",
  "training": {}
 }

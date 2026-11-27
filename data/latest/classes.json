@@ -220,14 +220,14 @@
    "provenance": {
     "command": "orchestrator/build_summary_v2.py (the nightly)",
     "heads": {
-     "snapshot_id": "2026-11-26_blis-v0.19.1_ix-api-2026-11-26"
+     "snapshot_id": "2026-11-27_blis-v0.19.1_ix-api-2026-11-27"
     },
-    "pulled_at": "2026-11-26T15:30:30Z"
+    "pulled_at": "2026-11-27T15:02:34Z"
    },
    "refusals": [
     {
      "code": "value_not_recorded",
-     "points": 17743,
+     "points": 17744,
      "subject": ""
     },
     {
@@ -237,7 +237,7 @@
     },
     {
      "code": "router_unsupported",
-     "points": 435,
+     "points": 434,
      "subject": ""
     },
     {
@@ -1522,6 +1522,6 @@
   }
  ],
  "format": "classes-1",
- "generated_at": "2026-11-26T15:30:30Z",
- "snapshot_id": "2026-11-26_blis-v0.19.1_ix-api-2026-11-26"
+ "generated_at": "2026-11-27T15:02:34Z",
+ "snapshot_id": "2026-11-27_blis-v0.19.1_ix-api-2026-11-27"
 }
